@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newGame, order, spyOn, advance, botFavour, FAVOUR_SPY_CAUGHT_HIT, HOUR, DAY } from './game';
+import { newGame, order, spyOn, recallSpy, advance, botFavour, FAVOUR_SPY_CAUGHT_HIT, HOUR } from './game';
 import { getStance, type GameState } from '../../packages/shared-core/src/index';
 import type { StepOut } from './protoKernel';
 
@@ -50,15 +50,21 @@ describe('espionage in the prototype kernel (SPY-8 playable)', () => {
     expect(order(st, spyOn('p1', worldOf(st, 'p1'), 'recon'), st.time).error).toBe('E_BAD_TARGET');
   });
 
-  it('windows expire: time.advanced prunes a stale grant', () => {
+  it('SPY-13: the recon agent stays on post, and its recall closes the intel', () => {
     let st = funded();
     const target = worldOf(st, 'p2');
-    for (let i = 0; i < 12 && !st.intel?.['p1']?.length; i++)
-      st = { ...mission(st, target).state, spyAgents: undefined };
-    expect(st.intel?.['p1']?.length).toBeGreaterThan(0);
-    // 24h base window (timeScale-compressed) — two full days later it must be gone.
-    const later = advance(st, st.time + 2 * DAY + HOUR).state;
-    expect(later.intel?.['p1'] ?? []).toHaveLength(0);
+    for (let i = 0; i < 12; i++) {
+      const out = mission(st, target).state;
+      if (out.intel?.['p1']?.length) {
+        st = out;
+        break;
+      }
+      st = { ...out, spyAgents: undefined };
+    }
+    expect(st.intel?.['p1']?.[0]).toMatchObject({ target, layer: 1 });
+    const recalled = order(st, recallSpy('p1', target, 'recon'), st.time);
+    expect(recalled.error).toBeUndefined();
+    expect(recalled.state.intel?.['p1'] ?? []).toHaveLength(0);
   });
 
   it('SPY-2: a bot that catches your spy red-handed sours its favour toward you', () => {
@@ -91,12 +97,13 @@ describe('espionage in the prototype kernel (SPY-8 playable)', () => {
   it('SPY-6: three agents away → the fourth mission is refused with E_NO_AGENT', () => {
     let st = funded();
     const target = worldOf(st, 'p2');
-    for (let i = 0; i < 3; i++) {
-      const out = order(st, spyOn('p1', target, 'recon'), st.time);
+    // SPY-13: one recon agent per world — the network goes on three different operations.
+    for (const op of ['recon', 'sabotage', 'theft'] as const) {
+      const out = order(st, spyOn('p1', target, op), st.time);
       expect(out.error).toBeUndefined();
       st = out.state;
     }
     expect(st.spyAgents?.['p1']).toHaveLength(3);
-    expect(order(st, spyOn('p1', target, 'recon'), st.time).error).toBe('E_NO_AGENT');
+    expect(order(st, spyOn('p1', target, 'research'), st.time).error).toBe('E_NO_AGENT');
   });
 });

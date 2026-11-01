@@ -527,6 +527,9 @@ export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new 
   ['espionage.aborted', 'owner'],
   ['espionage.failed', 'owner'],
   ['intel.stolen', 'owner'],
+  // SPY-13: a posted recon agent digging deeper, or caught on post.
+  ['intel.deepened', 'owner'],
+  ['intel.lost', 'owner'],
   ['espionage.succeeded', 'owner'],
   ['espionage.posted', 'owner'],
   ['espionage.recalled', 'owner'],

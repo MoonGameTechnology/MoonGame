@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createKernel } from '../kernel/kernel';
-import { espionageModule, MISSION_HOURS } from './espionage';
+import { COUNTER_POSTED, espionageModule, MISSION_HOURS } from './espionage';
 import { createInitialState, type GameState, type Planet, type Player } from '../state/gameState';
 import { visibleState } from '../state/visibility';
 import { parseGameData, type GameData } from '../data/schemas';
@@ -134,17 +134,21 @@ describe('espionage — sending an agent to a world (SPY-8)', () => {
     expect(early.state.intel).toBeUndefined();
   });
 
-  it('a successful recon opens a 24h window on the world at the end of the mission', () => {
+  it('a successful recon opens the first layer on the world and posts the agent there (SPY-13)', () => {
     const r = mission([sureShot, neverDetect]);
-    expect(r.state.intel?.p1).toEqual([{ kind: 'planet', target: 'B', until: END + 24 * HOUR }]);
+    expect(r.state.intel?.p1).toEqual([
+      { kind: 'planet', target: 'B', until: COUNTER_POSTED, layer: 1, mission: 1 },
+    ]);
     expect(ofType(r.events, 'intel.stolen')).toEqual([
       {
         type: 'intel.stolen',
-        payload: { owner: 'p1', target: 'p2', kind: 'recon', planetId: 'B', until: END + 24 * HOUR },
+        payload: { owner: 'p1', target: 'p2', kind: 'recon', planetId: 'B', until: COUNTER_POSTED, layer: 1 },
       },
     ]);
-    // the agent works the window while it is open
-    expect(r.state.spyAgents?.p1).toEqual([{ until: END + 24 * HOUR }]);
+    // the agent stays on post until recalled or caught
+    expect(r.state.spyAgents?.p1).toEqual([
+      { until: COUNTER_POSTED, mission: 1, op: 'recon', planetId: 'B', posted: true },
+    ]);
   });
 
   it('a failed mission burns the fee, grants nothing, and reports to the actor only', () => {
@@ -347,12 +351,14 @@ describe('espionage — the agent network (SPY-6)', () => {
     ]);
   });
 
-  it('a detected agent that survives escapes: home in 6h after a failure, still on the job after a success', () => {
+  it('a detected agent that survives escapes: home in 6h after a failure, still on post after a success', () => {
     const a = mission([dudShot, alwaysDetect, neverKill], rich());
     expect(a.state.spyAgents?.p1).toEqual([{ until: END + 6 * HOUR }]);
     expect(ofType(a.events, 'espionage.failed')[0]?.payload).not.toHaveProperty('agentLost');
     const b = mission([sureShot, alwaysDetect, neverKill], rich());
-    expect(b.state.spyAgents?.p1).toEqual([{ until: END + 24 * HOUR }]);
+    expect(b.state.spyAgents?.p1).toEqual([
+      { until: COUNTER_POSTED, mission: 1, op: 'recon', planetId: 'B', posted: true },
+    ]);
   });
 
   it('a killed agent after a SUCCESS: the window stays, the agent is lost, both sides are told', () => {
@@ -380,10 +386,12 @@ describe('espionage — the agent network (SPY-6)', () => {
   it('the fourth mission with all three agents away is refused — free of charge', () => {
     const k = createKernel([espionageModule, dudShot, neverDetect]);
     let s = rich();
-    for (const target of ['B', 'C', 'B']) s = okApply(k.applyAction(s, spy('p1', recon(target)), ctx(0))).state;
-    expect(s.players.p1?.resources.credits).toBe(10_000 - 3 * 150);
+    // one recon agent per world (SPY-13): the third agent goes on a theft
+    for (const payload of [recon('B'), recon('C'), { planetId: 'B', op: 'theft' }])
+      s = okApply(k.applyAction(s, spy('p1', payload), ctx(0))).state;
+    expect(s.players.p1?.resources.credits).toBe(10_000 - 2 * 150 - 300);
     expect(s.spyAgents?.p1?.map((a) => a.mission)).toEqual([1, 2, 3]);
-    expect(errCode(k.applyAction(s, spy('p1', recon()), ctx(0)))).toBe('E_NO_AGENT');
+    expect(errCode(k.applyAction(s, spy('p1', { planetId: 'B', op: 'sabotage' }), ctx(0)))).toBe('E_NO_AGENT');
     // an agent back home (12h mission + 6h return) frees a slot again
     const later = k.advanceTo(s, ctx(END + 6 * HOUR));
     if (!later.ok) throw new Error(later.code);

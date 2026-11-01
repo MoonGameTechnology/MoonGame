@@ -316,16 +316,27 @@ export interface PlayerTechnologyState {
 export type DiplomaticStance = 'war' | 'peace' | 'pact' | 'alliance';
 
 
-/** A stolen, time-boxed intel window (espionage `recon`, SPY-8): while `until` is
+/** Stolen intel on one world (espionage `recon`, SPY-8/SPY-13): while `until` is
  *  ahead of the world clock, `visibleState` lets the OWNING viewer see the granted
  *  world as identified — owner, garrison, buildings and the fleets in its orbit.
- *  Grants are produced by `espionageModule` and expire on their own. */
+ *  Grants are produced by `espionageModule`.
+ *
+ *  SPY-13: a grant held by a POSTED recon agent (`mission`) stays open until the agent
+ *  is recalled or caught (`until` = `COUNTER_POSTED`) and deepens every 12 h on post
+ *  (`layer`): 1 — the world itself; 2 — its owner's treasury; 3 — the world's build
+ *  queue and the owner's research; 4 — the owner's pending diplomatic offers. A grant
+ *  without `layer` is a plain time-boxed window of layer 1 (a killed agent's last look,
+ *  and windows from older saves). */
 export interface IntelGrant {
   kind: 'planet';
   /** The granted planet id. */
   target: string;
   /** World-time (ms) the window closes. */
   until: number;
+  /** How deep the posted agent has dug (1–4). Absent = 1. */
+  layer?: number;
+  /** The posted agent's mission (`AgentAway.mission`) that holds this grant open. */
+  mission?: number;
 }
 
 /** An espionage operation an agent is sent on (SPY-8). */

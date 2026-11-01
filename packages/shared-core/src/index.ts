@@ -780,6 +780,7 @@ export {
   BASE_SPY_AGENTS,
   COUNTER_POSTED,
   MISSION_HOURS,
+  RECON_LAYERS,
   SPY_OP_COST,
 } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';

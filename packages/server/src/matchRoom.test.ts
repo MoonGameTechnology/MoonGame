@@ -1553,6 +1553,8 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         h.emit('espionage.aborted', { owner, planetId: 'node1', kind: 'recon' });
         h.emit('espionage.failed', { owner, target: 'p2', kind: 'recon', planetId: 'node1' });
         h.emit('intel.stolen', { owner, target: 'p2', kind: 'recon', planetId: 'node1', until: 9 });
+        h.emit('intel.deepened', { owner, target: 'p2', planetId: 'node1', layer: 2 });
+        h.emit('intel.lost', { owner, target: 'p2', planetId: 'node1' });
         h.emit('espionage.succeeded', { owner, target: 'p2', kind: 'theft', planetId: 'node1', loot: null });
         h.emit('espionage.posted', { owner, planetId: 'node1' });
         h.emit('espionage.recalled', { owner, planetId: 'node1' });
@@ -1712,6 +1714,8 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
       'espionage.aborted',
       'espionage.failed',
       'intel.stolen',
+      'intel.deepened',
+      'intel.lost',
       'espionage.succeeded',
       'espionage.posted',
       'espionage.recalled',

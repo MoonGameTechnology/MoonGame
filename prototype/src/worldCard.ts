@@ -14,6 +14,7 @@
  */
 import type {
   GameState,
+  IntelGrant,
   PausedConstructionSite,
   Planet,
   SpyOp,
@@ -40,6 +41,7 @@ import { rallyOffer, type RallyOffer } from '../../decisions/rallyPoint';
 import { espionageShown, toolShown, victoryPointsShown } from '../../decisions/sectorZeroTools';
 import { medalBadges } from '../../decisions/unitMedals';
 import { worldFacts, type WorldFact } from '../../decisions/worldFacts';
+import { intelLayers } from '../../decisions/intelLayers';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { laneOf } from './buildOrders';
@@ -545,7 +547,9 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
     const free = myAgents(s, ME).free > 0;
     const ready = (op: SpyOp) => free && afford({ credits: SPY_COST[op] });
     const spy = spyOffer(mine, !!p.owner, !!live, ready('recon'));
-    if (spy === 'window' && live) {
+    // SPY-13: a posted agent — its layers and «Отозвать» (`intelRowsHtml`).
+    if (spy === 'window' && live && live.layer !== undefined) out.push(...intelRowsHtml(live));
+    else if (spy === 'window' && live) {
       out.push(
         `<span class="pfact cyan">${t('side.world.spy-window')} ${t('side.world.spy-window.left', { left: fmtEta(windowLeftH(live.until, s.time, HOUR)) })}</span>`,
       );
@@ -564,6 +568,43 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
     else if (p.owner) out.push(btn('spyplanet', 'counter', t('side.scan.counter', { c: SPY_COST.counter }), ready('counter')));
   }
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
+}
+
+const STANCE_KEY = {
+  war: 'diplo.stance.war',
+  peace: 'diplo.stance.peace',
+  pact: 'diplo.stance.pact',
+  alliance: 'diplo.stance.alliance',
+} as const;
+
+/** SPY-13: the layer chip, one line per open recon layer past the first
+ *  (`decisions/intelLayers.ts`) and the recall of the posted agent. */
+function intelRowsHtml(grant: IntelGrant): string[] {
+  const v = intelLayers(game.world(), grant);
+  const NAME = game.names();
+  const list = (items: string[]) => (items.length ? items.join(', ') : t('side.world.intel.none'));
+  const row = (text: string) => `<span class="pfact">${text}</span>`;
+  const rows: string[] = [`<span class="pfact cyan">${t('side.world.spy-layer', { n: v.layer })}</span>`];
+  if (v.treasury)
+    rows.push(row(t('side.world.intel.treasury', { list: resLine(Object.fromEntries(v.treasury)) || t('side.world.intel.none') })));
+  if (v.building) {
+    const names = v.building.map((id) =>
+      esc(data.buildings[id] ? buildingName(data.buildings[id]!.name, id) : displayUnit(id)),
+    );
+    rows.push(row(t('side.world.intel.build', { list: list(names) })));
+  }
+  if (v.research) {
+    const names = v.research.map((id) => esc(tData(data.technologies[id]?.name ?? id)));
+    rows.push(row(t('side.world.intel.research', { list: list(names) })));
+  }
+  if (v.offers) {
+    const names = v.offers.map(
+      (o) => `${esc(NAME[o.from] ?? o.from)} → ${esc(NAME[o.to] ?? o.to)}: ${t(STANCE_KEY[o.stance])}`,
+    );
+    rows.push(row(t('side.world.intel.offers', { list: list(names) })));
+  }
+  rows.push(btn('spyrecall', 'recon', t('side.scan.recall.recon'), true));
+  return rows;
 }
 
 /** Точка сбора мира-верфи (RALLY-1): цель и «Сменить»/«Снять», либо «Задать». Что

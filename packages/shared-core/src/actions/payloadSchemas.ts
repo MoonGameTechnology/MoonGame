@@ -91,8 +91,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'technology.boost': z.object({ technology: id }),
   // espionage.ts — send an agent on an operation against one world (SPY-8)
   'espionage.spy': z.object({ planetId: id, op: z.enum(['recon', 'sabotage', 'delay', 'theft', 'research', 'counter']) }),
-  // SPY-11: call a counter-intelligence agent off its post (or off its way there)
-  'espionage.recall': z.object({ planetId: id }),
+  // SPY-11: call a counter-intelligence agent off its post (or off its way there);
+  // SPY-13: `op: 'recon'` calls a posted recon agent off instead
+  'espionage.recall': z.object({ planetId: id, op: z.enum(['counter', 'recon']).optional() }),
   // market.ts — amounts are plain positive numbers (resources accrue continuously,
   // so fractional amounts are legal); price is a positive unit price (≥ 1) — the
   // anti-wash-trade guard (SEC-A06-5): a `price: 0` listing is a free resource
