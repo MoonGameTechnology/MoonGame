@@ -142,7 +142,9 @@ npm run apk          # sync → brand (icon/splash + landscape) → ./gradlew as
 `npm run apk` runs `npm run brand` between sync and the Gradle build:
 `capacitor-assets generate --android` (icons + splash from `assets/`), then
 `node patch-android.mjs` (enables rotation — `fullUser` + in-place `configChanges`
-so rotating never reloads the WebView / drops game state), then `node patch-updater.mjs`
+so rotating never reloads the WebView / drops game state; and keeps the WebView between
+the system bars, not under them — `system-bars.mjs`: the packaged page loses
+`viewport-fit=cover`, the strip behind the bars is black with light icons), then `node patch-updater.mjs`
 (wires the MainActivity system-browser bridge and stamps `versionCode`/`versionName` from `VOID_VC`/`VOID_VN` when set).
 A local build leaves `versionCode 1` and ships no `window.__BUILD__`, so its updater stays
 dormant — those are injected by CI from the git commit count; the native hook still
