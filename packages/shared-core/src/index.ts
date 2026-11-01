@@ -775,7 +775,13 @@ export {
   traderAffordable,
   TRADER_MAX_UNITS,
 } from './modules/trader';
-export { espionageModule, BASE_SPY_AGENTS, COUNTER_POSTED, MISSION_HOURS } from './modules/espionage';
+export {
+  espionageModule,
+  BASE_SPY_AGENTS,
+  COUNTER_POSTED,
+  MISSION_HOURS,
+  SPY_OP_COST,
+} from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
 
 export type { SwarmRepelRecord, MissionFacts } from './state/gameState';

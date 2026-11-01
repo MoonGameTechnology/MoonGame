@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
-import { espionageModule, MISSION_HOURS, THEFT_CAP } from './espionage';
+import { espionageModule, MISSION_HOURS, SPY_OP_COST, THEFT_CAP } from './espionage';
 import { constructionModule } from './construction';
 import { technologyModule } from './technology';
 import { createInitialState, type GameState, type Planet, type Player } from '../state/gameState';
@@ -82,6 +82,40 @@ function run(op: string, pins: GameModule[], s: GameState = baseState()) {
 }
 const ofType = (events: DomainEvent[], type: string) => events.filter((e) => e.type === type);
 
+describe('SPY-12 — each operation has its own price', () => {
+  const k = createKernel([constructionModule, technologyModule, espionageModule]);
+
+  it('guarding is the cheapest, stealing research the dearest', () => {
+    expect(SPY_OP_COST).toEqual({ counter: 50, recon: 150, sabotage: 300, theft: 300, research: 400 });
+    for (const op of ['counter', 'recon', 'sabotage', 'theft', 'research'] as const) {
+      const r = k.applyAction(baseState(), spy(op), ctx(0));
+      if (!r.ok) throw new Error(`${op}: ${r.code}`);
+      expect(r.state.players.p1!.resources.credits).toBe(500 - SPY_OP_COST[op]);
+    }
+  });
+
+  it('a treasury short of THIS operation refuses it, free of charge, while a cheaper one passes', () => {
+    const poor = baseState();
+    poor.players.p1!.resources.credits = 299;
+    const dear = k.applyAction(poor, spy('theft'), ctx(0));
+    expect(dear.ok ? null : dear.code).toBe('E_INSUFFICIENT');
+    const cheap = k.applyAction(poor, spy('recon'), ctx(0));
+    expect(cheap.ok && cheap.state.players.p1!.resources.credits).toBe(299 - SPY_OP_COST.recon);
+  });
+
+  it('the espionage.cost hook still bends the base price', () => {
+    const half: GameModule = {
+      id: 'half',
+      version: '1.0.0',
+      setup(api) {
+        api.hook<Record<string, number>>('espionage.cost', (fee) => ({ credits: (fee.credits ?? 0) / 2 }));
+      },
+    };
+    const r = createKernel([espionageModule, half]).applyAction(baseState(), spy('research'), ctx(0));
+    expect(r.ok && r.state.players.p1!.resources.credits).toBe(500 - SPY_OP_COST.research / 2);
+  });
+});
+
 describe('SPY-9 — sabotage', () => {
   it('hits every damageable building (fewer than 3) for 10–20% of max HP and tells the spy', () => {
     const { state, events } = run('sabotage', [sure, unseen, spared]);
@@ -156,7 +190,7 @@ describe('SPY-9 — resource theft', () => {
     expect(loot.amount).toBeGreaterThanOrEqual(Math.floor(stock * 0.05));
     expect(loot.amount).toBeLessThanOrEqual(Math.min(THEFT_CAP, Math.floor(stock * 0.15)));
     expect(state.players.p2!.resources[loot.resource]).toBe(stock - loot.amount);
-    const before = loot.resource === 'credits' ? 500 - 150 : 0; // the fee is paid in credits
+    const before = loot.resource === 'credits' ? 500 - SPY_OP_COST.theft : 0; // the fee is paid in credits
     expect(state.players.p1!.resources[loot.resource]).toBe(before + loot.amount);
   });
 

@@ -394,6 +394,10 @@ export function startTour(
         scrollCheck = now;
         if (!onScreen(node, r)) node.scrollIntoView({ block: 'nearest' });
       }
+      // While the step's scroll is still bringing the target in, a target clipped by its
+      // panel gets no ring: a press at the ring would land on whatever lies under the
+      // clipped part (the map, picking another world).
+      if (now - scrollStart < 3000 && !onScreen(node, r)) return null;
       return { left: r.left, top: r.top, width: r.width, height: r.height };
     },
     render: (view) => {

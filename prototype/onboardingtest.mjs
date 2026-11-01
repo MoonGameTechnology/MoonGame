@@ -8,7 +8,16 @@ import { instrumentedGame, launchBrowser, serve, waitForApp } from './harnessKit
 const host = await serve(
   await instrumentedGame(`
 // Счётчики гида — у обучения (REFM-221); \`main.ts\` их больше не видит.
-import { guideFleet as __guideFleet, guideMineLevel as __guideMineLevel, guideShipCount as __guideShipCount } from '../../decisions/firstMatchGuide';
+import { guideFleet as __guideFleet, guideMineLevel as __guideMineLevel, guideShipCount as __guideShipCount, guideHeroFleet as __guideHeroFleet } from '../../decisions/firstMatchGuide';
+window.__trail = [];
+{ let last = '';
+  setInterval(() => {
+    const now = String(selPlanet) + '|' + String(selFleet);
+    if (now !== last) window.__trail.push({ step: document.querySelector('#spotlight')?.dataset.step, sel: now, day: s.time });
+    last = now;
+    if (window.__trail.length > 12) window.__trail.shift();
+  }, 25);
+}
 window.__guideTest = {
   advanceHours: (hours) => apply(advance(s, s.time + hours * 3600000)),
   facts: () => ({ planets: Object.values(s.planets).filter(p => p.owner === ME).map(p => p.id),
@@ -16,7 +25,8 @@ window.__guideTest = {
     xp: loadMeta().xp, mine: __guideMineLevel(s, 'home_1'), tech: s.players[ME]?.technologies, selected: selFleet,
     hero: Object.values(s.heroes ?? {}).find(h => h.owner === ME && h.grade === 'main'),
     lots: (s.market ?? []).filter(o => o.owner === 'npc-guild').length,
-    log: logLines.slice(-6),
+    log: logLines.slice(-6), world: selPlanet,
+    heroFleet: (() => { const f = __guideHeroFleet(s, ME); return f && { id: f.id, at: f.location, mv: f.movement }; })(),
     medal: Object.keys(localStorage).filter(k => k.startsWith('vd.medal.tutorial.')).map(k => JSON.parse(localStorage.getItem(k))) }),
 };`),
 );
@@ -108,6 +118,20 @@ try {
         : { viewport: { width: 1280, height: 800 } },
     );
     const errors = [];
+    await page.addInitScript(() => {
+      window.__clicks = [];
+      document.addEventListener(
+        'pointerdown',
+        (e) =>
+          window.__clicks.push({
+            x: e.clientX,
+            y: e.clientY,
+            step: document.querySelector('#spotlight')?.dataset.step,
+            tgt: e.target?.id || String(e.target?.className),
+          }),
+        true,
+      );
+    });
     page.on('pageerror', (e) => errors.push(e.message));
     page.setDefaultTimeout(30000);
     try {
@@ -249,6 +273,21 @@ try {
     } catch (e) {
       console.error(e);
       await page.screenshot({ path: `/tmp/gw-onboarding/${mode}-failure.png` }).catch(() => {});
+      // The same state in the job log too: the artifact is not always at hand.
+      const where = await page
+        .evaluate(() => ({
+          step: document.querySelector('#spotlight')?.dataset.step,
+          copy: document.querySelector('.sl-copy')?.textContent,
+          log: window.__guideTest?.facts().log,
+          side: document.querySelector('#side')?.innerText.slice(0, 1500),
+          picked: window.__guideTest?.facts().world,
+          selected: window.__guideTest?.facts().selected,
+          fleets: window.__guideTest?.facts().heroFleet,
+          clicks: window.__clicks?.slice(-6),
+          trail: window.__trail,
+        }))
+        .catch(() => null);
+      console.error(`${mode} failure state:`, JSON.stringify(where, null, 2));
       writeFileSync(
         `/tmp/gw-onboarding/${mode}-failure.json`,
         JSON.stringify(

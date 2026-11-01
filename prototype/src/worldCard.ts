@@ -16,6 +16,7 @@ import type {
   GameState,
   PausedConstructionSite,
   Planet,
+  SpyOp,
   StrikeBase,
   UnitStack,
 } from '../../packages/shared-core/src/index';
@@ -413,13 +414,14 @@ export function unknownPlanetHtml(p: Planet): string {
     // Espionage from memory: an agent goes to the WORLD itself (SPY-8), not to its
     // owner — if the world changed hands, the kernel targets whoever holds it now.
     // В забеге Sector Zero шпионажа нет и здесь (`espionageShown`).
-    const spyReady = afford({ credits: SPY_COST }) && myAgents(game.world(), ME).free > 0;
+    const free = myAgents(game.world(), ME).free > 0;
+    const spyReady = (op: SpyOp) => free && afford({ credits: SPY_COST[op] });
     const spyRow =
       mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
-        ? `<div class="row">${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST }), spyReady)}` +
-          btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST }), spyReady) +
-          btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST }), spyReady) +
-          `${btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST }), spyReady)}</div>`
+        ? `<div class="row">${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon'))}` +
+          btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST.sabotage }), spyReady('sabotage')) +
+          btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST.theft }), spyReady('theft')) +
+          `${btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST.research }), spyReady('research'))}</div>`
         : '';
     // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
     // растягивает три строки газетой на всю ширину (переработка окна мира, 2026-09-29).
@@ -539,24 +541,25 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
     const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
     // Свой и ничейный мир не шпионят; нехватка кредитов или свободных агентов (SPY-6)
     // гасит кнопку, но не прячет её.
-    const ready = afford({ credits: SPY_COST }) && myAgents(s, ME).free > 0;
-    const spy = spyOffer(mine, !!p.owner, !!live, ready);
+    const free = myAgents(s, ME).free > 0;
+    const ready = (op: SpyOp) => free && afford({ credits: SPY_COST[op] });
+    const spy = spyOffer(mine, !!p.owner, !!live, ready('recon'));
     if (spy === 'window' && live) {
       out.push(
         `<span class="pfact cyan">${t('side.world.spy-window')} ${t('side.world.spy-window.left', { left: fmtEta(windowLeftH(live.until, s.time, HOUR)) })}</span>`,
       );
     } else if (spy !== 'none') {
-      out.push(btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST }), spy === 'buy'));
+      out.push(btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spy === 'buy'));
     }
     if (spy !== 'none') {
-      out.push(btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST }), ready));
-      out.push(btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST }), ready));
-      out.push(btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST }), ready));
+      out.push(btn('spyplanet', 'sabotage', t('side.scan.sabotage', { c: SPY_COST.sabotage }), ready('sabotage')));
+      out.push(btn('spyplanet', 'theft', t('side.scan.theft', { c: SPY_COST.theft }), ready('theft')));
+      out.push(btn('spyplanet', 'research', t('side.scan.research', { c: SPY_COST.research }), ready('research')));
     }
     // SPY-11: a guard for any owned world, your own too; posted or en route → «Отозвать».
     const guard = myAgents(s, ME).away.some((a) => a.op === 'counter' && a.planetId === p.id);
     if (p.owner && guard) out.push(btn('spyrecall', '', t('side.scan.recall'), true));
-    else if (p.owner) out.push(btn('spyplanet', 'counter', t('side.scan.counter', { c: SPY_COST }), ready));
+    else if (p.owner) out.push(btn('spyplanet', 'counter', t('side.scan.counter', { c: SPY_COST.counter }), ready('counter')));
   }
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
 }

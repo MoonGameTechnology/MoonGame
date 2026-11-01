@@ -53,7 +53,7 @@ import {
   shareMap,
   STANCE_RANK,
 } from './game';
-import { grantLeftMs, myAgents, pushSpyEntry, SPY_COST, type SpyEntry } from './intel';
+import { grantLeftMs, myAgents, pushSpyEntry, spyCostRange, type SpyEntry } from './intel';
 import { selPlanet } from './interaction';
 import { dispatchChat, markUnread, pushMsg, readMessages, sessionMessages } from './messageLog';
 import { offerAffordance, offerClass, offerDisabled, offerMark } from './offerAffordance';
@@ -676,7 +676,7 @@ function intelTabHtml(): string {
     .join('');
   return (
     `<div class="dp-list in-list">` +
-    `<div class="in-hint">${t('spy.note', { c: SPY_COST })}</div>` +
+    `<div class="in-hint">${t('spy.note', { c: spyCostRange() })}</div>` +
     `<div class="in-sec">${t('spy.agents.title', { free: net.free, total: net.total })}</div>` +
     agents +
     `<div class="in-sec">${t('spy.windows.title')}</div>` +

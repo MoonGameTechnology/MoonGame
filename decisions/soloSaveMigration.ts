@@ -60,6 +60,17 @@ export const RECON_HALT_SOLO_MIGRATION = {
   toDataHash: COMMANDER_CAREER_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: espionage 1.5.0 prices each operation on its own (SPY-12). The
+ *  catalogue and the saved world are unchanged; only fees paid from now on differ. */
+export const SPY_PRICES_SOLO_MIGRATION = {
+  fromRules: RECON_HALT_SOLO_MIGRATION.toRules,
+  fromData: RECON_HALT_SOLO_MIGRATION.toData,
+  fromDataHash: RECON_HALT_SOLO_MIGRATION.toDataHash,
+  toRules: '18baac692899a2',
+  toData: RECON_HALT_SOLO_MIGRATION.toData,
+  toDataHash: RECON_HALT_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -67,6 +78,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   CORP_FORMATS_SOLO_MIGRATION,
   COMMANDER_CAREER_SOLO_MIGRATION,
   RECON_HALT_SOLO_MIGRATION,
+  SPY_PRICES_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
