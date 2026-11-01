@@ -26,7 +26,6 @@ import {
   factionModule,
   sprawlModule,
   fleetOpsModule,
-  fleetRepairModule,
   forcedMarchModule,
   hashGameDataBundle,
   heroModule,
@@ -188,7 +187,6 @@ export const DEV_MODULES: GameModule[] = [
   capitalModule, // capital.designate: re-point the hero respawn anchor
   standingOrdersModule, // order.auto/order.retreat/order.chain: standing-order intent storage
   instantRepairModule, // fleet.instantRepair: paid-in-credits hull top-up, anywhere
-  fleetRepairModule, // fleet.repair: paid-in-metal hull top-up, at an owned dock
   forcedMarchModule, // fleet.forcemarch: +50% speed for hull wear while in transit
   pveModule, // PVE-3: NPC wave assault, armed by the mode's `pve` section (inert in PvP)
   fleetBroodModule, // paid onboard growth of ground organisms; after wave creation
@@ -253,7 +251,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '91'; // RQ-1: очередь исследований. Членство и порядок
+export const MODULE_MANIFEST_VERSION = '92'; // Снят `fleet-repair`: ремонта за металл у дока
+// больше нет (заказ владельца 2026-11-01), у дока корпус чинится только постепенно. Порядок
+// остальных не тронут. Там же `combat` 3.10.0 — наземные выжившие уходят из боя с ранами, и
+// `construction` 1.8.0 — залеченный госпиталем стек сливается с целыми.
+// export const MODULE_MANIFEST_VERSION = '91'; // RQ-1: очередь исследований. Членство и порядок
 // не тронуты; `technology` 1.5.0 — у игрока появилось поле `technologies.queue`, новые действия
 // `technology.queue` / `.dequeue` / `.queue.move` и событие `technology.queue.pump`. Партия на 90
 // не знает очереди и не запустила бы ждущую тему.

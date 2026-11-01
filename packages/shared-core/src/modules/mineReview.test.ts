@@ -28,7 +28,6 @@ import { orbitalModule } from './orbital';
 import { shuttleModule } from './shuttle';
 import { constructionModule } from './construction';
 import { standingOrdersModule } from './standingOrders';
-import { fleetRepairModule } from './fleetRepair';
 import { instantRepairModule } from './instantRepair';
 import { forcedMarchModule } from './forcedMarch';
 import { createInitialState, type Fleet, type GameState, type Planet, type Player } from '../state/gameState';
@@ -125,7 +124,6 @@ const rules = createKernel([
   fleetOpsModule,
   orbitalModule,
   standingOrdersModule,
-  fleetRepairModule,
   instantRepairModule,
   forcedMarchModule,
 ]);
@@ -170,7 +168,6 @@ describe('мина не принимает общих приказов флот�
   it('ремонт, постоянные приказы и марш — отказ тем же кодом', () => {
     const damaged = world([{ ...mine('MINE', 'p1', { location: 'M' }), units: [{ unit: 'mine', count: 3, hp: 10, modules: ['mine_layer'] }] }]);
     expect(code(damaged, act('fleet.instantRepair', 'p1', { fleetId: 'MINE' }))).toBe('E_MINE_PASSIVE');
-    expect(code(damaged, act('fleet.repair', 'p1', { fleetId: 'MINE' }))).toBe('E_MINE_PASSIVE');
     expect(code(s0, act('order.auto', 'p1', { fleetId: 'MINE', on: true }))).toBe('E_MINE_PASSIVE');
     expect(code(s0, act('fleet.forcemarch', 'p1', { fleetId: 'MINE', on: true }))).toBe('E_MINE_PASSIVE');
   });

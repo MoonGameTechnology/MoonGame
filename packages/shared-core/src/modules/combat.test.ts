@@ -835,7 +835,7 @@ describe('combat — бой на дороге втягивает проходя�
   });
 });
 
-describe('combat — ships keep hull damage; ground rests at full (persistent hull)', () => {
+describe('combat — ships keep hull damage; ground troops keep their wounds too', () => {
   it('leaves a surviving fleet at its battle-end hull, so damage carries forward', () => {
     const kernel = createKernel([...combatFamily, arrivalModule]);
     // A (aggressor, attack 30) beats D (guardian) but takes return-fire (guardian defense 20).
@@ -859,7 +859,10 @@ describe('combat — ships keep hull damage; ground rests at full (persistent hu
     expect(hp!).toBeLessThan(100); // hull damage persists out of combat (was reset to full before)
   });
 
-  it('deposits a won ground assault as a full-health garrison (clears the landing battle HP)', () => {
+  // Владелец 2026-11-01: «после боя гарнизон сразу восстанавливает себе хп» — баг. Бой
+  // больше не возвращает выживших целыми; раны лечит госпиталь (`construction`), а в этой
+  // сборке модулей его нет, поэтому раны просто остаются.
+  it('deposits a won ground assault as the new garrison WITH its wounds', () => {
     const kernel = createKernel([...combatFamily, arrivalModule]);
     // Shipless lander carries aggressors; the world is defended by a guardian (defense 20),
     // so the landing takes return-fire, wins, and is deposited as the new garrison.
@@ -872,7 +875,41 @@ describe('combat — ships keep hull damage; ground rests at full (persistent hu
     expect(r.state.planets.P?.owner).toBe('p1');
     const g = (r.state.planets.P?.garrison ?? []).find((s) => s.unit === 'aggressor');
     expect(g?.count).toBe(2);
-    // The resting garrison must be at full health — not the partial battle pool it ended with.
+    // The partial battle pool rides into the garrison — no instant heal on capture.
+    expect(g?.hp).toBeDefined();
+    expect(g!.hp!).toBeLessThan(2 * 100);
+  });
+
+  it('a garrison that repels an assault keeps its wounds (no instant heal)', () => {
+    const kernel = createKernel([...combatFamily, arrivalModule]);
+    // Two guardians (defense 20 each) shoot down a lone militia lander; its attack 3
+    // still lands, so the defenders end the fight hurt — and must stay hurt.
+    const lander = fleet('A', 'p1', 'P', [], [['militia', 1]]);
+    lander.orbit = 'near';
+    const st = baseState([lander], [planet('P', 'p2', 0, 0, [['guardian', 2]])]);
+    const started = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    const r = okAdvance(kernel.advanceTo(started.state, ctx(6 * HOUR)));
+
+    expect(Object.keys(r.state.battles)).toEqual([]);
+    expect(r.state.planets.P?.owner).toBe('p2');
+    const g = (r.state.planets.P?.garrison ?? []).find((s) => s.unit === 'guardian');
+    expect(g?.count).toBe(2);
+    expect(g?.hp).toBeDefined();
+    expect(g!.hp!).toBeLessThan(2 * 100);
+  });
+
+  it('an untouched ground stack leaves the fight healthy, so it still embarks and merges', () => {
+    const kernel = createKernel([...combatFamily, arrivalModule]);
+    // An unarmed lander (attack 0) cannot dent the guardian: keeping wounds must not
+    // brand an UNHURT defender as wounded, or it would stop embarking and merging.
+    const lander = fleet('A', 'p1', 'P', [], [['shield', 1]]);
+    lander.orbit = 'near';
+    const st = baseState([lander], [planet('P', 'p2', 0, 0, [['guardian', 1]])]);
+    const started = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    const r = okAdvance(kernel.advanceTo(started.state, ctx(6 * HOUR)));
+    expect(Object.keys(r.state.battles)).toEqual([]);
+    const g = (r.state.planets.P?.garrison ?? []).find((s) => s.unit === 'guardian');
+    expect(g?.count).toBe(1);
     expect(g?.hp).toBeUndefined();
   });
 });

@@ -112,6 +112,17 @@ export const fleetGone = (s: GameState, fleetId: string): boolean => {
 export const inOrbit = (s: GameState, me: PlayerId, planetId: string): boolean =>
   myFleets(s, me).some((f) => f.location === planetId && f.orbit === 'near');
 
+/** На сколько (доля полного корпуса) должен подрасти корпус у дока, чтобы шаг «Ремонт»
+ *  засчитался: 5% — полчаса у верфи базы (10% в час), то есть игрок видит, как полоса
+ *  растёт, а ждать полного ремонта не обязан. */
+export const TRAINING_MEND_STEP = 0.05;
+
+/** Корпус у дока чинится (заказ владельца 2026-11-01: ремонта за металл больше нет, у дока
+ *  корпус чинится сам, постепенно): подрос на {@link TRAINING_MEND_STEP} от доли `from`,
+ *  снятой в начале шага, — или он уже целый, и чинить нечего. Доли — 0..1 (`hullFraction`). */
+export const hullMending = (share: number, from: number): boolean =>
+  share >= 1 || share >= from + TRAINING_MEND_STEP;
+
 /** Эскадра вернулась: ни один вылет игрока не в воздухе, а в ангаре носителя снова машины. */
 export const squadronHome = (s: GameState, me: PlayerId): boolean =>
   !(s.strikes ?? []).some((st) => st.owner === me) &&

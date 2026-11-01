@@ -6,9 +6,8 @@
  * дефект-класс, что решение 5 нашло у форта, — правило обещало союзников, а код
  * спрашивал владельца, и заметить это можно было только спросив про ВТОРОГО игрока.
  *
- * Проверяются ОБА пути ремонта у дока (платный приказ и пассивная починка со временем):
- * починить один и забыть второй — это и есть «необъяснимо частичный эффект», которым
- * болели два хука наземной защиты форта.
+ * У дока остался ОДИН путь ремонта — пассивная починка со временем: платный приказ за
+ * металл снят (заказ владельца 2026-11-01, «убрать полное лечение кораблей за металл»).
  *
  * И отдельно — что правило не размазалось: перемирие доком не делится. Союзник это
  * ровно `alliance`, как и у форта.
@@ -20,8 +19,6 @@ import {
   createInitialState,
   createKernel,
   diplomacyModule,
-  fleetRepairModule,
-  type Action,
   type Context,
   type Fleet,
   type GameState,
@@ -55,38 +52,27 @@ function world(stance: 'alliance' | 'pact' | null): GameState {
     ...(stance ? { diplomacy: { [pairKey('p1', 'p2')]: stance } } : {}),
   };
 }
-const repairOrder: Action = {
-  id: 's:p1:1', type: 'fleet.repair', playerId: 'p1', payload: { fleetId: 'F' }, issuedAt: 0,
-};
-
 describe('док союзника — FORT-5.8', () => {
-  const kernel = createKernel([diplomacyModule, constructionModule, fleetRepairModule]);
-
-  it('ПЛАТНЫЙ ремонт у союзного дока проходит', () => {
-    const r = kernel.applyAction(world('alliance'), repairOrder, ctx());
-    expect(r.ok, r.ok ? '' : `отказ ${r.code}`).toBe(true);
-  });
-
-  it('ПАССИВНАЯ починка у союзного дока тоже идёт — второй путь не забыт', () => {
-    const r = kernel.advanceTo(world('alliance'), ctx(6 * HOUR));
+  const kernel = createKernel([diplomacyModule, constructionModule]);
+  const hull = (stance: 'alliance' | 'pact' | null): number | undefined => {
+    const r = kernel.advanceTo(world(stance), ctx(6 * HOUR));
     if (!r.ok) throw new Error('advance отказ');
-    expect(r.state.fleets.F!.units[0]!.hp ?? 999).toBeGreaterThan(20);
+    return r.state.fleets.F!.units[0]!.hp;
+  };
+
+  it('у союзного дока корпус чинится со временем', () => {
+    expect(hull('alliance') ?? 999).toBeGreaterThan(20);
   });
 
-  it('БЕЗ союза — обоим путям отказ: чужой док остаётся чужим', () => {
+  it('БЕЗ союза — не чинится: чужой док остаётся чужим', () => {
     // Контроль в другую сторону: если бы проверка владельца просто исчезла, чинились бы
     // у кого угодно, включая врага.
-    const r = kernel.applyAction(world(null), repairOrder, ctx());
-    expect(r.ok).toBe(false);
-    expect(r.ok ? '' : r.code).toBe('E_NO_DOCK');
-    const passive = kernel.advanceTo(world(null), ctx(6 * HOUR));
-    if (!passive.ok) throw new Error('advance отказ');
-    expect(passive.state.fleets.F!.units[0]!.hp).toBe(20);
+    expect(hull(null)).toBe(20);
   });
 
   it('ПАКТ доком не делится — союзник это ровно `alliance`', () => {
     // Та же граница, что у форта (решение 5): пакт о ненападении войсками не делится —
     // значит и доком. Иначе «союзник» расползся бы до «не враг».
-    expect(kernel.applyAction(world('pact'), repairOrder, ctx()).ok).toBe(false);
+    expect(hull('pact')).toBe(20);
   });
 });

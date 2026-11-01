@@ -205,7 +205,6 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'fleet.forcemarch': { fleetId: 'p1_1', on: true },
   'fleet.instantRepair': { fleetId: 'p1_1' },
   'fleet.layMines': { fleetId: 'p1_1' },
-  'fleet.repair': { fleetId: 'p1_1' },
   'order.chain': { fleetId: 'p1_1', steps: [] },
 };
 

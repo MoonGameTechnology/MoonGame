@@ -698,10 +698,6 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .chip-gold:hover{background:rgba(255,215,106,.18);box-shadow:0 0 8px rgba(255,215,106,.25);}
 /* ECON-4: net-подпись «→ N ¤» в биде книги (получатель кредитов платит комиссию) */
 .mk-net{color:var(--dim);font-size:var(--fs-caption);margin-left:6px;}
-/* ECON-3а: экспресс-ремонт за металл у дока — «обычная» пара к золотому чипу */
-.chip-metal{flex:0 0 auto;padding:3px 8px;font-size:var(--fs-caption);cursor:pointer;color:var(--cyan);
-  background:rgba(53,214,230,.07);border:1px solid rgba(53,214,230,.45);border-radius:4px;white-space:nowrap;}
-.chip-metal:hover{background:rgba(53,214,230,.16);box-shadow:0 0 8px rgba(53,214,230,.25);}
 /* тап по имени армии (заголовок карточки → сводка) */
 .ptitle-btn{background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:left;
   color:var(--ink);font:inherit;font-weight:700;letter-spacing:inherit;}

@@ -21,7 +21,6 @@ import {
   effectiveStats,
   estimateTravelHours,
   fleetBaseSpeed,
-  getStance,
   missingHull,
   previewBattle,
   previewLossCount,
@@ -89,8 +88,6 @@ import { buildingName, countdownHMS, displayUnit, esc, kfmt, resLine } from './f
 import {
   ctx,
   data,
-  dockRepairCost,
-  fleetAtOwnDock,
   FORCED_MARCH_MULT,
   instantRepairCost,
   traceHooks,
@@ -118,7 +115,7 @@ import { actionButton, cardHeader as kitCardHeader, pcols } from './panelKit';
 import { fleetWhere, groupTotals } from './panelSelect';
 import { worldName } from './planetName';
 import { isGroundUnit } from './planetSummary';
-import { canDockRepair, canRepair } from './repairOffer';
+import { canRepair } from './repairOffer';
 import { HINT_KEY, MINE_MODES, MODE_KEY } from './rocketMinesUi';
 import { isSectorZeroRun } from './sectorRun';
 import { catalogPortraitHtml } from './shipArt';
@@ -638,38 +635,21 @@ function fleetLandingNote(f: Fleet): string {
   return ' · ⤓ ' + t('side.fleet.landing', { t: timer });
 }
 
-/** Кнопки ремонта у полосы корпуса. */
+/** Кнопка ремонта у полосы корпуса. */
 function fleetRepairChipsHtml(f: Fleet): string {
-  const s = game.world();
   const ME = game.me();
-  // ХП-бар Bytro-стиля + два ремонта: ECON-3а — экспресс за METAL у своего дока
-  // (дешёвый, основной), и ненавязчивый платный за кредиты — где угодно вне боя
-  // (цены — те же формулы, что в гейте).
-  // Условия обеих кнопок — `repairOffer.ts` (REFM-90): общая часть «свой, вне боя, есть
-  // что чинить» одна на два ремонта, а привязка к доку — только у экспресса за металл.
+  // ХП-бар Bytro-стиля + ненавязчивый платный ремонт за кредиты — где угодно вне боя
+  // (цена — та же формула, что в гейте). Экспресса за металл у дока больше нет (заказ
+  // владельца 2026-11-01): у дока корпус чинится сам, постепенно. Условие кнопки —
+  // `repairOffer.ts` (REFM-90).
   const repairCost = instantRepairCost(f, data);
-  const repairable = canRepair(f.owner === ME, !!f.battleId, repairCost);
+  if (!canRepair(f.owner === ME, !!f.battleId, repairCost)) return '';
   // В забеге Sector Zero платный ремонт — за Суверены со счёта профиля (заказ владельца
   // 2026-09-24), в остальной игре — за кредиты матча, как было.
   const premiumCost = isSectorZeroRun() ? sovereignRepairCost(missingHull(f, data)) : 0;
-  // FORT-5.8: док открыт своему И СОЮЗНОМУ флоту. Союзность кнопка резолвит стойкой —
-  // capability `diplomacy` живёт в ядре и требует `HandlerContext`, которого у рендера
-  // нет; база самой capability — та же стойка, поэтому ответы сходятся. Правило «что
-  // считается доком» при этом НЕ переписано: зовётся та же функция ядра.
-  const atDock = canDockRepair(
-    repairable,
-    fleetAtOwnDock(f, s, data, (a, b) => getStance(s, a, b) === 'alliance'),
-  );
-  return (
-    (atDock
-      ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 <span class="rc-metal">${dockRepairCost(f, data)}❒</span></button>`
-      : '') +
-    (!repairable
-      ? ''
-      : premiumCost > 0
-        ? `<button class="chip-sov" data-act="premiumrepair" data-arg="${f.id}" title="${t('side.fleet.repair.premium.title')}">🔧 <i>${SOV_SVG}</i><b>${premiumCost}</b></button>`
-        : `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('side.fleet.repair.instant.title')}">🔧 ${repairCost}💰</button>`)
-  );
+  return premiumCost > 0
+    ? `<button class="chip-sov" data-act="premiumrepair" data-arg="${f.id}" title="${t('side.fleet.repair.premium.title')}">🔧 <i>${SOV_SVG}</i><b>${premiumCost}</b></button>`
+    : `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('side.fleet.repair.instant.title')}">🔧 ${repairCost}💰</button>`;
 }
 
 /** Строка минного заградителя. SM-3.5: заградитель ставит поле там, где стоит; правило

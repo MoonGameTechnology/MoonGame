@@ -175,6 +175,19 @@ export const RESEARCH_QUEUE_SOLO_MIGRATION = {
   toDataHash: SLOW_AVIATION_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: `fleet-repair` leaves the module graph (no metal top-up at a dock),
+ *  combat 3.10.0 lets ground survivors keep their wounds and construction 1.8.0 merges a
+ *  stack the hospital heals back into its whole kind (BAL-18). The catalogue is unchanged
+ *  and the metal repair kept nothing in the world, so a saved world reads as is. */
+export const HOSPITAL_WOUNDS_SOLO_MIGRATION = {
+  fromRules: RESEARCH_QUEUE_SOLO_MIGRATION.toRules,
+  fromData: RESEARCH_QUEUE_SOLO_MIGRATION.toData,
+  fromDataHash: RESEARCH_QUEUE_SOLO_MIGRATION.toDataHash,
+  toRules: '07155440325710',
+  toData: RESEARCH_QUEUE_SOLO_MIGRATION.toData,
+  toDataHash: RESEARCH_QUEUE_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -192,6 +205,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   LANDING_CANCEL_SOLO_MIGRATION,
   SLOW_AVIATION_SOLO_MIGRATION,
   RESEARCH_QUEUE_SOLO_MIGRATION,
+  HOSPITAL_WOUNDS_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

@@ -1,11 +1,15 @@
 /**
  * Fleet hull-repair math — shared by `modules/instantRepair.ts` (paid-in-credits,
- * anywhere) and `modules/fleetRepair.ts` (paid-in-metal, at an owned dock). A pure
- * utility (not a `GameModule`) so both action modules can share it without
+ * anywhere), `modules/construction.ts` (the dock's gradual repair) and the retreat
+ * rules. A pure utility (not a `GameModule`) so modules can share it without
  * importing each other (invariant #3). Was ported from the prototype's
  * `instantRepair.ts` (`missingHull`/`instantRepairCost`, REFP-17) and
- * `econScrews.ts` (`dockRepairCost`/`fleetAtOwnDock`, REFP-18); since CONV-1/CONV-2
- * those files are gone and this is the only copy of the math.
+ * `econScrews.ts` (`fleetAtOwnDock`, REFP-18); since CONV-1/CONV-2 those files are
+ * gone and this is the only copy of the math.
+ *
+ * The paid-in-metal dock top-up (`fleet.repair`, ECON-3) is gone (owner's order
+ * 2026-11-01: «убрать полное лечение кораблей за металл»): at a dock the hull mends
+ * only gradually, at the dock's `shipRepair` rate.
  */
 import type { Fleet, GameState, Planet } from '../state/gameState';
 import type { GameData } from '../data/schemas';
@@ -13,7 +17,6 @@ import { effectiveStat, effectiveStats } from './loadout';
 import { buildingLevel } from '../data/schemas';
 
 export const INSTANT_REPAIR_CREDITS_PER_HP = 1;
-export const REPAIR_HP_PER_METAL = 2;
 
 /** Missing hull of the fleet (ships + carried landing force), by effective (fitted)
  *  hp — a stack with `hp === undefined` is at full health and contributes nothing. */
@@ -62,11 +65,6 @@ export function instantRepairCost(f: Fleet, data: GameData): number {
   return Math.ceil(missingHull(f, data) * INSTANT_REPAIR_CREDITS_PER_HP);
 }
 
-/** Price of a dock (metal) repair — 0 = nothing to repair. */
-export function dockRepairCost(f: Fleet, data: GameData): number {
-  return Math.ceil(missingHull(f, data) / REPAIR_HP_PER_METAL);
-}
-
 /**
  * Есть ли у флота ДОК: он припаркован (не в пути) над миром, который ему открыт, и там
  * стоит живое здание с `shipRepair > 0` (верфь или космопорт).
@@ -77,9 +75,9 @@ export function dockRepairCost(f: Fleet, data: GameData): number {
  * форта: правило обещало союзников, а код спрашивал владельца.
  *
  * Союзность приходит ПАРАМЕТРОМ, а не считается здесь: у ядра она резолвится через
- * capability `diplomacy` (нужен `HandlerContext`, которого у чистой функции нет), а у
- * клиента — через стойку. Свести это внутрь значило бы завести второй дом для «кто
- * союзник»; параметр оставляет дом один. Не передали — поведение ровно прежнее.
+ * capability `diplomacy` (нужен `HandlerContext`, которого у чистой функции нет). Свести
+ * это внутрь значило бы завести второй дом для «кто союзник»; параметр оставляет дом
+ * один. Не передали — союзник доком не считается.
  */
 export function fleetAtOwnDock(
   f: Fleet,

@@ -19,6 +19,7 @@ import {
   fleetGone,
   fortified,
   garrisoned,
+  hullMending,
   inOrbit,
   owns,
   productionGrew,
@@ -27,7 +28,8 @@ import {
   techDone,
   trainingBaseline,
 } from '../../decisions/trainingStages';
-import type { GameState } from '../../packages/shared-core/src/index';
+import { hullFraction, type GameState } from '../../packages/shared-core/src/index';
+import { dockHullRate } from '../../packages/shared-core/src/util/repair';
 
 /**
  * СКВОЗНОЙ ПРОГОН УЧЕБНОГО ПОЛИГОНА (TRN-2): все двенадцать этапов §14.4 проходятся на
@@ -131,7 +133,13 @@ describe('учебный полигон: все двенадцать этапо�
     );
     s = act(s, 'fleet.move', { fleetId: main(s), to: 'base' });
     s = until(s, (x) => x.fleets[main(x)]?.location === 'base' && !x.fleets[main(x)]?.movement);
-    s = act(s, 'fleet.repair', { fleetId: main(s) });
+    // Ремонта за металл больше нет (заказ владельца 2026-11-01): у дока корпус чинится сам.
+    // Подсказка шага называет темп верфи базы — 10% в час; разъедутся данные — упадёт здесь.
+    expect(dockHullRate(s.planets.base!, data)).toBeCloseTo(0.1);
+    const battered = hullFraction(s.fleets[main(s)]!, data);
+    expect(battered).toBeLessThan(1); // отход стоил корпуса — чинить есть что
+    s = until(s, (x) => hullMending(hullFraction(x.fleets[main(x)]!, data), battered), 2, 0.25);
+    expect(hullMending(hullFraction(s.fleets[main(s)]!, data), battered)).toBe(true);
 
     // 9. Носитель и челноки: удар эскадры по посту, возвращение в ангар.
     const carrier = Object.values(s.fleets).find(

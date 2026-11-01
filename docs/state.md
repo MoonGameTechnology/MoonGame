@@ -151,7 +151,7 @@ JSONL. Root guard контролирует свободный диск, inode и
 packages/
   shared-core/src/     ядро: детерминированная симуляция без сети и БД
     kernel/            kernel.ts: createKernel, applyAction, advanceTo, canApply; module.ts
-    modules/           54 модуля механик; порядок ядра — DEV_MODULES в server/src/scenario.ts
+    modules/           53 модуля механик; порядок ядра — DEV_MODULES в server/src/scenario.ts
     state/             gameState.ts (GameState), visibility.ts (туман), buildFromMap.ts (посев)
     action/, actions/  types.ts (Action, Context, MatchConfig), matchMode.ts; payloadSchemas.ts
     data/              schemas.ts (zod-схемы GameData), mapSchema.ts, loadGameData.ts
@@ -163,7 +163,7 @@ packages/
   client/src/          PWA: main.ts, session.ts (вход), matchHud.ts + hudView.ts, multiplayer.ts
 prototype/             то, во что играют: клиент и игровой хост
   src/main.ts          клиент: карта, HUD, окна, ввод
-  src/protoKernel.ts   MODULES прототипа (56) и проба приказов canOrder
+  src/protoKernel.ts   MODULES прототипа (55) и проба приказов canOrder
   src/matchSetup.ts    newGame: посев партии; src/game.ts — фасад реэкспортов
   netserver.ts         хост HTTP+WS; bundle-netserver.mjs → packages/server/dist/proto-server.mjs
   build.mjs            сборка клиента в HTML-файлы prototype/dist/
@@ -228,7 +228,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 
 ## 5. Модули ядра
 
-54 модуля в `packages/shared-core/src/modules`, по файлу на механику; порядок исполнения —
+53 модуля в `packages/shared-core/src/modules`, по файлу на механику; порядок исполнения —
 `DEV_MODULES` (`packages/server/src/scenario.ts`), счётчики сборок — §9. Модули не импортируют
 друг друга: события, хуки и возможности, а без модуля работает базовый дефолт
 ([modulesystem.md](modulesystem.md)). События и хуки по модулям — [CODE-MAP.md](../CODE-MAP.md).
@@ -267,7 +267,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   (`surveyed`, проекция отдаёт игроку только его записи).
 - `construction` — `building.construct/upgrade`, `unit.build`, `construction.cancel/resume`:
   оплата вперёд, готовность событием `construction.complete`; возможность `building.damage` —
-  прицельный урон по выбранным постройкам (им бьёт саботаж шпиона).
+  прицельный урон по выбранным постройкам (им бьёт саботаж шпиона). Здесь же лечение и
+  ремонт со временем: раненые наземные войска лечит только госпиталь (`healRate`), без него
+  раны остаются; корпус кораблей со временем чинится только у дока (`shipRepair`) и
+  ремонтными модулями.
 - `technology` — `technology.research/boost`; урон боевой ветки идёт только своему каналу огня;
   возможность `technology.grant` выдаёт технологию мимо лаборатории (кража исследований).
   Очередь исследований (RQ-1): `technology.queue/dequeue/queue.move`, поле игрока
@@ -287,7 +290,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   после остановки доступен отход, а подтверждение войны предшествует повторному ходу.
   `visibility` наблюдает корабль в текущий момент обработчика, режет шаг по `time.stop`
   при контакте сенсора с миром и вызывает необязательную `fleet.reconcileVisibility`.
-  Большой офлайн-шаг и малые шаги дают одну точку остановки. Манифест правил — 90;
+  Большой офлайн-шаг и малые шаги дают одну точку остановки. Манифест правил — 91;
   несовместимые сохранённые партии требуют учёта при выкладке. Матрица проверок и
   ограничения — [аудит движения](reviews/2026-10-24-movement-logic-audit.md).
 - `fleet-ops` — `fleet.launch/merge/split/engage`; `auto-merge` — прибывший флот вливается в
@@ -295,14 +298,16 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - `capture-on-arrival` — свободный узел берётся прилётом; `army` — `army.load/unload`:
   наземные войска ездят только грузом флота.
 - `forced-march` — `fleet.forcemarch`: +50% скорости, износ 5% корпуса в час пути;
-  `fleet-repair` — `fleet.repair` за металл в своём доке; `instant-repair` — за кредиты.
+  `instant-repair` — `fleet.instantRepair` за кредиты где угодно вне боя (в забеге — за
+  Суверены). Ремонта за металл у дока нет с 2026-11-01: у дока корпус чинится постепенно.
 - `standing-orders` — `order.auto` (автоштурм), `order.retreat` (автоотход), `order.chain`;
   `steward` — `steward.delegate/recall/holdpoint`: место ведёт ИИ, пока игрок офлайн.
 
 **Бой.**
 - `combat` — `battle.attack/retreat`, `fleet.assault/retreat`: раунд раз в игровой час, фазы
   `orbital` и `ground`, штурм с высадкой (вылет флота её отменяет, десант остаётся на борту),
-  захват мира.
+  захват мира. Выжившие уходят из боя с ранами — и корабли, и наземные войска; корпус
+  чинит док, раны лечит госпиталь (`construction`).
 - `intercept` — встречи флотов на линиях и дорогах; без него бой бывает только в узлах.
 - `orbital` — `fleet.orbit/bombard`: одна орбита, бомбардировка и ПКО (залп орбитальных
   батарей раз в час, ближних зениток — раз в 15 минут). Орбита есть у видов с `orbit` в
@@ -875,14 +880,14 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 Готовность по этапам и продуктам — [readiness.md](readiness.md), путь к выпуску —
 [release-path.md](release-path.md). Здесь — состав ядра и технические долги.
 
-**54 модуля** на микроядре: столько файлов в `packages/shared-core/src/modules` (без тестов).
+**53 модуля** на микроядре: столько файлов в `packages/shared-core/src/modules` (без тестов).
 Оба хоста собирают весь каталог; прототип сверх него грузит два своих модуля из
 `prototype/src` (`hunger`, `botDiplomacy`): в ядре их нет, и серверу они не нужны.
 
 | Сборка | Модулей | Состав |
 | --- | --: | --- |
-| `DEV_MODULES` (канонический сервер, `scenario.ts`) | **54** | весь каталог ядра |
-| `MODULES` (ядро прототипа, `protoKernel.ts`) | **56** | каталог + `hunger`, `botDiplomacy` |
+| `DEV_MODULES` (канонический сервер, `scenario.ts`) | **53** | весь каталог ядра |
+| `MODULES` (ядро прототипа, `protoKernel.ts`) | **55** | каталог + `hunger`, `botDiplomacy` |
 
 §9 — единственный дом этих чисел: `scripts/docs-check.mjs` сверяет их с кодом (файлы каталога,
 закреплённый список `moduleManifest.test.ts`, массив `MODULES`), другие доки ссылаются сюда.

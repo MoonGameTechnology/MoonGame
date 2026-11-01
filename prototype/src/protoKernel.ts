@@ -46,7 +46,6 @@ import {
   shuttleModule,
   forcedMarchModule,
   instantRepairModule,
-  fleetRepairModule,
   taxModule,
   capitalModule,
   scientistModule,
@@ -152,7 +151,6 @@ export const MODULES: GameModule[] = [
   shuttleModule, // SQ: free-space movement for shuttles (strike/return off the lane graph)
   forcedMarchModule, // BOOST-1 форс-марш: +50% скорости за 5% max-HP износа в час хода
   instantRepairModule, // платный мгновенный ремонт корпуса (кредиты как премиум-валюта)
-  fleetRepairModule, // ECON-3: экспресс-ремонт корпуса за metal у своего дока
   effectsModule, // EFX-1: интерпретатор data.events (trigger→effect); инертен, пока events: {} пуст
   seatClaimModule, // ENTRY-3: заявка на место (дом + совет учёных) действием, а не мутацией
   // мимо редьюсера — иначе выбор не попадает в лог и реплей воспроизводит партию иначе.
