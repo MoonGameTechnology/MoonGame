@@ -249,6 +249,16 @@ export const deployForkFortress = (playerId: string, province: string, trail: nu
 /** Begin researching a session technology (one active at a time — technologyModule). */
 export const researchTech = (playerId: string, technology: string) =>
   act(playerId, 'technology.research', { technology });
+/** RQ-1: поставить тему в хвост очереди исследований. Свободный слот и деньги — ядро
+ *  начнёт её сразу; иначе она ждёт и стартует сама, когда до неё дойдёт очередь. */
+export const queueTech = (playerId: string, technology: string) =>
+  act(playerId, 'technology.queue', { technology });
+/** RQ-1: снять тему из очереди — вместе с темами, чей предок без неё не изучится. */
+export const dequeueTech = (playerId: string, technology: string) =>
+  act(playerId, 'technology.dequeue', { technology });
+/** RQ-1: переставить тему очереди на место `to` (с нуля). Выше своего предка — отказ. */
+export const moveQueuedTech = (playerId: string, technology: string, to: number) =>
+  act(playerId, 'technology.queue.move', { technology, to });
 /** «Хранитель»: hand this seat to the AI until game-time `until`, running `posture` —
  *  'defend' («Оборона», the safe default) or 'active_defend' («Активная оборона»,
  *  ST-3.3: + forecast-gated counterstrike and shuttle fire-watch on own soil).

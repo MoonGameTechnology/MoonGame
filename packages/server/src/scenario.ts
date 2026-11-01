@@ -253,7 +253,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '90'; // Recon before border halt; legal parked-fleet detours
+export const MODULE_MANIFEST_VERSION = '91'; // RQ-1: очередь исследований. Членство и порядок
+// не тронуты; `technology` 1.5.0 — у игрока появилось поле `technologies.queue`, новые действия
+// `technology.queue` / `.dequeue` / `.queue.move` и событие `technology.queue.pump`. Партия на 90
+// не знает очереди и не запустила бы ждущую тему.
+// export const MODULE_MANIFEST_VERSION = '90'; // Recon before border halt; legal parked-fleet detours
 // movement 1.6.0, visibility 2.4.0; module order unchanged.
 // export const MODULE_MANIFEST_VERSION = '89'; // ROS-1.6b: огонь сверху бьёт пехоту и технику
 // разной долей атаки. Членство и порядок не тронуты; `orbital` 1.5.0, `shuttle` 1.18.0. Партия

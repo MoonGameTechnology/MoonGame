@@ -487,6 +487,28 @@ export function handleEvents(events: DomainEvent[]) {
         // оттого, что событие случилось, а не оттого, что игрок о нём услышал.
         if (gainRepaint('research').techTree && game.techTree().isOpen()) game.techTree().repaint();
         break;
+      // RQ-1: очередь исследований работает, пока игрок офлайн, — лента говорит, что она
+      // запустила сама и что выбросила. Ручной старт игрок видел своими глазами, о нём молчим.
+      case 'technology.research.started':
+        if (p.fromQueue === true && researchHeard(p.playerId, ME))
+          note(
+            t('log.tech.queue-started', {
+              tech: tData(
+                data.technologies[p.technology as string]?.name ?? (p.technology as string),
+              ),
+            }),
+          );
+        break;
+      case 'technology.queue.dropped':
+        if (researchHeard(p.playerId, ME))
+          note(
+            t('log.tech.queue-dropped', {
+              tech: tData(
+                data.technologies[p.technology as string]?.name ?? (p.technology as string),
+              ),
+            }),
+          );
+        break;
       // «Хранитель» lifecycle: snapshot at delegation, diff on expiry (the morning report).
       // Что печатает каждое событие вахты и что делается с опорным снимком —
       // `stewardLog.ts` (REFM-176): всё только про СЕБЯ, поза меняет текст, снимок

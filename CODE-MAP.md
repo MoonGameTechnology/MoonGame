@@ -140,7 +140,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 16 | `construction` | `construction.ts` | `building.construct`, `building.upgrade`, `unit.build`, `construction.cancel`, `construction.resume` | `construction.complete`, `construction.queue.pump`, `station.destroyed`, `planet.captured`, `combat.round`, `planet.bombarded`, `time.advanced` | `combat.mitigation` | `building.damage` | `construction.queued`, `construction.queue.dropped`, `construction.started`, `building.destroyed`, `construction.cancelled`, `construction.resumed`, `building.constructed`, `building.upgraded`, `unit.built` |
 | 17 | `arsenal-sync` | `arsenalSync.ts` | `arsenal.sync` | — | — | — | — |
 | 18 | `station` | `station.ts` | `station.deploy` | `building.constructed`, `building.upgraded`, `building.destroyed`, `fleet.destroyed`, `planet.captured`, `player.eliminated` | `combat.mitigation` | — | `fleet.parked`, `station.destroyed`, `station.deployed` |
-| 19 | `technology` | `technology.ts` | `technology.research`, `technology.boost` | `time.advanced`, `technology.complete` | `construction.requirement`, `economy.production`, `fleet.speed`, `combat.damage.parallel` | `technology.grant` | `technology.research.started`, `technology.research.boosted`, `technology.researched` · sched: `technology.complete` |
+| 19 | `technology` | `technology.ts` | `technology.research`, `technology.boost`, `technology.queue`, `technology.dequeue`, `technology.queue.move` | `time.advanced`, `technology.complete`, `technology.queue.pump` | `construction.requirement`, `economy.production`, `fleet.speed`, `combat.damage.parallel` | `technology.grant` | `technology.research.started`, `technology.research.boosted`, `technology.researched`, `technology.queued`, `technology.dequeued`, `technology.queue.moved`, `technology.queue.dropped` · sched: `technology.complete`, `technology.queue.pump` |
 | 20 | `scientist` | `scientist.ts` | — | — | `research.slots` | — | — |
 | 21 | `steward` | `steward.ts` | `steward.delegate`, `steward.holdpoint`, `steward.report`, `steward.recall` | `planet.captured`, `planet.destroyed`, `station.destroyed`, `time.advanced` | — | — | `steward.delegated`, `steward.holdpoint`, `steward.reported`, `steward.recalled`, `steward.expired` |
 | 22 | `faction` | `faction.ts` | — | — | `construction.requirement`, `economy.production`, `fleet.speed`, `fort.garrisonCap`, `combat.damage.parallel` | — | — |
@@ -401,6 +401,11 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `swarm.net.cut` | `swarmNet` | — |
 | `swarm.observed` | `swarmMemory` | `swarmNet` |
 | `technology.complete` | `technology`* | `technology` |
+| `technology.dequeued` | `technology` | — |
+| `technology.queue.dropped` | `technology` | — |
+| `technology.queue.moved` | `technology` | — |
+| `technology.queue.pump` | `technology`* | `technology` |
+| `technology.queued` | `technology` | — |
 | `technology.research.boosted` | `technology` | — |
 | `technology.research.started` | `technology` | — |
 | `technology.researched` | `technology` | — |

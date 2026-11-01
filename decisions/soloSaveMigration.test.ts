@@ -14,6 +14,7 @@ import {
   SPY_CREW_SOLO_MIGRATION as spyCrew,
   SPY_TURN_SOLO_MIGRATION as spyTurn,
   LANDING_CANCEL_SOLO_MIGRATION as landingCancel,
+  RESEARCH_QUEUE_SOLO_MIGRATION as researchQueue,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -159,7 +160,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, researchQueue]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -330,5 +331,14 @@ describe('the rules-only landing cancel pair (0.1.70 → 0.1.70)', () => {
     before.state.version = { data: landingCancel.fromData, dataHash: landingCancel.fromDataHash, manifest: '1' };
     const raw = serializeSoloSave(before, landingCancel.fromRules);
     expect(parseCompatibleSoloSave(raw, landingCancel.toRules)).toEqual(before);
+  });
+});
+
+describe('the rules-only research queue pair (0.1.70 → 0.1.70)', () => {
+  it('reads a save of the landing cancel release under the new rules unchanged', () => {
+    const before = oldSave();
+    before.state.version = { data: researchQueue.fromData, dataHash: researchQueue.fromDataHash, manifest: '1' };
+    const raw = serializeSoloSave(before, researchQueue.fromRules);
+    expect(parseCompatibleSoloSave(raw, researchQueue.toRules)).toEqual(before);
   });
 });

@@ -305,6 +305,370 @@ export function technologyLock(
   return null;
 }
 
+// --- очередь исследований (RQ-1) ---------------------------------------------
+//
+// Просьба владельца 2026-11-01: «строить очередь технологий». Лаборатория больше не
+// простаивает, пока игрок офлайн: следующая тема стартует сама, как только освободится
+// слот. Правила списаны с очереди стройки (BLD-1, `construction.ts`) там, где вопрос тот
+// же, и решены здесь там, где у науки он свой:
+//
+//  1. **Деньги — НА СТАРТЕ, а не при постановке.** Ждущая тема не стоит ничего, и
+//     снятие её из очереди — просто удаление, без возврата (как BLD-1, правило 2).
+//  2. **Очередь — это ПРИОРИТЕТ.** Слот достаётся первой теме, которую можно начать.
+//     Не хватает на неё денег — она ЖДЁТ, а более дешёвые за ней не обгоняют: иначе
+//     они съедали бы доход, и дорогая тема не стартовала бы никогда (BLD-1, правило 4).
+//  3. **Ждать предка — не то же, что ждать денег.** Тема, у которой предок ещё изучается
+//     или стоит выше в очереди, слот не держит: его берёт следующая готовая. Так два
+//     слота не простаивают, пока один дорабатывает корень ветки.
+//  4. **В очередь можно то, что откроется само или по плану.** Предок должен быть изучен,
+//     в работе или стоять в очереди раньше; день и условия узла (сектора, постройки,
+//     учёный) могут ещё не наступить — тема ждёт их и честно называет, чего ждёт.
+//     Нельзя только невозможное: грант-узел, узел не этого матча, тему без предка в плане.
+//  5. **Порядок держит зависимость.** Тему нельзя поднять выше её предка в очереди, а
+//     снятие предка снимает и тех, кто от него зависит, — иначе они висели бы мёртвыми.
+//  6. **Повтор — событие на таймлайне**, раз в игровой час и только пока есть свободный
+//     слот: старт не может зависеть от того, каким шагом звали `advanceTo` (BLD-1,
+//     правило 4). Завершение темы, постановка, снятие и перестановка зовут насос сразу.
+//  7. **Глубина ограничена** — это граница персистируемого состояния, а не баланс.
+
+/** Потолок очереди исследований (правило 7). */
+export const MAX_RESEARCH_QUEUE = 8;
+
+/** Как часто очередь, которой не хватило денег или времени, пробует снова (правило 6). */
+const RESEARCH_QUEUE_RETRY_HOURS = 1;
+
+/** Идущие темы, даже если матч сохранён до слотов (одиночный объект, см. `technologyState`):
+ *  читающие функции ниже не мутируют состояние и не могут его мигрировать. */
+function activeOf(tech: PlayerTechnologyState | undefined): ActiveResearch[] {
+  const active = tech?.active as ActiveResearch[] | ActiveResearch | undefined;
+  return active === undefined ? [] : Array.isArray(active) ? active : [active];
+}
+
+/** Чего ждёт тема в очереди — по порядку проверок ядра (`technologyLock`). */
+type QueuedFate =
+  | { fate: 'ready' }
+  | { fate: 'prerequisite' | 'day' | 'conditions' }
+  | { fate: 'drop'; code: string };
+
+function queuedFate(
+  state: GameState,
+  playerId: string,
+  data: GameData,
+  id: string,
+  queue: readonly string[],
+): QueuedFate {
+  const def = data.technologies[id];
+  if (!def) return { fate: 'drop', code: 'E_UNKNOWN_TECHNOLOGY' };
+  const tech = state.players[playerId]?.technologies;
+  const completed = tech?.completed ?? [];
+  const active = activeOf(tech);
+  if (completed.includes(id) || active.some((a) => a.technology === id)) {
+    return { fate: 'drop', code: 'E_ALREADY_RESEARCHED' };
+  }
+  const lock = technologyLock(def, state, playerId, data, id);
+  switch (lock) {
+    case null:
+      return { fate: 'ready' };
+    case 'E_PREREQUISITE': {
+      const planned = def.prerequisites.every(
+        (p) => completed.includes(p) || active.some((a) => a.technology === p) || queue.includes(p),
+      );
+      return planned ? { fate: 'prerequisite' } : { fate: 'drop', code: 'E_PREREQUISITE' };
+    }
+    case 'E_TOO_EARLY':
+      return { fate: 'day' };
+    case 'E_CONDITIONS_UNMET':
+      return { fate: 'conditions' };
+    default:
+      return { fate: 'drop', code: lock }; // грант-узел, узел не этого матча — навсегда
+  }
+}
+
+/** Можно ли поставить тему в хвост очереди — то же правило, что у редьюсера
+ *  (`technology.queue`), для кнопки «В очередь». Null — можно, иначе код отказа. */
+export function queueableTechnology(
+  state: GameState,
+  playerId: string,
+  data: GameData,
+  id: string,
+): string | null {
+  const def = data.technologies[id];
+  if (!def) return 'E_UNKNOWN_TECHNOLOGY';
+  if (def.grantOnly) return 'E_GRANT_ONLY';
+  const tech = state.players[playerId]?.technologies;
+  if (tech?.completed.includes(id) || activeOf(tech).some((a) => a.technology === id)) {
+    return 'E_ALREADY_RESEARCHED';
+  }
+  const queue = tech?.queue ?? [];
+  if (queue.includes(id)) return 'E_RESEARCH_QUEUED';
+  if (queue.length >= MAX_RESEARCH_QUEUE) return 'E_QUEUE_FULL';
+  const fate = queuedFate(state, playerId, data, id, queue);
+  return fate.fate === 'drop' ? fate.code : null;
+}
+
+/** Правило 5: ни одна тема не стоит выше своего предка из той же очереди. */
+export function researchQueueOrderOk(queue: readonly string[], data: GameData): boolean {
+  return queue.every((id, i) =>
+    (data.technologies[id]?.prerequisites ?? []).every((p) => {
+      const at = queue.indexOf(p);
+      return at < 0 || at < i;
+    }),
+  );
+}
+
+/** Что уйдёт из очереди вместе с темой `id` (правило 5): она сама и все, чей предок
+ *  после её снятия не изучен, не в работе и не в очереди. Порядок — порядок очереди. */
+export function researchQueueCascade(
+  state: GameState,
+  playerId: string,
+  data: GameData,
+  id: string,
+): string[] {
+  const tech = state.players[playerId]?.technologies;
+  const queue = tech?.queue ?? [];
+  if (!queue.includes(id)) return [];
+  const completed = tech?.completed ?? [];
+  const active = activeOf(tech);
+  const gone = new Set([id]);
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const q of queue) {
+      if (gone.has(q)) continue;
+      const orphan = (data.technologies[q]?.prerequisites ?? []).some(
+        (p) =>
+          gone.has(p) && !completed.includes(p) && !active.some((a) => a.technology === p),
+      );
+      if (orphan) {
+        gone.add(q);
+        changed = true;
+      }
+    }
+  }
+  return queue.filter((q) => gone.has(q));
+}
+
+/** Чего ждёт тема очереди — для подписи в окне науки. */
+export type ResearchQueueWait =
+  /** стартует при следующей проверке очереди: слот свободен и денег хватает */
+  | 'starting'
+  /** первая готовая тема, но денег на неё пока нет — очередь ждёт их */
+  | 'resources'
+  /** все слоты заняты */
+  | 'slot'
+  /** готова, но выше стоит тема, которая ждёт денег (правило 2) */
+  | 'queue'
+  /** предок ещё изучается или стоит выше в очереди */
+  | 'prerequisite'
+  /** день узла ещё не наступил */
+  | 'day'
+  /** условия узла (сектора, постройки, учёный) пока не выполнены */
+  | 'conditions';
+
+export interface ResearchQueueEntry {
+  technology: string;
+  wait: ResearchQueueWait;
+}
+
+/** Очередь глазами насоса — чистое чтение того же правила, которым ядро решает, кто
+ *  стартует следующим (`pumpResearchQueue`). Клиент не держит своей копии порядка
+ *  проверок: разъедься она с ядром, окно обещало бы старт, которого не будет. `slots` —
+ *  число слотов, посчитанное снаружи (хук `research.slots` вне редьюсера не зовётся). */
+export function researchQueueView(
+  state: GameState,
+  playerId: string,
+  data: GameData,
+  slots: number,
+): ResearchQueueEntry[] {
+  const player = state.players[playerId];
+  const tech = player?.technologies;
+  const queue = tech?.queue ?? [];
+  let free = Math.max(0, slots - activeOf(tech).length);
+  const purse: Record<string, number> = { ...(player?.resources ?? {}) };
+  let blocked = false;
+  const out: ResearchQueueEntry[] = [];
+  for (const id of queue) {
+    const fate = queuedFate(state, playerId, data, id, queue);
+    if (fate.fate === 'drop') continue; // насос снимет её при первой же проверке
+    if (fate.fate !== 'ready') {
+      out.push({ technology: id, wait: fate.fate });
+      continue;
+    }
+    if (blocked) {
+      out.push({ technology: id, wait: 'queue' });
+    } else if (free === 0) {
+      out.push({ technology: id, wait: 'slot' });
+    } else {
+      const cost = matchCost(state, data.technologies[id]!.cost);
+      if (canAfford(purse, cost)) {
+        payCost(purse, cost);
+        free -= 1;
+        out.push({ technology: id, wait: 'starting' });
+      } else {
+        blocked = true;
+        out.push({ technology: id, wait: 'resources' });
+      }
+    }
+  }
+  return out;
+}
+
+/** Назначить повтор насоса (правило 6), не плодя дублей. */
+function scheduleResearchPump(h: HandlerContext, playerId: string): void {
+  const pending = h.state.scheduled.some(
+    (e) =>
+      e.type === 'technology.queue.pump' &&
+      (e.payload as { playerId?: string } | undefined)?.playerId === playerId,
+  );
+  if (pending) return;
+  h.schedule(h.ctx.now + hoursToMs(h.ctx, RESEARCH_QUEUE_RETRY_HOURS), 'technology.queue.pump', {
+    playerId,
+  });
+}
+
+function researchSlots(h: HandlerContext, playerId: string): number {
+  return clampResearchSlots(h.hook<number>('research.slots', BASE_RESEARCH_SLOTS, { playerId }));
+}
+
+/** Начать тему в слоте: списать цену, назначить завершение, занять слот. Цена и
+ *  возможность проверены вызывающим. */
+function beginResearch(
+  h: HandlerContext,
+  player: Player,
+  playerId: string,
+  technology: string,
+  def: TechnologyDef,
+  fromQueue: boolean,
+): void {
+  payCost(player.resources, matchCost(h.state, def.cost));
+  const completesAt = scheduleCompletion(
+    h,
+    technology,
+    playerId,
+    matchHours(h.state, def.researchTimeHours),
+  );
+  (technologyState(player).active ??= []).push({ technology, startedAt: h.ctx.now, completesAt });
+  h.emit('technology.research.started', {
+    playerId,
+    technology,
+    completesAt,
+    ...(fromQueue ? { fromQueue: true } : {}),
+  });
+}
+
+function setQueue(tech: PlayerTechnologyState, queue: string[]): void {
+  if (queue.length) tech.queue = queue;
+  else delete tech.queue;
+}
+
+/**
+ * Насос очереди: занять свободные слоты темами из очереди. Единственная точка старта из
+ * очереди — её зовут завершение темы, приказы очереди, кража технологии и повтор по
+ * таймеру. Порядок решений — правила 2 и 3 из шапки раздела.
+ */
+function pumpResearchQueue(h: HandlerContext, playerId: string): void {
+  const player = h.state.players[playerId];
+  if (!player || player.status === 'defeated' || !player.technologies?.queue?.length) return;
+  pinTechRules(h);
+  const tech = technologyState(player);
+  const slots = researchSlots(h, playerId);
+  for (;;) {
+    if ((tech.active ?? []).length >= slots) return; // слоты заняты — разбудит завершение
+    let pick: string | null = null;
+    for (const id of [...(tech.queue ?? [])]) {
+      const fate = queuedFate(h.state, playerId, h.ctx.data, id, tech.queue ?? []);
+      if (fate.fate === 'drop') {
+        setQueue(tech, (tech.queue ?? []).filter((q) => q !== id));
+        h.emit('technology.queue.dropped', { playerId, technology: id, code: fate.code });
+        continue;
+      }
+      if (fate.fate === 'ready') {
+        pick = id;
+        break;
+      }
+    }
+    if (pick === null) break; // готовых нет — ждут предка, дня или условий
+    const def = h.ctx.data.technologies[pick]!;
+    if (!canAfford(player.resources, matchCost(h.state, def.cost))) break; // правило 2
+    setQueue(tech, (tech.queue ?? []).filter((q) => q !== pick));
+    beginResearch(h, player, playerId, pick, def, true);
+  }
+  if (tech.queue?.length) scheduleResearchPump(h, playerId);
+}
+
+function queuePayload(action: Action, h: HandlerContext): { player: Player; technology: string } | null {
+  const payload = action.payload as Partial<ResearchPayload>;
+  if (typeof payload?.technology !== 'string') {
+    h.reject('E_BAD_PAYLOAD');
+    return null;
+  }
+  const player = h.state.players[action.playerId];
+  if (!player) {
+    h.reject('E_FORBIDDEN');
+    return null;
+  }
+  technologyState(player); // старый одиночный `active` — в список, до любых проверок
+  return { player, technology: payload.technology };
+}
+
+/** `technology.queue` — поставить тему в хвост очереди (правило 4). Свободный слот и
+ *  деньги — тема стартует тут же, тем же насосом. */
+function enqueueResearch(action: Action, h: HandlerContext): void {
+  const got = queuePayload(action, h);
+  if (!got) return;
+  pinTechRules(h);
+  const tech = got.player.technologies!;
+  const code = queueableTechnology(h.state, action.playerId, h.ctx.data, got.technology);
+  if (code) return h.reject(code);
+  tech.queue = [...(tech.queue ?? []), got.technology];
+  h.emit('technology.queued', {
+    playerId: action.playerId,
+    technology: got.technology,
+    position: tech.queue.length,
+  });
+  pumpResearchQueue(h, action.playerId);
+}
+
+/** `technology.dequeue` — снять тему и всех, кто без неё остался без предка (правило 5).
+ *  Возврата нет: ждущая тема не оплачена (правило 1). */
+function dequeueResearch(action: Action, h: HandlerContext): void {
+  const got = queuePayload(action, h);
+  if (!got) return;
+  const removed = researchQueueCascade(h.state, action.playerId, h.ctx.data, got.technology);
+  if (!removed.length) return h.reject('E_NOT_QUEUED');
+  const tech = technologyState(got.player);
+  setQueue(tech, (tech.queue ?? []).filter((q) => !removed.includes(q)));
+  h.emit('technology.dequeued', {
+    playerId: action.playerId,
+    technology: got.technology,
+    removed,
+  });
+  pumpResearchQueue(h, action.playerId); // снятая голова могла держать очередь на деньгах
+}
+
+/** `technology.queue.move` — переставить тему на место `to` (с нуля, лишнее — к краю). */
+function moveQueuedResearch(action: Action, h: HandlerContext): void {
+  const got = queuePayload(action, h);
+  if (!got) return;
+  const to = (action.payload as { to?: unknown }).to;
+  if (typeof to !== 'number' || !Number.isInteger(to) || to < 0) return h.reject('E_BAD_PAYLOAD');
+  const tech = technologyState(got.player);
+  const queue = [...(tech.queue ?? [])];
+  const from = queue.indexOf(got.technology);
+  if (from < 0) return h.reject('E_NOT_QUEUED');
+  const target = Math.min(to, queue.length - 1);
+  if (target === from) return;
+  queue.splice(from, 1);
+  queue.splice(target, 0, got.technology);
+  if (!researchQueueOrderOk(queue, h.ctx.data)) return h.reject('E_QUEUE_ORDER');
+  tech.queue = queue;
+  h.emit('technology.queue.moved', {
+    playerId: action.playerId,
+    technology: got.technology,
+    to: target,
+  });
+  pumpResearchQueue(h, action.playerId); // наверх могла встать тема, на которую хватает
+}
+
 function startResearch(action: Action, h: HandlerContext): void {
   const payload = action.payload as Partial<ResearchPayload>;
   if (typeof payload?.technology !== 'string') {
@@ -350,23 +714,15 @@ function startResearch(action: Action, h: HandlerContext): void {
   if (lock) {
     return h.reject(lock);
   }
-  const cost = matchCost(h.state, def.cost);
-  if (!canAfford(player.resources, cost)) {
+  if (!canAfford(player.resources, matchCost(h.state, def.cost))) {
     return h.reject('E_INSUFFICIENT');
   }
-  payCost(player.resources, cost);
-  const completesAt = scheduleCompletion(
-    h,
-    payload.technology,
-    action.playerId,
-    matchHours(h.state, def.researchTimeHours),
-  );
-  active.push({ technology: payload.technology, startedAt: h.ctx.now, completesAt });
-  h.emit('technology.research.started', {
-    playerId: action.playerId,
-    technology: payload.technology,
-    completesAt,
-  });
+  // RQ-1: тема из очереди, начатая вручную, уходит из очереди — она уже в слоте, и
+  // зависящие от неё темы остаются на своих местах (предок теперь «в работе»).
+  if (tech.queue?.includes(payload.technology)) {
+    setQueue(tech, tech.queue.filter((q) => q !== payload.technology));
+  }
+  beginResearch(h, player, action.playerId, payload.technology, def, false);
 }
 
 /** SES-3 (GDD §4.3): sink the premium resource into faster research. One boost
@@ -436,8 +792,10 @@ const grantTechnology: TechnologyGrant = (h, playerId, technology) => {
   if (!player || !h.ctx.data.technologies[technology] || hasCompleted(player, technology)) return false;
   const tech = technologyState(player);
   if (tech.active) tech.active = tech.active.filter((a) => a.technology !== technology);
+  if (tech.queue) setQueue(tech, tech.queue.filter((q) => q !== technology));
   tech.completed.push(technology);
   h.emit('technology.researched', { playerId, technology });
+  pumpResearchQueue(h, playerId); // слот мог освободиться, а предок — открыться
   return true;
 };
 
@@ -446,11 +804,19 @@ export const technologyModule: GameModule = {
   // 1.1.0: условие «есть юнит» видит и десант на плацдарме.
   // 1.2.0: площадка крепости на развилке не считается сектором (замечание Codex на #1410).
   // 1.4.0: возможность `technology.grant` — технология мимо лаборатории (SPY-10).
-  version: '1.4.0',
+  // 1.5.0: очередь исследований (RQ-1) — `technology.queue` / `.dequeue` / `.queue.move`.
+  version: '1.5.0',
   setup(api) {
     api.provideCapability<TechnologyGrant>('technology.grant', grantTechnology);
     api.onAction('technology.research', startResearch);
     api.onAction('technology.boost', boostResearch);
+    api.onAction('technology.queue', enqueueResearch);
+    api.onAction('technology.dequeue', dequeueResearch);
+    api.onAction('technology.queue.move', moveQueuedResearch);
+    api.on('technology.queue.pump', (event, h) => {
+      const playerId = (event.payload as { playerId?: unknown } | undefined)?.playerId;
+      if (typeof playerId === 'string') pumpResearchQueue(h, playerId);
+    });
     api.on('time.advanced', (_event, h) => pinTechRules(h));
 
     api.on('technology.complete', (event, h) => {
@@ -485,6 +851,7 @@ export const technologyModule: GameModule = {
         playerId: payload.playerId,
         technology: payload.technology,
       });
+      pumpResearchQueue(h, payload.playerId); // RQ-1: освободившийся слот берёт очередь
     });
 
     api.hook<ConstructionRequirement>('construction.requirement', (current, args, h) => {

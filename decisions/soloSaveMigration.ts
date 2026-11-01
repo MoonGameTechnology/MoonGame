@@ -150,6 +150,18 @@ export const LANDING_CANCEL_SOLO_MIGRATION = {
   toDataHash: SPY_TURN_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: technology 1.5.0 adds the research queue (RQ-1). A saved world has no
+ *  `technologies.queue` and the field is optional, so it reads as is; the catalogue is
+ *  unchanged. */
+export const RESEARCH_QUEUE_SOLO_MIGRATION = {
+  fromRules: LANDING_CANCEL_SOLO_MIGRATION.toRules,
+  fromData: LANDING_CANCEL_SOLO_MIGRATION.toData,
+  fromDataHash: LANDING_CANCEL_SOLO_MIGRATION.toDataHash,
+  toRules: '0b0fb478769e86',
+  toData: LANDING_CANCEL_SOLO_MIGRATION.toData,
+  toDataHash: LANDING_CANCEL_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -165,6 +177,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_CREW_SOLO_MIGRATION,
   SPY_TURN_SOLO_MIGRATION,
   LANDING_CANCEL_SOLO_MIGRATION,
+  RESEARCH_QUEUE_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

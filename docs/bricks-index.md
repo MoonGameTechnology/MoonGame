@@ -18,6 +18,7 @@
 | ID | Ст. | Зоны | Где | Заголовок |
 | --- | --- | --- | --- | --- |
 | B4 | 🗑 |  | `docs/backlog.md` | вырезано: |
+| RQ-1 | ✅ | core proto | `docs/backlog.md` | Очередь исследований |
 | G2 | 🗑 |  | `docs/backlog.md` | Skia-рендер карты (зум / скролл / culling) — RN-вариант, снят вместе с RN. |
 | H4 | 🗑 |  | `docs/backlog.md` | Конструктор наземной армии: пехота в 3 вариантах (militia — дешёвое мясо, |
 | LARS-2 | 🔒 | srv | `docs/backlog.md` | (EC-1.2, EC-2/EC-3 — economy-roadmap.md) Цепочка валют → фронт |

@@ -19,14 +19,19 @@ import {
   techInMatch,
   techRulesOf,
   BASE_RESEARCH_SLOTS,
+  MAX_RESEARCH_QUEUE,
+  queueableTechnology,
+  researchQueueCascade,
+  researchQueueOrderOk,
+  researchQueueView,
 } from '../../packages/shared-core/src/index';
-import type { Action, GameState } from '../../packages/shared-core/src/index';
+import type { Action, GameState, ResearchQueueWait } from '../../packages/shared-core/src/index';
 import { matchCost, matchHours } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { DAY, HOUR } from './time';
 import { esc, cost, displayUnit, fmtDur, fmtEta } from './format';
-import { researchTech } from '../../decisions/actions';
+import { dequeueTech, moveQueuedTech, queueTech, researchTech } from '../../decisions/actions';
 import { isGrantOnlyTech } from './techCoverage';
 
 const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
@@ -161,7 +166,9 @@ export function techTreeHtml(
   me: string,
   tab: string,
   modalId: string | null,
+  view: { queueFolded?: boolean; queueSel?: string | null } = {},
 ): string {
+  const { queueFolded = false, queueSel = null } = view;
   const seat = state.players[me];
   // Run boons are grants, not researchable session techs — the tree
   // shows only the real nodes. The rule itself lives in `techCoverage.ts` (BAL-12): the
@@ -191,6 +198,11 @@ export function techTreeHtml(
   // третье исследование отклонялось `E_RESEARCH_SLOTS_FULL` — интерфейс обещал слот,
   // которого нет. Модуль теперь загружен, а число берётся из одного места.
   const slots = clampResearchSlots(BASE_RESEARCH_SLOTS + scientistSlotBonus(seat, data));
+  // RQ-1: очередь исследований. Что можно поставить и чего ждёт каждая тема, решает ЯДРО
+  // (`queueableTechnology`, `researchQueueView`) — окно только читает его ответ.
+  const queue = seat?.technologies?.queue ?? [];
+  const freeSlot = activeList.length < slots;
+  const canQueue = (id: string): boolean => queueableTechnology(state, me, data, id) === null;
   // Состояние узла в порядке проверок ядра (technologyLock): prereq → день → условия.
   const nodeState = (id: string): { st: string; prog: number; eta: number } => {
     const td = techs[id]!;
@@ -204,6 +216,9 @@ export function techTreeHtml(
         eta: Math.max(0, Math.ceil((act.completesAt - state.time) / HOUR)),
       };
     }
+    // RQ-1: место в очереди — отдельное состояние: тема уже в плане, повторно её не
+    // ставят, а снять можно из полосы очереди или из досье.
+    if (queue.includes(id)) return { st: 'queued', prog: 0, eta: 0 };
     if ((td.prerequisites ?? []).some((p) => !done.has(p))) return { st: 'chain', prog: 0, eta: 0 };
     if (gateOf(td) > 0 && state.time - started < gateOf(td) * DAY)
       return { st: 'gate', prog: 0, eta: 0 };
@@ -275,17 +290,26 @@ export function techTreeHtml(
     }
     const price = matchCost(state, td.cost);
     const affordable = Object.entries(price).every(([k, v]) => (res[k] ?? 0) >= v);
-    // Правое поле строки — ОДНО состояние: сделано / идёт / можно взять / причина замка.
-    const right =
-      st.st === 'done'
-        ? `<span class="tt-st done">✓ ${t('tech.state.done')}</span>`
-        : st.st === 'res'
-          ? `<span class="tt-st run">⚗ ${fmtEta(st.eta)}</span>`
-          : st.st === 'avail'
-            ? `<button class="tt-take btn-main" data-go="${id}"${affordable ? '' : ' disabled'}>▷ ${
-                affordable ? t('tech.action.research') : t('tech.action.no-resources')
-              }</button>`
-            : `<span class="tt-st lock">🔒 ${lockText(id, st.st)}</span>`;
+    // Правое поле строки — состояние: сделано / идёт / в очереди / можно взять / причина
+    // замка. Под ним — «＋ В очередь», если начать прямо сейчас нельзя, а поставить в план
+    // можно (RQ-1): причина остаётся на виду, а действие — в тот же тап.
+    const queueBtn = canQueue(id)
+      ? `<button class="tt-qadd btn-second" data-q="${id}">＋ ${t('tech.action.queue')}</button>`
+      : '';
+    let right: string;
+    if (st.st === 'done') right = `<span class="tt-st done">✓ ${t('tech.state.done')}</span>`;
+    else if (st.st === 'res') right = `<span class="tt-st run">⚗ ${fmtEta(st.eta)}</span>`;
+    else if (st.st === 'queued')
+      right = `<span class="tt-st q">⏳ ${t('tech.state.queued', { n: queue.indexOf(id) + 1 })}</span>`;
+    else if (st.st === 'avail' && freeSlot && affordable)
+      right = `<button class="tt-take btn-main" data-go="${id}">▷ ${t('tech.action.research')}</button>`;
+    else if (st.st === 'avail' && !affordable)
+      right =
+        `<button class="tt-take btn-main" data-go="${id}" disabled>▷ ${t('tech.action.no-resources')}</button>` +
+        queueBtn;
+    else if (st.st === 'avail')
+      right = queueBtn || `<span class="tt-st lock">⏳ ${t('tech.action.slots-full')}</span>`;
+    else right = `<span class="tt-st lock">🔒 ${lockText(id, st.st)}</span>` + queueBtn;
     listHtml +=
       `<div class="tt-item st-${st.st}" data-tech="${id}">` +
       `<div class="tt-ih"><b>${esc(tData(td.name))}</b>${right}</div>` +
@@ -310,7 +334,7 @@ export function techTreeHtml(
           const pct = total > 0 ? Math.round(clamp((state.time - a.startedAt) / total, 0, 1) * 100) : 100;
           const left = Math.max(0, a.completesAt - state.time);
           return (
-            `<div class="tt-nowrow"><i class="tt-nowdot"></i>` +
+            `<div class="tt-nowrow" data-now="${esc(a.technology)}"><i class="tt-nowdot"></i>` +
             `<b>${esc(tData(td?.name ?? a.technology))}</b>` +
             `<span class="tt-nowt">${fmtClock(left)}</span>` +
             `<span class="tt-prog"><i style="width:${pct}%"></i></span></div>`
@@ -319,6 +343,81 @@ export function techTreeHtml(
         .join('') +
       `</div>`
     : '';
+
+  // RQ-1: полоса очереди — под «исследуется сейчас», в том же закреплённом верху. Каждая
+  // тема говорит, ЧЕГО она ждёт (правило насоса ядра, `researchQueueView`), и несёт три
+  // кнопки: выше / ниже / убрать. Стрелка, которая подняла бы тему над её предком, гаснет
+  // заранее — тот же вопрос, что задаст редьюсер (`researchQueueOrderOk`).
+  let queueHtml = '';
+  if (queue.length) {
+    const view = researchQueueView(state, me, data, slots);
+    const waitOf = new Map(view.map((v) => [v.technology, v.wait]));
+    const nameOf = (id: string): string => esc(tData(techs[id]?.name ?? data.technologies[id]?.name ?? id));
+    const swapped = (i: number, j: number): string[] => {
+      const next = [...queue];
+      [next[i], next[j]] = [next[j]!, next[i]!];
+      return next;
+    };
+    const waitText = (id: string, wait: ResearchQueueWait | undefined): string => {
+      const td = data.technologies[id];
+      switch (wait) {
+        case 'starting':
+          return `<button class="tt-qgo btn-main" data-go="${esc(id)}">▶ ${t('tech.action.research')}</button>`;
+        case 'resources':
+          return `${t('tech.queue.wait.resources')} ${techCost(matchCost(state, td?.cost ?? {}), res)}`;
+        case 'slot':
+          return t('tech.queue.wait.slot');
+        case 'queue':
+          return t('tech.queue.wait.queue');
+        case 'prerequisite': {
+          const parent = (td?.prerequisites ?? []).find((p) => !done.has(p)) ?? '';
+          return t('tech.queue.wait.prerequisite', { x: nameOf(parent) });
+        }
+        case 'day':
+          return t('tech.from-day', { n: (td ? gateOf(td) : 0) + 1 });
+        case 'conditions': {
+          const unmet = (td?.conditions ?? []).find((c) => !techCondOk(state, me, c));
+          return unmet ? esc(techCondText(unmet)) : t('tech.action.unmet');
+        }
+        default:
+          return '';
+      }
+    };
+    const rows = (queueFolded ? [] : queue)
+      .map((id, i) => {
+        const wait = waitOf.get(id);
+        const up = i > 0 && researchQueueOrderOk(swapped(i, i - 1), data);
+        const down = i < queue.length - 1 && researchQueueOrderOk(swapped(i, i + 1), data);
+        const gone = researchQueueCascade(state, me, data, id);
+        const removeTitle =
+          gone.length > 1
+            ? t('tech.queue.remove-with', { x: gone.slice(1).map(nameOf).join(', ') })
+            : t('tech.action.dequeue');
+        const qid = esc(id);
+        return (
+          `<div class="tt-qrow w-${wait ?? 'none'}${id === queueSel ? ' sel' : ''}" data-qitem="${qid}">` +
+          `<em>${i + 1}</em>` +
+          `<div class="tt-qmain"><b>${nameOf(id)}</b><span class="tt-qwait">${waitText(id, wait)}</span></div>` +
+          `<span class="tt-qbtns">` +
+          `<button class="tt-qb btn-second" data-qmove="${qid}" data-to="${i - 1}" title="${esc(t('tech.queue.up'))}" aria-label="${esc(t('tech.queue.up'))}"${up ? '' : ' disabled'}>▲</button>` +
+          `<button class="tt-qb btn-second" data-qmove="${qid}" data-to="${i + 1}" title="${esc(t('tech.queue.down'))}" aria-label="${esc(t('tech.queue.down'))}"${down ? '' : ' disabled'}>▼</button>` +
+          `<button class="tt-qx btn-x" data-dq="${qid}" title="${esc(removeTitle)}" aria-label="${esc(removeTitle)}">✕</button>` +
+          `</span></div>`
+        );
+      })
+      .join('');
+    // Свёрнутая полоса — одна строка: заголовок, первая тема и счётчик. Так очередь не
+    // отнимает у телефона место под дерево, а свернуть её можно тапом по заголовку.
+    const fold = t(queueFolded ? 'tech.queue.unfold' : 'tech.queue.fold');
+    queueHtml =
+      `<div class="tt-queue${queueFolded ? ' folded' : ''}">` +
+      `<div class="tt-qhead" data-qfold><span>⏭ ${t('tech.queue.title')}</span>` +
+      (queueFolded ? `<span class="tt-qpeek">1 · ${nameOf(queue[0]!)}</span>` : '') +
+      `<button class="tt-qfold btn-quiet" aria-expanded="${!queueFolded}" title="${esc(fold)}" aria-label="${esc(fold)}">` +
+      `<i>${queue.length}/${MAX_RESEARCH_QUEUE}</i> ${queueFolded ? '▾' : '▴'}</button></div>` +
+      (queueFolded ? '' : `<div class="tt-qlist">${rows}</div>`) +
+      `</div>`;
+  }
 
   // Досье узла (тап) — рендерится из состояния, так что живой 500мс-ререндер
   // обновляет прогресс/день, не закрывая окно.
@@ -342,11 +441,25 @@ export function techTreeHtml(
         ? `<span class="tt-tag">${t('tech.state.done')}</span>`
         : st.st === 'res'
           ? `<span class="tt-tag amb">${t('tech.state.running')}</span>`
-          : st.st === 'avail'
-            ? `<span class="tt-tag">${t('tech.state.open')}</span>`
-            : `<span class="tt-tag dim">${t('tech.state.locked')}</span>`;
+          : st.st === 'queued'
+            ? `<span class="tt-tag amb">${t('tech.state.queued', { n: queue.indexOf(id) + 1 })}</span>`
+            : st.st === 'avail'
+              ? `<span class="tt-tag">${t('tech.state.open')}</span>`
+              : `<span class="tt-tag dim">${t('tech.state.locked')}</span>`;
+    // RQ-1: под кнопкой состояния — действие очереди: «＋ В очередь», если начать сейчас
+    // нельзя, а поставить в план можно; «убрать», если тема уже стоит в очереди.
+    const qBtn =
+      st.st === 'queued'
+        ? `<button class="tt-mq btn-second danger" data-dq="${id}">✕ ${t('tech.action.dequeue')}</button>`
+        : !(st.st === 'avail' && freeSlot && affordable) && canQueue(id)
+          ? `<button class="tt-mq btn-second" data-q="${id}">＋ ${t('tech.action.queue')}</button>`
+          : '';
     const btn =
-      st.st === 'avail'
+      st.st === 'queued'
+        ? `<button class="tt-mbtn wait btn-main" disabled>⏳ ${t('tech.state.queued', { n: queue.indexOf(id) + 1 })}</button>`
+        : st.st === 'avail' && affordable && !freeSlot
+          ? `<button class="tt-mbtn wait btn-main" disabled>⏳ ${t('tech.action.slots-full')}</button>`
+          : st.st === 'avail'
         ? `<button class="tt-mbtn btn-main" data-go="${id}"${affordable ? '' : ' disabled'}>🔬 ${affordable ? t('tech.action.research') : t('tech.action.no-resources')}</button>`
         : st.st === 'done'
           ? `<button class="tt-mbtn wait btn-main" disabled>✓ ${t('tech.action.done')}</button>`
@@ -370,12 +483,13 @@ export function techTreeHtml(
       (gate > 0 ? `<span>📅 <b>${t('tech.from-day', { n: gate + 1 })}</b></span>` : '') +
       (prereqNames ? `<span>🔗 <b>${t('tech.req.title')} ${prereqNames}</b></span>` : '') +
       condRows +
-      `</div>${btn}</div></div>`;
+      `</div>${btn}${qBtn}</div></div>`;
   }
   const html =
     `<div class="tt-top">${dayGates ? `<span class="tt-day">📅 ${t('tech.day', { n: hudDay })}</span>` : ''}` +
     `<span class="tt-slots">⚛ ${t('tech.slots', { a: activeList.length, b: slots })}</span></div>` +
     activeHtml +
+    queueHtml +
     `<div class="tt-tabs">${tabs}</div>` +
     (showLead ? `<div class="tt-lead${lead ? '' : ' closed'}">${leadHtml}</div>` : '') +
     `<div class="tt-scroll"><div class="tt-list">${listHtml}</div></div>` +
@@ -409,6 +523,8 @@ export function initTechTree(host: TechHost): {
 } {
   let tab = 'space'; // активная вкладка-ветка
   let modalId: string | null = null; // открытое досье узла
+  let queueFolded = false; // RQ-1: полоса очереди свёрнута в одну строку
+  let queueSel: string | null = null; // RQ-1: строка очереди, чьи кнопки открыты на телефоне
   // Появление досье анимируется одноразовым классом .pop: живой 500мс-ререндер окна
   // пересоздаёт DOM, и анимация на самом .tt-mwin переигрывалась бы каждый тик —
   // досье «схлопывалось и выпрыгивало» дважды в секунду (баг живого плейтеста).
@@ -417,10 +533,41 @@ export function initTechTree(host: TechHost): {
   // переприсваиваем — innerHTML пересоздаёт DOM даже на идентичном тексте (и выбивал
   // бы элемент из-под пальца между touchstart и click).
   let lastHtml = '';
+  // RQ-1: отклик на приказ очереди — тема, которую поставили, сдвинули или начали,
+  // коротко вспыхивает там, где оказалась. Живой ререндер пересоздаёт узлы, поэтому
+  // вспышка помнит, когда началась, и пересозданный узел продолжает её с того же места
+  // (отрицательная задержка анимации), а не начинает заново. В сетевой игре узел
+  // появляется с ответом сервера — вспышка ждёт его до `FLASH_WAIT_MS`.
+  let flash: { id: string; since: number | null; asked: number } | null = null;
+  const FLASH_MS = 700;
+  const FLASH_WAIT_MS = 3000;
+  const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+  function paintFlash(body: HTMLElement): void {
+    if (!flash || typeof body.querySelectorAll !== 'function') return;
+    const at = now();
+    const sel = `[data-qitem="${CSS.escape(flash.id)}"],[data-now="${CSS.escape(flash.id)}"],.tt-item[data-tech="${CSS.escape(flash.id)}"]`;
+    const nodes = body.querySelectorAll<HTMLElement>(sel);
+    if (flash.since === null) {
+      if (nodes.length) flash.since = at;
+      else if (at - flash.asked > FLASH_WAIT_MS) flash = null;
+      if (!flash || flash.since === null) return;
+    }
+    const elapsed = at - flash.since;
+    if (elapsed >= FLASH_MS) {
+      flash = null;
+      return;
+    }
+    nodes.forEach((n) => {
+      if (n.classList.contains('tt-flash')) return;
+      n.style.animationDelay = `-${Math.round(elapsed)}ms`;
+      n.classList.add('tt-flash');
+    });
+  }
 
   function repaint(): void {
     const body = host.body();
-    const html = techTreeHtml(host.state(), host.me(), tab, modalId);
+    const html = techTreeHtml(host.state(), host.me(), tab, modalId, { queueFolded, queueSel });
     if (html !== lastHtml) {
       // A live re-render (innerHTML) would reset the panel's scroll — save and restore it.
       const before = body.querySelector('.tt-scroll');
@@ -440,6 +587,14 @@ export function initTechTree(host: TechHost): {
       body.querySelector('.tt-mwin')?.classList.add('pop');
       modalPop = false;
     }
+    paintFlash(body);
+  }
+
+  /** Приказ очереди: отправить, вспыхнуть на месте темы, перерисовать. */
+  function queueOrder(action: Action, id: string): void {
+    host.order(action);
+    flash = { id, since: null, asked: now() };
+    repaint();
   }
 
   host.root().addEventListener('click', (e) => {
@@ -459,8 +614,39 @@ export function initTechTree(host: TechHost): {
     // же гасит открытие досье: тап по кнопке в строке — это приказ, а не «показать».
     const go = (tg.closest('[data-go]') as HTMLElement | null)?.dataset.go;
     if (go) {
-      host.order(researchTech(host.me(), go));
-      repaint(); // узел тут же перекрашивается в «исследуется»
+      queueOrder(researchTech(host.me(), go), go); // узел тут же перекрашивается в «исследуется»
+      return;
+    }
+    // RQ-1: приказы очереди — поставить, снять, переставить. Как и «исследовать», они
+    // гасят открытие досье: кнопки лежат внутри кликабельной строки.
+    const q = (tg.closest('[data-q]') as HTMLElement | null)?.dataset.q;
+    if (q) {
+      queueOrder(queueTech(host.me(), q), q);
+      return;
+    }
+    const dq = (tg.closest('[data-dq]') as HTMLElement | null)?.dataset.dq;
+    if (dq) {
+      host.order(dequeueTech(host.me(), dq));
+      repaint();
+      return;
+    }
+    if (tg.closest('[data-qfold]')) {
+      queueFolded = !queueFolded;
+      repaint();
+      return;
+    }
+    const mv = tg.closest('[data-qmove]') as HTMLElement | null;
+    if (mv?.dataset.qmove) {
+      const to = Number(mv.dataset.to);
+      if (Number.isInteger(to) && to >= 0) queueOrder(moveQueuedTech(host.me(), mv.dataset.qmove, to), mv.dataset.qmove);
+      return;
+    }
+    // Тап по строке очереди (мимо её кнопок) открывает или прячет её кнопки — на телефоне
+    // они скрыты, чтобы строка занимала две строки текста, а не высоту 44-пиксельных кнопок.
+    const qi = (tg.closest('[data-qitem]') as HTMLElement | null)?.dataset.qitem;
+    if (qi) {
+      queueSel = queueSel === qi ? null : qi;
+      repaint();
       return;
     }
     const next = (tg.closest('.tt-tab') as HTMLElement | null)?.dataset.ttab;
