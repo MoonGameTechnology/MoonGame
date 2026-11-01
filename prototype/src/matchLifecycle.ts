@@ -28,6 +28,7 @@ import {
 import { type GameState, shareRoadNetwork } from '../../packages/shared-core/src/index';
 import { chainMode, exitChainMode, forgetChainRoutes } from './chainComposer';
 import { detach } from './detach';
+import { restoreSpyArchive } from './diploWindow';
 import type { EndAction } from './endScreen';
 import { note, resetEventFeed } from './eventFeed';
 import {
@@ -247,6 +248,7 @@ export function installMatch(
   resetThreatAlerts(); // тревоги и доклады союзника старого матча — у владельца полосы (REFM-222)
   clearFlak();
   forgetAway(); // reset the away-window baseline for the new match
+  restoreSpyArchive(); // SPY-20: донесения старой партии — не о мирах этой
   // The match goal, written AFTER the wipe so it is the first line a player can read.
   // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
   // elimination, or on domination — no "capital capture" victory exists.

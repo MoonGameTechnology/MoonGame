@@ -3,11 +3,9 @@ import type { IntelGrant } from '../../packages/shared-core/src/index';
 import {
   SPY_COST,
   spyCostRange,
-  SPY_LOG_MAX,
   grantLeftMs,
   grantVision,
   liveGrants,
-  pushSpyEntry,
   targetsOf,
 } from './intel';
 
@@ -90,30 +88,6 @@ describe('разведка — что она добавляет в туман', 
     grantVision(v, new Set(), () => true);
     expect(v.identify).toEqual(new Set(['свой']));
     expect(v.radar.size).toBe(0);
-  });
-});
-
-describe('разведка — журнал шпионажа', () => {
-  it('строки копятся в порядке событий', () => {
-    const log = pushSpyEntry(pushSpyEntry([], { at: 1, text: 'первое' }), {
-      at: 2,
-      text: 'второе',
-    });
-    expect(log.map((e) => e.text)).toEqual(['первое', 'второе']);
-  });
-
-  it('журнал ограничен — старое вытесняется, новое остаётся', () => {
-    const log: { at: number; text: string }[] = [];
-    for (let i = 0; i < SPY_LOG_MAX + 5; i++) pushSpyEntry(log, { at: i, text: `#${i}` });
-    expect(log.length).toBe(SPY_LOG_MAX);
-    expect(log[0]!.text).toBe('#5'); // первые пять вытеснены
-    expect(log[log.length - 1]!.text).toBe(`#${SPY_LOG_MAX + 4}`);
-  });
-
-  it('потолок можно задать явно (окно вкладки короче)', () => {
-    const log: { at: number; text: string }[] = [];
-    for (let i = 0; i < 10; i++) pushSpyEntry(log, { at: i, text: `#${i}` }, 3);
-    expect(log.map((e) => e.text)).toEqual(['#7', '#8', '#9']);
   });
 });
 

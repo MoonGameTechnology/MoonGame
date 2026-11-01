@@ -39,3 +39,27 @@ it('refuses non-envelopes, absent worlds and wrong versions without throwing', (
     expect(parseSoloSave(raw, 'rules')).toBeNull();
   }
 });
+
+it('SPY-20: carries the spy archive, refuses a damaged one, opens an older save without it', () => {
+  const state = createInitialState({ seed: 'spy-archive', version: { data: '1', manifest: '1' } });
+  state.mapId = 'nexus';
+  state.players.p1 = { id: 'p1', name: 'One', faction: 'x', status: 'active', resources: {} };
+  state.planets.A = {
+    id: 'A',
+    owner: 'p1',
+    position: { x: 0, y: 0 },
+    resources: {},
+    buildings: [],
+    garrison: [],
+    traits: [],
+  };
+  const base = { state, ai: [], normalSpeed: 10, fastSpeed: 30, autoAssault: [], memory: [] };
+  const save: SoloSave = {
+    ...base,
+    spyArchive: [{ at: 5, text: 'кража', planetId: 'A', op: 'theft' }],
+  };
+  expect(parseSoloSave(serializeSoloSave(save, 'rules'), 'rules')).toEqual(save);
+  expect(parseSoloSave(serializeSoloSave(base, 'rules'), 'rules')).toEqual(base);
+  const broken = { ...base, spyArchive: [{ at: 'вчера', text: 'x' }] } as unknown as SoloSave;
+  expect(parseSoloSave(serializeSoloSave(broken, 'rules'), 'rules')).toBeNull();
+});

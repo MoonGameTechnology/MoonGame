@@ -297,14 +297,14 @@ export function handleEvents(events: DomainEvent[]) {
         if (p.owner === ME) {
           const at = game.placeName(String(p.planetId));
           note(t('log.spy.sent', { at, n: MISSION_HOURS }));
-          pushSpyLog(t('log.spy.sent.short', { at }));
+          pushSpyLog(t('log.spy.sent.short', { at }), e.type, p);
         }
         break;
       case 'espionage.aborted':
         if (p.owner === ME) {
           const at = game.placeName(String(p.planetId));
           note(t('log.spy.aborted', { at }));
-          pushSpyLog(t('log.spy.aborted.short', { at }));
+          pushSpyLog(t('log.spy.aborted.short', { at }), e.type, p);
         }
         break;
       case 'intel.stolen': {
@@ -324,6 +324,8 @@ export function handleEvents(events: DomainEvent[]) {
                 : 'log.spy.success.short',
             { what },
           ),
+          e.type,
+          p,
         );
         if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
         break;
@@ -335,7 +337,7 @@ export function handleEvents(events: DomainEvent[]) {
         const what = n === 2 ? t('spy.layer.2') : n === 3 ? t('spy.layer.3') : t('spy.layer.4');
         const line = t('log.spy.layer', { at: game.placeName(String(p.planetId)), n, what });
         note(line);
-        pushSpyLog(line);
+        pushSpyLog(line, e.type, p);
         if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
@@ -351,7 +353,7 @@ export function handleEvents(events: DomainEvent[]) {
           at: game.placeName(String(p.planetId)),
         });
         note(line);
-        pushSpyLog(line);
+        pushSpyLog(line, e.type, p);
         if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
@@ -371,7 +373,7 @@ export function handleEvents(events: DomainEvent[]) {
         const lostKey = p.agentTurned === true ? 'log.spy.agent-turned' : 'log.spy.agent-lost';
         const line = t(deed.key, params) + (deed.lost ? ` ${t(lostKey)}` : '');
         note(line);
-        pushSpyLog(line);
+        pushSpyLog(line, e.type, p);
         break;
       }
       // SPY-11: контрразведчик — пост, отзыв, поимка чужого и потеря своего.
@@ -386,7 +388,7 @@ export function handleEvents(events: DomainEvent[]) {
                 : 'log.spy.recalled';
           const line = t(key, { at: game.placeName(String(p.planetId)) });
           note(line);
-          pushSpyLog(line);
+          pushSpyLog(line, e.type, p);
         }
         break;
       case 'espionage.counter.caught':
@@ -402,7 +404,7 @@ export function handleEvents(events: DomainEvent[]) {
                 })
               : t(dead ? 'log.spy.counter.lost.killed' : 'log.spy.counter.lost', { at });
           note(line);
-          pushSpyLog(line);
+          pushSpyLog(line, e.type, p);
         }
         break;
       case 'espionage.failed':
@@ -416,6 +418,8 @@ export function handleEvents(events: DomainEvent[]) {
             t(turnedF ? 'log.spy.fail.turned.short' : lost ? 'log.spy.fail.lost.short' : 'log.spy.fail.short', {
               who: whoF,
             }),
+            e.type,
+            p,
           );
         }
         break;
@@ -433,7 +437,7 @@ export function handleEvents(events: DomainEvent[]) {
               ? t(c.key, { who, what })
               : t(c.key, { what });
         note(line);
-        pushSpyLog(line);
+        pushSpyLog(line, e.type, p);
         break;
       }
       case 'planet.captured':
