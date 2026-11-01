@@ -123,8 +123,17 @@ export function initMobileHud(host: MobileHudHost) {
   let sub = '';
   let badgeText = '';
   let badgeKey = '';
+  // Лист пишется каждый кадр (`update`), а запись того же значения не бесплатна: узел с
+  // заново записанным `hidden` браузер заново стилизует, а с заново записанным текстом —
+  // ещё и перекладывает. Поэтому пишется только сменившееся.
   const setText = (el: HTMLElement, text: string): void => {
     if (el.textContent !== text) el.textContent = text;
+  };
+  const setHidden = (el: HTMLElement, hidden: boolean): void => {
+    if (el.hidden !== hidden) el.hidden = hidden;
+  };
+  const setAttr = (el: HTMLElement, name: string, value: string): void => {
+    if (el.getAttribute(name) !== value) el.setAttribute(name, value);
   };
   const expand = (next: boolean): void => {
     expanded = next;
@@ -250,35 +259,36 @@ export function initMobileHud(host: MobileHudHost) {
         choices.innerHTML = html;
         choicesHtml = html;
       }
-      sheet.hidden = !key && !mode && !choosing;
+      setHidden(sheet, !key && !mode && !choosing);
       sheet.classList.toggle('choosing', choosing);
       sheet.classList.toggle('order-mode', mode);
       sheet.classList.toggle('more-open', more);
       sheet.classList.toggle('has-commands', host.commands.classList.contains('show'));
-      head.hidden = mode;
-      tabs.hidden = mode || choosing || !tab;
+      setHidden(head, mode);
+      setHidden(tabs, mode || choosing || !tab);
       if (!tabs.hidden) {
         setText(fleetTab, t('hud.mobile.tab.fleet'));
         setText(worldTab, t('hud.mobile.tab.world'));
-        fleetTab.setAttribute('aria-selected', String(tab === 'fleet'));
-        worldTab.setAttribute('aria-selected', String(tab === 'world'));
+        setAttr(fleetTab, 'aria-selected', String(tab === 'fleet'));
+        setAttr(worldTab, 'aria-selected', String(tab === 'world'));
       }
-      choices.hidden = !choosing;
-      quick.hidden = mode || choosing;
-      grab.disabled = choosing;
+      setHidden(choices, !choosing);
+      setHidden(quick, mode || choosing);
+      if (grab.disabled !== choosing) grab.disabled = choosing;
       setText(caption, choosing ? t('hud.mobile.choose') : title);
       setText(subtitle, choosing ? t('hud.mobile.choose-hint') : sub);
       setText(badge, badgeText);
-      badge.hidden = choosing || !badgeText;
-      grab.setAttribute('aria-label', `${title} — ${t('hud.mobile.details')}`);
-      close.setAttribute('aria-label', t('card.close'));
+      setHidden(badge, choosing || !badgeText);
+      setAttr(grab, 'aria-label', `${title} — ${t('hud.mobile.details')}`);
+      setAttr(close, 'aria-label', t('card.close'));
       setText(detailButton, expanded ? t('hud.mobile.collapse') : t('hud.mobile.details'));
       setText(pingButton, t('side.world.ping'));
       setText(summaryButton, t('hud.mobile.summary'));
-      summaryButton.hidden =
-        !expanded || !host.side.querySelector('[data-act="fleetinfo"]');
-      pingButton.hidden =
-        !host.side.querySelector('[data-act="ping"]') || !key.startsWith('planet:');
+      setHidden(summaryButton, !expanded || !host.side.querySelector('[data-act="fleetinfo"]'));
+      setHidden(
+        pingButton,
+        !host.side.querySelector('[data-act="ping"]') || !key.startsWith('planet:'),
+      );
     },
   };
 }

@@ -138,7 +138,8 @@ describe('rule 6 in the frame', () => {
   });
 
   it('▶▶▶ — только в дев-забеге, и в игроцкой сборке её нет вовсе', () => {
-    expect(bar).toContain('if (devFastBtn) devFastBtn.hidden = !(run && sectorDevActive);');
+    expect(bar).toContain('const devHidden = !(run && sectorDevActive);');
+    expect(bar).toContain('devFastBtn.hidden = devHidden;');
     const markup = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
     expect(markup).toMatch(/<!--dev-only--><button id="spd-dev"[^>]*hidden>▶▶▶<\/button><!--\/dev-only-->/);
   });

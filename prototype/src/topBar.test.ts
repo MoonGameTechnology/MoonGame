@@ -44,8 +44,8 @@ describe('«до след. дня» — отдельный узел, чтобы 
   });
 
   it('в #tbeta уезжают только цифры: собранная строка вернула бы подпись назад', () => {
-    expect(topBar).toMatch(/tbEta\.textContent = eta;/);
-    expect(topBar).not.toMatch(/tbEta\.textContent = t\(/);
+    expect(topBar).toMatch(/patchText\(tbEta, eta\);/);
+    expect(topBar).not.toMatch(/tbEta(\.textContent =|,) t\(/);
   });
 
   it('узкий телефон подпись прячет', () => {
