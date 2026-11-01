@@ -108,6 +108,11 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  * independent of the outcome. Death cannot be hidden from the agent's owner
  * (`agentLost: true` on `espionage.failed` / `intel.stolen`); the victim's
  * `espionage.detected` says `killed: true`.
+ *
+ * Turning (SPY-18): an agent the victim's bureau kills may be turned instead (see
+ * `turnAgent`). The spy loses it just like a dead one (`agentTurned: true` beside
+ * `agentLost`); the victim's `espionage.detected` adds `turned: true` and the sender,
+ * and the victim holds one agent over its network for `TURNED_HOURS`.
  */
 
 const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>([
@@ -200,7 +205,7 @@ export function counterIntelOf(
   data: GameData,
   state: GameState,
   playerId: string,
-  field: 'spyDetectBonus' | 'spyKillBonus',
+  field: 'spyDetectBonus' | 'spyKillBonus' | 'spyTurnChance',
 ): number {
   let best = 0;
   for (const planet of recordValues(state.planets)) {
@@ -211,6 +216,35 @@ export function counterIntelOf(
     }
   }
   return best;
+}
+
+/** SPY-18: how long a turned agent serves its catcher, game-hours. */
+export const TURNED_HOURS = 24;
+
+/** Turned agents still serving `playerId` at `now` — each one over the network size. */
+export function turnedAgents(state: GameState, playerId: string, now: number): number {
+  return (state.spyTurned?.[playerId] ?? []).filter((until) => until > now).length;
+}
+
+/**
+ * SPY-18: an agent the catcher's bureau would kill may be turned instead — the
+ * `espionage.turn` pipeline over the catcher's strongest `spyTurnChance` (0 without a
+ * bureau that turns). For the spy the agent is lost all the same; the catcher holds one
+ * more agent for `TURNED_HOURS`. The roll is drawn only for a killed agent with a chance
+ * above zero, so a match without such a bureau keeps its RNG stream.
+ */
+function turnAgent(h: HandlerContext, catcher: string, spy: string, kind: SpyOp): boolean {
+  const base = counterIntelOf(h.ctx.data, h.state, catcher, 'spyTurnChance');
+  const raw = h.hook<number>('espionage.turn', base, { playerId: spy, target: catcher, kind });
+  const chance = Math.min(1, Math.max(0, finiteOr(raw, base)));
+  if (chance <= 0 || h.rng.nextFloat() >= chance) return false;
+  const now = h.ctx.now;
+  const turned = (h.state.spyTurned ??= {});
+  turned[catcher] = [
+    ...(turned[catcher] ?? []).filter((until) => until > now),
+    now + hoursToMs(h.ctx, TURNED_HOURS),
+  ];
+  return true;
 }
 
 interface SpyPayload {
@@ -355,7 +389,7 @@ export const espionageModule: GameModule = {
   // 1.7.0: разведка копится слоями, агент стоит до отзыва (SPY-13).
   // 1.8.0: подрыв экономики (SPY-15). 1.9.0: раскрытие — новость для всех (SPY-16).
   // 1.10.0: до трёх агентов на мире, волна складывает шансы (SPY-17).
-  version: '1.10.0',
+  version: '1.11.0',
   setup(api) {
     // SPY-15: a disrupted world produces `DISRUPT_FACTOR` of its output. A span never
     // runs across the end (it is a scheduled event), so «until ≥ now» at the span's end
@@ -420,9 +454,10 @@ export const espionageModule: GameModule = {
       const rawAgents = h.hook<number>('espionage.agents', BASE_SPY_AGENTS, {
         playerId: action.playerId,
       });
-      const agents = Number.isFinite(rawAgents)
-        ? Math.min(MAX_GRANTS, Math.max(0, Math.floor(rawAgents)))
-        : BASE_SPY_AGENTS;
+      const agents =
+        (Number.isFinite(rawAgents)
+          ? Math.min(MAX_GRANTS, Math.max(0, Math.floor(rawAgents)))
+          : BASE_SPY_AGENTS) + turnedAgents(h.state, action.playerId, h.ctx.now);
       const away = (h.state.spyAgents?.[action.playerId] ?? []).filter((a) => a.until > h.ctx.now);
       if (away.length >= agents) {
         return h.reject('E_NO_AGENT');
@@ -550,6 +585,9 @@ export const espionageModule: GameModule = {
       });
       const killChance = Math.min(1, Math.max(0, finiteOr(rawKill, baseKill)));
       const killed = h.rng.nextFloat() < killChance && detected;
+      const turned = killed && turnAgent(h, victim, spy, op);
+      const lostTags = killed ? { agentLost: true, ...(turned ? { agentTurned: true } : {}) } : {};
+      const caughtTags = killed ? { killed: true, ...(turned ? { turned: true, spy } : {}) } : {};
       const recruit: AgentAway = { until: now + hoursToMs(h.ctx, AGENT_RECRUIT_HOURS), lost: true };
       // War on exposure (SPY-11): even an ally or a pact partner caught spying is an enemy now.
       if (detected) {
@@ -565,7 +603,7 @@ export const espionageModule: GameModule = {
           target: victim,
           kind: op,
           planetId,
-          ...(killed ? { agentLost: true } : {}),
+          ...lostTags,
         });
         if (detected) {
           // Caught red-handed: the victim learns the operation AND who sent the agent.
@@ -574,7 +612,7 @@ export const espionageModule: GameModule = {
             kind: op,
             planetId,
             spy,
-            ...(killed ? { killed: true } : {}),
+            ...caughtTags,
           });
         }
         return;
@@ -599,14 +637,14 @@ export const espionageModule: GameModule = {
           kind: op,
           planetId,
           ...done,
-          ...(killed ? { agentLost: true } : {}),
+          ...lostTags,
         });
         if (detected) {
           h.emit('espionage.detected', {
             owner: victim,
             kind: op,
             planetId,
-            ...(killed ? { killed: true } : {}),
+            ...caughtTags,
           });
         }
         return;
@@ -644,7 +682,7 @@ export const espionageModule: GameModule = {
         planetId,
         until: grant.until,
         ...(grant.layer ? { layer: grant.layer } : {}),
-        ...(killed ? { agentLost: true } : {}),
+        ...lostTags,
       });
       if (detected) {
         // A noticed CLEAN theft: the victim learns the leak, not the thief.
@@ -652,7 +690,7 @@ export const espionageModule: GameModule = {
           owner: victim,
           kind: op,
           planetId,
-          ...(killed ? { killed: true } : {}),
+          ...caughtTags,
         });
       }
     });
@@ -708,6 +746,7 @@ export const espionageModule: GameModule = {
         succeeded: true,
       });
       const killed = h.rng.nextFloat() < Math.min(1, Math.max(0, finiteOr(rawKill, baseKill))) && detected;
+      const turned = killed && turnAgent(h, victim, spy, 'recon');
       if (detected) {
         h.capability<DiplomacyCapability>('diplomacy')?.declareWar?.(h, victim, spy, 'espionage');
         exposed(h, victim, spy, planetId);
@@ -718,12 +757,17 @@ export const espionageModule: GameModule = {
           mission,
           killed ? { until: now + hoursToMs(h.ctx, AGENT_RECRUIT_HOURS), lost: true } : comeHome,
         );
-        h.emit('intel.lost', { owner: spy, target: victim, planetId, ...(killed ? { agentLost: true } : {}) });
+        h.emit('intel.lost', {
+          owner: spy,
+          target: victim,
+          planetId,
+          ...(killed ? { agentLost: true, ...(turned ? { agentTurned: true } : {}) } : {}),
+        });
         h.emit('espionage.detected', {
           owner: victim,
           kind: 'recon',
           planetId,
-          ...(killed ? { killed: true } : {}),
+          ...(killed ? { killed: true, ...(turned ? { turned: true, spy } : {}) } : {}),
         });
         return;
       }
@@ -798,6 +842,15 @@ export const espionageModule: GameModule = {
           else if (still.length !== agents[playerId]!.length) agents[playerId] = still;
         }
         if (Object.keys(agents).length === 0) delete h.state.spyAgents;
+      }
+      const turned = h.state.spyTurned;
+      if (turned) {
+        for (const playerId of Object.keys(turned)) {
+          const still = turned[playerId]!.filter((until) => until > to);
+          if (still.length === 0) delete turned[playerId];
+          else if (still.length !== turned[playerId]!.length) turned[playerId] = still;
+        }
+        if (Object.keys(turned).length === 0) delete h.state.spyTurned;
       }
       const intel = h.state.intel;
       if (!intel) return;

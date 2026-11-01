@@ -1939,6 +1939,7 @@ export const de: Record<string, string> = {
   'dossier.building.refinery': 'Erzeugt {c}¤ {per}.',
   'dossier.building.starfort': 'Der Rumpf einer Festung im All: {hp} Struktur-TP, {aa} gegen Schiffe und {pd} gegen Shuttles, Schaden gegen den Knoten um {d} verringert. Wächst mit der Stufe der Festung.',
   'dossier.building.counterintel': 'Erhöht die Chance, feindliche Spione zu enttarnen, um {b} und enttarnte zu eliminieren um {k}. Gilt für jeden Versuch gegen Sie.',
+  'dossier.building.counterintel.turn': 'Wirbt den Spion mit {c} Chance an, statt ihn zu töten: +1 Agent für {n} Std.',
   'dossier.building.tax-office': 'Erhöht die Crediteinnahmen der Welt um {b}.',
   'dossier.fleet.desc': 'Ein mobiler Schiffsverband. Auswählen, um Manöver-, Orbit- und Angriffsbefehle zu erteilen.',
   'dossier.fleet.name': 'Flotte',

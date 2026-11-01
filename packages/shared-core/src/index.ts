@@ -789,7 +789,9 @@ export {
   BASE_DETECT_FAILED as SPY_DETECT_FAILED,
   CREW_BONUS as SPY_CREW_BONUS,
   MAX_AGENTS_PER_WORLD,
+  TURNED_HOURS,
   counterIntelOf,
+  turnedAgents,
 } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
 

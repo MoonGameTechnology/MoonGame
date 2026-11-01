@@ -74,7 +74,7 @@
 | SPY-15 | ✅ | core proto | `docs/backlog.md` | Подрыв экономики. |
 | SPY-16 | ✅ | srv proto | `docs/backlog.md` | Провал шпиона — новость для всех. |
 | SPY-17 | ✅ | core proto | `docs/backlog.md` | До 3 агентов на одном мире. |
-| SPY-18 | ⏳ | core data | `docs/backlog.md` | Перевербовка. |
+| SPY-18 | ✅ | core data | `docs/backlog.md` | Перевербовка. |
 | SPY-19 | ✅ | proto | `docs/backlog.md` | Шанс на кнопке операции. |
 | SPY-20 | ⏳ | proto | `docs/backlog.md` | Архив докладов. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |

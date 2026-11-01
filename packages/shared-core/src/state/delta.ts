@@ -21,6 +21,7 @@ const META_KEYS = [
   'diplomacyOffers',
   'intel',
   'spyAgents',
+  'spyTurned',
   'market',
   'marketSeq',
 ] as const;

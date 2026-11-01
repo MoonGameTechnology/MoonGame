@@ -786,6 +786,7 @@
         "hp": 32,
         "spyDetectBonus": 0.35,
         "spyKillBonus": 0.3,
+        "spyTurnChance": 0.3,
         "upkeep": {
           "energy": 55
         }

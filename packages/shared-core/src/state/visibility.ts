@@ -1194,6 +1194,12 @@ function project(
     if (own?.length) view.spyAgents = { [viewerId]: own };
     else delete view.spyAgents;
   }
+  // Turned agents (SPY-18) say who caught whom: only the catcher sees their own.
+  if (view.spyTurned) {
+    const own = view.spyTurned[viewerId];
+    if (own?.length) view.spyTurned = { [viewerId]: own };
+    else delete view.spyTurned;
+  }
   // Diplomatic OFFERS are private to the two negotiating parties (the committed
   // stances themselves are public): a third party must not see who is suing for
   // peace with whom. Keep only offers the viewer sends or receives; a map left
