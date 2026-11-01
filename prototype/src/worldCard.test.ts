@@ -147,6 +147,7 @@ async function boot(over: Record<string, unknown> = {}) {
     memory: { get: (id: string) => env.memory[id] },
     surveyed: (id: string) => env.surveyed[id],
     myIntel: () => env.intel,
+    known: () => true,
   }));
   vi.doMock('./stewardScreen', () => ({ stewardTechDone: () => env.stewardTech }));
   // Палитра держит свою связь с игрой и стойки; карточке нужен только цвет стороны.
@@ -277,6 +278,9 @@ describe('действия мира', () => {
     expect(card('N')).toContain(act('spyplanet', 'recon'));
     expect(card('A')).not.toContain(act('spyplanet', 'recon'));
     expect(card('A')).toContain(act('spyplanet', 'counter')); // SPY-11: свой мир охраняют
+    // SPY-19: шанс и риск у операций чужого мира, у своего — нет
+    expect(card('N')).toContain(t('side.scan.odds', { s: 60, r: 35 }));
+    expect(card('A')).not.toContain(t('side.scan.odds', { s: 60, r: 35 }));
     env.intel = [{ kind: 'planet', target: 'N', until: env.s.time + 3 * HOUR }];
     const html = card('N');
     expect(html).toContain(t('side.world.spy-window'));

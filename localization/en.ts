@@ -4745,6 +4745,8 @@ export const en: Record<string, string> = {
   'side.scan.owner': 'Owner',
   'side.scan.sabotage': '💣 Sabotage · {c}¤',
   'side.scan.delay': '⏳ Disrupt construction · {c}¤',
+  'side.scan.odds': '🎲 Success {s}% · exposure risk {r}%',
+  'side.scan.odds.hint': 'From what you know: an enemy counter-intelligence agent on post is not counted',
   'side.scan.disrupt': '📉 Disrupt the economy · {c}¤',
   'side.scan.theft': '💰 Steal resources · {c}¤',
   'side.scan.research': '🧪 Steal a technology · {c}¤',
