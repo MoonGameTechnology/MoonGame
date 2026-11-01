@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.70'); // SPY-18: a level-3 bureau turns the agent it would kill.
+    expect(data.version).toBe('0.1.71'); // SHU-6.15: shuttles fly at half speed, patrol circle 60.
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -131,11 +131,18 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.units.interceptor?.stats.rearmRounds).toBe(2);
     expect(data.units.cruiser?.stats.strikeRange).toBe(0); // schema default (not a shuttle)
     // SHU-6.2: patrol hours and circle (owner resolution 2026-10-04; the self-play run of
-    // SHU-6.9 raised the circle 60 → 90). The landing shuttle has neither, so it cannot patrol.
+    // SHU-6.9 raised the circle 60 → 90, the owner asked for a smaller one on 2026-11-01 and
+    // SHU-6.15 put it back to 60). The landing shuttle has neither, so it cannot patrol.
     expect(data.units.interceptor?.stats.patrolHours).toBe(4);
     expect(data.units.bomber?.stats.patrolHours).toBe(3);
     expect(data.units.heavy_striker?.stats.patrolHours).toBe(2);
-    expect(data.units.interceptor?.stats.patrolRadius).toBe(90);
+    expect(data.units.interceptor?.stats.patrolRadius).toBe(60);
+    // SHU-6.15 (owner 2026-11-01, «уменьшить скорость авиации»): every shuttle flies at half
+    // its former speed (92/62/44/54), so the ratios between the machines are unchanged.
+    expect(data.units.interceptor?.stats.speed).toBe(46);
+    expect(data.units.bomber?.stats.speed).toBe(31);
+    expect(data.units.heavy_striker?.stats.speed).toBe(22);
+    expect(data.units.landing_shuttle?.stats.speed).toBe(27);
     expect(data.units.landing_shuttle?.stats.patrolHours).toBe(0); // schema default
     expect(data.units.cruiser?.stats.patrolRadius).toBe(0); // schema default
     // reanimate_on_kill/Necromancer cut (designer-role) → assert a surviving event instead.

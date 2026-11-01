@@ -150,16 +150,29 @@ export const LANDING_CANCEL_SOLO_MIGRATION = {
   toDataHash: SPY_TURN_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Slower aviation: catalogue 0.1.71 halves the flight speed of every shuttle (interceptor
+ *  92 → 46, strikers 62 → 31 and 44 → 22, landing shuttle 54 → 27) and shrinks the patrol
+ *  circle 90 → 60. Stats only, so a saved world reads as is: a leg already scheduled keeps
+ *  its arrival, while a running chase and every leg started from now on fly at the new speed. */
+export const SLOW_AVIATION_SOLO_MIGRATION = {
+  fromRules: LANDING_CANCEL_SOLO_MIGRATION.toRules,
+  fromData: LANDING_CANCEL_SOLO_MIGRATION.toData,
+  fromDataHash: LANDING_CANCEL_SOLO_MIGRATION.toDataHash,
+  toRules: '03dbbe112f1a35',
+  toData: '0.1.71',
+  toDataHash: '1bfa23d5e23583',
+} as const;
+
 /** Rules-only pair: technology 1.5.0 adds the research queue (RQ-1). A saved world has no
  *  `technologies.queue` and the field is optional, so it reads as is; the catalogue is
  *  unchanged. */
 export const RESEARCH_QUEUE_SOLO_MIGRATION = {
-  fromRules: LANDING_CANCEL_SOLO_MIGRATION.toRules,
-  fromData: LANDING_CANCEL_SOLO_MIGRATION.toData,
-  fromDataHash: LANDING_CANCEL_SOLO_MIGRATION.toDataHash,
-  toRules: '0b0fb478769e86',
-  toData: LANDING_CANCEL_SOLO_MIGRATION.toData,
-  toDataHash: LANDING_CANCEL_SOLO_MIGRATION.toDataHash,
+  fromRules: SLOW_AVIATION_SOLO_MIGRATION.toRules,
+  fromData: SLOW_AVIATION_SOLO_MIGRATION.toData,
+  fromDataHash: SLOW_AVIATION_SOLO_MIGRATION.toDataHash,
+  toRules: '112685af289f05',
+  toData: SLOW_AVIATION_SOLO_MIGRATION.toData,
+  toDataHash: SLOW_AVIATION_SOLO_MIGRATION.toDataHash,
 } as const;
 
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
@@ -177,6 +190,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_CREW_SOLO_MIGRATION,
   SPY_TURN_SOLO_MIGRATION,
   LANDING_CANCEL_SOLO_MIGRATION,
+  SLOW_AVIATION_SOLO_MIGRATION,
   RESEARCH_QUEUE_SOLO_MIGRATION,
 ];
 
