@@ -17,7 +17,7 @@
  *    назвать время стройки; полоса обязана показать 100%, а не NaN.
  */
 import type { GameData, GameState } from '../../packages/shared-core/src/index';
-import { matchHours } from '../../packages/shared-core/src/index';
+import { matchHours, orderLane } from '../../packages/shared-core/src/index';
 import type { ActiveBuild, BuildLane, ConstructionPayload } from './buildQueue';
 
 /** Полезная нагрузка события стройки, если она вообще похожа на неё. */
@@ -26,9 +26,10 @@ export function constructionPayload(payload: unknown): ConstructionPayload | nul
   return typeof p?.planetId === 'string' ? p : null;
 }
 
-/** К какой полосе очереди относится нагрузка: юниты и всё остальное (здания). */
-export function laneOfPayload(p: ConstructionPayload): BuildLane {
-  return p.kind === 'unit' ? 'units' : 'buildings';
+/** К какой полосе очереди относится нагрузка: здания или полоса производственной
+ *  постройки юнита (BLD-2.1) — по правилу ядра, а не своей копии. */
+export function laneOfPayload(p: ConstructionPayload, data: Pick<GameData, 'units'>): BuildLane {
+  return orderLane(data, p);
 }
 
 /**
@@ -41,13 +42,14 @@ export function activeConstruction(
   state: GameState,
   planetId: string,
   lane: BuildLane,
+  data: Pick<GameData, 'units'>,
 ): ActiveBuild | null {
   let best: ActiveBuild | null = null;
   for (const event of state.scheduled) {
     if (event.type !== 'construction.complete') continue;
     const payload = constructionPayload(event.payload);
     if (!payload || payload.planetId !== planetId) continue;
-    if (laneOfPayload(payload) !== lane) continue;
+    if (laneOfPayload(payload, data) !== lane) continue;
     if (!best || event.at < best.at || (event.at === best.at && event.seq < best.seq)) {
       best = { at: event.at, seq: event.seq, payload };
     }

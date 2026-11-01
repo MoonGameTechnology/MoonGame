@@ -12,17 +12,17 @@
  * `main.ts`; модуль получает их хуками {@link initWorldQueries} — импорт оттуда был бы
  * циклом.
  */
-import type {
-  Action,
-  GameState,
-  Planet,
-  QueuedConstruction,
+import {
+  orderLane,
+  type Action,
+  type GameState,
+  type Planet,
+  type QueuedConstruction,
 } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { refusalText as errText } from '../../decisions/refusalText';
 import {
   afford as coreAfford,
-  laneOf,
   queuedAction as coreQueuedAction,
   queuedCost,
 } from './buildOrders';
@@ -74,7 +74,7 @@ export function afford(bag: Record<string, number> | undefined): boolean {
 }
 /** Ждущие заказы этой полосы — из ЯДРА (BLD-1): очередь больше не локальная. */
 export function coreQueue(planetId: string, lane: BuildLane): QueuedConstruction[] {
-  return (game.world().planets[planetId]?.buildQueue ?? []).filter((q) => laneOf(q.kind) === lane);
+  return (game.world().planets[planetId]?.buildQueue ?? []).filter((q) => orderLane(data, q) === lane);
 }
 /** Цена ждущего заказа — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»); правила масштаба и смещения
  *  уровней живут в `buildOrders.ts` (REFM-32). */
@@ -98,7 +98,7 @@ export function queuedAction(planetId: string, q: QueuedBuild): Action {
 /** Стройка, идущая на мире прямо сейчас (голову по `(at, seq)` выбирает
  *  `buildProgress.ts`, REFM-31 — там же и правило порядка). */
 export function activeConstruction(planetId: string, lane: BuildLane): ActiveBuild | null {
-  return coreActiveConstruction(game.world(), planetId, lane);
+  return coreActiveConstruction(game.world(), planetId, lane, data);
 }
 export function constructionLabel(p: ConstructionPayload): string {
   if (p.kind === 'unit' && p.unit) {
@@ -166,7 +166,7 @@ export function enqueueBuild(planetId: string, order: QueuedBuild): void {
   // косметическое: правду показывает панель конвейера, которая читает состояние, и
   // следующий снимок её поправит. Раньше тост был только в соло — в сети локальной
   // очереди не было вовсе, и тап не отвечал игроку ничем.
-  if (activeConstruction(planetId, laneOf(order.kind))) {
+  if (activeConstruction(planetId, orderLane(data, { kind: order.kind, unit: order.id }))) {
     game.note(t('queue.added', { what: queuedLabel(order), at: game.placeName(planetId) }));
   }
   game.playerOrder(queuedAction(planetId, order));

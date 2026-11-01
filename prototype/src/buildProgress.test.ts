@@ -15,7 +15,10 @@ const HOUR = 3_600_000;
 
 /** Данные ровно в той части, которую читает расчёт длительности. */
 const data = {
-  units: { cruiser: { buildTimeHours: 4 } },
+  units: {
+    cruiser: { buildTimeHours: 4, domain: 'space', traits: [] },
+    trooper: { buildTimeHours: 1, domain: 'ground', kind: 'infantry', traits: [] },
+  },
   buildings: {
     mine: {
       buildTimeHours: 6,
@@ -50,50 +53,54 @@ describe('стройка — что это за нагрузка', () => {
     expect(constructionPayload({ planetId: 'C1R1' })).toEqual({ planetId: 'C1R1' });
   });
 
-  it('юниты идут своей полосой, здания и апгрейды — общей', () => {
-    expect(laneOfPayload(build({ kind: 'unit', unit: 'cruiser' }))).toBe('units');
-    expect(laneOfPayload(build({ kind: 'building' }))).toBe('buildings');
-    expect(laneOfPayload(build({ kind: 'upgrade', level: 2 }))).toBe('buildings');
+  it('юнит идёт полосой своей постройки, здания и апгрейды — общей (BLD-2.1)', () => {
+    expect(laneOfPayload(build({ kind: 'unit', unit: 'cruiser' }), data)).toBe('ships');
+    expect(laneOfPayload(build({ kind: 'unit', unit: 'trooper' }), data)).toBe('infantry');
+    expect(laneOfPayload(build({ kind: 'building' }), data)).toBe('buildings');
+    expect(laneOfPayload(build({ kind: 'upgrade', level: 2 }), data)).toBe('buildings');
   });
 });
 
 describe('стройка — какая идёт сейчас', () => {
   it('из двух ближайшей считается та, что завершится РАНЬШЕ', () => {
     const s = withScheduled([evt(5000, 1, build()), evt(1000, 2, build())]);
-    expect(activeConstruction(s, 'C1R1', 'buildings')?.at).toBe(1000);
+    expect(activeConstruction(s, 'C1R1', 'buildings', data)?.at).toBe(1000);
   });
 
   it('РАВНОЕ время различает порядковый номер — иначе полоса прыгала бы между стройками', () => {
     const s = withScheduled([evt(1000, 7, build()), evt(1000, 3, build())]);
-    expect(activeConstruction(s, 'C1R1', 'buildings')?.seq).toBe(3);
+    expect(activeConstruction(s, 'C1R1', 'buildings', data)?.seq).toBe(3);
   });
 
   it('чужой мир не считается своим', () => {
     const s = withScheduled([evt(1000, 1, build({ planetId: 'C2R2' }))]);
-    expect(activeConstruction(s, 'C1R1', 'buildings')).toBeNull();
+    expect(activeConstruction(s, 'C1R1', 'buildings', data)).toBeNull();
   });
 
   it('полосы не смешиваются: юнит не отвечает за здания и наоборот', () => {
     const s = withScheduled([
       evt(1000, 1, build({ kind: 'unit', unit: 'cruiser' })),
       evt(2000, 2, build({ kind: 'building' })),
+      evt(500, 3, build({ kind: 'unit', unit: 'trooper' })),
     ]);
-    expect(activeConstruction(s, 'C1R1', 'units')?.at).toBe(1000);
-    expect(activeConstruction(s, 'C1R1', 'buildings')?.at).toBe(2000);
+    expect(activeConstruction(s, 'C1R1', 'ships', data)?.at).toBe(1000);
+    expect(activeConstruction(s, 'C1R1', 'buildings', data)?.at).toBe(2000);
+    // Пехота — своя полоса казарм: она не становится «идущей» на верфи.
+    expect(activeConstruction(s, 'C1R1', 'infantry', data)?.at).toBe(500);
   });
 
   it('события ДРУГОГО вида в расписании игнорируются', () => {
     const s = withScheduled([evt(1000, 1, build(), 'battle.tick')]);
-    expect(activeConstruction(s, 'C1R1', 'buildings')).toBeNull();
+    expect(activeConstruction(s, 'C1R1', 'buildings', data)).toBeNull();
   });
 
   it('мусор в нагрузке не роняет выбор', () => {
     const s = withScheduled([evt(1000, 1, null), evt(2000, 2, build())]);
-    expect(activeConstruction(s, 'C1R1', 'buildings')?.at).toBe(2000);
+    expect(activeConstruction(s, 'C1R1', 'buildings', data)?.at).toBe(2000);
   });
 
   it('пустое расписание — стройки нет', () => {
-    expect(activeConstruction(withScheduled([]), 'C1R1', 'buildings')).toBeNull();
+    expect(activeConstruction(withScheduled([]), 'C1R1', 'buildings', data)).toBeNull();
   });
 });
 

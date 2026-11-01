@@ -188,6 +188,18 @@ export const HOSPITAL_WOUNDS_SOLO_MIGRATION = {
   toDataHash: RESEARCH_QUEUE_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: construction 1.9.0 gives every production building its own queue
+ *  (BLD-2.1). A saved world keeps its shape: its one shared unit queue is split by the
+ *  unit's building the next time one of those queues wakes, so it reads as is. */
+export const PRODUCTION_LANES_SOLO_MIGRATION = {
+  fromRules: HOSPITAL_WOUNDS_SOLO_MIGRATION.toRules,
+  fromData: HOSPITAL_WOUNDS_SOLO_MIGRATION.toData,
+  fromDataHash: HOSPITAL_WOUNDS_SOLO_MIGRATION.toDataHash,
+  toRules: '03372b68cf3a45',
+  toData: HOSPITAL_WOUNDS_SOLO_MIGRATION.toData,
+  toDataHash: HOSPITAL_WOUNDS_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -206,6 +218,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SLOW_AVIATION_SOLO_MIGRATION,
   RESEARCH_QUEUE_SOLO_MIGRATION,
   HOSPITAL_WOUNDS_SOLO_MIGRATION,
+  PRODUCTION_LANES_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
