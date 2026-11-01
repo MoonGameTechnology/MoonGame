@@ -30,11 +30,12 @@ import { DAY, HOUR } from './time';
 beforeAll(() => setLocale('ru'));
 
 /** Узел страницы: ровно то, что полоса трогает у DOM. `innerHTML` считает записи — по ним
- *  видно, перерисовал ли кадр узел. */
+ *  видно, перерисовал ли кадр узел; `writes` так же считает записи текста и `hidden`. */
 class FakeEl {
-  textContent = '';
   title = '';
-  hidden = false;
+  writes = 0;
+  private text = '';
+  private hide = false;
   scrollTop = 0;
   className = '';
   style: Record<string, string> = {};
@@ -58,6 +59,20 @@ class FakeEl {
     },
   };
   constructor(readonly id = '') {}
+  get textContent(): string {
+    return this.text;
+  }
+  set textContent(v: string) {
+    this.text = v;
+    this.writes++;
+  }
+  get hidden(): boolean {
+    return this.hide;
+  }
+  set hidden(v: boolean) {
+    this.hide = v;
+    this.writes++;
+  }
   get innerHTML(): string {
     return this.html;
   }
@@ -485,6 +500,17 @@ describe('ряд 1 шапки', () => {
     expect(el('tbeta').textContent).toBe(countdownHMS(DAY - 3 * HOUR));
   });
 
+  it('кадр переписывает только сменившийся текст: отсчёт дня — да, остальное — нет', async () => {
+    const { m, el, env } = await boot();
+    m.renderTopBar([]);
+    const ids = ['tbname', 'tbplace', 'tbscore', 'tbday', 'tbeta', 'msgbadge'];
+    const before = ids.map((id) => el(id).writes);
+    env.s = { ...env.s, time: env.s.time + 1000 }; // секунда: сменился только отсчёт дня
+    m.renderTopBar([]);
+    m.renderTopBar([]);
+    expect(ids.map((id, i) => el(id).writes - before[i]!)).toEqual([0, 0, 0, 0, 1, 0]);
+  });
+
   it('пустой ввод — имя дома; порог взят — чип светится; без счёта места нет', async () => {
     const { m, el, env } = await boot({ scoreLimit: 120 });
     m.renderTopBar([]);
@@ -774,6 +800,10 @@ describe('полоса скорости', () => {
     m.renderSpeedbar();
     expect(el('spd-dev').hidden).toBe(false);
     expect(rec.sync.at(-1)![1]).toBe('dev');
+    // Кадр без перемены не переписывает `hidden`: браузер заново стилизовал бы кнопку.
+    const writes = el('spd-dev').writes;
+    m.renderSpeedbar();
+    expect(el('spd-dev').writes).toBe(writes);
   });
 });
 

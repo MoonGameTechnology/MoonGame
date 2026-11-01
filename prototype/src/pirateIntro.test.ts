@@ -33,6 +33,27 @@ it('focuses the target, opens the first fight once, and honours dismissal until 
   expect(openBattle).toHaveBeenCalledTimes(2);
 });
 
+it('кадр без перемены не переписывает `hidden` карточки', () => {
+  // Карточку обновляет каждый кадр, а тот же `hidden`, записанный заново, браузер заново
+  // стилизует.
+  let writes = 0;
+  let hidden = true;
+  const root = {
+    get hidden() { return hidden; },
+    set hidden(v: boolean) { hidden = v; writes++; },
+    addEventListener: () => {},
+  } as unknown as HTMLElement;
+  const copy = element(), action = element(), close = element();
+  const ui = initPirateIntro({ root, copy: copy.node, action: action.node, close: close.node, focus: vi.fn(), openBattle: vi.fn() });
+  ui.update(null);
+  ui.update(null);
+  expect(writes).toBe(0);
+  ui.update({ stage: 'approach', sector: 'pirate_den' });
+  ui.update({ stage: 'approach', sector: 'pirate_den' });
+  expect(writes).toBe(1);
+  expect(hidden).toBe(false);
+});
+
 it('YAG-7.2: первое появление карточки сообщается хосту один раз за забег', () => {
   // Хост пересчитывает стартовый вид под карточку: она появляется только после первого
   // хода часов, когда камера уже встала.

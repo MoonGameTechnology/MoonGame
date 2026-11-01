@@ -297,6 +297,13 @@ function patchPurse(html: string): void {
   });
 }
 
+/** Текст узла шапки — только сменившийся: тот же текст, записанный заново, заменяет
+ *  текстовый узел, и браузер заново стилизует и перекладывает его. Ряд 1 переписывается
+ *  каждую игровую секунду ради отсчёта дня, а сменился в нём обычно только отсчёт. */
+function patchText(el: HTMLElement, text: string): void {
+  if (el.textContent !== text) el.textContent = text;
+}
+
 /**
  * Кадр шапки: строка статуса и входы в досье Роя, ряд 1, плашки ресурсов и значки внимания.
  * `missions` — строки задач забега этого кадра: их же получают панель задач и комиксы.
@@ -422,14 +429,14 @@ export function renderTopBar(missions: MissionRow[]): void {
   runWallet.render();
   const topText = topSignature(nick, myPlace, seats, score, d, eta);
   if (topText !== lastTopText) {
-    tbName.textContent = nick;
-    tbPlace.textContent = standingShown(myPlace) ? t('hud.place', { p: myPlace, n: seats }) : '';
-    tbScore.textContent = `✦ ${score}/${SCORE_LIMIT}`;
+    patchText(tbName, nick);
+    patchText(tbPlace, standingShown(myPlace) ? t('hud.place', { p: myPlace, n: seats }) : '');
+    patchText(tbScore, `✦ ${score}/${SCORE_LIMIT}`);
     tbScore.classList.toggle('win', atLimit(need));
-    tbDay.textContent = t('browser.day', { n: d });
+    patchText(tbDay, t('browser.day', { n: d }));
     // digits only: the «до след. дня» caption is a static sibling node (#tbetacap),
     // so a narrow phone can drop the caption and keep the countdown.
-    tbEta.textContent = eta;
+    patchText(tbEta, eta);
     lastTopText = topText;
   }
 
@@ -620,7 +627,8 @@ export function renderSpeedbar(): void {
   // Правило 6 (`matchExits.ts`): в забеге полоса несёт только его темп — ▶ и ▶▶.
   const run = game.toolsHidden();
   speedbarEl.classList.toggle('spd-run', run);
-  if (devFastBtn) devFastBtn.hidden = !(run && sectorDevActive);
+  const devHidden = !(run && sectorDevActive);
+  if (devFastBtn && devFastBtn.hidden !== devHidden) devFastBtn.hidden = devHidden;
   const lesson = game.lessonSpeed() && !netWorld;
   if (lessonChip) {
     const chip = displayOf(lesson);
