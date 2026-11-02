@@ -93,6 +93,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `src/setupScreen.ts` · `src/matchJoin.ts` · `src/accountSession.ts` | выбор домов и мест из предложения сетевой сессии, опрос списка, вход и разбор отказов; поздний ответ сохраняет новый аккаунт |
 | `src/protoKernel.ts` | сборка ядра прототипа: список модулей (порядок = контракт детерминизма) + `canOrder`/`canOrderAll` — проба правил с памятью ответов |
 | `src/rocketMinesUi.ts` · `minestest.mjs` | карточка ракетной мины и браузерный smoke; `packages/client/src/ordnanceView.ts` рисует отфильтрованные мины и ракеты |
+| `src/diploWindow.ts` · `src/diploRosterView.ts` · `diplomacytest.mjs` | окно дипломатии, поиск и список участников; сортировка/фильтры — `decisions/diploRoster.ts`, браузерная проверка — `pnpm smoke:diplomacy` |
 | `build.mjs` | сборка клиента в самодостаточный HTML; `data-i18n` подставляется из `/localization` |
 | `selfplay.mjs` · `econplaytest.mjs` | боты друг против друга: баланс и экономика |
 | `perf.mjs` · `report.mjs` · `doctor.mjs` | профиль кадра; разбор JSONL-лога матча (`pnpm metrics`); проверка СВЯЗНОСТИ хоста — «почему не подключаются»: занят ли порт, какие адреса видны снаружи, не слушает ли он только loopback |
