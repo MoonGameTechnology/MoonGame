@@ -19,7 +19,7 @@ import { migrate, PostgresUserStore, PostgresMatchStore, PostgresAccountStore } 
 import { PostgresBotRosterStore, SYSTEM_BOT_ROSTER } from './botRoster';
 
 it('requires an explicit DML grant decision when a migration introduces a table', () => {
-  const sql = readFileSync(new URL('./store/postgres.ts', import.meta.url), 'utf8');
+  const sql = readFileSync(new URL('./store/postgres/schema.ts', import.meta.url), 'utf8');
   const names = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]);
   expect([...APP_TABLES].sort()).toEqual(names.sort());
 });
