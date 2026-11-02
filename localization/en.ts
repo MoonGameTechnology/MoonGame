@@ -5034,7 +5034,6 @@ export const en: Record<string, string> = {
   'tech.tier': 'Tier {n}',
 
   // --- troops — ⇅-меню десанта в ряду команд: шапка, план, сноски.
-  'troops.damaged': "damaged units don't embark",
   'troops.hold': 'hold {a}/{b}',
   'troops.planned': 'ordered {n}',
   'troops.timing': 'loading ≈1h · unloading is instant',

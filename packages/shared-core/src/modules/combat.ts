@@ -859,9 +859,9 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // the next assault, and a hospital had nothing left to heal. Wounds now mend only in
   // a hospital (`construction`'s `time.advanced`, owner's decision: no hospital — the
   // wound stays). Until a stack is whole again `findHealthyStack` passes it over, so a
-  // wounded stack does not embark — the same rule bombardment damage (ROS-1.6) already
-  // lived by, and the troops menu already footnotes. A stack the fight never dented
-  // never got an `hp` pool, so it stays healthy and still merges and embarks.
+  // wounded stack does not MERGE with a whole one — but it still embarks and lands,
+  // wounds and all (`army.ts`, owner's decision 2026-11-02: survivors must be able to
+  // reach a hospital). A stack the fight never dented never got an `hp` pool.
   //
   // Shields still reset — they recharge for free by design, and no ground unit carries
   // one today. SHIPS (a fleet's `units`) keep `hp` AND `shieldHp`: a battered fleet

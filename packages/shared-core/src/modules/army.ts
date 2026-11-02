@@ -3,7 +3,7 @@ import type { Fleet, GameState, LoadingClaim, UnloadingClaim } from '../state/ga
 import type { GameData } from '../data/schemas';
 import { hoursToMs } from '../action/types';
 import { defHasTrait } from '../data/traits';
-import { findHealthyStack, addUnits } from '../util/stacks';
+import { mergeStacks, takeFromStacks, unitCount } from '../util/stacks';
 import { garrisonUnderAssault, requireOwnedIdleFleet } from '../util/fleet';
 import { isAllied } from '../util/combat';
 import { hasMapShare } from '../state/diplomacy';
@@ -96,7 +96,7 @@ function claimedCargo(fleet: Fleet, data: GameData): number {
  */
 export const armyModule: GameModule = {
   id: 'army',
-  version: '1.1.0',
+  version: '1.2.0',
   setup(api) {
     /** Validates a load/unload order and resolves the fleet, its planet and the
      *  ground unit def, or rejects. */
@@ -142,10 +142,13 @@ export const armyModule: GameModule = {
       if (garrisonUnderAssault(h.state, planet.id)) {
         return h.reject('E_UNDER_ASSAULT');
       }
-      const avail = findHealthyStack(planet.garrison, unit);
+      // Поднимается ЛЮБОЙ стек этого типа, раненый тоже (решение владельца 2026-11-02):
+      // с тех пор как раны переживают бой, правило «только здоровые» запирало выживших
+      // на мире, где нет госпиталя. Здоровье, оснастка и выслуга едут вместе с ними.
+      const avail = unitCount(planet.garrison, unit);
       // Уже обещанное вычитается ОБА раза: из гарнизона (два флота у одного мира не
       // вычерпают одну роту) и из трюма (два заказа подряд не пообещают один отсек).
-      if (!avail || avail.count - claimedAt(h.state, planet.id, unit) < count) {
+      if (avail - claimedAt(h.state, planet.id, unit) < count) {
         return h.reject('E_NO_ARMY'); // not that many in the garrison
       }
       // Трюм общий с шаттлами (SHU-5.1): места эскадр на борту и улетевших в вылет
@@ -198,8 +201,8 @@ export const armyModule: GameModule = {
         if (!planet || !docked || planet.owner !== fleet.owner) continue;
         if (garrisonUnderAssault(h.state, planet.id)) continue;
         const def = h.ctx.data.units[claim.unit];
-        const stack = findHealthyStack(planet.garrison, claim.unit);
-        if (!def || !stack) continue;
+        const have = unitCount(planet.garrison, claim.unit);
+        if (!def || have <= 0) continue;
         // Берём, сколько ЕСТЬ и сколько влезает: за час гарнизон мог поредеть в бою,
         // а трюм — заполниться соседней заявкой. Частичная погрузка честнее отказа:
         // приказ был «подними столько», и он поднимает столько, сколько осталось.
@@ -208,12 +211,13 @@ export const armyModule: GameModule = {
         // трюм у них с десантом общий.
         const room = fleetHoldFree(h.state, fleet, h.ctx.data) + claimedCargo(fleet, h.ctx.data);
         const size = def.stats.cargoSize;
-        const take = Math.min(claim.count, stack.count, size > 0 ? Math.floor(room / size) : claim.count);
+        const take = Math.min(claim.count, have, size > 0 ? Math.floor(room / size) : claim.count);
         if (take <= 0) continue;
-        stack.count -= take;
+        // `takeFromStacks` делит пул ран пропорционально и копирует оснастку и заслугу,
+        // `mergeStacks` не сливает раненый стек со здоровым — раны не размазываются.
+        const moved = takeFromStacks(planet.garrison, claim.unit, take);
         planet.garrison = planet.garrison.filter((s) => s.count > 0);
-        fleet.landing = fleet.landing ?? [];
-        addUnits(fleet.landing, claim.unit, take);
+        fleet.landing = mergeStacks(fleet.landing ?? [], moved);
         h.emit('army.loaded', {
           fleetId: fleet.id,
           planetId: planet.id,
@@ -276,8 +280,9 @@ export const armyModule: GameModule = {
       // Механически это корректно: ссылка защитника (`kind: 'garrison'`) адресует мир,
       // а не снимок стеков, поэтому подошедшие войска считаются со следующего раунда.
       // Уже обещанное выгрузкам вычитается: два приказа подряд не высадят одну роту.
-      const carried = findHealthyStack(fleet.landing ?? [], unit);
-      if (!carried || carried.count - claimedAboard(fleet, unit) < count) {
+      // Высаживается любой стек этого типа, раненый тоже — то же правило, что у погрузки.
+      const carried = unitCount(fleet.landing ?? [], unit);
+      if (carried - claimedAboard(fleet, unit) < count) {
         return h.reject('E_NO_ARMY'); // not that many aboard
       }
       // Час не проходит здесь, как и у погрузки: заявка встаёт в мир и созревает событием.
@@ -314,12 +319,11 @@ export const armyModule: GameModule = {
         const planet = h.state.planets[claim.to];
         const docked = fleet.location === claim.to && !fleet.movement && !fleet.battleId;
         if (!planet || !docked || !mayLand(h, fleet.owner, planet.owner)) continue;
-        const carried = findHealthyStack(fleet.landing ?? [], claim.unit);
-        const take = Math.min(claim.count, carried?.count ?? 0);
-        if (!carried || take <= 0) continue;
-        carried.count -= take;
+        const take = Math.min(claim.count, unitCount(fleet.landing ?? [], claim.unit));
+        if (take <= 0) continue;
+        const moved = takeFromStacks(fleet.landing ?? [], claim.unit, take);
         fleet.landing = (fleet.landing ?? []).filter((s) => s.count > 0);
-        addUnits(planet.garrison, claim.unit, take);
+        planet.garrison = mergeStacks(planet.garrison, moved);
         h.emit('army.unloaded', {
           fleetId: fleet.id,
           planetId: planet.id,

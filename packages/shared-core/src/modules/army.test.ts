@@ -387,6 +387,59 @@ describe('army module — unloading and validation', () => {
   });
 });
 
+describe('army — раненые выжившие перевозятся (2026-11-02)', () => {
+  // После боя раны остаются (combat.ts), и старое правило «грузить только здоровых»
+  // запирало выживших на мире без госпиталя. Теперь едет любой стек — как есть.
+  const wounded = {
+    unit: 'militia',
+    count: 4,
+    hp: 40, // половина от 4 × 20
+    modules: ['plate'],
+    battles: 2,
+    damageDealt: 30,
+    promoted: 0.25,
+  };
+  const st = () =>
+    stateWith({
+      players: [player('p1')],
+      planets: [
+        { ...planet('A', 'p1', [['militia', 2]]), garrison: [{ unit: 'militia', count: 2 }, { ...wounded }] },
+        planet('B', 'p1'),
+      ],
+      fleets: [fleet('F', 'p1', 'A', [['dropship', 1]])],
+    });
+
+  it('погрузка берёт раненых: здоровье, оснастка и выслуга едут с ними, раны не размазываются', () => {
+    const kernel = createKernel([armyModule]);
+    const r = okApply(kernel.applyAction(st(), load('F', 'militia', 5), ctx));
+    const done = advanced(kernel, r.state, HOUR);
+    // Целый стек ушёл целым, от раненого — три из четырёх с ¾ пула ран.
+    expect(done.fleets.F?.landing).toEqual([
+      { unit: 'militia', count: 2 },
+      { ...wounded, count: 3, hp: 30 },
+    ]);
+    expect(done.planets.A?.garrison).toEqual([{ ...wounded, count: 1, hp: 10 }]);
+  });
+
+  it('один раненый стек грузится и высаживается без потерь', () => {
+    const kernel = createKernel([armyModule]);
+    const only = st();
+    only.planets.A!.garrison = [{ ...wounded }];
+    const loaded = advanced(kernel, okApply(kernel.applyAction(only, load('F', 'militia', 4), ctx)).state, HOUR);
+    expect(loaded.fleets.F?.landing).toEqual([wounded]);
+    expect(loaded.planets.A?.garrison).toEqual([]);
+    const ordered = okApply(kernel.applyAction(loaded, unload('F', 'militia', 4), at(HOUR)));
+    const landed = advanced(kernel, ordered.state, 2 * HOUR);
+    expect(landed.planets.A?.garrison).toEqual([wounded]);
+    expect(landed.fleets.F?.landing).toEqual([]);
+  });
+
+  it('больше, чем есть во всех стеках, не поднять', () => {
+    const kernel = createKernel([armyModule]);
+    expect(errCode(kernel.applyAction(st(), load('F', 'militia', 7), ctx))).toBe('E_NO_ARMY');
+  });
+});
+
 // BF-27: while a live battle references a world's garrison, that garrison is
 // locked in — loading it onto ships mid-assault would dodge the resolve (the
 // defender escapes unbloodied; the attacker wins an empty rock).

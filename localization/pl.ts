@@ -4691,7 +4691,6 @@ export const pl: Record<string, string> = {
   'tech.state.queued': 'nr {n} w kolejce',
   'tech.state.running': 'Trwają badania',
   'tech.tier': 'Poziom {n}',
-  'troops.damaged': 'uszkodzone jednostki nie są przyjmowane na pokład',
   'troops.hold': 'ładownia {a}/{b}',
   'troops.planned': 'zamówiono {n}',
   'troops.timing': 'załadunek ≈1 godz. · wyładunek natychmiastowy',

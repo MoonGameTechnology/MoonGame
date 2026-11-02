@@ -18,7 +18,6 @@
  */
 import type { Action, Fleet, GameState } from '../../packages/shared-core/src/index';
 import {
-  findHealthyStack,
   fleetHoldFree,
   fleetShuttleBay,
   knownOwner,
@@ -210,13 +209,9 @@ export function troopsInputFor(fleetId: string): TroopsInput | null {
   if (!hasTroops(types)) return null;
   const units: TroopsUnitInput[] = types.map((unit) => ({
     unit,
-    // «Всего» складывает и побитые стопки, а поднять/высадить ядро даст только здоровую.
-    ...garrisonSide(
-      mine,
-      findHealthyStack(here.garrison, unit)?.count ?? 0,
-      totalOf(here.garrison, unit),
-    ),
-    hold: findHealthyStack(landing, unit)?.count ?? 0,
+    // Ядро поднимает и высаживает ВСЕ стеки типа, раненые тоже (2026-11-02).
+    ...garrisonSide(mine, totalOf(here.garrison, unit), totalOf(here.garrison, unit)),
+    hold: totalOf(landing, unit),
     holdAll: totalOf(landing, unit),
     queued: pendingLoadOf(fleetId, unit),
     reserved: pendingLoadUnits(here.id, unit),

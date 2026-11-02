@@ -231,17 +231,16 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
     ]);
   });
 
-  it('battle-worn troops cannot embark: no load is planned for them (it would bounce off E_NO_ARMY)', () => {
-    // army.load resolves via findHealthyStack — a damaged stack never loads.
-    // Planning it anyway would fire a doomed order AND mark the garrison as
-    // handled; the fleet still saves itself.
+  it('battle-worn troops embark too: the wounded garrison is lifted, not stranded', () => {
+    // army.load lifts every stack of the type, wounded included (2026-11-02), so
+    // the guard plans the lift exactly as for a healthy garrison.
     const s = guardState({
       fleets: [raider(inboundToH(10)), fl('F1', 'p1', { location: 'H', units: stacks([['cruiser', 1]]) })],
       hGarrison: [{ unit: 'militia', count: 4, hp: 40 }],
     });
     const orders = stewardGuardOrders(s, 'p1');
-    expect(orders.map((a) => a.type)).toEqual(['fleet.move', 'steward.report']);
-    expect(orders[0]!.payload).toMatchObject({ fleetId: 'F1', to: 'S' });
+    expect(orders.map((a) => a.type)).toEqual(['army.load', 'steward.report']);
+    expect(orders[0]!.payload).toMatchObject({ fleetId: 'F1', unit: 'militia' });
   });
 
   it('анти-шаттл: недавняя эвакуация H→S блокирует обратный рейс — крыло стоит и дерётся у S', () => {

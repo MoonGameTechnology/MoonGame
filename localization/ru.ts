@@ -5039,7 +5039,6 @@ export const ru: Record<string, string> = {
   'tech.tier': 'Ярус {n}',
 
   // --- troops — ⇅-меню десанта в ряду команд: шапка, план, сноски.
-  'troops.damaged': 'повреждённые части на борт не поднимаются',
   'troops.hold': 'трюм {a}/{b}',
   'troops.planned': 'заказано {n}',
   'troops.timing': 'погрузка ≈1 ч · выгрузка сразу',

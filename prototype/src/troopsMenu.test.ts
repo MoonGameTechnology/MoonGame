@@ -67,14 +67,6 @@ describe('troopsModel — сколько влезет', () => {
     expect(m.rows[0]!.maxLoad).toBe(1); // 5 − 4 обещано другим погрузкам
   });
 
-  it('побитые стеки видно, но поднять нельзя', () => {
-    const m = troopsModel(
-      input({ units: [unit({ unit: 'militia', garrison: 2, garrisonAll: 7 })] }),
-    );
-    expect(m.rows[0]!.maxLoad).toBe(2); // здоровых только 2 из 7
-    expect(m.anyDamaged).toBe(true);
-  });
-
   it('строки делят один трюм: избыточная погрузка гасится', () => {
     const m = troopsModel(
       input({
@@ -251,12 +243,12 @@ describe('troopsMenuHtml — разметка поповера', () => {
     expect(dry).toContain('в гарнизоне не осталось');
   });
 
-  it('сноски: побитые не грузятся, очередь, асимметрия времени', () => {
+  it('сноски: очередь и асимметрия времени; про раненых сноски нет — они грузятся', () => {
     const html = troopsMenuHtml(
       troopsModel(input({ units: [unit({ unit: 'militia', garrison: 1, garrisonAll: 4, queued: 2 })] })),
       opts,
     );
-    expect(html).toContain('повреждённые части на борт не поднимаются');
+    expect(html).not.toContain('повреждённые части');
     expect(html).toContain('⏳ грузится: 2');
     // Час — на ЗАКАЗ, а не на единицу: подпись врала ровно этим словом. Правило
     // одно и живёт в ядре (CARGO-1), поэтому и подпись теперь называет его точно.

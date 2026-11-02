@@ -4670,7 +4670,6 @@ export const es: Record<string, string> = {
   'tech.state.open': 'Disponible',
   'tech.state.running': 'Investigando',
   'tech.tier': 'Nivel {n}',
-  'troops.damaged': 'las unidades dañadas no embarcan',
   'troops.hold': 'bodega {a}/{b}',
   'troops.planned': 'encargadas {n}',
   'troops.timing': 'embarque ≈1h · desembarque instantáneo',

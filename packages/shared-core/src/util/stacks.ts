@@ -33,6 +33,14 @@ export function findHealthyStack(
   );
 }
 
+/** Сколько единиц `unit` во ВСЕХ стеках списка — раненых, оснащённых, любой выслуги.
+ *  Столько и можно перевезти: погрузка и высадка берут стеки как есть. */
+export function unitCount(stacks: readonly UnitStack[], unit: string): number {
+  let n = 0;
+  for (const s of stacks) if (s.unit === unit) n += s.count;
+  return n;
+}
+
 /** Высшая степень «Выслуги», до которой выслуга делит стеки. Пороги линии в данных —
  *  1/2/3/4 пережитых боя (`data/medalGrades.json`), то есть степень и есть число полных
  *  боёв; тест `stacks.test.ts` сверяет это с данными, чтобы пороги не разъехались молча. */
@@ -191,6 +199,7 @@ export function takeFromStacks(
     // делится пул `hp`, значило бы наказывать за разделение флота.
     if (st.damageDealt !== undefined) t.damageDealt = st.damageDealt;
     if (st.battles !== undefined) t.battles = st.battles;
+    if (st.promoted !== undefined) t.promoted = st.promoted; // PERK-3.2: доля, сплит копирует
     st.count -= move;
     taken.push(t);
   }

@@ -200,6 +200,18 @@ export const PRODUCTION_LANES_SOLO_MIGRATION = {
   toDataHash: HOSPITAL_WOUNDS_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: army 1.2.0 lifts and lands wounded ground stacks too, carrying their
+ *  wounds, loadout and merit along. The catalogue is unchanged and a saved world keeps its
+ *  shape (a pending lift is the same claim), so it reads as is. */
+export const WOUNDED_TRANSPORT_SOLO_MIGRATION = {
+  fromRules: PRODUCTION_LANES_SOLO_MIGRATION.toRules,
+  fromData: PRODUCTION_LANES_SOLO_MIGRATION.toData,
+  fromDataHash: PRODUCTION_LANES_SOLO_MIGRATION.toDataHash,
+  toRules: '0dc73742d3b68e',
+  toData: PRODUCTION_LANES_SOLO_MIGRATION.toData,
+  toDataHash: PRODUCTION_LANES_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -219,6 +231,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   RESEARCH_QUEUE_SOLO_MIGRATION,
   HOSPITAL_WOUNDS_SOLO_MIGRATION,
   PRODUCTION_LANES_SOLO_MIGRATION,
+  WOUNDED_TRANSPORT_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
