@@ -1495,6 +1495,7 @@
 | SM-3.7b | ✅ | core data proto | `docs/ship-modules-roadmap.md` | Ракета — отряд без приказов, полёт по прямой, обычный туман |
 | SM-3.7c | ✅ | core | `docs/ship-modules-roadmap.md` | Челноки бьют ракету |
 | SM-3.7d | ✅ | core | `docs/ship-modules-roadmap.md` | Чем и когда челноки сбивают ракету |
+| SM-4.1 | ✅ | data | `docs/ship-modules-roadmap.md` | Боевые и защитные модули вдвое, эффекты флота — флагману героя |
 | SHU-0.1 | ✅ | core data proto | `docs/shuttles-roadmap.md` | Переименование: эскадрильи → челноки |
 | SHU-1.1 | ✅ | core data | `docs/shuttles-roadmap.md` | Ангар космопорта |
 | SHU-1.2 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар и возврат |
