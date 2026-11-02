@@ -151,7 +151,7 @@ describe('personal attack clocks', () => {
       1.5 * hour,
     ]);
     expect(after.state.fleets.a!.units[0]!.hp).toBe(994);
-    expect(after.state.fleets.c!.units[0]!.hp).toBe(992);
+    expect(after.state.fleets.c!.units[0]!.hp).toBeCloseTo(1000 - 8 * 994 / 1000, 10);
   });
 
   it('bulk attack only orders owned defenders and never resets attackers', () => {
@@ -191,7 +191,7 @@ describe('personal attack clocks', () => {
       attackStartedAt: hour / 2,
     });
     const after = advance(kernel, s, hour);
-    expect(after.state.fleets.a!.units[0]!.hp).toBe(992); // full reply, no c attack yet
+    expect(after.state.fleets.a!.units[0]!.hp).toBeCloseTo(1000 - 8 * 994 / 1000, 10); // full reply, no c attack yet
     expect(after.state.fleets.b!.units[0]!.hp).toBe(994);
     expect(after.state.fleets.c!.units[0]!.hp).toBe(994); // only a's divided attack
     expect(after.state.battles.B!.sides[1]!.nextAttackAt).toBeUndefined();
@@ -273,7 +273,7 @@ describe('personal attack clocks', () => {
     expect(hashState(s)).toBe(before);
     const after = advance(k, s, hour);
     expect(1000 - after.state.fleets.b!.units[0]!.hp!).toBeCloseTo(view.attack);
-    expect(1000 - after.state.fleets.a!.units[0]!.hp!).toBeCloseTo(view.defense.max);
+    expect(1000 - after.state.fleets.a!.units[0]!.hp!).toBeCloseTo(view.defense.max * (1 - view.attack / 1000));
   });
 
   it('CORE-DMG-4: readout names the fleet under fire, so a psi zone shows as it lands', () => {

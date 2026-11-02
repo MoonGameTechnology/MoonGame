@@ -143,14 +143,14 @@ describe('sector module — combat modifiers', () => {
   it('a fleet fighting in a sector it owns deals +25% (home advantage)', () => {
     // P owned by p2 (the defender D); plain terrain so only ownership matters.
     const dmg = firstRound([planet('P', 'p2', 0, 0)]);
-    expect(dmg.toAttacker).toBe(25); // D (owner) → A: 20 × 1.25
+    expect(dmg.toAttacker).toBe(25 * (1 - dmg.toDefender / 40)); // D (owner) → A: 20 × 1.25
     expect(dmg.toDefender).toBe(20); // A (invader) → D: unchanged
   });
 
   it('an asteroid sector toughens both sides (reduced incoming damage ≈ +HP)', () => {
     // Neutral asteroid field: no home bonus, everyone takes less.
     const dmg = firstRound([planet('P', null, 0, 0, 'asteroid_field')]);
-    expect(dmg.toAttacker).toBeCloseTo(20 / 1.1);
+    expect(dmg.toAttacker).toBeCloseTo(20 * (1 - dmg.toDefender / 40) / 1.1);
     expect(dmg.toDefender).toBeCloseTo(20 / 1.1);
   });
 });

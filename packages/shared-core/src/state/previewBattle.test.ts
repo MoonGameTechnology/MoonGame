@@ -197,13 +197,12 @@ describe('previewBattle — contract', () => {
 });
 
 describe('damageFraction — the «ответный урон» share the Steward gate reads (ST-3.1)', () => {
-  it('hand-checked: 3 fighters break on 1 guardian — attacker 1.0, defender 0.6', () => {
-    // fighter atk10/hp20, guardian def20/hp100. Rounds: 30→70|60−20=40 (2 left),
-    // 20→50|40−20=20 (1 left), 10→40|20−20=0 → wiped. Defender keeps 40/100 hull.
+  it('post-loss return fire changes the outcome of three fighters against a guardian', () => {
     const pv = previewBattle(stacks([['fighter', 3]]), stacks([['guardian', 1]]), data);
-    expect(pv.outcome).toBe('defender');
-    expect(pv.attacker.damageFraction).toBe(1);
-    expect(pv.defender.damageFraction).toBeCloseTo(0.6, 10);
+    expect(pv.outcome).toBe('attacker');
+    expect(pv.defender.damageFraction).toBe(1);
+    expect(pv.attacker.damageFraction).toBeGreaterThan(0);
+    expect(pv.attacker.damageFraction).toBeLessThan(1);
   });
 
   it('an untouched side reads 0; an empty side reads 0 (nothing to lose)', () => {
@@ -239,7 +238,7 @@ describe('damageFraction — the «ответный урон» share the Steward
   });
 });
 
-describe('COMBAT_UNIT_CAP — only 10 units fire, the rest just soak', () => {
+describe('soft fleet limit — all units fire at min(1, 10/N)', () => {
   it('the 11th+ attacker adds no damage: 12 fighters finish exactly like 10, 9 lag behind', () => {
     // 25 pacifists = 750 hull, zero return fire. Capped line = 10 × atk10 = 100/round.
     const wall = stacks([['pacifist', 25]]);
@@ -252,7 +251,7 @@ describe('COMBAT_UNIT_CAP — only 10 units fire, the rest just soak', () => {
     expect(r9.roundsEst).toBeGreaterThan(r12.roundsEst); // a real gun less is slower
   });
 
-  it('units beyond the cap still soak: a 12-strong wing loses a smaller hull share than a 10-strong one', () => {
+  it('a one-shot kill causes no return damage, with either 10 or 12 ships', () => {
     // 1 guardian: 100 hull dies to the capped 100-dmg alpha in one round, its 20
     // return fire lands on both wings alike — the bigger wing spreads the same
     // absolute damage over a bigger hull pool.
@@ -262,6 +261,7 @@ describe('COMBAT_UNIT_CAP — only 10 units fire, the rest just soak', () => {
     expect(w12.outcome).toBe('attacker');
     expect(w12.roundsEst).toBe(1);
     expect(w10.roundsEst).toBe(1);
-    expect(w12.attacker.damageFraction).toBeLessThan(w10.attacker.damageFraction);
+    expect(w12.attacker.damageFraction).toBe(0);
+    expect(w10.attacker.damageFraction).toBe(0);
   });
 });

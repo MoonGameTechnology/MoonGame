@@ -1,3 +1,4 @@
+import { announceCasualty } from './casualties';
 import { captureCasualtyCost, partitionCasualtyCost } from './casualtyCost';
 import type { HandlerContext } from '../kernel/module';
 import type {
@@ -8,15 +9,16 @@ import type {
   PlayerId,
   UnitStack,
 } from '../state/gameState';
-import type { GameData, UnitDef } from '../data/schemas';
+import type { GameData } from '../data/schemas';
 import { cappedUnitBreakdown, type StackContribution } from './stacks';
-import { TARGET_CLASSES, targetClassOf, type ClassPools } from './groundTargets';
+import { classShares, poolsTotal, targetClassOf, type ClassPools } from './groundTargets';
+import { formationShares } from './formation';
 import { effectiveStats } from './loadout';
 import { getStance, type DiplomacyCapability } from '../state/diplomacy';
 import { MISSILE_TRAIT } from '../state/minefields';
 import { unitHasTrait } from '../data/traits';
 import { laneTrunks, T_EPS, type TrunkSpan } from '../state/roads';
-import { fortressSiteOf } from '../state/fortress';
+import { fortressSiteOf, refreshFortressBody } from '../state/fortress';
 import { divertFortressDamage } from './fortressDamage';
 
 /**
@@ -33,76 +35,7 @@ import { divertFortressDamage } from './fortressDamage';
  *  forecast so the two can never drift apart. */
 export const MAX_COMBAT_ROUNDS = 240;
 
-export type Tier = 'front' | 'mid' | 'rear';
-/** The lines bow to stern (GDD §7.2). Not a damage ORDER any more — every line
- *  present in the fight is hit in the same volley; the order decides only which
- *  line rounds UP when an absent line's share is split (see {@link lineShares}).
- *
- *  ROS-2.1 dropped a fourth line that a since-removed trait carried; every hull
- *  now states its own line and there is no exception to it. */
-export const TIER_ORDER: readonly Tier[] = ['front', 'mid', 'rear'];
-
-/** Share of an incoming volley each line takes, in whole percent (sums to 100).
- *  A line with no live ship takes nothing and its share is split across the lines
- *  that ARE present. Balance constants (like COMBAT_UNIT_CAP) — data after shakeout.
- *
- *  50/30/20 since ROS-2.1: the old 40/30/20/10 only summed to 100 together with a
- *  fourth line, so dropping that line had to redistribute its ten percent. */
-export const LINE_SHARE: Readonly<Record<Tier, number>> = {
-  front: 50,
-  mid: 30,
-  rear: 20,
-};
-
-/**
- * Which line a unit takes its damage in.
- *
- * Lines are a SHIP formation: a ground assault is one body of troops, so every
- * ground unit shares the front line and the whole volley lands on it — the split
- * below can never carve up an army.
- *
- * No hull overrides its line: `def.line` is the whole rule.
- */
-export function unitTier(def: UnitDef): Tier {
-  if (def.domain === 'ground') {
-    return 'front';
-  }
-  return def.line;
-}
-
-/**
- * How a volley splits across the lines that are actually in the fight, in whole
- * percent summing to exactly 100 (GDD §7.2).
- *
- * Base split is {@link LINE_SHARE}; an ABSENT line takes nothing and its percent
- * is divided EVENLY among the present ones. When that division is not whole, the
- * odd percent goes to the more forward lines (bow rounds up, stern rounds down) —
- * so an even split of a missing line's 20% is 60/40, never 61/39.
- * One line alone therefore always takes 100%.
- *
- * `present` need not be sorted: the result is read off {@link TIER_ORDER}, so the
- * split is a pure function of WHICH lines are in the fight, never of stack order.
- */
-export function lineShares(present: readonly Tier[]): Record<Tier, number> {
-  const out: Record<Tier, number> = { front: 0, mid: 0, rear: 0 };
-  const lines = TIER_ORDER.filter((tier) => present.includes(tier));
-  if (lines.length === 0) {
-    return out;
-  }
-  let orphaned = 100;
-  for (const tier of lines) {
-    orphaned -= LINE_SHARE[tier];
-  }
-  const each = Math.floor(orphaned / lines.length);
-  let odd = orphaned - each * lines.length;
-  for (const tier of lines) {
-    out[tier] = LINE_SHARE[tier] + each + (odd > 0 ? 1 : 0);
-    if (odd > 0) {
-      odd -= 1;
-    }
-  }
-  return out;
-}
+export { TIER_ORDER, LINE_SHARE, unitTier, lineShares, type Tier } from './formation';
 
 // --- combatant side access (ships / landing troops / planet garrison) --------
 
@@ -164,19 +97,8 @@ export function sideAlive(state: GameState, ref: CombatantRef): boolean {
   return !!units && units.some((s) => s.count > 0);
 }
 
-/**
- * Damage a side deals in one round = Σ count × stat over at most COMBAT_UNIT_CAP
- * units — the strongest guns form the firing line, everyone behind them only
- * soaks (Bytro line cap; the receiving hull pools stay whole-stack). The
- * aggressor uses its `attack` stat; a standing fleet that is attacked (the
- * defender) answers with its `defense` stat only — the return-fire mechanic.
- *
- * Возвращает залп ВМЕСТЕ с разбивкой по стекам (VET-1): то же число, что и раньше, плюс
- * вклад каждого стека, который до этого кирпича вычислялся и выбрасывался. Прежний
- * `sideDamage`, отдававший одну сумму, снят: после VET-2 у него не осталось ни одного
- * читателя, а держать две двери в одно правило — это ровно тот способ, которым две копии
- * правила потом расходятся.
- */
+/** All living units fire with linear hull health and soft 20/10 efficiency.
+ * The breakdown also feeds veteran credit, using exactly the same contributions. */
 export function sideDamageBreakdown(
   state: GameState,
   ref: CombatantRef,
@@ -300,39 +222,6 @@ export function stackHull(
 }
 
 /**
- * Damage ONE line: spends `amount` on the line's stacks (sorted by unit id, so
- * the order is data-driven and not stack order) and RETURNS what the line could
- * not absorb. Each stack's remaining HP pool is tracked so partial damage
- * persists across rounds; whole ships/troops are lost as the pool drops.
- */
-function damageLine(
-  units: UnitStack[],
-  tier: Tier,
-  amount: number,
-  data: GameData,
-  deaths: { unit: string; count: number }[],
-): number {
-  let remaining = amount;
-  const stacks = units
-    .filter((s) => {
-      if (!isTargetable(s, data)) {
-        return false;
-      }
-      const def = data.units[s.unit];
-      return def ? unitTier(def) === tier : false;
-    })
-    .sort((a, b) => (a.unit < b.unit ? -1 : a.unit > b.unit ? 1 : 0));
-
-  for (const stack of stacks) {
-    if (remaining <= 0) {
-      break;
-    }
-    remaining = damageStack(stack, remaining, data, deaths);
-  }
-  return remaining;
-}
-
-/**
  * Damage ONE stack: spends `amount` on its shield, then its hull pool, and RETURNS
  * what the stack could not absorb. Whole ships/troops are lost as the pool drops;
  * the residual pool persists on the stack (`hp`).
@@ -370,7 +259,10 @@ function damageStack(
   pool -= absorbed;
   remaining -= absorbed;
 
-  const newCount = pool <= 0 ? 0 : Math.ceil(pool / perShip);
+  // Round-off must not leave an immortal fraction of a hull or an extra unit.
+  const epsilon = 1e-10 * Math.max(1, startPool, perShip);
+  if (pool <= epsilon) pool = 0;
+  const newCount = Math.min(stack.count, pool <= 0 ? 0 : Math.ceil((pool - epsilon) / perShip));
   const lost = stack.count - newCount;
   if (lost > 0) {
     deaths.push({ unit: stack.unit, count: lost });
@@ -390,83 +282,48 @@ function isTargetable(stack: UnitStack, data: GameData): boolean {
   return stack.count > 0 && !!data.units[stack.unit];
 }
 
-/** The lines that have at least one live, TARGETABLE ship, in {@link TIER_ORDER}.
- *  A stack whose unit is missing from `data` belongs to no line — it neither fires
- *  nor is hit, and its line's share is redistributed by the «absent line» rule. */
-function presentLines(units: readonly UnitStack[], data: GameData): Tier[] {
-  return TIER_ORDER.filter((tier) =>
-    units.some((s) => {
-      if (!isTargetable(s, data)) {
-        return false;
-      }
-      const def = data.units[s.unit];
-      return def ? unitTier(def) === tier : false;
-    }),
-  );
-}
-
 /**
- * The PURE damage model (GDD §7.2): EVERY line in the fight takes a slice of
- * `totalDamage` in the same volley — {@link lineShares} says how big a slice,
- * given which lines are present.
- *
- * Overkill is never wasted: a line handed more than it can absorb dies and its
- * leftover is re-split over the lines still standing by the SAME rule — the
- * split is simply recomputed and the pass repeats. There is one rule in the
- * game, not a split rule plus a spill rule. That terminates in at most four
- * passes: a pass either spends everything or empties a line.
- *
- * No bus access — losses are RETURNED (`deaths`, in processing order) so the math
- * is unit-testable in isolation; the `applyDamage` wrapper turns each loss into a
- * `unit.died` event.
+ * Split a volley 50/30/20, then equally per living unit within each line.
+ * Optional class potency converts an equal volley share to class-specific HP loss.
+ * Overkill is redistributed with the same class potency and echelon proportions.
+ * Each pass conserves actual damage, including the garrison damage floor.
  */
 export function damageUnits(
   units: UnitStack[],
   totalDamage: number,
   data: GameData,
+  weights?: ClassPools,
 ): { survivors: UnitStack[]; deaths: { unit: string; count: number }[] } {
   const deaths: { unit: string; count: number }[] = [];
-  let remaining = totalDamage;
+  const potency = units.map(s => weights ? Math.max(0, weights[targetClassOf(data.units[s.unit])]) : 1);
+  let remaining = Math.max(0, totalDamage);
   while (remaining > 0) {
-    const lines = presentLines(units, data);
-    if (lines.length === 0) {
-      break; // nothing left that can be hit
-    }
-    const shares = lineShares(lines);
-    let allocated = 0;
+    const shares = formationShares(units, data);
+    const average = shares.reduce((sum, share, i) => sum + share * potency[i]!, 0);
+    if (!(average > 0)) break;
     let leftover = 0;
-    for (const [i, tier] of lines.entries()) {
-      // The last line takes the exact remainder, so splitting by percent can
-      // neither lose nor mint damage to floating-point rounding.
-      const slice =
-        i === lines.length - 1 ? remaining - allocated : (remaining * shares[tier]) / 100;
-      allocated += slice;
-      leftover += damageLine(units, tier, slice, data, deaths);
+    for (const [i, stack] of units.entries()) {
+      if (!(shares[i]! > 0) || !(potency[i]! > 0)) continue;
+      const slice = remaining * shares[i]! * potency[i]! / average;
+      leftover += damageStack(stack, slice, data, deaths);
     }
-    if (leftover >= remaining) {
-      break; // absorbed nothing — cannot happen with live lines, but never spin
-    }
+    if (leftover >= remaining) break;
     remaining = leftover;
   }
-  return { survivors: units.filter((s) => s.count > 0), deaths };
+  return { survivors: units.filter(s => s.count > 0), deaths };
 }
 
-/** Урон, разложенный по роду войск (`util/groundTargets.ts`), ложится каждый на свой род:
- *  урон по пехоте — только на пехоту, по технике — только на технику. Внутри рода — тем же
- *  {@link damageUnits}. Мутирует стеки так же; выжившие — в исходном порядке. */
+/** Recover class potency from the original formation's allocations. */
 export function damageByClass(
   units: UnitStack[],
   pools: ClassPools,
   data: GameData,
 ): { survivors: UnitStack[]; deaths: { unit: string; count: number }[] } {
-  const deaths: { unit: string; count: number }[] = [];
-  for (const cls of TARGET_CLASSES) {
-    if (!(pools[cls] > 0)) continue;
-    const subset = units.filter((s) => targetClassOf(data.units[s.unit]) === cls);
-    if (subset.length === 0) continue;
-    deaths.push(...damageUnits(subset, pools[cls], data).deaths);
-  }
-  return { survivors: units.filter((s) => s.count > 0), deaths };
+  const shares = classShares(units, data);
+  const power = (cls: keyof ClassPools): number => shares[cls] > 0 ? pools[cls] / shares[cls] : 0;
+  return damageUnits(units, poolsTotal(pools), data, {
+    infantry: power('infantry'), vehicle: power('vehicle'), other: power('other'),
+  });
 }
 
 /**
@@ -549,7 +406,7 @@ export function applyDamage(
     // exactly like a point-defense kill — otherwise the expedition tally, loot drops and
     // hero XP would score an interception as a kill.
     if (unitHasTrait(data, d.unit, MISSILE_TRAIT)) continue;
-    h.emit('unit.died', { unit: d.unit, count: d.count, ...source, lossCost: costs[index] ?? {} });
+    announceCasualty(h, { unit: d.unit, count: d.count, ...source, lossCost: costs[index] ?? {} });
   }
   return survivors;
 }
@@ -712,8 +569,7 @@ export function applyDamageToSide(
    *  burst names the world's owner; a shuttle strike names the strike's owner. Omitted
    *  when nobody owns the fire (a neutral garrison). */
   killedBy?: PlayerId | null,
-  /** Урон поровну на каждого юнита стороны, с весом его рода войск ({@link damageEvenly}):
-   *  так огонь сверху бьёт гарнизон (ROS-1.6a/b). Не передан — линиями, как в бою. */
+  /** Class potency for orbital/air fire, applied through the same echelons. */
   evenly?: ClassPools,
   damageShares?: Record<string, number>,
 ): void {
@@ -721,8 +577,8 @@ export function applyDamageToSide(
   if (!units) {
     return;
   }
+  const site = ref.kind === 'fleet' ? fortressSiteOf(h.state, ref.fleetId) : undefined;
   if (ref.kind === 'fleet') {
-    const site = fortressSiteOf(h.state, ref.fleetId);
     if (site) {
       const routed = divertFortressDamage(site, units, dmg, data);
       dmg = capHooked(dmg, routed.hullInput);
@@ -767,17 +623,19 @@ export function applyDamageToSide(
   }
   const value = captureCasualtyCost(h.state, units, data);
   const laid = evenly
-    ? damageEvenly(units, dmg, data, evenly)
+    ? damageUnits(units, dmg, data, evenly)
     : byClass
       ? damageByClass(units, byClass, data)
       : null;
   if (!laid) {
-    setSideUnits(h.state, ref, applyDamage(h, units, dmg, data, source));
+    const survivors = applyDamage(h, units, dmg, data, source);
+    setSideUnits(h.state, ref, survivors);
+    if (site) for (const body of survivors) refreshFortressBody(site, body, data);
     return;
   }
   const costs = partitionCasualtyCost(laid.deaths, value());
   for (const [index,d] of laid.deaths.entries()) {
-    h.emit('unit.died', {
+    announceCasualty(h, {
       unit: d.unit,
       count: d.count,
       ...source,

@@ -17,7 +17,7 @@
  */
 import type { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
 import {
-  COMBAT_UNIT_CAP,
+  COMBAT_UNIT_CAP, combatEfficiency,
   effectiveStats,
   estimateTravelHours,
   fleetBaseSpeed,
@@ -518,7 +518,7 @@ export function fleetPanelHtml(f: Fleet): string {
     h += fleetHoldsHtml(fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)));
   h += fleetMinesRowHtml(f);
   // Aggregate combat weight — БОЕВОЙ вес, как его считает ядро: effectiveStats +
-  // кап линии огня (топ-10 стволов). Скорость — базовая скорость флота (мин по
+  // доля корпуса и эффективность состава. Скорость — базовая скорость флота (мин по
   // корпусам, лимп <30% учтён). У своего флота ход уже включает форс-марш, и метка
   // ×1.5 не пишется — её прочли бы как ещё один множитель поверх. У чужого — прежняя.
   const atk = shownFire(sm.attack.capped, mods);
@@ -532,7 +532,7 @@ export function fleetPanelHtml(f: Fleet): string {
         : String(Math.round(spd))
       : '—';
   // Fleet-card blurb removed (feedback: compact panel) — the header + stat chips carry it.
-  h += `<div class="pstats"><span data-desc="stat:atk"${tone(mods?.fire.tone)}${tap('atk')}${key}>⚔ ${t('side.stat.atk')} ${atk}</span><span data-desc="stat:def"${tone(mods?.fire.tone)}${tap('def')}${key}>🛡 ${t('side.stat.def')} ${def}</span><span data-desc="stat:cap"${tap('cap')}${key}>Ⅹ ${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}</span><span data-desc="stat:spd"${tone(mods?.speed.tone)}${tap('spd')}${key}>⚡ ${t('side.stat.spd')} ${spdTxt}</span></div>`;
+  h += `<div class="pstats"><span data-desc="stat:atk"${tone(mods?.fire.tone)}${tap('atk')}${key}>⚔ ${t('side.stat.atk')} ${atk}</span><span data-desc="stat:def"${tone(mods?.fire.tone)}${tap('def')}${key}>🛡 ${t('side.stat.def')} ${def}</span><span data-desc="stat:cap"${tap('cap')}${key}>Ⅹ ${nShips}/${COMBAT_UNIT_CAP} · ${Math.round(combatEfficiency(nShips) * 100)}%</span><span data-desc="stat:spd"${tone(mods?.speed.tone)}${tap('spd')}${key}>⚡ ${t('side.stat.spd')} ${spdTxt}</span></div>`;
 
   h += fleetEffectsHtml(f, boosted, nTr);
 
@@ -975,7 +975,7 @@ function fleetConsoleHtml(f: Fleet): string {
       stat: 'cap',
       icon: 'stack',
       label: t('dossier.stat.cap.name'),
-      value: `${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}`,
+      value: `${nShips}/${COMBAT_UNIT_CAP} · ${Math.round(combatEfficiency(nShips) * 100)}%`,
       tone: 'neutral',
     },
     {
@@ -1220,7 +1220,7 @@ export function statPopModel(f: Fleet, stat: ConsoleStat): StatPopView {
       lessIsBetter: true,
     };
   }
-  return plain(`${Math.min(sumUnits(f.units), COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}`);
+  return plain(`${sumUnits(f.units)}/${COMBAT_UNIT_CAP} · ${Math.round(combatEfficiency(sumUnits(f.units)) * 100)}%`);
 }
 
 /** Держит всплывашку в согласии с листом: зовётся каждым `renderPanel`. */

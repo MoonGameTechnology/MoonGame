@@ -300,10 +300,10 @@ describe('heroEffects — aura (rally/bulwark → time-boxed combat.damage)', ()
   it('a live aura near the hero buffs its fleet damage (×1.1); a distant battle does not', () => {
     const near = round(battleBase(200, LIVE)); // 200 ≤ radius 300
     expect(near.dmgToDefender).toBe(22); // 20 × 1.1 — p1 attacks harder
-    expect(near.dmgToAttacker).toBe(20); // p2's return fire unbuffed
+    expect(near.dmgToAttacker).toBeCloseTo(20 * (1 - near.dmgToDefender / 200), 10); // p2's return fire unbuffed
     const far = round(battleBase(700, LIVE)); // 700 > 300
     expect(far.dmgToDefender).toBe(20);
-    expect(far.dmgToAttacker).toBe(20);
+    expect(far.dmgToAttacker).toBeCloseTo(20 * (1 - far.dmgToDefender / 200), 10);
   });
 
   it('an EXPIRED aura contributes nothing (filtered by `until` at read time)', () => {
@@ -476,39 +476,39 @@ describe('heroEffects — the PSI ladder (scan steps 2–3 → combat inside the
   it('the scan`s owner: the enemy in the zone takes MORE, the owner`s own fleet takes LESS', () => {
     const r = round(zoneWorld()); // p1 owns the scan; p2 is hostile by the FFA default
     expect(r.dmgToDefender).toBeCloseTo(20 * 1.05, 6); // p2 takes 20 → 21
-    expect(r.dmgToAttacker).toBeCloseTo(20 / 1.05, 6); // p1 takes 20 → 19.05
+    expect(r.dmgToAttacker).toBeCloseTo(20 * (1 - r.dmgToDefender / 200) / 1.05, 6); // p1 takes 20 → 19.05
   });
 
   it('step 2 alone touches only the enemy — the owner`s own fleet is not yet protected', () => {
     const r = round(zoneWorld({ reveals: [{ center: 'P', radius: 250, until: 10 * HOUR, weakPoints: 0.05 }] }));
     expect(r.dmgToDefender).toBeCloseTo(20 * 1.05, 6);
-    expect(r.dmgToAttacker).toBe(20);
+    expect(r.dmgToAttacker).toBeCloseTo(20 * (1 - r.dmgToDefender / 200), 10);
   });
 
   it('an ALLY of the scan`s owner is covered too, and the ally`s enemy is exposed', () => {
     // The scan belongs to p3, who is nowhere near the battle: p1 is its ally, p2 its enemy.
     const r = round(zoneWorld({ owner: 'p3', diplomacy: { 'p1|p3': 'alliance' } }));
     expect(r.dmgToDefender).toBeCloseTo(20 * 1.05, 6); // p2 — hostile to p3 (FFA default)
-    expect(r.dmgToAttacker).toBeCloseTo(20 / 1.05, 6); // p1 — p3's ally
+    expect(r.dmgToAttacker).toBeCloseTo(20 * (1 - r.dmgToDefender / 200) / 1.05, 6); // p1 — p3's ally
   });
 
   it('a NEUTRAL is untouched by either step — a scan is not an area attack', () => {
     // p3 owns the scan and is at peace with BOTH sides: nothing applies to anyone.
     const r = round(zoneWorld({ owner: 'p3', diplomacy: { 'p1|p3': 'peace', 'p2|p3': 'peace' } }));
     expect(r.dmgToDefender).toBe(20);
-    expect(r.dmgToAttacker).toBe(20);
+    expect(r.dmgToAttacker).toBeCloseTo(20 * (1 - r.dmgToDefender / 200), 10);
   });
 
   it('a battle OUTSIDE the lit zone is ordinary combat', () => {
     const r = round(zoneWorld({ reveals: [{ center: 'H', radius: 250, until: 10 * HOUR, weakPoints: 0.05, evasion: 0.05 }] })); // H is 900 away
     expect(r.dmgToDefender).toBe(20);
-    expect(r.dmgToAttacker).toBe(20);
+    expect(r.dmgToAttacker).toBeCloseTo(20 * (1 - r.dmgToDefender / 200), 10);
   });
 
   it('an EXPIRED scan stops fighting, exactly as it stops lifting fog', () => {
     const r = round(zoneWorld({ reveals: [{ center: 'P', radius: 250, until: 0, weakPoints: 0.05, evasion: 0.05 }] }));
     expect(r.dmgToDefender).toBe(20);
-    expect(r.dmgToAttacker).toBe(20);
+    expect(r.dmgToAttacker).toBeCloseTo(20 * (1 - r.dmgToDefender / 200), 10);
   });
 
   it('a DEAD hero`s zone goes dark — the radar picture dies with its hero (BF-24)', () => {
@@ -516,7 +516,7 @@ describe('heroEffects — the PSI ladder (scan steps 2–3 → combat inside the
     delete st.heroes!['hero:x:1']!.alive;
     const r = round(st);
     expect(r.dmgToDefender).toBe(20);
-    expect(r.dmgToAttacker).toBe(20);
+    expect(r.dmgToAttacker).toBeCloseTo(20 * (1 - r.dmgToDefender / 200), 10);
   });
 
   it('composes with the aura hook instead of replacing it (both registrants fire)', () => {
@@ -524,7 +524,7 @@ describe('heroEffects — the PSI ladder (scan steps 2–3 → combat inside the
     st.heroes!['hero:x:1']!.activeAuras = [{ bonus: 0.1, radius: 1000, until: 10 * HOUR }]; // p1's own aura, reaching P
     const r = round(st);
     expect(r.dmgToDefender).toBeCloseTo(20 * 1.1 * 1.05, 6); // aura (dealing side) × weak points (taking side)
-    expect(r.dmgToAttacker).toBeCloseTo(20 / 1.05, 6); // p2 deals: no aura, but p1 evades
+    expect(r.dmgToAttacker).toBeCloseTo(20 * (1 - r.dmgToDefender / 200) / 1.05, 6); // p2 deals: no aura, but p1 evades
   });
 });
 

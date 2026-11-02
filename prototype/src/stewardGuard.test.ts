@@ -199,7 +199,7 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
     });
     const orders = stewardGuardOrders(s, 'p1');
     expect(orders.map((a) => a.type)).toEqual(['steward.report']);
-    expect(reportEntries(orders)).toMatchObject([{ kind: 'hold', node: 'H', fraction: 0.5 }]);
+    expect(reportEntries(orders)).toMatchObject([{ kind: 'hold', node: 'H', fraction: 0.676 }]);
   });
 
   it('never poaches the ferry off ANOTHER threatened node — that node lifts its own garrison in place', () => {

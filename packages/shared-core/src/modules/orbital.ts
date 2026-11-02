@@ -3,7 +3,7 @@ import type { BuildingInstance, Fleet, UnitStack } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { buildingLevel } from '../data/schemas';
 import { hoursToMs, type Context } from '../action/types';
-import { cappedUnitStat, sumUnitStat } from '../util/stacks';
+import { cappedUnitStat } from '../util/stacks';
 import { requireOwnedIdleFleet } from '../util/fleet';
 import { isActivelyBombarding } from '../state/orbit';
 import { hasOrbit } from '../state/sectorKind';
@@ -19,6 +19,7 @@ import {
 } from '../util/combat';
 import { splitVolley } from '../util/volley';
 import { fireOnGarrison, groundVolley, shipGroundDamage, type GroundVolley } from '../util/groundFire';
+import { wearStructures } from '../util/structureDamage';
 import { recordValues } from '../util/records';
 
 /** Fraction of a bombarding fleet's firepower that rains on the planet below. */
@@ -42,7 +43,7 @@ function aaOrbitalAt(planet: { buildings: BuildingInstance[] }, data: GameData):
  *  flak. Fires every QUARTER game-hour at a quarter of the hourly rate, so the
  *  hourly output matches the stat while the dodge window shrinks to 15 minutes. */
 function aaCloseAt(planet: { garrison: UnitStack[] }, data: GameData): number {
-  return sumUnitStat(planet.garrison, data, 'aaDamage');
+  return cappedUnitStat(planet.garrison, data, 'aaDamage');
 }
 
 /** EVERY hostile, free fleet sitting on the NEAR orbit of `planetId`, in a fixed
@@ -287,34 +288,21 @@ function fireBombardVolley(h: HandlerContext, f: Fleet): void {
     defender: planet.owner,
     attackerFleet: f.id, // обстрел ведёт флот на орбите (CORE-DMG-3)
   };
-  const power = fleetBombardPower(f, data); // per game hour = per volley
-  if (power > 0) {
-    // CORE-DMG-1: the shelling power is scaled at the SOURCE, before it leaves
-    // on the bus — `construction` applies whatever arrives, so hooking here is
-    // the only place that knows who is firing.
-    // Единственный канал, чей урон НЕ проходит через приёмник с брендом:
-    // обстрел уезжает по шине, а `construction` уже сам стачивает им постройки.
-    // Тип в payload события не уедет (по шине идёт JSON), поэтому шов тут
-    // остаётся явным и держится тестом `damageHookScope.test.ts` (CORE-DMG-2).
-    const shelling = hookedDamage(h, power, hit);
-    // `hit` и `factor` — чем этот залп срезан: постройки, которые он снесёт,
-    // перестают прикрывать мир для остатка того же урона, и `construction`
-    // пересчитывает его по ходу (FORT-5.15, замечание Codex на #1389).
-    h.emit('planet.bombarded', {
-      planetId,
-      power: shelling,
-      owner: planet.owner,
-      by: f.owner,
-      hit,
-      factor: mitigationFactor(h, hit),
-    });
-  }
-  // ROS-1.6: тот же залп бьёт и войска мира — слабо и без последнего бойца
-  // (`util/groundFire.ts`). Те же аргументы хука: прикрытие мира режет и этот урон.
+  const power = fleetBombardPower(f, data);
+  // Both channels sample the same protection; structures are then worn before
+  // another source or its return fire is evaluated.
+  const shelling = hookedDamage(h, power, hit);
+  const factor = mitigationFactor(h, hit);
   const troops = shipGroundPower(f, planet, data);
   if (troops.total > 0) {
     fireOnGarrison(h, planet, hookedDamage(h, troops.total, hit), f.owner, troops.weights);
   }
+  if (power > 0) {
+    const structuresApplied = wearStructures(h, planetId, shelling, planet.owner, { hit, factor });
+    h.emit('planet.bombarded', { planetId, power: shelling, owner: planet.owner, by: f.owner,
+      hit, factor, structuresApplied });
+  }
+
 }
 
 /**
@@ -335,7 +323,7 @@ export const orbitalModule: GameModule = {
   // 1.5.0: обстрел бьёт пехоту и технику разной долей атаки (ROS-1.6b).
   // 1.6.0: обстрел бьёт залпом раз в игровой час по своим часам флота, как атака в бою
   //        (`fleet.bombardNextAt`), а не непрерывно.
-  version: '1.6.0',
+  version: '1.7.0',
   setup(api) {
     // A single orbit (GDD §7.4): arriving = stationed in orbit, not bombarding
     // until ordered. Registered BEFORE the melee module in the manifest, so this

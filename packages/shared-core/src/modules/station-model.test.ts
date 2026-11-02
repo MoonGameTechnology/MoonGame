@@ -190,7 +190,7 @@ describe('separate fortress model', () => {
       { owner: 'p1', role: 'defender', units: state.fleets[bodyId]!.units, fortress: site },
     ], data, (a, b) => a !== b);
     expect(prediction.roundsEst).toBe(1);
-    const live = ok(kernel.applyAction(state, action('test.hit', { fleetId: bodyId, amount: 10 }), ctx(6 * H))).state;
+    const live = ok(kernel.applyAction(state, action('test.hit', { fleetId: bodyId, amount: 0.01 }), ctx(6 * H))).state;
     expect(prediction.sides[1]?.survivors[0]?.hp).toBe(live.fleets[bodyId]?.units[0]?.hp);
     expect(JSON.stringify(state)).toBe(before);
   });

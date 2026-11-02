@@ -285,6 +285,17 @@ export const HERO_MOBILIZATION_SOLO_MIGRATION = {
   toDataHash: '023cd15f09ee90',
 } as const;
 
+/** Combat echelons and post-loss replies retain the save's state shape. Existing
+ * hull/shield pools, orders, clocks and RNG survive; later volleys use the new rules. */
+export const ECHELONS_SOLO_MIGRATION = {
+  fromRules: HERO_MOBILIZATION_SOLO_MIGRATION.toRules,
+  fromData: HERO_MOBILIZATION_SOLO_MIGRATION.toData,
+  fromDataHash: HERO_MOBILIZATION_SOLO_MIGRATION.toDataHash,
+  toRules: '08554ff861af98',
+  toData: '0.1.75',
+  toDataHash: '0afbb7f3739821',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -311,6 +322,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   FORTRESS_MODEL_SOLO_MIGRATION,
   LOAD_FIRST_SOLO_MIGRATION,
   HERO_MOBILIZATION_SOLO_MIGRATION,
+  ECHELONS_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

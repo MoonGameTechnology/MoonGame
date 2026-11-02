@@ -1,3 +1,5 @@
+import { effectiveStats } from '../util/loadout';
+import { wearStructures } from '../util/structureDamage';
 import { captureCasualtyCost } from '../util/casualtyCost';
 import { fleetPointDefense, planetPointDefense, fleetPDRange, PD_COOLDOWN_MINUTES } from '../util/pointDefense';
 /**
@@ -81,6 +83,7 @@ import {
   applyDamageToSide,
   beachheadOf,
   hookedDamage,
+  mitigationFactor,
   isAllied,
   isHostile,
   ownFleet,
@@ -625,7 +628,7 @@ function strikePower(
 /** Огонь вылета по ВОЗДУШНОЙ цели — чужому вылету и ракете (SM-3.7d): `shuttleDamage`, в
  *  доле живого корпуса. */
 function strikeAirPower(strike: ShuttleStrike, data: GameData): number {
-  return sumUnitStat(strike.units, data, 'shuttleDamage') * hullShare(strike.units, strike.damage, data);
+  return cappedUnitStat(strike.units, data, 'shuttleDamage') * hullShare(strike.units, strike.damage, data);
 }
 
 /** Огонь вылета по ВОЙСКАМ мира за удар (ROS-1.6): той же линией огня и в той же доле
@@ -1231,10 +1234,6 @@ function clearMine(
  * берётся той же долей. Две копии этих строк разъехались бы на первой правке урона.
  */
 function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet, share: number): void {
-  // Ответка считается ДО удара, из того же снимка: цель, которую этот залп добьёт, всё
-  // равно успевает огрызнуться — та же одновременность, что у артиллерии, где залпы
-  // считаются из состояния до отрезка.
-  const answer = returnFireAgainstFleet(target, h.ctx.data) * share;
   const power = strikePower(strike, h.ctx.data, 'fleet') * share;
   // Ракета — воздушная цель (SM-3.7d): её бьёт `shuttleDamage`, ответки нет.
   if (isMissileFleet(target, h.ctx.data)) return hitMissile(h, strike, target, strikeAirPower(strike, h.ctx.data) * share);
@@ -1274,7 +1273,7 @@ function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet, sh
     if (mine) clearMine(h, strike.owner, target.id, 'shuttle.mineCleared');
     else removeIfWiped(h, target.id);
   }
-  repelStrike(h, strike, answer, {
+  repelStrike(h, strike, returnFireAgainstFleet(target, h.ctx.data) * share, {
     kind: 'fleet',
     id: target.id,
     owner: target.owner,
@@ -1646,17 +1645,12 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
         const target = h.state.planets[strike.target.id];
         if (target && target.owner !== strike.owner) {
           const power = strikePower(strike, h.ctx.data, 'planet');
-          const answer = planetPointDefense(target, h.ctx.data);
+          const hit = { phase: 'shuttle', location: target.id, attacker: strike.owner,
+            defender: target.owner ?? '', ...strikeAttackerFleet(strike) };
+          const shelling = hookedDamage(h, power, hit);
+          const factor = mitigationFactor(h, hit);
           if (power > 0) {
-            // Второй шов по шине, как у обстрела с орбиты: урон миру накладывает
-            // `construction`, получив `planet.bombarded` (CORE-DMG-2).
-            const dealt = hookedDamage(h, power, {
-              phase: 'shuttle',
-              location: target.id,
-              attacker: strike.owner,
-              defender: target.owner ?? '',
-              ...strikeAttackerFleet(strike),
-            });
+            const dealt = shelling;
             h.emit('shuttle.hit', {
               strikeId: strike.id,
               owner: strike.owner,
@@ -1666,11 +1660,7 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
               planetId: target.id,
               damage: dealt,
             });
-            h.emit('planet.bombarded', {
-              planetId: target.id,
-              power: dealt,
-              owner: target.owner,
-            });
+
           }
           // ROS-1.6: удар задевает и войска мира — сильнее обстрела с орбиты, но без
           // последнего бойца (`util/groundFire.ts`). Только у врага или ничейного мира:
@@ -1686,7 +1676,12 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
             });
             fireOnGarrison(h, target, toTroops, strike.owner, troops.weights);
           }
-          repelStrike(h, strike, answer, {
+          if (power > 0) {
+            const structuresApplied = wearStructures(h, target.id, shelling, target.owner, { hit, factor });
+            h.emit('planet.bombarded', { planetId: target.id, power: shelling, owner: target.owner,
+              hit, factor, structuresApplied });
+          }
+          repelStrike(h, strike, planetPointDefense(target, h.ctx.data), {
             kind: 'planet',
             id: target.id,
             owner: target.owner,
@@ -1937,7 +1932,7 @@ export const shuttleModule: GameModule = {
   // 1.17.0: урон удара по войскам мира делится поровну на каждого юнита, а не фокусом
   //         (ROS-1.6a, то же правило, что у обстрела с орбиты).
   // 1.18.0: удар по миру бьёт технику и пехоту разной долей атаки (ROS-1.6b).
-  version: '1.19.0',
+  version: '2.0.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -2319,10 +2314,8 @@ export const shuttleModule: GameModule = {
     /**
      * Прибытие. Нога `out` — удар и разворот, нога `back` — посадка в свой порт.
      *
-     * Удар наносится ОДНОСТОРОННЕ: флоту — через тот же хук `combat.damage`, что и
-     * любой другой канал огня (CORE-DMG-1, `phase: 'shuttle'`), миру — событием
-     * `planet.bombarded`, которое модуль построек уже умеет превращать в урон зданиям.
-     * Ни бой, ни ответный огонь не начинаются.
+     * Удар проходит через combat.damage. Потери кораблей и построек применяются
+     * сразу; затем цель отвечает оставшимся оружием, и вылет поворачивает домой.
      */
     api.on('shuttle.arrived', (event, h: HandlerContext) => {
       // Сбит по дороге, сел, событие от сменённого приказа (SHU-6.13) — dead letter,
@@ -2781,15 +2774,8 @@ export const shuttleModule: GameModule = {
      *
      * Три вещи, которые здесь легко потерять при правке:
      *
-     * 1. **Перехватчик — тот, у кого есть `shuttleDamage`.** Отдельного флага «я
-     *    истребитель» нет намеренно: ноль урона по челнокам и «не умею перехватывать»
-     *    — одно и то же, а два способа сказать одно разъезжаются (тот же довод, что у
-     *    `shuttleBay` в SHU-1.1).
-     * 2. **Взлёт стоит топлива БАЗЫ.** Дежурство не бесплатно: пустой порт пропускает
-     *    удар, и это ровно то решение, ради которого топливо вообще существует.
-     * 3. **Машины не улетают из ангара.** Перехват — это подъём и посадка внутри
-     *    одного часа; заводить ради него второй летящий объект в состоянии значило бы
-     *    удвоить сущность, которую видят туман, зональное ПВО и выбор цели.
+     * Interceptors use their remaining hull and the air-wing size threshold.
+     * The base spends one sortie and targets the nearest hostile flight in range.
      */
     api.on('time.advanced', (_event, h: HandlerContext) => {
       const strikes = h.state.strikes ?? [];
@@ -2807,7 +2793,13 @@ export const shuttleModule: GameModule = {
       for (const base of bases) {
         if (base.owner === null || base.position === null) continue;
         const machines = hangarMachines({ hangar: base.hangar });
-        const power = sumUnitStat(machines, data, 'shuttleDamage');
+        const healthyMachines = base.hangar.flatMap(squad => {
+          const health = hullShare(squad.units, squad.damage, data);
+          return squad.units.map(stack => ({ ...stack,
+            hp: (stack.hp ?? stack.count * (effectiveStats(data.units[stack.unit]!, stack, data).hp ?? 1)) * health,
+          }));
+        });
+        const power = cappedUnitStat(healthyMachines, data, 'shuttleDamage');
         if (power <= 0) continue; // в ангаре нет охотников
         const spec = baseSortieSpec(base, h.state, data);
         const sortie = base.sortie ?? freshSortie(spec.maxFuel);

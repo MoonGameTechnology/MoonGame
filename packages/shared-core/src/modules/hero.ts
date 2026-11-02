@@ -1,3 +1,4 @@
+import type { HeroCasualty } from '../util/casualties';
 import { activeHeroCount, heroActiveCap } from '../state/heroDeployment';
 import { registerHeroDeployment } from './hero/deployment';
 import { sectorKindDef } from '../state/sectorKind';
@@ -470,6 +471,21 @@ function killHero(h: HandlerContext, hero: Hero): void {
   h.emit('hero.died', { owner: hero.owner, heroId: hero.id, at: h.ctx.now });
 }
 
+/** Resolve a hero hull loss while its fleet link and owner are still available. */
+const heroCasualty: HeroCasualty = (h, { unit, fleetId, owner, heroId }) => {
+  if (typeof unit !== 'string') return;
+  const commander = typeof heroId === 'string'
+    ? h.state.heroes?.[heroId]
+    : typeof fleetId === 'string' ? heroByFleet(h.state, fleetId) : undefined;
+  const hero = commander && unit === heroShipUnit(h, commander)
+    ? commander
+    : unit === HERO_UNIT && typeof heroId !== 'string'
+      ? commander ?? (typeof owner === 'string' ? heroOf(h.state, owner) : undefined)
+      : undefined;
+  if (hero && hero.alive !== false) killHero(h, hero);
+  return hero?.id;
+};
+
 /** Why a «Devour World» siege ended without the world dying (`hero.siege.broken`). */
 type SiegeBreak = 'died' | 'battle' | 'departed' | 'ceased' | 'captured' | 'lapsed';
 
@@ -680,7 +696,9 @@ export const heroModule: GameModule = {
   // 4.4.0: map-authored hero rescue on arrival, with one-time persisted recruitment facts.
   // 4.5.0: герой не появляется на крепости у развилки — это не мир (FORT-6.1).
   // 4.6.0: чужая ракета (SM-3.7b) для `hero.spawn` — как отсутствующая цель (`E_NO_PLANET`).
-  version: '4.8.0',
+  // 4.8.0: timed hero mobilization and researched command slots.
+  // 4.9.0: remove a slain hero's aura before the surviving escort returns fire.
+  version: '4.9.1',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
@@ -946,32 +964,10 @@ export const heroModule: GameModule = {
       return bonus !== 0 ? base + bonus : base;
     });
 
-    // The hero went down (its ship was destroyed) → start the respawn timer once.
-    // `unit.died` carries the dead stack's `fleetId` and `owner` (the fleet may already
-    // be gone by drain time). Attribute the death to the hero commanding THAT ship, so
-    // it's right when several heroes share an owner; fall back to the owner's hero when
-    // the ship link isn't recorded (older saves / a hero set up without a fleetId).
-    api.on('unit.died', (event, h) => {
-      const { unit, fleetId, owner } = (event.payload ?? {}) as {
-        unit?: string;
-        fleetId?: string;
-        owner?: string;
-      };
-      if (typeof unit !== 'string') return;
-      // The dead stack is the hero's ship when it is the hull of the hero commanding
-      // THAT fleet — `hero` for every roster archetype, its own hull for a boss (PVR-4.7).
-      // A boss that took a wave aboard loses its ship while the fleet lives on, so the
-      // whole-fleet signal below would never fire for it.
-      const commander = typeof fleetId === 'string' ? heroByFleet(h.state, fleetId) : undefined;
-      const hero =
-        commander && unit === heroShipUnit(h, commander)
-          ? commander
-          : unit === HERO_UNIT
-            ? (commander ?? (typeof owner === 'string' ? heroOf(h.state, owner) : undefined))
-            : undefined;
-      if (!hero || hero.alive === false) return; // no hero entity, or already respawning
-      killHero(h, hero);
-    });
+    // Death must remove the aura before surviving units return fire. Keep the
+    // event handler for other death paths; the alive guard makes it idempotent.
+    api.provideCapability<HeroCasualty>('hero.casualty', heroCasualty);
+    api.on('unit.died', (event, h) => heroCasualty(h, (event.payload ?? {}) as Record<string, unknown>));
 
     // HERO-2: the whole ship went down with its fleet. `fleet.destroyed` covers the
     // removal paths that never drain a hero stack individually; the alive guard makes
