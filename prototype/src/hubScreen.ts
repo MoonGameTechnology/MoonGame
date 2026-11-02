@@ -39,6 +39,7 @@ import { PORTRAITS } from './profileArt';
 import { initProfile } from './profileScreen';
 import { initRank } from './rankScreen';
 import { initMedalRewards } from './medalRewards';
+import { initModuleRewards } from './moduleRewards';
 import { initRegistrationReward } from './registrationReward';
 import { initTutorialMedal } from './tutorialMedal';
 import { openSectorZero } from './sectorZeroShell';
@@ -85,9 +86,19 @@ export let hubEl: HTMLElement;
 /** Строка заметок хаба: сюда пишут вкладки, обозреватель и вход. */
 export let hubNote: HTMLElement;
 
+let moduleRewards: ReturnType<typeof initModuleRewards> | null = null;
+function createModuleRewards() {
+  return initModuleRewards({
+    identity: profileKey,
+    visible: () => hubEl.style.display !== 'none',
+    read: (key) => JSON.parse(readRaw(key + '.module-rewards') ?? 'null'),
+    write: (key, items) => writeRaw(key + '.module-rewards', JSON.stringify(items)),
+  });
+}
 let registrationReward: ReturnType<typeof initRegistrationReward> | null = null;
 
 export function showHub(show: boolean): void {
+  if (!show) moduleRewards?.hide();
   if (!show) registrationReward?.close();
   if (!show) arsenal?.close();
   if (!show) shop?.close();
@@ -223,6 +234,11 @@ function arsenalKey(): string {
   return 'vd.arsenal.' + (game.nick().trim() || 'guest');
 }
 
+function readArsenalCache(): unknown {
+  try { return JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null'); }
+  catch { return null; }
+}
+
 export let profile: ReturnType<typeof initProfile> | null = null;
 
 const medalsKey = (): string => 'vd.medals.' + (game.nick().trim() || 'guest');
@@ -330,13 +346,15 @@ export function openHub(note = ''): void {
   detach('хаб: сверка командира с сервером', syncCommanderFromServer()); // account-backed XP → local mirror (accounts mode only)
   detach('хаб: портрет аккаунта', syncProfileAppearance());
   detach('account deletion capability', game.refreshAccountDeletion());
-  if (registrationReward) detach('registration reward', registrationReward.show());
   // The tutorial claim goes first: its medal is then paid by the same hub entry.
   detach(
     'tutorial medal claim and medal rewards',
     (async () => {
+      if (registrationReward) await registrationReward.show();
       if (tutorialMedal) await tutorialMedal.claim();
       if (medalRewards) await medalRewards.claim();
+      moduleRewards?.resume();
+      if (hubEl.style.display !== 'none') await arsenal?.refresh();
     })(),
   );
 }
@@ -412,14 +430,9 @@ export function initHubScreen(host: HubScreenHost): void {
       root: () => $('hp-arsenal'),
       sheet: () => $('arsenal-sheet'),
       narrow: () => $('hp-arsenal').clientWidth < ARSENAL_WIDE_MIN,
-      readCache: () => {
-        try {
-          return JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null');
-        } catch {
-          return null;
-        }
-      },
+      readCache: readArsenalCache,
       writeCache: (items) => localStorage.setItem(arsenalKey(), JSON.stringify(items)),
+      confirmed: (items) => (moduleRewards ??= createModuleRewards()).observe(items),
       openCodex,
       authorizedBase: hubAuthorizedBase,
       canSignIn: () => !!game.resolveServer() && authMode === 'accounts',
