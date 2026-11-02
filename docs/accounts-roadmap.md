@@ -88,7 +88,7 @@ password-слой тогда станет одним из провайдеров
 ## Фаза 0 · Модель аккаунта и хранение
 
 ### AC-0.1 · Сущность Account + связь с Player `[srv][data]` ✅ — M
-✅ уже в коде: таблица `users` (`packages/server/src/store/postgres.ts` — id/login/pass_hash/
+✅ уже в коде: таблица `users` (`packages/server/src/store/postgres/schema.ts` — id/login/pass_hash/
 email + уникальные индексы по нижнему регистру) за интерфейсом `UserStore`, а связь
 «аккаунт ↔ игрок матча» держит `AccountStore.resolveSeat` (ник → место в комнате, memory +
 Postgres, контракты в `store.test.ts`).

@@ -491,7 +491,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `pveOrchestrator.ts` | `pveOrders(state, data, {session, seq})` | PVE-5: тактика волн Роя — ЧИСТАЯ функция → `Action[]`, подаётся через `serverOrders` (ADR `docs/explanations/05-pve-ai-placement.md`: тактика NPC не входит в контракт реплея, поэтому живёт на сервере, а не в модуле ядра) |
 | `matchId.ts` | `newMatchId()`, `freeMatchId` | ADDR-1: номер партии — 8 случайных цифр, один источник для обоих хостов; старые `m-<uuid>`/`proto` остаются действительными |
 | `joinSeat.ts` / `matchRoster.ts` / `seatExpiry.ts` | посадка на место, ростер, истечение брони | ENTRY/REL-5 |
-| `store/` | `PostgresStore`, `MatchSnapshot`, `StoredReceipt` | Postgres JSONB persistence |
+| `store/` | `PostgresStore`, `MatchSnapshot`, `StoredReceipt` | Postgres JSONB persistence; SLIM-5: домены в `store/postgres/` и `store/memory/` (партии, аккаунты, корпорации, AvA, новости, арсенал, друзья, push), схема — `store/postgres/schema.ts`; `postgres.ts`/`memory.ts` — бочки реэкспорта |
 | `auth.ts` | `verifyJoinToken`, `signJoinToken`, сессионный JWT | join-токен и сессия (`AUTH_JWT_SECRET`), Origin allowlist |
 | `authApi.ts` | password auth, `pwFingerprint` | аутентификация |
 | `protocol.ts` | реэкспорт `@void/protocol` | сам провод объявлен в `packages/protocol` (NETA2-4) |

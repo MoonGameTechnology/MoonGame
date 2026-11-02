@@ -49,7 +49,7 @@
 | SLIM-2 | ✅ | proto | `docs/backlog.md` | CSS из build.mjs в файлы. |
 | SLIM-3 | ✅ | proto | `docs/backlog.md` | Мозг ботов по фазам. |
 | SLIM-4 | ✅ | core srv proto | `docs/backlog.md` | Один список модулей ядра. |
-| SLIM-5 | ⏳ | srv | `docs/backlog.md` | Хранилища сервера по доменам. |
+| SLIM-5 | ✅ | srv | `docs/backlog.md` | Хранилища сервера по доменам. |
 | SLIM-6 | ⏳ | proto core | `docs/backlog.md` | Длинные функции — по месту. |
 | SLIM-7 | ⏳ | proto core docs | `docs/backlog.md` | Мелкая уборка. |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
