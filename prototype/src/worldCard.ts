@@ -24,6 +24,7 @@ import type {
 import {
   buildingLevel,
   capitalOf,
+  orderLane,
   forkSiteId,
   hasShipyard,
   isForkSite,
@@ -45,8 +46,8 @@ import { intelLayers } from '../../decisions/intelLayers';
 import { knownBureau, oddsPct, spyOdds } from '../../decisions/spyOdds';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
-import { laneOf } from './buildOrders';
 import type { BuildLane } from './buildQueue';
+import { shownProductionLanes } from '../../decisions/productionLanes';
 import type { UnitCatalogTab } from './buildScreen';
 import { bombardFall } from './bombardClock';
 import { builtTileHtml } from './catalogTile';
@@ -335,6 +336,22 @@ export function unitRows(stacks: Array<UnitStack>): string {
 function pausedLabel(site: PausedConstructionSite): string {
   return constructionLabel(site);
 }
+/** Заголовок конвейера полосы юнитов: очередь названа по тому, что в ней строится. */
+const LANE_TITLE: Record<string, string> = {
+  ships: 'side.conveyor.lane.ships',
+  shuttles: 'side.conveyor.lane.shuttles',
+  infantry: 'side.conveyor.lane.infantry',
+  vehicles: 'side.conveyor.lane.vehicles',
+};
+
+/** Конвейеры полос вкладки, которые мир может вести или уже ведёт (BLD-2.2), каждый под
+ *  своим заголовком (`decisions/productionLanes.ts`). */
+function laneConveyors(planetId: string, lanes: readonly BuildLane[]): string {
+  return shownProductionLanes(game.world(), planetId, lanes, data)
+    .map((l) => `<div class="sec">${t(LANE_TITLE[l] ?? '')}</div>` + conveyorHtml(planetId, l))
+    .join('');
+}
+
 function conveyorHtml(planetId: string, lane: BuildLane): string {
   const s = game.world();
   // Разметку собирает `conveyorView.ts` (REFM-36) — там же правило «живые числа не
@@ -356,7 +373,7 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
         : null,
       queued: queued.map((q) => ({ label: esc(constructionLabel(q)), id: q.id })),
       paused: (s.planets[planetId]?.pausedConstruction ?? [])
-        .filter((p) => laneOf(p.kind) === lane)
+        .filter((p) => orderLane(data, p) === lane)
         .map((p) => ({ id: p.id, label: esc(pausedLabel(p)), progress: p.progress })),
       // Строку «ждём цену» показываем только на ПК: на телефоне место дороже.
       // Условие простое именно потому, что решает ЯДРО: полоса свободна, а голова всё
@@ -741,14 +758,9 @@ export function planetPanelHtml(p: Planet): string {
         game.garrisonTiles(p.owner, ground),
     );
     if (mine) {
-      // Очередь юнитов у мира ОДНА на три вкладки (полоса `units`): прежде она звалась
-      // «наземным конвейером», «конвейером кораблей» и «конвейером шаттлов», и корабль в
-      // очереди стоял во «наземном». Имя теперь одно — какая есть очередь, такая и названа.
-      cols.push(
-        `<div class="sec">${t('side.units.conveyor')}</div>` +
-          conveyorHtml(p.id, 'units') +
-          unitCatalogButton('ground'),
-      );
+      // У каждой производственной постройки своя очередь (BLD-2.1): на земле это казармы
+      // и завод, и у каждой свой конвейер под своим именем.
+      cols.push(laneConveyors(p.id, ['infantry', 'vehicles']) + unitCatalogButton('ground'));
     }
     if (!pcUi()) {
       cols.push(`<div class="hint">${t('dossier.tab.ground.desc')}</div>`);
@@ -778,11 +790,7 @@ export function planetPanelHtml(p: Planet): string {
     const rally = rallyOffer(mine, hasShipyard(p, data), rallyPointOf(s, ME, p.id) !== null);
     if (rally !== 'none') cols.push(rallySectionHtml(p.id, rally));
     if (mine) {
-      cols.push(
-        `<div class="sec">${t('side.units.conveyor')}</div>` +
-          conveyorHtml(p.id, 'units') +
-          unitCatalogButton('ships'),
-      );
+      cols.push(laneConveyors(p.id, ['ships']) + unitCatalogButton('ships'));
     }
     if (!pcUi()) {
       // PC carries this in the ФЛОТ tab's hover dossier ('tab:ships') — TXT-3 свёл
@@ -823,11 +831,7 @@ export function planetPanelHtml(p: Planet): string {
       );
     }
     if (mine) {
-      cols.push(
-        `<div class="sec">${t('side.units.conveyor')}</div>` +
-          conveyorHtml(p.id, 'units') +
-          unitCatalogButton('shuttle'),
-      );
+      cols.push(laneConveyors(p.id, ['shuttles']) + unitCatalogButton('shuttle'));
     }
     if (!pcUi()) {
       // PC carries this in the ЭСКАДРА tab's hover dossier ('tab:shuttle').

@@ -272,8 +272,8 @@ export function startGuidedMatch(): void {
         shipCardOpen: () => dossier('[data-build="unit:frigate"]'),
         shipOrdered: () =>
           hasShip() ||
-          activeConstruction(home, 'units')?.payload.unit === GUIDE_HULL ||
-          coreQueue(home, 'units').some((q) => q.unit === GUIDE_HULL),
+          activeConstruction(home, 'ships')?.payload.unit === GUIDE_HULL ||
+          coreQueue(home, 'ships').some((q) => q.unit === GUIDE_HULL),
         hasShip,
         fleetSelected: () => selFleet !== null && selFleet === guideFleet(live(), me())?.id,
         moveArmed: () => aiming,

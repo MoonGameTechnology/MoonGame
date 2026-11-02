@@ -44,7 +44,7 @@ import {
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { esc, displayUnit, cost as priceHtml, fmtDur, fmtEta } from './format';
-import { activeConstruction, hoursLeft, progressPct } from './buildProgress';
+import { hoursLeft, progressPct, unitLaneOrders } from './buildProgress';
 import { HOUR } from './time';
 import { motionOn } from './graphicsPrefs';
 import { unitIconHtml } from './icons';
@@ -487,17 +487,16 @@ export function loadoutPaneHtml(
 }
 
 /**
- * Что ждёт заказ юнитов на этом мире (BLD-1): мир строит один заказ юнитов за раз, остальные
- * стоят в очереди ядра (`Planet.buildQueue`). `null` — полоса свободна, заказ начнётся сразу.
+ * Что ждёт заказ этого юнита на мире (BLD-1): полоса его постройки (BLD-2.1) строит один заказ
+ * за раз, остальные стоят в очереди ядра (`Planet.buildQueue`). `null` — полоса свободна.
  * `nextInHours` — когда закончится идущая стройка; ноль — идущей нет, голова очереди ждёт денег.
  */
 export function unitLaneAhead(
   state: GameState,
   planetId: string,
+  unit: string,
 ): { count: number; nextInHours: number } | null {
-  const active = activeConstruction(state, planetId, 'units');
-  // Полоса юнитов — заказы рода `unit`: то же правило полос, что у ядра и `laneOf`.
-  const queued = (state.planets[planetId]?.buildQueue ?? []).filter((q) => q.kind === 'unit');
+  const { active, queued } = unitLaneOrders(state, planetId, unit, data);
   const count = (active ? 1 : 0) + queued.length;
   if (count === 0) return null;
   return { count, nextInHours: active ? hoursLeft(active.at, state.time, HOUR) : 0 };
@@ -512,12 +511,12 @@ export function unitLaneAhead(
 export function yardQueueHtml(
   state: GameState,
   planetId: string,
+  unit: string,
   color: string,
   fresh = false,
 ): string {
   if (!planetId) return '';
-  const active = activeConstruction(state, planetId, 'units');
-  const queued = (state.planets[planetId]?.buildQueue ?? []).filter((q) => q.kind === 'unit');
+  const { active, queued } = unitLaneOrders(state, planetId, unit, data);
   const items: string[] = [];
   const chip = (unit: string, count: number, tail: string, extra = ''): string => {
     const label = `${displayUnit(unit)} ×${count}`;
@@ -658,7 +657,7 @@ export function orderBarHtml(
   const affordable = Object.entries(total).every(([r, n]) => (res[r] ?? 0) >= n);
   const canBuild = affordable && draft.planet !== '' && (!lander || troop !== undefined);
   const worlds = buildSites(state, me, draft.hull);
-  const ahead = draft.planet ? unitLaneAhead(state, draft.planet) : null;
+  const ahead = draft.planet ? unitLaneAhead(state, draft.planet, draft.hull) : null;
   const queue = !ahead
     ? t('yard.queue.now')
     : ahead.nextInHours > 0
@@ -857,8 +856,8 @@ export function initShipyard(host: YardHost): {
   /** Что сейчас стоит в полосе (своя строка: `innerHTML` браузер сериализует иначе). */
   let queuePainted = '';
   const queueCount = (planetId: string): number =>
-    (activeConstruction(host.state(), planetId, 'units') ? 1 : 0) +
-    (host.state().planets[planetId]?.buildQueue ?? []).filter((q) => q.kind === 'unit').length;
+    (unitLaneOrders(host.state(), planetId, draft.hull, data).active ? 1 : 0) +
+    unitLaneOrders(host.state(), planetId, draft.hull, data).queued.length;
   /** Полоса очереди мира черновика; заказ, прибавившийся на том же мире, подсвечен. */
   function queueHtml(): string {
     if (tab === 'heroes') return '';
@@ -866,7 +865,7 @@ export function initShipyard(host: YardHost): {
     // Подсветка — один раз, на той отрисовке, где заказ впервые виден.
     const fresh = draft.planet === queueSig.planet && n > queueSig.n;
     queueSig = { planet: draft.planet, n };
-    queuePainted = yardQueueHtml(host.state(), draft.planet, host.youColor(), fresh);
+    queuePainted = yardQueueHtml(host.state(), draft.planet, draft.hull, host.youColor(), fresh);
     return queuePainted;
   }
 

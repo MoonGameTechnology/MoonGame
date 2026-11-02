@@ -320,11 +320,11 @@ describe('вкладки', () => {
     const mine = card('A', 'ground');
     expect(rec.tiles.at(-1)).toEqual(['p1', [{ unit: 'militia', count: 3 }]]);
     expect(mine).toContain('<i class="tiles">p1:militia×3</i>');
-    expect(mine).toContain(t('side.units.conveyor'));
+    expect(mine).toContain(t('side.conveyor.lane.infantry'));
     expect(mine).toContain(act('openunits', 'ground'));
     const foe = card('N', 'ground');
     expect(foe).toContain('<i class="tiles">p2:militia×4</i>');
-    expect(foe).not.toContain(t('side.units.conveyor'));
+    expect(foe).not.toContain(t('side.conveyor.lane.infantry'));
     expect(foe).not.toContain('data-act="openunits"');
   });
 
@@ -397,11 +397,20 @@ describe('очередь стройки', () => {
     const payload = '<img src=x onerror="alert(1)">';
     const a = env.s.planets.A!;
     a.buildQueue = [{ id: 11, kind: 'unit', playerId: 'p1', unit: payload, count: 2 }];
-    a.pausedConstruction = [{
-      id: 7, kind: 'unit', playerId: 'p1', unit: payload, count: 1,
-      progress: 0.5, remainingHours: 2, remainingCost: {},
-    }];
-    const html = card('A', 'ground');
+    a.pausedConstruction = [
+      {
+        id: 7,
+        kind: 'unit',
+        playerId: 'p1',
+        unit: payload,
+        count: 1,
+        progress: 0.5,
+        remainingHours: 2,
+        remainingCost: {},
+      },
+    ];
+    // Неизвестный юнит ядро ведёт полосой кораблей (`unitLane`) — там его и ищем.
+    const html = card('A', 'ships');
     expect(html).not.toContain(payload);
     expect(html).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
   });
@@ -421,7 +430,9 @@ describe('очередь стройки', () => {
         remainingCost: {},
       },
     ];
-    const units = card('A', 'ground');
+    // Крейсер — полоса верфи (BLD-2.1): он на вкладке флота, а не в очереди пехоты.
+    expect(card('A', 'ground')).not.toContain(act('dequeue', '11'));
+    const units = card('A', 'ships');
     expect(units).toContain(act('dequeue', '11'));
     expect(units).not.toContain(act('resumebuild', '7'));
     const blds = card('A', 'buildings');
@@ -470,7 +481,9 @@ describe('мир вне зрения', () => {
   it('провинция, куда залетал корабль, называет свой тип, но не хозяина', async () => {
     const { env, m } = await boot();
     const { SECTOR_TYPES } = await import('./map');
-    expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain(tData(SECTOR_TYPES.graveyard!.name));
+    expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain(
+      tData(SECTOR_TYPES.graveyard!.name),
+    );
     env.surveyed.Z = { kind: 'graveyard', at: 1 };
     const html = m.unknownPlanetHtml(env.s.planets.Z!);
     expect(html).toContain(t('side.notelemetry.title'));
