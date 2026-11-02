@@ -1972,6 +1972,15 @@ export const en: Record<string, string> = {
   'data.wing-commodore': 'Wing Commodore',
 
   // --- diplo — Дипломатия: окно, вкладки, фильтр и сортировка ростера, названия отношений.
+  'diplo.actions': 'Actions for {name}',
+  'diplo.search': 'Search nickname or house',
+  'diplo.results': 'Showing {shown} of {total}',
+  'diplo.sort.name.asc': 'Name: A–Z',
+  'diplo.sort.name.desc': 'Name: Z–A',
+  'diplo.sort.worlds.asc': 'Fewest provinces first',
+  'diplo.sort.worlds.desc': 'Most provinces first',
+  'diplo.sort.stance.asc': 'War to alliance',
+  'diplo.sort.stance.desc': 'Alliance to war',
   'diplo.filter': 'Filter',
   'diplo.filter.ai': 'AI',
   'diplo.filter.human': 'Human',

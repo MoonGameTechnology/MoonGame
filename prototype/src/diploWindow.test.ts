@@ -218,13 +218,15 @@ describe('REFM-214 — окно и вкладки', () => {
 });
 
 describe('REFM-214 — ростер', () => {
-  it('я первым, дальше по стойке (война раньше мира), сортировка по имени', async () => {
+  it('стойки идут от войны к миру, имя сортирует все строки и повторный клик меняет направление', async () => {
     const { win, env } = await boot();
     env.s = withStance(withStance(env.s, 'p1|p2', 'peace'), 'p1|p3', 'war');
     win.openDiplo('diplo');
     expect(rosterNames()).toEqual(['Орион', 'Вега', 'Багровые']);
     tap('diplo', { '.dp-sortb': { sort: 'name' } });
-    expect(rosterNames()).toEqual(['Орион', 'Багровые', 'Вега']);
+    expect(rosterNames()).toEqual(['Багровые', 'Вега', 'Орион']);
+    tap('diplo', { '.dp-sortb': { sort: 'name' } });
+    expect(rosterNames()).toEqual(['Орион', 'Вега', 'Багровые']);
   });
 
   it('фильтр стойки прячет и меня, фильтр рода делит людей и ботов, сброс снимает оба', async () => {
@@ -255,6 +257,14 @@ describe('REFM-214 — ростер', () => {
 });
 
 describe('ник игрока в ростере', () => {
+  it('сортировка по имени сравнивает показанный ник, а не скрытое за ним имя дома', async () => {
+    const { win, env } = await boot();
+    env.nicks = { p1: 'Zulu', p3: 'Alpha' };
+    win.openDiplo('diplo');
+    tap('diplo', { '.dp-sortb': { sort: 'name' } });
+    const html = el('diplo').innerHTML;
+    expect(html.indexOf('data-prof="p3"')).toBeLessThan(html.indexOf('data-prof="p1"'));
+  });
   it('без ника строка как прежде: имя дома, без ссылки', async () => {
     const { win } = await boot();
     win.openDiplo('diplo');
