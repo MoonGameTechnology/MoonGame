@@ -154,6 +154,12 @@ export {
   hasOrbit,
   allowedBuildings,
 } from './state/sectorKind';
+export {
+  DEVELOPMENT_COST_PER_POINT,
+  developmentOfLevel,
+  buildingDevelopment,
+  planetDevelopment,
+} from './state/development';
 export { factionStart, type FactionStart } from './state/factionStart';
 export {
   planRoute,

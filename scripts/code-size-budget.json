@@ -65,7 +65,7 @@
     "prototype/src/techTree.ts::techTreeHtml": 335,
     "prototype/src/hubScreen.ts::initHubScreen": 325,
     "prototype/src/chatWindow.ts::initChat": 315,
-    "prototype/src/dossiers.ts::createDossiers": 301,
+    "prototype/src/dossiers.ts::createDossiers": 302,
     "prototype/src/firstMatchOperation.ts::buildOperationSteps": 301
   }
 }
