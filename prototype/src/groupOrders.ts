@@ -216,6 +216,7 @@ export function troopsInputFor(fleetId: string): TroopsInput | null {
     queued: pendingLoadOf(fleetId, unit),
     reserved: pendingLoadUnits(here.id, unit),
     cargoSize: data.units[unit]?.stats.cargoSize ?? 1,
+    wounded: mine ? woundedOf(here.garrison, unit) : 0,
   }));
   return {
     units,
@@ -229,7 +230,15 @@ export function troopsInputFor(fleetId: string): TroopsInput | null {
       fleetHoldFree(s, f, data),
     reservedCargo: pendingLoadCargo(fleetId),
     plan: planFor(troopsPlan?.fleetId, fleetId, troopsPlan?.plan),
+    asking: troopsPlan?.fleetId === fleetId && !!troopsPlan.asking,
   };
+}
+
+/** Единиц `unit` в раненых стеках (корпус или щит не полны). */
+function woundedOf(stacks: readonly { unit: string; count: number; hp?: number; shieldHp?: number }[], unit: string): number {
+  let n = 0;
+  for (const s of stacks) if (s.unit === unit && (s.hp !== undefined || s.shieldHp !== undefined)) n += s.count;
+  return n;
 }
 
 // --- diplomacy gate (client order layer) -------------------------------------

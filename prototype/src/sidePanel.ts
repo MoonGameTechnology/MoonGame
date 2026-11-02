@@ -17,6 +17,8 @@ import {
   effectiveStats,
   type Fleet,
   forkSiteId,
+  stationSiteId,
+  fleetAtStation,
   type GameState,
   missingHull,
   type ShuttleStrike,
@@ -27,7 +29,7 @@ import {
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
 import { t, tData } from '../../localization/runtime';
 import {
-  deployForkFortress,
+  repairStation,
   disarmRocketMine,
   holdPatrol,
   recallPatrol,
@@ -68,7 +70,7 @@ import { displayUnit, esc, fmtEta, hl } from './format';
 import {
   cancelConstruction,
   data,
-  deployStation,
+  canOrder,
   designateCapital,
   engageFleet,
   HOUR,
@@ -131,6 +133,7 @@ import { cursorTipPos } from './tipPlacement';
 import { arrivalHours } from './travelEta';
 import { forkPanelHtml, planetPanelHtml, type PlanetTab, unknownPlanetHtml } from './worldCard';
 import { enqueueBuild, timeLeft } from './worldQueries';
+import { openFortressDialog } from './fortressDialog';
 
 /** Что листу нужно от игры. Мир, выбор, эскадры, досье и окна — в `main.ts`. */
 export interface SidePanelHost {
@@ -656,14 +659,23 @@ function onSideClick(ev: MouseEvent): void {
     if (selPlanet && (arg === 'ground' || arg === 'ships' || arg === 'shuttle'))
       game.buildWin().open(selPlanet, arg);
   } else if (act === 'fortress') {
-    playerOrder(deployStation(ME, selPlanet!));
+    const province = selPlanet;
+    if (province) openFortressDialog({ state: () => game.world(), me: () => game.me(),
+      probe: (order) => canOrder(game.world(), order), order: playerOrder,
+      placed: () => pickWorld(stationSiteId(province)),
+    }, province);
   } else if (act === 'forkfortress') {
     // Крепость на развилке (FORT-6.1): встала — выбираем её саму, как мир, чтобы сразу
     // было видно ядро, постройки и кнопку стройки. Отказ оставляет карточку развилки.
     const fork = selFork;
-    if (fork && playerOrder(deployForkFortress(ME, fork.province, fork.trail))) {
-      pickWorld(forkSiteId(fork.province, fork.trail));
-    }
+    if (fork) openFortressDialog({ state: () => game.world(), me: () => game.me(),
+      probe: (order) => canOrder(game.world(), order), order: playerOrder,
+      placed: () => pickWorld(forkSiteId(fork.province, fork.trail)),
+    }, fork.province, fork.trail);
+  } else if (act === 'openstation') {
+    pickWorld(arg);
+  } else if (act === 'repairfortress') {
+    playerOrder(repairStation(ME, arg));
   } else if (act === 'opentech') {
     game.techTree().open();
   } else if (act === 'build') {
@@ -774,13 +786,15 @@ function onSideClick(ev: MouseEvent): void {
     // источника, столько, сколько влезет в приёмник. Кнопки нет, если брать нечего,
     // поэтому `null` здесь означает «состояние изменилось между отрисовкой и тапом».
     const f = s.fleets[arg];
-    const at = f?.location ? s.planets[f.location] : undefined;
+    const selected = selPlanet ? s.planets[selPlanet] : undefined;
+    const at = f && selected?.fortress && fleetAtStation(s, f, selected) ? selected
+      : f?.location ? s.planets[f.location] : undefined;
     const portView = at ? planetHangar(at, data) : null;
     const holdView = f ? fleetHangar(f, data, s) : null;
     const up = act === 'wingload';
     const pick = transferPick(up ? portView : holdView, up ? holdView : portView);
     if (pick) {
-      playerOrder((up ? loadShuttle : unloadShuttle)(ME, arg, pick.squadronId));
+      playerOrder((up ? loadShuttle : unloadShuttle)(ME, arg, pick.squadronId, at?.fortress ? at.id : undefined));
     }
   } else if (act === 'spyplanet') {
     if (

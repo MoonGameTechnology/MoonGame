@@ -50,8 +50,8 @@ describe('верфь и космопорт — разные здания с ра
     // Суть правила — РАЗДЕЛЕНИЕ РОЛЕЙ, а не «ангар в мире один». Решение владельца 14
     // (FORT-5.7) завело второй ангар намеренно: у крепости своё здание под челноки, а не
     // наземный космопорт планеты. Список выписан поимённо, чтобы третий не появился молча.
-    expect(yards).toEqual(['shipyard']);
-    expect([...hangars].sort()).toEqual(['spaceport', 'void_hangar']);
+    expect(yards).toEqual(['shipyard', 'station_shipyard']);
+    expect([...hangars].sort()).toEqual(['spaceport', 'station_hangar', 'void_hangar']);
     expect(yards.some((b) => hangars.includes(b))).toBe(false);
   });
 

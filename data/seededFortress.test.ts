@@ -25,7 +25,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /** Виды, которые появляются только постройкой игрока. */
-const PLAYER_BUILT = ['void_station', 'fork_station'];
+const PLAYER_BUILT = ['void_station', 'fork_station', 'station_site'];
 /** Сюжетные станции кампании и обучения — оставлены решением владельца (2026-11-02). */
 const CAMPAIGN_STATIONS = ['pve-1.json', 'pve-4.json', 'pve-5.json', 'pve-6.json', 'training-1.json'];
 

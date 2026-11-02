@@ -11,6 +11,7 @@
  * разметка полностью чистая — её можно проверить, не открывая браузер.
  */
 import { t } from '../../localization/runtime';
+import { LOCALE_IDS, LOCALE_LABEL, type LocaleId } from '../../localization/index';
 import { controlsFor } from '../../decisions/controls';
 import {
   DEFAULT_PHONE_BAR,
@@ -25,6 +26,7 @@ import { PUSH_KIND_LABEL, PUSH_KINDS, type PushKind } from '../../decisions/push
 import { RATE_UNITS, RATE_WORD_KEY, type RateUnit } from '../../decisions/rateUnit';
 import type { PushView } from './pushSetup';
 import { matchNumberText } from '../../decisions/matchNumber';
+import { FRAME_RATES, isFrameRate, type FrameRate } from '../../decisions/frameRate';
 
 /** Снимок всех настроек на момент отрисовки. */
 export interface SettingsView {
@@ -44,6 +46,7 @@ export interface SettingsView {
   renderCompatibilityActive?: boolean;
   renderCompatibilitySupported?: boolean;
   fps: boolean;
+  frameRate: FrameRate;
   soundOn: boolean;
   /** Громкость звука, 0..1. */
   volume: number;
@@ -72,6 +75,8 @@ export interface SettingsView {
   /** Номер партии, в которой игрок сейчас (FRIENDS-2). Нет — вне сетевой партии, и строки
    *  с кнопкой «Скопировать номер» нет: копировать нечего. */
   matchId?: string;
+  locale?: LocaleId;
+  news?: string;
 }
 
 /** Палитры соперников: id и ключ подписи. Порядок — порядок кнопок. */
@@ -124,7 +129,7 @@ function rangeRow(
 /** Вкладки окна (UX-SET-1, заказ владельца 2026-09-23: «разнеси по вкладкам звук,
  *  графику и т. д.»). Справка по управлению жила отдельно и раньше — таблица клавиш
  *  длинная и в общем списке прятала под собой кнопку «Готово» (UX-KEYS-1). */
-export type SettingsTab = 'sound' | 'graphics' | 'map' | 'controls' | 'game' | 'push';
+export type SettingsTab = 'sound' | 'graphics' | 'map' | 'controls' | 'game' | 'push' | 'news';
 
 /** Вкладки по порядку кнопок; первая — та, на которой окно открывается. Каждая настройка
  *  живёт ровно в одной вкладке (сторож в тесте), иначе её было бы две правды на экране. */
@@ -147,7 +152,8 @@ export const PUSH_TAB: { id: SettingsTab; key: string } = { id: 'push', key: 'se
 export function tabsFor(view: SettingsView): ReadonlyArray<{ id: SettingsTab; key: string }> {
   return [
     ...SETTINGS_TABS,
-    ...(view.rateUnit || view.matchId ? [GAME_TAB] : []),
+    ...(view.rateUnit || view.matchId || view.locale ? [GAME_TAB] : []),
+    ...(view.news !== undefined ? [{ id: 'news' as const, key: 'news.title' }] : []),
     ...(view.push ? [PUSH_TAB] : []),
   ];
 }
@@ -245,27 +251,31 @@ function tabHtml(
       return gameHtml(view);
     case 'push':
       return pushHtml(view.push);
+    case 'news':
+      return view.news ?? '';
   }
 }
 
 /** «Игра»: в чём читать скорость ресурсов — в час или в сутки. Выбор из двух кнопок, а не
  *  тумблер: у тумблера «вкл/выкл», а здесь оба положения — значения. */
 function gameHtml(view: SettingsView): string {
-  // Номер партии — первой строкой: его копируют и отправляют друзьям (FRIENDS-2).
+  // Язык, номер сетевой партии и единица дохода.
+  const language = view.locale ? `<label class="set-row set-language"><span class="set-lbl">${t('settings.language')}<span class="set-sub">${t('settings.language.reload')}</span></span>` +
+    `<select id="set-language">${LOCALE_IDS.map(id => `<option value="${id}"${id === view.locale ? ' selected' : ''}>${LOCALE_LABEL[id]}</option>`).join('')}</select></label>` : '';
   const match = view.matchId
     ? `<div class="set-row">` +
       `<div class="set-lbl">${t('settings.match.number')}<span class="set-sub">${esc(matchNumberText(view.matchId))}</span></div>` +
       `<div class="set-ctl"><button type="button" class="set-pal" id="set-copy-match">${t('hub.mine.copy')}</button></div>` +
       `</div>`
     : '';
-  if (!view.rateUnit) return match;
+  if (!view.rateUnit) return language + match;
   const units = RATE_UNITS.map(
     (u) =>
       `<button type="button" class="set-pal${view.rateUnit === u ? ' on' : ''}" data-rate="${u}"` +
       ` aria-pressed="${view.rateUnit === u}">${t(RATE_WORD_KEY[u])}</button>`,
   ).join('');
   return (
-    match +
+    language + match +
     `<div class="set-row">` +
     `<div class="set-lbl">${t('settings.rate')}<span class="set-sub">${t('settings.rate.hint')}</span></div>` +
     `<div class="set-ctl set-pals set-rate" role="group" aria-label="${t('settings.rate')}">${units}</div>` +
@@ -373,6 +383,10 @@ function graphicsHtml(view: SettingsView, renderingReportAvailable: boolean): st
       view.starfield,
     ) +
     switchRow('motion', t('settings.gfx.motion'), t('settings.gfx.motion.hint'), view.motion) +
+    `<div class="set-row"><label class="set-lbl" for="set-frame-rate">${t('settings.gfx.frame-rate')}<span id="set-frame-rate-hint" class="set-sub">${t('settings.gfx.frame-rate.hint')}</span></label>` +
+    `<div class="set-ctl"><select id="set-frame-rate" class="set-frame-rate" aria-describedby="set-frame-rate-hint">` +
+    FRAME_RATES.map((mode) => `<option value="${mode}"${view.frameRate === mode ? ' selected' : ''}>${mode === 'auto' ? t('settings.gfx.frame-rate.auto') : t('settings.gfx.frame-rate.value', { n: Number(mode) })}</option>`).join('') +
+    `</select></div></div>` +
     switchRow('fps', t('settings.gfx.fps'), t('settings.gfx.fps.hint'), view.fps) +
     (view.renderCompatibilitySupported
       ? switchRow(
@@ -398,6 +412,8 @@ export interface SettingsHost {
   /** Снимок всех настроек на момент отрисовки. */
   view(): SettingsView;
   setSweepOpacity(v: number): void;
+  setLocale?(locale: LocaleId): void;
+  mountNews?(root: HTMLElement): void;
   /** Непрозрачность окон, 0..1 (есть только там, где есть {@link SettingsView.windowOpacity}). */
   setWindowOpacity?(v: number): void;
   /** Размер интерфейса, доля 0,8..1,5 (есть только там, где есть {@link SettingsView.uiScale}). */
@@ -412,6 +428,7 @@ export interface SettingsHost {
   /** Локальный технический отчёт; читается только по запросу игрока. */
   renderingReport?(): string;
   setFps(v: boolean): void;
+  setFrameRate(mode: FrameRate): void;
   setSound(v: boolean): void;
   setVolume(v: number): void;
   /** Короткий отклик: включил звук или двигаешь громкость — слышно, что именно вышло. */
@@ -433,7 +450,7 @@ export interface SettingsHost {
 }
 
 /** Собрать оверлей. `open()` зовут и хаб, и рельса матча. */
-export function initSettings(host: SettingsHost): { open: () => void; render: () => void } {
+export function initSettings(host: SettingsHost): { open: (tab?: SettingsTab) => void; render: () => void } {
   const q = <T extends HTMLElement>(id: string): T | null => host.root().querySelector<T>(`#${id}`);
 
   /** Подписать значение рядом с контролом, если оно на месте. */
@@ -461,6 +478,11 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
       tab,
       barSlot,
     );
+    host.mountNews?.(host.root());
+    q<HTMLSelectElement>('set-language')?.addEventListener('change', e => {
+      const locale = LOCALE_IDS.find(id => id === (e.target as HTMLSelectElement).value);
+      if (locale && locale !== v.locale) host.setLocale?.(locale);
+    });
     for (const b of Array.from(host.root().querySelectorAll<HTMLElement>('[data-settab]'))) {
       b.addEventListener('click', () => select(tabOf(b.dataset.settab, tabsFor(host.view()))));
       // Стрелки ходят по кругу, Home/End — к краям (образец WAI-ARIA «tabs»).
@@ -496,6 +518,10 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
     toggle('starfield', host.setStarfield);
     toggle('motion', host.setMotion);
     toggle('fps', host.setFps);
+    const frameRate = q<HTMLSelectElement>('set-frame-rate');
+    frameRate?.addEventListener('change', () => {
+      if (isFrameRate(frameRate.value)) host.setFrameRate(frameRate.value);
+    });
     // Push: ответ приходит после разрешения браузера и сервера — перерисовка по нему, а
     // не по галочке (отказ браузера оставляет выключатель выключенным).
     const pushToggle = q<HTMLInputElement>('set-push');
@@ -639,8 +665,8 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
   });
 
   return {
-    open: () => {
-      tab = DEFAULT_TAB; // окно открывается на первой вкладке, а не там, где его закрыли
+    open: (requested) => {
+      tab = tabOf(requested, tabsFor(host.view())); // окно открывается на первой вкладке, а не там, где его закрыли
       barSlot = 0;
       render();
       host.root().classList.add('show');

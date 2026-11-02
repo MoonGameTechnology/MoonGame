@@ -51,7 +51,7 @@ describe('карточка корабля — отсеки (заказ влад�
 
   it('вклад отсека — то, что модуль добавляет одному кораблю', () => {
     const m = shipCardModel({ unit: 'cruiser', count: 1, modules: ['targeting_array'] }, data)!;
-    expect(m.bays[0]!.effect).toEqual({ attack: 4 });
+    expect(m.bays[0]!.effect).toEqual({ attack: 2 });
     expect(m.bays[1]!.effect).toEqual({});
   });
 
@@ -61,7 +61,7 @@ describe('карточка корабля — отсеки (заказ влад�
     expect(m.bays[0]!.stars).toBe(2);
     const attack = m.stats.find((s) => s.stat === 'attack')!;
     expect(attack.effective).toBeCloseTo(effectiveStats(data.units.cruiser!, stack, data).attack!, 9);
-    expect(attack.effective).toBeGreaterThan(16 + 4 - 1e-9);
+    expect(attack.effective).toBeGreaterThan(16 + 2 - 1e-9);
     expect(m.bays[0]!.effect.attack).toBeCloseTo(attack.delta, 9);
   });
 
@@ -87,7 +87,7 @@ describe('карточка корабля — универсальные отс�
 
   it('вклад модуля в универсальном отсеке считается так же, как в своём', () => {
     const m = shipCardModel({ unit: 'heavy_cruiser', count: 1, modules: ['targeting_array'] }, data)!;
-    expect(m.bays[0]!.effect).toEqual({ attack: 4 });
+    expect(m.bays[0]!.effect).toEqual({ attack: 2 });
   });
 });
 
@@ -100,7 +100,7 @@ describe('карточка корабля — характеристики (пр
     expect(keys).not.toContain('radarRange');
     const fitted = shipCardModel({ unit: 'cruiser', count: 1, modules: ['shield_booster', 'radar_module'] }, data)!;
     const shield = fitted.stats.find((s) => s.stat === 'shield')!;
-    expect(shield).toMatchObject({ base: 0, effective: 15, delta: 15 });
+    expect(shield).toMatchObject({ base: 0, effective: 7.5, delta: 7.5 });
     expect(fitted.stats.some((s) => s.stat === 'radarRange')).toBe(true);
   });
 
@@ -108,8 +108,8 @@ describe('карточка корабля — характеристики (пр
     const bare = shipCardModel({ unit: 'cruiser', count: 1 }, data)!;
     expect(bare.stats.map((s) => s.stat)).not.toContain('hullRepair');
     const m = shipCardModel({ unit: 'cruiser', count: 1, modules: ['repair_bay'] }, data)!;
-    expect(m.stats.find((s) => s.stat === 'hullRepair')).toMatchObject({ base: 0, effective: 0.05 });
-    expect(m.bays.find((b) => b.module === 'repair_bay')!.effect).toEqual({ hullRepair: 0.05 });
+    expect(m.stats.find((s) => s.stat === 'hullRepair')).toMatchObject({ base: 0, effective: 0.025 });
+    expect(m.bays.find((b) => b.module === 'repair_bay')!.effect).toEqual({ hullRepair: 0.025 });
   });
 });
 

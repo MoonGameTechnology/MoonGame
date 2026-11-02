@@ -114,6 +114,7 @@ async function load() {
     enterBrowse: log('enterBrowse'),
     halt: log('halt'),
     refreshAccountDeletion: async () => {},
+    openNewsSettings: () => {},
   };
   hub.initHubScreen(host);
   return hub;

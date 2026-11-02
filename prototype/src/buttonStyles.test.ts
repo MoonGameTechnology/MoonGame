@@ -248,6 +248,8 @@ describe('три стиля кнопок (UIX-11.1)', () => {
     expect(tags).toEqual([
       'openunits:btn-main',
       'openbuild:btn-main',
+      'openbuild:btn-main',
+      'openstation:btn-second',
       'fortress:btn-second',
       'opentech:btn-quiet',
       'forkfortress:btn-main',
@@ -408,7 +410,7 @@ describe('три стиля кнопок (UIX-11.1)', () => {
     expect(browser).toContain("join.className = 'mbtn btn-second';");
     expect(browser).toContain("arch.className = 'mbtn btn-quiet';");
     expect(browser).toContain("open.className = 'mbtn btn-second';");
-    expect(browser).toContain("copy.className = 'mbtn btn-quiet';");
+    expect(read('./matchNumberButton.ts')).toContain("button.className = 'mnumber btn-quiet';");
   });
 
   it('выбранная вкладка — токенами, без мятной заливки', () => {

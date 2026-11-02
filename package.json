@@ -39,11 +39,13 @@
     "smoke:ava": "pnpm run prototype && node prototype/avatest.mjs",
     "smoke:corp-materials": "pnpm run prototype && node prototype/corpmaterialstest.mjs",
     "smoke:corp-style": "pnpm run prototype && node prototype/corpstyletest.mjs",
+    "smoke:diplomacy": "pnpm run prototype && node prototype/diplomacytest.mjs",
     "smoke:registration-reward": "pnpm run prototype && node prototype/registrationrewardtest.mjs",
     "smoke:bots": "node prototype/botpopulationtest.mjs",
     "smoke:bots:chat": "node prototype/botsocialtest.mjs",
     "perf:bots": "node prototype/bot-scheduler-perf.mjs",
     "perf:bots:load": "node prototype/bot-load-perf.mjs",
+    "smoke:news": "pnpm run prototype && node prototype/newstest.mjs",
     "smoke:browser": "node prototype/browsertest.mjs",
     "smoke:browser:install": "node prototype/browsertest.mjs --install",
     "smoke:context": "node prototype/contexttest.mjs",
@@ -79,7 +81,8 @@
     "smoke:apk-site": "node prototype/apksitetest.mjs",
     "smoke:onboarding": "pnpm run prototype && node prototype/onboardingtest.mjs",
     "smoke:training": "pnpm run prototype && node prototype/trainingtest.mjs",
-    "smoke:troop-timers": "pnpm run prototype && node prototype/trooptransferstest.mjs"
+    "smoke:troop-timers": "pnpm run prototype && node prototype/trooptransferstest.mjs",
+    "smoke:transfer-fps": "pnpm run prototype && node prototype/transferfxfpstest.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

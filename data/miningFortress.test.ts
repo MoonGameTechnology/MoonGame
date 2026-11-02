@@ -95,7 +95,8 @@ describe('добыча и крепость сосуществуют (решен�
     // астероиде уже качает руду станция, сверху поднимается крепость.
     for (const kind of MINING_KINDS) {
       const after = okApply(raiseFortress(nodeOwnedBy(kind, [MINING])));
-      expect(after.planets.A?.kind, kind).toBe('void_station');
+      expect(after.planets.A?.kind, kind).toBe(kind);
+      expect(after.planets['station-A']?.fortress).toBeDefined();
       expect(after.planets.A?.buildings.map((b) => b.type), kind).toContain(MINING);
     }
   });

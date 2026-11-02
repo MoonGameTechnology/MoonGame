@@ -10,7 +10,6 @@ import {
   newsCalendar,
   newsCardHtml,
   newsFeedHtml,
-  newsTeaserHtml,
   newsTimeText,
   type NewsHost,
   type NewsPaint,
@@ -116,12 +115,7 @@ describe('разметка ленты', () => {
     expect(newsFeedHtml({ ...more, loadingMore: true })).toContain('disabled aria-busy="true"');
   });
 
-  it('превью телефона: «Вся лента · N» — только с точным числом', () => {
-    expect(newsTeaserHtml(paint())).toContain(t('news.all.count', { n: 1 }));
-    const more = newsTeaserHtml(paint({ view: view([founded('f', NOW)], true) }));
-    expect(more).toContain(`>${t('news.all')}</button>`);
-    expect(newsTeaserHtml(paint({ view: view([]) }))).not.toContain('data-nw-all');
-  });
+
 });
 
 describe('карточка корпорации', () => {
@@ -162,6 +156,9 @@ const BASE = 'https://game.test';
 
 interface FakeEl {
   innerHTML: string;
+  attributes: Record<string, string>;
+  setAttribute(key: string, value: string): void;
+  focus(): void;
   classList: { toggle(name: string, on: boolean): void };
   querySelector(): null;
   querySelectorAll(): never[];
@@ -173,6 +170,9 @@ function fakeEl(): FakeEl {
   const handlers: Array<(e: Event) => void> = [];
   const el: FakeEl = {
     innerHTML: '',
+    attributes: {},
+    focus: () => {},
+    setAttribute: (key, value) => { el.attributes[key] = value; },
     classList: { toggle: () => {} },
     querySelector: () => null,
     querySelectorAll: () => [],
@@ -189,8 +189,8 @@ function fakeEl(): FakeEl {
 type Reply = { status: number; body: unknown };
 let routes: Record<string, () => Reply | Promise<Reply>>;
 let calls: Array<{ url: string; method: string; authorization?: string }>;
-let column: FakeEl;
-let teaser: FakeEl;
+let button: FakeEl;
+let identity: string;
 let sheet: FakeEl;
 let signedIn: boolean;
 let openCorp: ReturnType<typeof vi.fn>;
@@ -198,8 +198,9 @@ let notes: string[];
 
 function screen(): ReturnType<typeof initNews> {
   const host: NewsHost = {
-    column: () => column as unknown as HTMLElement,
-    teaser: () => teaser as unknown as HTMLElement,
+    button: () => button as unknown as HTMLElement,
+    identity: () => identity,
+    openSettings: () => {},
     sheet: () => sheet as unknown as HTMLElement,
     publicBase: () => BASE,
     authorizedBase: async () => (signedIn ? { base: BASE, token: 'tok' } : null),
@@ -208,12 +209,14 @@ function screen(): ReturnType<typeof initNews> {
     openCorp: openCorp as unknown as NewsHost['openCorp'],
     now: () => NOW,
   };
-  return initNews(host);
+  const news = initNews(host);
+  news.openFeed();
+  return news;
 }
 
 beforeEach(() => {
-  column = fakeEl();
-  teaser = fakeEl();
+  button = fakeEl();
+  identity = 'alice';
   sheet = fakeEl();
   signedIn = true;
   openCorp = vi.fn();
@@ -238,26 +241,93 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('экран ленты', () => {
+  it('периодический опрос идёт только в видимом хабе с закрытой лентой', async () => {
+    vi.useFakeTimers();
+    const doc = { visibilityState: 'visible', activeElement: null };
+    vi.stubGlobal('document', doc);
+    const news = screen();
+    news.setActive(true);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(calls).toEqual([]);
+    news.close();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(calls.filter(c => c.url.endsWith('/news'))).toHaveLength(1);
+    doc.visibilityState = 'hidden';
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(calls.filter(c => c.url.endsWith('/news'))).toHaveLength(1);
+    news.setActive(false);
+    doc.visibilityState = 'visible';
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(calls.filter(c => c.url.endsWith('/news'))).toHaveLength(1);
+  });
+
+  it('кнопка отмечает новые новости своей корпорации и гаснет после открытия', async () => {
+    routes['GET /corps/me'] = () => ({ status: 200, body: { membership: { corpId: A.id, accountId: '1', login: 'Alice', role: 'member' } } });
+    const news = screen(); news.close();
+    await news.refresh();
+    expect(button.attributes['aria-label']).toBe(t('news.unread'));
+    news.openFeed(); news.close();
+    await news.refresh();
+    expect(button.attributes['aria-label']).toBe(t('news.open'));
+    routes['GET /news'] = () => ({ status: 200, body: view([founded('new', NOW - 60_000)]) });
+    await news.refresh();
+    expect(button.attributes['aria-label']).toBe(t('news.unread'));
+  });
+
+  it('подписка даёт индикатор чужой корпорации; отключённая тема его убирает', async () => {
+    const news = screen(); news.close();
+    await news.refresh();
+    expect(button.attributes['aria-label']).toBe(t('news.open'));
+    news.preferences.save({ ...news.preferences.get(), following: [A] });
+    expect(button.attributes['aria-label']).toBe(t('news.unread'));
+    news.preferences.save({ ...news.preferences.get(), categories: { ann: true, corp: false, battle: true, ach: true } });
+    expect(button.attributes['aria-label']).toBe(t('news.open'));
+  });
+
+  it('смена аккаунта до нового запроса не помечает чужую ленту прочитанной', async () => {
+    const news = screen(); news.close();
+    await news.refresh();
+    identity = 'bob';
+    news.openFeed();
+    expect(sheet.innerHTML).not.toContain('«Альфа»');
+    expect(news.preferences.get().read).toEqual([]);
+  });
+
+  it('поздний ответ прошлого аккаунта не попадает в новую ленту', async () => {
+    let finish: (reply: Reply) => void = () => {};
+    routes['GET /news'] = () => new Promise<Reply>(resolve => { finish = resolve; });
+    const news = screen();
+    const pending = news.refresh();
+    await vi.waitFor(() => expect(calls.some(c => c.url.endsWith('/news'))).toBe(true));
+    identity = 'bob';
+    routes['GET /news'] = () => ({ status: 200, body: view([founded('new', NOW, B)]) });
+    await news.refresh();
+    finish({ status: 200, body: view([founded('old', NOW, A)]) });
+    await pending;
+    expect(sheet.innerHTML).toContain('«Бета»');
+    expect(sheet.innerHTML).not.toContain('«Альфа»');
+  });
+
   it('передаёт сессию для закрытых наград и забывает их при выходе даже если лента недоступна', async () => {
     routes['GET /news'] = () => ({ status: 200, body: view([{ id: 'secret-medal', at: NOW, kind: 'player_medal', medalId: 'first', grade: 2, login: 'PrivatePilot', corp: A }]) });
     const news = screen();
     await news.refresh();
     expect(calls.find((c) => c.url === `${BASE}/news`)?.authorization).toBe('Bearer tok');
-    expect(column.innerHTML).toContain('PrivatePilot');
+    expect(sheet.innerHTML).toContain('PrivatePilot');
     signedIn = false;
     routes['GET /news'] = () => ({ status: 503, body: {} });
     await news.refresh();
-    expect(column.innerHTML).not.toContain('PrivatePilot');
-    expect(teaser.innerHTML).not.toContain('PrivatePilot');
+    expect(sheet.innerHTML).not.toContain('PrivatePilot');
+    expect(sheet.innerHTML).not.toContain('PrivatePilot');
   });
   it('гость читает ленту без сессии и без запросов о членстве', async () => {
     signedIn = false;
     await screen().refresh();
-    expect(column.innerHTML).toContain('Основана корпорация «Альфа»');
-    expect(teaser.innerHTML).toContain('Основана корпорация «Альфа»');
+    expect(sheet.innerHTML).toContain('Основана корпорация «Альфа»');
+    expect(sheet.innerHTML).toContain('Основана корпорация «Альфа»');
     expect(calls.map((c) => c.url)).toEqual([`${BASE}/news`]);
     expect(calls[0]!.authorization).toBeUndefined();
   });
@@ -265,16 +335,16 @@ describe('экран ленты', () => {
   it('членство не прочиталось — кнопки заявки нет, карточка есть', async () => {
     routes['GET /corps/me'] = () => ({ status: 500, body: null });
     await screen().refresh();
-    expect(column.innerHTML).toContain('data-nw-corp="c-a"');
-    expect(column.innerHTML).not.toContain('data-nw-apply');
+    expect(sheet.innerHTML).toContain('data-nw-corp="c-a"');
+    expect(sheet.innerHTML).not.toContain('data-nw-apply');
   });
 
   it('заявка уходит с сессией, и строка сразу говорит «Заявка отправлена»', async () => {
     await screen().refresh();
-    expect(column.innerHTML).toContain('data-nw-apply="c-a"');
-    column.click({ nwApply: 'c-a' });
-    await vi.waitFor(() => expect(column.innerHTML).toContain(t('news.applied')));
-    expect(column.innerHTML).not.toContain('data-nw-apply');
+    expect(sheet.innerHTML).toContain('data-nw-apply="c-a"');
+    sheet.click({ nwApply: 'c-a' });
+    await vi.waitFor(() => expect(sheet.innerHTML).toContain(t('news.applied')));
+    expect(sheet.innerHTML).not.toContain('data-nw-apply');
     expect(calls).toContainEqual({ url: `${BASE}/corps/c-a/apply`, method: 'POST', authorization: 'Bearer tok' });
     expect(notes).toEqual([]); // успех говорит сама строка, без второго эха в строке хаба
   });
@@ -282,16 +352,16 @@ describe('экран ленты', () => {
   it('отказ в заявке — причина в строке хаба, кнопка остаётся', async () => {
     routes['POST /corps/c-a/apply'] = () => ({ status: 409, body: { error: 'E_ALREADY_MEMBER' } });
     await screen().refresh();
-    column.click({ nwApply: 'c-a' });
+    sheet.click({ nwApply: 'c-a' });
     await vi.waitFor(() => expect(notes).toEqual(['✖ E_ALREADY_MEMBER']));
-    expect(column.innerHTML).toContain('data-nw-apply="c-a"');
-    expect(column.innerHTML).not.toContain(t('news.applied'));
+    expect(sheet.innerHTML).toContain('data-nw-apply="c-a"');
+    expect(sheet.innerHTML).not.toContain(t('news.applied'));
   });
 
   it('карточка из шторки ленты: первый Back — к ленте, второй закрывает', async () => {
     const news = screen();
     await news.refresh();
-    teaser.click({ nwAll: '' });
+    news.openFeed();
     expect(news.isOpen()).toBe(true);
     expect(sheet.innerHTML).toContain('class="nw-sheet"');
     sheet.click({ nwCorp: 'c-a', nwName: 'Альфа' });
@@ -308,7 +378,7 @@ describe('экран ленты', () => {
   it('«К битвам» закрывает шторку и открывает кабинет на нужной вкладке', async () => {
     const news = screen();
     await news.refresh();
-    teaser.click({ nwAll: '' });
+    news.openFeed();
     sheet.click({ nwBattles: 'history' });
     expect(news.isOpen()).toBe(false);
     expect(openCorp).toHaveBeenCalledWith('history');
@@ -323,7 +393,7 @@ describe('экран ленты', () => {
     await news.refresh();
     finish({ status: 200, body: view([founded('old', NOW, A)]) });
     await first;
-    expect(column.innerHTML).toContain('«Бета»');
-    expect(column.innerHTML).not.toContain('«Альфа»');
+    expect(sheet.innerHTML).toContain('«Бета»');
+    expect(sheet.innerHTML).not.toContain('«Альфа»');
   });
 });

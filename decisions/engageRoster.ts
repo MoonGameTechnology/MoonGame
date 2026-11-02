@@ -24,6 +24,7 @@
  */
 import {
   attacks,
+  fortressSiteOf,
   getStance,
   isMineFleet,
   shipsEngaged,
@@ -55,6 +56,7 @@ export function engageRoster(
       units: f.units,
       owner: f.owner,
       key: f.id,
+      ...(fortressSiteOf(state, f.id) ? { fortress: fortressSiteOf(state, f.id) } : {}),
     });
     taken.add(f.id);
   };

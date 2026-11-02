@@ -15,6 +15,7 @@ import type { Fleet, GameState, Planet } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { effectiveStat, effectiveStats } from './loadout';
 import { buildingLevel } from '../data/schemas';
+import { serviceSitesForFleet } from '../state/fortress';
 
 export const INSTANT_REPAIR_CREDITS_PER_HP = 1;
 
@@ -85,15 +86,11 @@ export function fleetAtOwnDock(
   data: GameData,
   allied: (a: string, b: string) => boolean = () => false,
 ): boolean {
-  if (f.movement || !f.location) return false;
-  const planet = state.planets[f.location];
-  if (!planet || planet.owner === null) return false;
-  if (planet.owner !== f.owner && !allied(f.owner, planet.owner)) return false;
-  return planet.buildings.some((b) => {
+  return serviceSitesForFleet(state, f, allied).some((planet) => planet.buildings.some((b) => {
     if (b.hp <= 0) return false;
     const def = data.buildings[b.type];
     return !!def && buildingLevel(def, b.level).shipRepair > 0;
-  });
+  }));
 }
 
 /**

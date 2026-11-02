@@ -243,8 +243,8 @@ for (const [file, heads] of roadmapHeads) {
 //   - `DEV_MODULES` — через ЗАКРЕПЛЁННЫЙ список id в moduleManifest.test.ts; сам он
 //     сверяется с настоящим `DEV_MODULES` витестом (инвариант #6), так что цепочка
 //     замкнута: код → сторож манифеста → этот скрипт → state.md;
-//   - `MODULES` прототипа — массив в protoKernel.ts (своего сторожа у него нет:
-//     поматчево он не версионируется).
+//   - `MODULES` прототипа своего числа больше не имеет: с SLIM-4 это тот же массив
+//     `GAME_MODULES`, что и `DEV_MODULES`, и это держит витест (`protokernel.test.ts`).
 const counts = (() => {
   const modDir = join(ROOT, 'packages/shared-core/src/modules');
   const files = readdirSync(modDir).filter((f) => f.endsWith('.ts') && !f.includes('.test.')).length;
@@ -256,13 +256,7 @@ const counts = (() => {
     ? pinned[1].split('\n').filter((l) => l.trim().startsWith("'")).length
     : null;
 
-  const proto = readFileSync(join(ROOT, 'prototype/src/protoKernel.ts'), 'utf8');
-  const arr = proto.match(/export const MODULES: GameModule\[\] = \[([\s\S]*?)\n\];/);
-  const protoCount = arr
-    ? arr[1].split('\n').filter((l) => /^[a-zA-Z]+Module,/.test(l.trim())).length
-    : null;
-
-  return { files, dev, proto: protoCount };
+  return { files, dev };
 })();
 
 const state = readFileSync(join(ROOT, 'docs/state.md'), 'utf8');
@@ -276,8 +270,7 @@ const CLAIMS = [
   // допустить, подмена числа выглядела бы как «счётчик удалили», и сообщение об ошибке
   // отправило бы чинить не то.
   ['модулей в каталоге', claim(/\*\*(\d+) модул(?:ь|я|ей)\*\* на микроядре/), counts.files],
-  ['DEV_MODULES', claim(/`scenario\.ts`\) \| \*\*(\d+)\*\*/), counts.dev],
-  ['MODULES прототипа', claim(/`protoKernel\.ts`\) \| \*\*(\d+)\*\*/), counts.proto],
+  ['GAME_MODULES', claim(/`gameModules\.ts`\) \| \*\*(\d+)\*\*/), counts.dev],
 ];
 for (const [what, said, real] of CLAIMS) {
   if (real === null) {

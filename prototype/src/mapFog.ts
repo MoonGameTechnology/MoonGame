@@ -86,7 +86,7 @@ export interface Vision {
   signatures: SignatureContact[];
   /** Мои бои и флоты в них — видны, даже где узел не опознан (`engagementOf`). */
   engaged: Engagement;
-  /** Чужие флоты в круге моей мины или висящего патруля — опознаны по позиции, даже на
+  /** Чужие флоты в любом круге зрения блока — опознаны по позиции, даже на
    *  линии вдали от миров (`fleetsSeenByPosition`, SHU-6.7). */
   seenAt: Set<string>;
   /** Чужие висящие патрули в моём обзоре — круг и состав (SHU-6.10). В сети их считает
@@ -248,8 +248,8 @@ export function restoreFogMemory(entries: Parameters<ScanMemory['restore']>[0]):
   scans.restore(entries);
 }
 
-/** Is this fleet visible? Own always; enemy — when its node is identified (a recon
- *  window on a world identifies the fleets at it, SPY-8). */
+/** Is this fleet visible? Own always; enemy — by actual position or combat.
+ * A recon window on a world identifies fleets stationed there (SPY-8). */
 export function fleetSeen(f: Fleet): boolean {
   const s = game.world();
   if (s.match.status === 'ended') return true;
@@ -270,8 +270,8 @@ export function fleetSeen(f: Fleet): boolean {
   return fleetVisible(f.owner === ME, fleetKnown(f), false);
 }
 
-/** Опознан ли флот: стоит у опознанного узла, дерётся в моём бою ИЛИ идёт в круге моей
- *  мины или висящего патруля. Перехват на полпути идёт вдали от миров — без второго
+/** Опознан ли флот: стоит у опознанного узла, дерётся в моём бою ИЛИ идёт в круге общего
+ *  источника зрения. Перехват на полпути идёт вдали от миров — без второго
  *  условия флот вставал перед невидимым врагом (владелец 2026-09-29); патруль висит над
  *  дорогой — без третьего он не видел бы того, по кому бьёт (SHU-6.7). Правила те же, что
  *  у ядра, — `engagementOf` и `fleetsSeenByPosition`. В сети флот без окна шпионажа опознан
@@ -288,7 +288,7 @@ export function fleetKnown(f: Fleet): boolean {
  *  спрашивается напрямую (сторож `engagedFog.test.ts`). */
 function fleetSeenHere(f: Fleet): boolean {
   if (game.world().match.status === 'ended') return true;
-  return known(fleetNode(f)) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);
+  return known(f.location) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);
 }
 
 /** Виден ли бой: его узел опознан ИЛИ в нём дерусь я (или мой блок зрения). */

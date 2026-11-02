@@ -670,3 +670,19 @@
 .mk-btn{flex:none;padding:6px 11px;border-radius:7px;font-size:var(--fs-caption);white-space:nowrap;}
 .mk-empty{padding:10px 2px;font-size:var(--fs-caption);color:var(--dim);opacity:.8;}
 
+
+/* A fortress is a separate space unit with its own infrastructure. */
+.fortress-status{display:grid;gap:10px;padding:14px;}
+.fortress-status progress{width:100%;height:12px;accent-color:var(--cyan,#64d8e8);}
+.repair-offer{display:flex;flex-wrap:wrap;align-items:center;gap:10px;}
+#fortress-order{box-sizing:border-box;width:min(620px,calc(100% - 28px));max-height:calc(100dvh - 40px);
+  margin:auto;padding:20px;color:var(--sf-text);background:#07121d;border:1px solid var(--sf-edge-hi);
+  border-radius:16px;font:16px/1.5 var(--sf-font);overflow-y:auto;overflow-wrap:anywhere;}
+#fortress-order::backdrop{background:rgba(2,8,14,.82);}
+#fortress-order h2{margin-top:0;}
+.fortress-modules{display:grid;gap:8px;max-height:42dvh;overflow-y:auto;overscroll-behavior:contain;}
+.fortress-module{display:grid;gap:4px;text-align:left;min-height:44px;padding:10px;white-space:normal;}
+.fortress-module span{font-size:13px;}
+.fortress-module.on{outline:2px solid var(--cyan,#64d8e8);}
+.fortress-dialog-actions{display:flex;gap:12px;justify-content:space-between;}
+.fortress-dialog-actions button{min-height:44px;padding:10px 16px;font:inherit;}

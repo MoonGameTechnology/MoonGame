@@ -162,7 +162,7 @@ function buildPage(): El {
   const browse = add(root, 'div', { id: 'cbrowse' });
   // Позывной — спрятанный носитель состояния, на странице его нет (UIX-17.1).
   add(add(browse, 'form', { className: 'mcarry', hidden: true }), 'input', { id: 'cnick' });
-  for (const tab of ['available', 'active', 'archived'])
+  for (const tab of ['available', 'active', 'archived', 'corporate'])
     add(add(browse, 'button', {
       className: tab === 'available' ? 'mtab active' : 'mtab',
       dataset: { tab },
@@ -479,11 +479,12 @@ describe('REFM-217 — лента обозревателя', () => {
     expect(a3).not.toContain('mmode');
   });
 
-  it('номера партии в строке нет: он в подсказке строки, для разговора с поддержкой', async () => {
+  it('номер стоит отдельной кнопкой и не вытесняет название', async () => {
     await browsing();
     const first = rows()[0]!;
     expect(first.info).not.toContain('a1');
     expect(first.row.title).toBe('a1');
+    expect(first.row.querySelector('.mnumber')!.innerHTML).toContain('№ a1');
   });
 
   it('больше восьми мест — без точек, только число', async () => {
@@ -828,7 +829,7 @@ describe('REFM-217 — «Мои партии» хаба', () => {
     expect(cards()).toHaveLength(2);
     const first = cards()[0]!;
     // Под партией — её номер, а не адрес (плейтест 2026-10-17).
-    expect(first.innerHTML).toContain('№ m1');
+    expect(first.querySelector('.mnumber')!.innerHTML).toContain('№ m1');
     expect(first.innerHTML).not.toContain('/game/');
     expect(first.innerHTML).toContain('▶');
     expect(cards()[1]!.innerHTML).toContain('◼');
@@ -869,8 +870,9 @@ describe('REFM-217 — «Мои партии» хаба', () => {
   it('номер партии копируется; без буфера обмена — просьба скопировать из строки', async () => {
     const mb = await boot();
     await mb.refreshMyMatches();
-    const copy = () => cards()[0]!.children.at(-1)!.children[1]!;
-    expect(copy().textContent).toBe(t('hub.mine.copy'));
+    const copy = () => cards()[0]!.querySelector('.mnumber')!;
+    expect(copy().title).toContain(t('hub.mine.copy'));
+    expect(copy().innerHTML).toContain('№ m1');
     copy().click();
     await settle();
     expect(of('clipboard')).toEqual([['clipboard', 'm1']]);
@@ -982,5 +984,64 @@ describe('REFM-217 — стык с main.ts', () => {
     expect(SIZES).toContain('__showLists(lists);');
     expect(SIZES).not.toMatch(/\b(matchLists|activeTab|renderMatches)\b/);
     expect(BROWSER).not.toMatch(/from '\.\/main'/);
+  });
+});
+
+
+describe('вкладка битв корпораций', () => {
+  it('отделяет битвы, считает их и сохраняет действия из исходных списков', async () => {
+    lists.active.push(row('ava-live'));
+    lists.available.push(row('ava-join'));
+    lists.archived.push(row('ava-shelved'), row('ava-ended', { status: 'ended' }));
+    await browsing();
+    expect(ids()).toEqual(['a1', 'a2', 'a3']);
+    tab('active').click();
+    expect(ids()).toEqual(['m2', 'm1']);
+    tab('archived').click();
+    expect(ids()).toEqual(['z1']);
+    tab('corporate').click();
+    expect(ids()).toEqual(['ava-live', 'ava-join', 'ava-shelved', 'ava-ended']);
+    expect(tab('corporate').querySelector('.mcount')!.textContent).toBe('4');
+    expect($('match-create').style.display).toBe('none');
+    expect($('mfilter').style.display).toBe('none');
+    const live = rows()[0]!;
+    expect(live.buttons[0]!.textContent).toBe(t('browser.resume'));
+    expect(live.buttons[1]!.textContent).toBe(t('browser.archive'));
+    live.buttons[0]!.click();
+    rows()[1]!.buttons[0]!.click();
+    expect(of('openSessionTab').slice(-2)).toEqual([['openSessionTab', 'ava-live', true], ['openSessionTab', 'ava-join', false]]);
+    expect(rows()[2]!.buttons[1]!.textContent).toBe(t('browser.restore'));
+    expect(rows()[3]!.buttons[0]!.textContent).toBe(t('browser.view-map'));
+    expect(rows()[3]!.buttons).toHaveLength(2);
+  });
+  it('пустая вкладка получает своё сообщение', async () => {
+    await browsing();
+    tab('corporate').click();
+    expect($('mlist').innerHTML).toContain(t('browser.empty.corporate'));
+  });
+  it('сокращённый UUID копируется целиком, отказ буфера раскрывает полный номер', async () => {
+    const id = 'ava-12345678-1234-4abc-a123-12345678abcd';
+    lists.active = [row(id)];
+    const browser = await boot();
+    await browser.refreshMyMatches();
+    const button = $('hub-mine').querySelector('.mnumber')!;
+    expect(button.innerHTML).toContain('№ ava-12345678…abcd');
+    button.click();
+    await settle();
+    expect(of('clipboard').at(-1)).toEqual(['clipboard', id]);
+    expect(button.has('copied')).toBe(true);
+    clipboard = { writeText: async () => { throw new Error('denied'); } };
+    button.click();
+    await settle();
+    expect(button.querySelector('.mnumber-label')!.textContent).toBe('№ ' + id);
+    expect(button.has('manual')).toBe(true);
+  });
+  it('скрытая за лимитом хаба битва открывает корпоративную вкладку', async () => {
+    lists.active = ['m1', 'm2', 'm3', 'ava-live'].map(id => row(id));
+    const browser = await boot();
+    await browser.refreshMyMatches();
+    $('hub-mine').querySelector('.hm-more')!.click();
+    expect(tab('corporate').has('active')).toBe(true);
+    expect(ids()).toEqual(['ava-live']);
   });
 });

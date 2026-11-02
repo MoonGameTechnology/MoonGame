@@ -34,6 +34,7 @@ import {
   previewSides,
   type GameData,
   type GameState,
+  type Planet,
   type UnitStack,
 } from '../packages/shared-core/src/index';
 import { engageForecastCard, type EngageForecastCard } from './engageForecast';
@@ -52,6 +53,8 @@ export interface ForecastSide {
   key?: string;
   /** Сторона держит мир — гарнизон наземного боя. */
   holds?: boolean;
+  /** Only known infrastructure from the viewer's projected state. */
+  fortress?: Planet;
 }
 
 /** Враждебны ли два владельца. */

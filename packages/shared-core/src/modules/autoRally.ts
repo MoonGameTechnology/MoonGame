@@ -80,7 +80,7 @@ function dropRallyPointsOf(state: GameState, planetId: PlanetId, keepOwner: Play
 export const autoRallyModule: GameModule = {
   id: 'auto-rally',
   // 1.1.0 RALLY-1: точка сбора (`rally.point`); 1.2.0: поднятый на орбиту корабль сходится с врагом.
-  version: '1.2.0',
+  version: '1.3.0',
   setup(api) {
     // RALLY-1: поставить (`to` — свой другой мир) или снять (`to: null`) точку сбора.
     api.onAction('rally.point', (action, h) => {

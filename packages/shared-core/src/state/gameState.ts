@@ -34,6 +34,9 @@ export type ResourceBag = Record<ResourceId, number>;
 export interface UnitStack {
   unit: UnitId;
   count: number;
+  /** Effective built hull levels of a fortress body. Fractional while assembling;
+   *  absent on ordinary units. Damage remains a separate, persistent HP pool. */
+  stationScale?: number;
   /** Remaining HP pool of this stack during a battle (≤ count × def.hp).
    *  Undefined outside combat = full health. */
   hp?: number;
@@ -106,6 +109,24 @@ export interface BuildingInstance {
   type: BuildingId;
   level: number;
   hp: number;
+  repair?: RepairWork;
+}
+
+/** A prepaid repair restores only this HP budget, never subsequent combat damage. */
+export interface RepairWork {
+  owner: PlayerId;
+  remainingHp: number;
+  hpPerHour: number;
+  doneAt: number;
+}
+
+/** A fortress owns a separate construction site, not the province underneath it. */
+export interface FortressState {
+  level: number;
+  modules?: string[];
+  assembly?: { from: number; to: number; startedAt: number; doneAt: number; paused?: boolean };
+  repair?: RepairWork;
+  damageCursor?: number;
 }
 
 /** A construction/upgrade/unit order cancelled mid-build: the paid-in-full order was
@@ -557,6 +578,9 @@ export interface Planet {
    *  крепость: у него нет ни лейнов, ни клетки на карте, его не захватывают и не
    *  считают территорией (`state/forkSite.ts`). Отсутствует у всех обычных узлов. */
   fork?: ForkAnchor;
+  /** A fortress's private construction site anchored at an existing province. */
+  stationHost?: PlanetId;
+  fortress?: FortressState;
   /** Relative size / weight of the sector (default 1). Drives how much territory
    *  it claims: a sector's border with a neighbour sits proportionally to their
    *  sizes, so resizing one shifts its neighbours' borders evenly. Undefined = 1. */
@@ -747,6 +771,8 @@ export interface LoadingClaim {
   startAt: number;
   /** World-time (ms) the lift finishes. */
   doneAt: number;
+  /** Кого грузить первыми (выбор игрока); нет — порядок гарнизона (`army.ts`). */
+  first?: 'wounded' | 'healthy';
 }
 
 /** Выгрузка десанта на свой или союзный мир (решение владельца 2026-09-26: «на союзном или
@@ -1480,6 +1506,8 @@ export interface Hero {
   cooldowns: Record<string, number>;
   /** False while the hero is dead and awaiting respawn; absent/true ⇒ alive. */
   alive?: boolean;
+  /** Pending deployment; its destination and deadline survive save/restore. */
+  mobilization?: { target: string; startedAt: number; readyAt: number };
   /** Rarity tier (e.g. `common` | `rare` | `legendary` | `main`) → `data.heroGrades`.
    *  Drives BOTH of the hero's budgets, and the core enforces them: how many abilities
    *  may be worn (`skillSlots`, HPR-1.2) and the bonus module bays on top of the hull

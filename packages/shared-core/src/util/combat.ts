@@ -16,6 +16,8 @@ import { getStance, type DiplomacyCapability } from '../state/diplomacy';
 import { MISSILE_TRAIT } from '../state/minefields';
 import { unitHasTrait } from '../data/traits';
 import { laneTrunks, T_EPS, type TrunkSpan } from '../state/roads';
+import { fortressSiteOf } from '../state/fortress';
+import { divertFortressDamage } from './fortressDamage';
 
 /**
  * Shared combat primitives — the damage model, combatant-side accessors,
@@ -718,6 +720,22 @@ export function applyDamageToSide(
   const units = sideUnits(h.state, ref);
   if (!units) {
     return;
+  }
+  if (ref.kind === 'fleet') {
+    const site = fortressSiteOf(h.state, ref.fleetId);
+    if (site) {
+      const routed = divertFortressDamage(site, units, dmg, data);
+      dmg = capHooked(dmg, routed.hullInput);
+      // A fortress body is one space-domain target, never a ground-class split.
+      byClass = undefined;
+      evenly = undefined;
+      for (const building of routed.destroyed) {
+        h.emit('building.destroyed', { planetId: site.id, building: building.type, uid: building.uid, owner: site.owner });
+      }
+      if (routed.internalDamage > 0) h.emit('station.internal.damaged', {
+        planetId: site.id, fleetId: ref.fleetId, damage: routed.internalDamage,
+      });
+    }
   }
   // Плацдарм адресуется миром, как и гарнизон: флота у него нет (ROS-1.5).
   const onPlanet = ref.kind === 'garrison' || ref.kind === 'beachhead';

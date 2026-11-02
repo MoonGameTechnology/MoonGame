@@ -383,6 +383,8 @@ export const BuildingLevelSchema = z.object({
 });
 
 export const BuildingDefSchema = z.object({
+  /** Fraction of unshielded fortress damage routed to one internal system. */
+  internalDamageShare: z.number().min(0).max(1).optional(),
   name: z.string(),
   /** Retained for existing worlds and accepted construction orders, but no longer
    *  available for new construction. Omitted on active catalogue entries so old
@@ -635,6 +637,8 @@ export const TechnologyUnlocksSchema = z.object({
 });
 
 export const TechnologyEffectsSchema = z.object({
+  /** Additional simultaneously deployed heroes; an integer, not a percentage. */
+  heroSlots: z.number().int().min(0).max(2).optional(),
   /** Multiplier on owned planetary production, e.g. 0.1 = +10%. */
   productionBonus: z.number().default(0),
   /** Multiplier on owned fleet movement speed, e.g. 0.15 = +15%. */

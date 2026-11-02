@@ -19,7 +19,7 @@ import type { PlayerArsenal } from '../state/gameState';
  */
 export const arsenalSyncModule: GameModule = {
   id: 'arsenal-sync',
-  version: '0.1.0',
+  version: '0.2.0',
   setup(api) {
     api.onAction('arsenal.sync', (action, h) => {
       const payload = action.payload as Partial<PlayerArsenal> | undefined;

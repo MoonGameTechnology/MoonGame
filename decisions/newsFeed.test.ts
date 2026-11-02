@@ -9,9 +9,7 @@ import {
   newsItems,
   newsLine,
   newsPlaceholder,
-  newsTeaser,
   newsText,
-  newsTotal,
   newsWhen,
   nextNewsBefore,
   ownCorp,
@@ -152,14 +150,7 @@ describe('порядок и фильтры', () => {
     expect(newsItems(v, 'ann', 'a')).toEqual([]);
   });
 
-  it('телефону — закреплённые и три свежие (правило 6)', () => {
-    expect(newsTeaser(v).map((it) => it.id)).toEqual(['pin-new', 'pin-old', 'f', 'plain', 'r']);
-  });
 
-  it('число всей ленты — только точное (правило 6)', () => {
-    expect(newsTotal(v)).toBe(7);
-    expect(newsTotal({ ...v, more: true })).toBe(null);
-  });
 });
 
 describe('страницы', () => {

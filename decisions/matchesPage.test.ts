@@ -5,15 +5,15 @@ describe('числа на вкладках «Матчей»', () => {
   const lists = { available: [1, 2, 3, 4, 5], active: [1, 2], archived: [] };
 
   it('ЧИСЛО — СКОЛЬКО СТРОК ПОКАЖЕТ ВКЛАДКА: у «Доступных» — после фильтра', () => {
-    expect(tabCounts(lists, 3)).toEqual({ available: 3, active: 2, archived: 0 });
+    expect(tabCounts(lists, 3)).toEqual({ available: 3, active: 2, archived: 0, corporate: 0 });
   });
 
   it('ленты нет — чисел нет: «0» значило бы «пусто», а сервер мог не ответить', () => {
-    expect(tabCounts(null, 0)).toEqual({ available: null, active: null, archived: null });
+    expect(tabCounts(null, 0)).toEqual({ available: null, active: null, archived: null, corporate: null });
   });
 
   it('вкладки, которой сервер не прислал, — ноль, а не пропуск', () => {
-    expect(tabCounts({ available: [1] }, 1)).toEqual({ available: 1, active: 0, archived: 0 });
+    expect(tabCounts({ available: [1] }, 1)).toEqual({ available: 1, active: 0, archived: 0, corporate: 0 });
   });
 });
 

@@ -69,6 +69,6 @@ describe('комиксы глав — проводка', () => {
   it('комикс выше обычных экранов, нативный диалог описания выше комикса', () => {
     const block = MAIN.split('const BACK_LAYERS: BackLayer[] = [')[1]!.split('\n];')[0]!;
     const ladder = [...block.matchAll(/\{\s*id: '([^']+)'/g)].map(match => match[1]);
-    expect(ladder.slice(0, 2)).toEqual(['match-description', 'comic']);
+    expect(ladder.slice(0, 3)).toEqual(['match-description', 'fortress-order', 'comic']);
   });
 });

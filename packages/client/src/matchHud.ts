@@ -23,6 +23,7 @@
 import {
   attacks,
   combatantKey,
+  fortressSiteOf,
   getStance,
   attackerOf,
   defenderOf,
@@ -49,6 +50,7 @@ import type {
   GameData,
   GameState,
   MatchConfig,
+  Planet,
   PlanetId,
   PlayerId,
   ResourceId,
@@ -761,6 +763,7 @@ export function resolveWorldAction(action: WorldAction, model: WorldModel): Flee
 
 /** One side of a battle (attacker or defender) as the panel shows it. */
 export interface BattleSideView {
+  fortress?: Planet;
   key?: string;
   ref?: CombatantRef;
   relation?: 'own' | 'ally' | 'enemy' | 'neutral';
@@ -862,6 +865,8 @@ function sideView(
     mine: owner != null && owner === viewerId,
     key: combatantKey(ref),
     ref: { ...ref },
+    ...(ref.kind === 'fleet' && fortressSiteOf(state, ref.fleetId)
+      ? { fortress: fortressSiteOf(state, ref.fleetId) } : {}),
     relation: owner === viewerId ? 'own' : owner === null ? 'enemy'
       : ['alliance', 'pact'].includes(getStance(state, viewerId, owner)) ? 'ally'
       : getStance(state, viewerId, owner) === 'war' ? 'enemy' : 'neutral',

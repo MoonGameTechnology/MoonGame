@@ -236,6 +236,66 @@ export const BOMBARD_VOLLEY_SOLO_MIGRATION = {
   toDataHash: STAND_UP_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Lighter ship modules: catalogue 0.1.72 halves the combat and defence numbers of nine
+ *  modules (their base and every rarity line) and the side rarity lines of the radar, cargo,
+ *  siege and mine modules; tractor beam, debris collector and repair tender fit only a hero's
+ *  flagship. Stats and fitting rules only, so a saved world reads as is: a ship already built
+ *  keeps its modules and simply reads the new numbers. */
+export const HALF_MODULES_SOLO_MIGRATION = {
+  fromRules: BOMBARD_VOLLEY_SOLO_MIGRATION.toRules,
+  fromData: BOMBARD_VOLLEY_SOLO_MIGRATION.toData,
+  fromDataHash: BOMBARD_VOLLEY_SOLO_MIGRATION.toDataHash,
+  toRules: '0eb5ffa544097a',
+  toData: '0.1.72',
+  toDataHash: '17cb1050daa7a3',
+} as const;
+
+/** Separate player-built fortresses and manual repairs. Existing sites and paid
+ *  work retain their legacy shape; new deployments use station_site. The old
+ *  catalogue definitions remain, so migration only advances the audited pins. */
+export const FORTRESS_MODEL_SOLO_MIGRATION = {
+  fromRules: HALF_MODULES_SOLO_MIGRATION.toRules,
+  fromData: HALF_MODULES_SOLO_MIGRATION.toData,
+  fromDataHash: HALF_MODULES_SOLO_MIGRATION.toDataHash,
+  toRules: '016783459c4258',
+  toData: '0.1.73',
+  toDataHash: '0b767cf7a4b647',
+} as const;
+
+/** Rules-only pair: army 1.3.0 lets a lift order say whether wounded or whole stacks board
+ *  first (an optional `first` on the claim). A saved claim without it boards in garrison
+ *  order as before, so a saved world reads as is. */
+export const LOAD_FIRST_SOLO_MIGRATION = {
+  fromRules: FORTRESS_MODEL_SOLO_MIGRATION.toRules,
+  fromData: FORTRESS_MODEL_SOLO_MIGRATION.toData,
+  fromDataHash: FORTRESS_MODEL_SOLO_MIGRATION.toDataHash,
+  toRules: '1ce24e9a208610',
+  toData: FORTRESS_MODEL_SOLO_MIGRATION.toData,
+  toDataHash: FORTRESS_MODEL_SOLO_MIGRATION.toDataHash,
+} as const;
+
+/** Optional mobilization state and additive main-only research. Existing ships,
+ *  accepted orders and campaign deployments survive; future main deployments use the timer. */
+export const HERO_MOBILIZATION_SOLO_MIGRATION = {
+  fromRules: LOAD_FIRST_SOLO_MIGRATION.toRules,
+  fromData: LOAD_FIRST_SOLO_MIGRATION.toData,
+  fromDataHash: LOAD_FIRST_SOLO_MIGRATION.toDataHash,
+  toRules: '0876d80977cf6d',
+  toData: '0.1.74',
+  toDataHash: '023cd15f09ee90',
+} as const;
+
+/** Optional snapshots pin paid orders and hero loadouts before the next arsenal sync.
+ * Old snapshots remain readable; the existing lazy pinning preserves their values. */
+export const MODULE_PROGRESSION_SOLO_MIGRATION = {
+  fromRules: HERO_MOBILIZATION_SOLO_MIGRATION.toRules,
+  fromData: HERO_MOBILIZATION_SOLO_MIGRATION.toData,
+  fromDataHash: HERO_MOBILIZATION_SOLO_MIGRATION.toDataHash,
+  toRules: '1cabdded184a38',
+  toData: HERO_MOBILIZATION_SOLO_MIGRATION.toData,
+  toDataHash: HERO_MOBILIZATION_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -258,6 +318,11 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   WOUNDED_TRANSPORT_SOLO_MIGRATION,
   STAND_UP_SOLO_MIGRATION,
   BOMBARD_VOLLEY_SOLO_MIGRATION,
+  HALF_MODULES_SOLO_MIGRATION,
+  FORTRESS_MODEL_SOLO_MIGRATION,
+  LOAD_FIRST_SOLO_MIGRATION,
+  HERO_MOBILIZATION_SOLO_MIGRATION,
+  MODULE_PROGRESSION_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

@@ -1,8 +1,20 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { SCORE_LIMIT, kernel, advance, setMatchMode, ctx } from './game';
+import { MODULES } from './protoKernel';
 import { data } from './gameData';
 import { pveState, pveModeId } from '../../packages/client/src/gameData';
-import type { Context } from '../../packages/shared-core/src/index';
+import { GAME_MODULES, type Context } from '../../packages/shared-core/src/index';
+import { DEV_MODULES } from '../../packages/server/src/scenario';
+
+// SLIM-4. Списков модулей было два, прототипа и сервера, и они разъезжались: PVR-0.2,
+// FORT-0.2 и FOG-10 ниже — механики, которые жили в одном списке и не срабатывали на
+// хосте с другим. Теперь оба хоста берут один массив ядра, и сторож держит именно это.
+describe('one module list for both hosts (SLIM-4)', () => {
+  it('the prototype kernel and the canonical server load the same array', () => {
+    expect(MODULES).toBe(GAME_MODULES);
+    expect(DEV_MODULES).toBe(GAME_MODULES);
+  });
+});
 
 // Порог победы по очкам — конфиг матча прототипа (`protoKernel.ts`), а не механика
 // ядра: `victoryModule` читает его из `ctx.config.victory.scoreLimit`. Проверка жила

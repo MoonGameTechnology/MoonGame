@@ -101,6 +101,17 @@ export function requireOwnedIdleFleet(
   return fleet as IdleFleet;
 }
 
+/** Stationary ships may berth at a road fork as well as a world. */
+export function requireOwnedStationaryFleet(
+  h: HandlerContext, fleetId: string, playerId: string,
+): Fleet {
+  const fleet = requireOwnedUnengagedFleet(h, fleetId, playerId);
+  if (fleet.movement || fleet.assaultLanding || (fleet.location === null && !fleet.edge)) {
+    h.reject('E_FLEET_BUSY');
+  }
+  return fleet;
+}
+
 /** Whether a LIVE battle references this world's garrison as a side. While the
  *  assault runs the garrison is locked in: it can neither evacuate onto ships
  *  (`army.load`, the prototype's `fleet.launch`) nor otherwise dodge the resolve —
