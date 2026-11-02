@@ -22,10 +22,12 @@
  * и плавающий чат живут в `main.ts`; модуль получает их хуками {@link initDiploWindow} —
  * импорт оттуда был бы циклом.
  */
+import { selectDiploRoster, nextDiploSort, type DiploParticipant, type DiploSortOrder, type DiploSort } from '../../decisions/diploRoster';
+import { diploRosterHtml, rememberRosterUi } from './diploRosterView';
 import { coalitionInviteBlock, coalitionTreatyLocked } from '../../decisions/coalitionCreation';
 import { pushSpyRecord, spyOpGlyph, spyRecordOf, type SpyRecord } from '../../decisions/spyArchive';
 import { espionageShown, victoryPointsShown } from '../../decisions/sectorZeroTools';
-import { t, tData } from '../../localization/runtime';
+import { LOCALE, t, tData } from '../../localization/runtime';
 import {
   getOffer,
   getStance,
@@ -53,7 +55,6 @@ import {
   hasMapShareOffer,
   HOUR,
   shareMap,
-  STANCE_RANK,
 } from './game';
 import { grantLeftMs, myAgents, spyCostRange } from './intel';
 import { selPlanet } from './interaction';
@@ -125,7 +126,8 @@ const sumUnits = (stacks: ReadonlyArray<{ count: number }>): number =>
 
 export let diploOpen = false;
 export let diploTab: 'diplo' | 'msgs' | 'intel' = 'diplo';
-let diploSort: 'name' | 'worlds' | 'stance' = 'stance';
+let diploSort: DiploSortOrder = { key: 'stance', direction: 'asc' };
+let diploQuery = '';
 let diploExpanded: string | null = null; // participant row showing its action buttons
 // Roster filters (alongside sort): show only seats matching the picked stance(s) and
 // type(s). Empty set = no constraint from that category. They AND across categories,
@@ -382,16 +384,6 @@ export function seatBadge(id: string): { icon: string; tag: string } {
   return seatBadgeOf(seatKind(id === game.me(), isAiSeat(id)));
 }
 
-/** Does a seat pass the active roster filters? Stance filter never matches ME (no
- *  self-stance); an empty category imposes no constraint. */
-function diploPasses(id: string): boolean {
-  const ME = game.me();
-  if (diploStanceFilter.size) {
-    if (id === ME || !diploStanceFilter.has(getStance(game.state(), ME, id))) return false;
-  }
-  if (diploTypeFilter.size && !diploTypeFilter.has(isAiSeat(id) ? 'ai' : 'human')) return false;
-  return true;
-}
 /** A bot's approval-of-you meter (game.ts botDiplomacyModule). A bot only ever sits at
  *  ≤ FAVOUR_BASE, so a full bar = its passive-friendly baseline; your aggression drains it
  *  past the embargo tick (won't trade on the market) and then the war tick (declares war).
@@ -579,61 +571,23 @@ function seatDiploActionsHtml(id: string): string {
     intelRowHtml(id)
   );
 }
-function diploRowsHtml(): string {
+function diploRoster(): string {
   const s = game.state();
-  const ME = game.me();
-  const NAME = game.names();
-  const others = diploSeats().filter((id) => id !== ME);
-  const byName = (a: string, b: string) => (NAME[a] ?? a).localeCompare(NAME[b] ?? b);
-  if (diploSort === 'name') others.sort(byName);
-  else if (diploSort === 'worlds') others.sort((a, b) => worldsOf(b) - worldsOf(a) || byName(a, b));
-  else
-    others.sort(
-      (a, b) => STANCE_RANK[getStance(s, ME, a)] - STANCE_RANK[getStance(s, ME, b)] || byName(a, b),
-    );
-  const ordered = [ME, ...others].filter(diploPasses);
-  // Keep the expansion in sync with visibility: if a filter (or a stance/capture change
-  // that re-renders) hides the expanded seat, drop the expansion — otherwise the row
-  // re-opens itself when that seat later re-enters the list.
-  if (diploExpanded && !ordered.includes(diploExpanded)) diploExpanded = null;
-  if (!ordered.length) return `<div class="dp-empty">${t('comms.filter.empty')}</div>`;
-  return ordered
-    .map((id) => {
-      const bdg = seatBadge(id);
-      const col = game.ownerColor(id);
-      const w = worldsOf(id);
-      const isMe = id === ME;
-      const st = isMe ? null : getStance(s, ME, id);
-      const stanceTag = isMe
-        ? `<span class="dp-tag">${t('comms.you')}</span>`
-        : `<span class="dp-stance" style="color:${game.stanceCol(st!)};border-color:${game.stanceCol(st!)}">${stanceRu(st!)}</span>`;
-      // Bots (AI seats) carry a favour meter toward you; humans/you don't.
-      const favBar = !isMe && isAiSeat(id) ? favourBarHtml(id) : '';
-      const expanded = diploExpanded === id && !isMe;
-      const actions = expanded ? seatDiploActionsHtml(id) : '';
-      return (
-        `<div class="dp-row${expanded ? ' open' : ''}${isMe ? ' me' : ''}"${isMe ? '' : ` data-seat="${id}"`}>` +
-        `<span class="dp-ic" style="color:${col}">${bdg.icon}</span>` +
-        diploNameHtml(id, NAME[id] ?? id, bdg.tag) +
-        `<span class="dp-w" title="${t('comms.provinces')}">⬣ ${w}</span>` +
-        stanceTag +
-        favBar +
-        `</div>` +
-        actions
-      );
-    })
-    .join('');
-}
-
-/** Имя в строке дипломатии. Ник живого игрока известен (сеть) — он идёт первым и
- *  открывает профиль, а имя дома уходит в подпись; без ника строка как прежде. */
-function diploNameHtml(id: string, house: string, tag: string): string {
-  const nick = isAiSeat(id) ? undefined : game.seatNick(id);
-  if (!nick) return `<span class="dp-name">${esc(house)} <em>${tag}</em></span>`;
-  return (
-    `<span class="dp-name"><button class="dp-prof" data-prof="${esc(id)}" title="${t('diplo.profile')}">${esc(nick)}</button>` +
-    ` <em>${esc(house)} · ${tag}</em></span>`
-  );
+  const worlds: Record<string, number> = {};
+  for (const p of Object.values(s.planets))
+    if (p.owner && !isForkSite(p)) worlds[p.owner] = (worlds[p.owner] ?? 0) + 1;
+  const all: DiploParticipant[] = diploSeats().map((id) => ({
+    id, house: game.names()[id] ?? id, nick: game.seatNick(id),
+    kind: isAiSeat(id) ? 'ai' : 'human', worlds: worlds[id] ?? 0,
+    stance: id === game.me() ? null : getStance(s, game.me(), id),
+  }));
+  const options = { sort: diploSort, query: diploQuery, stances: diploStanceFilter,
+    kinds: diploTypeFilter, locale: LOCALE };
+  const rows = selectDiploRoster(all, options);
+  if (diploExpanded && !rows.some((row) => row.id === diploExpanded)) diploExpanded = null;
+  return diploRosterHtml({ ...options, rows, total: all.length, expanded: diploExpanded,
+    ownerColor: (id) => game.ownerColor(id), stanceCol: (st) => game.stanceCol(st),
+    stanceLabel: stanceRu, badge: seatBadge, favour: favourBarHtml, actions: seatDiploActionsHtml });
 }
 
 // --- conversations (messages tab: list of chats + the open thread) -----------
@@ -707,34 +661,18 @@ function intelTabHtml(): string {
     `</div>`
   );
 }
-export function renderDiplo(): void {
+export function renderDiplo(resetRosterScroll = false): void {
   const el = document.getElementById('diplo');
   if (!el) return;
+  const restoreUi = diploTab === 'diplo' ? rememberRosterUi(el, resetRosterScroll) : () => {};
   // Вкладки «Шпионаж» в забеге Sector Zero нет: открытая до забега не переживает вход в него.
   const spyTab = espionageShown(game.sectorZeroToolsHidden());
   if (!spyTab && diploTab === 'intel') diploTab = 'diplo';
   const tabBtn = (k: 'diplo' | 'msgs' | 'intel', label: string) =>
     `<button class="dp-tab${diploTab === k ? ' on' : ''}" data-tab="${k}">${label}</button>`;
-  const sortBtn = (k: typeof diploSort, label: string) =>
-    `<button class="dp-sortb${diploSort === k ? ' on' : ''}" data-sort="${k}">${label}</button>`;
-  const stChip = (k: DiplomaticStance) =>
-    `<button class="dp-fchip${diploStanceFilter.has(k) ? ' on' : ''}" data-fstance="${k}" style="--sc:${game.stanceCol(k)}">${stanceRu(k)}</button>`;
-  const tyChip = (k: 'human' | 'ai', label: string) =>
-    `<button class="dp-fchip ty${diploTypeFilter.has(k) ? ' on' : ''}" data-ftype="${k}">${label}</button>`;
-  const anyFilter = diploStanceFilter.size || diploTypeFilter.size;
-  const filterRow =
-    `<div class="dp-filters"><span>${t('diplo.filter')}:</span>` +
-    STANCES.map(stChip).join('') +
-    `<span class="dp-fsep"></span>${tyChip('human', '☻ ' + t('diplo.filter.human'))}${tyChip('ai', '⌬ ' + t('diplo.filter.ai'))}` +
-    (anyFilter
-      ? `<button class="dp-fclear" data-fclear="1">${t('diplo.filter.reset')}</button>`
-      : '') +
-    `</div>`;
   const body =
     diploTab === 'diplo'
-      ? `<div class="dp-sorts"><span>${t('diplo.sort')}:</span>${sortBtn('name', t('diplo.sort.name'))}${sortBtn('worlds', t('diplo.sort.provinces'))}${sortBtn('stance', t('diplo.sort.stance'))}</div>` +
-        filterRow +
-        `<div class="dp-list">${diploRowsHtml()}</div>`
+      ? diploRoster()
       : diploTab === 'intel'
         ? intelTabHtml()
         : `<div class="dp-convo">${conversations.listHtml()}${conversations.threadHtml()}</div>`;
@@ -743,6 +681,7 @@ export function renderDiplo(): void {
     `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}${spyTab ? tabBtn('intel', t('diplo.tab.espionage')) : ''}<button class="dp-close btn-x">✕</button></div>` +
     body +
     `</div>`;
+  restoreUi();
   if (diploTab === 'msgs') scrollFeedToEnd();
 }
 /** COAL-1: после дипломатического пакета — список чатов и карточки предложений в
@@ -888,28 +827,29 @@ export function initDiploWindow(host: DiploWindowHost): void {
         return;
       }
       const sort = (tg.closest('.dp-sortb') as HTMLElement | null)?.dataset.sort;
-      if (sort) {
-        diploSort = sort as typeof diploSort;
-        renderDiplo();
+      if (sort === 'name' || sort === 'worlds' || sort === 'stance') {
+        diploSort = nextDiploSort(diploSort, sort as DiploSort);
+        renderDiplo(true);
         return;
       }
       const fstance = (tg.closest('.dp-fchip[data-fstance]') as HTMLElement | null)?.dataset
         .fstance;
       if (fstance) {
         toggleSet(diploStanceFilter, fstance as DiplomaticStance);
-        renderDiplo();
+        renderDiplo(true);
         return;
       }
       const ftype = (tg.closest('.dp-fchip[data-ftype]') as HTMLElement | null)?.dataset.ftype;
       if (ftype) {
         toggleSet(diploTypeFilter, ftype as 'human' | 'ai');
-        renderDiplo();
+        renderDiplo(true);
         return;
       }
       if (tg.closest('.dp-fclear')) {
         diploStanceFilter.clear();
         diploTypeFilter.clear();
-        renderDiplo();
+        diploQuery = '';
+        renderDiplo(true);
         return;
       }
       // COAL-1: «отказаться» в карточке предложения внутри лички.
@@ -958,6 +898,12 @@ export function initDiploWindow(host: DiploWindowHost): void {
         diploExpanded = diploExpanded === row.dataset.seat ? null : row.dataset.seat;
         renderDiplo();
       }
+    });
+    diploEl.addEventListener('input', (e) => {
+      const input = e.target as HTMLInputElement;
+      if (input.id !== 'dp-search') return;
+      diploQuery = input.value.slice(0, 120);
+      renderDiplo(true);
     });
     // Enter sends the composed message.
     diploEl.addEventListener('keydown', (e) => {

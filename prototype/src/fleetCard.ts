@@ -21,6 +21,7 @@ import {
   effectiveStats,
   estimateTravelHours,
   fleetBaseSpeed,
+  fortressSiteOf,
   missingHull,
   previewBattle,
   previewLossCount,
@@ -81,10 +82,10 @@ import {
   type VitalView,
 } from './fleetConsole';
 import { effectsShown, fleetEffects, pointDefenseTotal, type EffectTag } from './fleetEffects';
-import { bombardFall } from './bombardClock';
+import { fleetVolleyIn } from './bombardClock';
 import { fleetHoldsHtml } from './fleetHoldView';
 import { fleetSummary, hullPct, LIMP_PCT, stackPools } from './fleetSummary';
-import { buildingName, countdownHMS, displayUnit, esc, kfmt, resLine } from './format';
+import { countdownHMS, displayUnit, esc, kfmt, resLine } from './format';
 import {
   ctx,
   data,
@@ -126,6 +127,8 @@ import { unitGlyphSvg } from './unitGlyphs';
 import { veteranTag } from './veteranChevrons';
 import { hangarSectionHtml, unitRows } from './worldCard';
 import { planet } from './worldQueries';
+import { fortressStatusHtml } from './fortressView';
+import { canOrder } from './game';
 
 /** Что карточке нужно от игры. Мир, выбор, мины, часы и имена флотов — в `main.ts`. */
 export interface FleetCardHost {
@@ -454,6 +457,10 @@ export function fleetPanelHtml(f: Fleet): string {
   const s = game.world();
   const ME = game.me();
   const NAME = game.names();
+  const fortress = fortressSiteOf(s, f.id);
+  if (fortress) return kitCardHeader(ownerColor(f.owner), worldName(s, fortress.id), t('fleet.kind.fortress')) +
+    fortressStatusHtml(s, fortress, ME, (order) => canOrder(s, order)) +
+    `<button class="bw-open btn-second" data-act="openstation" data-arg="${esc(fortress.id)}">${t('fortress.open')}</button>`;
   // Мина (SM-3.6): свой короткий паспорт — заряды, доля за подрыв, прочность. Ракетная
   // (SM-3.7a) — радар, обзор и прочность, а хозяину ещё режим, удар и управление.
   if (isMineFleet(f, data))
@@ -701,19 +708,14 @@ function fleetEffectsHtml(f: Fleet, boosted: boolean, nTr: number): string {
     s.players[ME]?.arrears ?? [],
   );
   if (!effectsShown(tags)) return '';
-  // Метка обстрела несёт таймер: когда рухнет следующая постройка мира под флотом
-  // (`decisions/bombardTimer.ts`). Имя постройки — в подсказке, как и в шапке мира.
-  const fall = f.bombarding && f.location ? bombardFall(s, f.location, ME) : null;
+  // Метка обстрела несёт таймер: через сколько следующий залп этого флота
+  // (`decisions/bombardTimer.ts`). Слова — в подсказке, как и в шапке мира.
+  const volleyIn = fleetVolleyIn(s, f, ME);
   let h = `<div class="sec">${t('effect.title')}</div><div class="row effects">`;
   for (const tag of tags) {
-    if (tag.kind === 'bombarding' && fall) {
-      const left = countdownHMS(fall.leftMs);
-      const tip = esc(
-        t('side.world.bombard-fall', {
-          b: buildingName(data.buildings[fall.building]?.name, fall.building),
-          t: left,
-        }),
-      );
+    if (tag.kind === 'bombarding' && volleyIn !== null) {
+      const left = countdownHMS(volleyIn);
+      const tip = esc(t('side.world.bombard-next', { t: left }));
       h += `<span class="effect-tag" title="${tip}" aria-label="${tip}">${effectTagText(tag)} · ${left}</span>`;
     } else h += `<span class="effect-tag">${effectTagText(tag)}</span>`;
   }

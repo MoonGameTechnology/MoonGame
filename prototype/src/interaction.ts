@@ -57,7 +57,8 @@ export interface Armed {
   cmdMore: true;
   castMenu: true;
   retreatMenu: true;
-  troopsPlan: { fleetId: string; plan: Record<string, number> };
+  /** `asking` — на экране вопрос «кого грузить первыми» (раненых или здоровых). */
+  troopsPlan: { fleetId: string; plan: Record<string, number>; asking?: boolean };
   splitState: { fleetId: string; take: Record<string, number> };
 }
 

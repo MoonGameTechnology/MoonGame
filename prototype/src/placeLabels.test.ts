@@ -39,7 +39,7 @@ describe('SZ-map-ids — места называются именами', () => 
     // Карточки тумана («нет телеметрии», «последний снимок») брали в заголовок `p.id`.
     expect((MAIN + CARD).match(/cardHeader\([^,]+,\s*(?:[np]\.)?id\b/g) ?? []).toEqual([]);
     // Обе карточки тумана и известный мир называют место его именем.
-    expect(CARD.match(/cardHeader\([^,]+,\s*placeName\(p\.id\)/g)?.length).toBe(3);
+    expect(CARD.match(/cardHeader\([^,]+,\s*placeName\(p\.id\)/g)?.length).toBe(4);
   });
 
   it('вид сектора под полем астероидов — из данных, а не зашитой строкой', () => {

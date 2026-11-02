@@ -1,3 +1,4 @@
+import { legacyFortressDeploymentContext } from './fixtures/legacyFortress';
 /**
  * ОРУДИЯ КРЕПОСТИ (FORT-5.4; решения владельца 9, 16, 19 — §0.7 роадмапа).
  *
@@ -69,12 +70,12 @@ const GUNS_FLEET = 'fleet:station:A';
 
 /** Поднять крепость на своём узле и вернуть состояние после этого. */
 function raised(kernel = createKernel([stationModule])): GameState {
-  const r = kernel.applyAction(world(), act('station.deploy', { planetId: 'A' }), ctx());
+  const r = kernel.applyAction(world(), act('station.deploy', { planetId: 'A' }), legacyFortressDeploymentContext(0, data));
   if (!r.ok) throw new Error(`отказ ${r.code}`);
   return r.state;
 }
 
-describe('орудия крепости — решения владельца 9/16/19', () => {
+describe('legacy save compatibility — орудия крепости — решения владельца 9/16/19', () => {
   it('появляются ВМЕСТЕ с крепостью и принадлежат хозяину узла', () => {
     const st = raised();
     const guns = st.fleets[GUNS_FLEET];

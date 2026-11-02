@@ -4,10 +4,10 @@
     "rarity": "simple",
     "rarityBonus": {
       "unique": {
-        "hp": 6
+        "hp": 3
       },
       "mythic": {
-        "speed": 1
+        "speed": 0.5
       },
       "legendary": {
         "cargoCapacity": 3
@@ -35,20 +35,20 @@
     "rarity": "simple",
     "rarityBonus": {
       "unique": {
-        "hp": 6
+        "hp": 3
       },
       "mythic": {
-        "speed": 1
+        "speed": 0.5
       },
       "legendary": {
-        "hullRepair": 0.02
+        "hullRepair": 0.01
       }
     },
     "slot": "utility",
     "tag": "horizontal",
     "effects": {
       "stats": {
-        "hullRepair": 0.05
+        "hullRepair": 0.025
       }
     },
     "cost": {
@@ -66,10 +66,10 @@
     "rarity": "simple",
     "rarityBonus": {
       "unique": {
-        "speed": 2
+        "speed": 1
       },
       "mythic": {
-        "defense": 2
+        "defense": 1
       },
       "legendary": {
         "radarRange": 60
@@ -97,10 +97,10 @@
     "rarity": "simple",
     "rarityBonus": {
       "unique": {
-        "speed": 2
+        "speed": 1
       },
       "mythic": {
-        "defense": 1
+        "defense": 0.5
       },
       "legendary": {
         "radarRange": 30
@@ -128,27 +128,30 @@
     "rarity": "simple",
     "rarityBonus": {
       "unique": {
-        "defense": 1
+        "defense": 0.5
       },
       "mythic": {
-        "hp": 8
+        "hp": 4
       },
       "legendary": {
-        "speed": 1
+        "speed": 0.5
       }
     },
     "slot": "utility",
     "tag": "vertical",
     "effects": {
       "stats": {
-        "speed": 2
+        "speed": 1
       }
     },
     "cost": {
       "metal": 40
     },
     "allowed": {
-      "domain": "space"
+      "domain": "space",
+      "excludeTraits": [
+        "immobile"
+      ]
     }
   },
   "targeting_array": {
@@ -156,17 +159,17 @@
     "rarity": "unique",
     "rarityBonus": {
       "mythic": {
-        "hp": 10
+        "hp": 5
       },
       "legendary": {
-        "defense": 3
+        "defense": 1.5
       }
     },
     "slot": "weapon",
     "tag": "vertical",
     "effects": {
       "stats": {
-        "attack": 4
+        "attack": 2
       }
     },
     "cost": {
@@ -181,20 +184,20 @@
     "rarity": "simple",
     "rarityBonus": {
       "unique": {
-        "defense": 2
+        "defense": 1
       },
       "mythic": {
-        "shield": 5
+        "shield": 2.5
       },
       "legendary": {
-        "hp": 8
+        "hp": 4
       }
     },
     "slot": "defense",
     "tag": "vertical",
     "effects": {
       "stats": {
-        "hp": 12
+        "hp": 6
       }
     },
     "cost": {
@@ -209,17 +212,17 @@
     "rarity": "unique",
     "rarityBonus": {
       "mythic": {
-        "shieldRegen": 0.01
+        "shieldRegen": 0.005
       },
       "legendary": {
-        "defense": 3
+        "defense": 1.5
       }
     },
     "slot": "defense",
     "tag": "vertical",
     "effects": {
       "stats": {
-        "shield": 15
+        "shield": 7.5
       }
     },
     "cost": {
@@ -234,20 +237,20 @@
     "rarity": "simple",
     "rarityBonus": {
       "unique": {
-        "defense": 1
+        "defense": 0.5
       },
       "mythic": {
-        "hp": 8
+        "hp": 4
       },
       "legendary": {
-        "pointDefense": 4
+        "pointDefense": 2
       }
     },
     "slot": "defense",
     "tag": "vertical",
     "effects": {
       "stats": {
-        "pointDefense": 8
+        "pointDefense": 4
       }
     },
     "cost": {
@@ -414,10 +417,10 @@
     "rarity": "unique",
     "rarityBonus": {
       "mythic": {
-        "hp": 10
+        "hp": 5
       },
       "legendary": {
-        "attack": 3
+        "attack": 1.5
       }
     },
     "slot": "weapon",
@@ -447,17 +450,17 @@
     "rarity": "unique",
     "rarityBonus": {
       "mythic": {
-        "retreatPull": 0.05
+        "retreatPull": 0.025
       },
       "legendary": {
-        "attack": 3
+        "attack": 1.5
       }
     },
     "slot": "weapon",
     "tag": "vertical",
     "effects": {
       "stats": {
-        "retreatPull": 0.15
+        "retreatPull": 0.075
       }
     },
     "cost": {
@@ -465,7 +468,10 @@
       "microelectronics": 4
     },
     "allowed": {
-      "domain": "space"
+      "domain": "space",
+      "units": [
+        "hero"
+      ]
     }
   },
   "salvage_rig": {
@@ -474,27 +480,30 @@
     "rarity": "simple",
     "rarityBonus": {
       "unique": {
-        "cargoCapacity": 2
+        "cargoCapacity": 1
       },
       "mythic": {
-        "hp": 8
+        "hp": 4
       },
       "legendary": {
-        "salvageBonus": 0.03
+        "salvageBonus": 0.015
       }
     },
     "slot": "utility",
     "tag": "horizontal",
     "effects": {
       "stats": {
-        "salvageBonus": 0.05
+        "salvageBonus": 0.025
       }
     },
     "cost": {
       "metal": 50
     },
     "allowed": {
-      "domain": "space"
+      "domain": "space",
+      "units": [
+        "hero"
+      ]
     }
   },
   "repair_tender": {
@@ -503,17 +512,17 @@
     "rarity": "unique",
     "rarityBonus": {
       "mythic": {
-        "hp": 10
+        "hp": 5
       },
       "legendary": {
-        "fleetHullRepair": 0.01
+        "fleetHullRepair": 0.005
       }
     },
     "slot": "defense",
     "tag": "horizontal",
     "effects": {
       "stats": {
-        "fleetHullRepair": 0.03
+        "fleetHullRepair": 0.015
       }
     },
     "cost": {
@@ -521,7 +530,10 @@
       "credits": 20
     },
     "allowed": {
-      "domain": "space"
+      "domain": "space",
+      "units": [
+        "hero"
+      ]
     }
   },
   "mine_layer": {
@@ -598,5 +610,59 @@
         "microelectronics": 20
       }
     }
+  },
+  "station_battery_1": {
+    "name": "Fortress Battery 1",
+    "slot": "weapon",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "attack": 12,
+        "pointDefense": 12
+      }
+    },
+    "cost": {},
+    "allowed": {
+      "units": [
+        "fortress_guns"
+      ]
+    },
+    "rarity": "unique"
+  },
+  "station_battery_2": {
+    "name": "Fortress Battery 2",
+    "slot": "weapon",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "attack": 20,
+        "pointDefense": 20
+      }
+    },
+    "cost": {},
+    "allowed": {
+      "units": [
+        "fortress_guns"
+      ]
+    },
+    "rarity": "mythic"
+  },
+  "station_battery_3": {
+    "name": "Fortress Battery 3",
+    "slot": "weapon",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "attack": 30,
+        "pointDefense": 30
+      }
+    },
+    "cost": {},
+    "allowed": {
+      "units": [
+        "fortress_guns"
+      ]
+    },
+    "rarity": "legendary"
   }
 }

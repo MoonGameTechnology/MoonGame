@@ -50,7 +50,12 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // minefield.ts (SM-3.4): поставить минное поле на узле, где стоит флот
   'fleet.layMines': z.object({ fleetId: id }),
   // army.ts
-  'army.load': z.object({ fleetId: id, unit: id, count: count.optional() }),
+  'army.load': z.object({
+    fleetId: id,
+    unit: id,
+    count: count.optional(),
+    first: z.enum(['wounded', 'healthy']).optional(),
+  }),
   'army.unload': z.object({ fleetId: id, unit: id, count: count.optional() }),
   // hero.ts
   // AUD-18: `hero.move` и `planet.annihilate` сняты — у них нет схемы, значит шлюз их не
@@ -63,7 +68,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'hero.install': z.object({ heroId: id, moduleId: id }),
   'hero.uninstall': z.object({ heroId: id, moduleId: id }),
   // station.ts. `trail` — крепость на развилке этой тропы провинции `planetId` (FORT-6.1).
-  'station.deploy': z.object({ planetId: id, trail: z.number().int().nonnegative().optional() }),
+  'station.deploy': z.object({ planetId: id, trail: z.number().int().nonnegative().optional(), modules: z.array(id).max(16).optional() }),
+  'station.repair': z.object({ planetId: id }),
+  'building.repair': z.object({ planetId: id, building: id, uid: id.optional() }),
   // seatClaim.ts (ENTRY-3): схемы у `seat.claim` НЕТ намеренно, как у `seat.confirm`.
   // Заявку подаёт сервер во входе (`joinSeat.ts`), где дом сверяется со списком этого
   // матча и с ростером AvA; от клиента она прошла бы мимо обеих сверок.
@@ -234,8 +241,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     z.object({ strikeId: id, toPlanetId: id.optional(), toFleetId: id.optional() }),
   ]),
   // Перегрузка челноков между космопортом и стоящим там носителем (SHU-2.1).
-  'shuttle.load': z.object({ fleetId: id, squadronId: id }),
-  'shuttle.unload': z.object({ fleetId: id, squadronId: id }),
+  'shuttle.load': z.object({ fleetId: id, squadronId: id, planetId: id.optional() }),
+  'shuttle.unload': z.object({ fleetId: id, squadronId: id, planetId: id.optional() }),
   // Пересборка ангара (SHU-4.2). База — мир ИЛИ носитель, ровно одна из двух: как и у
   // вылета, «обе или ни одной» схема не выражает, это гейт обработчика. Эскадру в воздухе
   // (SHU-6.13) делят по `strikeId` вместо базы и эскадры ангара.

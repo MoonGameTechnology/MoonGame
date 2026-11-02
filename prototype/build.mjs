@@ -155,6 +155,14 @@ const SDK_LOADER = `<!-- Yandex Games SDK -->
 <script async src="/sdk.js" onload="initSDK()"></script>
 <script>function initSDK(){window.dispatchEvent(new Event('ya-sdk-ready'));}</script>`;
 
+/** Match categories are shared by every playable page target. */
+const matchTabs = () => `<div class="mtabs">
+          <button class="mtab active" type="button" data-tab="available"><span data-i18n="welcome.browse.tab.available"></span><i class="mcount"></i></button>
+          <button class="mtab" type="button" data-tab="active"><span data-i18n="welcome.browse.tab.active"></span><i class="mcount"></i></button>
+          <button class="mtab" type="button" data-tab="archived"><span data-i18n="welcome.browse.tab.archived"></span><i class="mcount"></i></button>
+          <button class="mtab" type="button" data-tab="corporate"><span data-i18n="welcome.browse.tab.corporate"></span><i class="mcount"></i></button>
+        </div>`;
+
 const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <style>html{background:#02080e}</style>
@@ -442,11 +450,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <form class="mcarry" hidden onsubmit="return false">
           <input id="cnick" type="text" autocomplete="off" maxlength="24">
         </form>
-        <div class="mtabs">
-          <button class="mtab active" type="button" data-tab="available"><span data-i18n="welcome.browse.tab.available"></span><i class="mcount"></i></button>
-          <button class="mtab" type="button" data-tab="active"><span data-i18n="welcome.browse.tab.active"></span><i class="mcount"></i></button>
-          <button class="mtab" type="button" data-tab="archived"><span data-i18n="welcome.browse.tab.archived"></span><i class="mcount"></i></button>
-        </div>
+        ${matchTabs()}
         <div class="mbody">
           <!-- Адрес сервера виден, только когда сервер не ответил (browserFallback.ts, правило 4). -->
           <div id="msrv" class="msrv" style="display:none">
@@ -633,8 +637,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div class="hub-name" id="hub-name">Командир</div>
       <div class="hub-st" data-i18n="hub.status.online"></div>
     </div>
-    <div class="hub-wallet" id="hubwallet"></div>
-    <button class="hub-lang" id="hub-lang" type="button"></button>
+    <div class="hub-wallet-row"><div class="hub-wallet" id="hubwallet"></div>
+    ${entry === 'sector-zero' ? '' : `<button class="hub-news" id="hub-news" type="button" data-i18n-aria="news.open" data-i18n-title="news.open" aria-haspopup="dialog" aria-controls="news-sheet" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h15v15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8h2m0-4v15a2 2 0 0 0 2 2M8 7h9M8 11h3v4H8zM14 11h3m-3 4h3M8 18h9"/></svg><span class="news-dot" aria-hidden="true"></span></button>`}</div>
     <button class="hub-gear" id="hub-gear" type="button" data-i18n-aria="hub.tile.settings"><span class="hg-ic" aria-hidden="true">⚙</span><span class="hg-lbl" data-i18n="hub.tile.settings"></span></button>
     <button class="hub-msg" id="hub-msg" type="button" data-i18n-aria="hub.msgs.aria">✉</button>
   </div>
@@ -653,7 +657,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <button id="ob-start" class="hub-door" type="button"><b data-i18n="hub.onboard.start"></b><span data-i18n="hub.onboard.sub"></span></button>
         <button id="ob-skip" class="ob-later" type="button" data-i18n="hub.onboard.skip"></button>
       </div>
-      <section class="nw-teaser" id="news-teaser" data-i18n-aria="news.title"></section>
       <div class="hub-sec" data-i18n="hub.modes"></div>
       <button id="hub-solo" class="hub-mode" type="button"><b data-i18n="hub.solo"></b><span data-i18n="hub.solo.desc"></span></button>
       <button id="hub-play" class="hub-mode" type="button"><b data-i18n="hub.play"></b><span data-i18n="hub.play.desc"></span></button>
@@ -664,7 +667,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div class="hub-sec" id="hub-mine-sec" data-i18n="hub.mine.section"></div>
       <div class="hm-list" id="hub-mine"></div>
       </div>
-      <aside class="nw-col" id="news-col" data-i18n-aria="news.title"></aside>
       </div>
     </div>
     <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
@@ -704,7 +706,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </div>`}
     </div>
   </div>
-  <div class="hub-note" id="hub-note"></div>
+  <div class="hub-note" id="hub-note" role="status" aria-live="polite"></div>
   <nav class="hub-nav">
     <button class="hub-tab active" data-hub="home" type="button"><span class="hn-ic">⌂</span><span data-i18n="hub.nav.home"></span></button>
     <button class="hub-tab" data-hub="games" type="button"><span class="hn-ic">▶</span><span data-i18n="hub.nav.games"></span></button>

@@ -716,7 +716,8 @@
       }
     ],
     "onlyOn": [],
-    "buildSlots": 1
+    "buildSlots": 1,
+    "internalDamageShare": 0.2
   },
   "tax_office": {
     "name": "Tax Office",
@@ -907,5 +908,342 @@
     "traits": [
       "infected"
     ]
+  },
+  "station_shipyard": {
+    "name": "Fortress Shipyard",
+    "cost": {
+      "metal": 250,
+      "credits": 120
+    },
+    "buildTimeHours": 12,
+    "produces": {},
+    "hp": 25,
+    "shipRepair": 0.05,
+    "enablesShipConstruction": true,
+    "scoreValue": 6,
+    "traits": [],
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 150,
+          "credits": 80
+        },
+        "buildTimeHours": 12,
+        "hp": 30,
+        "shipRepair": 0.1,
+        "enablesShipConstruction": true
+      },
+      {
+        "cost": {
+          "metal": 320,
+          "credits": 180
+        },
+        "buildTimeHours": 18,
+        "hp": 42,
+        "shipRepair": 0.16,
+        "enablesShipConstruction": true
+      }
+    ],
+    "onlyOn": [
+      "station_site"
+    ],
+    "description": "building.station-shipyard.desc"
+  },
+  "station_sensor": {
+    "name": "Fortress Sensor Array",
+    "cost": {
+      "metal": 90,
+      "credits": 40
+    },
+    "buildTimeHours": 3,
+    "hp": 18,
+    "radarRange": 240,
+    "radarLevel": 1,
+    "scoreValue": 2,
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 180,
+          "credits": 80
+        },
+        "buildTimeHours": 5,
+        "upkeep": {
+          "energy": 50
+        },
+        "hp": 28,
+        "radarRange": 330,
+        "radarLevel": 2
+      },
+      {
+        "cost": {
+          "metal": 300,
+          "credits": 140
+        },
+        "buildTimeHours": 7,
+        "upkeep": {
+          "energy": 80
+        },
+        "hp": 38,
+        "radarRange": 420,
+        "radarLevel": 3
+      }
+    ],
+    "upkeep": {
+      "energy": 30
+    },
+    "onlyOn": [
+      "station_site"
+    ],
+    "description": "building.station-sensor.desc"
+  },
+  "station_reactor": {
+    "name": "Fortress Reactor",
+    "cost": {
+      "metal": 110,
+      "credits": 30
+    },
+    "buildTimeHours": 4,
+    "produces": {
+      "energy": 14
+    },
+    "hp": 20,
+    "scoreValue": 4,
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 240,
+          "credits": 100
+        },
+        "buildTimeHours": 6,
+        "produces": {
+          "energy": 26
+        },
+        "upkeep": {
+          "credits": 96
+        },
+        "hp": 28
+      },
+      {
+        "cost": {
+          "metal": 400,
+          "credits": 190
+        },
+        "buildTimeHours": 8,
+        "produces": {
+          "energy": 42
+        },
+        "upkeep": {
+          "credits": 160
+        },
+        "hp": 36
+      }
+    ],
+    "upkeep": {
+      "credits": 48
+    },
+    "onlyOn": [
+      "station_site"
+    ],
+    "description": "building.station-reactor.desc"
+  },
+  "station_fabricator": {
+    "name": "Fortress Fabricator",
+    "cost": {
+      "metal": 180,
+      "credits": 100
+    },
+    "buildTimeHours": 6,
+    "produces": {
+      "microelectronics": 5
+    },
+    "hp": 22,
+    "scoreValue": 6,
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 320,
+          "credits": 200,
+          "microelectronics": 30
+        },
+        "buildTimeHours": 8,
+        "produces": {
+          "microelectronics": 11
+        },
+        "upkeep": {
+          "energy": 275,
+          "food": 70
+        },
+        "hp": 32
+      },
+      {
+        "cost": {
+          "metal": 520,
+          "credits": 340,
+          "microelectronics": 80
+        },
+        "buildTimeHours": 10,
+        "produces": {
+          "microelectronics": 19
+        },
+        "upkeep": {
+          "energy": 450,
+          "food": 110
+        },
+        "hp": 42
+      }
+    ],
+    "upkeep": {
+      "energy": 150,
+      "food": 40
+    },
+    "onlyOn": [
+      "station_site"
+    ],
+    "description": "building.station-fabricator.desc"
+  },
+  "station_hangar": {
+    "name": "Fortress Hangar",
+    "cost": {
+      "metal": 180,
+      "credits": 70
+    },
+    "buildTimeHours": 5,
+    "hp": 25,
+    "produces": {
+      "credits": 5
+    },
+    "shipRepair": 0.05,
+    "shuttleBay": 6,
+    "scoreValue": 4,
+    "onlyOn": [
+      "station_site"
+    ],
+    "description": "building.station-hangar.desc"
+  },
+  "station_medbay": {
+    "name": "Fortress Medical Bay",
+    "cost": {
+      "metal": 120,
+      "credits": 40
+    },
+    "buildTimeHours": 4,
+    "hp": 22,
+    "healRate": 0.15,
+    "scoreValue": 4,
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 160,
+          "credits": 60
+        },
+        "buildTimeHours": 6,
+        "upkeep": {
+          "energy": 20
+        },
+        "hp": 32,
+        "healRate": 0.25
+      },
+      {
+        "cost": {
+          "metal": 220,
+          "credits": 90
+        },
+        "buildTimeHours": 9,
+        "upkeep": {
+          "energy": 35
+        },
+        "hp": 42,
+        "healRate": 0.4
+      }
+    ],
+    "onlyOn": [
+      "station_site"
+    ],
+    "description": "building.station-medbay.desc"
+  },
+  "station_shield": {
+    "name": "Fortress Shield Generator",
+    "cost": {
+      "metal": 170,
+      "microelectronics": 30
+    },
+    "buildTimeHours": 6,
+    "hp": 22,
+    "upkeep": {
+      "energy": 25
+    },
+    "scoreValue": 4,
+    "onlyOn": [
+      "station_site"
+    ],
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 290,
+          "microelectronics": 60
+        },
+        "buildTimeHours": 9,
+        "hp": 34,
+        "upkeep": {
+          "energy": 45
+        }
+      },
+      {
+        "cost": {
+          "metal": 450,
+          "microelectronics": 110
+        },
+        "buildTimeHours": 13,
+        "hp": 48,
+        "upkeep": {
+          "energy": 70
+        }
+      }
+    ],
+    "description": "building.station-shield.desc"
+  },
+  "station_defense": {
+    "name": "Fortress Defense Battery",
+    "cost": {
+      "metal": 140,
+      "credits": 50
+    },
+    "buildTimeHours": 5,
+    "hp": 30,
+    "aaDamage": 12,
+    "scoreValue": 3,
+    "upkeep": {
+      "energy": 30
+    },
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 240,
+          "credits": 110
+        },
+        "buildTimeHours": 8,
+        "hp": 44,
+        "aaDamage": 20,
+        "upkeep": {
+          "energy": 50
+        }
+      },
+      {
+        "cost": {
+          "metal": 380,
+          "credits": 190
+        },
+        "buildTimeHours": 12,
+        "hp": 62,
+        "aaDamage": 30,
+        "upkeep": {
+          "energy": 80
+        }
+      }
+    ],
+    "onlyOn": [
+      "station_site"
+    ],
+    "description": "building.station-defense.desc"
   }
 }

@@ -107,7 +107,7 @@ describe('крепость на развилке — новая точка по�
     const st = built();
     const site = st.planets[SITE];
     expect(site, 'площадки нет').toBeDefined();
-    expect(site).toMatchObject({ kind: 'fork_station', owner: 'p1', position: { x: 60, y: 0 }, links: [], fork: { province: 'B', trail: 0 } });
+    expect(site).toMatchObject({ kind: 'station_site', owner: 'p1', position: { x: 60, y: 0 }, links: [], fork: { province: 'B', trail: 0 } });
     expect(site!.buildings.map((b) => [b.type, b.level])).toEqual([['starfort', 1]]);
     // Провинция не превратилась ни во что: «не превращается — появляется».
     expect(st.planets.B).toMatchObject({ kind: 'planet', owner: 'p1', buildings: [] });
@@ -200,26 +200,30 @@ describe('крепость на развилке — новая точка по�
     const after = kernel.advanceTo(moved.state, ctx(40 * HOUR));
     if (!after.ok) throw new Error('advance отказ');
     expect(after.state.fleets[GUNS], 'восемь крейсеров не выбили одно орудие').toBeUndefined();
-    expect(after.state.planets[SITE]).toMatchObject({ owner: null, buildings: [], kind: 'fork_station' });
+    expect(after.state.planets[SITE]).toMatchObject({ owner: null, buildings: [], kind: 'station_site' });
     expect(after.events.some((e) => e.type === 'station.destroyed')).toBe(true);
     const again = kernel.applyAction(after.state, deploy('B', 0), ctx(40 * HOUR));
     expect(again.ok ? 'ok' : again.code).toBe('ok');
     if (again.ok) expect(again.state.planets[SITE]?.owner).toBe('p1');
   });
 
-  it('на площадке строят радар и щит, а верфь — нет: корабли с неё не ушли бы никуда', () => {
+  it('после сборки площадка принимает собственные радар, щит и верфь', () => {
     const kernel = createKernel([stationModule, constructionModule]);
-    const st = built(kernel);
+    const completed = kernel.advanceTo(built(kernel), ctx(6 * HOUR));
+    if (!completed.ok) throw new Error(completed.code);
+    const st = completed.state;
     const order = (building: string): string => {
       const r = kernel.applyAction(
         st,
         { id: `s:p1:${building}`, type: 'building.construct', playerId: 'p1', payload: { planetId: SITE, building }, issuedAt: 0 },
-        ctx(),
+        ctx(st.time),
       );
       return r.ok ? 'ok' : r.code;
     };
-    expect(order('radar')).toBe('ok');
-    expect(order('void_shield')).toBe('ok');
+    expect(order('station_sensor')).toBe('ok');
+    expect(order('station_shield')).toBe('ok');
+    expect(order('station_shipyard')).toBe('ok');
+    expect(order('radar')).toBe('E_WRONG_SECTOR');
     expect(order('shipyard')).toBe('E_WRONG_SECTOR');
     expect(order('fort')).toBe('E_WRONG_SECTOR');
   });
@@ -257,7 +261,9 @@ describe('крепость на развилке — доводка по рев�
 
   it('бой с орудиями развилки ставит стройку площадки на паузу, как бой на узле', () => {
     const kernel = createKernel([stationModule, constructionModule]);
-    const st = built(kernel);
+    const completed = kernel.advanceTo(built(kernel), ctx(6 * HOUR));
+    if (!completed.ok) throw new Error(completed.code);
+    const st = completed.state;
     const raider = cruisers('R', 'p2', 'A', 1);
     const fighting: GameState = {
       ...st,
@@ -277,8 +283,8 @@ describe('крепость на развилке — доводка по рев�
     };
     const r = kernel.applyAction(
       fighting,
-      { id: 's:p1:radar', type: 'building.construct', playerId: 'p1', payload: { planetId: SITE, building: 'radar' }, issuedAt: 0 },
-      ctx(),
+      { id: 's:p1:radar', type: 'building.construct', playerId: 'p1', payload: { planetId: SITE, building: 'station_sensor' }, issuedAt: 0 },
+      ctx(st.time),
     );
     expect(r.ok ? 'ok' : r.code).toBe('E_BATTLE_HERE');
   });

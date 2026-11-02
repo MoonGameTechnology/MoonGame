@@ -27,6 +27,8 @@ const CLIENT_ACTION_TYPES = [
   'hero.uninstall',
   'pve.boon',
   'station.deploy',
+  'station.repair',
+  'building.repair',
   'building.construct',
   'building.upgrade',
   'unit.build',

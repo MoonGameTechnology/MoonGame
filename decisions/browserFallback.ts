@@ -35,7 +35,7 @@
  */
 
 /** Вкладки страницы матчей. */
-export type BrowserTab = 'available' | 'active' | 'archived';
+export type BrowserTab = import('./corporateMatches').MatchPageTab;
 
 /** Куда зовёт пустое место (правило 1). */
 export type NextStep =
@@ -62,7 +62,8 @@ export type FallbackMessage =
   /** Ответ пришёл, а на вкладке пусто — у каждой вкладки своя причина. */
   | 'browser.empty.available'
   | 'browser.empty.active'
-  | 'browser.empty.archived';
+  | 'browser.empty.archived'
+  | 'browser.empty.corporate';
 
 export interface BrowserState {
   /** Список получен (пусть даже пустой). */
@@ -83,6 +84,7 @@ const EMPTY: Readonly<Record<BrowserTab, Fallback>> = {
   available: { kind: 'empty', message: 'browser.empty.available', next: 'solo' },
   active: { kind: 'empty', message: 'browser.empty.active', next: 'available' },
   archived: { kind: 'empty', message: 'browser.empty.archived', next: null },
+  corporate: { kind: 'empty', message: 'browser.empty.corporate', next: null },
 };
 
 /** Что показать вместо списка (правила 1–3, 6). */

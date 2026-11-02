@@ -201,7 +201,7 @@ describe.each(FFA_MAPS)(
       const kinds = Object.keys(data.sectorKinds)
         // Fortresses (`void_station`, `fork_station`) are only raised by a player, see
         // data/seededFortress.test.ts; `empty` stays off combat maps.
-        .filter((k) => k !== 'fork_station' && k !== 'void_station' && k !== 'empty')
+        .filter((k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station' && k !== 'empty')
         .sort();
       expect(has((s) => s.kind)).toEqual(kinds);
       expect(has((s) => s.terrain)).toEqual(Object.keys(data.sectors).sort());

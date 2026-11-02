@@ -77,6 +77,8 @@ async function load(over: Partial<SettingsViewHost> = {}, sectorZeroOnly = false
     },
   }));
   vi.doMock('./graphicsPrefs', () => ({
+    frameRateMode: () => '90',
+    setFrameRate: log('frameRate'),
     glowOn: () => true,
     mapSharpOn: () => true,
     motionOn: () => true,
@@ -103,7 +105,7 @@ async function load(over: Partial<SettingsViewHost> = {}, sectorZeroOnly = false
     canvasCompatibilitySupported: () => true,
     setCanvasCompatibility: log('compat'),
   }));
-  vi.doMock('./hubScreen', () => ({ hubAuthorizedBase: () => null }));
+  vi.doMock('./hubScreen', () => ({ hubAuthorizedBase: () => null, news: null }));
   vi.doMock('./mapCamera', () => ({ cam: { scale: 1.5 } }));
   vi.doMock('./mapLayer', () => ({
     backgroundContextEvents: { lost: 0 },
@@ -217,6 +219,8 @@ describe('REFM-248 · изменения уходят хозяевам', () => {
     h.setRateUnit!('day');
     h.setPhoneBar!(['map'] as unknown as Parameters<NonNullable<SettingsHost['setPhoneBar']>>[0]);
     h.setOwnPings(false);
+    expect(h.view().frameRate).toBe('90');
+    h.setFrameRate('120');
     h.resetColors();
     expect(env.calls).toEqual([
       'mapSharp:false',
@@ -224,6 +228,7 @@ describe('REFM-248 · изменения уходят хозяевам', () => {
       'rateUnit:day',
       'phoneBar:map',
       'ownPings:false',
+      'frameRate:120',
       expect.stringMatching(/^colors:.*,classic$/),
     ]);
   });

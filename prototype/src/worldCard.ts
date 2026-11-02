@@ -26,6 +26,7 @@ import {
   capitalOf,
   orderLane,
   forkSiteId,
+  stationSiteId,
   hasShipyard,
   isForkSite,
   isInhabited,
@@ -50,11 +51,13 @@ import { showsBlackout, showsStarving } from './arrearsWarnings';
 import type { BuildLane } from './buildQueue';
 import { shownProductionLanes } from '../../decisions/productionLanes';
 import type { UnitCatalogTab } from './buildScreen';
-import { bombardFall } from './bombardClock';
+import { bombardVolleyIn } from './bombardClock';
 import { builtTileHtml } from './catalogTile';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { buildingName, cost, countdownHMS, displayUnit, esc, fmtEta, resLine } from './format';
 import { data } from './gameData';
+import { canOrder } from './game';
+import { fortressStatusHtml, fortressServicesHtml } from './fortressView';
 import { pcUi } from './graphicsPrefs';
 import {
   dockedCarrier,
@@ -489,10 +492,10 @@ function worldFactHtml(f: WorldFact): string {
     case 'blackout':
       return `<span class="pfact bad">⚡ ${t('side.world.blackout')}</span>`;
     case 'bombard': {
-      // Знак и время на фишке, имя постройки — в подсказке: шапка узкая, а на телефоне
-      // фишка делит строку с действиями мира.
+      // Знак и время на фишке, слова — в подсказке: шапка узкая, а на телефоне фишка
+      // делит строку с действиями мира.
       const left = countdownHMS(f.leftMs);
-      const tip = esc(t('side.world.bombard-fall', { b: buildingName(data.buildings[f.building]?.name, f.building), t: left }));
+      const tip = esc(t('side.world.bombard-next', { t: left }));
       return `<span class="pfact bad" title="${tip}" aria-label="${tip}">⊗ ${left}</span>`;
     }
     case 'type': {
@@ -690,6 +693,24 @@ export function planetPanelHtml(p: Planet): string {
   const ME = game.me();
   const NAME = game.names();
   const mine = p.owner === ME;
+  if (p.fortress) {
+    let station = cardHeader(ownerColor(p.owner), placeName(p.id), t('fleet.kind.fortress')) +
+      fortressStatusHtml(s, p, ME, (order) => canOrder(s, order));
+    station += `<div class="sec">${t('side.tab.buildings')}</div><div class="blist">` +
+      p.buildings.filter((b) => b.type !== 'starfort').map((b) => builtTileHtml({ type: b.type, level: b.level,
+        icon: BUILD_ICON[b.type] ?? '▪', name: buildingName(data.buildings[b.type]?.name, b.type),
+        income: incomeOf(b.type, b.level),
+      })).join('') + '</div>';
+    if (mine) {
+      station += `<button class="bw-open btn-main" data-act="openbuild">▣ ${t('side.build.open')}</button>` +
+        conveyorHtml(p.id, 'buildings');
+      station += fortressServicesHtml(s, p, ME, { hasShipyard: hasShipyard(p, data),
+        production: (tab) => unitCatalogButton(tab) + laneConveyors(p.id, [tab === 'shuttle' ? 'shuttles' : 'ships']),
+        hangar: (port) => hangarSectionHtml(port, p.id, true),
+      });
+    }
+    return station;
+  }
   const sec = tData(data.sectors[p.terrain ?? '']?.name ?? p.terrain ?? '—');
   const pt = p.planetType ? data.planetTypes[p.planetType] : undefined;
   const ptName = tData(pt?.name ?? p.planetType ?? '—');
@@ -732,8 +753,8 @@ export function planetPanelHtml(p: Planet): string {
     capital: capitalOf(s, ME) === p.id,
     // ECON-2: блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
     blackout: showsBlackout(mine, s.players[ME]?.arrears),
-    // Таймер обстрела: когда рухнет следующая постройка (`decisions/bombardTimer.ts`).
-    bombard: bombardFall(s, p.id, ME),
+    // Таймер обстрела: через сколько следующий залп (`decisions/bombardTimer.ts`).
+    bombardIn: bombardVolleyIn(s, p.id, ME),
     bonuses: sm.bonuses,
     mitigation: sm.mitigation,
     baseOutput: sm.baseOutput,
@@ -897,6 +918,8 @@ export function planetPanelHtml(p: Planet): string {
       s.players[ME]?.technologies?.completed ?? [],
       s,
     );
+    const attached = s.planets[stationSiteId(p.id)];
+    if (attached?.fortress) blds += `<button class="bw-open btn-second" data-act="openstation" data-arg="${esc(attached.id)}">◈ ${t('fortress.open')}</button>`;
     if (fortress.show) {
       const off = fortress.enabled ? '' : ' disabled';
       // Цена — фишками `resLine` (это РАЗМЕТКА со значками). Экранировать её нельзя: игрок

@@ -28,9 +28,9 @@ const rich = (s: GameState): GameState => ({
 });
 
 describe('ПКО: технология есть в каталоге и запирает именно батарею', () => {
-  it('узел объявлен и открывает ровно orbital_aa', () => {
+  it('узел объявлен и открывает планетарную батарею и батарею крепости', () => {
     expect(data.technologies[TECH]).toBeDefined();
-    expect(data.technologies[TECH]?.unlocks.buildings).toEqual([AA]);
+    expect(data.technologies[TECH]?.unlocks.buildings).toEqual([AA, 'station_defense']);
   });
 
   it('он ЯРУС 1 без предпосылок: оборону надо оплатить и подождать, а не заслужить цепочкой', () => {

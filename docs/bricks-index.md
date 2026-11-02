@@ -47,8 +47,8 @@
 | REFM-249 | ✅ | proto | `docs/backlog.md` | Окна забега: торговец, союзник, подсказка пиратов, комиксы |
 | SLIM-1 | ✅ | proto srv core | `docs/backlog.md` | Сторож размеров. |
 | SLIM-2 | ✅ | proto | `docs/backlog.md` | CSS из build.mjs в файлы. |
-| SLIM-3 | ⏳ | proto | `docs/backlog.md` | Мозг ботов по фазам. |
-| SLIM-4 | ⏳ | core srv proto | `docs/backlog.md` | Один список модулей ядра. |
+| SLIM-3 | ✅ | proto | `docs/backlog.md` | Мозг ботов по фазам. |
+| SLIM-4 | ✅ | core srv proto | `docs/backlog.md` | Один список модулей ядра. |
 | SLIM-5 | ⏳ | srv | `docs/backlog.md` | Хранилища сервера по доменам. |
 | SLIM-6 | ⏳ | proto core | `docs/backlog.md` | Длинные функции — по месту. |
 | SLIM-7 | ⏳ | proto core docs | `docs/backlog.md` | Мелкая уборка. |
@@ -1495,6 +1495,7 @@
 | SM-3.7b | ✅ | core data proto | `docs/ship-modules-roadmap.md` | Ракета — отряд без приказов, полёт по прямой, обычный туман |
 | SM-3.7c | ✅ | core | `docs/ship-modules-roadmap.md` | Челноки бьют ракету |
 | SM-3.7d | ✅ | core | `docs/ship-modules-roadmap.md` | Чем и когда челноки сбивают ракету |
+| SM-4.1 | ✅ | data | `docs/ship-modules-roadmap.md` | Боевые и защитные модули вдвое, эффекты флота — флагману героя |
 | SHU-0.1 | ✅ | core data proto | `docs/shuttles-roadmap.md` | Переименование: эскадрильи → челноки |
 | SHU-1.1 | ✅ | core data | `docs/shuttles-roadmap.md` | Ангар космопорта |
 | SHU-1.2 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар и возврат |

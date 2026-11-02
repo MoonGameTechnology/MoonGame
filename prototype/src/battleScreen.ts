@@ -361,6 +361,7 @@ export function battleWindowHtml(
               owner: s.owner,
               ...(s.ref?.kind === 'fleet' ? { key: s.ref.fleetId } : {}),
               ...(s.kind === 'garrison' ? { holds: true } : {}),
+              ...(s.fortress ? { fortress: s.fortress } : {}),
             })),
           ),
         )) +

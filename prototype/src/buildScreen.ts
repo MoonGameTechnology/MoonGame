@@ -45,6 +45,7 @@ import {
 import { canBuildHere } from '../../decisions/buildGate';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
 import { worldName } from './planetName';
+import { buildingRepairHtml } from './fortressView';
 
 type BuildingDef = (typeof data.buildings)[string];
 
@@ -249,7 +250,7 @@ export function buildScreenHtml(
   const head =
     `<div class="bw-top"><div class="bw-world"><b>${esc(worldName(state, p.id))}</b>` +
     (sub.length ? `<span>${sub.join(' · ')}</span>` : '') +
-    `</div><span class="bw-cnt">⛭ ${t('build.head.built', { n: p.buildings.length })}</span></div>`;
+    `</div><span class="bw-cnt">⛭ ${t('build.head.built', { n: p.buildings.filter((b) => !p.fortress || b.type !== 'starfort').length })}</span></div>`;
 
   const groups = new Map<BuildCategory, string[]>();
   for (const id of Object.keys(data.buildings)) {
@@ -262,7 +263,7 @@ export function buildScreenHtml(
     // читалась частью имени, и владелец не увидел, что у построенного есть уровни
     // (сообщение 2026-10-03). У нестоящего уровня нет — строится первый.
     const name =
-      esc(buildingName(def.name, id)) +
+      esc(p.fortress && id === 'starfort' ? t('fortress.core') : buildingName(def.name, id)) +
       (st.st === 'built' && maxLvl > 1
         ? ` <i class="bw-lv">${t('build.level.now', { n: st.level, max: maxLvl })}</i>`
         : '');
@@ -277,7 +278,8 @@ export function buildScreenHtml(
                 st.affordable ? t('build.action.build') : t('build.action.no-res')
               }</button>`;
     // Эффект СВОЕГО уровня: построенное показывает, что даёт СЕЙЧАС, остальное — L1.
-    const fx = buildFx(def, shownLvl) || (dossierBody ? dossierBody(id, shownLvl) : '');
+    const fx = p.fortress && id === 'starfort' ? t('fortress.core-effect', { n: buildingLevel(def, shownLvl).buildSlots })
+      : buildFx(def, shownLvl) || (dossierBody ? dossierBody(id, shownLvl) : '');
     // Цена и срок: для построенного — цена СЛЕДУЮЩЕГО уровня (то, что можно купить),
     // для остального — вход первого уровня. Достроенному до упора платить нечего.
     const nextLvl = st.st === 'built' ? st.level + 1 : 1;
@@ -296,10 +298,11 @@ export function buildScreenHtml(
             ? 'built'
             : st.up.up;
     const row =
-      `<div class="bw-item st-${look}" data-bw="${id}">` +
+      `<div class="bw-item st-${look}"${p.fortress && id === 'starfort' ? '' : ` data-bw="${id}"`}>` +
       `<div class="bw-ih"><span class="bw-ic">${BUILD_ICON[id] ?? '▣'}</span><b>${name}</b>${right}</div>` +
       (fx ? `<div class="bw-fx">${fx}</div>` : '') +
       foot +
+      p.buildings.filter((b) => b.type === id).map((b) => buildingRepairHtml(state, me, planetId, b, probe)).join('') +
       `</div>`;
     const cat = buildCategory(def);
     groups.set(cat, [...(groups.get(cat) ?? []), row]);
@@ -441,6 +444,7 @@ export interface BuildHost {
   build(planetId: string, id: string): void;
   /** Улучшение стоящего здания тем же хостовым путём, что и «Улучшить» в его карточке. */
   upgrade(planetId: string, id: string): void;
+  repair(planetId: string, id: string, uid?: string): void;
   unitIds(tab: UnitCatalogTab): string[];
   /** `troop` — боец десантного челнока (SHU-5.2); у остальных юнитов его нет. */
   buildUnit(planetId: string, id: string, troop?: string): void;
@@ -524,6 +528,12 @@ export function initBuildScreen(host: BuildHost): {
     }
     // Кнопка «Строить» лежит ВНУТРИ кликабельной строки — спрашиваем по самому
     // приказу (data-bw-go) и выходим рано, иначе тап дал бы и заказ, и карточку.
+    const repair = tg.closest<HTMLElement>('[data-bw-repair]');
+    if (repair?.dataset.bwRepair && planetId) {
+      host.repair(planetId, repair.dataset.bwRepair, repair.dataset.uid || undefined);
+      repaint();
+      return;
+    }
     const go = (tg.closest('[data-bw-go]') as HTMLElement | null)?.dataset.bwGo;
     if (go && planetId) {
       host.build(planetId, go);

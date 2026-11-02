@@ -337,7 +337,7 @@ describe('REFM-231 — стык с main.ts', () => {
       'me: () => ME,',
       'net: () => NET,',
       'contacts: () => netSignatures,',
-      "sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),",
+      "sight: () => perWorld('sight', () => viewSightCircles(s, ME, data, worldPlanets())),",
       'planets: worldPlanets,',
     ]) {
       expect(init, hook).toContain(hook);

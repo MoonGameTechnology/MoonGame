@@ -1,6 +1,8 @@
 import { seedRng, type RngState } from '../rng/rng';
 import type { FleetChain } from './chain';
 import type { Coalition, CoalitionClock } from './coalition';
+import type { SightRules } from './sensorView';
+export type { SightRules } from './sensorView';
 
 /**
  * The authoritative game state. Stored as JSONB on the server
@@ -30,6 +32,9 @@ export type ResourceBag = Record<ResourceId, number>;
 export interface UnitStack {
   unit: UnitId;
   count: number;
+  /** Effective built hull levels of a fortress body. Fractional while assembling;
+   *  absent on ordinary units. Damage remains a separate, persistent HP pool. */
+  stationScale?: number;
   /** Remaining HP pool of this stack during a battle (≤ count × def.hp).
    *  Undefined outside combat = full health. */
   hp?: number;
@@ -105,6 +110,24 @@ export interface BuildingInstance {
   type: BuildingId;
   level: number;
   hp: number;
+  repair?: RepairWork;
+}
+
+/** A prepaid repair restores only this HP budget, never subsequent combat damage. */
+export interface RepairWork {
+  owner: PlayerId;
+  remainingHp: number;
+  hpPerHour: number;
+  doneAt: number;
+}
+
+/** A fortress owns a separate construction site, not the province underneath it. */
+export interface FortressState {
+  level: number;
+  modules?: string[];
+  assembly?: { from: number; to: number; startedAt: number; doneAt: number; paused?: boolean };
+  repair?: RepairWork;
+  damageCursor?: number;
 }
 
 /** A construction/upgrade/unit order cancelled mid-build: the paid-in-full order was
@@ -579,6 +602,9 @@ export interface Planet {
    *  крепость: у него нет ни лейнов, ни клетки на карте, его не захватывают и не
    *  считают территорией (`state/forkSite.ts`). Отсутствует у всех обычных узлов. */
   fork?: ForkAnchor;
+  /** A fortress's private construction site anchored at an existing province. */
+  stationHost?: PlanetId;
+  fortress?: FortressState;
   /** Relative size / weight of the sector (default 1). Drives how much territory
    *  it claims: a sector's border with a neighbour sits proportionally to their
    *  sizes, so resizing one shifts its neighbours' borders evenly. Undefined = 1. */
@@ -768,6 +794,8 @@ export interface LoadingClaim {
   startAt: number;
   /** World-time (ms) the lift finishes. */
   doneAt: number;
+  /** Кого грузить первыми (выбор игрока); нет — порядок гарнизона (`army.ts`). */
+  first?: 'wounded' | 'healthy';
 }
 
 /** Выгрузка десанта на свой или союзный мир (решение владельца 2026-09-26: «на союзном или
@@ -852,9 +880,9 @@ export interface Fleet {
    *  land and is exposed to the planet's orbital AA — no separate "far" safe standoff.
    *  (The value stays `'near'` for back-compat; the old near/far split was collapsed.) */
   orbit?: 'near';
-  /** Whether the fleet is actively bombarding the planet below (in orbit over a
-   *  hostile world). Damages structures and freezes the owner's production. */
+  /** Shelling the hostile world below: its production frozen, a volley at `bombardNextAt` hourly. */
   bombarding?: boolean;
+  bombardNextAt?: number;
   traits: TraitId[];
   /** Id of the battle this fleet is engaged in; absent/null when free to move. */
   battleId?: BattleId | null;
@@ -1008,6 +1036,8 @@ export interface GameVersion {
 }
 
 export interface GameState {
+  /** Resolved sensors for this viewer, written only by the network projection. */
+  sensorView?: import('./sensorView').SensorView;
   /** Stationary rocket mines and their one-shot missiles; filtered before networking. */
   ordnance?: import('./ordnance').OrdnanceState;
   /** Authored map identity, persisted and public; absent on legacy saves. */
@@ -1820,27 +1850,6 @@ export interface ProvinceSurvey {
   planetType?: string;
   /** Simulation time (ms) of the last crossing. */
   at: number;
-}
-
-/**
- * Зрение — ТОЛЬКО КРУГИ (решение владельца 2026-09-24). Каждый свой мир и флот видит
- * вокруг себя круг полного обзора; радары (постройки, корабли, модули) расширяют его
- * вторым, внешним кругом засечки. Связи между мирами на зрение не влияют: раньше свой
- * мир раскрывал соседей ПО ЛИНИЯМ на любом расстоянии, и игрок видел мир в 781 единице,
- * но не видел мир в 521 без линии. Расстояния — в единицах карты.
- */
-export interface SightRules {
-  /** Радиус полного обзора вокруг каждого своего мира — у вида провинции без своего числа в
-   *  `byKind`. */
-  world: number;
-  /** Свой радиус обзора по виду провинции (`Planet.kind`) вместо `world`. Решение владельца
-   *  2026-09-25 для забега: вокруг себя видят только колонии и космические крепости, по 100;
-   *  захваченное поле, туманность или мёртвый мир — только себя, дальше — радар. */
-  byKind?: Record<string, number>;
-  /** Радиус полного обзора вокруг каждого своего флота — в его фактическом месте. */
-  fleet: number;
-  /** Множитель дальности всех радаров, мировых и корабельных: карты Sector Zero крупнее. */
-  radarScale: number;
 }
 
 /** Множители цен партии (`MatchMap.pricing`, `util/pricing.ts`). */

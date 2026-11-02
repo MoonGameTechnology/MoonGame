@@ -37,6 +37,7 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Fleet, GameState, PlanetId, PlayerId } from '../state/gameState';
 import type { FleetCourse } from './movement';
+import type { BattleStandUp } from '../util/standUp';
 import { defHasTrait } from '../data/traits';
 import { rallyPointOf } from '../state/rallyPoint';
 import { nextFleetSeq } from '../util/fleet';
@@ -78,7 +79,8 @@ function dropRallyPointsOf(state: GameState, planetId: PlanetId, keepOwner: Play
 
 export const autoRallyModule: GameModule = {
   id: 'auto-rally',
-  version: '1.1.0', // RALLY-1: точка сбора (`rally.point`)
+  // 1.1.0 RALLY-1: точка сбора (`rally.point`); 1.2.0: поднятый на орбиту корабль сходится с врагом.
+  version: '1.2.0',
   setup(api) {
     // RALLY-1: поставить (`to` — свой другой мир) или снять (`to: null`) точку сбора.
     api.onAction('rally.point', (action, h) => {
@@ -178,6 +180,8 @@ export const autoRallyModule: GameModule = {
       // которая ставится ИМЕННО при постройке, дыра стала видимой: корабль терял её в ту
       // же секунду, как авто-сбор поднимал его во флот.
       addUnits(rally.units, p.unit, take, mods, stack.moduleStars, stack.moduleRarity, stack);
+      // Корабль поднялся на орбиту, где стоит враг, — бой, как у прибывшего (баг 2026-11-02).
+      h.capability<BattleStandUp>('battle.standUp')?.(rally.id, planet.id, h);
     });
   },
 };

@@ -31,7 +31,7 @@ describe('карточка корабля — разметка (заказ вл�
     expect(html).toContain('🎯');
     expect(html).toContain('★★');
     expect(html).toContain(t('rarity.legendary'));
-    expect(html).toContain(`+15 ${t('loadout.stat.shield')}`);
+    expect(html).toContain(`+7.5 ${t('loadout.stat.shield')}`);
     expect(html).toContain('name:cruiser <span class="sc-n">×2</span>');
     // Игроку — имена, а не id модулей.
     expect(html).not.toMatch(/>targeting_array</);

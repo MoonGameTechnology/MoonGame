@@ -1,4 +1,5 @@
 import type { Battle, BattleSide, Fleet, GameState, PlanetId } from './gameState';
+import { forkSiteInBattle } from './forkSite';
 
 /**
  * MSB-1 — ОДИН доступ к сторонам боя на все поверхности.
@@ -99,6 +100,7 @@ export function landingBattleOf(
  * каждый узел.
  */
 export function battleAt(state: GameState, planetId: PlanetId): boolean {
+  if (state.planets[planetId]?.fortress && forkSiteInBattle(state, state.planets[planetId])) return true;
   for (const b of Object.values(state.battles)) {
     if (b.location === planetId) return true;
   }
@@ -109,5 +111,10 @@ export function battleAt(state: GameState, planetId: PlanetId): boolean {
 export function battleLocations(state: GameState): Set<PlanetId> {
   const set = new Set<PlanetId>();
   for (const b of Object.values(state.battles)) set.add(b.location);
+  if (set.size > 0) {
+    for (const site of Object.values(state.planets)) {
+      if (site.fortress && forkSiteInBattle(state, site)) set.add(site.id);
+    }
+  }
   return set;
 }

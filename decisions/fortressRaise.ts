@@ -21,6 +21,7 @@ import {
   STATION_CORE,
   STATION_COST,
   technologiesUnlocking,
+  stationSiteId,
 } from '../packages/shared-core/src/index';
 import { matchCost } from '../packages/shared-core/src/index';
 import type { GameData, GameState, Planet, ResourceBag } from '../packages/shared-core/src/index';
@@ -59,17 +60,19 @@ export interface FortressRaise {
  * была бы мусором в панели.
  */
 export function fortressRaise(
-  node: Pick<Planet, 'kind' | 'owner'>,
+  node: Pick<Planet, 'kind' | 'owner'> & Partial<Pick<Planet, 'id'>>,
   viewerId: string,
   treasury: ResourceBag,
   data: GameData,
   completed: readonly string[] = [],
-  match: Pick<GameState, 'pricing'> = {},
+  match: Pick<GameState, 'pricing'> & Partial<Pick<GameState, 'planets'>> = {},
 ): FortressRaise {
   const locks = technologiesUnlocking(data, 'building', STATION_CORE);
   const cost = matchCost(match, STATION_COST);
   if (node.owner !== viewerId) return notHere('not-owned', locks, cost);
   if (!isStationable(data, node)) return notHere('kind', locks, cost);
+  const occupied = node.id ? match.planets?.[stationSiteId(node.id)] : undefined;
+  if (occupied?.owner != null) return notHere('kind', locks, cost);
   return placeable(locks, treasury, completed, cost);
 }
 

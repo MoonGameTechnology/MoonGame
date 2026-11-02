@@ -24,7 +24,7 @@
  */
 
 /** Вкладки страницы. */
-export type MatchesTab = 'available' | 'active' | 'archived';
+export type MatchesTab = import('./corporateMatches').MatchPageTab;
 
 /**
  * Числа на ярлыках вкладок (правило 1). `lists` — лента сервера, `null` — её нет;
@@ -35,11 +35,12 @@ export function tabCounts(
   lists: Partial<Record<MatchesTab, readonly unknown[]>> | null,
   availableShown: number,
 ): Record<MatchesTab, number | null> {
-  if (!lists) return { available: null, active: null, archived: null };
+  if (!lists) return { available: null, active: null, archived: null, corporate: null };
   return {
     available: availableShown,
     active: lists.active?.length ?? 0,
     archived: lists.archived?.length ?? 0,
+    corporate: lists.corporate?.length ?? 0,
   };
 }
 

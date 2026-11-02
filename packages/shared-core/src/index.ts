@@ -59,6 +59,8 @@ export {
   type SeenPatrol,
   type UnitStack,
   type BuildingInstance,
+  type FortressState,
+  type RepairWork,
   type PausedConstructionSite,
   type QueuedConstruction,
   type ActiveResearch,
@@ -145,6 +147,12 @@ export {
   type TrunkSpan,
 } from './state/roads';
 export { forkPoint, forkSiteEdge, forkSiteId, forkSiteInBattle, isForkSite } from './state/forkSite';
+export {
+  FORTRESS_CORE, FORTRESS_BODY, FORTRESS_DEPLOY_COST, FORTRESS_FLEET_PREFIX,
+  stationSiteId, fortressFleetId, fortressSiteOf, stationBerth, fleetAtStation,
+  serviceSitesForFleet, repairQuote, buildingRepairQuote, fortressRepairQuote,
+  fortressLoadoutHull, issuedFortressModule, refreshFortressBody, type RepairQuote,
+} from './state/fortress';
 export {
   sectorKindDef,
   provinceScore,
@@ -239,6 +247,7 @@ export {
 // FOG-LEAK: чей мир в глазах игрока — право прохода и окно войны судят по нему.
 export { knownOwner } from './state/knownOwner';
 export { signatureSize, fleetSignalStrength, radarThreshold, SIG_MEDIUM, SIG_LARGE, SIGNAL_CLUSTER_RADIUS } from './state/radarSignals';
+export { viewSightCircles, sharedRadarSources, type SensorView, type RadarFootprint } from './state/sensorView';
 export type {
   Coverage,
   Engagement,
@@ -539,8 +548,6 @@ export {
   MITIGATION_CAP,
   TIER_ORDER,
   mitigationFromPool,
-  damageHookQueries,
-  damageFromTraces,
   type Tier,
 } from './util/combat';
 export {
@@ -612,7 +619,7 @@ export {
 export { economyModule, BROWNOUT } from './modules/economy';
 export { movementModule } from './modules/movement';
 export { combatModule } from './modules/combat';
-export { orbitalModule, BOMBARD_FRACTION, fleetBombardPower } from './modules/orbital';
+export { orbitalModule, BOMBARD_FRACTION } from './modules/orbital';
 export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
@@ -705,7 +712,7 @@ export {
 } from './modules/sprawl';
 export { veteranModule } from './modules/veteran';
 export { promotionModule } from './modules/promotion';
-export { armyModule } from './modules/army';
+export { armyModule, type LoadFirst } from './modules/army';
 export { fleetOpsModule } from './modules/fleetOps';
 export { autoRallyModule } from './modules/autoRally';
 export { rallyPointOf } from './state/rallyPoint';
@@ -815,6 +822,23 @@ export {
   turnedAgents,
 } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
+export { botDiplomacyModule } from './modules/botDiplomacy';
+export {
+  botFavour,
+  botEmbargoes,
+  FAVOUR_BASE,
+  FAVOUR_EMBARGO,
+  FAVOUR_WAR,
+  FAVOUR_PEACE_ACCEPT,
+  FAVOUR_PACT_ACCEPT,
+  FAVOUR_WAR_DECLARED_HIT,
+  FAVOUR_SPY_CAUGHT_HIT,
+  FAVOUR_WAR_DECAY_PER_DAY,
+  FAVOUR_HEAL_PER_DAY,
+  type ApprovalLedger,
+} from './state/botFavour';
+export { hungerModule, HUNGER_MULT } from './modules/hunger';
+export { GAME_MODULES } from './gameModules';
 
 export type { SwarmRepelRecord, MissionFacts } from './state/gameState';
 export { swarmNetPlan, RELAY_POST_TRAIT, type SwarmNetPlan } from './util/swarmNetTactics';

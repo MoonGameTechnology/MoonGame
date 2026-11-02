@@ -39,7 +39,8 @@
     "researchTimeHours": 5,
     "unlocks": {
       "buildings": [
-        "orbital_aa"
+        "orbital_aa",
+        "station_defense"
       ]
     }
   },
@@ -407,7 +408,8 @@
     ],
     "unlocks": {
       "buildings": [
-        "void_hangar"
+        "void_hangar",
+        "station_hangar"
       ]
     }
   },
@@ -427,7 +429,8 @@
     ],
     "unlocks": {
       "buildings": [
-        "void_shield"
+        "void_shield",
+        "station_shield"
       ]
     }
   },
@@ -764,7 +767,8 @@
     ],
     "unlocks": {
       "buildings": [
-        "hospital"
+        "hospital",
+        "station_medbay"
       ]
     }
   },

@@ -212,15 +212,77 @@ export const WOUNDED_TRANSPORT_SOLO_MIGRATION = {
   toDataHash: PRODUCTION_LANES_SOLO_MIGRATION.toDataHash,
 } as const;
 
-/** Optional mobilization state and additive main-only research. Existing ships,
- *  accepted orders and campaign deployments survive; future main deployments use the timer. */
-export const HERO_MOBILIZATION_SOLO_MIGRATION = {
+/** Rules-only pair: combat 3.11.0 and auto-rally 1.2.0 send a fleet that stands up at a
+ *  world without arriving (a ship off the yard, a launched garrison, a split, a hero) into
+ *  battle with the enemy already there. A saved world keeps its shape, so it reads as is. */
+export const STAND_UP_SOLO_MIGRATION = {
   fromRules: WOUNDED_TRANSPORT_SOLO_MIGRATION.toRules,
   fromData: WOUNDED_TRANSPORT_SOLO_MIGRATION.toData,
   fromDataHash: WOUNDED_TRANSPORT_SOLO_MIGRATION.toDataHash,
-  toRules: '1dc44ebfecd071',
+  toRules: '001c2831afafba',
+  toData: WOUNDED_TRANSPORT_SOLO_MIGRATION.toData,
+  toDataHash: WOUNDED_TRANSPORT_SOLO_MIGRATION.toDataHash,
+} as const;
+
+/** Rules-only pair: orbital 1.6.0 lands bombardment as one volley per game hour on the
+ *  fleet's own clock (`bombardNextAt`). A saved bombarding fleet has no clock yet and
+ *  starts one at its first world step, so the world reads as is. */
+export const BOMBARD_VOLLEY_SOLO_MIGRATION = {
+  fromRules: STAND_UP_SOLO_MIGRATION.toRules,
+  fromData: STAND_UP_SOLO_MIGRATION.toData,
+  fromDataHash: STAND_UP_SOLO_MIGRATION.toDataHash,
+  toRules: '062f4475b44061',
+  toData: STAND_UP_SOLO_MIGRATION.toData,
+  toDataHash: STAND_UP_SOLO_MIGRATION.toDataHash,
+} as const;
+
+/** Lighter ship modules: catalogue 0.1.72 halves the combat and defence numbers of nine
+ *  modules (their base and every rarity line) and the side rarity lines of the radar, cargo,
+ *  siege and mine modules; tractor beam, debris collector and repair tender fit only a hero's
+ *  flagship. Stats and fitting rules only, so a saved world reads as is: a ship already built
+ *  keeps its modules and simply reads the new numbers. */
+export const HALF_MODULES_SOLO_MIGRATION = {
+  fromRules: BOMBARD_VOLLEY_SOLO_MIGRATION.toRules,
+  fromData: BOMBARD_VOLLEY_SOLO_MIGRATION.toData,
+  fromDataHash: BOMBARD_VOLLEY_SOLO_MIGRATION.toDataHash,
+  toRules: '0eb5ffa544097a',
   toData: '0.1.72',
-  toDataHash: '00cf3949fffff5',
+  toDataHash: '17cb1050daa7a3',
+} as const;
+
+/** Separate player-built fortresses and manual repairs. Existing sites and paid
+ *  work retain their legacy shape; new deployments use station_site. The old
+ *  catalogue definitions remain, so migration only advances the audited pins. */
+export const FORTRESS_MODEL_SOLO_MIGRATION = {
+  fromRules: HALF_MODULES_SOLO_MIGRATION.toRules,
+  fromData: HALF_MODULES_SOLO_MIGRATION.toData,
+  fromDataHash: HALF_MODULES_SOLO_MIGRATION.toDataHash,
+  toRules: '016783459c4258',
+  toData: '0.1.73',
+  toDataHash: '0b767cf7a4b647',
+} as const;
+
+/** Rules-only pair: army 1.3.0 lets a lift order say whether wounded or whole stacks board
+ *  first (an optional `first` on the claim). A saved claim without it boards in garrison
+ *  order as before, so a saved world reads as is. */
+export const LOAD_FIRST_SOLO_MIGRATION = {
+  fromRules: FORTRESS_MODEL_SOLO_MIGRATION.toRules,
+  fromData: FORTRESS_MODEL_SOLO_MIGRATION.toData,
+  fromDataHash: FORTRESS_MODEL_SOLO_MIGRATION.toDataHash,
+  toRules: '1ce24e9a208610',
+  toData: FORTRESS_MODEL_SOLO_MIGRATION.toData,
+  toDataHash: FORTRESS_MODEL_SOLO_MIGRATION.toDataHash,
+} as const;
+
+/** Optional mobilization state and additive main-only research. Existing ships,
+ *  accepted orders and campaign deployments survive; future main deployments use the timer. */
+export const HERO_MOBILIZATION_SOLO_MIGRATION = {
+  fromRules: LOAD_FIRST_SOLO_MIGRATION.toRules,
+  fromData: LOAD_FIRST_SOLO_MIGRATION.toData,
+  fromDataHash: LOAD_FIRST_SOLO_MIGRATION.toDataHash,
+  toRules: '0876d80977cf6d',
+  toData: '0.1.74',
+  toDataHash: '023cd15f09ee90',
 } as const;
 
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
@@ -243,6 +305,11 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   HOSPITAL_WOUNDS_SOLO_MIGRATION,
   PRODUCTION_LANES_SOLO_MIGRATION,
   WOUNDED_TRANSPORT_SOLO_MIGRATION,
+  STAND_UP_SOLO_MIGRATION,
+  BOMBARD_VOLLEY_SOLO_MIGRATION,
+  HALF_MODULES_SOLO_MIGRATION,
+  FORTRESS_MODEL_SOLO_MIGRATION,
+  LOAD_FIRST_SOLO_MIGRATION,
   HERO_MOBILIZATION_SOLO_MIGRATION,
 ];
 

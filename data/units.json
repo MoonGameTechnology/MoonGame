@@ -539,7 +539,7 @@
     "hullClass": "heavy"
   },
   "fortress_guns": {
-    "name": "Fortress Guns",
+    "name": "Space Fortress",
     "faction": "neutral",
     "domain": "space",
     "stats": {
@@ -559,9 +559,9 @@
       "issued"
     ],
     "slots": {
-      "weapon": 0,
-      "defense": 1,
-      "utility": 0
+      "weapon": 2,
+      "defense": 2,
+      "utility": 1
     }
   },
   "mine": {

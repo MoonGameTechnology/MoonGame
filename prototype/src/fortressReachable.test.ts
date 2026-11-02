@@ -49,7 +49,8 @@ describe('FORT-0.2 — космическая крепость на ядре П�
     const r = kernel.applyAction(world('nebula', 'p1'), deployStation('p1', 'N'), { now: 0, data });
     expect(r.ok, r.ok ? '' : `отказ ${r.code}`).toBe(true);
     if (!r.ok) return;
-    expect(r.state.planets.N?.kind).toBe('void_station');
+    expect(r.state.planets.N?.kind).toBe('nebula');
+    expect(r.state.planets['station-N']?.fortress?.assembly).toBeDefined();
     expect(r.state.players.p1?.resources.metal).toBe(500 - 120);
   });
 

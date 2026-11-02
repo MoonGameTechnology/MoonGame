@@ -86,6 +86,7 @@ import {
 } from './matchJoin';
 import { initMatchBrowser } from './matchBrowser';
 import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
+import { closeFortressDialog, isFortressDialogOpen } from './fortressDialog';
 import { isAvaMap, isFrontier, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
@@ -157,7 +158,7 @@ import {
   typingTarget,
 } from './backGesture';
 import {
-  sightCircles,
+  viewSightCircles,
   type Planet,
   type SightCircle,
   type Squadron,
@@ -173,9 +174,10 @@ import { forgetBorderLayer, initBorderLayer } from './borderLayer';
 import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawRallyPoint, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
 import { drawAimPreview, drawAssaultTargets, drawCourseReach, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
 import { drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
-import { chainHits, drawAllyMarks, drawBombardTimers, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
+import { chainHits, drawAllyMarks, drawBombardTimers, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, drawTroopTransferTimers, initMapMarks, pingHits } from './mapMarks';
 import { drawSweepAfterglow, drawWorlds, initMapWorlds, prepareWorldArt } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
+import { drawTroopTransferEffects } from './mapTransfers';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
 import { backgroundContextEvents, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapMoving, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
 import { blackBoxError, blackBoxFrame, startBlackBox } from './renderBlackBox';
@@ -347,7 +349,8 @@ import {
   startPvEMatch,
   startTraining,
 } from './matchLifecycle';
-import { pcUi, showFpsOn, motionOn, mapSharpOn, mapSlowSeen, markMapSlow } from './graphicsPrefs';
+import { pcUi, showFpsOn, motionOn, mapSharpOn, mapSlowSeen, markMapSlow, frameRateMode } from './graphicsPrefs';
+import { nextFrameSlot, type FrameSlot } from '../../decisions/frameRate';
 import { slowVerdictReachNow } from './slowVerdictReachNow';
 import { initSettingsView, openSettings, push } from './settingsView';
 import { canvasCompatibilityOptions } from './canvasCompatibility';
@@ -358,7 +361,7 @@ import { reframePresentation } from './holographicLayout';
 import { initMarket } from './marketScreen';
 import { linkedAlly } from '../../decisions/allyPanel';
 import { extractionCandidates } from '../../decisions/chapterChain';
-import { captiveLoad, extractionStart } from '../../decisions/actions';
+import { captiveLoad, extractionStart, repairBuilding } from '../../decisions/actions';
 import { captiveCandidates } from '../../decisions/captive';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
 import { initChat } from './chatWindow';
@@ -387,7 +390,7 @@ import {
 import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, setView, world, worldDist } from './mapCamera';
 import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, restoreFogMemory, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
-import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, ownRadarSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
+import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, radarSweepSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder } from './orderPipeline';
 import {
   forceIntroduced,
@@ -1032,8 +1035,8 @@ initMapRadar({
   ctx: () => cx,
   vw: () => VW,
   vh: () => VH,
-  sources: () => perWorld('radar', ownRadarSources),
-  sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),
+  sources: () => perWorld('radar', radarSweepSources),
+  sight: () => perWorld('sight', () => viewSightCircles(s, ME, data, worldPlanets())),
   planets: worldPlanets,
   note,
   placeName,
@@ -1197,7 +1200,7 @@ initMapFog({
   me: () => ME,
   net: () => NET,
   contacts: () => netSignatures,
-  sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),
+  sight: () => perWorld('sight', () => viewSightCircles(s, ME, data, worldPlanets())),
   planets: worldPlanets,
 });
 
@@ -1580,6 +1583,7 @@ function renderMap(now: number) {
   drawPatrolRings(); // SHU-6.3: круг патруля и остаток висения — под значками вылетов
   drawSeenPatrols(); // SHU-6.10: чужой висящий патруль в моём обзоре — круг и состав
   drawStrikeTrails(now); // остаток SHU-3.1: вылет в воздухе виден на карте
+  drawTroopTransferEffects(s, ME, cx, hologramTime); // свои погрузки и высадки: световые капсулы
   drawOrdnance(cx, mineView(), ME, world, cam.scale);
   drawMissiles(); // SM-3.7b: летящая ракета — отряд, но рисуется стрелкой с курсом
   mineControls.refresh();
@@ -1615,6 +1619,7 @@ function renderMap(now: number) {
   drawMinefields(); // SM-3.5: свои минные поля «💣 ×заряд» и установки
   drawDevourSieges(); // PVR-4.7: осада «Поглощения мира» над своим миром — кольцо-часы и отсчёт
   drawBombardTimers(); // таймер обстрела: до сноса следующей постройки мира
+  drawTroopTransferTimers(); // погрузка и высадка: отсчёт над объектом без выбора флота
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
   drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром
@@ -2346,6 +2351,7 @@ const buildWin = initBuildScreen({
     coreQueue(pid, 'buildings').some((q) => q.building === id),
   build: (pid, id) => enqueueBuild(pid, { kind: 'building', id, count: 1 }),
   upgrade: (pid, id) => enqueueBuild(pid, { kind: 'upgrade', id, count: 1 }),
+  repair: (pid, id, uid) => { playerOrder(repairBuilding(ME, pid, id, uid)); },
   // Юнитные вкладки окна стройки (BUILD-2): тот же путь, которым их строила боковая
   // панель, — ростер по вкладке, заказ через ту же очередь, карточка через тот же кодекс.
   // Новой логики здесь нет и быть не должно: окно переехало, правила остались.
@@ -2596,6 +2602,7 @@ initHubScreen({
   halt: () => {
     speed = 0;
   },
+  openNewsSettings: () => openSettings('news'),
   refreshAccountDeletion: () => refreshAccountDeletion(), // объявлен ниже, у страниц входа
 });
 
@@ -2643,9 +2650,9 @@ $('cback').addEventListener('click', () => {
   openHub(); // back from the browser → the hub
 });
 // Выбор языка — кнопка со списком (`localeMenu.ts`, заказ владельца 2026-09-25): на экране
-// входа, в хабе и в меню Sector Zero. Выбор сохраняется, перезагрузка перестраивает все
+// входа и в меню Sector Zero. Выбор сохраняется, перезагрузка перестраивает все
 // рендеры на новом языке (кнопки живут только вне партии — терять нечего).
-for (const id of ['clang', 'hub-lang', 'sz-lang'])
+for (const id of ['clang', 'sz-lang'])
   mountLocaleMenu($(id), {
     current: () => LOCALE,
     pick: (locale) => {
@@ -3058,6 +3065,7 @@ const flexed = (id: string): boolean => document.getElementById(id)?.style.displ
 
 const BACK_LAYERS: BackLayer[] = [
   { id: 'match-description', isOpen: isMatchDescriptionOpen, close: closeMatchDescription }, // native top layer
+  { id: 'fortress-order', isOpen: isFortressDialogOpen, close: closeFortressDialog },
   { id: 'comic', isOpen: () => comicPlayer.isOpen(), close: () => comicPlayer.skip() }, // z90
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   { id: 'intro', isOpen: () => shown('intro'), close: () => hide('intro') }, // z61, above the cabinet it explains
@@ -3569,7 +3577,7 @@ function judgeMapSharpness(nowReal: number, dt: number): void {
   if (notice) toast(t(notice));
 }
 
-function frame(nowReal: number) {
+function frame(nowReal: number, nativeGap: number) {
   flushPinch();
   const wasHolographic = holographic.active();
   const previousViewport = insets();
@@ -3597,7 +3605,7 @@ function frame(nowReal: number) {
     fpsEma = fpsAfter(fpsEma, dt, sinceMenu);
     countNetFrame(dt);
   }
-  judgeMapSharpness(nowReal, dt);
+  judgeMapSharpness(nowReal, nativeGap); // пауза выбранного FPS не означает слабый GPU
   // Отдельный поток расчёта: сначала то, что он прислал (мир, события и исходы своих
   // приказов), потом следующий шаг (`simDriver.ts`).
   syncSim(nowReal);
@@ -3837,10 +3845,15 @@ let frameErrs = 0;
  */
 function frameLoop(nowReal: number) {
   frameAsked = false;
+  const nativeGap = nowReal - lastRafAt;
+  lastRafAt = nowReal;
+  const slot = nextFrameSlot(frameSlot, nowReal, frameRateMode());
+  if (!slot) { askFrame(); return; }
+  frameSlot = slot;
   blackBoxFrame(nowReal, cam.scale, mapPreparation.active);
   let covered = false;
   try {
-    frame(nowReal);
+    frame(nowReal, nativeGap);
     covered = mapCovered();
   } catch (err) {
     blackBoxError(err);
@@ -3854,6 +3867,8 @@ function frameLoop(nowReal: number) {
 }
 
 let frameAsked = false; // a frame is already requested from rAF
+let frameSlot: FrameSlot | null = null;
+let lastRafAt = 0; // every native callback, including deliberately skipped frames
 let menuPause: ReturnType<typeof setTimeout> | undefined; // the menu's pause before the next one
 
 /** Заказать кадр к следующему кадру экрана: пауза меню, если ждала, снимается. */

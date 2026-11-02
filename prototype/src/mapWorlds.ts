@@ -11,7 +11,7 @@
  * они живут в `main.ts`, и импорт оттуда был бы циклом. Слои зовёт кадр `renderMap()`.
  */
 import type { BuildingInstance, GameState } from '../../packages/shared-core/src/index';
-import { isForkSite } from '../../packages/shared-core/src/index';
+import { isForkSite, fortressFleetId, effectiveStats } from '../../packages/shared-core/src/index';
 import { rgba } from '../../packages/client/src/holoDraw';
 import { mapRegions } from '../../packages/client/src/gameData';
 import { drawSchematicNode, type MapLod } from '../../packages/client/src/mapLod';
@@ -270,6 +270,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     col: string,
     buildings: readonly Pick<BuildingInstance, 'type' | 'level'>[],
     R: number,
+    hull?: { hp: number; max: number },
   ): void => {
     cx.save();
     cx.strokeStyle = rgba(col, 0.7);
@@ -309,8 +310,8 @@ export function drawWorlds(now: number, lod: MapLod): void {
         cx.restore();
       }
       // A remembered core has no strength: the scan saw the fortress, not its damage.
-      if ('hp' in core && typeof core.hp === 'number') {
-        const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
+      if (hull || ('hp' in core && typeof core.hp === 'number')) {
+        const frac = Math.max(0, Math.min(1, hull ? hull.hp / hull.max : (core as BuildingInstance).hp / hpOfLevel('starfort', core.level)));
         cx.fillStyle = 'rgba(2,9,13,.7)';
         cx.fillRect(c.x - 12, c.y - 22, 24, 3);
         cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
@@ -777,7 +778,10 @@ export function drawWorlds(now: number, lod: MapLod): void {
       if (!isForkSite(p) || p.owner === null || !(p.owner === ME || known(p.id))) continue;
       const c = world(p.position);
       if (!visible(c, 40)) continue;
-      drawStationArt(c, ownerColor(p.owner), p.buildings, R * 0.7);
+      const body = p.fortress ? s.fleets[fortressFleetId(p.id)]?.units[0] : undefined;
+      const def = body ? data.units[body.unit] : undefined;
+      const max = body && def ? effectiveStats(def, body, data).hp ?? 0 : 0;
+      drawStationArt(c, ownerColor(p.owner), p.buildings, R * 0.7, body && max > 0 ? { hp: body.hp ?? max, max } : undefined);
       if (selPlanet === p.id) targetBrackets(c.x, c.y, R, now);
     }
     if (selFork) {
