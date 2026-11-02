@@ -741,6 +741,7 @@ export {
 } from './modules/hero';
 export type { HeroEffect, HeroEffectArgs } from './modules/hero';
 export { heroEffectsModule } from './modules/heroEffects';
+export { heroActiveCap, activeHeroCount } from './state/heroDeployment';
 export {
   stewardModule,
   stewardActive,

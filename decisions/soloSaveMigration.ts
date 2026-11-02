@@ -274,15 +274,26 @@ export const LOAD_FIRST_SOLO_MIGRATION = {
   toDataHash: FORTRESS_MODEL_SOLO_MIGRATION.toDataHash,
 } as const;
 
-/** Combat echelons and post-loss replies retain the save's state shape. Existing
- * hull/shield pools, orders, clocks and RNG survive; later volleys use the new rules. */
-export const ECHELONS_SOLO_MIGRATION = {
+/** Optional mobilization state and additive main-only research. Existing ships,
+ *  accepted orders and campaign deployments survive; future main deployments use the timer. */
+export const HERO_MOBILIZATION_SOLO_MIGRATION = {
   fromRules: LOAD_FIRST_SOLO_MIGRATION.toRules,
   fromData: LOAD_FIRST_SOLO_MIGRATION.toData,
   fromDataHash: LOAD_FIRST_SOLO_MIGRATION.toDataHash,
-  toRules: '00e914e2b0bfd3',
+  toRules: '0876d80977cf6d',
   toData: '0.1.74',
-  toDataHash: '018c559c8a84a3',
+  toDataHash: '023cd15f09ee90',
+} as const;
+
+/** Combat echelons and post-loss replies retain the save's state shape. Existing
+ * hull/shield pools, orders, clocks and RNG survive; later volleys use the new rules. */
+export const ECHELONS_SOLO_MIGRATION = {
+  fromRules: HERO_MOBILIZATION_SOLO_MIGRATION.toRules,
+  fromData: HERO_MOBILIZATION_SOLO_MIGRATION.toData,
+  fromDataHash: HERO_MOBILIZATION_SOLO_MIGRATION.toDataHash,
+  toRules: '1d7067722c5c32',
+  toData: '0.1.75',
+  toDataHash: '0afbb7f3739821',
 } as const;
 
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
@@ -310,6 +321,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   HALF_MODULES_SOLO_MIGRATION,
   FORTRESS_MODEL_SOLO_MIGRATION,
   LOAD_FIRST_SOLO_MIGRATION,
+  HERO_MOBILIZATION_SOLO_MIGRATION,
   ECHELONS_SOLO_MIGRATION,
 ];
 

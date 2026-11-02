@@ -50,7 +50,8 @@ export function missingEffectNumbers(messages: Messages, techs: Record<string, T
     if (!def.description || !def.effects) continue;
     const text = messages[def.description] ?? '';
     for (const [effect, value] of Object.entries(def.effects)) {
-      if (!text.includes(effectToken(value))) out.push(`${id}.${effect}: ${effectToken(value)}`);
+      const token = effect === 'heroSlots' ? String(value) : effectToken(value);
+      if (!text.includes(token)) out.push(`${id}.${effect}: ${token}`);
     }
   }
   return out;
