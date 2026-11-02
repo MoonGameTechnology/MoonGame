@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const PREP = readFileSync(new URL('./sectorZeroPreparation.ts', import.meta.url), 'utf8');
+const PREP = readFileSync(new URL('./sectorHeroArsenal.ts', import.meta.url), 'utf8');
 
 describe('AUD-22 — Академия читает изученное из решения', () => {
   it('карточка узла строится через sectorSkillCard, а не по hero.skills', () => {

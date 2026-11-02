@@ -68,7 +68,12 @@ describe('комиксы глав — проводка', () => {
 
   it('комикс выше обычных экранов, нативный диалог описания выше комикса', () => {
     const block = MAIN.split('const BACK_LAYERS: BackLayer[] = [')[1]!.split('\n];')[0]!;
-    const ladder = [...block.matchAll(/\{\s*id: '([^']+)'/g)].map(match => match[1]);
-    expect(ladder.slice(0, 3)).toEqual(['match-description', 'fortress-order', 'comic']);
+    const native = readFileSync(new URL('./nativeBackLayers.ts', import.meta.url), 'utf8');
+    const ladder = [
+      ...[...native.matchAll(/(?:heroRewardBackLayer\(|\bid: )'([^']+)'/g)].map((m) => m[1]),
+      ...[...block.matchAll(/\{\s*id: '([^']+)'/g)].map((m) => m[1]),
+    ];
+    expect(block.trimStart().startsWith('...NATIVE_BACK_LAYERS,')).toBe(true);
+    expect(ladder.slice(0, 5)).toEqual(['hero-reward', 'match-hero-reward', 'match-description', 'fortress-order', 'comic']);
   });
 });

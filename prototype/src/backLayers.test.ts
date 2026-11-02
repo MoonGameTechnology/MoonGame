@@ -114,15 +114,20 @@ describe('опись полна: каждый оверлей объявлен с
 describe('лестница main.ts совпадает с описью', () => {
   const main = read('./main.ts');
   const block = /const BACK_LAYERS: BackLayer\[\] = \[([\s\S]*?)\n\];/.exec(main)?.[1] ?? '';
-  const ladder = [...block.matchAll(/\bid: '([^']+)'/g)].map((m) => m[1] as string);
+  const native = read('./nativeBackLayers.ts');
+  const ladder = [
+    ...[...native.matchAll(/(?:heroRewardBackLayer\(|\bid: )'([^']+)'/g)].map((m) => m[1] as string),
+    ...[...block.matchAll(/\bid: '([^']+)'/g)].map((m) => m[1] as string),
+  ];
 
   it('лестница найдена в main.ts и не пуста', () => {
     expect(ladder.length).toBeGreaterThan(20);
   });
 
-  it('описание матча закрывается первым: нативный dialog выше обычных слоёв', () => {
-    expect(ladder[0]).toBe('match-description');
-    expect(block).toContain('isOpen: isMatchDescriptionOpen, close: closeMatchDescription');
+  it('оба окна наград и другие нативные dialog закрываются до экранов под ними', () => {
+    expect(block.trimStart().startsWith('...NATIVE_BACK_LAYERS,')).toBe(true);
+    expect(ladder.slice(0, 4)).toEqual(['hero-reward', 'match-hero-reward', 'match-description', 'fortress-order']);
+    expect(native).toContain('isOpen: isMatchDescriptionOpen, close: closeMatchDescription');
   });
 
   it('каждый слой описи есть в лестнице — иначе Back его не закроет', () => {
