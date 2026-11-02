@@ -53,6 +53,7 @@ export function registerConstructionMaintenance(api: ModuleSetupApi, clearInfect
     // его не высадить. Только флоты, где есть кого лечить: на большой карте целых трюмов —
     // подавляющее большинство.
     const holdsAt = new Map<string, Fleet[]>();
+    const blockedPorts = new Set<string>();
     for (const fleet of recordValues(h.state.fleets)) {
       if (fleet.movement || fleet.battleId) continue;
       if (!(fleet.landing ?? []).some(wounded)) continue;
@@ -66,6 +67,7 @@ export function registerConstructionMaintenance(api: ModuleSetupApi, clearInfect
     for (const planet of recordValues(h.state.planets)) {
       if (planet.owner === null) continue;
       const paused = fighting.has(planet.id) || forkSiteInBattle(h.state, planet);
+      if (paused) blockedPorts.add(planet.id);
       for (const building of planet.buildings) {
         const repair = building.repair;
         if (!repair) continue;
@@ -139,7 +141,7 @@ export function registerConstructionMaintenance(api: ModuleSetupApi, clearInfect
       // ровно так разъезжались два хука наземной защиты форта.
       let hullRate = 0;
       const ports = serviceSitesForFleet(h.state, fleet, (a, b) => isAllied(h, a, b), serviceIndex);
-      if (ports.some((port) => fighting.has(port.id))) continue;
+      if (ports.some((port) => blockedPorts.has(port.id))) continue;
       for (const planet of ports) {
         for (const b of planet.buildings) {
           if (b.hp <= 0) continue;

@@ -1531,6 +1531,7 @@ export const constructionModule: GameModule = {
           typeof p.playerId === 'string' ? h.state.players[p.playerId]?.arsenal : undefined;
         const stars = arsenal?.stars;
         const rarity = arsenal?.rarity; // SZE-5.1 — тем же снимком, что звёзды
+        let fleet: Fleet | undefined;
         if (built?.traits.includes('shuttle')) {
           // Готовая машина встаёт в ЭСКАДРУ (SHU-4.2), а не россыпью. Правило живёт в
           // `state/shuttle.ts` — там же, где вся арифметика ангара: своя копия здесь
@@ -1565,11 +1566,9 @@ export const constructionModule: GameModule = {
           const id = `fleet:${p.playerId}:${h.ctx.now}:${sequence}`;
           const units: UnitStack[] = [];
           addUnits(units, p.unit, p.count, p.modules, stars, rarity);
-          const fleet: Fleet = { id, owner: p.playerId!, ...stationBerth(h.state, planet),
+          fleet = { id, owner: p.playerId!, ...stationBerth(h.state, planet),
             movement: null, units, traits: [], battleId: null };
           h.state.fleets[id] = fleet;
-          if (fleet.edge) h.emit('fleet.parked', { fleetId: id, edge: fleet.edge });
-          else h.emit('fleet.arrived', { fleetId: id, at: fleet.location });
         } else {
           addUnits(planet.garrison, p.unit, p.count, p.modules, stars, rarity);
         }
@@ -1578,9 +1577,13 @@ export const constructionModule: GameModule = {
           unit: p.unit,
           count: p.count,
           owner: p.playerId,
+          ...(fleet ? { fleetId: fleet.id } : {}),
           ...(p.modules && p.modules.length > 0 ? { modules: p.modules } : {}),
           ...(typeof p.troop === 'string' ? { troop: p.troop } : {}),
         });
+        // Let promotion stamp the fresh stack before arrival can auto-merge its fleet.
+        if (fleet?.edge) h.emit('fleet.parked', { fleetId: fleet.id, edge: fleet.edge });
+        else if (fleet) h.emit('fleet.arrived', { fleetId: fleet.id, at: fleet.location });
       }
     }
 

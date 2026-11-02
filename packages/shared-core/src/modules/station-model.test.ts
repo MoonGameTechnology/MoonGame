@@ -13,6 +13,10 @@ import { ownedProvinceCount } from './sprawl';
 import { instantRepairModule } from './instantRepair';
 import { previewSides } from '../state/previewBattle';
 import { movementModule } from './movement';
+import { promotionModule } from './promotion';
+import { autoMergeModule } from './autoMerge';
+import { shuttleModule } from './shuttle';
+import { forkTAtStart } from '../state/roads';
 import { stationModule } from './station';
 import { constructionModule, type BuildingDamage, type ConstructionDelay } from './construction';
 import type { Action, ApplyResult, AdvanceResult } from '../action/types';
@@ -23,12 +27,17 @@ const data = parseGameData({
   units: { fortress_guns: { faction: 'neutral', traits: ['immobile', 'issued'],
     slots: { weapon: 2, defense: 2, utility: 1 }, stats: { hp: 100, attack: 20, defense: 20, speed: 0 } },
     scout: { faction: 'x', domain: 'space', cost: { metal: 10 }, buildTimeHours: 1,
-      stats: { hp: 100, attack: 1, defense: 1, speed: 10 } } },
+      stats: { hp: 100, attack: 1, defense: 1, speed: 10 } },
+    carrier: { faction: 'x', domain: 'space', stats: { hp: 100, attack: 1, defense: 1, speed: 10, cargoCapacity: 4 } },
+    interceptor: { faction: 'x', traits: ['shuttle'], stats: { hp: 10, attack: 2, defense: 2, speed: 100 } },
+    marine: { faction: 'x', domain: 'ground', stats: { hp: 100, attack: 1, defense: 1, speed: 1 } } },
   buildings: {
     starfort: { name: 'Core', hp: 100, defenseBonus: 0, buildTimeHours: 6, onlyOn: [], buildSlots: 4,
       upgrades: [{ cost: { metal: 120 }, hp: 200, buildTimeHours: 6, defenseBonus: 0, buildSlots: 5 }] },
     station_radar: { name: 'Station Radar', hp: 100, cost: { metal: 100 }, buildTimeHours: 10, defenseBonus: 0 },
     station_yard: { name: 'Station Yard', hp: 100, enablesShipConstruction: true, shipRepair: 0.1 },
+    station_hangar: { name: 'Station Hangar', hp: 100, shuttleBay: 6 },
+    station_medbay: { name: 'Station Medbay', hp: 100, healRate: 0.1 },
     mine: { name: 'Mine', hp: 100, cost: { metal: 100 }, buildTimeHours: 10, defenseBonus: 0,
       upgrades: [{ cost: { metal: 100 }, hp: 200, buildTimeHours: 1, defenseBonus: 0 }] },
   },
@@ -58,6 +67,16 @@ function world(): GameState {
     links: [], resources: { metal: 7 }, buildings: [{ type: 'mine', level: 1, hp: 100 }], garrison: [], traits: [] };
   return { ...base, players: { p1: { id: 'p1', name: 'p1', faction: 'x', status: 'active', resources: { metal: 1000 } } },
     planets: { A: node }, fleets: {} };
+}
+function forkWorld(): GameState {
+  const state = world();
+  const a = state.planets.A!;
+  a.links = ['B', 'C'];
+  a.roads = { crossings: { B: { x: 50, y: -10 }, C: { x: 50, y: 10 } },
+    trails: [{ exits: ['B', 'C'], fork: { x: 20, y: 0 } }] };
+  for (const [id, y] of [['B', -20], ['C', 20]] as const) state.planets[id] = { ...structuredClone(a), id,
+    position: { x: 100, y }, links: ['A'], roads: { crossings: { A: a.roads.crossings[id]! }, trails: [{ exits: ['A'], fork: null }] } };
+  return state;
 }
 const hit: GameModule = { id: 'test-hit', version: '1', setup(api) {
   api.onAction('test.delay', (_a, h) => {
@@ -333,13 +352,7 @@ describe('separate fortress model', () => {
   });
 
   it('ships and dock services at a fork use its real road berth, never the bookkeeping node', () => {
-    let state = world();
-    const a = state.planets.A!;
-    a.links = ['B', 'C'];
-    a.roads = { crossings: { B: { x: 50, y: -10 }, C: { x: 50, y: 10 } },
-      trails: [{ exits: ['B', 'C'], fork: { x: 20, y: 0 } }] };
-    for (const [id, y] of [['B', -20], ['C', 20]] as const) state.planets[id] = { ...structuredClone(a), id,
-      position: { x: 100, y }, links: ['A'], roads: { crossings: { A: a.roads.crossings[id]! }, trails: [{ exits: ['A'], fork: null }] } };
+    let state = forkWorld();
     state = ok(kernel.applyAction(state, action('station.deploy', { planetId: 'A', trail: 0 }), ctx())).state;
     state = ok(kernel.advanceTo(state, ctx(6 * H))).state;
     const site = state.planets[forkSiteId('A', 0)]!;
@@ -358,6 +371,87 @@ describe('separate fortress model', () => {
     ship.units[0]!.hp = 50;
     state = ok(kernel.advanceTo(state, ctx(8 * H))).state;
     expect(state.fleets[ship.id]?.units[0]?.hp).toBe(60);
+  });
+
+  const carrierKernel = createKernel([constructionModule, stationModule, shuttleModule]);
+  function forkCarrier(exit: string, reverse: boolean): GameState {
+    let state = ok(carrierKernel.applyAction(forkWorld(), action('station.deploy', { planetId: 'A', trail: 0 }), ctx())).state;
+    state = ok(carrierKernel.advanceTo(state, ctx(6 * H))).state;
+    const site = state.planets[forkSiteId('A', 0)]!;
+    site.buildings.push({ type: 'station_yard', level: 1, hp: 100 },
+      { type: 'station_medbay', level: 1, hp: 100 }, { type: 'station_hangar', level: 1, hp: 100 });
+    site.hangar = [{ id: 'sq:port', units: [{ unit: 'interceptor', count: 1 }] }];
+    const t = forkTAtStart(state, 'A', exit);
+    state.fleets.cv = { id: 'cv', owner: 'p1', location: null, movement: null,
+      edge: reverse ? { from: exit, to: 'A', t: 1 - t } : { from: 'A', to: exit, t },
+      units: [{ unit: 'carrier', count: 1, hp: 50 }], landing: [{ unit: 'marine', count: 1, hp: 50 }], traits: [] };
+    return state;
+  }
+
+  it.each([['B', false], ['B', true], ['C', false], ['C', true]] as const)('services and squadron transfers share fork identity via exit %s (reversed: %s)', (exit, reverse) => {
+      let state = forkCarrier(exit, reverse);
+      const pid = forkSiteId('A', 0);
+      const index = indexServiceSites(state);
+      expect(serviceSitesForFleet(state, state.fleets.cv!, undefined, index).map((p) => p.id)).toContain(pid);
+      state = ok(carrierKernel.applyAction(state, action('shuttle.load', { fleetId: 'cv', squadronId: 'sq:port', planetId: pid }), ctx(6 * H))).state;
+      expect(state.fleets.cv?.hangar?.[0]?.id).toBe('sq:port');
+      state = ok(carrierKernel.applyAction(state, action('shuttle.unload', { fleetId: 'cv', squadronId: 'sq:port', planetId: pid }), ctx(6 * H))).state;
+      expect(state.planets[pid]?.hangar?.[0]?.id).toBe('sq:port');
+      state = ok(carrierKernel.advanceTo(state, ctx(7 * H))).state;
+      expect(state.fleets.cv?.units[0]?.hp).toBe(60);
+      expect(state.fleets.cv?.landing?.[0]?.hp).toBe(60);
+    });
+
+  it.each(['movement', 'battle', 'landing'])('keeps squadron transfer blocked during %s at a fork', (busy) => {
+    const state = forkCarrier('C', false);
+    if (busy === 'movement') state.fleets.cv!.movement = { from: 'A', to: 'C', departedAt: 6 * H, arrivesAt: 7 * H };
+    if (busy === 'battle') state.fleets.cv!.battleId = 'battle';
+    if (busy === 'landing') state.fleets.cv!.assaultLanding = { planetId: 'A', startAt: 6 * H, doneAt: 7 * H };
+    const before = JSON.stringify(state);
+    expect(carrierKernel.applyAction(state, action('shuttle.load', { fleetId: 'cv', squadronId: 'sq:port', planetId: forkSiteId('A', 0) }), ctx(6 * H)))
+      .toMatchObject({ ok: false, code: 'E_FLEET_BUSY' });
+    expect(JSON.stringify(state)).toBe(before);
+  });
+
+  it('does not transfer squadrons from a remote fork or an enemy fleet', () => {
+    const state = forkCarrier('C', false);
+    const order = action('shuttle.load', { fleetId: 'cv', squadronId: 'sq:port', planetId: forkSiteId('A', 0) });
+    expect(carrierKernel.applyAction(state, { ...order, playerId: 'p2' }, ctx(6 * H)))
+      .toMatchObject({ ok: false, code: 'E_NO_FLEET' });
+    state.fleets.cv!.edge!.t += 0.01;
+    expect(carrierKernel.applyAction(state, order, ctx(6 * H))).toMatchObject({ ok: false, code: 'E_NO_PLANET' });
+  });
+
+  it('pauses repairs and dock services when a battle occupies another exit of the same fork', () => {
+    const state = forkCarrier('C', false);
+    const pid = forkSiteId('A', 0);
+    state.fleets.enemy = { ...structuredClone(state.fleets.cv!), id: 'enemy', owner: 'p2', battleId: 'fight' };
+    state.battles.fight = { id: 'fight', location: 'A', phase: 'orbital', round: 0,
+      sides: [{ owner: 'p2', role: 'attacker', ref: { kind: 'fleet', fleetId: 'enemy' } }] };
+    state.fleets[fortressFleetId(pid)]!.units[0]!.hp = 50;
+    expect(carrierKernel.applyAction(state, action('station.repair', { planetId: pid }), ctx(6 * H)))
+      .toMatchObject({ ok: false, code: 'E_IN_BATTLE' });
+    const paused = ok(carrierKernel.advanceTo(state, ctx(7 * H))).state;
+    expect(paused.fleets.cv?.units[0]?.hp).toBe(50);
+    expect(paused.fleets.cv?.landing?.[0]?.hp).toBe(50);
+  });
+
+  it('promotes a fortress-built ship before arrival can merge it into an existing fleet', () => {
+    const k = createKernel([constructionModule, stationModule, promotionModule, autoMergeModule]);
+    const promoted = { ...data, promotion: { chance: 1, damageBonus: 0.1 } };
+    const context = (now: number) => ({ now, data: promoted });
+    let state = ok(k.applyAction(world(), action('station.deploy', { planetId: 'A' }), context(0))).state;
+    state = ok(k.advanceTo(state, context(6 * H))).state;
+    state.planets[siteId]!.buildings.push({ type: 'station_yard', level: 1, hp: 100 });
+    state.fleets.old = { id: 'old', owner: 'p1', location: 'A', movement: null,
+      units: [{ unit: 'scout', count: 1 }], traits: [] };
+    state = ok(k.applyAction(state, action('unit.build', { planetId: siteId, unit: 'scout' }), context(6 * H))).state;
+    state = ok(k.advanceTo(state, context(7 * H))).state;
+    const ships = Object.values(state.fleets).flatMap((f) => f.units).filter((s) => s.unit === 'scout');
+    expect(ships.reduce((n, s) => n + s.count, 0)).toBe(2);
+    expect(ships.reduce((n, s) => n + s.count * (s.promoted ?? 0), 0)).toBe(1);
+    expect(state.fleets.old?.units[0]).toMatchObject({ count: 2, promoted: 0.5 });
+    expect(state.fleets[bodyId]?.units[0]?.count).toBe(1);
   });
 
   it('does not reveal a newly built remote fortress or private repair work through fog', () => {

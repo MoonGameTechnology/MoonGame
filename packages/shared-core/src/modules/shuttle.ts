@@ -87,7 +87,7 @@ import {
   removeIfWiped,
   type HookedDamage,
 } from '../util/combat';
-import { requireOwnedIdleFleet, requireOwnedUnengagedFleet } from '../util/fleet';
+import { requireOwnedStationaryFleet, requireOwnedUnengagedFleet } from '../util/fleet';
 import { fireOnGarrison, groundVolley, shuttleGroundDamage, type GroundVolley } from '../util/groundFire';
 import { addUnits, cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types';
@@ -95,6 +95,7 @@ import { MS_PER_HOUR } from '../util/time';
 import { deepClone } from '../util/clone';
 import { dockHullRate, fleetHangarRepairRate } from '../util/repair';
 import { serviceSitesForFleet, indexServiceSites } from '../state/fortress';
+import { forkSiteInBattle } from '../state/forkSite';
 import { recordValues } from '../util/records';
 import { battleLocations } from '../state/battle';
 
@@ -2250,7 +2251,7 @@ export const shuttleModule: GameModule = {
       if (typeof p?.fleetId !== 'string' || typeof p?.squadronId !== 'string') {
         return h.reject('E_BAD_PAYLOAD');
       }
-      const fleet = requireOwnedIdleFleet(h, p.fleetId, action.playerId);
+      const fleet = requireOwnedStationaryFleet(h, p.fleetId, action.playerId);
       const ports = serviceSitesForFleet(h.state, fleet).filter((site) => site.owner === action.playerId);
       if (!p.planetId && fleet.location && h.state.planets[fleet.location]?.owner !== action.playerId) return h.reject('E_FORBIDDEN');
       const planet = p.planetId ? ports.find((site) => site.id === p.planetId)
@@ -2602,8 +2603,11 @@ export const shuttleModule: GameModule = {
           else delete sq.damage;
         }
       };
+      const blockedPorts = new Set<string>();
       for (const planet of recordValues(h.state.planets)) {
-        if (!planet.hangar?.length || planet.owner === null || fighting.has(planet.id)) continue;
+        if (planet.owner === null) continue;
+        if (fighting.has(planet.id) || forkSiteInBattle(h.state, planet)) { blockedPorts.add(planet.id); continue; }
+        if (!planet.hangar?.length) continue;
         mend(planet.hangar, dockHullRate(planet, data));
       }
       // Флот чинит свой ангар ремонтным модулем ВЕЗДЕ вне боя (SHU-5.4), у дока — сверх
@@ -2613,7 +2617,7 @@ export const shuttleModule: GameModule = {
         if (!fleet.hangar?.length || fleet.battleId) continue;
         if (fleet.location !== null && fighting.has(fleet.location)) continue;
         const ports = serviceSitesForFleet(h.state, fleet, (a, b) => isAllied(h, a, b), serviceIndex);
-        if (ports.some((port) => fighting.has(port.id))) continue;
+        if (ports.some((port) => blockedPorts.has(port.id))) continue;
         const dock = ports.reduce((rate, port) => rate + dockHullRate(port, data), 0);
         mend(fleet.hangar, dock + fleetHangarRepairRate(fleet, data));
       }

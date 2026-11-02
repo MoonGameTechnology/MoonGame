@@ -1,7 +1,7 @@
-import type { Fleet, GameState, Planet, ResourceBag, UnitStack } from './gameState';
+import type { Fleet, ForkAnchor, GameState, Planet, ResourceBag, UnitStack } from './gameState';
 import type { GameData, UnitDef } from '../data/schemas';
 import { buildingLevel } from '../data/schemas';
-import { forkSiteEdge } from './forkSite';
+import { forkAnchorAt, forkSiteEdge } from './forkSite';
 import { effectiveStats, loadoutCost } from '../util/loadout';
 
 export const FORTRESS_CORE = 'starfort';
@@ -77,6 +77,10 @@ export function stationBerth(state: GameState, site: Planet): Pick<Fleet, 'locat
 
 export function fleetAtStation(state: GameState, fleet: Fleet, site: Planet): boolean {
   if (fleet.movement) return false;
+  if (site.fork) {
+    const at = fleet.edge ? forkAnchorAt(state, fleet.edge) : null;
+    return at?.province === site.fork.province && at.trail === site.fork.trail;
+  }
   const berth = stationBerth(state, site);
   if (berth.location !== null) return fleet.location === berth.location;
   const a = berth.edge;
@@ -89,28 +93,28 @@ export function fleetAtStation(state: GameState, fleet: Fleet, site: Planet): bo
 /** Construction sites provide services at their real berth, not at the off-graph id. */
 export interface ServiceSiteIndex {
   nodes: ReadonlyMap<string, readonly Planet[]>;
-  lanes: ReadonlyMap<string, readonly Planet[]>;
+  forks: ReadonlyMap<string, readonly Planet[]>;
 }
 
-function serviceLaneKey(from: string, to: string): string {
-  return JSON.stringify(from < to ? [from, to] : [to, from]);
+function serviceForkKey(anchor: ForkAnchor): string {
+  return JSON.stringify([anchor.province, anchor.trail]);
 }
 
 /** Per-step index; never cached across state mutations or world-clock steps. */
 export function indexServiceSites(state: GameState): ServiceSiteIndex {
   const nodes = new Map<string, Planet[]>();
-  const lanes = new Map<string, Planet[]>();
+  const forks = new Map<string, Planet[]>();
   for (const site of Object.values(state.planets)) {
     if (!site.fortress) continue;
     const berth = stationBerth(state, site);
-    const map = berth.location !== null ? nodes : lanes;
-    const key = berth.location ?? (berth.edge ? serviceLaneKey(berth.edge.from, berth.edge.to) : undefined);
-    if (key === undefined) continue;
+    const map = site.fork ? forks : nodes;
+    const key = site.fork ? serviceForkKey(site.fork) : berth.location;
+    if (key == null) continue;
     const bucket = map.get(key) ?? [];
     bucket.push(site);
     map.set(key, bucket);
   }
-  return { nodes, lanes };
+  return { nodes, forks };
 }
 
 export function serviceSitesForFleet(
@@ -124,8 +128,9 @@ export function serviceSitesForFleet(
   const host = fleet.location ? state.planets[fleet.location] : undefined;
   if (host && allowed(host)) sites.push(host);
   const lookup = index ?? indexServiceSites(state);
-  const candidates = fleet.location !== null ? lookup.nodes.get(fleet.location) : fleet.edge
-    ? lookup.lanes.get(serviceLaneKey(fleet.edge.from, fleet.edge.to)) : undefined;
+  const fork = fleet.edge ? forkAnchorAt(state, fleet.edge) : null;
+  const candidates = fleet.location !== null ? lookup.nodes.get(fleet.location)
+    : fork ? lookup.forks.get(serviceForkKey(fork)) : undefined;
   for (const site of candidates ?? []) {
     if (site !== host && allowed(site) && fleetAtStation(state, fleet, site)) sites.push(site);
   }

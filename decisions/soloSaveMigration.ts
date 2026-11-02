@@ -257,9 +257,9 @@ export const FORTRESS_MODEL_SOLO_MIGRATION = {
   fromRules: HALF_MODULES_SOLO_MIGRATION.toRules,
   fromData: HALF_MODULES_SOLO_MIGRATION.toData,
   fromDataHash: HALF_MODULES_SOLO_MIGRATION.toDataHash,
-  toRules: '09fea4f0cd268e',
+  toRules: '016783459c4258',
   toData: '0.1.73',
-  toDataHash: '1225f30538de14',
+  toDataHash: '0b767cf7a4b647',
 } as const;
 
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save

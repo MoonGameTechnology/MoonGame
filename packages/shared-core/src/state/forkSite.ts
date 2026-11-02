@@ -1,5 +1,5 @@
 import type { FleetEdge, ForkAnchor, GameState, Planet, PlanetId, RoadPoint } from './gameState';
-import { forkTAtStart, laneRoad } from './roads';
+import { forkAt, forkTAtStart, laneRoad } from './roads';
 
 /**
  * ПЛОЩАДКА КРЕПОСТИ НА РАЗВИЛКЕ (FORT-6.1, решение владельца 2026-09-29).
@@ -65,6 +65,15 @@ export function forkSiteEdge(state: GameState, anchor: ForkAnchor): FleetEdge | 
   return null;
 }
 
+/** A fork has one identity across every exit and both lane orientations. */
+export function forkAnchorAt(state: GameState, edge: FleetEdge): ForkAnchor | null {
+  const fork = forkAt(state, edge.from, edge.to, edge.t);
+  if (!fork) return null;
+  const toward = fork.province === edge.from ? edge.to : edge.from;
+  const trail = state.planets[fork.province]?.roads?.trails.findIndex((t) => t.exits.includes(toward)) ?? -1;
+  return trail >= 0 ? { province: fork.province, trail } : null;
+}
+
 /**
  * Идёт ли бой У ПЛОЩАДКИ: орудия стоят на дороге (`forkSiteEdge`), а не на узле площадки,
  * поэтому бой с ними носит место провинции-якоря, и проверка «бой на узле» площадку не
@@ -81,15 +90,14 @@ export function forkSiteInBattle(state: GameState, site: Pick<Planet, 'fork' | '
     return Object.values(state.battles).some((battle) => battle.location === site.stationHost);
   }
   if (!site?.fork) return false;
-  const at = forkSiteEdge(state, site.fork);
-  if (!at) return false;
+  if (!forkPoint(state, site.fork)) return false;
   for (const b of Object.values(state.battles)) {
     for (const side of b.sides) {
       if (side.ref.kind !== 'fleet') continue;
       const e = state.fleets[side.ref.fleetId]?.edge;
       if (!e) continue;
-      if (e.from === at.from && e.to === at.to && Math.abs(e.t - at.t) < 1e-9) return true;
-      if (e.from === at.to && e.to === at.from && Math.abs(1 - e.t - at.t) < 1e-9) return true;
+      const at = forkAnchorAt(state, e);
+      if (at?.province === site.fork.province && at.trail === site.fork.trail) return true;
     }
   }
   return false;
