@@ -249,9 +249,13 @@ try {
     body: JSON.stringify({ mapId: 'duel-1' }),
   });
   const match = first.matchId;
+  // A real join/leave creates the journal on a clean checkout. It also proves
+  // that an owned human seat stays idle after its owner leaves without delegating.
+  await connect(match);
+  const idleAt = await disconnect();
   await assertQuiet(
     match,
-    Date.now(),
+    idleAt,
     'an ordinary unattended human seat must not get an expansion AI',
   );
   const welcome = await connect(match);
