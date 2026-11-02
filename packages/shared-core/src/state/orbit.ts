@@ -21,9 +21,9 @@ import type { Fleet, GameState, PlanetId, PlayerId } from './gameState';
  *  - it is NOT pinned in a melee (`battleId`): a pinned fleet is busy fighting —
  *    it neither shells nor freezes the planet (bug-hunt MAJOR: a relief fleet
  *    must lift the siege it engages, not shield the bombarder);
- *  - the world is OWNED and `hostile(fleet.owner, planet.owner)` — an owner
- *    mismatch alone is not enough; a fleet over a neutral or allied world
- *    freezes nothing.
+ *  - the world is neutral OR `hostile(fleet.owner, planet.owner)` — an owner
+ *    mismatch alone is not enough for owned worlds; own and allied worlds
+ *    are not targets. Neutral worlds must take damage when the order is accepted.
  *
  * `hostile` is injected because the projection differs by layer: a module passes
  * combat's capability-aware `isHostile(h, …)`; pure state readers fall back to
@@ -55,7 +55,7 @@ export function isActivelyBombarding(
   if (!isBombardable(data, planet)) {
     return false;
   }
-  return planet.owner !== null && hostile(fleet.owner, planet.owner);
+  return planet.owner === null || hostile(fleet.owner, planet.owner);
 }
 
 /** The D1 fallback hostility read: only an explicit `war` stance is hostile —
