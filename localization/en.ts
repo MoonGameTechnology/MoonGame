@@ -337,6 +337,13 @@ export const en: Record<string, string> = {
   'refuge.offer':
     'The enemy main force is heading for the docks. We can hold it off, but that leaves you fewer forces for the assault on the complex',
   'refuge.offer.accept': 'Guard the docks',
+  'module-reward.received': 'Module acquired',
+  'module-reward.upgraded': 'Star upgraded!',
+  'module-reward.progress': 'Stars: {from} → {to}',
+  'module-reward.saved': 'Already in your arsenal',
+  'module-reward.continue': 'Continue',
+  'module-reward.close': 'Close all rewards',
+  'module-reward.remaining': 'More rewards: {n}',
   'chain.title': 'Chapter operation',
   'chain.contact': 'Link: reach the rendezvous',
   'chain.archive': 'Archive: clear the station of the Swarm',

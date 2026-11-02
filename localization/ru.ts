@@ -340,6 +340,13 @@ export const ru: Record<string, string> = {
   'refuge.offer':
     'Основное соединение противника идёт к докам. Мы можем задержать его, но для атаки комплекса придётся оставить вам меньше сил',
   'refuge.offer.accept': 'Охранять доки',
+  'module-reward.received': 'Модуль получен',
+  'module-reward.upgraded': 'Новая звезда!',
+  'module-reward.progress': 'Звёздность: {from} → {to}',
+  'module-reward.saved': 'Уже в твоём арсенале',
+  'module-reward.continue': 'Продолжить',
+  'module-reward.close': 'Закрыть все награды',
+  'module-reward.remaining': 'Ещё наград: {n}',
   'chain.title': 'Операция главы',
   'chain.contact': 'Связь: прибыть к точке встречи',
   'chain.archive': 'Архив: очистить станцию от Роя',

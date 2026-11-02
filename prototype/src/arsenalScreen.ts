@@ -630,6 +630,8 @@ export interface ArsenalHost {
   readCache(): unknown;
   /** Persist a freshly fetched collection for the current callsign. */
   writeCache(items: readonly ArsenalItem[]): void;
+  /** A validated server inventory, never the cached starter preview. */
+  confirmed?(items: readonly ArsenalItem[]): void;
   /** Open the codex card for a `<kind>:<defId>` key. */
   openCodex(key: string): void;
   /** HTTP base + session token, or null when there is no server, no accounts, or no session
@@ -689,6 +691,7 @@ export function initArsenal(host: ArsenalHost): {
       forgotten = false;
       items = parseArsenalItems(view.items);
       host.writeCache(items);
+      host.confirmed?.(items);
     },
     ...(host.changed ? { changed: () => host.changed!() } : {}),
     ...(host.requestId ? { requestId: () => host.requestId!() } : {}),
