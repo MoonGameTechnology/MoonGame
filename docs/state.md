@@ -666,7 +666,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 
 **Соло и ИИ.**
 - Ядро в браузере: `protoKernel.ts` `MODULES` — весь каталог плюс `hunger.ts` и `botDiplomacy.ts`;
-  ИИ мест — `ai.ts`; карты — `mapCatalog.ts` (`MAP_IDS`; `nexus`, `frontier-*` — для старых).
+  ИИ мест — `ai.ts`, ход бота по фазам — `aiTurn/` (сверка правок бота — `prototype/aitrace.mjs`);
+  карты — `mapCatalog.ts` (`MAP_IDS`; `nexus`, `frontier-*` — для старых).
 - Мир обычной соло-схватки считает отдельный поток (`simWorker.ts`, экранная сторона —
   `simLink.ts`, драйвер кадра — `simDriver.ts`): шаг — ядро, затем `soloDrivers.ts` — ИИ, авто-штурм, сведение флотов,
   авто-отход, цепочки; отлучку не догоняет. Присланный мир экран берёт не чаще раза в 100 мс,

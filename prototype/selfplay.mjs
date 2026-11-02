@@ -25,8 +25,8 @@
 //
 // Fairness controls per match index i: starts swap on i%2, the ORDERED faction pair
 // cycles on (i>>1)%12 — so "win rate by slot", "by faction" and "by start" separate cleanly.
-import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
+import { botSource } from './botSource.mjs';
 
 const N = Math.max(1, Number(process.argv[2] ?? 20) || 20);
 const BASE_SEED = process.argv[3] ?? 'sp';
@@ -923,12 +923,9 @@ const seededOnly = neverBuilt.filter((k) => seededTotal.has(k));
 // AI-BAL-10 (остаток): ноль построек — симптом, а не диагноз. Делим по ПРОВЕРЯЕМОМУ
 // признаку — упоминает ли исходник бота эту сущность строковым литералом, — потому что
 // «бот не умеет» и «бот умеет, но условие не наступает» лечатся в разных местах: первое
-// в `ai.ts` (или нигде — механики нет), второе в контенте. Список в харнесе устарел бы
-// молча, исходник — нет.
-const { offRepertoire, unbuilt } = splitDeadContent(
-  zeros,
-  readFileSync('prototype/src/ai.ts', 'utf8'),
-);
+// в боте (`botSource.mjs`; или нигде — механики нет), второе в контенте. Список в харнесе
+// устарел бы молча, исходник — нет.
+const { offRepertoire, unbuilt } = splitDeadContent(zeros, botSource());
 const topTech = [...techTotal.entries()]
   .sort((a, b) => b[1] - a[1])
   .slice(0, 12)

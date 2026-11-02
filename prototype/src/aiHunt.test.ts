@@ -1,6 +1,6 @@
 // Охота отстающего (снежный ком, 2026-09-28): флот места, которое ОТСТАЁТ по очкам
 // провинций на войне, выбирает цель по «расстояние ÷ ценность», а не ближайшую. Лидер
-// идёт к ближайшему, как раньше. Замер и довод — у `huntWeight` в `ai.ts`.
+// идёт к ближайшему, как раньше. Замер и довод — у `huntWeight` в `aiTurn/fleets.ts`.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
 import { data } from './gameData';
