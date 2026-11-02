@@ -80,7 +80,8 @@
     "smoke:apk-site": "node prototype/apksitetest.mjs",
     "smoke:onboarding": "pnpm run prototype && node prototype/onboardingtest.mjs",
     "smoke:training": "pnpm run prototype && node prototype/trainingtest.mjs",
-    "smoke:troop-timers": "pnpm run prototype && node prototype/trooptransferstest.mjs"
+    "smoke:troop-timers": "pnpm run prototype && node prototype/trooptransferstest.mjs",
+    "smoke:transfer-fps": "pnpm run prototype && node prototype/transferfxfpstest.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

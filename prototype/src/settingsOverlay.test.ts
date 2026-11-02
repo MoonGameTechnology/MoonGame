@@ -21,6 +21,7 @@ const viewOf = (over: Partial<SettingsView> = {}): SettingsView => ({
   starfield: true,
   motion: true,
   fps: false,
+  frameRate: '60',
   soundOn: true,
   volume: 0.5,
   youColor: '#00ffcc',
@@ -172,6 +173,7 @@ function wired(over: Partial<SettingsHost> = {}, view: SettingsView = viewOf()) 
     setStarfield: (v) => calls.push(['starfield', v]),
     setMotion: (v) => calls.push(['motion', v]),
     setFps: (v) => calls.push(['fps', v]),
+    setFrameRate: (v) => calls.push(['frameRate', v]),
     setSound: (v) => calls.push(['snd', v]),
     setVolume: (v) => calls.push(['vol', v]),
     previewSound: () => previews++,
@@ -183,6 +185,20 @@ function wired(over: Partial<SettingsHost> = {}, view: SettingsView = viewOf()) 
 }
 
 describe('настройки — разметка', () => {
+  it('режимы FPS доступны из «Графики»; выбор отдаётся владельцу без перезагрузки окна', () => {
+    const { api, win, calls } = wired({}, viewOf({ frameRate: '90' }));
+    api.open();
+    win.tab('graphics');
+    expect(win.html()).toContain('value="90" selected');
+    expect(win.html()).toContain('value="auto"');
+    const select = win.node('set-frame-rate')!;
+    select.value = '120';
+    win.fire('set-frame-rate');
+    expect(calls).toContainEqual(['frameRate', '120']);
+    select.value = '999';
+    win.fire('set-frame-rate');
+    expect(calls.filter(([name]) => name === 'frameRate')).toHaveLength(1);
+  });
   it('«Управление»: на ПК — клавиши и жесты, на телефоне — только жесты (UX-KEYS-1)', () => {
     const pc = settingsBoxHtml(viewOf(), false, 'controls');
     const phone = settingsBoxHtml(viewOf({ touchOnly: true }), false, 'controls');
@@ -245,7 +261,7 @@ describe('настройки — разметка', () => {
 
   const HOME: Record<string, readonly string[]> = {
     sound: ['set-snd', 'set-snd-vol'],
-    graphics: ['set-ui-scale', 'set-window-opacity', 'set-map-sharp', 'set-glow', 'set-starfield', 'set-motion', 'set-fps'],
+    graphics: ['set-ui-scale', 'set-window-opacity', 'set-map-sharp', 'set-glow', 'set-starfield', 'set-motion', 'set-frame-rate', 'set-fps'],
     map: ['set-sweep', 'set-ownpings', 'set-colyou', 'set-colneutral', 'set-colreset'],
     controls: [],
   };

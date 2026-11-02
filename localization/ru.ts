@@ -4632,6 +4632,10 @@ export const ru: Record<string, string> = {
   'settings.bar.reset': 'Вернуть как было',
   'settings.done': 'Готово',
   'settings.gfx.fps': 'Счётчик FPS',
+  'settings.gfx.frame-rate': 'Лимит частоты кадров',
+  'settings.gfx.frame-rate.auto': 'По частоте экрана',
+  'settings.gfx.frame-rate.hint': 'выше лимит — больше расход батареи; фактический FPS зависит от устройства и экрана',
+  'settings.gfx.frame-rate.value': '{n} FPS',
   'settings.gfx.fps.hint': 'показывать кадры в секунду в углу — для проверки производительности',
   'settings.gfx.glow': 'Свечение и ореолы',
   'settings.gfx.glow.hint':

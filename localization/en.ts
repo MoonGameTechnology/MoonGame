@@ -4627,6 +4627,10 @@ export const en: Record<string, string> = {
   'settings.bar.reset': 'Restore default',
   'settings.done': 'Done',
   'settings.gfx.fps': 'FPS counter',
+  'settings.gfx.frame-rate': 'Frame rate limit',
+  'settings.gfx.frame-rate.auto': 'Match display refresh rate',
+  'settings.gfx.frame-rate.hint': 'higher limits use more battery; actual FPS depends on your device and display',
+  'settings.gfx.frame-rate.value': '{n} FPS',
   'settings.gfx.fps.hint': 'show frames per second in the corner — to check performance',
   'settings.gfx.glow': 'Glow & haloes',
   'settings.gfx.glow.hint':

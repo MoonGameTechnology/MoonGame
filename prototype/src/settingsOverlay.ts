@@ -25,6 +25,7 @@ import { PUSH_KIND_LABEL, PUSH_KINDS, type PushKind } from '../../decisions/push
 import { RATE_UNITS, RATE_WORD_KEY, type RateUnit } from '../../decisions/rateUnit';
 import type { PushView } from './pushSetup';
 import { matchNumberText } from '../../decisions/matchNumber';
+import { FRAME_RATES, isFrameRate, type FrameRate } from '../../decisions/frameRate';
 
 /** Снимок всех настроек на момент отрисовки. */
 export interface SettingsView {
@@ -44,6 +45,7 @@ export interface SettingsView {
   renderCompatibilityActive?: boolean;
   renderCompatibilitySupported?: boolean;
   fps: boolean;
+  frameRate: FrameRate;
   soundOn: boolean;
   /** Громкость звука, 0..1. */
   volume: number;
@@ -373,6 +375,10 @@ function graphicsHtml(view: SettingsView, renderingReportAvailable: boolean): st
       view.starfield,
     ) +
     switchRow('motion', t('settings.gfx.motion'), t('settings.gfx.motion.hint'), view.motion) +
+    `<div class="set-row"><label class="set-lbl" for="set-frame-rate">${t('settings.gfx.frame-rate')}<span id="set-frame-rate-hint" class="set-sub">${t('settings.gfx.frame-rate.hint')}</span></label>` +
+    `<div class="set-ctl"><select id="set-frame-rate" class="set-frame-rate" aria-describedby="set-frame-rate-hint">` +
+    FRAME_RATES.map((mode) => `<option value="${mode}"${view.frameRate === mode ? ' selected' : ''}>${mode === 'auto' ? t('settings.gfx.frame-rate.auto') : t('settings.gfx.frame-rate.value', { n: Number(mode) })}</option>`).join('') +
+    `</select></div></div>` +
     switchRow('fps', t('settings.gfx.fps'), t('settings.gfx.fps.hint'), view.fps) +
     (view.renderCompatibilitySupported
       ? switchRow(
@@ -412,6 +418,7 @@ export interface SettingsHost {
   /** Локальный технический отчёт; читается только по запросу игрока. */
   renderingReport?(): string;
   setFps(v: boolean): void;
+  setFrameRate(mode: FrameRate): void;
   setSound(v: boolean): void;
   setVolume(v: number): void;
   /** Короткий отклик: включил звук или двигаешь громкость — слышно, что именно вышло. */
@@ -496,6 +503,10 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
     toggle('starfield', host.setStarfield);
     toggle('motion', host.setMotion);
     toggle('fps', host.setFps);
+    const frameRate = q<HTMLSelectElement>('set-frame-rate');
+    frameRate?.addEventListener('change', () => {
+      if (isFrameRate(frameRate.value)) host.setFrameRate(frameRate.value);
+    });
     // Push: ответ приходит после разрешения браузера и сервера — перерисовка по нему, а
     // не по галочке (отказ браузера оставляет выключатель выключенным).
     const pushToggle = q<HTMLInputElement>('set-push');
