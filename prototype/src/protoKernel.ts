@@ -8,60 +8,8 @@ import { mapPreset, victoryFor } from './mapCatalog';
  * everything for `main.ts`/`netserver.ts`/tests (until REFP-28).
  */
 import {
+  GAME_MODULES,
   createKernel,
-  economyModule,
-  effectsModule,
-  salvageModule,
-  loadoutEffectsModule,
-  minefieldModule,
-  rendezvousModule,
-  extractionModule,
-  operationModule,
-  captiveModule,
-  autoMergeModule,
-  seatClaimModule,
-  visibilityModule,
-  movementModule,
-  factionModule,
-  sprawlModule,
-  heroModule,
-  heroEffectsModule,
-  combatModule,
-  orbitalModule,
-  interceptModule,
-  captureOnArrivalModule,
-  sectorModule,
-  planetTypeModule,
-  constructionModule,
-  arsenalSyncModule,
-  stationModule,
-  armyModule,
-  promotionModule,
-  veteranModule,
-  victoryModule,
-  technologyModule,
-  espionageModule,
-  stewardModule,
-  diplomacyModule,
-  shuttleModule,
-  forcedMarchModule,
-  instantRepairModule,
-  taxModule,
-  capitalModule,
-  scientistModule,
-  standingOrdersModule,
-  fleetOpsModule,
-  autoRallyModule,
-  marketModule,
-  traderModule,
-  rocketMinesModule,
-  fleetBroodModule,
-  pveModule,
-  swarmMemoryModule,
-  swarmNetModule,
-  swarmAdaptModule,
-  swarmJournalModule,
-  missionFactsModule,
   resolveMatchConfig,
   type GameModule,
   type HookQuery,
@@ -73,125 +21,10 @@ import {
   type DomainEvent,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
-import { hungerModule } from './hunger';
-import { botDiplomacyModule } from './botDiplomacy';
 
-export const MODULES: GameModule[] = [
-  sectorModule,
-  planetTypeModule,
-  taxModule, // civic tax on inhabited worlds (hooks economy.production, after planetType)
-  factionModule, // H3: чисто пассивные бонусы дома (production / fleet.speed / combat.damage)
-  // BAL-10: налог на рост державы. После `tax` обязательно — множитель должен задеть и
-  // гражданский налог; с остальными вкладами (чистые множители) порядок на число не влияет.
-  sprawlModule,
-  hungerModule, // ECON-1: food в arrears → наземный урон ×0.75 (корабли едят кредиты)
-  economyModule,
-  movementModule,
-  heroModule, // projection hero: fleet combat aura (+5%) + death/respawn
-  heroEffectsModule, // first hero.effect.<type> capability provider: recall (warp ship home)
-  // The combat family (split along the bus seams). Order matters (invariant #6):
-  // orbital stamps orbit on fleet.arrived BEFORE combat engages, and runs its
-  orbitalModule, // the single near-orbit: stationing, AA fire, bombardment
-  combatModule, // melee battles: engage / tick / assault / retreat / capture
-  // PERK-3.1: надбавка за пережитые бои. Место то же, что в серверном `DEV_MODULES`, и
-  // оно не про порядок хуков — все вклады в `combat.damage` перемножаются, так что
-  // порядок внутри группы на число не влияет. Списков два, и разъезжались они тут уже не
-  // раз (PVR-0.2/FORT-0.2/FOG-10 ниже): модуль, который есть у сервера и нет здесь, на
-  // живом хосте не сработает НИ РАЗУ.
-  veteranModule,
-  interceptModule, // schedules lane-crossing meetings (resolved by combat)
-  captureOnArrivalModule, // walk-in capture now a kernel rule (was client-side seizeSector)
-  // EVT-2: трофеи победителю. Стоит ПЕРЕД `construction` намеренно и это единственное
-  // его ребро по порядку: гибель крепости оба модуля слышат одним событием
-  // (`station.destroyed`), и стройка сносит постройки, по которым салваж считает цену.
-  salvageModule,
-  constructionModule,
-  arsenalSyncModule, // LARS-1: server-driver refresh of live build-catalog ownership (bypasses gate)
-  // FORT-0.2: КОСМИЧЕСКАЯ КРЕПОСТЬ наконец достижима на хосте, где играют. Модуль давно
-  // был и в ядре, и в серверном `DEV_MODULES`, но не здесь — то есть механика существовала
-  // и при этом не могла сработать НИ РАЗУ. Место то же, что у сервера (сразу за
-  // `arsenalSync`), чтобы два списка читались одинаково.
-  stationModule, // station.deploy: свой узел → крепость, дальше на ней строят
-  technologyModule, // session research: branch/day-gated techs → effect bonuses + content unlocks
-  // CONV-5: совет учёных наконец влияет на партию, а не только на пилюлю слотов.
-  // Врезка в `techTree.ts` рисовала «+1 слот» от Полимата, но модуля, который его
-  // даёт, в этом ядре не было — редьюсер отказывал третьему исследованию
-  // (`E_RESEARCH_SLOTS_FULL`). Сразу за technologyModule, как в `DEV_MODULES`:
-  // модуль вешает только хук `research.slots`, других рёбер у него нет.
-  scientistModule,
-  stewardModule, // «Хранитель»: delegate the seat to the AI while you sleep (gated by the Steward tech)
-  armyModule,
-  // PVR-0.2: волны Роя наконец достижимы на хосте, где играют. Тот же класс, что FORT-0.2
-  // и FOG-10: модуль был и в ядре, и в серверном `DEV_MODULES`, но не здесь — механика
-  // существовала, была покрыта тестами и не могла сработать НИ РАЗУ. Место то же, что у
-  // сервера (вплотную перед `victory`), потому что `victoryModule` ЧИТАЕТ `state.pve` и
-  // судит кооп-исход (`pve-failed`/`pve-cleared`) первым — встань `pve` после него, и
-  // первая волна попала бы в вердикт только следующим ходом часов.
-  pveModule, // PVE-3: волны NPC, вооружается секцией `pve` режима матча (в PvP инертен)
-  fleetBroodModule, // paid onboard growth of ground organisms; after wave creation
-  swarmMemoryModule, // PVR-4.2: наблюдения завершённых столкновений; только пишет факты
-  swarmNetModule, // сеть Роя: знание течёт только по связи ретрансляторов и центров данных
-  swarmAdaptModule, // PVR-4.3: проект развития модуля Роя; читает память, платит, растит
-  swarmJournalModule, // PVR-4.5: что игрок ВИДЕЛ про ответы Роя; зеркало swarmMemory
-  missionFactsModule, // факты для задач забега: удержание, потери, эвакуация
-  victoryModule, // terminal match state from authoritative state (domination / elimination / score / timeout)
-  fleetOpsModule, // fleet.launch/merge/split/engage — модуль ЯДРА (CONV-8)
-  // PERK-3.2: бросок промоушена. СТРОГО ПЕРЕД `autoRally` — оба слушают `unit.built`,
-  // и авто-сбор уносит свежие корабли из гарнизона во флот; отметить надо до переезда.
-  promotionModule,
-  // CONV-10: авто-сбор построенного (BF-29) переехал В ЯДРО — это последняя
-  // механика, которую прототип держал один; канон её теперь тоже грузит.
-  autoRallyModule,
-  diplomacyModule, // CORE D2+D3 (D4): escalation/consent offers; combat reads state.diplomacy
-  espionageModule, // SPY-1 core module: espionage.spy → time-boxed intel windows (state.intel)
-  botDiplomacyModule, // bots: friendly-by-default favour meter → embargo/war only when provoked
-  marketModule, // session resource market: two-sided order book (sell/buy lots), embargo-gated
-  capitalModule, // designatable capital (hero respawn / module re-fit anchor)
-  standingOrdersModule, // CC-2/RETR-2/CC-1 standing orders (auto-storm / auto-retreat / chains), server-driven
-  shuttleModule, // SQ: free-space movement for shuttles (strike/return off the lane graph)
-  forcedMarchModule, // BOOST-1 форс-марш: +50% скорости за 5% max-HP износа в час хода
-  instantRepairModule, // платный мгновенный ремонт корпуса (кредиты как премиум-валюта)
-  effectsModule, // EFX-1: интерпретатор data.events (trigger→effect); инертен, пока events: {} пуст
-  seatClaimModule, // ENTRY-3: заявка на место (дом + совет учёных) действием, а не мутацией
-  // мимо редьюсера — иначе выбор не попадает в лог и реплей воспроизводит партию иначе.
-  // В КОНЕЦ намеренно: модуль не вешает ни хуков, ни подписок на чужие события, поэтому
-  // относительный порядок всех остальных остаётся нетронутым (инвариант #6).
-  //
-  // FOG-10. Память тумана (вариант B): пишет `state.fog` — последний известный снимок
-  // каждого опознанного мира, а `visibleState` показывает по нему серые «последние
-  // известные» миры. Модуль был в списке `packages/server`, но НЕ в этом, а живой хост
-  // (`prototype/netserver.ts`) крутит именно этот список — значит на сервере `state.fog`
-  // не писался никогда. Прототип этого не замечал, потому что держал свою память в
-  // браузере (`scanMemory.ts`): пока вкладка жива, карта рисуется верно, а перезагрузил
-  // страницу — вся разведка забыта, разведанные лично миры снова «?».
-  // Тоже в КОНЕЦ и по той же причине: подписки у него только на СВОИ поводы
-  // (`time.advanced`, `planet.captured`, `fleet.arrived`), хуков нет, чужого порядка он
-  // не трогает.
-  visibilityModule,
-  // Торговец экспедиции («живой курс», решение владельца 2026-09-26): оживает только в
-  // режиме с разделом `trader`. В КОНЕЦ по той же причине, что два соседа выше: у него нет
-  // ни хуков, ни подписок — только свои действия, чужой порядок он не трогает.
-  traderModule,
-  // Фаза 3 модулей кораблей: те же два модуля и то же место, что в серверном `DEV_MODULES`
-  // (в конец, после торговца). Правило и причина — там.
-  loadoutEffectsModule,
-  minefieldModule,
-  rocketMinesModule, // isolated road-weapon timers; preserve all existing module order
-  // Сценарный союзник главы IV (PVR-7.2): слушает `fleet.arrived` и ставит стойку по месту
-  // встречи. В КОНЕЦ — то же место, что в серверном `DEV_MODULES`.
-  rendezvousModule,
-  // Накопитель архива главы IV (PVR-7.3): после союзника — слушает его `ally.contact`.
-  extractionModule,
-  // Контракт операции главы VI (PVR-8.3): то же место, что в серверном `DEV_MODULES`, —
-  // вплотную перед автослиянием.
-  operationModule,
-  // Пленный главы V (PVR-9.5): своё действие и свои поводы, хуков нет. То же место, что в
-  // серверном `DEV_MODULES`, — перед автослиянием.
-  captiveModule,
-  // Автослияние на прибытии (заказ владельца 2026-10-03). В САМЫЙ КОНЕЦ — то же место, что в
-  // серверном `DEV_MODULES`: прибытие сначала слышат все, потом флот вливается в стоявший.
-  autoMergeModule,
-];
+// Состав и порядок модулей — общий с каноническим сервером список ядра (SLIM-4,
+// `packages/shared-core/src/gameModules.ts`); правка там поднимает версию манифеста.
+export const MODULES: GameModule[] = GAME_MODULES;
 
 export const kernel = createKernel(MODULES);
 

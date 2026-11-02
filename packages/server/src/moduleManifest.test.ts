@@ -22,7 +22,7 @@
  * решение, и молча расширять контракт тестом было бы неправильно.
  */
 import { describe, expect, it } from 'vitest';
-import { createKernel } from '@void/shared-core';
+import { createKernel, GAME_MODULES } from '@void/shared-core';
 import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData } from './scenario';
 
 /** Версия манифеста, для которой закреплён список ниже. Разъехалась с
@@ -124,7 +124,12 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 92: ЧЛЕНСТВО — снят `fleet-repair` (ремонт за металл у дока, заказ владельца 2026-11-01);
 // combat 3.10.0 — наземные выжившие уходят из боя с ранами; construction 1.8.0 —
 // залеченный госпиталем стек сливается с целыми.
-const PINNED_FOR_VERSION = '93';
+// 93: порядок тот же; orbital 1.6.0 — обстрел залпом раз в игровой час (`Fleet.bombardNextAt`).
+// 94: ЧЛЕНСТВО И ПОРЯДОК — один список модулей на оба хоста (SLIM-4,
+// `shared-core/src/gameModules.ts`). Взят порядок прод-хоста: вошли `hunger` и
+// `bot-diplomacy`, `faction`/`sprawl` встали за `tax`, `diplomacy`/`espionage`/`market` —
+// за `auto-rally`, `pve` и семья Роя — сразу за `army`. Партии прод-хоста не тронуты.
+const PINNED_FOR_VERSION = '94';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -132,21 +137,19 @@ const PINNED_MODULE_IDS = [
   'sector',
   'planet-type',
   'tax',
+  'faction',
+  'sprawl', // BAL-10: после `tax` — множитель задевает и гражданский налог
+  'hunger', // ECON-1: еда в долгах — наземный урон ×0.75
   'economy',
   'movement',
   'hero',
   // CORE-PARITY: провайдеры `hero.effect.<type>` стоят сразу за героем — они вешают
   // хуки `combat.damage` (аура), а место в конвейере значений и есть предмет договора.
   'heroEffects',
-  'diplomacy',
-  'espionage',
-  // Боевая семья, разложенная по швам шины: orbital штампует орбиту до combat,
-  // а свой залп отрабатывает до artillery.
+  // Боевая семья, разложенная по швам шины: orbital штампует орбиту до combat.
   'orbital',
   'combat',
   // PERK-3.1: надбавка за пережитые бои читает счётчик, который начисляет `combat`.
-  // На число место не влияет — вклады в `combat.damage` перемножаются, — но членство
-  // графа это меняет, и версия манифеста поднята именно поэтому.
   'veteran',
   'intercept',
   'capture-on-arrival',
@@ -157,20 +160,8 @@ const PINNED_MODULE_IDS = [
   'technology',
   'scientist',
   'steward',
-  'faction',
-  'sprawl',
-  'market',
   'army',
-  'fleet-ops',
-  // PERK-3.2: бросок промоушена обязан пройти ДО того, как авто-сбор унесёт свежие
-  // корабли из гарнизона во флот — оба слушают `unit.built`.
-  'promotion',
-  'auto-rally',
-  'shuttle',
-  'capital',
-  'standing-orders',
-  'instant-repair',
-  'forced-march',
+  // PVR-0.2: волны и семья Роя вплотную перед `victory`, который читает `state.pve`.
   'pve',
   'fleetBrood',
   'swarmMemory',
@@ -179,15 +170,29 @@ const PINNED_MODULE_IDS = [
   'swarmJournal',
   'missionFacts', // задачи забега 2026-09-24: удержание, потери, беженцы
   'victory',
-  'visibility',
+  'fleet-ops',
+  // PERK-3.2: бросок промоушена обязан пройти ДО того, как авто-сбор унесёт свежие
+  // корабли из гарнизона во флот — оба слушают `unit.built`.
+  'promotion',
+  'auto-rally',
+  'diplomacy',
+  'espionage',
+  'bot-diplomacy', // шкала расположения ботов; без счётчика (`approval`) инертен
+  'market',
+  'capital',
+  'standing-orders',
+  'shuttle',
+  'forced-march',
+  'instant-repair',
   // 'division' СНЯТ ОСОЗНАННО (H4-REVERT, 2026-07-31), не потерян при правке.
   // Игра вернулась к системе отдельных наземных юнитов: armyModule возит UnitStack'и
   // между гарнизоном и трюмом, combatModule разрешает десант — этот путь никогда не
   // исчезал, дивизии стояли ПАРАЛЛЕЛЬНО ему. Прежде чем вписывать 'division' обратно,
   // прочти причину отката в docs/backlog.md: возврат строки откатывает решение
-  // владельца, а не чинит опечатку.,
+  // владельца, а не чинит опечатку.
   'effects',
   'seatClaim',
+  'visibility', // FOG-10: память тумана
   'trader', // торговец экспедиции («живой курс»): только свои действия
   'loadoutEffects', // SM-3.1/3.2: стат носителя вливается в чужие хуки
   'minefield', // SM-3.4: минные поля
@@ -211,6 +216,13 @@ describe('сторож манифеста', () => {
     // Правили DEV_MODULES? Поднимите MODULE_MANIFEST_VERSION (scenario.ts) и перенесите
     // новый порядок сюда — иначе живые матчи молча доиграются на другом графе модулей.
     expect(ids).toEqual(PINNED_MODULE_IDS);
+  });
+
+  it('сервер грузит общий список ядра, а не свою копию (SLIM-4)', () => {
+    // Двух списков больше нет: прототип берёт тот же `GAME_MODULES` (сторож рядом с
+    // `protoKernel.ts`). Своя копия здесь снова дала бы модуль, который на одном хосте есть,
+    // а на другом не срабатывает ни разу.
+    expect(DEV_MODULES).toBe(GAME_MODULES);
   });
 
   it('свежий матч штампует эту версию в state.version.manifest', () => {

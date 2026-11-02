@@ -152,7 +152,7 @@ JSONL. Root guard контролирует свободный диск, inode и
 packages/
   shared-core/src/     ядро: детерминированная симуляция без сети и БД
     kernel/            kernel.ts: createKernel, applyAction, advanceTo, canApply; module.ts
-    modules/           53 модуля механик; порядок ядра — DEV_MODULES в server/src/scenario.ts
+    modules/           55 модулей механик; порядок ядра — GAME_MODULES в gameModules.ts
     state/             gameState.ts (GameState), visibility.ts (туман), buildFromMap.ts (посев)
     action/, actions/  types.ts (Action, Context, MatchConfig), matchMode.ts; payloadSchemas.ts
     data/              schemas.ts (zod-схемы GameData), mapSchema.ts, loadGameData.ts
@@ -164,7 +164,7 @@ packages/
   client/src/          PWA: main.ts, session.ts (вход), matchHud.ts + hudView.ts, multiplayer.ts
 prototype/             то, во что играют: клиент и игровой хост
   src/main.ts          клиент: карта, HUD, окна, ввод
-  src/protoKernel.ts   MODULES прототипа (55) и проба приказов canOrder
+  src/protoKernel.ts   ядро прототипа на GAME_MODULES и проба приказов canOrder
   src/matchSetup.ts    newGame: посев партии; src/game.ts — фасад реэкспортов
   netserver.ts         хост HTTP+WS; bundle-netserver.mjs → packages/server/dist/proto-server.mjs
   build.mjs            сборка клиента в HTML-файлы prototype/dist/
@@ -232,9 +232,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 
 ## 5. Модули ядра
 
-53 модуля в `packages/shared-core/src/modules`, по файлу на механику; порядок исполнения —
-`DEV_MODULES` (`packages/server/src/scenario.ts`), счётчики сборок — §9. Модули не импортируют
-друг друга: события, хуки и возможности, а без модуля работает базовый дефолт
+55 модулей в `packages/shared-core/src/modules`, по файлу на механику; порядок исполнения —
+`GAME_MODULES` (`packages/shared-core/src/gameModules.ts`), один на оба хоста, счётчик — §9.
+Модули не импортируют друг друга: события, хуки и возможности, а без модуля работает базовый дефолт
 ([modulesystem.md](modulesystem.md)). События и хуки по модулям — [CODE-MAP.md](../CODE-MAP.md).
 
 - **Приказы.** Модули обрабатывают 86 типов действий, игрок может прислать 74: у каждого есть
@@ -684,7 +684,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Слово-термин (`termTip.ts`) открывает статью `GLOSSARY` справочника (`codexIndex.ts`).
 
 **Соло и ИИ.**
-- Ядро в браузере: `protoKernel.ts` `MODULES` — весь каталог плюс `hunger.ts` и `botDiplomacy.ts`;
+- Ядро в браузере: `protoKernel.ts` на общем списке ядра `GAME_MODULES`;
   ИИ мест — `ai.ts`, ход бота по фазам — `aiTurn/` (сверка правок бота — `prototype/aitrace.mjs`);
   карты — `mapCatalog.ts` (`MAP_IDS`; `nexus`, `frontier-*` — для старых).
 - Мир обычной соло-схватки считает отдельный поток (`simWorker.ts`, экранная сторона —
@@ -904,19 +904,18 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 Готовность по этапам и продуктам — [readiness.md](readiness.md), путь к выпуску —
 [release-path.md](release-path.md). Здесь — состав ядра и технические долги.
 
-**53 модуля** на микроядре: столько файлов в `packages/shared-core/src/modules` (без тестов).
-Оба хоста собирают весь каталог; прототип сверх него грузит два своих модуля из
-`prototype/src` (`hunger`, `botDiplomacy`): в ядре их нет, и серверу они не нужны.
+**55 модулей** на микроядре: столько файлов в `packages/shared-core/src/modules` (без тестов).
+Оба хоста собирают весь каталог одним списком (SLIM-4): `MODULES` прототипа и `DEV_MODULES`
+канонического сервера — это `GAME_MODULES` из ядра.
 
 | Сборка | Модулей | Состав |
 | --- | --: | --- |
-| `DEV_MODULES` (канонический сервер, `scenario.ts`) | **53** | весь каталог ядра |
-| `MODULES` (ядро прототипа, `protoKernel.ts`) | **55** | каталог + `hunger`, `botDiplomacy` |
+| `GAME_MODULES` (оба хоста, `gameModules.ts`) | **55** | весь каталог ядра |
 
-§9 — единственный дом этих чисел: `scripts/docs-check.mjs` сверяет их с кодом (файлы каталога,
-закреплённый список `moduleManifest.test.ts`, массив `MODULES`), другие доки ссылаются сюда.
-Состав и порядок `DEV_MODULES` — инвариант 6: правка без подъёма `MODULE_MANIFEST_VERSION`
-(`scenario.ts`) роняет `moduleManifest.test.ts`. У `MODULES` прототипа такого сторожа нет.
+§9 — единственный дом этих чисел: `scripts/docs-check.mjs` сверяет их с кодом (файлы каталога и
+закреплённый список `moduleManifest.test.ts`), другие доки ссылаются сюда. Состав и порядок —
+инвариант 6: правка без подъёма `MODULE_MANIFEST_VERSION` (`scenario.ts`) роняет
+`moduleManifest.test.ts`, а что оба хоста берут один массив, держат он же и `protokernel.test.ts`.
 
 ### ⚠️ Известные стопгапы и долги
 
@@ -1001,7 +1000,7 @@ coarse ≈ fine на полном стеке), `delta` (`applyDelta∘diffState 
 2. Ветка от свежего `main`, перед коммитом — `pnpm run check`, публикация — скилл `publish-pr`
    и [CONTRIBUTING.md](../CONTRIBUTING.md); в очередь слияния PR ставит `automerge.yml`.
 3. Новая механика — модуль в `packages/shared-core/src/modules` плюс данные; ядро не трогают.
-   Модуль подключают в `DEV_MODULES` и `MODULES`, поднимают `MODULE_MANIFEST_VERSION` и
+   Модуль подключают в `GAME_MODULES` (`gameModules.ts`), поднимают `MODULE_MANIFEST_VERSION` и
    перезакрепляют список в `moduleManifest.test.ts`. Текст игрока — ключ в `localization/`.
 4. После правки переписать устаревший факт здесь, а не дописывать рядом; закрытый этап —
    «Статус реализации» в [roadmap.md](roadmap.md). Порядок — скиллы `brick` и `sync-state-doc`.

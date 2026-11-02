@@ -813,6 +813,23 @@ export {
   turnedAgents,
 } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
+export { botDiplomacyModule } from './modules/botDiplomacy';
+export {
+  botFavour,
+  botEmbargoes,
+  FAVOUR_BASE,
+  FAVOUR_EMBARGO,
+  FAVOUR_WAR,
+  FAVOUR_PEACE_ACCEPT,
+  FAVOUR_PACT_ACCEPT,
+  FAVOUR_WAR_DECLARED_HIT,
+  FAVOUR_SPY_CAUGHT_HIT,
+  FAVOUR_WAR_DECAY_PER_DAY,
+  FAVOUR_HEAL_PER_DAY,
+  type ApprovalLedger,
+} from './state/botFavour';
+export { hungerModule, HUNGER_MULT } from './modules/hunger';
+export { GAME_MODULES } from './gameModules';
 
 export type { SwarmRepelRecord, MissionFacts } from './state/gameState';
 export { swarmNetPlan, RELAY_POST_TRAIT, type SwarmNetPlan } from './util/swarmNetTactics';

@@ -4,10 +4,11 @@ import type {
   DomainEvent,
   GameState,
   StateDelta,
+  ApprovalLedger,
 } from '../../packages/shared-core/src/index';
 import { declareWar, moveFleet } from '../../decisions/actions';
 import { parseSoloSave, type SoloSave } from '../../decisions/soloSave';
-import { approvalLedger, type ApprovalLedger } from './botFavour';
+import { approvalLedger } from './botFavour';
 import { HOUR } from './time';
 import { DEFAULT_SETUP, networkSeats, newGame } from './matchSetup';
 import { order } from './protoKernel';

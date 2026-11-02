@@ -2,23 +2,15 @@
  * Bot diplomacy — the favour meter reacts to a player's aggression. Bots are
  * passive-friendly (never start a war to expand); this module lowers favour on
  * wrongs, declares war back only at rock bottom, and mends favour in peace.
- * Extracted from `game.ts` (REFP-11): depends on `botFavour` (REFP-6) + the core
- * diplomacy helpers + `timeScaleOf`/`DAY`. `game.ts` imports `botDiplomacyModule`
- * for `MODULES`.
+ * Reads the favour scale (`state/botFavour.ts`) and the core diplomacy helpers.
+ * Inert where no host seeded the `approval` ledger. Lived in the prototype (REFP-11)
+ * until SLIM-4 gave both hosts one module list (`gameModules.ts`).
  */
-import type {
-  GameModule,
-  GameState,
-  MarketEmbargoCapability,
-} from '../../packages/shared-core/src/index';
-import {
-  clearOffers,
-  getStance,
-  hasFixedSides,
-  setStance,
-  timeScaleOf,
-  type DiplomaticStance,
-} from '../../packages/shared-core/src/index';
+import type { GameModule } from '../kernel/module';
+import type { DiplomaticStance, GameState } from '../state/gameState';
+import { timeScaleOf } from '../action/types';
+import { hasFixedSides } from '../action/matchMode';
+import { clearOffers, getStance, setStance } from '../state/diplomacy';
 import {
   FAVOUR_BASE,
   FAVOUR_EMBARGO,
@@ -31,9 +23,10 @@ import {
   FAVOUR_HEAL_PER_DAY,
   botFavour,
   botEmbargoes,
-} from './botFavour';
+} from '../state/botFavour';
+import type { MarketEmbargoCapability } from './market';
 
-/** Minimal view of the prototype's state extension for the approval meter. */
+/** Minimal view of the state extension for the approval meter. */
 interface ApprovalState extends GameState {
   approval?: Record<string, Record<string, number>>;
 }
@@ -46,7 +39,7 @@ export const botDiplomacyModule: GameModule = {
   setup(api) {
     // CONV-9: рынок ядра спрашивает эмбарго через капабилити, а не лезет в чужое
     // состояние. Владелец правила — этот модуль: счётчик расположения ботов живёт
-    // здесь. Хост без него (канонический сервер) получает базовый ответ «эмбарго нет».
+    // здесь. Где счётчик не посеян (канонический сервер), ответ базовый: «эмбарго нет».
     api.provideCapability<MarketEmbargoCapability>('market.embargo', {
       embargoed: (state, a, b) => botEmbargoes(state, a, b),
     });

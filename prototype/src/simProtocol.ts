@@ -21,10 +21,11 @@ import type {
   GameState,
   Player,
   StateDelta,
+  ApprovalLedger,
 } from '../../packages/shared-core/src/index';
 import { deepEqual } from '../../packages/shared-core/src/util/clone';
 import type { AiProfile } from './ai';
-import { approvalView, type ApprovalLedger } from './botFavour';
+import { approvalView } from './botFavour';
 import type { DriverOrder } from './soloSim';
 
 /** Экран → поток. */
