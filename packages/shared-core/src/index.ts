@@ -574,6 +574,8 @@ export {
   sumUnitStat,
   cappedUnitStat,
   COMBAT_UNIT_CAP,
+  GROUND_COMBAT_UNIT_CAP,
+  combatEfficiency,
   loadoutKey,
   starsOf,
   rarityOf,

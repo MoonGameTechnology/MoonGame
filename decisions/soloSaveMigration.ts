@@ -274,6 +274,17 @@ export const LOAD_FIRST_SOLO_MIGRATION = {
   toDataHash: FORTRESS_MODEL_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Combat echelons and post-loss replies retain the save's state shape. Existing
+ * hull/shield pools, orders, clocks and RNG survive; later volleys use the new rules. */
+export const ECHELONS_SOLO_MIGRATION = {
+  fromRules: LOAD_FIRST_SOLO_MIGRATION.toRules,
+  fromData: LOAD_FIRST_SOLO_MIGRATION.toData,
+  fromDataHash: LOAD_FIRST_SOLO_MIGRATION.toDataHash,
+  toRules: '00e914e2b0bfd3',
+  toData: '0.1.74',
+  toDataHash: '018c559c8a84a3',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -299,6 +310,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   HALF_MODULES_SOLO_MIGRATION,
   FORTRESS_MODEL_SOLO_MIGRATION,
   LOAD_FIRST_SOLO_MIGRATION,
+  ECHELONS_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

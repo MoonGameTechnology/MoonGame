@@ -188,7 +188,7 @@ describe('shipped maps resolve against the shipped catalogue', () => {
 
 /**
  * PVR-6.32 — старт главы по сложности забега (решение владельца 2026-09-26): на обычном
- * Рое у игрока в главе I гарнизон дома 6 вместо 9 и +3 крейсера. Карта объявляет это
+ * Рое у игрока в главе I гарнизон дома 6 вместо 9 и +6 крейсеров. Карта объявляет это
  * сама, блоком `difficultyStart`; `mapForDifficulty` заменяет им гарнизоны и флоты до
  * сборки мира.
  */
@@ -202,7 +202,7 @@ describe('старт главы по сложности (PVR-6.32)', () => {
     expect(count(base.sectors.home_a!.garrison)).toBe(9);
     expect(count(weak.sectors.home_a!.garrison)).toBe(6);
     expect(base.fleets.p1_2!.units).toEqual([{ unit: 'cruiser', count: 2 }]);
-    expect(weak.fleets.p1_2!.units).toEqual([{ unit: 'cruiser', count: 5 }]);
+    expect(weak.fleets.p1_2!.units).toEqual([{ unit: 'cruiser', count: 8 }]);
     // Остальное — та же карта: первый флот, чужие флоты и прочие сектора не тронуты.
     expect(weak.fleets.p1_1).toEqual(base.fleets.p1_1);
     expect(weak.fleets.p3_1).toEqual(base.fleets.p3_1);

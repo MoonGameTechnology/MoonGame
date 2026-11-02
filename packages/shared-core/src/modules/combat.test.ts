@@ -628,7 +628,7 @@ describe('combat — attack vs defense stats (return-fire mechanic)', () => {
     const p = round?.payload as { dmgToDefender: number; dmgToAttacker: number };
 
     expect(p.dmgToDefender).toBe(30); // A (aggressor) strikes with its attack stat
-    expect(p.dmgToAttacker).toBe(20); // D (standing) returns defense, not its attack (7)
+    expect(p.dmgToAttacker).toBe(20 * 0.7); // D (standing) returns defense, not its attack (7)
   });
 });
 
@@ -847,7 +847,7 @@ describe('combat — ships keep hull damage; ground troops keep their wounds too
     // Mid-battle the survivor carries a partial HP pool... Один раунд теперь приходится
     // на сам миг встречи (CMB-4), поэтому «после одного раунда» — это `ctx(0)`, а не час.
     const mid = okAdvance(kernel.advanceTo(started.state, ctx(0)));
-    expect(stackOf(mid.state.fleets.A, 'aggressor')?.hp).toBe(80);
+    expect(stackOf(mid.state.fleets.A, 'aggressor')?.hp).toBe(86);
     // ...and once the battle resolves the SHIP keeps its reduced hull — no auto-heal,
     // so a battered fleet limps off and only mends at a repair base (construction.ts).
     const r = okAdvance(kernel.advanceTo(started.state, ctx(6 * HOUR)));
@@ -1480,7 +1480,7 @@ describe('combat — штурм: ничейный гарнизон и бой н�
     // guardian: 100 hp, отвечает `defense` 20 — десантник (20 hp) падает в первом раунде.
     const st = baseState([a], [planet('X', null, 0, 0, [['guardian', 1]])]);
     const stormed = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
-    const r = okAdvance(kernel.advanceTo(stormed.state, ctx(LANDED)));
+    const r = okAdvance(kernel.advanceTo(stormed.state, ctx(LANDED + HOUR)));
     const round = r.events.find((e) => e.type === 'combat.round');
     const sides = (round?.payload as { sides: Array<{ owner: string | null; damage: number }> })
       .sides;
@@ -1534,7 +1534,7 @@ describe('combat — штурм: ничейный гарнизон и бой н�
   it('выигранный бой на орбите отпускает флот — плацдарм берёт мир без него', () => {
     // guardian отвечает 20 — истребитель подмоги (20 hp) падает в первом раунде.
     const { groundId, arrived } = ashore([['guardian', 1]], [['fighter', 1]], 5);
-    const r = okAdvance(kernel.advanceTo(arrived.state, ctx(LANDED)));
+    const r = okAdvance(kernel.advanceTo(arrived.state, ctx(LANDED + HOUR)));
     expect(r.state.fleets.R).toBeUndefined();
     expect(Object.keys(r.state.battles)).toEqual([groundId]);
     expect(r.state.fleets.A?.battleId ?? null).toBeNull(); // не заперт наземным боем

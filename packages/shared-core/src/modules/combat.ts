@@ -1,12 +1,10 @@
 import type { GameModule, HandlerContext, ActionHandler } from '../kernel/module';
 import type {
   Battle,
-  BattleSide,
   CombatantRef,
   Fleet,
   Planet,
   PlanetId,
-  PlayerId,
   UnitStack,
 } from '../state/gameState';
 import type { GameData } from '../data/schemas';
@@ -18,21 +16,8 @@ import { peekValues } from '../util/draft';
 import { isCapturable } from '../state/sectorKind';
 import { attacks, combatantKey, attackerOf, defenderOf, landingBattleOf, shipsEngaged } from '../state/battle';
 import type { FleetCourse } from './movement';
-import { splitVolley, volleyShare } from '../util/volley';
+import { battleExchanges } from '../util/battleExchanges';
 import {
-  addPools,
-  hasGroundTargets,
-  poolsTotal,
-  splitDealt,
-  targetedVolley,
-  type ClassPools,
-  type FireRole,
-} from '../util/groundTargets';
-import type { StackContribution } from '../util/stacks';
-import {
-  addHooked,
-  applyDamageToSide,
-  hookedDamage,
   INTERCEPT_TOL,
   isAllied,
   isHostile,
@@ -43,13 +28,10 @@ import {
   removeIfWiped,
   sideAlive,
   creditBattle,
-  creditVolley,
   earnsMerit,
-  sideDamageBreakdown,
   sideUnits,
   trunkOccupancies,
   trunkPosAt,
-  type HookedDamage,
 } from '../util/combat';
 import { legT } from '../state/fleetPosition';
 import { fleetHoldFree } from '../state/shuttle';
@@ -199,21 +181,6 @@ function ceasefired(h: HandlerContext, battle: Battle): boolean {
   // означало бы «неизвестно ⇒ мир» и разводило бы бой с ничейным гарнизоном — ровно то,
   // что запрещает правило «любая неопределённость → отказ, а не тихий проход».
   return comparable > 0;
-}
-
-/**
- * ASSAULT-1. Враждебны ли две стороны боя — для залпа.
- *
- * Ничейный гарнизон (`owner === null`) — враг всякому, кто пришёл его брать: стойки у
- * него нет, и мира с ним не бывает (см. `ceasefired`). Залп спрашивал только стойку
- * пары и ничейную сторону отбрасывал целиком — десант и гарнизон ничейного мира не
- * стреляли друг в друга вовсе, и штурм стоял до предохранителя `MAX_COMBAT_ROUNDS`
- * (240 раундов — полтора часа забега) с запертым над миром флотом. Двое ничейных друг
- * другу не враги: такого боя модель не заводит.
- */
-function sidesHostile(h: HandlerContext, a: string | null, b: string | null): boolean {
-  if (a === null || b === null) return a !== b;
-  return isHostile(h, a, b);
 }
 
 /** Pulls a fleet out of transit and pins it at a node (it now fights/holds). */
@@ -1097,59 +1064,6 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
  * (AA / bombardment) lives in `orbital`, and the
  * lane-crossing detector in `intercept` — each degrades gracefully on its own.
  */
-/**
- * ЗАЛП ПО НАЗЕМНЫМ ВОЙСКАМ (решение владельца 2026-09-25, `util/groundTargets.ts`). Та же
- * одновременность и тот же делёж, что у раунда флотов (MSB-2), с одним отличием: залп
- * зависит от ЦЕЛИ. Против каждого врага он считается под его состав — доля пехоты бьётся
- * уроном по пехоте, доля техники уроном по технике, — и ложится на врага раздельно по родам.
- *
- * Хук зовётся по-прежнему ОДИН раз на пару: разложение по родам идёт после него, в той же
- * пропорции (`splitDealt`), так что технологии, укрепления и ауры усиливают залп целиком,
- * а не одну его часть. Заслуга ветерана (VET-2) пишется по тем же строкам, из которых
- * сложен залп, — сумма залпов по всем врагам делится на их число, ровно как делится урон.
- */
-function groundVolleys(
-  h: HandlerContext,
-  battle: Battle,
-  side: BattleSide,
-  enemies: readonly BattleSide[],
-  role: FireRole,
-  incoming: Map<BattleSide, HookedDamage>,
-  byClass: Map<BattleSide, ClassPools>,
-): void {
-  const data = h.ctx.data;
-  const shooters = sideUnits(h.state, side.ref) ?? [];
-  const credit = new Map<number, StackContribution>();
-  let creditTotal = 0;
-  let landed = 0;
-  for (const target of enemies) {
-    const shot = targetedVolley(shooters, sideUnits(h.state, target.ref) ?? [], data, role);
-    const dealt = hookedDamage(h, volleyShare(shot.total, enemies.length), {
-      battleId: battle.id,
-      phase: battle.phase,
-      location: battle.location,
-      attacker: side.owner,
-      defender: target.owner,
-      ...(side.ref.kind === 'fleet' ? { attackerFleet: side.ref.fleetId } : {}),
-      ...(target.ref.kind === 'fleet' ? { defenderFleet: target.ref.fleetId } : {}),
-    });
-    const running = incoming.get(target);
-    incoming.set(target, running === undefined ? dealt : addHooked(running, dealt));
-    const pools = splitDealt(shot.pools, shot.total, dealt);
-    const had = byClass.get(target);
-    byClass.set(target, had === undefined ? pools : addPools(had, pools));
-    landed += dealt;
-    for (const row of shot.rows) {
-      const part = row.damage / enemies.length;
-      const prev = credit.get(row.index);
-      credit.set(row.index, prev ? { ...prev, damage: prev.damage + part } : { ...row, damage: part });
-      creditTotal += part;
-    }
-  }
-  if (earnsMerit(h.state, side.owner, data))
-    creditVolley(h.state, side.ref, { total: creditTotal, rows: [...credit.values()] }, landed);
-}
-
 export const combatModule: GameModule = {
   id: 'combat',
   // 3.0.0: личные часы атакующих; защита отвечает на полученные залпы.
@@ -1167,7 +1081,7 @@ export const combatModule: GameModule = {
   // 3.10.0: наземные выжившие уходят из боя с ранами; лечит их госпиталь, а не сам бой.
   // 3.11.0: флот, вставший у мира не прилётом (верфь, взлёт, раскол, герой), сходится с врагом.
   // 3.12.0: separate fortress hull/internal-system damage routing.
-  version: '3.12.0',
+  version: '4.0.0',
   setup(api) {
     api.provideCapability<BattlePullIn>('battle.pullIn', (at, h) => pullInBystanders(h, at));
     // Встал у мира без прилёта — бой, как у прибывшего (`util/standUp.ts`, баг 2026-11-02).
@@ -1574,7 +1488,6 @@ export const combatModule: GameModule = {
       if (!battle) {
         return; // already resolved
       }
-      const data = h.ctx.data;
       // MSB-1: гибель ЛЮБОЙ стороны закрывает бой — на двух это прежнее правило, а при N
       // это выбор владельца «цепочка: каждая смерть — конец боя» (§0.0 №5 роадмапа).
       if (battle.sides.some((side) => !sideAlive(h.state, side.ref))) {
@@ -1607,7 +1520,8 @@ export const combatModule: GameModule = {
           side.nextAttackAt = h.ctx.now;
         }
       }
-      const due = battle.sides.filter((s) => attacks(s) && s.nextAttackAt! <= h.ctx.now);
+      const due = battle.sides.filter((s) => attacks(s) && s.nextAttackAt! <= h.ctx.now)
+        .sort((a, b) => a.nextAttackAt! - b.nextAttackAt!);
       if (!due.length) return; // superseded event, never an extra volley
       delete battle.nextRoundAt;
       for (const side of due) {
@@ -1622,114 +1536,7 @@ export const combatModule: GameModule = {
         return;
       }
 
-      // РАУНД НА N СТОРОН (MSB-2, решение владельца §0.0 №1: «урон дробится на всех
-      // врагов»). Одновременный, из ПРЕДРАУНДОВОГО снимка: сперва считаются ВСЕ залпы, и
-      // только потом наносятся. Иначе сторона, обсчитанная первой, била бы по уже
-      // подбитым, и исход зависел бы от порядка обхода списка — то есть от порядка
-      // вступления в бой, который к силе залпа отношения не имеет.
-      //
-      // Роль принадлежит СТОРОНЕ, а не паре (MSB-1): атакующий бьёт `attack`,
-      // обороняющийся отвечает `defense`. При N участниках атакующими могут быть сразу
-      // несколько, и «атакующий ↔ обороняющийся» перестаёт описывать бой целиком.
-      const live = battle.sides.filter((side) => sideAlive(h.state, side.ref));
-      const incoming = new Map<BattleSide, HookedDamage>();
-      // Урон по роду войск (решение владельца 2026-09-25): против наземных войск залп
-      // считается под СОСТАВ цели и ложится по родам — пехоте своё, технике своё. Разложение
-      // живёт рядом с суммой: сумма идёт в `combat.round`, разложение — в `applyDamageToSide`.
-      const byClass = new Map<BattleSide, ClassPools>();
-      // Чей огонь добил сторону: кто положил в неё больше всех за раунд (PVR-6.20 —
-      // боевой счёт экспедиции засчитывает павших ему). Равный вклад решает меньший id,
-      // а не порядок сторон: иначе засчитанная победа зависела бы от того, кто вошёл первым.
-      const damageShares = new Map<BattleSide, Record<string, number>>();
-      const topShooter = new Map<BattleSide, { owner: PlayerId; dealt: number }>();
-      const noteShooter = (target: BattleSide, side: BattleSide, dealt: number): void => {
-        if (dealt > 0) {
-          const source = side.owner ?? '\u0000neutral';
-          const shares = damageShares.get(target) ?? {};
-          shares[source] = (shares[source] ?? 0) + dealt;
-          damageShares.set(target, shares);
-        }
-        const top = topShooter.get(target);
-        if (
-          side.owner !== null &&
-          dealt > 0 &&
-          (!top || dealt > top.dealt || (dealt === top.dealt && side.owner < top.owner))
-        )
-          topShooter.set(target, { owner: side.owner, dealt });
-      };
-      // Attackers fire on their own clocks. Each defender answers EACH attacker
-      // that strikes it, with a full defensive volley aimed only at that attacker.
-      const exchanges: { side: BattleSide; enemies: BattleSide[]; role: FireRole }[] = [];
-      for (const side of due) {
-        const enemies = live.filter((other) => other !== side && sidesHostile(h, side.owner, other.owner));
-        exchanges.push({ side, enemies, role: 'attack' });
-        for (const defender of enemies) {
-          if (!attacks(defender)) exchanges.push({ side: defender, enemies: [side], role: 'defense' });
-        }
-      }
-      for (const { side, enemies, role } of exchanges) {
-        const ground = enemies.some((e) => hasGroundTargets(sideUnits(h.state, e.ref) ?? [], data));
-        if (ground) {
-          // Наземный залп пишет в `incoming` сам; вклад этой стороны в каждую цель — прирост.
-          const before = new Map(enemies.map((e) => [e, incoming.get(e) ?? 0]));
-          groundVolleys(h, battle, side, enemies, role, incoming, byClass);
-          for (const target of enemies)
-            noteShooter(target, side, (incoming.get(target) ?? 0) - before.get(target)!);
-          continue;
-        }
-        const shot = sideDamageBreakdown(h.state, side.ref, data, role);
-        const volley = shot.total;
-        let landed = 0; // сколько РЕАЛЬНО легло на врагов после хука — это и есть заслуга
-        for (const [i, share] of splitVolley(volley, enemies).entries()) {
-          const target = enemies[i]!;
-          // Хук зовётся НА ПАРУ (кто бьёт → кого бьёт), а не на весь залп: его
-          // подписчики — местность, укрепления, пассивы фракции и ауры героя — меряют
-          // именно отношение двух конкретных владельцев. Один вызов на всех врагов
-          // сделал бы их вклад неразличимым.
-          const dealt = hookedDamage(h, share.damage, {
-            battleId,
-            phase: battle.phase,
-            location: battle.location,
-            attacker: side.owner,
-            defender: target.owner,
-            // CORE-DMG-3: сторона боя и есть ответ на «кто стреляет». Гарнизон остаётся
-            // без `attackerFleet` — ауры и пассивы героя усиливают флоты, не гарнизоны,
-            // и это правило ближнего боя здесь ровно то же, что было.
-            ...(side.ref.kind === 'fleet' ? { attackerFleet: side.ref.fleetId } : {}),
-            // Зеркально — КОГО бьют: прикрытие бывает у одного флота (орудия крепости).
-            ...(target.ref.kind === 'fleet' ? { defenderFleet: target.ref.fleetId } : {}),
-          });
-          const running = incoming.get(target);
-          incoming.set(target, running === undefined ? dealt : addHooked(running, dealt));
-          landed += dealt;
-          noteShooter(target, side, dealt);
-        }
-        // Пишется ДО применения урона — по тому же ПРЕДРАУНДОВОМУ снимку, из которого
-        // считался залп. Иначе развеска шла бы по составу, уже подбитому этим раундом.
-        if (earnsMerit(h.state, side.owner, h.ctx.data)) creditVolley(h.state, side.ref, shot, landed);
-      }
-      for (const [side, dmg] of incoming) {
-        if (!(dmg > 0)) continue;
-        // Сторону могли бить и по составу (наземный залп), и одним телом (залп флота по
-        // флоту в том же бою). Разложение покрывает только первое; всё, что сверх него,
-        // ложится как всегда — родом `other`, то есть на весь состав без разбора.
-        const pools = byClass.get(side);
-        const split = pools
-          ? { ...pools, other: pools.other + Math.max(0, dmg - poolsTotal(pools)) }
-          : undefined;
-        applyDamageToSide(
-          h,
-          side.ref,
-          dmg,
-          data,
-          battle.location,
-          battle.id,
-          split,
-          topShooter.get(side)?.owner,
-          undefined,
-          damageShares.get(side),
-        );
-      }
+      const incoming = battleExchanges(h, battle, due);
 
       // Полезная нагрузка события — единственная двойственность боя, которая уезжает ПО
       // ШИНЕ наружу, и у неё есть чужой потребитель: `construction.ts` берёт
@@ -1747,6 +1554,7 @@ export const combatModule: GameModule = {
         defender: defender.owner,
         dmgToAttacker: incoming.get(attacker) ?? 0,
         dmgToDefender: incoming.get(defender) ?? 0,
+        structuresApplied: true,
         sides: battle.sides.map((side) => ({
           owner: side.owner,
           role: attacks(side) ? 'attacker' : 'defender',

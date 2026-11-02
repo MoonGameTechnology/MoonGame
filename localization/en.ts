@@ -1287,7 +1287,7 @@ export const en: Record<string, string> = {
     'The world runs in real time and keeps going 24/7 — even after you leave. Orders take real hours: set a course, close the game, come back to the result.',
   'codex.term.async.title': 'Asynchronous world',
   'codex.term.attack.body':
-    'Volley strength when this fleet attacks. When it is attacked, it answers with [[defense|defense]]. Only the [[fire-line|firing line]] shoots in a volley.',
+    'Attack volley strength. Every living unit fires, scaled by hull health and [[fire-line|force efficiency]].',
   'codex.term.attack.title': 'Attack',
   'codex.term.capture.body':
     'Capturing a world is two-phase. First enter orbit and beat the defenders in space; if the world holds a garrison, land troops (a ground division from the hold).',
@@ -1296,11 +1296,11 @@ export const en: Record<string, string> = {
     'Diplomacy lets you sign pacts and alliances, but a coalition is capped by combined strength — you cannot gang everyone up on one player. The cap keeps the balance of power and stops a snowball from crushing the game.',
   'codex.term.coalition.title': 'Coalition cap',
   'codex.term.defense.body':
-    'Return-fire strength when the fleet is attacked. It does not reduce damage taken: the [[shield|shield]] and [[hull|hull]] absorb it.',
+    'Survivors return fire after taking damage, using remaining hull health and force efficiency. Incoming damage is absorbed by [[shield|shields]] and [[hull|hull]].',
   'codex.term.defense.title': 'Defense',
   'codex.term.fire-line.body':
-    'Only the {n} strongest {n|unit fires|units fire} in a volley. The rest only take damage.',
-  'codex.term.fire-line.title': 'Firing line',
+    'All living units fire. Full-efficiency thresholds: fleets and air wings {n}, ground forces 20. Above the threshold, efficiency is threshold / unit count. Firepower also scales linearly with remaining hull health.',
+  'codex.term.fire-line.title': 'Force efficiency',
   'codex.term.fog.body':
     'You see only what is near your forces and radars; the rest is hidden by fog or shown from memory (the last thing you saw there). Scouts and radar widen your view.',
   'codex.term.fog.title': 'Fog of war',
@@ -2075,7 +2075,7 @@ export const en: Record<string, string> = {
   'dossier.fleet.name': 'Fleet',
   'dossier.hint': 'Hover an object on the left — its dossier appears here.',
   'dossier.stat.atk.name': 'Attack',
-  'dossier.stat.cap.name': 'Firing line',
+  'dossier.stat.cap.name': 'Force efficiency',
   'dossier.stat.datk.name': 'Attack',
   'dossier.stat.ddef.name': 'Defense',
   'dossier.stat.def.name': 'Defense',
@@ -4349,7 +4349,7 @@ export const en: Record<string, string> = {
   'sector-zero.difficulty.about.strong':
     'The veteran Swarm thinks: it researches technologies, retreats from lost battles, splits its fleet between two targets, lands troops on defended worlds, launches shuttles and trains its heroes. The Leviathan, the Swarm’s boss, arrives with the last wave.',
   'sector-zero.difficulty.about.weak':
-    'The standard Swarm wins by numbers: its fleets go for the nearest target and fight to the end; it researches nothing and never lands troops on defended worlds. In chapter I you start with +3 cruisers and a home garrison of 6 instead of 9.',
+    'The standard Swarm wins by numbers: its fleets go for the nearest target and fight to the end; it researches nothing and never lands troops on defended worlds. In chapter I you start with +6 cruisers and a home garrison of 6 instead of 9.',
   'sector-zero.difficulty.hint': 'Your saved run keeps its original difficulty.',
   'sector-zero.difficulty.same': 'Scheduled waves are the same on both levels.',
   'sector-zero.end.kills': 'Enemies destroyed: {n}',
@@ -4861,7 +4861,7 @@ export const en: Record<string, string> = {
   'side.summary.cargo': 'Cargo hold',
   'side.summary.composition': 'Composition',
   'side.summary.defense': 'Defense',
-  'side.summary.firing-cap': '{n} {n|unit|units} firing',
+  'side.summary.firing-cap': 'efficiency threshold {n}; strength includes hull health',
   'side.summary.forced-march': 'forced march',
   'side.summary.hull': 'Hull',
   'side.summary.radar': 'Radar',

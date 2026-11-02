@@ -5,7 +5,7 @@
  * получившая полкорпуса, возвращалась как новая. Теперь:
  *
  * 1. **Недобитый урон переезжает на эскадру** (`Squadron.damage`) и уходит с ней в
- *    следующий вылет — второй такой же залп подбитую машину сбивает.
+ *    следующий вылет — повторные удары без ремонта добивают машину.
  * 2. **Эскадра чинится у ДОКА** тем же темпом, что корпус корабля (`shipRepair`): в
  *    порту своего мира и на борту флота, стоящего у дока. Без дока — не чинится.
  * 3. **Делёж и слияние** носят урон с собой: делится по числу бортов, при слиянии
@@ -29,7 +29,7 @@ const data: GameData = parseGameData({
   version: '0.1.0',
   resources: ['metal'],
   units: {
-    // Пять крейсеров — 100 огня, ответка челноку 5% от него: ровно полкорпуса страйкера.
+    // Пять крейсеров — 100 огня до попадания; отвечают 5% оставшейся после удара силы.
     cruiser: {
       faction: 'x',
       domain: 'space',
@@ -132,14 +132,32 @@ function advance(state: GameState, hours: number): GameState {
   return r.state;
 }
 /** Вылет туда и обратно: час до цели и два домой — полкорпуса летит вполскорости (SHU-5.7). */
-const sortie = (s: GameState): GameState => advance(apply(s, strike()), 3);
+const sortie = (s: GameState): GameState => {
+  let after = apply(s, strike());
+  // Fleet pursuit uses scheduled chase ticks; arrivesAt is only an ETA.
+  // Follow the actual event so a nearly destroyed aircraft can finish its approach,
+  // then stop at landing before any extra dock healing.
+  for (let step = 0; step < 1000 && after.strikes?.length; step++) {
+    const next = after.scheduled
+      .filter(event => event.type.startsWith('shuttle.'))
+      .sort((a, b) => a.at - b.at || a.seq - b.seq)[0];
+    if (!next) throw new Error('flight has no scheduled event');
+    const result = kernel.advanceTo(after, { now: next.at, data });
+    if (!result.ok) throw new Error(result.code);
+    after = result.state;
+  }
+  if (after.strikes?.length) throw new Error('sortie did not finish');
+  return after;
+};
 const squad = (s: GameState, id = 'sq:1') => (s.planets.A?.hangar ?? []).find((q) => q.id === id);
 
 describe('SHU-5.3 — урон шаттлов между вылетами', () => {
-  it('ГОТОВО: подбитый страйкер возвращается подбитым, и второй такой же удар его сбивает', () => {
+  it('ГОТОВО: подбитый страйкер возвращается подбитым, и повторные вылеты без ремонта его сбивают', () => {
     let s = sortie(world());
     expect(squad(s)?.units).toEqual([{ unit: 'striker', count: 1 }]);
-    expect(squad(s)?.damage).toBe(5);
+    expect(squad(s)?.damage).toBeCloseTo(4.94, 10);
+    s = sortie(s);
+    expect(squad(s)?.damage).toBeGreaterThan(9);
     s = sortie(s);
     expect(s.planets.A?.hangar ?? []).toEqual([]);
   });
@@ -147,9 +165,9 @@ describe('SHU-5.3 — урон шаттлов между вылетами', () =
   it('у дока подбитый страйкер чинится со временем — и тогда второй удар он переживает', () => {
     let s = sortie(world(['spaceport', 'dock']));
     // Сел ровно в конце прогона, чинить ещё не начал.
-    expect(squad(s)?.damage).toBe(5);
+    expect(squad(s)?.damage).toBeCloseTo(4.94, 10);
     s = advance(s, 2); // 10%/ч от корпуса 10 — минус 2
-    expect(squad(s)?.damage).toBeCloseTo(3);
+    expect(squad(s)?.damage).toBeCloseTo(2.94);
     s = advance(s, 3);
     expect(squad(s)?.damage).toBeUndefined();
     s = sortie(s);
@@ -158,7 +176,7 @@ describe('SHU-5.3 — урон шаттлов между вылетами', () =
 
   it('без дока эскадра не чинится', () => {
     const s = advance(sortie(world()), 24);
-    expect(squad(s)?.damage).toBe(5);
+    expect(squad(s)?.damage).toBeCloseTo(4.94, 10);
   });
 
   it('эскадра на борту флота чинится, только пока флот стоит у своего дока', () => {

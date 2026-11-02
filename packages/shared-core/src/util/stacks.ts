@@ -261,30 +261,21 @@ function mergeMerit(base: UnitStack, add: UnitStack): void {
   }
 }
 
-/** Combat line cap (Bytro-style): only this many units per combatant side fire in
- *  a volley — everyone beyond the cap only adds hull/shield to soak damage. Binds
- *  melee attack/defense and bombardment; NOT AA, cargo or the
- *  receiving hull pools. A balance constant (like BROWNOUT) — data after shakeout. */
+/** Soft efficiency thresholds: every living unit fires, at min(1, limit / N). */
 export const COMBAT_UNIT_CAP = 10;
+export const GROUND_COMBAT_UNIT_CAP = 20;
 
-/** `sumUnitStat` bounded by the combat line cap: only the `cap` strongest units
- *  (per-unit EFFECTIVE `stat`, strongest first, ties by unit id) contribute.
- *  Stacks the optional `eligible` filter rejects neither fire nor consume budget
- *  (a filtered call spends the cap on the matching units only). Deterministic:
- *  the sort key is (stat desc, unit id asc); stacks tied on both have identical
- *  per-unit contributions, so their relative order can't change the sum.
- *
- *  `stat` may be a FORMULA over the unit's effective stats instead of one stat
- *  name (ROS-1.3): bombardment reads `siegeDamage` from the hulls that carry it
- *  and `attack × fraction` from those that don't, and both kinds share ONE firing
- *  line. Two calls could not express that — each would spend the full cap, and a
- *  mixed fleet would fire twice over. */
+export function combatEfficiency(count: number, limit = COMBAT_UNIT_CAP): number {
+  return count > 0 ? Math.min(1, Math.max(0, limit) / count) : 0;
+}
+
+/** Combat power only; cargo, vision, upkeep and other noncombat sums stay unchanged. */
 export function cappedUnitStat(
   stacks: readonly UnitStack[],
   data: GameData,
   stat: string | ((stats: Record<string, number>) => number),
   eligible?: (def: UnitDef) => boolean,
-  cap: number = COMBAT_UNIT_CAP,
+  cap?: number,
 ): number {
   // Сумма — это сложение разбивки, а не второй счёт того же (VET-1). Так исход боя
   // не может разойтись с тем, что записано ветерану в заслугу: расходиться нечему,
@@ -307,52 +298,40 @@ export interface StackContribution {
    *  медали (VET-2) — именно стек. */
   index: number;
   unit: string;
-  /** Сколько юнитов этого стека попало в линию огня (кап мог срезать часть). */
+  /** Число живых юнитов этого стека: в залпе участвуют все. */
   firing: number;
   /** Вклад одного юнита — эффективный `stat` или значение формулы. */
   per: number;
+  /** Linear hull health times the force size coefficient. */
+  powerScale: number;
   /** `firing × per` — что стек положил в залп. */
   damage: number;
 }
 
-/**
- * Разбивка {@link cappedUnitStat} по стекам: то же правило, тот же порядок, но вклад
- * каждого стека виден отдельно, а не только в сумме.
- *
- * Порядок строк — порядок линии огня (сильные первыми, ties по имени юнита), и он
- * ЗНАЧИМ: сумма считается сложением `damage` в этом порядке, поэтому переставить строки
- * значит изменить последние биты суммы. Стек, до которого бюджет не дошёл, строки не
- * получает вовсе — «не стрелял» и «стрелял на ноль» для медали разные вещи (транспорт
- * без пушек бюджет ЗАНИМАЕТ, и его строка есть, просто с нулевым `damage`).
- */
+/** All live stacks contribute; no strongest-first selection or HP from shields. */
 export function cappedUnitBreakdown(
   stacks: readonly UnitStack[],
   data: GameData,
   stat: string | ((stats: Record<string, number>) => number),
   eligible?: (def: UnitDef) => boolean,
-  cap: number = COMBAT_UNIT_CAP,
+  cap?: number,
 ): StackContribution[] {
-  const rows: Array<{ per: number; unit: string; count: number; index: number }> = [];
+  const live = stacks.filter(s => s.count > 0 && data.units[s.unit]);
+  const count = live.reduce((n, s) => n + s.count, 0);
+  const limit = cap ?? (live.every(s => data.units[s.unit]!.domain === 'ground')
+    ? GROUND_COMBAT_UNIT_CAP : COMBAT_UNIT_CAP);
+  const efficiency = combatEfficiency(count, limit);
+  const rows: StackContribution[] = [];
   for (const [index, s] of stacks.entries()) {
-    if (s.count <= 0) continue;
     const def = data.units[s.unit];
-    if (!def || (eligible && !eligible(def))) continue;
+    if (s.count <= 0 || !def || (eligible && !eligible(def))) continue;
     const stats = effectiveStats(def, s, data);
-    rows.push({
-      per: typeof stat === 'function' ? stat(stats) : (stats[stat] ?? 0),
-      unit: s.unit,
-      count: s.count,
-      index,
-    });
+    const fullHp = s.count * ((stats.hp ?? 0) > 0 ? stats.hp! : 1);
+    const health = Math.max(0, Math.min(1, (s.hp ?? fullHp) / fullHp));
+    const powerScale = health * efficiency;
+    const per = (typeof stat === 'function' ? stat(stats) : (stats[stat] ?? 0)) * powerScale;
+    rows.push({ index, unit: s.unit, firing: s.count, per, powerScale, damage: s.count * per });
   }
   rows.sort((a, b) => b.per - a.per || (a.unit < b.unit ? -1 : a.unit > b.unit ? 1 : 0));
-  let budget = cap;
-  const out: StackContribution[] = [];
-  for (const r of rows) {
-    if (budget <= 0) break;
-    const n = Math.min(r.count, budget);
-    out.push({ index: r.index, unit: r.unit, firing: n, per: r.per, damage: n * r.per });
-    budget -= n;
-  }
-  return out;
+  return rows;
 }

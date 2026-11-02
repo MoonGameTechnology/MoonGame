@@ -68,7 +68,7 @@ describe('прогноз в окне боя (UIX-6.2)', () => {
     const defends = battleForecast([side(true, 'attacker', 4), side(false, 'defender', 5)], data);
     const attacks = battleForecast([side(true, 'attacker', 4), side(false, 'attacker', 5)], data);
     expect(defends).toMatchObject({ verdict: 'win', hours: 6 });
-    expect(attacks).toMatchObject({ verdict: 'loss', hours: 3 });
+    expect(attacks).toMatchObject({ verdict: 'loss', hours: 6 });
   });
 
   it('считает от текущего состава: израненный флот проигрывает бой, который выиграл бы целым', () => {
@@ -120,7 +120,7 @@ describe('прогноз в окне боя (UIX-6.2)', () => {
   it('моя сторона пала, а союзник победил — это победа, потери моих 100%', () => {
     const f = battleForecast(
       [
-        side(true, 'attacker', 1),
+        side(true, 'attacker', 1, 5),
         { ...side(false, 'attacker', 30, undefined, 'ally'), ally: true },
         side(false, 'defender', 4),
       ],
@@ -133,7 +133,7 @@ describe('прогноз в окне боя (UIX-6.2)', () => {
   it('устоял сосед — не союзник и не враг: его победа не моя, ничья', () => {
     const f = battleForecast(
       [
-        side(true, 'attacker', 1),
+        side(true, 'attacker', 1, 5),
         side(false, 'attacker', 30, undefined, 'neutral'),
         side(false, 'defender', 4),
       ],

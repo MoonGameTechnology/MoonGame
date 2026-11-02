@@ -949,7 +949,7 @@ describe('hero — fleet combat aura (+5%)', () => {
     const round = r.events.find((e) => e.type === 'combat.round');
     const p = round?.payload as { dmgToDefender: number; dmgToAttacker: number };
     expect(p.dmgToDefender).toBe(21); // A (attacker, has hero): 20 attack × 1.05
-    expect(p.dmgToAttacker).toBe(20); // D (defender, no hero): 20 defense, unbuffed
+    expect(p.dmgToAttacker).toBeCloseTo(20 * (1 - p.dmgToDefender / 200), 10); // D (defender, no hero): 20 defense, unbuffed
   });
 });
 
@@ -1317,18 +1317,18 @@ describe('hero — data-driven passives (HERO-5)', () => {
     // Hero at H (200 away): p1's side deals 20 × 1.5 = 30; p2's side stays 20.
     const near = round(base('H'));
     expect(near.dmgToDefender).toBe(30);
-    expect(near.dmgToAttacker).toBe(20);
+    expect(near.dmgToAttacker).toBeCloseTo(20 * (1 - near.dmgToDefender / 200), 10);
     // Hero at X (700 away): out of radius — both sides plain 20.
     const far = round(base('X'));
     expect(far.dmgToDefender).toBe(20);
-    expect(far.dmgToAttacker).toBe(20);
+    expect(far.dmgToAttacker).toBeCloseTo(20 * (1 - far.dmgToDefender / 200), 10);
     // BF-24: the SAME hero as an undeployed reserve (alive undefined) radiates
     // nothing, even in radius — no invulnerable bench buffer.
     const benched = base('H');
     delete benched.heroes!['hero:p1']!.alive;
     const res = round(benched);
     expect(res.dmgToDefender).toBe(20);
-    expect(res.dmgToAttacker).toBe(20);
+    expect(res.dmgToAttacker).toBe(20 * 0.9);
   });
 });
 

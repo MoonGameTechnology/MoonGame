@@ -51,7 +51,7 @@ describe('прогноз наземного боя', () => {
     // Прогноз не знает про укрепления, местность и тип планеты — их накидывает хук
     // `combat.damage` только обороняющемуся и только на земле. Поэтому «победил в
     // прогнозе» и «уверен» — разные ответы, и у края они расходятся.
-    const att = [st('tank', 3)];
+    const att = [st('tank', 2)];
     const def = [st('heavy', 3)];
     expect(forecastGround(att, def, data).winner).toBe('attacker');
     expect(confidentGroundWin(att, def, data)).toBe(false);

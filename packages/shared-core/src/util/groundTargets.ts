@@ -1,31 +1,7 @@
-/**
- * УРОН ПО РОДУ ВОЙСК (решение владельца 2026-09-25): «есть два типа наземных юнитов —
- * техника и пехота, и у каждого юнита свой урон по этим типам». Четыре числа на юнит —
- * атака и оборона отдельно по пехоте и по технике (`attackVsInfantry`, `attackVsVehicle`,
- * `defenseVsInfantry`, `defenseVsVehicle`). Прежде наземный бой бил всех одной `attack` /
- * `defense`, а матрица «танк давит пехоту, спецназ грызёт броню» (`GROUND_ROSTER`, FND-4)
- * лежала рядом неподключённой.
- *
- * Правило ОДНО на живой бой (`modules/combat.ts`) и оба прогноза (`state/previewBattle.ts`,
- * `decisions/groundForecast.ts`): прогноз, считающий другим правилом, обещает игроку
- * другой бой. Урон по классам кладёт `damageByClass` (`util/combat.ts`).
- *
- * 1. **Класс цели — из данных.** Наземный юнит — его род (`kind`), всё остальное (корабли,
- *    челноки) — `other`. По `other` стреляют прежней `attack`/`defense`, поэтому бой
- *    флотов этим правилом не задет ни на единицу.
- * 2. **Смешанный отряд — раздельно по долям** (решение владельца). Доля класса — его доля
- *    в пуле корпуса цели (`count × hp`). Залп против цели = Σ по классам `доля × урон по
- *    классу`, и урон по пехоте ложится ТОЛЬКО на пехоту, по технике — только на технику:
- *    танки не прикрывают пехоту своей бронёй.
- * 3. **Кап линии огня выбирает стрелков по ВЗВЕШЕННОМУ урону** — по тому, насколько юнит
- *    опасен именно этому составу. Против брони вперёд выходит спецназ, против пехоты —
- *    танк. Разбивка по классам — точное разложение того же залпа, а не второй счёт.
- * 4. **Числа не объявлены — прежний стат.** Юнит без `…Vs…` бьёт по классу своей
- *    `attack`/`defense`: корабль, челнок, контент модов. Живой наземный каталог объявляет
- *    все четыре явно — это держит сторож в `schemas.test.ts`.
- */
+/** Class-specific weapons applied to equal unit shares within 50/30/20 echelons. */
 import type { GameData, UnitDef } from '../data/schemas';
 import type { UnitStack } from '../state/gameState';
+import { formationShares } from './formation';
 import { effectiveStats } from './loadout';
 import { cappedUnitBreakdown, type StackContribution } from './stacks';
 
@@ -55,19 +31,11 @@ export function statVs(stats: Record<string, number>, role: FireRole, cls: Targe
 
 const emptyPools = (): ClassPools => ({ infantry: 0, vehicle: 0, other: 0 });
 
-/** Доли классов в пуле корпуса цели (правило 2). Пустая цель — все нули. */
+/** Class shares of the formation's volley, independent of target hull HP. */
 export function classShares(targets: readonly UnitStack[], data: GameData): ClassPools {
   const pool = emptyPools();
-  let total = 0;
-  for (const s of targets) {
-    if (s.count <= 0) continue;
-    const def = data.units[s.unit];
-    const hp = s.count * Math.max(0, def?.stats.hp ?? 0);
-    pool[targetClassOf(def)] += hp;
-    total += hp;
-  }
-  if (total <= 0) return pool;
-  for (const cls of TARGET_CLASSES) pool[cls] /= total;
+  const shares = formationShares(targets, data);
+  targets.forEach((stack, i) => { pool[targetClassOf(data.units[stack.unit])] += shares[i]!; });
   return pool;
 }
 
@@ -99,17 +67,16 @@ export function targetedVolley(
   for (const row of rows) {
     const stack = shooters[row.index]!;
     const def = data.units[stack.unit]!;
-    // Те же статы, что взял кап (`effectiveStats` внутри разбивки), — здесь их читают
-    // заново только чтобы разложить уже выбранный залп по классам.
+    // Те же эффективные статы, что использует разбивка залпа, — здесь их читают
+    // заново только чтобы разложить залп по классам.
     const stats = effectiveStats(def, stack, data);
-    for (const cls of present) pools[cls] += row.firing * weight(cls) * statVs(stats, role, cls);
+    for (const cls of present) pools[cls] += row.firing * row.powerScale * weight(cls) * statVs(stats, role, cls);
     total += row.damage;
   }
   return { total, rows, pools };
 }
 
-/** Есть ли у цели наземные войска. Нет — правило рода войск не участвует вовсе, и бой идёт
- *  прежним путём бит в бит (бой флотов, орбита): реплеи и золотые тесты его не заметят. */
+/** Есть ли у цели наземные войска, которым нужна матрица урона по классам. */
 export function hasGroundTargets(units: readonly UnitStack[], data: GameData): boolean {
   return units.some((s) => s.count > 0 && targetClassOf(data.units[s.unit]) !== 'other');
 }

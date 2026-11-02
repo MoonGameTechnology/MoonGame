@@ -115,10 +115,10 @@ describe('MSB-6 — прогноз считает N сторон теми же �
   });
 });
 
-describe('UIX-6.3 — раунд прогноза = раунд живого боя 3.x, и цепочка досчитывается', () => {
-  it('ОБОРОНЯЮЩИЙСЯ отвечает КАЖДОМУ атакующему полным залпом (§0.0 №1, 2026-09-28)', () => {
-    // Двое союзников бьют одного. Он гибнет за раунд, но успевает ответить обоим — каждому
-    // всей своей обороной (30), а не половиной: прежний прогноз делил ответ между ними.
+describe('UIX-6.3 — раунд прогноза = раунд живого боя 4.x, и цепочка досчитывается', () => {
+  it('оборона, уничтоженная первым источником, никому не отвечает', () => {
+    // Первый удар уничтожает оборону. Ответа после смерти нет ни первому,
+    // ни второму источнику.
     const r = previewSides(
       [
         { units: striker(1), role: 'attacker', owner: 'a1' },
@@ -129,8 +129,8 @@ describe('UIX-6.3 — раунд прогноза = раунд живого бо
       (x, y) => x !== y && (x === 'd' || y === 'd'),
     );
     expect(r.roundsEst).toBe(1);
-    expect(r.sides[0]!.damageFraction).toBeCloseTo(0.3, 10);
-    expect(r.sides[1]!.damageFraction).toBeCloseTo(0.3, 10);
+    expect(r.sides[0]!.damageFraction).toBe(0);
+    expect(r.sides[1]!.damageFraction).toBe(0);
   });
 
   it('ОБОРОНЯЮЩИЙСЯ стреляет, только когда его атакуют: двое обороняющихся друг друга не бьют', () => {
@@ -164,7 +164,7 @@ describe('UIX-6.3 — раунд прогноза = раунд живого бо
     expect(r.sides.filter((x) => x.survivors.length > 0)).toHaveLength(1);
   });
 
-  it('ПЕРЕСЦЕПКА — по ключу, а не по месту в списке: порядок входа исход не меняет', () => {
+  it('при одинаковых часах порядок вступления влияет на потери', () => {
     const a = { units: f(4), role: 'attacker' as const, key: 'f2' };
     const d = { units: f(1), role: 'defender' as const, key: 'f0' };
     const b = {
@@ -178,7 +178,7 @@ describe('UIX-6.3 — раунд прогноза = раунд живого бо
     const one = previewSides([a, d, b], data);
     const two = previewSides([b, a, d], data);
     expect(two.roundsEst).toBe(one.roundsEst);
-    expect(two.sides[0]!.survivors).toEqual(one.sides[2]!.survivors);
-    expect(two.sides[1]!.survivors).toEqual(one.sides[0]!.survivors);
+    expect(two.sides[0]!.survivors).not.toEqual(one.sides[2]!.survivors);
+    expect(previewSides([a, d, b], data)).toEqual(one);
   });
 });

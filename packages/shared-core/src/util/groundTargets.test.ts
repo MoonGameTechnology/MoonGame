@@ -62,8 +62,8 @@ describe('урон по роду войск — чистое правило', ()
     expect(statVs(rifle, 'attack', 'other')).toBe(4);
   });
 
-  it('доли — по пулу корпуса, а не по числу машин', () => {
-    // 1 танк (30) + 3 стрелка (30): поровну, хотя машин вчетверо меньше.
+  it('доли внутри линии — по числу живых юнитов', () => {
+    // Один танк получает четверть залпа, три стрелка — три четверти.
     const shares = classShares(
       st([
         ['tank', 1],
@@ -71,8 +71,8 @@ describe('урон по роду войск — чистое правило', ()
       ]),
       data,
     );
-    expect(shares.vehicle).toBeCloseTo(0.5, 12);
-    expect(shares.infantry).toBeCloseTo(0.5, 12);
+    expect(shares.vehicle).toBeCloseTo(0.25, 12);
+    expect(shares.infantry).toBeCloseTo(0.75, 12);
     expect(shares.other).toBe(0);
   });
 
@@ -106,20 +106,20 @@ describe('урон по роду войск — чистое правило', ()
     );
     expect(shot.pools.infantry + shot.pools.vehicle).toBeCloseTo(shot.total, 9);
     // Против брони стрелок (12) полезнее танка (2), против пехоты — наоборот.
-    expect(shot.pools.infantry).toBeCloseTo(0.5 * (3 * 20 + 5 * 4), 9);
-    expect(shot.pools.vehicle).toBeCloseTo(0.5 * (3 * 2 + 5 * 12), 9);
+    expect(shot.pools.infantry).toBeCloseTo(0.75 * (3 * 20 + 5 * 4), 9);
+    expect(shot.pools.vehicle).toBeCloseTo(0.25 * (3 * 2 + 5 * 12), 9);
   });
 
-  it('кап линии огня выбирает стрелков по урону против ЭТОГО состава', () => {
+  it('все 20 наземных юнитов стреляют своими статами по классу цели', () => {
     const shooters = st([
       ['tank', COMBAT_UNIT_CAP],
       ['rifle', COMBAT_UNIT_CAP],
     ]);
     expect(targetedVolley(shooters, st([['tank', 1]]), data, 'attack').total).toBe(
-      COMBAT_UNIT_CAP * 12,
+      COMBAT_UNIT_CAP * (12 + 2),
     );
     expect(targetedVolley(shooters, st([['rifle', 1]]), data, 'attack').total).toBe(
-      COMBAT_UNIT_CAP * 20,
+      COMBAT_UNIT_CAP * (20 + 4),
     );
   });
 

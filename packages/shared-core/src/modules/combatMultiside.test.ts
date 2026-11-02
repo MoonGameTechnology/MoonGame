@@ -134,14 +134,14 @@ describe('MSB-2 — урон дробится на всех врагов', () =>
   it('ТРОЕ: залп каждого делится ПОПОЛАМ между двумя врагами', () => {
     // Обороняющийся p000 отвечает по 8 каждому ударившему; атакующие делят 12 пополам.
     const after = oneRound(melee(3));
-    expect(hull(after, 'f000')).toBeCloseTo(4000 - 12, 6); // 6 + 6
-    expect(hull(after, 'f001')).toBeCloseTo(4000 - 14, 6); // полный ответ 8 + атака соседа 6
-    expect(hull(after, 'f002')).toBeCloseTo(4000 - 14, 6);
+    expect(hull(after, 'f000')).toBeCloseTo(4000 - 6 - 5.991, 6); // second source fires after taking 6 HP damage
+    expect(hull(after, 'f001')).toBeCloseTo(4000 - 7.988 - 5.991, 6);
+    expect(hull(after, 'f002')).toBeCloseTo(4000 - 6 - 7.976018, 6);
   });
 
   it('ЧЕТВЕРО: сумма прилетевшего равна сумме выпущенного — делёж ничего не теряет', () => {
     const after = oneRound(melee(4));
-    const dealt = 3 * 8 + 3 * 12; // ответ КАЖДОМУ из трёх атакующих
+    const dealt = 12 + 11.988 + 11.976012 + 7.992 + 7.984008 + 7.976023992; // post-loss volleys
     const taken =
       4 * 4000 - Object.values(after.fleets).reduce((n, f) => n + totalHp(f.units, 4000), 0);
     expect(taken).toBeCloseTo(dealt, 6);
@@ -152,13 +152,13 @@ describe('MSB-2 — урон дробится на всех врагов', () =>
     const after = oneRound(melee(3, 2));
     expect(hull(after, 'f000')).toBeCloseTo(4000 - 6, 6); // только половина атаки
     expect(hull(after, 'f001')).toBeCloseTo(4000 - 6, 6);
-    expect(hull(after, 'f002')).toBeCloseTo(4000 - 16, 6); // два полных ответа по 8
+    expect(hull(after, 'f002')).toBeCloseTo(4000 - 2 * 8 * (3994 / 4000), 6); // both defenders reply after the hit
   });
 
-  it('НА ДВУХ СТОРОНАХ ИСХОД ПРЕЖНИЙ: весь залп уходит единственному врагу', () => {
+  it('ДУЭЛЬ: весь залп уходит одному врагу, ответ ослаблен потерями', () => {
     const after = oneRound(melee(2));
     expect(hull(after, 'f000')).toBeCloseTo(4000 - 12, 6); // удар attack
-    expect(hull(after, 'f001')).toBeCloseTo(4000 - 8, 6); // ответ defense
+    expect(hull(after, 'f001')).toBeCloseTo(4000 - 8 * (3988 / 4000), 6); // post-loss defense
   });
 
   it('СОЮЗНИКОВ НЕ БЬЮТ: залп делится только между ВРАЖДЕБНЫМИ сторонами', () => {
@@ -167,12 +167,12 @@ describe('MSB-2 — урон дробится на всех врагов', () =>
     setStance(s, 'p001', 'p002', 'alliance');
     const after = oneRound(s);
     expect(hull(after, 'f000')).toBeCloseTo(4000 - 24, 6); // по 12 от каждого
-    expect(hull(after, 'f001')).toBeCloseTo(4000 - 8, 6); // полный ответ на свой удар
-    expect(hull(after, 'f002')).toBeCloseTo(4000 - 8, 6);
+    expect(hull(after, 'f001')).toBeCloseTo(4000 - 8 * (3988 / 4000), 6); // first post-loss reply
+    expect(hull(after, 'f002')).toBeCloseTo(4000 - 8 * (3976 / 4000), 6);
   });
 });
 
-describe('PVR-6.20 — павших стороны засчитывают тому, кто положил в неё больше всех', () => {
+describe('PVR-6.20 — потери относятся к источнику конкретного удара', () => {
   /** Три стороны; у обороняющегося `f000` корпус на один залп. */
   function killers(counts: [number, number, number]): Array<string | undefined> {
     const s = melee(3);
@@ -187,12 +187,12 @@ describe('PVR-6.20 — павших стороны засчитывают том
       .map((e) => (e.payload as { killedBy?: string }).killedBy);
   }
 
-  it('больший вклад: второй атакующий вдвое сильнее — павшие его', () => {
+  it('первый источник добивает цель до выстрела второго', () => {
     // f001 бьёт 12 пополам (6 в оборону), f002 — 24 пополам (12 в оборону).
-    expect(killers([1, 1, 2])).toEqual(['p002']);
+    expect(killers([1, 1, 2])).toEqual(['p001']);
   });
 
-  it('равный вклад решает меньший id, а не порядок сторон', () => {
+  it('при равных часах первым бьёт раньше вступивший', () => {
     expect(killers([1, 1, 1])).toEqual(['p001']);
   });
 });

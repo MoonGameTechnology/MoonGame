@@ -240,12 +240,12 @@ describe('PVR-6.32 — старт главы под сложность забе�
       .filter((f) => f.owner === 'p1')
       .reduce((n, f) => n + f.units.filter((u) => u.unit === 'cruiser').reduce((m, u) => m + u.count, 0), 0);
 
-  it('обычный Рой: в главе I гарнизон дома 6 вместо 9 и на 3 крейсера больше', () => {
+  it('обычный Рой: в главе I гарнизон дома 6 вместо 9 и на 6 крейсеров больше', () => {
     const base = pveState(data, 0);
     const weak = pveState(data, 0, 'weak');
     expect(garrisonOf(base, 'home_a')).toBe(9);
     expect(garrisonOf(weak, 'home_a')).toBe(6);
-    expect(cruisersOf(weak) - cruisersOf(base)).toBe(3);
+    expect(cruisersOf(weak) - cruisersOf(base)).toBe(6);
   });
 
   it('матёрый Рой получает базовый старт, а главы без блока — свою карту как есть', () => {

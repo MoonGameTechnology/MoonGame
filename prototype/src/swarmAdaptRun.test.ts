@@ -16,6 +16,7 @@ import { runAiSeats } from '../../decisions/runAiSeats';
 import { RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 import type { RunDifficulty } from '../../decisions/runDifficulty';
 import { fleetHolder, knowledgeOf, swarmNet } from '../../packages/shared-core/src/util/swarmNet';
+import { fleetPointDefense } from '../../packages/shared-core/src/util/pointDefense';
 import { recalled } from '../../packages/shared-core/src/modules/swarmMemory';
 
 /**
@@ -26,8 +27,8 @@ import { recalled } from '../../packages/shared-core/src/modules/swarmMemory';
  * До аудита цепочка «удар → память → проект → перехват» была зелёной только в тесте
  * ядра: бот забега `swarm.adapt` не отправлял вовсе. Здесь она проходит целиком:
  * игрок бьёт волны Роя бомбардировщиками из порта своего дома → Рой набирает сигнал →
- * бот заказывает проект → покров вырастает на матках → следующий удар по матке встречает
- * перехват, которого раньше не было.
+ * бот заказывает проект → покров вырастает на матках и даёт им ПВО. Рецепт изолированного
+ * носителя не достаётся волнам, чья часть сети его ещё не знает.
  *
  * Подготовка мира — единственная рука теста: дом игрока с портом, эскадрой
  * бомбардировщиков и тремя авианосцами (ещё три запаса вылетов), крепче обычного —
@@ -71,7 +72,7 @@ interface Mc01 {
     downed: number;
   }>;
   started?: { hour: number; moduleId: string; connectedToHive: boolean; signal: number };
-  done?: { hour: number; touched: number };
+  done?: { hour: number; touched: number; fleetId: string; pointDefense: number; connectedToHive: boolean };
   /** Час, когда ИИ Роя сам поставил пост-ретранслятор на `drift` — последнее звено сети до
    *  дома игрока. Не поставил — поля нет. */
   chainAt?: number;
@@ -170,7 +171,14 @@ function runMc01(difficulty: RunDifficulty, maxHours: number, chain = true): Mc0
       // Отложенное событие проекта носит то же имя, что и объявление о нём; объявление —
       // то, где есть `touched`.
       if (e.type === 'swarm.adapt.done' && p.touched !== undefined && !out.done)
-        out.done = { hour, touched: Number(p.touched) };
+        {
+          const fleetId = String(p.fleetId);
+          const fleet = s.fleets[fleetId];
+          const net = swarmNet(s, data, 'p3', s.time);
+          out.done = { hour, touched: Number(p.touched), fleetId,
+            pointDefense: fleet ? fleetPointDefense(fleet, data) : 0,
+            connectedToHive: net.partOf.get(fleetHolder(fleetId)) === net.partOf.get('planet:hive') };
+        }
     }
   };
   const apply = (a: Action): void => {
@@ -274,20 +282,16 @@ describe('MC-01 на pve-1: удары шаттлов доводят Рой до
     expect(run.state.swarmRecipes?.[VEIL]).toBeGreaterThanOrEqual(1);
   });
 
-  it('после проявления удар по матке встречает перехват, которого раньше не было', () => {
+  it('локально выращенный покров даёт ПВО носителю, а не изолированным волнам', () => {
     const run = runMc01('weak', 120);
     expect(run.done).toBeDefined();
-    const doneAt = run.done!.hour;
-    const before = run.repelled.filter((r) => r.hour < run.started!.hour);
-    const after = run.repelled.filter((r) => r.hour > doneAt);
-    expect(before.length).toBeGreaterThan(0);
-    expect(after.length).toBeGreaterThan(0);
-    // До адаптации цель огрызается только долей пушек (5%) и не сбивает никого; покров
-    // добавляет полный перехват — удар теперь стоит машин.
-    const maxBefore = Math.max(...before.map((r) => r.damage));
-    const maxAfter = Math.max(...after.map((r) => r.damage));
-    expect(maxAfter).toBeGreaterThan(maxBefore * 5);
-    expect(before.every((r) => r.downed === 0)).toBe(true);
-    expect(after.some((r) => r.downed > 0)).toBe(true);
+    expect(run.done!.pointDefense).toBeGreaterThan(0);
+    expect(run.done!.connectedToHive).toBe(false);
+    // The new HP/return-fire model kills the relay before the recipe reaches the
+    // hive. Later waves cannot inherit that isolated hull's point defense.
+    const later = Object.values(run.state.fleets).filter(f =>
+      f.owner === 'p3' && f.id.startsWith('pve:wave:') && f.id !== run.done!.fleetId);
+    expect(later.length).toBeGreaterThan(0);
+    expect(later.every(f => fleetPointDefense(f, data) === 0)).toBe(true);
   });
 });

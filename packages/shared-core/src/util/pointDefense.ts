@@ -1,6 +1,6 @@
 import type { Fleet, Planet } from '../state/gameState';
 import { buildingLevel, type GameData } from '../data/schemas';
-import { sumUnitStat } from './stacks';
+import { cappedUnitStat } from './stacks';
 
 /** Default PD engagement range (map units) when the unit's `pointDefenseRange` is 0. */
 export const PD_RANGE = 120;
@@ -11,7 +11,7 @@ export const PD_COOLDOWN_MINUTES = 20;
  *  Σ the `pointDefense` stat of its live units (via effectiveStats, so modules
  *  are included). 0 = no point defense. */
 export function fleetPointDefense(fleet: Fleet, data: GameData): number {
-  return sumUnitStat(fleet.units, data, 'pointDefense');
+  return cappedUnitStat(fleet.units, data, 'pointDefense');
 }
 
 /** Σ the `pointDefense` of a planet's standing buildings — ЗОНАЛЬНОЕ ПВО мира
@@ -21,6 +21,7 @@ export function fleetPointDefense(fleet: Fleet, data: GameData): number {
 export function planetPointDefense(planet: Planet, data: GameData): number {
   let total = 0;
   for (const b of planet.buildings) {
+    if (b.hp <= 0) continue;
     const def = data.buildings[b.type];
     if (def) total += buildingLevel(def, b.level).pointDefense;
   }

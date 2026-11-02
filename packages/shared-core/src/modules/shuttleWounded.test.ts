@@ -151,8 +151,8 @@ describe('SHU-5.7 — подбитый шаттл', () => {
 
   it('полкорпуса — вполсилы по постройкам', () => {
     const mine = (s: GameState): number | undefined => s.planets.B?.buildings[0]?.hp;
-    expect(mine(advance(launch(world(striker())), 1))).toBe(200 - 8);
-    expect(mine(advance(launch(world(striker(5))), 2))).toBe(200 - 4);
+    expect(mine(advance(launch(world(striker())), 1))).toBeCloseTo(200 - 8 * 0.95, 10);
+    expect(mine(advance(launch(world(striker(5))), 2))).toBeCloseTo(200 - 4 * 0.95, 10);
   });
 
   it('побитый челнок высаживает бойца с тем же процентом здоровья', () => {

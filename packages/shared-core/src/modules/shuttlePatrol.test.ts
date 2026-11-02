@@ -453,10 +453,10 @@ describe('SHU-6.2 — тик патруля', () => {
       2,
     ).strikes ?? [])[0];
     expect(struck?.leg).toBe('back');
-    expect(struck?.damage).toBeCloseTo(2); // 40 × 5%
+    expect(struck?.damage).toBeCloseTo(2 * (1 - 40 / 100)); // 40 × 5%
 
     const patrolled = patrolOf(until(apply(s, patrol('sq:b')), 1.75));
-    expect(patrolled?.damage).toBeCloseTo(struck!.damage! / 4);
+    expect(patrolled?.damage).toBeCloseTo(2 * (1 - 10 / 100) / 4);
   });
 
   it('БЕЗОРУЖНАЯ ПОЛОВИНА НЕ ВЫБИРАЕТ ЦЕЛЬ: охотник за машинами не ныряет под корабль ради нуля урона', () => {

@@ -907,11 +907,11 @@ describe('всплывашка надбавок', () => {
     });
   });
 
-  it('линия огня — сколько бортов стреляет из предела', async () => {
+  it('эффективность состава и фактическая численность', async () => {
     const { m, env } = await boot();
     const { COMBAT_UNIT_CAP } = await import('../../packages/shared-core/src/index');
     expect(m.statPopModel(env.s.fleets.F1!, 'cap')).toMatchObject({
-      value: `2/${COMBAT_UNIT_CAP}`,
+      value: `2/${COMBAT_UNIT_CAP} · 100%`,
       plain: true,
     });
   });
