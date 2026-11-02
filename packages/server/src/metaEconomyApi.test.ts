@@ -30,6 +30,8 @@ function setup(
     readModel: vi.fn(async () => view),
     matchRewards: vi.fn(async () => ({ receipts: [], finalReady: false })),
     setSupplyGoal: vi.fn(async () => ok),
+    upgradeModule: vi.fn(async () => ok),
+    selectModule: vi.fn(async () => ok),
     craft: vi.fn(async () => ok),
     salvage: vi.fn(async () => ok),
     selectPass: vi.fn(async () => ok),
@@ -313,5 +315,24 @@ describe('main economy HTTP boundary', () => {
       (await app.inject({ method: 'POST', url: '/meta-economy/craft', payload: craft })).json(),
     ).toEqual({ error: 'E_RATE_LIMIT' });
     expect((await app.inject({ url: '/meta-economy/me' })).statusCode).toBe(200);
+  });
+});
+
+
+describe('module upgrade HTTP intentions', () => {
+  const command = { requestId: 'upgrade-1', itemId: 'module-1', mode: 'stars', grade: 0, rarity: 'simple', ingredientIds: ['a', 'b', 'c'], allowSoulbound: false };
+  it('accepts intent for the authenticated account only', async () => {
+    const { app, economy } = setup();
+    expect((await app.inject({ method: 'POST', url: '/meta-economy/module/upgrade', payload: command })).statusCode).toBe(200);
+    expect(economy.upgradeModule).toHaveBeenCalledWith('session-owner', command);
+  });
+  it('rejects forged outcomes, prices, duplicate inputs and missing authentication', async () => {
+    const { app, economy } = setup();
+    for (const extra of [{ chance: 1 }, { success: true }, { accountId: 'victim' }, { grade: 100 }, { ingredientIds: ['a', 'a', 'a'] }, { seed: 'winner' }, { warrants: 0 }]) {
+      expect((await app.inject({ method: 'POST', url: '/meta-economy/module/upgrade', payload: { ...command, ...extra } })).statusCode).toBe(400);
+    }
+    expect(economy.upgradeModule).not.toHaveBeenCalled();
+    const anonymous = setup({ authenticated: false });
+    expect((await anonymous.app.inject({ method: 'POST', url: '/meta-economy/module/upgrade', payload: command })).statusCode).toBe(401);
   });
 });

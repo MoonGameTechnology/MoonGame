@@ -958,9 +958,9 @@
 | EC-1.1 | ⏳ | data core | `docs/economy-roadmap.md` | Data-driven модель предметов/модулей/чертежей |
 | EC-1.2 | ⏳ | srv | `docs/economy-roadmap.md` | Две валюты: серверный кошелёк |
 | EC-1.3 | 🔒 | srv | `docs/economy-roadmap.md` | Персистентный инвентарь финансового качества |
-| EC-2.1 | 🔒 | srv core | `docs/economy-roadmap.md` | Заточка: гарант низа + серверный RNG выше |
-| EC-2.2 | 🔒 | srv data | `docs/economy-roadmap.md` | Осколки → сборка soulbound-модуля |
-| EC-2.3 | 🔒 | srv cli | `docs/economy-roadmap.md` | Раскрытие шансов |
+| EC-2.1 | ✅ | srv core | `docs/economy-roadmap.md` | Заточка: гарант низа + серверный RNG выше — реализовано |
+| EC-2.2 | ⏳ | srv data | `docs/economy-roadmap.md` | Осколки → сборка soulbound-модуля |
+| EC-2.3 | ✅ | srv cli | `docs/economy-roadmap.md` | Раскрытие шансов — реализовано |
 | EC-3.1 | 🔒 | srv sec | `docs/economy-roadmap.md` | Леджер аукциона |
 | EC-3.2 | 🔒 | srv | `docs/economy-roadmap.md` | Листинг/покупка за рыночную валюту + комиссия-бёрн |
 | EC-3.3 | ⏳ | srv sec | `docs/economy-roadmap.md` | Анти-абьюз рынка |

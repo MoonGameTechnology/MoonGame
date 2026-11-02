@@ -80,7 +80,7 @@ function dropRallyPointsOf(state: GameState, planetId: PlanetId, keepOwner: Play
 export const autoRallyModule: GameModule = {
   id: 'auto-rally',
   // 1.1.0 RALLY-1: точка сбора (`rally.point`); 1.2.0: поднятый на орбиту корабль сходится с врагом.
-  version: '1.2.0',
+  version: '1.3.0',
   setup(api) {
     // RALLY-1: поставить (`to` — свой другой мир) или снять (`to: null`) точку сбора.
     api.onAction('rally.point', (action, h) => {
@@ -122,6 +122,7 @@ export const autoRallyModule: GameModule = {
         count?: number;
         owner?: string;
         modules?: unknown;
+        moduleSnapshot?: { stars: Record<string, number>; rarity: Record<string, string> };
       };
       if (
         typeof p?.planetId !== 'string' ||
@@ -146,7 +147,7 @@ export const autoRallyModule: GameModule = {
         : undefined;
       // Выслуга 0: новостройка легла в стек НОВИЧКОВ — ветераны того же корпуса стоят
       // отдельно (`serviceKey`), и увести надо построенное, а не их.
-      const stack = findHealthyStack(planet.garrison, p.unit, mods, 0);
+      const stack = findHealthyStack(planet.garrison, p.unit, mods, 0, p.moduleSnapshot ? { moduleStars: p.moduleSnapshot.stars, moduleRarity: p.moduleSnapshot.rarity } : undefined);
       if (!stack) return;
       const take = Math.min(want, stack.count);
       if (take <= 0) return;

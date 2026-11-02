@@ -77,9 +77,9 @@ describe('ArsenalItemSchema (ARS-1) — parse + the hybrid rule', () => {
     expect(safeParseArsenalItem({ itemId: 'a', kind: 'ship', defId: 'x' }).success).toBe(false); // unknown kind
     expect(safeParseArsenalItem({ itemId: 'a', kind: 'hull', defId: '' }).success).toBe(false);
     expect(
-      safeParseArsenalItem({ itemId: 'a', kind: 'module', form: 'instance', defId: 'm', grade: 4 })
+      safeParseArsenalItem({ itemId: 'a', kind: 'module', form: 'instance', defId: 'm', grade: 7 })
         .success,
-    ).toBe(false); // grade past the EC-2.1 cap (+3)
+    ).toBe(false); // grade past the legendary cap (+6)
     expect(
       safeParseArsenalItem({ itemId: 'a', kind: 'hull', defId: 'x', origin: 'gift' }).success,
     ).toBe(false); // unknown origin

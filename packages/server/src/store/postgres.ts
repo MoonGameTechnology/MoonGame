@@ -1,3 +1,4 @@
+export { PostgresArsenalStore } from './postgresArsenal';
 import { scopedPool } from '../corporateScopedPool';
 import { reservedBotLogin } from '../botNicknames';
 import { archiveMetadataOf, archiveStateBytes, type ArchiveSummaryMetadata } from '../matchArchiveMetadata';
@@ -17,11 +18,10 @@ import type { CorpShowcaseResult } from '@void/protocol';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
-import type { ArsenalItem, PlayerId } from '@void/shared-core';
+import type { PlayerId } from '@void/shared-core';
 import type {
   AccountStore,
   AnnouncementStore,
-  ArsenalStore,
   AvaBattleReport,
   AvaChallenge,
   AvaChallengeStatus,
@@ -54,7 +54,6 @@ import type {
   MatchStore,
   Medal,
   MedalStore,
-  OwnedArsenalItem,
   PushStore,
   PushSubscriptionRecord,
   ReceiptStore,
@@ -385,9 +384,16 @@ const SCHEMA_SQL = `
       soulbound   boolean NOT NULL,
       durability  integer,
       origin      text NOT NULL,
-      acquired_at bigint NOT NULL
+      acquired_at bigint NOT NULL,
+      progression jsonb NOT NULL DEFAULT '{}'::jsonb
     );
     CREATE INDEX IF NOT EXISTS arsenal_account_idx ON arsenal (account_id);
+
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid='arsenal'::regclass AND attname='progression' AND NOT attisdropped) THEN
+        ALTER TABLE arsenal ADD COLUMN progression jsonb NOT NULL DEFAULT '{}'::jsonb;
+      END IF;
+    END $$;
 
     -- Corp-arsenal rentals (ARS-6): a corp-owned item (a row in the arsenal table
     -- with account_id = the corp's id) lent to a rostered fighter for one war. item_id PK
@@ -2506,37 +2512,6 @@ export class PostgresAvaSessionStore implements AvaSessionStore {
   }
 }
 
-interface ArsenalRow {
-  item_id: string;
-  account_id: string;
-  kind: string;
-  form: string;
-  def_id: string;
-  grade: number | null;
-  soulbound: boolean;
-  durability: number | null;
-  origin: string;
-  acquired_at: string;
-}
-
-function ownedItemOf(row: ArsenalRow): OwnedArsenalItem {
-  return {
-    itemId: row.item_id,
-    accountId: row.account_id,
-    kind: row.kind as ArsenalItem['kind'],
-    form: row.form as ArsenalItem['form'],
-    defId: row.def_id,
-    ...(row.grade === null ? {} : { grade: row.grade }),
-    soulbound: row.soulbound,
-    ...(row.durability === null ? {} : { durability: row.durability }),
-    origin: row.origin as ArsenalItem['origin'],
-    acquiredAt: Number(row.acquired_at),
-  };
-}
-
-const ARSENAL_COLS =
-  'item_id, account_id, kind, form, def_id, grade, soulbound, durability, origin, acquired_at';
-
 interface CorpRentRow {
   item_id: string;
   corp_id: string;
@@ -2557,97 +2532,6 @@ function corpRentOf(row: CorpRentRow): CorpRent {
   };
 }
 
-/** Postgres arsenal store (ARS-2). The PK makes `grant` idempotent (ON CONFLICT DO
- *  NOTHING — first write wins); transfer/consume are owner-guarded conditional writes,
- *  so a double-sell race and a soulbound move are impossible at the storage level. */
-export class PostgresArsenalStore implements ArsenalStore {
-  constructor(private readonly pool: Pick<Pool, 'query'>) {}
-
-  async grant(item: OwnedArsenalItem): Promise<void> {
-    await this.pool.query(
-      // nosemgrep: no-sql-string-interpolation -- ARSENAL_COLS is a fixed column-list constant, not user input
-      `INSERT INTO arsenal (${ARSENAL_COLS})
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       ON CONFLICT (item_id) DO NOTHING`,
-      [
-        item.itemId,
-        item.accountId,
-        item.kind,
-        item.form,
-        item.defId,
-        item.grade ?? null,
-        item.soulbound,
-        item.durability ?? null,
-        item.origin,
-        item.acquiredAt,
-      ],
-    );
-  }
-
-  async get(itemId: string): Promise<OwnedArsenalItem | null> {
-    const r = await this.pool.query<ArsenalRow>( // nosemgrep: no-sql-string-interpolation -- ARSENAL_COLS is a fixed column-list constant, not user input
-      `SELECT ${ARSENAL_COLS} FROM arsenal WHERE item_id = $1`,
-      [itemId],
-    );
-    return r.rows[0] ? ownedItemOf(r.rows[0]) : null;
-  }
-
-  async listOf(accountId: string): Promise<ArsenalItem[]> {
-    const r = await this.pool.query<ArsenalRow>( // nosemgrep: no-sql-string-interpolation -- ARSENAL_COLS is a fixed column-list constant, not user input
-      `SELECT ${ARSENAL_COLS} FROM arsenal WHERE account_id = $1
-       ORDER BY kind, def_id, item_id`,
-      [accountId],
-    );
-    return r.rows.map((row) => {
-      const { accountId: _owner, ...item } = ownedItemOf(row);
-      return item;
-    });
-  }
-
-  async transfer(
-    itemId: string,
-    from: string,
-    to: string,
-  ): Promise<{ ok: true } | { ok: false; code: 'E_NOT_OWNER' | 'E_SOULBOUND' }> {
-    // The conditional UPDATE is the invariant: only the current owner's, non-soulbound
-    // item moves — atomically, so two racing buyers cannot both win.
-    const r = await this.pool.query(
-      `UPDATE arsenal SET account_id = $3
-       WHERE item_id = $1 AND account_id = $2 AND NOT soulbound`,
-      [itemId, from, to],
-    );
-    if ((r.rowCount ?? 0) > 0) return { ok: true };
-    // Post-hoc classification only (the guard above already held the invariant).
-    const row = await this.get(itemId);
-    return row && row.accountId === from && row.soulbound
-      ? { ok: false, code: 'E_SOULBOUND' }
-      : { ok: false, code: 'E_NOT_OWNER' };
-  }
-
-  async consume(itemId: string, accountId: string): Promise<boolean> {
-    const r = await this.pool.query(`DELETE FROM arsenal WHERE item_id = $1 AND account_id = $2`, [
-      itemId,
-      accountId,
-    ]);
-    return (r.rowCount ?? 0) > 0;
-  }
-
-  async wear(itemId: string, by: number): Promise<{ durability?: number } | null> {
-    // Only an INSTANCE (durability IS NOT NULL) actually wears — a blueprint's row
-    // stays NULL and the UPDATE simply changes nothing for it (still 1 row touched
-    // if it exists, so we read the value back either way to report it honestly).
-    const r = await this.pool.query<{ durability: number | null }>(
-      `UPDATE arsenal SET durability = GREATEST(0, durability - $2)
-       WHERE item_id = $1 AND durability IS NOT NULL
-       RETURNING durability`,
-      [itemId, by],
-    );
-    if (r.rows[0]) return { durability: r.rows[0].durability ?? undefined };
-    const row = await this.get(itemId);
-    if (!row) return null;
-    return { durability: undefined }; // exists, but a blueprint — nothing to wear
-  }
-}
 
 export class PostgresCorpRentStore implements CorpRentStore {
   async activeForCorp(corpId: string): Promise<CorpRent[]> {

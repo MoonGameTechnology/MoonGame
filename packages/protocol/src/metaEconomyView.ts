@@ -98,7 +98,37 @@ export interface MetaStoreOfferView {
   blocked?: 'owned' | 'limit' | 'season';
 }
 
+export interface ModuleUpgradeQuote {
+  itemId: string;
+  mode: 'stars' | 'rarity';
+  grade: number;
+  rarity: string;
+  next: number | string | null;
+  cap: number;
+  chance: number;
+  misses: number;
+  pity: number;
+  warrants: number;
+  ingredientIds: string[];
+  blueprint?: string;
+  blueprintOwned?: number;
+  binds: boolean;
+  reason: string | null;
+}
+export interface ModuleUpgradeCommand {
+  requestId: string;
+  itemId: string;
+  mode: 'stars' | 'rarity';
+  grade: number;
+  rarity: string;
+  ingredientIds: string[];
+  allowSoulbound: boolean;
+}
 export interface MetaEconomyView {
+  moduleUpgrades?: ModuleUpgradeQuote[];
+  moduleBlueprintOdds?: { first: number; other: number };
+  warrants?: number;
+  moduleBlueprints?: Record<string, number>;
   catalogVersion: string;
   materials: MetaMaterialView[];
   recipes: MetaRecipeView[];
@@ -158,6 +188,9 @@ export interface MetaCommandReceipt {
     soulbound: boolean;
     sourceId?: string;
   };
+  moduleUpgrade?: { itemId: string; mode: 'stars' | 'rarity'; success: boolean; from: number | string; to: number | string; chance: number; seed: string; consumedIds: string[]; consumedItems: ArsenalItem[]; warrants: number };
+  moduleBlueprint?: string;
+  moduleBlueprintRoll?: { seed: string; chance: number; policy: string };
   goalElapsedMs?: number;
   firstSelectedCraft?: boolean;
   seasonCompleted?: boolean;

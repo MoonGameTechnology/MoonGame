@@ -76,7 +76,7 @@ function firingUnits(
 
 export const promotionModule: GameModule = {
   id: 'promotion',
-  version: '1.1.0',
+  version: '1.2.0',
   setup(api) {
     api.on('unit.built', (event, h) => {
       const chance = h.ctx.data.promotion.chance;
@@ -88,6 +88,7 @@ export const promotionModule: GameModule = {
         owner?: string;
         fleetId?: string;
         modules?: unknown;
+        moduleSnapshot?: { stars: Record<string, number>; rarity: Record<string, string> };
       };
       if (typeof p?.planetId !== 'string' || typeof p?.unit !== 'string') return;
       const count = p.count ?? 0;
@@ -103,7 +104,7 @@ export const promotionModule: GameModule = {
       // новичков, ветераны того же корпуса стоят отдельно.
       const fleet = typeof p.fleetId === 'string' ? ownFleet(h.state, p.fleetId) : undefined;
       if (p.fleetId !== undefined && (!fleet || fleet.owner !== p.owner)) return;
-      const stack = findHealthyStack(fleet?.units ?? planet.garrison, p.unit, mods, 0);
+      const stack = findHealthyStack(fleet?.units ?? planet.garrison, p.unit, mods, 0, p.moduleSnapshot ? { moduleStars: p.moduleSnapshot.stars, moduleRarity: p.moduleSnapshot.rarity } : undefined);
       if (!stack || stack.count <= 0) return;
       // Бросок ПОСЛЕ всех отказов выше: иначе поток RNG зависел бы от того, нашёлся ли
       // стек, и реплей разошёлся бы на ровном месте.

@@ -4,6 +4,7 @@ export const ACTION_TYPES = new Set([
   'ally.cancel',
   'ally.order',
   'army.load',
+  'army.prepare',
   'army.unload',
   'arsenal.sync',
   'battle.attack',

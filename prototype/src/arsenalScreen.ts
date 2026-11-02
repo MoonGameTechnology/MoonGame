@@ -1,3 +1,4 @@
+import { buildModuleCopies } from '../../packages/shared-core/src/index';
 import { arsenalHeroesHtml } from './arsenalHeroes';
 /**
  * «Арсенал» — the hub tab over the account's persistent collection and its workshop (ARS-5,
@@ -18,6 +19,8 @@ import { arsenalHeroesHtml } from './arsenalHeroes';
  *
  * PC shows the detail beside the list; a narrow tab (phone) opens it as a sheet over the hub.
  */
+import { moduleCopyControls, moduleUpgradeConfirm, moduleItemEffects, moduleUpgradeResult, moduleItemHtml } from './moduleProgression';
+import type { ModuleUpgradeQuote } from '../../packages/protocol/src/metaEconomyView';
 import type { ArsenalItem } from '../../packages/shared-core/src/index';
 import type { MetaEconomyView, MetaRecipeView } from '../../packages/protocol/src/metaEconomyView';
 import { LOCALE, t, tData } from '../../localization/runtime';
@@ -153,10 +156,11 @@ export function starterPreview(): ArsenalItem[] {
 
 export type ArsenalTab = 'modules' | 'hulls' | 'heroes';
 export type ArsenalConfirm =
-  { kind: 'craft'; recipeId: string } | { kind: 'salvage'; itemId: string };
+  { kind: 'craft'; recipeId: string } | { kind: 'salvage'; itemId: string } | { kind: 'upgrade'; quote: ModuleUpgradeQuote };
 
 /** Everything one paint needs. Pure input of `arsenalHtml` / `arsenalDetailHtml`. */
 export interface ArsenalState {
+  upgradeResult?: import('../../packages/protocol/src/metaEconomyView').MetaCommandReceipt['moduleUpgrade'];
   /** The collection shown: the account's, or the starter preview. */
   items: readonly ArsenalItem[];
   /** The workshop, odds and seasons; null for a guest or while the server is unknown. */
@@ -199,6 +203,8 @@ function moduleGetHtml(s: ArsenalState, id: string): string {
 
 function moduleCard(s: ArsenalState, id: string): string {
   const own = owns(s.items, id);
+  const copy = buildModuleCopies(s.items).find((i) => i.defId === id);
+  const tier = copy?.rarity ?? rarityOf(id);
   const copies = copiesOf(s.items, id).length;
   const goal = !own && goalRecipe(s.view)?.defId === id;
   const selected = s.wide && s.tab === 'modules' && s.module === id;
@@ -208,9 +214,9 @@ function moduleCard(s: ArsenalState, id: string): string {
       ? `<span class="ar-tag">×${copies}</span>`
       : '';
   return (
-    `<button type="button" class="ar-mc r-${rarityOf(id)}${own ? '' : ' miss'}${goal ? ' goal' : ''}" data-ar-module="${esc(id)}" aria-pressed="${selected}">` +
+    `<button type="button" class="ar-mc r-${tier}${own ? '' : ' miss'}${goal ? ' goal' : ''}" data-ar-module="${esc(id)}" aria-pressed="${selected}">` +
     `<span class="ar-mc-ic" aria-hidden="true">${moduleIcon(id)}</span><span class="ar-mc-nm">${esc(moduleName(id))}</span>` +
-    `<span class="ar-mc-sub"><span class="ar-rw">${rarityText(id)}</span>${effectsOf(id)
+    `<span class="ar-mc-sub"><span class="ar-rw">${t(RARITY_KEY[tier] ?? 'rarity.simple')}${copy?.grade ? ` · ★${copy.grade}` : ''}</span>${(copy ? moduleItemEffects(copy) : effectsOf(id))
       .map((e) => `<span>${esc(e)}</span>`)
       .join('')}</span>` +
     (own ? '' : moduleGetHtml(s, id)) +
@@ -362,7 +368,8 @@ function fitsHtml(s: ArsenalState, id: string, hulls: readonly string[]): string
 }
 
 function copiesHtml(s: ArsenalState, id: string): string {
-  const copies = copiesOf(s.items, id);
+  const selected = buildModuleCopies(s.items).find((i) => i.defId === id)?.itemId;
+  const copies = copiesOf(s.items, id).sort((a, b) => Number(b.itemId === selected) - Number(a.itemId === selected));
   if (copies.every((c) => c.origin === 'starter'))
     return `<div class="ar-sec"><h4>${t('arsenal.copies')}</h4><p class="ar-note">${t('arsenal.copies.starter')}</p></div>`;
   let actionable = false;
@@ -399,7 +406,7 @@ function copiesHtml(s: ArsenalState, id: string): string {
         (salvage
           ? `<button type="button" class="btn-second" data-ar-salvage="${esc(c.itemId)}"${off(s.busy)}>${t('arsenal.salvage')}</button>`
           : '') +
-        '</div></div>'
+        '</div>' + (s.view?.moduleUpgrades && c.kind === 'module' ? moduleCopyControls(c, s.items, s.view, s.busy) : '') + '</div>'
       );
     })
     .join('');
@@ -510,6 +517,7 @@ function confirmHtml(s: ArsenalState): string {
   const buttons = (attr: string, label: string): string =>
     `<div class="ar-acts-row"><button type="button" class="btn-main" ${attr}${off(s.busy)}>${label}</button>` +
     `<button type="button" class="btn-quiet" data-ar-cancel>${t('arsenal.cancel')}</button></div>`;
+  if (c.kind === 'upgrade') return moduleUpgradeConfirm(c.quote, s.items, s.busy);
   if (c.kind === 'craft') {
     const recipe = view.recipes.find((r) => r.id === c.recipeId);
     if (!recipe) return '';
@@ -539,6 +547,7 @@ function confirmHtml(s: ArsenalState): string {
     .join(', ');
   return (
     `<div class="ar-confirm" role="group"><p>${esc(t('arsenal.salvage.confirm', { item: arsenalItemName(item), list }))}</p>` +
+    (item.grade || item.rarity ? moduleItemHtml(item) + `<p class="ar-note warn">${t('module.salvage-upgraded')}</p>` : '') +
     (item.soulbound ? `<p class="ar-note">${t('arsenal.salvage.bound')}</p>` : '') +
     (isLastCopy(s.items, item) ? `<p class="ar-note warn">${t('arsenal.salvage.last')}</p>` : '') +
     buttons(`data-ar-salvage-do="${esc(item.itemId)}"`, t('arsenal.salvage')) +
@@ -549,19 +558,23 @@ function confirmHtml(s: ArsenalState): string {
 function moduleDetailHtml(s: ArsenalState, id: string, hulls: readonly string[]): string {
   const own = owns(s.items, id);
   const def = data.modules[id];
-  const effects = effectsOf(id);
+  const copy = buildModuleCopies(s.items).find((i) => i.defId === id);
+  const tier = copy?.rarity ?? rarityOf(id);
+  const effects = copy ? moduleItemEffects(copy) : effectsOf(id);
   return (
-    `<div class="ar-dt r-${rarityOf(id)}"><div class="ar-dt-head"><span class="ar-dt-ic${own ? '' : ' miss'}" aria-hidden="true">${moduleIcon(id)}</span>` +
-    `<div><h3 id="ar-dt-title">${esc(moduleName(id))}</h3><div class="ar-dt-meta"><span class="ar-rw">${rarityText(id)}</span>` +
+    `<div class="ar-dt r-${tier}"><div class="ar-dt-head"><span class="ar-dt-ic${own ? '' : ' miss'}" aria-hidden="true">${moduleIcon(id)}</span>` +
+    `<div><h3 id="ar-dt-title">${esc(moduleName(id))}</h3><div class="ar-dt-meta"><span class="ar-rw">${t(RARITY_KEY[tier] ?? 'rarity.simple')}${copy?.grade ? ` · ★${copy.grade}` : ''}</span>` +
     (def ? `<span>${t('arsenal.slot', { slot: t(SLOT_KEY[def.slot] ?? def.slot) })}</span>` : '') +
     `<span>${t(own ? 'arsenal.owned' : 'arsenal.missing')}</span></div></div></div>` +
     statusHtml(s.notice) +
+    moduleUpgradeResult(s.upgradeResult, s.items) +
+    (s.view?.moduleUpgrades ? `<p class="ar-note">${t('module.no-refit')}</p><p class="ar-note">${t('module.blueprint-source', { first: Math.round((s.view.moduleBlueprintOdds?.first ?? 0) * 100), other: Math.round((s.view.moduleBlueprintOdds?.other ?? 0) * 100) })}</p>` : '') +
     (effects.length
       ? `<div class="ar-dt-eff">${effects.map((e) => `<span>${esc(e)}</span>`).join('')}</div>`
       : '') +
     (def?.description ? `<p class="ar-note">${esc(t(def.description))}</p>` : '') +
     confirmHtml(s) +
-    (own ? fitsHtml(s, id, hulls) + copiesHtml(s, id) : waysHtml(s, id) + fitsHtml(s, id, hulls)) +
+    (own ? fitsHtml(s, id, hulls) + copiesHtml(s, id) + (s.view && recipeOf(s.view, id) ? workshopWayHtml(s, s.view, recipeOf(s.view, id)!) : '') + `<button class="btn-second" data-ar-auction>${t('arsenal.way.auction')}</button>` : waysHtml(s, id) + fitsHtml(s, id, hulls)) +
     `<div class="ar-acts-row"><button type="button" class="btn-quiet" data-ar-codex="md:${esc(id)}">${t('arsenal.codex')}</button></div></div>`
   );
 }
@@ -711,6 +724,7 @@ export function initArsenal(host: ArsenalHost): {
   const actionNotice = (st: MetaEconomyStatus): ArsenalState['notice'] => {
     if (!acting) return null;
     if (st.kind === 'pending') return { text: t('arsenal.pending'), error: false };
+    if (st.kind === 'done' && st.receipt?.moduleUpgrade?.success) return null;
     if (st.kind === 'done') return st.key ? { text: t(st.key), error: false } : null;
     if (st.kind === 'failed') return { text: t(st.key ?? 'arsenal.failed'), error: true };
     return null;
@@ -743,6 +757,7 @@ export function initArsenal(host: ArsenalHost): {
       confirm,
       status: readStatus(st),
       notice: actionNotice(st),
+      upgradeResult: acting && st.kind === 'done' ? st.receipt?.moduleUpgrade : undefined,
       wide,
     };
   }
@@ -762,6 +777,7 @@ export function initArsenal(host: ArsenalHost): {
         `<div class="ar-sheet-body">${arsenalDetailHtml(s)}</div></div>`
       : '';
     sheet.classList.toggle('open', sheetOpen);
+    if (s.upgradeResult?.success) detailBox()?.querySelector?.('.mi-reward')?.scrollIntoView?.({ block: 'start' });
   }
 
   /** The detail box the open item lives in now. */
@@ -850,6 +866,16 @@ export function initArsenal(host: ArsenalHost): {
     }
     const view = client.view();
     if (client.busy() || !view) return;
+    if (d.arSelect) return act('/meta-economy/module/select', { itemId: d.arSelect }, 'module.done');
+    if (d.arUpgrade) {
+      const quote = view.moduleUpgrades?.find((q) => q.itemId === d.arUpgrade && q.mode === d.arMode);
+      if (quote && !quote.reason) ask({ kind: 'upgrade', quote: structuredClone(quote) });
+      return;
+    }
+    if (d.arUpgradeDo !== undefined && confirm?.kind === 'upgrade') {
+      const q = confirm.quote;
+      return act('/meta-economy/module/upgrade', { itemId: q.itemId, mode: q.mode, grade: q.grade, rarity: q.rarity, ingredientIds: q.ingredientIds, allowSoulbound: q.binds });
+    }
     if (d.arSell) {
       const item = items.find((i) => i.itemId === d.arSell);
       if (!item || !canSell(item)) return;

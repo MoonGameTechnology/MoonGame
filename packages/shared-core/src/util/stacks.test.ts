@@ -288,3 +288,16 @@ describe('addUnits — заслуга при доливе и переезде (V
     expect(dest[0]).toEqual({ unit: 'gun', count: 2 });
   });
 });
+
+
+describe('live module progression and fleet merges', () => {
+  it('does not retrofit ships by merging different stars or rarities', () => {
+    const base = { unit: 'ship', count: 1, modules: ['gun'] };
+    const stronger = { ...base, moduleStars: { gun: 1 } };
+    const rarer = { ...base, moduleRarity: { gun: 'unique' } };
+    const merged = mergeStacks([base], [stronger, rarer]);
+    expect(merged).toHaveLength(3);
+    expect(merged.map((s) => s.count)).toEqual([1, 1, 1]);
+    expect(mergeStacks(merged, [stronger])[1]?.count).toBe(2);
+  });
+});

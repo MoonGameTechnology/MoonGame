@@ -1,5 +1,7 @@
 /** DOM/navigation adapter for the training lesson; no game orders are sent here. */
 import { trainingFleet, type TrainingFleetRole } from '../../decisions/trainingGuide';
+import { hasPlannedArmyLoad } from '../../decisions/armyTransferRows';
+import { data } from './gameData';
 import type { GameState } from '../../packages/shared-core/src/index';
 import { fleetAnchor } from './fleetGeometry';
 import {
@@ -117,7 +119,7 @@ export function trainingTourUi(h: TrainingDomHost): TrainingTourUi {
         );
       if (kind === 'retreat') return retreatAim !== null;
       if (kind === 'strike') return strikeAim !== null;
-      if (kind === 'troops-ready') return (troopsPlan?.plan.heavy_infantry ?? 0) > 0;
+      if (kind === 'troops-ready') return hasPlannedArmyLoad(h.world(), troopsPlan, 'heavy_infantry', data);
       if (kind === 'carrier-course')
         return (
           !!fleet('carrier')?.movement ||

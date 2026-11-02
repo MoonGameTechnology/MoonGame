@@ -176,6 +176,7 @@ export {
   retreatFleet,
   bombardFleet,
   loadArmy,
+  prepareArmy,
   unloadArmy,
   launchFleet,
   mergeFleet,

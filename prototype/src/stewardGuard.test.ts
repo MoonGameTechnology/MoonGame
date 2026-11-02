@@ -335,7 +335,7 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
     const tick2 = stewardGuardOrders(s, 'p1');
     expect(tick2.map((a) => a.type)).toEqual(['army.load', 'steward.report']);
     apply(tick2);
-    expect(s.planets.H!.garrison).toEqual([{ unit: 'militia', count: 4 }]); // ещё на земле
+    expect(s.planets.H!.garrison).toEqual([{ unit: 'militia', count: 4, armyGroup: expect.any(String) }]); // ещё на земле
     expect(s.fleets.F2!.loading).toMatchObject([{ unit: 'militia', count: 4, from: 'H' }]);
     expect(s.fleets.F2!.movement).toBeNull();
     // Tick 2а: пока час идёт, драйвер молчит — второй раз ту же роту он не заказывает

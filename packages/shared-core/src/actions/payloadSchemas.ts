@@ -50,13 +50,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // minefield.ts (SM-3.4): поставить минное поле на узле, где стоит флот
   'fleet.layMines': z.object({ fleetId: id }),
   // army.ts
-  'army.load': z.object({
-    fleetId: id,
-    unit: id,
-    count: count.optional(),
-    first: z.enum(['wounded', 'healthy']).optional(),
-  }),
-  'army.unload': z.object({ fleetId: id, unit: id, count: count.optional() }),
+  'army.prepare': z.object({ fleetId: id }),
+  'army.load': z.object({ fleetId: id, unit: id, count: count.optional(), group: id.max(128).optional(), first: z.enum(['wounded', 'healthy']).optional() }),
+  'army.unload': z.object({ fleetId: id, unit: id, count: count.optional(), group: id.max(128).optional() }),
   // hero.ts
   // AUD-18: `hero.move` и `planet.annihilate` сняты — у них нет схемы, значит шлюз их не
   // примет. Второй был живым обходом: аннигилировал миры героем без этой способности.

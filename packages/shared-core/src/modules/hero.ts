@@ -1,3 +1,4 @@
+import { heroShipStack, rememberHeroModule } from '../util/heroLoadout';
 import type { HeroCasualty } from '../util/casualties';
 import { activeHeroCount, heroActiveCap } from '../state/heroDeployment';
 import { registerHeroDeployment } from './hero/deployment';
@@ -19,7 +20,6 @@ import type {
   PlayerId,
   ResourceBag,
   TempLane,
-  UnitStack,
 } from '../state/gameState';
 import { stacksHaveTrait } from '../data/traits';
 import { heroByFleet, heroNode } from '../state/heroes';
@@ -30,7 +30,6 @@ import { isAllied } from '../util/combat';
 import { canInstall } from '../util/fitting';
 import { knownSkillNodes } from '../util/heroSkills';
 import { moduleAllowed, type SlotCounts } from '../util/loadout';
-import { rarityOf, starsOf } from '../util/stacks';
 import { canAfford, payCost } from '../util/treasury';
 
 /**
@@ -300,7 +299,7 @@ function formHeroShip(h: HandlerContext, hero: Hero, at: PlanetId): string {
     owner: hero.owner,
     location: at,
     movement: null,
-    units: [heroShipStack(h, hero)],
+    units: [heroShipStack(h, hero, heroShipUnit(h, hero))],
     traits: [],
     orbit: 'near',
   };
@@ -399,22 +398,6 @@ export function heroModuleSlots(hero: Hero, unit: string, data: GameData): SlotC
  *  An empty set leaves the key ABSENT rather than writing `[]` — a stack's loadout is
  *  part of its merge identity, so an empty array would split stacks that used to merge
  *  and change old behaviour for heroes that own no modules. */
-function heroShipStack(h: HandlerContext, hero: Hero): UnitStack {
-  const stack: UnitStack = { unit: heroShipUnit(h, hero), count: 1 };
-  const mods = hero.modules;
-  if (mods !== undefined && mods.length > 0) {
-    stack.modules = [...mods];
-    // Звёзды и редкость модулей — из СНИМКА арсенала места, как у верфи (SZE-1.1/5.1):
-    // иначе возрождённый корабль героя выходил бы с голыми ★0 (PVR-6.24). Нет снимка
-    // (обычный матч) — полей нет, стек байт-в-байт прежний.
-    const arsenal = h.state.players[hero.owner]?.arsenal;
-    const own = starsOf(stack.modules, arsenal?.stars);
-    if (own) stack.moduleStars = own;
-    const raised = rarityOf(stack.modules, arsenal?.rarity);
-    if (raised) stack.moduleRarity = raised;
-  }
-  return stack;
-}
 
 export function equippedOf(hero: Hero): string[] {
   if (hero.equipped !== undefined) return hero.equipped;
@@ -696,9 +679,8 @@ export const heroModule: GameModule = {
   // 4.4.0: map-authored hero rescue on arrival, with one-time persisted recruitment facts.
   // 4.5.0: герой не появляется на крепости у развилки — это не мир (FORT-6.1).
   // 4.6.0: чужая ракета (SM-3.7b) для `hero.spawn` — как отсутствующая цель (`E_NO_PLANET`).
-  // 4.8.0: timed hero mobilization and researched command slots.
-  // 4.9.0: remove a slain hero's aura before the surviving escort returns fire.
-  version: '4.9.1',
+  // 4.10.0 combines remembered loadouts with aura removal before the reply volley.
+  version: '4.10.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
@@ -1156,7 +1138,7 @@ export const heroModule: GameModule = {
         }[gate.reason];
         return h.reject(code);
       }
-      hero.modules = [...installed, moduleId];
+      rememberHeroModule(hero, moduleId, arsenal);
       h.emit('hero.installed', { owner: action.playerId, heroId, moduleId });
     });
 

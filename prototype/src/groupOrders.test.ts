@@ -335,10 +335,13 @@ describe('REFM-228 — погрузка десанта', () => {
       ...env.world,
       fleets: { ...env.world.fleets, [fleet.id]: { ...fleet, loading } },
     };
+    const { prepareArmyGroups, groundClaims } = await import('../../packages/shared-core/src/util/armySelection');
+    const { data } = await import('./game');
+    prepareArmyGroups(env.world, env.world.planets[home.id]!.garrison, groundClaims(env.world, home.id), data);
     const input = go.troopsInputFor(fleet.id)!;
     expect(input.units.map((u) => u.unit).sort()).toEqual(['heavy_infantry', 'militia']);
     const militia = input.units.find((u) => u.unit === 'militia')!;
-    expect([militia.queued, militia.reserved, militia.hold]).toEqual([3, 2, 0]);
+    expect([militia.queued, militia.reserved, militia.hold]).toEqual([2, 2, 0]);
     expect(input.reservedCargo).toBe(2 + 1 + 2);
     expect(input.plan).toEqual({});
   });

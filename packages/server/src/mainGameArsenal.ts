@@ -100,7 +100,12 @@ export function syncAccountArsenal(deps: SyncAccountArsenalDeps): Promise<number
         const player = room.state.players[playerId];
         if (!player?.arsenal || player.npc) break;
         if (
-          JSON.stringify({ hulls: player.arsenal.hulls, modules: player.arsenal.modules }) ===
+          JSON.stringify({
+            hulls: player.arsenal.hulls,
+            modules: player.arsenal.modules,
+            stars: player.arsenal.stars,
+            rarity: player.arsenal.rarity,
+          }) ===
           JSON.stringify(fresh)
         )
           break;

@@ -36,7 +36,7 @@ describe('meta market screen', () => {
     );
     expect(html).toContain('⌖ 420');
     expect(html).toContain('data-mm-buy="lot"');
-    expect(html).toContain('data-mm-list="trade"');
+    expect(html).not.toContain('data-mm-list="trade"'); // already listed: cannot offer twice
     expect(html).not.toContain('data-mm-list="bound"');
   });
 

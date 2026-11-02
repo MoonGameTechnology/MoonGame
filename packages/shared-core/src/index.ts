@@ -584,6 +584,7 @@ export {
   serviceKey,
   SERVICE_MERGE_CAP,
 } from './util/stacks';
+export { buildModuleCopies, constructionModuleSnapshot } from './util/arsenalLoadout';
 export {
   effectiveStats,
   moduleStarMultiplier,

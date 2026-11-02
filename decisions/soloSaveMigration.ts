@@ -296,6 +296,28 @@ export const ECHELONS_SOLO_MIGRATION = {
   toDataHash: '0afbb7f3739821',
 } as const;
 
+/** Optional snapshots pin paid orders and hero loadouts before the next arsenal sync.
+ * Old snapshots remain readable; the existing lazy pinning preserves their values. */
+export const MODULE_PROGRESSION_SOLO_MIGRATION = {
+  fromRules: ECHELONS_SOLO_MIGRATION.toRules,
+  fromData: ECHELONS_SOLO_MIGRATION.toData,
+  fromDataHash: ECHELONS_SOLO_MIGRATION.toDataHash,
+  toRules: '049dc3b8692491',
+  toData: ECHELONS_SOLO_MIGRATION.toData,
+  toDataHash: ECHELONS_SOLO_MIGRATION.toDataHash,
+} as const;
+
+/** Army 1.4.0 adds optional formation identities and claim sources. Older claims
+ * retain their completion semantics and are pinned before a new explicit selection. */
+export const ARMY_SELECTION_SOLO_MIGRATION = {
+  fromRules: MODULE_PROGRESSION_SOLO_MIGRATION.toRules,
+  fromData: MODULE_PROGRESSION_SOLO_MIGRATION.toData,
+  fromDataHash: MODULE_PROGRESSION_SOLO_MIGRATION.toDataHash,
+  toRules: '13fa26ace0540a',
+  toData: MODULE_PROGRESSION_SOLO_MIGRATION.toData,
+  toDataHash: MODULE_PROGRESSION_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -323,6 +345,8 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   LOAD_FIRST_SOLO_MIGRATION,
   HERO_MOBILIZATION_SOLO_MIGRATION,
   ECHELONS_SOLO_MIGRATION,
+  MODULE_PROGRESSION_SOLO_MIGRATION,
+  ARMY_SELECTION_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

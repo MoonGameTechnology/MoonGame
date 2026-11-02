@@ -1,3 +1,5 @@
+import type { BuildUnitPayload, CompletePayload } from '../state/construction';
+import { constructionModuleSnapshot, completionModuleSnapshot } from '../util/arsenalLoadout';
 import type { StructureDamage } from '../util/structureDamage';
 import { registerConstructionMaintenance } from './construction/maintenance';
 import type { GameModule, HandlerContext } from '../kernel/module';
@@ -43,36 +45,6 @@ const STRUCTURE_DAMAGE_SHARE = 0.5;
 interface ConstructBuildingPayload {
   planetId: string;
   building: string;
-}
-interface BuildUnitPayload {
-  planetId: string;
-  unit: string;
-  count?: number;
-  /** Ship modules to install on the built stack (loadout). Validated against the
-   *  hull's slots at order time, paid for up-front, then LOCKED onto the stack —
-   *  there is no refit action. Absent/empty = a bare hull. */
-  modules?: string[];
-  /** Десантный челнок (трейт `lander`, SHU-5.2): какой наземный юнит он несёт. Цена и
-   *  срок заказа — челнок плюс этот юнит, условия его постройки проверяются здесь же. */
-  troop?: string;
-}
-/** Payload of the internal `construction.complete` schedule (we author it, so
- *  it is well-formed; the handler still guards types and is fail-secure). */
-interface CompletePayload {
-  kind?: 'building' | 'unit' | 'upgrade';
-  planetId?: string;
-  playerId?: string;
-  building?: string;
-  unit?: string;
-  count?: number;
-  level?: number;
-  modules?: string[];
-  /** Наземный юнит десантного челнока (SHU-5.2). */
-  troop?: string;
-  /** RULES-2.1: instance uid for upgrade completion (when maxPerPlanet > 1). */
-  uid?: string;
-  /** Scheduled event seq (for uid generation). */
-  seq?: number;
 }
 interface ConstructionRequirement {
   allowed: boolean;
@@ -149,6 +121,7 @@ function orderSpec(
 /** Schedules a build to finish after `hours`, scaled by the match timeScale
  *  exactly like every other real-time duration (GDD §3.1). */
 function scheduleCompletion(h: HandlerContext, hours: number, payload: CompletePayload): void {
+  if (payload.kind === 'unit') payload.moduleSnapshot ??= constructionModuleSnapshot(payload.modules, h.state.players[payload.playerId ?? '']?.arsenal);
   h.schedule(h.ctx.now + hoursToMs(h.ctx, hours), 'construction.complete', payload);
 }
 
@@ -336,6 +309,7 @@ function enqueueOrder(
   // Личность из счётчика запланированных событий — чтобы `construction.cancel` брал
   // ОДИН номер и не путал ждущий заказ с идущей стройкой (см. `QueuedConstruction`).
   const id = h.state.scheduleSeq++;
+  if (order.kind === 'unit') order.moduleSnapshot = constructionModuleSnapshot(order.modules, h.state.players[order.playerId]?.arsenal);
   planet.buildQueue = [...queue, { ...order, id }];
   h.emit('construction.queued', {
     planetId: planet.id,
@@ -448,6 +422,7 @@ function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): vo
       unit: head.unit,
       count: head.count,
       modules: head.modules,
+      moduleSnapshot: head.moduleSnapshot,
       troop: head.troop,
     });
     h.emit('construction.started', {
@@ -853,7 +828,8 @@ export const constructionModule: GameModule = {
   // 1.8.0: залеченный госпиталем стек сливается с целыми того же вида (раны теперь
   // переживают бой, `combat` 3.10.0).
   // 1.9.0: своя полоса у каждой производственной постройки — верфь, порт, казармы, завод (BLD-2.1).
-  version: '1.11.1',
+  // 1.12.0 combines paid module snapshots with immediate structure casualties.
+  version: '1.12.0',
   setup(api) {
     api.provideCapability<StructureDamage>('construction.impact', (h, id, amount, owner, covered) => {
       const planet = h.state.planets[id];
@@ -1301,6 +1277,7 @@ export const constructionModule: GameModule = {
         unit: p.unit,
         count: p.count,
         modules: p.modules,
+        moduleSnapshot: p.moduleSnapshot,
         troop: p.troop,
         progress,
         remainingHours: fortressWork ? Math.max(0, fortressWork.doneAt - h.ctx.now) / hoursToMs(h.ctx, 1)
@@ -1381,6 +1358,7 @@ export const constructionModule: GameModule = {
         unit: site.unit,
         count: site.count,
         modules: site.modules,
+        moduleSnapshot: site.moduleSnapshot,
         troop: site.troop,
       });
       h.emit('construction.resumed', {
@@ -1531,12 +1509,7 @@ export const constructionModule: GameModule = {
         // Челнок сдают В ПОРТ (SHU-1.1) — он не гарнизон (не держит мир, не гибнет в
         // наземном штурме) и не флот (`autoRally` его не поднимает).
         const built = h.ctx.data.units[p.unit];
-        // Звёздность модулей (SZE-1.1) берётся из СНИМКА арсенала места, а не из меты:
-        // ядро во время матча мету не читает. Нет снимка (обычный матч) → ★0 у всех.
-        const arsenal =
-          typeof p.playerId === 'string' ? h.state.players[p.playerId]?.arsenal : undefined;
-        const stars = arsenal?.stars;
-        const rarity = arsenal?.rarity; // SZE-5.1 — тем же снимком, что звёзды
+        const { stars, rarity } = completionModuleSnapshot(p, h.state.players[p.playerId ?? '']?.arsenal);
         let fleet: Fleet | undefined;
         if (built?.traits.includes('shuttle')) {
           // Готовая машина встаёт в ЭСКАДРУ (SHU-4.2), а не россыпью. Правило живёт в
@@ -1584,7 +1557,7 @@ export const constructionModule: GameModule = {
           count: p.count,
           owner: p.playerId,
           ...(fleet ? { fleetId: fleet.id } : {}),
-          ...(p.modules && p.modules.length > 0 ? { modules: p.modules } : {}),
+          ...(p.modules && p.modules.length > 0 ? { modules: p.modules, moduleSnapshot: { stars, rarity } } : {}),
           ...(typeof p.troop === 'string' ? { troop: p.troop } : {}),
         });
         // Let promotion stamp the fresh stack before arrival can auto-merge its fleet.

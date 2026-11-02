@@ -12,6 +12,8 @@ export interface MetaEconomyApiDeps {
     | 'matchRewards'
     | 'setSupplyGoal'
     | 'craft'
+    | 'upgradeModule'
+    | 'selectModule'
     | 'salvage'
     | 'selectPass'
     | 'chooseSeasonReward'
@@ -127,6 +129,13 @@ export function registerMetaEconomyApi(app: FastifyInstance, deps: MetaEconomyAp
         allowSoulbound: b.allowSoulbound as boolean,
       }),
   );
+  post('module/select', (b) => fields(b, ['requestId', 'itemId']) && id(b.itemId),
+    (account, b) => deps.economy.selectModule(account, b as unknown as Parameters<MetaEconomy['selectModule']>[1]));
+  post('module/upgrade', (b) => fields(b, ['requestId', 'itemId', 'mode', 'grade', 'rarity', 'ingredientIds', 'allowSoulbound']) && id(b.itemId) &&
+    (b.mode === 'stars' || b.mode === 'rarity') && Number.isInteger(b.grade) && Number(b.grade) >= 0 && Number(b.grade) <= 6 &&
+    ['simple', 'unique', 'mythic', 'legendary'].includes(String(b.rarity)) && Array.isArray(b.ingredientIds) && b.ingredientIds.length === 3 &&
+    b.ingredientIds.every(id) && new Set(b.ingredientIds).size === 3 && typeof b.allowSoulbound === 'boolean',
+    (account, b) => deps.economy.upgradeModule(account, b as unknown as Parameters<MetaEconomy['upgradeModule']>[1]));
   post(
     'salvage',
     (b) => fields(b, ['requestId', 'itemId']) && id(b.itemId),

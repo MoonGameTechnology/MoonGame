@@ -43,3 +43,11 @@ it('a different new instance with more stars is a receipt, not a fictitious upgr
     'received',
   );
 });
+
+
+it('celebrates raised rarity once without claiming a star upgrade', () => {
+  const before: ArsenalItem = { itemId: 'tier', kind: 'module', form: 'instance', defId: 'cargo_bay', origin: 'craft', acquiredAt: 0, soulbound: false, grade: 2 };
+  const after = { ...before, rarity: 'unique' as const };
+  expect(moduleRewards([before], [after])).toEqual([{ kind: 'rarity', item: after, previousGrade: 2, previousRarity: undefined }]);
+  expect(moduleRewards([after], [after])).toEqual([]);
+});

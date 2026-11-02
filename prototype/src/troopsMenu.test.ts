@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { setLocale } from '../../localization/runtime';
+import { setLocale, t } from '../../localization/runtime';
 import {
   maxPlan,
   planOrders,
@@ -33,6 +33,81 @@ const input = (over: Partial<TroopsInput> = {}): TroopsInput => ({
 });
 
 describe('troopsModel — сколько влезет', () => {
+  it('keeps same-type formations separate and sends only the chosen group', () => {
+    const units = [
+      unit({
+        unit: 'militia',
+        key: 'garrison:healthy',
+        group: 'healthy',
+        side: 'garrison',
+        prepared: true,
+        garrison: 4,
+        garrisonAll: 4,
+        grade: 0,
+        battles: 0,
+        health: 100,
+      }),
+      unit({
+        unit: 'militia',
+        key: 'garrison:wounded',
+        group: 'wounded',
+        side: 'garrison',
+        prepared: true,
+        garrison: 4,
+        garrisonAll: 4,
+        grade: 2,
+        battles: 6,
+        health: 50,
+      }),
+      unit({
+        unit: 'militia',
+        key: 'hold:aboard',
+        group: 'aboard',
+        side: 'hold',
+        prepared: true,
+        hold: 2,
+        holdAll: 3,
+        grade: 1,
+        battles: 3,
+        health: 75,
+        queued: 1,
+      }),
+    ];
+    let inp = input({ units, used: 3 });
+    inp = { ...inp, plan: stepPlan(inp, 'garrison:wounded', 2) };
+    inp = { ...inp, plan: stepPlan(inp, 'hold:aboard', -5) };
+    const model = troopsModel(inp);
+    expect(model.rows.map((r) => r.delta)).toEqual([0, 2, -2]);
+    expect(planOrders(model)).toEqual({
+      load: [{ unit: 'militia', count: 2, group: 'wounded' }],
+      unload: [{ unit: 'militia', count: 2, group: 'aboard' }],
+    });
+    const html = troopsMenuHtml(model, { name: (u) => u, icon: () => '' });
+    expect(html).toContain('Здоровье: 50%');
+    expect(html).toContain('Выслуга: 2');
+    expect(html).toContain('Боёв: 6');
+  });
+
+  it('does not send a selection until the server identifies its formation', () => {
+    const model = troopsModel(
+      input({
+        units: [
+          unit({
+            unit: 'militia',
+            key: 'pending',
+            side: 'garrison',
+            prepared: false,
+            garrison: 4,
+            garrisonAll: 4,
+          }),
+        ],
+        plan: { pending: 2 },
+      }),
+    );
+    expect(model.valid).toBe(false);
+    expect(model.rows[0]!.maxLoad).toBe(0);
+    expect(planOrders(model)).toEqual({ load: [], unload: [] });
+  });
   it('пустой план ничего не подтверждает', () => {
     const m = troopsModel(input());
     expect(m.valid).toBe(false);
@@ -82,7 +157,7 @@ describe('troopsModel — сколько влезет', () => {
     expect(m.freeCargo).toBe(0);
   });
 
-  it('выгрузка в том же плане освобождает место под погрузку', () => {
+  it('ещё не завершённая выгрузка не обещает место под погрузку', () => {
     const m = troopsModel(
       input({
         units: [
@@ -94,8 +169,9 @@ describe('troopsModel — сколько влезет', () => {
         plan: { tank: -3 },
       }),
     );
-    // высадив 3 танка, освобождаем 3 места — ополчение туда влезает
-    expect(m.rows[1]!.maxLoad).toBe(3);
+    // Места освободятся только через час, после завершения выгрузки.
+    expect(m.rows[1]!.maxLoad).toBe(0);
+    expect(m.freeCargo).toBe(3);
   });
 
   it('нельзя выгрузить больше, чем на борту', () => {
@@ -207,10 +283,14 @@ describe('troopsMenuHtml — разметка поповера', () => {
   it('строка на тип несёт кнопки шага и пресетов с id юнита', () => {
     const html = troopsMenuHtml(troopsModel(input()), opts);
     expect(html).toContain('class="cmdpop tpop"');
-    expect(html).toContain('data-cmd="tstep" data-unit="militia" data-n="1"');
-    expect(html).toContain('data-cmd="tstep" data-unit="militia" data-n="-1"');
-    expect(html).toContain('data-cmd="tmax" class="tall btn-quiet" data-unit="militia" data-dir="1"');
-    expect(html).toContain('data-cmd="tmax" class="tall btn-quiet" data-unit="militia" data-dir="-1"');
+    expect(html).toContain('data-cmd="tstep" data-unit="militia" data-group="militia" data-n="1"');
+    expect(html).toContain('data-cmd="tstep" data-unit="militia" data-group="militia" data-n="-1"');
+    expect(html).toContain(
+      'data-cmd="tmax" class="tall btn-quiet" data-unit="militia" data-group="militia" data-dir="1"',
+    );
+    expect(html).toContain(
+      'data-cmd="tmax" class="tall btn-quiet" data-unit="militia" data-group="militia" data-dir="-1"',
+    );
     expect(html).toContain('MILITIA');
     expect(html).toContain('5 ▸ 0');
   });
@@ -228,31 +308,39 @@ describe('troopsMenuHtml — разметка поповера', () => {
       troopsModel(input({ units: [unit({ unit: 'militia', hold: 1, holdAll: 1 })] })),
       opts,
     );
-    expect(html).toContain('data-n="1" title="▲ Погрузить MILITIA" aria-label="▲ Погрузить MILITIA" disabled');
+    expect(html).toContain(
+      'data-n="1" title="▲ Погрузить MILITIA" aria-label="▲ Погрузить MILITIA" disabled',
+    );
     expect(html).toContain('data-n="-1" title="▼ Выгрузить MILITIA"');
-    expect(html).not.toContain('data-n="-1" title="▼ Выгрузить MILITIA" aria-label="▼ Выгрузить MILITIA" disabled');
+    expect(html).not.toContain(
+      'data-n="-1" title="▼ Выгрузить MILITIA" aria-label="▼ Выгрузить MILITIA" disabled',
+    );
   });
 
   it('причина серой кнопки написана в меню, а не спрятана в тултип', () => {
     const full = troopsMenuHtml(troopsModel(input({ capacity: 2, used: 2 })), opts);
     expect(full).toContain('трюм полон');
     const dry = troopsMenuHtml(
-      troopsModel(input({ units: [unit({ unit: 'militia', garrison: 2, garrisonAll: 2, reserved: 2 })] })),
+      troopsModel(
+        input({ units: [unit({ unit: 'militia', garrison: 2, garrisonAll: 2, reserved: 2 })] }),
+      ),
       opts,
     );
     expect(dry).toContain('в гарнизоне не осталось');
   });
 
-  it('сноски: очередь и асимметрия времени; про раненых сноски нет — они грузятся', () => {
+  it('сноски: очередь и одинаковое время погрузки и выгрузки', () => {
     const html = troopsMenuHtml(
-      troopsModel(input({ units: [unit({ unit: 'militia', garrison: 1, garrisonAll: 4, queued: 2 })] })),
+      troopsModel(
+        input({ units: [unit({ unit: 'militia', garrison: 1, garrisonAll: 4, queued: 2 })] }),
+      ),
       opts,
     );
     expect(html).not.toContain('повреждённые части');
-    expect(html).toContain('⏳ грузится: 2');
+    expect(html).toContain(t('troops.transferring', { n: 2 }));
     // Час — на ЗАКАЗ, а не на единицу: подпись врала ровно этим словом. Правило
     // одно и живёт в ядре (CARGO-1), поэтому и подпись теперь называет его точно.
-    expect(html).toContain('погрузка ≈1 ч · выгрузка сразу');
+    expect(html).toContain(t('troops.timing'));
   });
 
   it('шапка показывает, каким трюм СТАНЕТ, и сводку плана', () => {
@@ -266,7 +354,10 @@ describe('troopsMenuHtml — разметка поповера', () => {
 
   it('в разметке нет живых тикающих чисел — только счётные', () => {
     // Покадровый дифф ряда переписал бы DOM под пальцем: таймеров тут быть не должно.
-    const html = troopsMenuHtml(troopsModel(input({ units: [unit({ unit: 'militia', queued: 1 })] })), opts);
+    const html = troopsMenuHtml(
+      troopsModel(input({ units: [unit({ unit: 'militia', queued: 1 })] })),
+      opts,
+    );
     expect(html).not.toContain('pn-timer');
     expect(html).not.toContain('data-at=');
   });

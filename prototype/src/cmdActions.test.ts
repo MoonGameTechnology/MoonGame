@@ -356,18 +356,21 @@ describe('REFM-227 — нажатия ряда', () => {
   });
 
   it('⇅: меню десанта, «макс» набирает план, «Готово» грузит его и закрывает меню', async () => {
-    const { inter, go, game, fleet, select, press } = await boot();
+    const { inter, go, game, env, home, fleet, select, press } = await boot();
+    const { prepareArmyGroups } = await import('../../packages/shared-core/src/util/armySelection');
+    prepareArmyGroups(env.world, home.garrison, [], game.data);
     select(fleet.id);
     press('troops');
     expect(inter.troopsPlan).toEqual({ fleetId: fleet.id, plan: {} });
-    const unit = go.troopsInputFor(fleet.id)!.units.find((u) => u.unit === 'militia')!.unit;
+    const row = go.troopsInputFor(fleet.id)!.units.find((u) => u.unit === 'militia')!;
+    const unit = row.key!;
     press('tmax', { unit, dir: '1' });
     const n = inter.troopsPlan!.plan[unit]!;
     expect(n).toBeGreaterThan(0);
     press('tstep', { unit, n: '-1' });
     expect(inter.troopsPlan!.plan[unit]).toBe(n - 1);
     press('tok');
-    expect(orders()).toEqual([game.loadArmy('p1', fleet.id, unit, n - 1)].map(bare));
+    expect(orders()).toEqual([game.prepareArmy('p1', fleet.id), game.loadArmy('p1', fleet.id, row.unit, n - 1, row.group)].map(bare));
     expect(inter.troopsPlan).toBeNull();
     press('troops');
     press('troops');
@@ -375,15 +378,18 @@ describe('REFM-227 — нажатия ряда', () => {
   });
 
   it('⇅ «Готово» у осаждённого мира выгружает, но не грузит', async () => {
-    const { inter, go, env, home, fleet, select, press } = await boot();
+    const { inter, go, game, env, home, fleet, select, press } = await boot();
+    const { prepareArmyGroups } = await import('../../packages/shared-core/src/util/armySelection');
+    prepareArmyGroups(env.world, home.garrison, [], game.data);
     select(fleet.id);
     press('troops');
-    const unit = go.troopsInputFor(fleet.id)!.units.find((u) => u.unit === 'militia')!.unit;
+    const row = go.troopsInputFor(fleet.id)!.units.find((u) => u.unit === 'militia')!;
+    const unit = row.key!;
     press('tmax', { unit, dir: '1' });
     const battle = { sides: [{ ref: { kind: 'garrison', planetId: home.id } }] };
     env.world = { ...env.world, battles: { b1: battle } } as unknown as GameState;
     press('tok');
-    expect(sent).toEqual([]);
+    expect(sent.filter(a => a.type !== 'army.prepare')).toEqual([]);
     expect(inter.troopsPlan).toBeNull();
   });
 

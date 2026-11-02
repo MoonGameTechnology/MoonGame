@@ -149,11 +149,11 @@ describe('army module — loading ground army onto fleets', () => {
     const r = okApply(kernel.applyAction(base(), load('F', 'militia', 3), ctx));
     // Заказ принят, но трюм ещё пуст, а рота — на месте: она СТОИТ в гарнизоне.
     expect(r.state.fleets.F?.landing ?? []).toEqual([]);
-    expect(r.state.planets.A?.garrison).toEqual([
+    expect(r.state.planets.A?.garrison).toMatchObject([
       { unit: 'militia', count: 4 },
       { unit: 'tank', count: 2 },
     ]);
-    expect(r.state.fleets.F?.loading).toEqual([
+    expect(r.state.fleets.F?.loading).toMatchObject([
       { unit: 'militia', count: 3, from: 'A', startAt: 0, doneAt: HOUR },
     ]);
     expect(r.events.map((e) => e.type)).toContain('army.loading');
@@ -161,8 +161,8 @@ describe('army module — loading ground army onto fleets', () => {
 
     // Час прошёл — вот теперь рота на борту, и заявки больше нет.
     const done = advanced(kernel, r.state, HOUR);
-    expect(done.fleets.F?.landing).toEqual([{ unit: 'militia', count: 3 }]);
-    expect(done.planets.A?.garrison).toEqual([
+    expect(done.fleets.F?.landing).toMatchObject([{ unit: 'militia', count: 3 }]);
+    expect(done.planets.A?.garrison).toMatchObject([
       { unit: 'militia', count: 1 },
       { unit: 'tank', count: 2 },
     ]);
@@ -189,7 +189,7 @@ describe('army module — loading ground army onto fleets', () => {
     });
     const first = okApply(kernel.applyAction(st, load('F', 'militia', 3), ctx)).state;
     // В гарнизоне ЧЕТЫРЕ и все на месте, но три уже обещаны — свободна одна.
-    expect(first.planets.A?.garrison).toEqual([{ unit: 'militia', count: 4 }]);
+    expect(first.planets.A?.garrison).toMatchObject([{ unit: 'militia', count: 4 }]);
     expect(errCode(kernel.applyAction(first, load('G', 'militia', 2, 'p1'), ctx))).toBe('E_NO_ARMY');
     okApply(kernel.applyAction(first, load('G', 'militia', 1, 'p1'), ctx));
   });
@@ -216,7 +216,7 @@ describe('army module — loading ground army onto fleets', () => {
     expect(flight.events.filter((e) => e.type === 'army.load.cancelled').map((e) => e.payload)).toEqual([
       { fleetId: 'F', planetId: 'A', unit: 'militia', count: 3, owner: 'p1' },
     ]);
-    expect(flew.planets.A?.garrison).toEqual([{ unit: 'militia', count: 4 }]); // ничего не пропало
+    expect(flew.planets.A?.garrison).toMatchObject([{ unit: 'militia', count: 4 }]); // ничего не пропало
     okApply(kernel.applyAction(flew, load('G', 'militia', 4), ctx)); // бронь отпустила гарнизон
 
     // И час спустя улетевший ничего не «догружает».
@@ -260,7 +260,7 @@ describe('army module — loading ground army onto fleets', () => {
     // пообещали бы один и тот же отсек.
     expect(errCode(kernel.applyAction(r.state, load('F', 'tank', 1), ctx))).toBe('E_NO_CAPACITY');
     const done = advanced(kernel, r.state, HOUR);
-    expect(done.fleets.F?.landing).toEqual([{ unit: 'tank', count: 4 }]);
+    expect(done.fleets.F?.landing).toMatchObject([{ unit: 'tank', count: 4 }]);
     expect(errCode(kernel.applyAction(done, load('F', 'tank', 1), at(HOUR)))).toBe('E_NO_CAPACITY');
   });
 
@@ -282,7 +282,7 @@ describe('army module — loading ground army onto fleets', () => {
       fleets: [fleet('F', 'p1', 'A', [['dropship', 1]])], // ample capacity
     });
     expect(errCode(kernel.applyAction(st, load('F', 'orbital_aa', 1), ctx))).toBe('E_IMMOBILE');
-    expect(st.planets.A?.garrison).toEqual([{ unit: 'orbital_aa', count: 2 }]); // nothing moved
+    expect(st.planets.A?.garrison).toMatchObject([{ unit: 'orbital_aa', count: 2 }]); // nothing moved
   });
 });
 
@@ -296,8 +296,8 @@ describe('army module — unloading and validation', () => {
     });
     const r = okApply(kernel.applyAction(st, unload('F', 'militia', 2), ctx));
     // Выгрузка идёт час, как погрузка (решение владельца 2026-09-26): до срока войска на борту.
-    expect(r.state.fleets.F?.landing).toEqual([{ unit: 'militia', count: 2 }]);
-    expect(r.state.fleets.F?.unloading).toEqual([
+    expect(r.state.fleets.F?.landing).toMatchObject([{ unit: 'militia', count: 2 }]);
+    expect(r.state.fleets.F?.unloading).toMatchObject([
       { unit: 'militia', count: 2, to: 'A', startAt: 0, doneAt: HOUR },
     ]);
     expect(r.events.map((e) => e.type)).toContain('army.unloading');
@@ -305,7 +305,7 @@ describe('army module — unloading and validation', () => {
     if (!done.ok) throw new Error(done.code);
     expect(done.state.fleets.F?.landing).toEqual([]);
     expect(done.state.fleets.F?.unloading).toBeUndefined();
-    expect(done.state.planets.A?.garrison).toEqual([{ unit: 'militia', count: 3 }]); // 1 + 2 merged
+    expect(done.state.planets.A?.garrison).toMatchObject([{ unit: 'militia', count: 3 }]); // 1 + 2 merged
     expect(done.events.map((e) => e.type)).toContain('army.unloaded');
   });
 
@@ -328,7 +328,7 @@ describe('army module — unloading and validation', () => {
     expect(gone.events.map((e) => e.type)).not.toContain('army.load.cancelled');
     const later = advanced(kernel, gone.state, 2 * HOUR);
     expect(later.planets.A?.garrison).toEqual([]);
-    expect(later.fleets.F?.landing).toEqual([{ unit: 'militia', count: 2 }]);
+    expect(later.fleets.F?.landing).toMatchObject([{ unit: 'militia', count: 2 }]);
   });
 
   it('обещанное выгрузке второй приказ не возьмёт; мир, ставший чужим, десант не принимает', () => {
@@ -344,7 +344,7 @@ describe('army module — unloading and validation', () => {
     lost.planets.A!.owner = 'p2'; // мир взят, пока шла выгрузка
     const later = advanced(kernel, lost, HOUR);
     expect(later.planets.A?.garrison).toEqual([]);
-    expect(later.fleets.F?.landing).toEqual([{ unit: 'militia', count: 2 }]);
+    expect(later.fleets.F?.landing).toMatchObject([{ unit: 'militia', count: 2 }]);
   });
 
   it('rejects unauthorized, busy, or wrong-planet transfers', () => {
@@ -414,11 +414,11 @@ describe('army — раненые выжившие перевозятся (2026-
     const r = okApply(kernel.applyAction(st(), load('F', 'militia', 5), ctx));
     const done = advanced(kernel, r.state, HOUR);
     // Целый стек ушёл целым, от раненого — три из четырёх с ¾ пула ран.
-    expect(done.fleets.F?.landing).toEqual([
+    expect(done.fleets.F?.landing).toMatchObject([
       { unit: 'militia', count: 2 },
       { ...wounded, count: 3, hp: 30 },
     ]);
-    expect(done.planets.A?.garrison).toEqual([{ ...wounded, count: 1, hp: 10 }]);
+    expect(done.planets.A?.garrison).toMatchObject([{ ...wounded, count: 1, hp: 10 }]);
   });
 
   it('один раненый стек грузится и высаживается без потерь', () => {
@@ -439,10 +439,10 @@ describe('army — раненые выжившие перевозятся (2026-
     const first = (f: 'wounded' | 'healthy'): Action => ({ ...load('F', 'militia', 3), payload: { fleetId: 'F', unit: 'militia', count: 3, first: f } });
     const w = advanced(kernel, okApply(kernel.applyAction(st(), first('wounded'), ctx)).state, HOUR);
     expect(w.fleets.F?.landing).toEqual([{ ...wounded, count: 3, hp: 30 }]);
-    expect(w.planets.A?.garrison).toEqual([{ unit: 'militia', count: 2 }, { ...wounded, count: 1, hp: 10 }]);
+    expect(w.planets.A?.garrison).toMatchObject([{ unit: 'militia', count: 2 }, { ...wounded, count: 1, hp: 10 }]);
     const hl = advanced(kernel, okApply(kernel.applyAction(st(), first('healthy'), ctx)).state, HOUR);
     expect(hl.fleets.F?.landing).toEqual([{ unit: 'militia', count: 2 }, { ...wounded, count: 1, hp: 10 }]);
-    expect(hl.planets.A?.garrison).toEqual([{ ...wounded, count: 3, hp: 30 }]);
+    expect(hl.planets.A?.garrison).toMatchObject([{ ...wounded, count: 3, hp: 30 }]);
   });
 
   it('неизвестная очерёдность отклоняется', () => {

@@ -718,6 +718,8 @@ export interface ArsenalStore {
   /** Insert the item unless its `itemId` already exists (idempotent, first wins). */
   grant(item: OwnedArsenalItem): Promise<void>;
   get(itemId: string): Promise<OwnedArsenalItem | null>;
+  /** Owner-guarded progression write; call within the economy transaction. */
+  update(item: OwnedArsenalItem): Promise<boolean>;
   /** The account's items, sorted (kind, defId, itemId) for determinism. */
   listOf(accountId: string): Promise<ArsenalItem[]>;
   /** Atomic ownership move: succeeds only while `from` CURRENTLY owns the item and

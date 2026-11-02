@@ -1,6 +1,8 @@
 /** DOM/navigation adapter for the operation half of the guided first match; it reads the
  * screen and moves the camera or windows, and never sends a game order. */
 import { GUIDE_TROOP, guideHeroFleet } from '../../decisions/firstMatchGuide';
+import { hasPlannedArmyLoad } from '../../decisions/armyTransferRows';
+import { data } from './gameData';
 import type { GameState } from '../../packages/shared-core/src/index';
 import type { OperationUi } from './firstMatchOperation';
 import {
@@ -93,7 +95,7 @@ export function operationUi(h: OperationDomHost): OperationUi {
       if (kind === 'spawn') return heroSpawnAim !== null;
       if (kind === 'move') return aiming;
       if (kind === 'strike') return strikeAim !== null;
-      if (kind === 'troops-ready') return (troopsPlan?.plan[GUIDE_TROOP] ?? 0) > 0;
+      if (kind === 'troops-ready') return hasPlannedArmyLoad(h.world(), troopsPlan, GUIDE_TROOP, data);
       if (kind.startsWith('picked:'))
         return (
           mobileDraft?.order === 'move' &&

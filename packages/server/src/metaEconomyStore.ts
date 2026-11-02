@@ -26,6 +26,8 @@ export interface MetaEconomyTransaction {
     at: number,
   ): Promise<number>;
   isItemListed(itemId: string): Promise<boolean>;
+  warrants(accountId: string): Promise<number>;
+  spendWarrants(accountId: string, amount: number, sourceId: string, at: number): Promise<boolean>;
   announcePlayerMedal(event: PlayerMedalNews, accountId: string): Promise<void>;
   /** Internal auction adapter only: participates in this exact local transaction. */
   sql?: PoolClient;
@@ -71,6 +73,9 @@ function validAccount(account: MetaEconomyAccount): void {
   if (account.corpMaterials) {
     for (const n of Object.values(account.corpMaterials.available)) if (!Number.isSafeInteger(n) || n < 0) throw Error('E_ECONOMY_STATE');
     for (const n of Object.values(account.corpMaterials.pending?.materials ?? {})) if (!Number.isSafeInteger(n) || n <= 0) throw Error('E_ECONOMY_STATE');
+  }
+  for (const [tier, count] of Object.entries(account.moduleBlueprints ?? {})) {
+    if (!['unique', 'mythic', 'legendary'].includes(tier) || !Number.isSafeInteger(count) || count < 0) throw Error('E_ECONOMY_STATE');
   }
   const ids = new Set<string>();
   for (const lot of account.materials) {
@@ -168,6 +173,8 @@ export class MemoryMetaEconomyStore implements MetaEconomyStore {
             accountFrom(staged, id);
             return this.market.creditWarrants(id, amount, reason, sourceId, at);
           },
+          warrants: async (id) => { accountFrom(staged, id); return this.market.balance(id); },
+          spendWarrants: async (id, amount, source, at) => { accountFrom(staged, id); return this.market.spendWarrants(id, amount, source, at); },
           isItemListed: async (itemId) =>
             (await this.market.listings()).some((lot) => lot.item.itemId === itemId),
         });
@@ -356,6 +363,19 @@ export class PostgresMetaEconomyStore implements MetaEconomyStore {
             [randomUUID(), id, amount, reason, sourceId, at],
           );
           return balance;
+        },
+        warrants: async (id) => {
+          accountFrom(accounts, id);
+          const r = await db.query<{ warrants: string }>('SELECT warrants FROM meta_wallets WHERE account_id=$1', [id]);
+          return Number(r.rows[0]?.warrants ?? 0);
+        },
+        spendWarrants: async (id, amount, source, at) => {
+          accountFrom(accounts, id);
+          if (!Number.isSafeInteger(amount) || amount < 0) throw Error('E_BAD_AMOUNT');
+          const r = await db.query('UPDATE meta_wallets SET warrants=warrants-$2 WHERE account_id=$1 AND warrants >= $2', [id, amount]);
+          if (r.rowCount !== 1) return false;
+          await db.query('INSERT INTO meta_market_ledger(id,account_id,delta,reason,listing_id,at) VALUES($1,$2,$3,$4,$5,$6)', [randomUUID(), id, -amount, 'module-upgrade', source, at]);
+          return true;
         },
         isItemListed: async (itemId) => {
           await db.query('SELECT item_id FROM arsenal WHERE item_id=$1 FOR UPDATE', [itemId]);

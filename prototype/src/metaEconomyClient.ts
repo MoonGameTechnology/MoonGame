@@ -16,7 +16,7 @@
  */
 import type { CommerceOffer } from '../../packages/protocol/src/commerce';
 import type { MetaCorpStyleView } from '../../packages/protocol/src/corpStyle';
-import type { MetaEconomyView } from '../../packages/protocol/src/metaEconomyView';
+import type { MetaEconomyView, MetaCommandReceipt } from '../../packages/protocol/src/metaEconomyView';
 import { hasKey } from '../../localization/runtime';
 import { parseCorpStyle } from '../../decisions/corpStyle';
 import { refusalKeyOf } from '../../decisions/refusalText';
@@ -36,7 +36,7 @@ export type MetaEconomyStatus =
   | { kind: 'unavailable' }
   | { kind: 'pending' }
   /** A write was confirmed and re-read; `key` is the success text the caller asked for. */
-  | { kind: 'done'; key: string | null }
+  | { kind: 'done'; key: string | null; receipt?: MetaCommandReceipt }
   /** A write failed: `key` is the localized refusal when one exists. */
   | { kind: 'failed'; key: string | null };
 
@@ -176,12 +176,12 @@ export function createMetaEconomyClient(host: MetaEconomyClientHost): MetaEconom
       const key = path + JSON.stringify(body);
       const requestId = attempts.get(key) ?? host.requestId?.() ?? crypto.randomUUID();
       attempts.set(key, requestId);
-      const response = (await json(auth, path, { ...body, requestId })) as { ok?: boolean } | null;
+      const response = (await json(auth, path, { ...body, requestId })) as { ok?: boolean; receipt?: MetaCommandReceipt } | null;
       if (response?.ok !== true) throw new Error('E_NETWORK');
       attempts.delete(key);
       view = null; // A confirmed write must never leave stale controls after a failed refresh.
       await load(auth, generation);
-      status = { kind: 'done', key: successKey ?? null };
+      status = { kind: 'done', receipt: response.receipt, key: response.receipt?.moduleUpgrade ? response.receipt.moduleUpgrade.success ? 'module.success' : 'module.miss' : successKey ?? null };
       await host.changed?.().catch(() => undefined);
     } catch (e) {
       const key = refusalKeyOf(e instanceof Error ? e.message : 'E_NETWORK');

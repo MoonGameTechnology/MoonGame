@@ -58,9 +58,9 @@ import { playerOrder } from './orderPipeline';
 import { isGroundUnit } from './planetSummary';
 import { houseDisplayName } from './setupSeats';
 import { autoStance } from './stanceToggle';
-import type { TroopsInput, TroopsUnitInput } from './troopsMenu';
-import { garrisonSide, planFor, troopsGate } from './troopsScene';
-import { groundTypes, hasTroops, totalOf, troopSources } from './troopsSources';
+import type { TroopsInput } from './troopsMenu';
+import { armyTransferRows } from '../../decisions/armyTransferRows';
+import { planFor, troopsGate } from './troopsScene';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
 import { warPromptText, warReason } from './warPromptView';
 
@@ -153,22 +153,6 @@ function pendingLoadCargo(fleetId: string): number {
   return n;
 }
 
-/** Сколько единиц `unit` уже обещано подъёмами ИЗ ЭТОГО мира — по всем флотам. */
-function pendingLoadUnits(planetId: string, unit: string): number {
-  let n = 0;
-  for (const f of Object.values(game.world().fleets)) {
-    for (const c of f.loading ?? []) if (c.from === planetId && c.unit === unit) n += c.count;
-  }
-  return n;
-}
-
-/** Сколько единиц `unit` поднимает именно этот флот. */
-function pendingLoadOf(fleetId: string, unit: string): number {
-  let n = 0;
-  for (const c of game.world().fleets[fleetId]?.loading ?? []) if (c.unit === unit) n += c.count;
-  return n;
-}
-
 /** Fail-secure: ядро не выпускает войска из гарнизона, запертого живым боем
  *  (`E_UNDER_ASSAULT`). Без этой проверки заказ ушёл бы и молча отскочил. */
 export function troopsLiftable(planetId: string): boolean {
@@ -201,23 +185,8 @@ export function troopsInputFor(fleetId: string): TroopsInput | null {
     landingAllowed: () => canOrder(s, unloadArmy(ME, fleetId, carried[0]!.unit, 1)) === null,
   });
   if (gate === 'closed') return null;
-  // Источники, типы и суммы — `troopsSources.ts` (REFM-81): на союзном мире поднимать
-  // нечего, поэтому счётчик выходит односторонним сам собой, без отдельного режима меню.
-  // «Гарнизон» форта неподвижен (`immobile`) — ядро его не поднимет, меню не предлагает.
-  const liftable = (u: string) => !data.units[u]?.traits.includes('immobile');
-  const types = groundTypes(troopSources(mine, here.garrison, landing, liftable), isGround);
-  if (!hasTroops(types)) return null;
-  const units: TroopsUnitInput[] = types.map((unit) => ({
-    unit,
-    // Ядро поднимает и высаживает ВСЕ стеки типа, раненые тоже (2026-11-02).
-    ...garrisonSide(mine, totalOf(here.garrison, unit), totalOf(here.garrison, unit)),
-    hold: totalOf(landing, unit),
-    holdAll: totalOf(landing, unit),
-    queued: pendingLoadOf(fleetId, unit),
-    reserved: pendingLoadUnits(here.id, unit),
-    cargoSize: data.units[unit]?.stats.cargoSize ?? 1,
-    wounded: mine ? woundedOf(here.garrison, unit) : 0,
-  }));
+  const units = armyTransferRows(s, f, mine, data);
+  if (!units.length) return null;
   return {
     units,
     capacity: sumUnitStat(f.units, data, 'cargoCapacity'),
@@ -232,13 +201,6 @@ export function troopsInputFor(fleetId: string): TroopsInput | null {
     plan: planFor(troopsPlan?.fleetId, fleetId, troopsPlan?.plan),
     asking: troopsPlan?.fleetId === fleetId && !!troopsPlan.asking,
   };
-}
-
-/** Единиц `unit` в раненых стеках (корпус или щит не полны). */
-function woundedOf(stacks: readonly { unit: string; count: number; hp?: number; shieldHp?: number }[], unit: string): number {
-  let n = 0;
-  for (const s of stacks) if (s.unit === unit && (s.hp !== undefined || s.shieldHp !== undefined)) n += s.count;
-  return n;
 }
 
 // --- diplomacy gate (client order layer) -------------------------------------

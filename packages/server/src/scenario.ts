@@ -100,8 +100,9 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '95'; // Эшелоны, HP/численность и ответ после потерь.
-// Членство и порядок прежние; старые сетевые партии нельзя продолжать без миграции правил.
+export const MODULE_MANIFEST_VERSION = '97'; // Эшелоны, снимки модулей и точные группы войск.
+// Членство и порядок прежние; объединённые правила требуют отдельной версии.
+// 95: эшелоны; 96: предварительная ветка выбора войск до интеграции эшелонов.
 // 94 — SLIM-4: один список модулей на оба хоста
 // (`shared-core/src/gameModules.ts`). Взят порядок прод-хоста, и канону сменились членство
 // (вошли `hunger`, `bot-diplomacy`) и порядок. Партия на 93 шла без голода и в другом порядке.

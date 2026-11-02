@@ -17,6 +17,7 @@
  */
 import type { Fleet, GameState } from '../../packages/shared-core/src/index';
 import { shipsEngaged } from '../../packages/shared-core/src/index';
+import { prepareArmy } from '../../decisions/actions';
 import { t } from '../../localization/runtime';
 import { assaultTargetOk } from '../../decisions/aimTargets';
 import { engageOrders } from '../../decisions/engageOrders';
@@ -313,14 +314,19 @@ export function onCommandClick(ev: MouseEvent): void {
     if (id) {
       // toggle the popover
       if (troopsPlan) drop('troopsPlan');
-      else arm('troopsPlan', { fleetId: id, plan: {} });
+      else {
+        playerOrder(prepareArmy(ME, id));
+        arm('troopsPlan', { fleetId: id, plan: {} });
+      }
     }
+  } else if (cmd === 'trefresh') {
+    if (troopsPlan) playerOrder(prepareArmy(ME, troopsPlan.fleetId));
   } else if (cmd === 'tstep' || cmd === 'tmax') {
     // Набор количества. Шаг КЛАМПИТСЯ моделью, а не блокируется — как «+10» в
     // диалоге разделения флота: «+5» при трёх доступных даст +3, а не откажет.
     const inp = troopsPlan ? troopsInputFor(troopsPlan.fleetId) : null;
     if (troopsPlan && inp) {
-      const unit = bEl.dataset.unit ?? '';
+      const unit = bEl.dataset.group ?? bEl.dataset.unit ?? '';
       troopsPlan.plan =
         cmd === 'tmax'
           ? maxPlan(inp, unit, Number(bEl.dataset.dir) > 0 ? 1 : -1)
@@ -338,18 +344,14 @@ export function onCommandClick(ev: MouseEvent): void {
     if (st && ask) st.asking = true;
     else if (st && inp && at && model) {
       const { load, unload } = planOrders(model);
-      // Выгрузка мгновенна и уходит в ядро ОДНИМ действием на тип (count оно
-      // принимает атомарно). Погрузка ложится в часовую очередь БЕЗ повторной
-      // проверки места: модель уже посчитала её ровно на тот трюм, который
-      // освободит эта выгрузка, а реальный `army.load` уйдёт лишь через игровой
-      // час — к тому времени выгрузка применена и в соло, и по сети.
-      for (const o of unload) playerOrder(unloadArmy(ME, st.fleetId, o.unit, o.count));
+      // Both directions take an hour; only currently free bays can be reserved.
+      for (const o of unload) playerOrder(unloadArmy(ME, st.fleetId, o.unit, o.count, o.group));
       // ALLY-LAND. Идущий наземный бой запирает ТОЛЬКО погрузку (ядро: `E_UNDER_ASSAULT`
       // на `army.load` — иначе защитник уплыл бы небитым). Высадку он не запирает, и
       // раньше один общий гейт резал обе половины: подкрепить осаждённый мир было
       // нельзя — ровно то, ради чего союзная высадка и нужна.
       if (load.length && troopsLiftable(at)) {
-        for (const o of load) playerOrder(loadArmy(ME, st.fleetId, o.unit, o.count, first));
+        for (const o of load) playerOrder(loadArmy(ME, st.fleetId, o.unit, o.count, o.group ?? first));
       }
     }
     if (!ask) drop('troopsPlan');
