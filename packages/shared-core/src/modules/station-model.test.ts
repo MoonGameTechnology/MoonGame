@@ -5,7 +5,7 @@ import { createInitialState, type GameState, type Planet } from '../state/gameSt
 import { parseGameData } from '../data/schemas';
 import { effectiveStats, effectiveStat } from '../util/loadout';
 import { applyDamageToSide, hookedDamage, removeIfWiped } from '../util/combat';
-import { fortressFleetId, fortressRepairQuote, stationSiteId, buildingRepairQuote, serviceSitesForFleet } from '../state/fortress';
+import { fortressFleetId, fortressRepairQuote, stationSiteId, buildingRepairQuote, serviceSitesForFleet, indexServiceSites } from '../state/fortress';
 import { divertFortressDamage } from '../util/fortressDamage';
 import { visibleState } from '../state/visibility';
 import { forkSiteId, forkSiteEdge } from '../state/forkSite';
@@ -14,7 +14,7 @@ import { instantRepairModule } from './instantRepair';
 import { previewSides } from '../state/previewBattle';
 import { movementModule } from './movement';
 import { stationModule } from './station';
-import { constructionModule, type BuildingDamage } from './construction';
+import { constructionModule, type BuildingDamage, type ConstructionDelay } from './construction';
 import type { Action, ApplyResult, AdvanceResult } from '../action/types';
 
 const H = 3_600_000;
@@ -60,6 +60,9 @@ function world(): GameState {
     planets: { A: node }, fleets: {} };
 }
 const hit: GameModule = { id: 'test-hit', version: '1', setup(api) {
+  api.onAction('test.delay', (_a, h) => {
+    h.capability<ConstructionDelay>('construction.delay')!(h, siteId, 12);
+  });
   api.onAction('test.sabotage', (_a, h) => {
     h.capability<BuildingDamage>('building.damage')!(h, siteId, [
       { index: 0, amount: 1000 }, { index: 1, amount: 1000 },
@@ -273,6 +276,37 @@ describe('separate fortress model', () => {
     expect(fortressRepairQuote(state, state.planets[siteId]!, data).cost.metal).toBe(70);
   });
 
+  it.each([1, 24])('keeps readiness, refunds and the remaining delayed work consistent at speed ×%i', (speed) => {
+    const context = (now: number) => ({ ...ctx(now), config: { timeScale: speed } });
+    const at = (hours: number) => 6 * H + hours * H / speed;
+    let state = built();
+    state.fleets[bodyId]!.units[0]!.hp = 70;
+    state = ok(kernel.applyAction(state, action('building.upgrade', { planetId: siteId, building: 'starfort' }), context(at(0)))).state;
+    state = ok(kernel.advanceTo(state, context(at(3)))).state;
+    state = ok(kernel.applyAction(state, action('test.delay', {}), context(at(3)))).state;
+    expect(state.fleets[bodyId]?.units[0]).toMatchObject({ stationScale: 1.5, hp: 120 });
+    expect(state.planets[siteId]?.fortress?.assembly?.doneAt).toBe(at(18));
+    state = ok(kernel.advanceTo(state, context(at(6)))).state;
+    expect(state.fleets[bodyId]?.units[0]?.stationScale).toBeCloseTo(1.6);
+    expect(state.fleets[bodyId]?.units[0]?.hp).toBeCloseTo(130);
+    expect(state.planets[siteId]?.buildings[0]?.level).toBe(1);
+    const order = state.scheduled.find((e) => e.type === 'construction.complete')!;
+    const treasury = state.players.p1!.resources.metal!;
+    state = ok(kernel.applyAction(state, action('construction.cancel', { planetId: siteId, seq: order.seq }), context(at(6)))).state;
+    const paused = state.planets[siteId]!.pausedConstruction![0]!;
+    expect(paused.progress).toBeCloseTo(0.6);
+    expect(paused.remainingHours).toBeCloseTo(12);
+    expect(state.players.p1!.resources.metal! - treasury).toBeCloseTo(48);
+    state = ok(kernel.advanceTo(state, context(at(9)))).state;
+    expect(state.fleets[bodyId]?.units[0]?.stationScale).toBeCloseTo(1.6);
+    state = ok(kernel.applyAction(state, action('construction.resume', { planetId: siteId, id: paused.id }), context(at(9)))).state;
+    state = ok(kernel.advanceTo(state, context(at(15)))).state;
+    expect(state.fleets[bodyId]?.units[0]?.stationScale).toBeCloseTo(1.8);
+    state = ok(kernel.advanceTo(state, context(at(21)))).state;
+    expect(state.fleets[bodyId]?.units[0]).toMatchObject({ stationScale: 2, hp: 170 });
+    expect(state.planets[siteId]?.buildings[0]?.level).toBe(2);
+  });
+
   it('destroys only fortress infrastructure and never resurrects it from a later building event', () => {
     let state = built();
     const province = structuredClone(state.planets.A);
@@ -316,6 +350,11 @@ describe('separate fortress model', () => {
     expect(ship.location).toBeNull();
     expect(ship.edge).toEqual(forkSiteEdge(state, { province: 'A', trail: 0 }));
     expect(serviceSitesForFleet(state, ship).map((p) => p.id)).toContain(site.id);
+    const index = indexServiceSites(state);
+    expect(serviceSitesForFleet(state, ship, undefined, index)).toEqual(serviceSitesForFleet(state, ship));
+    const edge = ship.edge!;
+    ship.edge = { from: edge.to, to: edge.from, t: 1 - edge.t };
+    expect(serviceSitesForFleet(state, ship, undefined, index).map((p) => p.id)).toContain(site.id);
     ship.units[0]!.hp = 50;
     state = ok(kernel.advanceTo(state, ctx(8 * H))).state;
     expect(state.fleets[ship.id]?.units[0]?.hp).toBe(60);

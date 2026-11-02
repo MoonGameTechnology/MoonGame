@@ -94,7 +94,7 @@ import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types'
 import { MS_PER_HOUR } from '../util/time';
 import { deepClone } from '../util/clone';
 import { dockHullRate, fleetHangarRepairRate } from '../util/repair';
-import { serviceSitesForFleet } from '../state/fortress';
+import { serviceSitesForFleet, indexServiceSites } from '../state/fortress';
 import { recordValues } from '../util/records';
 import { battleLocations } from '../state/battle';
 
@@ -2608,10 +2608,11 @@ export const shuttleModule: GameModule = {
       }
       // Флот чинит свой ангар ремонтным модулем ВЕЗДЕ вне боя (SHU-5.4), у дока — сверх
       // темпа дока.
+      const serviceIndex = indexServiceSites(h.state);
       for (const fleet of recordValues(h.state.fleets)) {
         if (!fleet.hangar?.length || fleet.battleId) continue;
         if (fleet.location !== null && fighting.has(fleet.location)) continue;
-        const ports = serviceSitesForFleet(h.state, fleet, (a, b) => isAllied(h, a, b));
+        const ports = serviceSitesForFleet(h.state, fleet, (a, b) => isAllied(h, a, b), serviceIndex);
         if (ports.some((port) => fighting.has(port.id))) continue;
         const dock = ports.reduce((rate, port) => rate + dockHullRate(port, data), 0);
         mend(fleet.hangar, dock + fleetHangarRepairRate(fleet, data));

@@ -1538,6 +1538,8 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         const playerId = action.playerId;
         h.emit('building.constructed', { planetId: 'node1', building: 'mine', owner });
         h.emit('building.upgraded', { planetId: 'node1', building: 'mine', level: 2, owner });
+        h.emit('building.repair.started', { planetId: 'node1', building: 'mine', owner, cost: { metal: 40 }, doneAt: 9000 });
+        h.emit('station.repair.started', { planetId: 'node1', owner, cost: { metal: 60 }, doneAt: 12000 });
         h.emit('unit.built', { planetId: 'node1', unit: 'fighter', count: 3, owner });
         h.emit('army.load.cancelled', { fleetId: 'f1', planetId: 'node1', unit: 'infantry', count: 2, owner });
         h.emit('army.unload.cancelled', { fleetId: 'f1', planetId: 'node1', unit: 'infantry', count: 2, owner });
@@ -1701,6 +1703,8 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
     const intel = [
       'building.constructed',
       'building.upgraded',
+      'building.repair.started',
+      'station.repair.started',
       'unit.built',
       'army.load.cancelled',
       'army.unload.cancelled',

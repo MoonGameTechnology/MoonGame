@@ -23,6 +23,17 @@ export function issuedFortressModule(id: string): boolean {
   return /^void_shield_(i|ii|iii)$/.test(id) || id.startsWith('station_battery_');
 }
 
+/** Current paid readiness, including partial upgrades rebased by a delay/resume. */
+export function fortressAssemblyScale(site: Planet, now: number): number {
+  const model = site.fortress;
+  if (!model) return 0;
+  const work = model.assembly;
+  if (!work) return model.level;
+  const progress = Math.max(0, Math.min(1,
+    (now - work.startedAt) / Math.max(1, work.doneAt - work.startedAt)));
+  return work.from + (work.to - work.from) * progress;
+}
+
 /** Equipment and readiness share one calculation in the live game and forecasts.
  *  Changes add capacity while preserving absolute hull wounds and spent shields. */
 export function refreshFortressBody(site: Planet, body: UnitStack, data: GameData, scale = body.stationScale): void {
@@ -76,8 +87,35 @@ export function fleetAtStation(state: GameState, fleet: Fleet, site: Planet): bo
 }
 
 /** Construction sites provide services at their real berth, not at the off-graph id. */
+export interface ServiceSiteIndex {
+  nodes: ReadonlyMap<string, readonly Planet[]>;
+  lanes: ReadonlyMap<string, readonly Planet[]>;
+}
+
+function serviceLaneKey(from: string, to: string): string {
+  return JSON.stringify(from < to ? [from, to] : [to, from]);
+}
+
+/** Per-step index; never cached across state mutations or world-clock steps. */
+export function indexServiceSites(state: GameState): ServiceSiteIndex {
+  const nodes = new Map<string, Planet[]>();
+  const lanes = new Map<string, Planet[]>();
+  for (const site of Object.values(state.planets)) {
+    if (!site.fortress) continue;
+    const berth = stationBerth(state, site);
+    const map = berth.location !== null ? nodes : lanes;
+    const key = berth.location ?? (berth.edge ? serviceLaneKey(berth.edge.from, berth.edge.to) : undefined);
+    if (key === undefined) continue;
+    const bucket = map.get(key) ?? [];
+    bucket.push(site);
+    map.set(key, bucket);
+  }
+  return { nodes, lanes };
+}
+
 export function serviceSitesForFleet(
   state: GameState, fleet: Fleet, allied: (a: string, b: string) => boolean = () => false,
+  index?: ServiceSiteIndex,
 ): Planet[] {
   if (fleet.movement) return [];
   const allowed = (site: Planet): boolean => site.owner !== null &&
@@ -85,8 +123,11 @@ export function serviceSitesForFleet(
   const sites: Planet[] = [];
   const host = fleet.location ? state.planets[fleet.location] : undefined;
   if (host && allowed(host)) sites.push(host);
-  for (const site of Object.values(state.planets)) {
-    if (site.fortress && site !== host && allowed(site) && fleetAtStation(state, fleet, site)) sites.push(site);
+  const lookup = index ?? indexServiceSites(state);
+  const candidates = fleet.location !== null ? lookup.nodes.get(fleet.location) : fleet.edge
+    ? lookup.lanes.get(serviceLaneKey(fleet.edge.from, fleet.edge.to)) : undefined;
+  for (const site of candidates ?? []) {
+    if (site !== host && allowed(site) && fleetAtStation(state, fleet, site)) sites.push(site);
   }
   return sites;
 }

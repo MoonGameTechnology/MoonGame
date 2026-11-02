@@ -5,7 +5,7 @@ import { MS_PER_HOUR } from '../../util/time';
 import { buildingLevel } from '../../data/schemas';
 import { battleLocations } from '../../state/battle';
 import { forkSiteInBattle } from '../../state/forkSite';
-import { fortressSiteOf, serviceSitesForFleet } from '../../state/fortress';
+import { fortressSiteOf, serviceSitesForFleet, indexServiceSites } from '../../state/fortress';
 import { bestFleetStat, effectiveStats } from '../../util/loadout';
 import { mergeStacks } from '../../util/stacks';
 import { recordValues } from '../../util/records';
@@ -27,6 +27,7 @@ export function registerConstructionMaintenance(api: ModuleSetupApi, clearInfect
     // Прежде условием был только НАЗЕМНЫЙ бой, и это давало странность: флот врага
     // режется с крепостью на орбите, а её госпиталь спокойно штопает гарнизон.
     const fighting = battleLocations(h.state);
+    const serviceIndex = indexServiceSites(h.state);
 
     const wounded = (stack: UnitStack): boolean => stack.count > 0 && stack.hp !== undefined;
 
@@ -55,7 +56,7 @@ export function registerConstructionMaintenance(api: ModuleSetupApi, clearInfect
     for (const fleet of recordValues(h.state.fleets)) {
       if (fleet.movement || fleet.battleId) continue;
       if (!(fleet.landing ?? []).some(wounded)) continue;
-      for (const host of serviceSitesForFleet(h.state, fleet, (a, b) => isAllied(h, a, b))) {
+      for (const host of serviceSitesForFleet(h.state, fleet, (a, b) => isAllied(h, a, b), serviceIndex)) {
         const bucket = holdsAt.get(host.id) ?? [];
         bucket.push(fleet);
         holdsAt.set(host.id, bucket);
@@ -137,7 +138,7 @@ export function registerConstructionMaintenance(api: ModuleSetupApi, clearInfect
       // живёт оно в `fleetAtOwnDock`. Частичный эффект здесь был бы необъяснимым —
       // ровно так разъезжались два хука наземной защиты форта.
       let hullRate = 0;
-      const ports = serviceSitesForFleet(h.state, fleet, (a, b) => isAllied(h, a, b));
+      const ports = serviceSitesForFleet(h.state, fleet, (a, b) => isAllied(h, a, b), serviceIndex);
       if (ports.some((port) => fighting.has(port.id))) continue;
       for (const planet of ports) {
         for (const b of planet.buildings) {

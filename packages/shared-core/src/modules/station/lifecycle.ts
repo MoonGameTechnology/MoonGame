@@ -8,7 +8,7 @@ import { matchCost, matchHours } from '../../util/pricing';
 import { canAfford, payCost } from '../../util/treasury';
 import { forkSiteInBattle } from '../../state/forkSite';
 import { FORTRESS_BODY, FORTRESS_CORE, fortressFleetId, fortressRepairQuote,
-  stationBerth, refreshFortressBody } from '../../state/fortress';
+  stationBerth, refreshFortressBody, fortressAssemblyScale } from '../../state/fortress';
 
 /** A single progressive body; new capacity preserves absolute wounds. */
 export function syncModelGuns(h: HandlerContext, site: Planet, create = false): void {
@@ -30,11 +30,7 @@ export function syncModelGuns(h: HandlerContext, site: Planet, create = false): 
   }
   const body = fleet.units[0];
   if (!body || body.count <= 0) return;
-  const assembly = model.assembly;
-  const progress = assembly ? Math.max(0, Math.min(1,
-    (h.ctx.now - assembly.startedAt) / Math.max(1, assembly.doneAt - assembly.startedAt))) : 1;
-  const scale = assembly ? assembly.from + (assembly.to - assembly.from) * progress : model.level;
-  refreshFortressBody(site, body, h.ctx.data, scale);
+  refreshFortressBody(site, body, h.ctx.data, fortressAssemblyScale(site, h.ctx.now));
   if (create) {
     if (fleet.edge) h.emit('fleet.parked', { fleetId: id, edge: fleet.edge });
     else h.emit('fleet.arrived', { fleetId: id, at: fleet.location });

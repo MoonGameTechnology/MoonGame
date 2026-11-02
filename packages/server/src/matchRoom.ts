@@ -506,6 +506,8 @@ export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new 
 >([
   ['building.constructed', 'owner'],
   ['building.upgraded', 'owner'],
+  ['building.repair.started', 'owner'],
+  ['station.repair.started', 'owner'],
   ['unit.built', 'owner'],
   ['army.load.cancelled', 'owner'],
   ['army.unload.cancelled', 'owner'],

@@ -32,7 +32,8 @@ import {
 } from '../util/loadout';
 import { isInfected, worksFor } from '../util/infestation';
 import { isBuildLane, orderLane, UNIT_LANES, type BuildLane } from '../state/buildLane';
-import { buildingRepairQuote, stationBerth, FORTRESS_CORE } from '../state/fortress';
+import { buildingRepairQuote, stationBerth, FORTRESS_CORE, fortressAssemblyScale,
+  fortressFleetId, refreshFortressBody } from '../state/fortress';
 
 /** Share of the ground assault's round damage that also wears down the planet's
  *  structures (the rest is spent on the defending garrison). Tunable. */
@@ -800,10 +801,19 @@ const delayFirstOrder: ConstructionDelay = (h, planetId, hours) => {
   if (!first) return null;
   const rest = h.state.scheduled.filter((e) => e !== first);
   const moved = { ...first, at: first.at + hoursToMs(h.ctx, hours) };
+  const p = first.payload as CompletePayload;
+  const site = h.state.planets[planetId];
+  const work = p.kind === 'upgrade' && p.building === FORTRESS_CORE ? site?.fortress?.assembly : undefined;
+  if (site && work) {
+    const readiness = fortressAssemblyScale(site, h.ctx.now);
+    moved.at = Math.max(first.at, work.doneAt) + hoursToMs(h.ctx, hours);
+    Object.assign(work, { from: readiness, startedAt: h.ctx.now, doneAt: moved.at });
+    const body = h.state.fleets[fortressFleetId(site.id)]?.units[0];
+    if (body) refreshFortressBody(site, body, h.ctx.data, readiness);
+  }
   const pos = rest.findIndex((e) => e.at > moved.at || (e.at === moved.at && e.seq > moved.seq));
   rest.splice(pos < 0 ? rest.length : pos, 0, moved);
   h.state.scheduled = rest;
-  const p = first.payload as CompletePayload;
   return {
     kind: p.kind ?? 'building',
     ...(p.building ? { building: p.building } : {}),
@@ -1269,7 +1279,10 @@ export const constructionModule: GameModule = {
         return h.reject('E_UNKNOWN_BUILDING');
       }
       const totalDurationMs = hoursToMs(h.ctx, spec.hours);
-      const progress = buildProgress(h.ctx.now, event.at, totalDurationMs);
+      const fortressWork = p.kind === 'upgrade' && p.building === FORTRESS_CORE ? planet.fortress?.assembly : undefined;
+      const progress = fortressWork && p.level !== undefined
+        ? Math.max(0, Math.min(1, fortressAssemblyScale(planet, h.ctx.now) - (p.level - 1)))
+        : buildProgress(h.ctx.now, event.at, totalDurationMs);
       const refund = scaleCost(spec.cost, 1 - progress); // linear, NOT the 50% output threshold
       refundCost(player.resources, refund);
       h.state.scheduled = h.state.scheduled.filter((e) => e.seq !== payload.seq);
@@ -1284,7 +1297,8 @@ export const constructionModule: GameModule = {
         modules: p.modules,
         troop: p.troop,
         progress,
-        remainingHours: spec.hours * (1 - progress),
+        remainingHours: fortressWork ? Math.max(0, fortressWork.doneAt - h.ctx.now) / hoursToMs(h.ctx, 1)
+          : spec.hours * (1 - progress),
         remainingCost: refund,
       };
       planet.pausedConstruction = [...(planet.pausedConstruction ?? []), site];

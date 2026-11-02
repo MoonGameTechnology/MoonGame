@@ -187,7 +187,7 @@ function emitSitesIn(file: string, rawSrc: string): EmitSite[] {
 function collectEmitSites(): EmitSite[] {
   const sites: EmitSite[] = [];
 
-  for (const name of readdirSync(MODULES_DIR)) {
+  for (const name of readdirSync(MODULES_DIR, { recursive: true, encoding: 'utf8' })) {
     if (!name.endsWith('.ts') || name.endsWith('.test.ts')) continue;
     sites.push(...emitSitesIn(name, readFileSync(path.join(MODULES_DIR, name), 'utf8')));
   }
