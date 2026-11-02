@@ -158,6 +158,12 @@ data. You should not need to touch the kernel.
   `schemas.test.ts` for the exact composition). All external data is validated before
   it reaches the core (A05/A08).
 - Tests live next to source as `*.test.ts`. The root `vitest.config.ts` discovers them.
+- **Size guard** (`scripts/codeSize.test.ts`, brick SLIM-1): a source file over 1000 lines or a
+  function over 300 lines passes the gate only through `scripts/code-size-budget.json`, whose
+  ceilings are today's sizes. Don't add to a monster: put new code in its own module. Raising a
+  ceiling is an explicit budget edit with the reason in the PR body; when code shrinks by 100+
+  lines (functions: 50+), lower the ceiling in the same PR. Tests, `.d.ts` and locale files are
+  not measured.
 
 ## Локализация — читай ДО того, как напишешь игроку хоть одно слово
 

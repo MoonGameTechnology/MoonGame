@@ -45,6 +45,13 @@
 | REFM-247 | ✅ | proto | `docs/backlog.md` | Экран подключения |
 | REFM-248 | ✅ | proto | `docs/backlog.md` | Проводка настроек |
 | REFM-249 | ✅ | proto | `docs/backlog.md` | Окна забега: торговец, союзник, подсказка пиратов, комиксы |
+| SLIM-1 | ✅ | proto srv core | `docs/backlog.md` | Сторож размеров. |
+| SLIM-2 | ⏳ | proto | `docs/backlog.md` | CSS из build.mjs в файлы. |
+| SLIM-3 | ⏳ | proto | `docs/backlog.md` | Мозг ботов по фазам. |
+| SLIM-4 | ⏳ | core srv proto | `docs/backlog.md` | Один список модулей ядра. |
+| SLIM-5 | ⏳ | srv | `docs/backlog.md` | Хранилища сервера по доменам. |
+| SLIM-6 | ⏳ | proto core | `docs/backlog.md` | Длинные функции — по месту. |
+| SLIM-7 | ⏳ | proto core docs | `docs/backlog.md` | Мелкая уборка. |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
 | CMD-VIS-4 | ✅ | core proto | `docs/backlog.md` | Штурм и бомбардировка в ряду приказов, отмена |
