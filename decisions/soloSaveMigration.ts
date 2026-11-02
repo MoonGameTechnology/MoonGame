@@ -212,6 +212,18 @@ export const WOUNDED_TRANSPORT_SOLO_MIGRATION = {
   toDataHash: PRODUCTION_LANES_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: combat 3.11.0 and auto-rally 1.2.0 send a fleet that stands up at a
+ *  world without arriving (a ship off the yard, a launched garrison, a split, a hero) into
+ *  battle with the enemy already there. A saved world keeps its shape, so it reads as is. */
+export const STAND_UP_SOLO_MIGRATION = {
+  fromRules: WOUNDED_TRANSPORT_SOLO_MIGRATION.toRules,
+  fromData: WOUNDED_TRANSPORT_SOLO_MIGRATION.toData,
+  fromDataHash: WOUNDED_TRANSPORT_SOLO_MIGRATION.toDataHash,
+  toRules: '001c2831afafba',
+  toData: WOUNDED_TRANSPORT_SOLO_MIGRATION.toData,
+  toDataHash: WOUNDED_TRANSPORT_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -232,6 +244,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   HOSPITAL_WOUNDS_SOLO_MIGRATION,
   PRODUCTION_LANES_SOLO_MIGRATION,
   WOUNDED_TRANSPORT_SOLO_MIGRATION,
+  STAND_UP_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

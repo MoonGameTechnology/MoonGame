@@ -192,8 +192,9 @@ describe('ATK-3 — бой «Атаки» втягивает ждавших у �
 
 describe('ATK-3 — «Атака» по цели, которая уже дерётся у этого мира', () => {
   /**
-   * Свободный флот рядом с идущим боем: гарнизон мира поднят флотом (`fleet.launch`) уже
-   * после того, как бой завязался, — прибытия не было, и втянуть его было нечему.
+   * Свободный флот рядом с идущим боем, которого бой не втянул. Раньше его получали взлётом
+   * гарнизона (`fleet.launch`) — прибытия не было, втягивать было нечему. Теперь вставший у
+   * мира флот сходится с врагом сам (`util/standUp.ts`), поэтому флот кладётся в мир прямо.
    */
   function launchedNextToBattle(): { s: GameState; launched: string } {
     const st = world([
@@ -201,24 +202,10 @@ describe('ATK-3 — «Атака» по цели, которая уже дерё
       ['E', 'p3'],
     ]);
     st.players.p1 = { id: 'p1', name: 'p1', faction: 'x', status: 'active', resources: {} };
-    st.planets.P = { ...planetOf('P', 'p1'), garrison: [{ unit: 'fighter', count: 2 }] };
+    st.planets.P = planetOf('P', 'p1');
     const fighting = ok(kernel.applyAction(st, engage('E', 'D', 'p3'), ctx));
-    const r = kernel.applyAction(
-      fighting,
-      {
-        id: 'a:p1:launch',
-        type: 'fleet.launch',
-        playerId: 'p1',
-        payload: { planetId: 'P' },
-        issuedAt: 0,
-      },
-      ctx,
-    );
-    if (!r.ok) throw new Error(`launch failed: ${r.code}`);
-    const launched = (
-      r.events.find((e) => e.type === 'fleet.launched')?.payload as { fleetId: string }
-    ).fleetId;
-    return { s: r.state, launched };
+    fighting.fleets.A = fleetOf('A', 'p1');
+    return { s: fighting, launched: 'A' };
   }
 
   it('вступает в её бой, как вступил бы прибывший: идущий бой важнее новой дуэли (MSB-3)', () => {
