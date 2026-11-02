@@ -1,14 +1,14 @@
 // Палитра меню-экранов (UIX-15) — две копии одного факта: типизированная `surfaceTheme` в
-// packages/client/src/theme.ts и CSS-переменные --sf-* в prototype/build.mjs (скилл
+// packages/client/src/theme.ts и CSS-переменные --sf-* в листах prototype/styles/ (скилл
 // frontend-design §2). Сторож держит копии одинаковыми: правка одной без второй красит
 // гейт, а не экраны в два разных цвета.
-import { readFileSync } from 'node:fs';
+import { gameCss } from '../gameSheets.mjs';
 import { describe, expect, it } from 'vitest';
 import { surfaceTheme, type SurfaceTheme } from '../../packages/client/src/theme';
 
-const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+const GAME_CSS = gameCss();
 /** Первый :root листа — там живут токены. */
-const ROOT = /:root\{([\s\S]*?)\n\}/.exec(BUILD)?.[1] ?? '';
+const ROOT = /:root\{([\s\S]*?)\n\}/.exec(GAME_CSS)?.[1] ?? '';
 
 const VAR: Record<keyof SurfaceTheme, string> = {
   text: '--sf-text',
@@ -44,10 +44,10 @@ const norm = (v: string): string =>
     .replace(/([(,])0\./g, '$1.')
     .toLowerCase();
 
-describe('палитра меню-экранов: theme.ts и build.mjs — одна правда (UIX-15)', () => {
+describe('палитра меню-экранов: theme.ts и листы игры — одна правда (UIX-15)', () => {
   it.each(Object.entries(VAR))('%s живёт в %s с тем же значением', (key, name) => {
     const m = new RegExp(`${name}:([^;]+);`).exec(ROOT);
-    expect(m, `${name} нет в :root build.mjs`).not.toBeNull();
+    expect(m, `${name} нет в :root листов игры`).not.toBeNull();
     expect(norm(m![1]!)).toBe(norm(surfaceTheme[key as keyof SurfaceTheme]));
   });
 

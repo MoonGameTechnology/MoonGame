@@ -96,7 +96,7 @@ export function showHub(show: boolean): void {
   if (show) document.getElementById('codex')?.classList.remove('show');
   hubEl.style.display = show ? 'flex' : 'none';
   // Справочник, открытый из хаба (карточка арсенала, плитка «Справка»), встаёт ПОВЕРХ хаба:
-  // в партии его слой ниже, а у хаба выше, и раньше он открывался за ним (build.mjs).
+  // в партии его слой ниже, а у хаба выше, и раньше он открывался за ним (`prototype/styles/`).
   document.body.classList.toggle('hub-open', show);
 }
 
@@ -190,8 +190,8 @@ export let rank: ReturnType<typeof initRank> | null = null;
 // a session token a prior join already stashed, but must never prompt for a password just to
 // LOOK at the collection — no server, no accounts or no stashed session all read the same way
 // (the starter kit and a sign-in). Narrow = the tab is too narrow for the detail beside the
-// list (the `@container arsenal` rule in build.mjs uses the same width), and then the detail
-// opens as a sheet over the hub.
+// list (the `@container arsenal` rule in prototype/styles/ uses the same width), and then the
+// detail opens as a sheet over the hub.
 const ARSENAL_WIDE_MIN = 700;
 
 export let arsenal: ReturnType<typeof initArsenal> | null = null;

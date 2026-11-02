@@ -1,0 +1,672 @@
+/* «Штаб героев» redesign (STAFF-1): chips · identity · tabs · real tree · dossier */
+#herobody{--hx-ps:#b98cff;
+  /* Палитра РЕДКОСТИ (HERO-12). Копия таблицы HERO_GRADE_COLORS из
+     decisions/heroIdentity.ts — тот же цвет рисует канвас на карте. Сверяется
+     текстом в prototype/src/heroStaff.test.ts: правка там без правки здесь падает. */
+  --hx-g-common:#8fa6ad;--hx-g-rare:#5aa9ff;--hx-g-legendary:#e8b45a;--hx-g-main:#b98cff;}
+#herobody .hx-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px;}
+#herobody .hx-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 6px;border-radius:999px;border:1px solid var(--line-hi);background:rgba(53,214,230,.05);color:var(--dim);font:inherit;font-size:var(--fs-caption);cursor:pointer;white-space:nowrap;}
+#herobody .hx-chip .hx-cr{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:var(--fs-caption);background:rgba(53,214,230,.14);color:var(--cyan);}
+#herobody .hx-chip.ps .hx-cr{background:rgba(185,140,255,.16);color:var(--hx-ps);}
+#herobody .hx-chip.g-common{border-color:var(--hx-g-common);}
+#herobody .hx-chip.g-rare{border-color:var(--hx-g-rare);}
+#herobody .hx-chip.g-legendary{border-color:var(--hx-g-legendary);}
+#herobody .hx-chip.g-main{border-color:var(--hx-g-main);}
+#herobody .hx-chip.sel{color:#eafffb;border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan);background:rgba(53,214,230,.12);}
+#herobody .hx-chip.ps.sel{border-color:var(--hx-ps);box-shadow:0 0 0 1px var(--hx-ps);}
+/* Фокус НЕ съедает редкость: выбранный чип оставляет рамку своего цвета, а выделение
+   несёт ореол. Иначе у правила «обводка = редкость» было бы исключение ровно на том
+   герое, которого игрок сейчас и смотрит. Три класса — специфичнее, чем .sel выше. */
+#herobody .hx-chip.sel.g-common{border-color:var(--hx-g-common);}
+#herobody .hx-chip.sel.g-rare{border-color:var(--hx-g-rare);}
+#herobody .hx-chip.sel.g-legendary{border-color:var(--hx-g-legendary);}
+#herobody .hx-chip.sel.g-main{border-color:var(--hx-g-main);}
+#herobody .hx-chip .hx-cst{font-size:var(--fs-caption);color:var(--dim);}
+#herobody .hx-chip .hx-cst.on{color:#9ff0da;}
+#herobody .hx-cap{margin-left:auto;font-size:var(--fs-caption);color:var(--dim);}
+#herobody .hx-ident{border:1px solid var(--line-hi);border-radius:10px;padding:11px 12px;margin-bottom:10px;background:linear-gradient(180deg,rgba(53,214,230,.07),rgba(53,214,230,.02));}
+#herobody .hx-ident.ps{background:linear-gradient(180deg,rgba(185,140,255,.08),rgba(185,140,255,.02));}
+/* Обводка карточки героя — по РЕДКОСТИ (HERO-12): рамка плюс мягкий ореол того же
+   цвета, чтобы степень читалась и на маленьком экране, где рамка в 1px теряется. */
+#herobody .hx-ident.g-common{border-color:var(--hx-g-common);box-shadow:0 0 0 1px rgba(143,166,173,.28);}
+#herobody .hx-ident.g-rare{border-color:var(--hx-g-rare);box-shadow:0 0 0 1px rgba(90,169,255,.3);}
+#herobody .hx-ident.g-legendary{border-color:var(--hx-g-legendary);box-shadow:0 0 0 1px rgba(232,180,90,.32);}
+#herobody .hx-ident.g-main{border-color:var(--hx-g-main);box-shadow:0 0 0 1px rgba(185,140,255,.34);}
+#herobody .hx-ident.g-common .hx-gtag{color:var(--hx-g-common);background:rgba(143,166,173,.14);border-color:rgba(143,166,173,.45);}
+#herobody .hx-ident.g-rare .hx-gtag{color:var(--hx-g-rare);background:rgba(90,169,255,.14);border-color:rgba(90,169,255,.45);}
+#herobody .hx-ident.g-legendary .hx-gtag{color:var(--hx-g-legendary);background:rgba(232,180,90,.14);border-color:rgba(232,180,90,.45);}
+#herobody .hx-ident.g-main .hx-gtag{color:var(--hx-g-main);background:rgba(185,140,255,.14);border-color:rgba(185,140,255,.45);}
+#herobody .hx-irow{display:flex;align-items:center;gap:8px;}
+#herobody .hx-tag{font-size:var(--fs-caption);padding:2px 7px;border-radius:5px;color:var(--cyan);background:rgba(53,214,230,.12);border:1px solid var(--cyan-dim);white-space:nowrap;}
+#herobody .hx-ident.ps .hx-tag{color:var(--hx-ps);background:rgba(185,140,255,.14);border-color:rgba(185,140,255,.4);}
+#herobody .hx-dstat{margin-left:auto;font-size:var(--fs-caption);}
+#herobody .hx-dep{color:#9ff0da;}
+#herobody .hx-dead{color:#e2a15a;}
+#herobody .hx-traits{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
+#herobody .hx-trait{font-size:var(--fs-caption);color:#cfeee8;border:1px solid var(--line);border-radius:5px;padding:3px 7px;}
+#herobody .hx-pips{letter-spacing:2px;color:var(--cyan);}
+/* Вкладки штаба героев — СЕТКА 2×2, а не четыре равные ячейки в строку: на четверти
+   ширины телефона «Способности» не помещались, и ряд читался одним серым пятном. */
+#herobody .hx-tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:12px;}
+#herobody .hx-tab{display:flex;align-items:center;justify-content:center;gap:6px;min-height:38px;
+  padding:7px 6px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);
+  color:var(--dim);font:inherit;font-size:var(--fs-caption);cursor:pointer;}
+#herobody .hx-tab i{font-style:normal;font-size:var(--fs-body);opacity:.85;}
+#herobody .hx-tab.on{color:var(--cyan);border-color:var(--cyan);background:rgba(53,214,230,.12);font-weight:700;}
+#herobody .hx-tree{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+#herobody .hx-rail.foreign{opacity:.5;}
+#herobody .hx-rhd{display:flex;align-items:center;gap:6px;font-size:var(--fs-caption);color:var(--cyan);margin-bottom:10px;}
+#herobody .hx-rail.ps .hx-rhd{color:var(--hx-ps);}
+#herobody .hx-rhd .hx-dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 7px currentColor;}
+#herobody .hx-rhd .hx-ftag{margin-left:auto;font-size:var(--fs-caption);color:var(--dim);}
+#herobody .hx-node{position:relative;border:1px solid var(--line-hi);border-radius:8px;padding:8px 9px;background:rgba(53,214,230,.03);}
+#herobody .hx-node+.hx-node{margin-top:22px;}
+#herobody .hx-node .hx-conn{position:absolute;top:-18px;left:16px;width:2px;height:16px;background:var(--line-hi);}
+#herobody .hx-node .hx-conn.lit{background:linear-gradient(#7df0d0,var(--line-hi));}
+#herobody .hx-node.owned{border-color:rgba(125,240,208,.5);background:rgba(125,240,208,.06);}
+#herobody .hx-node.avail{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(53,214,230,.35);cursor:pointer;}
+#herobody .hx-rail.ps .hx-node.avail{border-color:var(--hx-ps);box-shadow:0 0 0 1px rgba(185,140,255,.35);}
+#herobody .hx-node.locked{opacity:.65;cursor:pointer;}
+#herobody .hx-node.foreignn{opacity:.55;}
+#herobody .hx-nn{display:flex;align-items:center;gap:6px;font-weight:600;font-size:var(--fs-caption);color:#eafffb;}
+#herobody .hx-crest{width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center;font-size:var(--fs-caption);flex:0 0 auto;border:1px solid var(--line-hi);color:var(--dim);}
+#herobody .hx-node.owned .hx-crest{background:#7df0d0;color:#04201a;border-color:#7df0d0;}
+#herobody .hx-node.avail .hx-crest{color:var(--cyan);border-color:var(--cyan);}
+#herobody .hx-nd{font-size:var(--fs-caption);color:var(--dim);line-height:1.4;margin:3px 0 6px;}
+#herobody .hx-nf{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+#herobody .hx-g{font-size:var(--fs-caption);padding:2px 5px;border-radius:4px;}
+#herobody .hx-g.ab{color:var(--cyan);background:rgba(53,214,230,.12);}
+#herobody .hx-g.pa{color:#9ff0da;background:rgba(125,240,208,.12);}
+#herobody .hx-cost{margin-left:auto;font-size:var(--fs-caption);color:#ffb43a;border:1px solid rgba(255,180,58,.4);border-radius:5px;padding:2px 7px;white-space:nowrap;}
+#herobody .hx-st{margin-left:auto;font-size:var(--fs-caption);color:var(--dim);text-align:right;}
+#herobody .hx-st.on{color:#9ff0da;}
+#herobody .hx-ov{display:flex;gap:8px;margin-bottom:6px;}
+#herobody .hx-ovc{flex:1;text-align:center;border:1px solid var(--line);border-radius:8px;padding:9px 4px;}
+#herobody .hx-ovc b{display:block;font-size:16px;color:var(--cyan);}
+#herobody .hx-ovc span{font-size:var(--fs-caption);color:var(--dim);}
+#herobody .hx-row[data-hfitd]{cursor:pointer;}
+/* HPR-1.2 — слоты под скиллы. Отсек читается как отсек корабля в «Производстве»: рамка держит
+   форму и у занятого, и у пустого, поэтому ряд не «прыгает», когда скилл сняли. Занятый
+   подсвечен cyan'ом, пустой — приглушённой рамкой: пустота тут приглашение, а не дыра.
+   Высота 44px — нижняя граница тач-цели, ниже неё опускаться нельзя даже на 360px. */
+#herobody .hx-bays{display:flex;flex-direction:column;gap:6px;margin:6px 0;}
+#herobody .hx-bay{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);}
+#herobody .hx-bay.on{border-color:var(--cyan-dim);background:rgba(53,214,230,.05);}
+#herobody .hx-bay.off{justify-content:center;border-style:dashed;color:var(--dim);font-size:var(--fs-caption);}
+#herobody .hx-bayact{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+/* Не влезающее ПОКАЗЫВАЕТСЯ погашенным, а не прячется: экран не должен врать о том, чем игрок владеет. */
+#herobody .hx-row.dim{opacity:.55;}
+#herobody .hx-dossier{margin-top:12px;border:1px solid var(--cyan);border-radius:10px;padding:12px;background:var(--glass);}
+#herobody .hx-dh{display:flex;align-items:center;gap:8px;}
+#herobody .hx-dnm{font-weight:700;color:#eafffb;font-size:var(--fs-body);}
+#herobody .hx-dx{margin-left:auto;width:24px;height:24px;border-radius:6px;}
+#herobody .hx-give{margin:10px 0;padding:9px 10px;border-radius:7px;background:rgba(53,214,230,.08);border:1px solid var(--cyan-dim);}
+#herobody .hx-dgl{font-size:var(--fs-caption);color:var(--cyan);}
+#herobody .hx-dgv{font-weight:600;color:#eafffb;font-size:var(--fs-body);margin-top:2px;}
+#herobody .hx-drow{display:flex;align-items:center;gap:8px;font-size:var(--fs-caption);padding:5px 0;border-top:1px solid var(--line);}
+#herobody .hx-dk{color:var(--dim);}
+#herobody .hx-dv{margin-left:auto;text-align:right;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+#herobody .hx-ok{color:#9ff0da;}
+#herobody .hx-no{color:#e2a15a;}
+#herobody .hx-warn{display:flex;align-items:center;gap:6px;margin:10px 0 0;font-size:var(--fs-caption);color:#ff5a4d;}
+#herobody .hx-warn:before{content:"⚠";}
+#herobody .hx-dbtn{display:block;width:100%;margin-top:10px;padding:10px;border-radius:7px;font-size:var(--fs-body);}
+/* Steward («Хранитель») delegate panel */
+/* Окно боя «для взрослых детей» (заказ владельца 2026-09-23): где бой и в какой он фазе
+   (в шапке окна: отдельная карточка под это съедала высоту, 2026-09-28), полоса остатка
+   сил цветами владельцев, карточки сторон со шкалами корпуса/щита светофором и чипами
+   кораблей, свои флоты — с кнопкой отхода. */
+#battlewin .lw-head{gap:10px;}
+#battlewin .bw-hd{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;}
+#battlewin .bw-hd b{overflow-wrap:anywhere;}
+#battlewin .bw-phase{font-size:var(--fs-caption);color:var(--dim);}
+#battlewin .bw-phase.ground{color:#ffb44d;}
+#battlewinbody .bw-ended{margin-bottom:10px;padding:10px 12px;border:1px solid #ffd27a88;border-radius:8px;background:rgba(255,210,122,.08);}
+#battlewinbody .bw-ended b{display:block;color:#ffd27a;font-size:14px;}
+#battlewinbody .bw-ended p{margin:4px 0 0;font-size:var(--fs-body);color:var(--txt,#e8f6fa);}
+#battlewinbody .bw-sub{margin:0 0 6px;font-size:var(--fs-caption);color:var(--dim);}
+#battlewinbody .bw-balance{margin-bottom:10px;}
+#battlewinbody .bw-bal{display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;background:rgba(255,255,255,.05);}
+#battlewinbody .bw-bal i{display:block;min-width:3px;transition:flex .6s ease;}
+/* UIX-12.1: своя доля отличается штриховкой, а не только цветом */
+#battlewinbody .bw-bal i.mine{background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.38) 0 3px,transparent 3px 7px) !important;}
+#battlewinbody .bw-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:var(--fs-body);color:var(--dim);}
+#battlewinbody .bw-legend span{display:inline-flex;align-items:center;gap:5px;}
+#battlewinbody .bw-legend span.mine{color:var(--cyan);font-weight:700;}
+#battlewinbody .bw-legend i{width:9px;height:9px;border-radius:50%;}
+#battlewinbody .bw-side{padding:10px 12px 10px 14px;border:1px solid var(--line);border-left:4px solid var(--own,#8aa0ad);border-radius:10px;
+  margin-bottom:8px;background:rgba(255,255,255,.02);}
+/* Своя сторона подсвечена рамкой: в свалке на пять сторон «где я» — первый вопрос. */
+#battlewinbody .bw-side.mine{border-color:var(--cyan-dim);border-left-color:var(--own,var(--cyan));background:rgba(53,214,230,.08);}
+#battlewinbody .bw-who{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 7px;font-size:14px;}
+#battlewinbody .bw-you{font-style:normal;font-size:var(--fs-caption);font-weight:700;padding:1px 6px;border-radius:8px;background:var(--cyan);color:#05161c;}
+#battlewinbody .bw-role{font-size:var(--fs-caption);padding:2px 7px;border-radius:8px;border:1px solid var(--line-hi);}
+#battlewinbody .attacker .bw-role{color:#ff7a6b;border-color:rgba(255,122,107,.5);}
+#battlewinbody .defender .bw-role{color:#7fc8ff;border-color:rgba(127,200,255,.5);}
+#battlewinbody .bw-kind{font-size:var(--fs-caption);color:var(--dim);margin-left:auto;}
+/* PERK-3.3: надбавка за пережитые бои. Янтарь — цвет семьи ветерана (ср. .umedal.g3),
+   чтобы значок в окне боя читался как продолжение вымпела в строке состава. */
+#battlewinbody .bw-vet{font-size:var(--fs-caption);font-variant-numeric:tabular-nums;padding:2px 6px;border-radius:8px;color:var(--amb);border:1px solid rgba(255,190,90,.45);}
+#battlewinbody .bw-meter{position:relative;height:18px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;margin-bottom:4px;}
+#battlewinbody .bw-meter i{position:absolute;inset:0 auto 0 0;border-radius:5px;transition:width .6s ease;}
+#battlewinbody .bw-meter span{position:relative;display:block;padding:0 7px;font-size:var(--fs-caption);line-height:18px;color:#f2fbff;text-shadow:0 1px 2px #000;}
+#battlewinbody .bw-meter.tone-ok i{background:linear-gradient(90deg,#1f9d6a,#3ddc97);}
+#battlewinbody .bw-meter.tone-hurt i{background:linear-gradient(90deg,#b7791f,#ffc14d);}
+#battlewinbody .bw-meter.tone-low i{background:linear-gradient(90deg,#a3261d,#ff5a4d);}
+#battlewinbody .bw-meter.shield i{background:linear-gradient(90deg,#1c6aa6,#5fb8ff);}
+#battlewinbody .bw-units{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+#battlewinbody .bw-unit{font-size:var(--fs-caption);padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--dim);}
+#battlewinbody .bw-unit b{color:var(--txt,#e8f6fa);}
+#battlewinbody .bw-orders{margin-top:12px;}
+#battlewinbody .bw-ret{display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:6px;border:1px solid var(--cyan-dim);border-radius:9px;background:rgba(53,214,230,.06);}
+#battlewinbody .bw-ret div{flex:1;min-width:0;}
+#battlewinbody .bw-ret div b{display:block;font-size:var(--fs-body);}
+#battlewinbody .bw-ret div span{font-size:var(--fs-caption);color:var(--dim);}
+#battlewinbody .bw-ret button{flex:0 0 auto;min-height:36px;}
+/* UIX-6.2: прогноз над колонками — слово итога и строка «срок · потери»; цвет тот же, что у
+   прогноза в прицеле «Атаки», и лишь дублирует слово. */
+#battlewinbody .bw-forecast{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;margin:0 0 10px;padding:8px 12px;border:1px solid var(--line);border-left:4px solid var(--line-hi);border-radius:7px;font-size:var(--fs-body);color:var(--dim);}
+#battlewinbody .bw-forecast b{font-size:14px;color:var(--txt,#e8f6fa);}
+#battlewinbody .bw-forecast.positive{border-left-color:#7df0d0;}
+#battlewinbody .bw-forecast.positive b{color:#7df0d0;}
+#battlewinbody .bw-forecast.negative{border-left-color:#ff5a4d;}
+#battlewinbody .bw-forecast.negative b{color:#ff5a4d;}
+#battlewinbody .bw-forecast.neutral{border-left-color:#ffb43a;}
+#battlewinbody .bw-forecast.neutral b{color:#ffb43a;}
+/* UIX-6.2: правила отхода и раундов под «?» — на виду одна строка, она же кнопка. */
+#battlewinbody .bw-rules-toggle{display:flex;align-items:center;gap:10px;width:100%;min-height:36px;margin-top:8px;padding:6px 0;border:0;border-top:1px solid var(--line);background:transparent;color:var(--dim);font:inherit;font-size:var(--fs-body);line-height:1.4;text-align:left;cursor:pointer;}
+#battlewinbody .bw-rules-toggle span{flex:1;min-width:0;}
+#battlewinbody .bw-rules-toggle i{flex:0 0 auto;width:22px;height:22px;border:1px solid var(--line-hi);border-radius:50%;font-style:normal;font-weight:700;line-height:20px;text-align:center;color:var(--cyan);}
+#battlewinbody .bw-rules-toggle[aria-expanded="true"] i{background:var(--cyan);border-color:var(--cyan);color:#05161c;}
+#battlewinbody .bw-rules p{font-size:var(--fs-body);color:var(--dim);line-height:1.45;margin:4px 0 0;}
+#battlewinbody .bw-empty{font-size:var(--fs-body);color:var(--dim);}
+/* Horizontal command window: ownership is independent from combat stance. */
+#battlewin .twbox{width:min(1220px,96vw);max-height:92dvh;}
+#battlewinbody{padding:12px 16px;}
+#battlewinbody .bw-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;}
+#battlewinbody .bw-column{min-width:0;}
+#battlewinbody .bw-column h3{display:flex;justify-content:space-between;margin:0 0 8px;padding-bottom:7px;border-bottom:1px solid var(--line-hi);font-size:var(--fs-body);}
+#battlewinbody .bw-column h3 span{color:var(--dim);}
+#battlewinbody .bw-side{margin-bottom:10px;padding:10px 12px;border-left-color:var(--own);border-radius:7px;background:#0c1a24;}
+#battlewinbody .bw-side.mine{border-color:var(--line-hi);border-left-color:var(--own);background:color-mix(in srgb,var(--own) 10%,#0c1a24);}
+#battlewinbody .bw-who{gap:8px;align-items:center;}
+#battlewinbody .bw-who>div{flex:1;min-width:0;}
+#battlewinbody .bw-who b{display:block;color:var(--own);overflow-wrap:anywhere;font-size:14px;}
+#battlewinbody .bw-who small{display:block;font-size:var(--fs-caption);color:var(--dim);margin-top:3px;}
+#battlewinbody .bw-you{background:transparent;border:1px solid var(--own);color:var(--own);white-space:nowrap;}
+#battlewinbody .bw-damage{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;}
+#battlewinbody .bw-damage>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;background:#07121c;border:1px solid var(--line);border-radius:4px;}
+#battlewinbody .bw-damage span{font-size:var(--fs-caption);color:var(--dim);}
+#battlewinbody .bw-damage b{font:700 17px var(--sf-font);font-variant-numeric:tabular-nums;color:var(--txt,#e8f6fa);white-space:nowrap;}
+#battlewinbody .bw-clock{display:flex;justify-content:space-between;align-items:center;padding:7px 0;color:#ffc36b;font-size:var(--fs-caption);}
+#battlewinbody .bw-clock b{font:700 17px var(--sf-font);font-variant-numeric:tabular-nums;}
+#battlewinbody .bw-response{margin:8px 0;color:#7fc8ff;font-size:var(--fs-caption);}
+#battlewinbody .bw-expand,#battlewinbody .bw-effect-toggle,#battlewinbody .bw-more{display:block;width:100%;text-align:left;min-height:36px;padding:7px 0;background:transparent;border:0;color:var(--txt,#e8f6fa);font:inherit;font-size:var(--fs-caption);cursor:pointer;}
+#battlewinbody .bw-effect-toggle{color:#a3d9bd;border-bottom:1px solid var(--line);}
+#battlewinbody .bw-no-effects,#battlewinbody .bw-auto{font-size:var(--fs-caption);color:var(--dim);margin:5px 0;}
+#battlewinbody .bw-tiles{gap:6px;margin-top:4px;align-items:stretch;}
+#battlewinbody .bw-tiles .ptile{flex:0 0 auto;min-width:56px;box-sizing:border-box;color:var(--own);}
+#battlewinbody .bw-tiles .ptile.with-art{flex-basis:104px;}
+#battlewinbody .bw-tiles .ptile:focus-visible{outline:2px solid var(--own);outline-offset:2px;}
+#battlewinbody .bw-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;}
+#battlewinbody .bw-actions button,#battlewinbody .bw-orders button{min-height:38px;padding:8px 15px;font-size:var(--fs-body);border-radius:4px;}
+#battlewinbody .bw-orders{position:sticky;bottom:-12px;display:flex;justify-content:center;gap:12px;padding:10px;background:#09141ff5;border-top:1px solid var(--line-hi);z-index:1;}
+#battlewinbody .bw-effects{padding:8px;background:#07121c;border:1px solid var(--line);border-radius:4px;}
+#battlewinbody .bw-effects ul{list-style:none;padding:0;margin:0;display:grid;gap:7px;}
+#battlewinbody .bw-effects li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:var(--fs-caption);}
+#battlewinbody .bw-effects .buff b{color:#67dca0;}
+#battlewinbody .bw-effects .debuff b{color:#ff887b;}
+#battlewinbody .bw-effects small{grid-column:1/-1;color:var(--dim);}
+#battlewinbody .bw-effects p{font-size:var(--fs-caption);line-height:1.4;color:var(--dim);margin-bottom:0;}
+#battlewinbody button:focus-visible{outline:2px solid #e8f6fa;outline-offset:2px;}
+@media(max-width:700px){#battlewinbody{padding:10px;}#battlewinbody .bw-columns{grid-template-columns:1fr;gap:12px;}#battlewin .twbox{max-height:94dvh;}#battlewinbody .bw-orders{bottom:-10px;}#battlewinbody .bw-damage b{font-size:15px;}#battlewinbody .bw-rules-toggle{min-height:44px;}}
+#stewardbody .st-status{padding:11px 13px;border:1px solid var(--cyan-dim);border-radius:9px;background:rgba(53,214,230,.08);font-size:var(--fs-body);color:var(--cyan);line-height:1.55;}
+#stewardbody .st-status.locked{border-color:var(--line);background:rgba(255,255,255,.03);color:var(--dim);}
+#stewardbody .st-status.on{border-color:#7df0d0;background:rgba(125,240,208,.10);color:#9ff0da;}
+#stewardbody .st-h{font-size:var(--fs-caption);color:var(--dim);margin:14px 0 8px;}
+#stewardbody .st-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+#stewardbody .st-btn{flex:1;min-width:92px;padding:9px 10px;border-radius:8px;border:1px solid var(--cyan);background:rgba(53,214,230,.10);color:var(--cyan);cursor:pointer;font-size:var(--fs-body);}
+#stewardbody .st-btn:disabled{opacity:.4;cursor:not-allowed;}
+#stewardbody .st-btn.warn{border-color:#e2a15a;color:#e2a15a;background:rgba(226,161,90,.10);}
+#stewardbody .st-btn.sel{background:rgba(53,214,230,.28);font-weight:700;}
+#stewardbody .st-log{max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;font-size:var(--fs-body);}
+#stewardbody .st-log-line{padding:4px 6px;border-left:2px solid rgba(53,214,230,.35);background:rgba(53,214,230,.05);border-radius:0 6px 6px 0;}
+#stewardbody .st-log-when{opacity:.55;margin-right:4px;}
+#stewardbody .st-note{margin-top:12px;font-size:var(--fs-caption);color:var(--dim);line-height:1.55;}
+/* TT-3.1 + TT-4: technology tree — tabs = branches, the branch's nodes as a
+   tier-grouped LIST (one full-width row per node: name, state, effect, cost, time),
+   tap → dossier modal. Сетка 52-пиксельных иконок вмещала больше узлов,
+   но про каждый молчала: что даёт «⚙», было видно только из досье. */
+#tech .twbox{position:relative;width:min(430px,94vw);}
+#techbody{padding:0;overflow:hidden;display:flex;flex-direction:column;}
+.tt-top{display:flex;align-items:center;justify-content:space-between;padding:9px 12px 0;flex:none;}
+.tt-day{font-size:var(--fs-caption);color:var(--grn);border:1px solid var(--grn-dim);border-radius:12px;padding:3px 10px;background:rgba(95,240,192,.06);}
+.tt-slots{font-size:var(--fs-caption);color:var(--cyan);margin-left:auto;}
+/* Ветки — СЕТКА 3×2, а не лента с прокруткой: пять веток влезают целиком, и «сколько
+   ещё осталось» видно по всем сразу, не досвайпывая до края. */
+.tt-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:9px 12px 8px;flex:none;}
+.tt-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  min-height:40px;padding:6px 4px;border:1px solid var(--line-hi);border-radius:9px;background:transparent;
+  color:var(--ink);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.tt-tab>span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* Выбранная ветка — как включённый режим кнопки (UIX-11.1): мятная заливка спорила с главной
+   кнопкой «Исследовать» за взгляд. */
+.tt-tab.on{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
+/* «готово/всего» на вкладке: где ещё есть что исследовать — видно без обхода веток */
+.tt-cnt{font-style:normal;font-size:var(--fs-caption);color:var(--dim);}
+.tt-tab.on .tt-cnt{color:var(--sf-text);}
+.tt-lead{padding:0 12px 8px;font-size:var(--fs-caption);color:var(--dim);border-bottom:1px solid var(--line);flex:none;}
+.tt-lead b{color:#4fe0b0;}
+.tt-lead.closed{color:var(--amber);}
+.tt-scroll{flex:1;min-height:0;overflow:auto;touch-action:pan-x pan-y;}
+/* Закреплённая шапка «исследуется сейчас» — единственное, ради чего экран
+   открывают повторно; раньше это приходилось искать глазами по всей сетке. */
+.tt-now{flex:none;margin:0 12px 8px;padding:7px 9px;border:1px solid var(--amber-dim,rgba(255,180,58,.35));
+  border-radius:10px;background:rgba(255,180,58,.07);display:flex;flex-direction:column;gap:6px;}
+.tt-nowrow{position:relative;display:flex;align-items:center;gap:7px;padding-bottom:6px;font-size:var(--fs-caption);color:var(--ink);}
+.tt-nowrow b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;}
+.tt-nowdot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--amber);animation:ttpulse 1.6s ease-in-out infinite;}
+@keyframes ttpulse{0%,100%{opacity:.35;}50%{opacity:1;}}
+.tt-nowt{flex:none;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--amber);font-variant-numeric:tabular-nums;}
+/* Узлы — ПЛИТКАМИ (решение владельца 2026-09-26): сетка вместо столбца строк, ярус —
+   заголовком во всю ширину сетки. Эффект, цена и срок видны на плитке, как и в строке. */
+.tt-list{padding:0 12px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:7px;align-items:stretch;}
+/* Ярус вместо рельсы дней: day-гейт не пропал, он стал ПРИЧИНОЙ замка в самой строке */
+.tt-tierh{grid-column:1/-1;margin:9px 0 1px;font:800 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--dim);}
+.tt-list > .hint{grid-column:1/-1;}
+.tt-tierh:first-child{margin-top:2px;}
+.tt-item{position:relative;padding:9px 10px 10px;border:1px solid var(--line);border-radius:10px;
+  background:linear-gradient(180deg,rgba(12,32,38,.85),rgba(8,20,24,.85));cursor:pointer;}
+.tt-item:active{transform:scale(.995);}
+.tt-item{display:flex;flex-direction:column;}
+/* На плитке имя — сверху, состояние или кнопка — под ним во всю ширину. */
+.tt-ih{display:flex;flex-direction:column;align-items:stretch;gap:6px;}
+.tt-ih b{flex:none;min-width:0;font-size:var(--fs-body);font-weight:700;color:#eafffb;}
+.tt-ih .tt-st{max-width:none;text-align:left;}
+.tt-ifoot{margin-top:auto !important;padding-top:6px;}
+.tt-ifx{margin-top:4px;font-size:var(--fs-body);line-height:1.45;color:var(--dim);}
+.tt-ifoot{margin-top:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:var(--fs-caption);color:var(--dim);}
+.tt-idur{flex:none;font-variant-numeric:tabular-nums;}
+/* Правое поле строки — РОВНО ОДНО состояние: сделано / идёт / можно / причина замка */
+.tt-st{flex:none;max-width:56%;font-size:var(--fs-caption);line-height:1.3;text-align:right;color:var(--dim);}
+.tt-st.done{color:#4fe0b0;}
+.tt-st.run{color:var(--amber);font-weight:700;}
+/* Вид «Изучить» — классом .btn-main (UIX-11.1); здесь только размер и место. */
+.tt-take{flex:none;padding:6px 11px;border-radius:8px;font-size:var(--fs-body);white-space:nowrap;}
+/* Доступный И оплачиваемый узел дышит — то же правило, что зажигает кнопку в досье */
+.tt-item.st-avail{border-color:var(--cyan);}
+.tt-item.st-res{border-color:var(--amber);}
+.tt-item.st-done{opacity:.7;}
+.tt-item.st-gate,.tt-item.st-chain,.tt-item.st-cond{opacity:.62;}
+@media(hover:hover){
+  :where(.tt-item:hover){border-color:var(--line-hi);}
+}
+.tt-prog{position:absolute;left:9px;right:9px;bottom:4px;height:3px;border-radius:2px;background:rgba(255,180,58,.22);overflow:hidden;}
+.tt-prog i{position:absolute;left:0;top:0;bottom:0;background:var(--amber);}
+.tt-nowrow .tt-prog{left:0;right:0;bottom:0;}
+/* RQ-1: очередь исследований — под «исследуется сейчас», в том же закреплённом верху. Своя
+   прокрутка с потолком высоты и сворачивание в одну строку: восемь тем не должны выдавить
+   список узлов с экрана телефона. На ПК строка темы — одна линия: имя, чего ждёт, кнопки. */
+.tt-queue{flex:none;margin:0 12px 8px;padding:5px 7px 6px;border:1px solid var(--line-hi);border-radius:10px;background:rgba(53,214,230,.05);}
+.tt-qhead{display:flex;align-items:center;gap:8px;min-height:26px;padding:0 2px 4px;font:800 var(--fs-caption) var(--sf-font);color:var(--cyan);cursor:pointer;}
+.tt-queue.folded .tt-qhead{padding-bottom:0;}
+.tt-qhead>span:first-child{flex:none;}
+.tt-qpeek{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;color:var(--ink);}
+.tt-qfold{margin-left:auto;flex:none;padding:3px 10px;border-radius:7px;font-size:var(--fs-caption);}
+.tt-qfold i{font-style:normal;font-variant-numeric:tabular-nums;}
+.tt-qlist{display:flex;flex-direction:column;gap:4px;max-height:min(28vh,220px);overflow-y:auto;touch-action:pan-y;}
+.tt-qrow{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;column-gap:6px;row-gap:2px;padding:3px 5px;border:1px solid var(--line);border-radius:8px;background:rgba(8,20,24,.7);}
+.tt-qrow>em{font:800 var(--fs-caption) var(--sf-font);font-style:normal;font-variant-numeric:tabular-nums;color:var(--cyan);text-align:center;}
+.tt-qmain{min-width:0;display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:1px;}
+.tt-qmain b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-caption);font-weight:700;color:var(--ink);}
+.tt-qwait{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-width:0;font-size:var(--fs-caption);color:var(--dim);}
+/* Ждёт денег — янтарём, как нехватка в цене: это единственное ожидание, которое лечит игрок. */
+.tt-qrow.w-resources .tt-qwait{color:var(--amber);}
+.tt-qrow.w-starting{border-color:var(--cyan);}
+.tt-qbtns{display:flex;gap:4px;}
+/* Вид стрелок, крестика и сворачивания — классами (.btn-second, .btn-x, .btn-quiet); здесь
+   только размер. */
+.tt-qb,.tt-qx{width:28px;height:28px;display:grid;place-items:center;padding:0;border-radius:7px;font-size:12px;}
+.tt-qgo{padding:3px 9px;border-radius:7px;font-size:var(--fs-caption);}
+/* «＋ В очередь» — вторичная кнопка (.btn-second): это план, а не действие «сейчас». */
+.tt-qadd{align-self:flex-start;padding:5px 10px;border-radius:8px;font-size:var(--fs-caption);white-space:nowrap;}
+.tt-st.q{color:var(--cyan);font-weight:700;}
+.tt-item.st-queued{border-color:var(--cyan-dim,rgba(53,214,230,.45));border-style:dashed;}
+.tt-mq{margin-top:7px;width:100%;padding:9px;border-radius:10px;font-size:var(--fs-caption);}
+/* Отклик на приказ очереди — вспышка там, где тема оказалась. Живой ререндер пересоздаёт
+   узел, и techTree.ts продолжает вспышку отрицательной задержкой, а не играет её заново. */
+.tt-flash{animation:ttflash .7s ease-out both;}
+@keyframes ttflash{0%{box-shadow:0 0 0 2px var(--cyan),0 0 14px rgba(53,214,230,.55);transform:scale(1.02);}100%{box-shadow:0 0 0 0 rgba(53,214,230,0);transform:scale(1);}}
+/* Телефон: кнопки здесь не меньше 44 px (body.mobile-ui), и три таких кнопки в каждой
+   строке съели бы экран. Поэтому строка — две линии текста (имя, «чего ждёт» во всю
+   ширину), а ▲▼✕ появляются у строки, по которой тапнули (.sel); «⋯» подсказывает тап. */
+@media(max-width:700px){
+  .tt-qrow{grid-template-areas:"n name btns" "n wait wait";cursor:pointer;}
+  .tt-qrow>em{grid-area:n;}
+  .tt-qmain{display:contents;}
+  .tt-qmain b{grid-area:name;}
+  .tt-qwait{grid-area:wait;}
+  .tt-qwait:empty{display:none;}
+  .tt-qbtns{grid-area:btns;}
+  .tt-qrow:not(.sel) .tt-qbtns{display:none;}
+  .tt-qrow:not(.sel)::after{content:'⋯';grid-area:btns;padding:0 4px;color:var(--dim);}
+  .tt-qrow.sel{border-color:var(--line-hi);background:rgba(53,214,230,.08);}
+  .tt-qadd{padding:7px 12px;}
+}
+@media(prefers-reduced-motion:reduce){.tt-flash{animation:none;}}
+/* dossier modal over the tree (inside .twbox, so Esc/back close the whole window) */
+.tt-modal{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;}
+.tt-mback{position:absolute;inset:0;background:rgba(1,6,8,.72);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+.tt-mwin{position:relative;width:min(320px,calc(100% - 28px));background:linear-gradient(180deg,#0c2026,#081418);
+  border:1px solid var(--line-hi);border-radius:14px;padding:14px;}
+/* Появление анимируется КЛАССОМ, который ставится только на реальное открытие досье
+   (techTree.ts). На самом .tt-mwin анимации быть не должно: окно живо ререндерится
+   innerHTML'ом каждые ~500мс, пересозданный узел проигрывал бы ttpop заново — досье
+   «схлопывалось и выпрыгивало» дважды в секунду (баг живого плейтеста). */
+.tt-mwin.pop{animation:ttpop .14s ease-out;}
+@keyframes ttpop{from{transform:scale(.94);opacity:.4;}to{transform:scale(1);opacity:1;}}
+.tt-mx{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:8px;}
+.tt-mhead{display:flex;gap:11px;align-items:center;padding-right:30px;}
+.tt-mico{flex:none;width:50px;height:50px;border-radius:11px;border:2px solid var(--line-hi);
+  background:linear-gradient(180deg,#0f2b31,#0a1a1f);display:grid;place-items:center;font-size:23px;font-variant-emoji:text;}
+.tt-mname{font-size:var(--fs-body);font-weight:800;color:#eafffb;}
+.tt-mname .tt-tier{font-size:var(--fs-caption);color:var(--dim);margin-left:6px;}
+.tt-mtags{margin-top:4px;display:flex;flex-wrap:wrap;gap:5px;}
+.tt-tag{font-size:var(--fs-caption);font-weight:800;border-radius:5px;padding:2px 6px;color:#04231c;background:#4fe0b0;}
+.tt-tag.dim{background:#0a1a1f;color:var(--dim);border:1px solid var(--line-hi);}
+.tt-tag.amb{background:var(--amber);color:#2a1602;}
+.tt-mdesc{margin:10px 0 0;padding-left:10px;border-left:2px solid var(--line-hi);font-size:var(--fs-caption);line-height:1.55;color:var(--ink);}
+.tt-mstats{margin-top:10px;display:grid;grid-template-columns:1fr;gap:5px;font-size:var(--fs-caption);color:var(--dim);}
+.tt-mstats b{color:var(--ink);font-weight:600;}
+.tt-mbtn{margin-top:12px;width:100%;padding:10px;border-radius:10px;font-size:var(--fs-caption);}
+/* Состояние узла («идёт», «изучено», «закрыто») — ответ, а не запрет: курсор не спорит. */
+.tt-mbtn.wait{cursor:default;}
+/* BUILD-1: окно построек мира — список категориями, строки «имя+уровень / состояние /
+   эффект / цена+срок» в том же языке, что список технологий (TT-4). */
+.bw-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:10px 12px 8px;flex:none;border-bottom:1px solid var(--line);}
+.bw-world b{display:block;font-size:var(--fs-body);font-weight:800;color:#eafffb;}
+.bw-world span{display:block;margin-top:2px;font-size:var(--fs-caption);color:var(--dim);}
+.bw-cnt{flex:none;font-size:var(--fs-caption);color:var(--cyan);border:1px solid var(--line-hi);border-radius:10px;padding:3px 9px;}
+.bw-scroll{flex:1;min-height:0;overflow:auto;touch-action:pan-y;}
+.bw-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:7px;}
+/* Вкладки прилипают к верху списка (просьба владельца 2026-10-03): прокрутил длинный каталог —
+   переключить категорию можно, не листая назад. Плотная подложка во всю ширину списка, иначе
+   сквозь вкладки читаются строки. */
+.bw-tabs{display:flex;gap:5px;padding:10px 12px 6px;margin:0 -12px;flex:none;overflow-x:auto;touch-action:pan-x;scrollbar-width:none;
+  position:sticky;top:0;z-index:2;background:rgba(3,14,18,.92);backdrop-filter:blur(4px);}
+.bw-tabs::-webkit-scrollbar{display:none;}
+.bw-tab{flex:none;padding:7px 12px;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
+  color:var(--dim);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap;}
+/* Выбранная категория — как ветка науки (UIX-11.1): заливка остаётся главной кнопке «Строить». */
+.bw-tab.on{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
+.bw-cath{margin:10px 0 1px;font:800 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--dim);}
+.bw-item{position:relative;padding:9px 10px 10px;border:1px solid var(--line);border-radius:10px;
+  background:linear-gradient(180deg,rgba(12,32,38,.85),rgba(8,20,24,.85));cursor:pointer;}
+.bw-item:active{transform:scale(.995);}
+.bw-ih{display:flex;align-items:center;gap:8px;}
+.bw-ic{flex:none;font-size:15px;font-variant-emoji:text;color:var(--cyan);}
+.bw-ih b{flex:1;min-width:0;font-size:var(--fs-body);font-weight:700;color:#eafffb;}
+.bw-lv{display:inline-block;margin-left:4px;padding:1px 7px;border:1px solid var(--line-hi);border-radius:10px;
+  font-style:normal;font-weight:600;font-size:var(--fs-caption);color:var(--cyan);white-space:nowrap;}
+.bw-fx{margin-top:4px;font-size:var(--fs-caption);line-height:1.45;color:var(--dim);}
+.bw-foot{margin-top:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:var(--fs-caption);color:var(--dim);}
+.bw-dur{flex:none;font-variant-numeric:tabular-nums;}
+.bw-next{font-style:normal;color:var(--amber);font-size:var(--fs-caption);}
+/* Правое поле строки — РОВНО ОДНО состояние, как у технологий */
+.bw-st{flex:none;max-width:56%;font-size:var(--fs-caption);line-height:1.3;text-align:right;color:var(--dim);}
+.bw-st.done{color:#4fe0b0;}
+.bw-st.run{color:var(--amber);font-weight:700;}
+/* Вид «Построить» — классом .btn-main (UIX-11.1); здесь только размер и место. */
+.bw-take{flex:none;padding:6px 11px;border-radius:8px;font-size:var(--fs-body);white-space:nowrap;}
+/* Улучшаемое здание горит так же, как доступное к стройке: в строке есть что нажать. */
+.bw-item:is(.st-avail,.st-up){border-color:var(--cyan);}
+.bw-item.st-queued{border-color:var(--amber);}
+.bw-item.st-built{opacity:.75;}
+.bw-item.st-lock{opacity:.62;}
+@media(hover:hover){
+  :where(.bw-item:hover){border-color:var(--line-hi);}
+}
+/* Кнопка панели во всю ширину колонки: «Постройки», «Юниты», крепость, путь к технологиям.
+   Вид — классом стиля (UIX-11.2). */
+.bw-open{margin-top:8px;width:100%;padding:10px;border-radius:10px;font-size:var(--fs-caption);}
+/* Крепость не изучена — причина под серой кнопкой и путь к технологиям (сообщение владельца
+   2026-09-24: кнопка горела, а ядро отвечало безымянным «нужна технология»). */
+.fort-why{margin-top:6px;font-size:var(--fs-caption);line-height:1.45;color:#e6c77a;}
+/* Серая кнопка панели должна БЫТЬ серой: погашенная «Возвести крепость» светилась так же, как
+   живая, и нажатие «ничего не делало». Серой её делает класс стиля; цена внутри — цветом
+   кнопки, а не бледным .dim. */
+.bw-open .dim{color:inherit;opacity:.85;}
+/* Листалка уровней в карточке кодекса (BUILD-1) */
+.cx-lvls{display:flex;gap:6px;margin:10px 0 0;}
+.cx-lv{flex:1;padding:6px 0;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
+  color:var(--dim);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.cx-lv.on{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
+#devline [data-solo-play],#devline [data-solo-save]{flex:0 0 auto;border:1px solid var(--cyan-dim);border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;padding:3px 9px;cursor:pointer;}
+/* YAG-6.2: пауза забега. Идёт мир — неброская «‖» рядом с часами; стоит — янтарная
+   «▶ Продолжить»: после ухода со страницы мир ждёт именно её, и её должно быть видно. */
+#devline-head,#devline-status{display:contents;}
+/* Досье Роя (заказ владельца 2026-09-23): сводка → адаптации → силы → «О Рое».
+   Порядок — вопросами игрока, а не разработки; см. шапку prototype/src/swarmDossier.ts. */
+.sd-summary{margin:0 0 12px;padding:8px 10px;border:1px solid var(--cyan-dim);border-radius:8px;
+  background:rgba(53,214,230,.06);color:var(--ink);font-size:var(--fs-body);}
+.sd-sec{margin:0 0 14px;}
+.sd-sec h3{margin:0 0 8px;font-size:var(--fs-caption);color:var(--cyan);}
+.sd-journal{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.sd-journal li{display:flex;align-items:flex-start;gap:8px;font-size:var(--fs-body);line-height:1.4;color:var(--ink);}
+.sd-tag{flex:none;font-size:var(--fs-caption);padding:2px 6px;border-radius:5px;
+  border:1px solid var(--line-hi);color:var(--dim);margin-top:1px;}
+.sd-journal .j-fact .sd-tag{color:#7df0d0;border-color:rgba(125,240,208,.5);background:rgba(125,240,208,.08);}
+.sd-journal .j-hypothesis .sd-tag{color:#e2a15a;border-color:rgba(226,161,90,.5);background:rgba(226,161,90,.08);}
+.sd-contact{border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin:0 0 8px;background:rgba(255,255,255,.02);}
+.sd-contact.live{border-color:var(--cyan-dim);box-shadow:inset 3px 0 0 var(--cyan);}
+.sd-contact header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px;}
+.sd-loc{border:0;background:none;padding:0;font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--cyan);cursor:pointer;
+  text-decoration:underline dotted;text-underline-offset:3px;overflow-wrap:anywhere;text-align:left;}
+.sd-loc:hover,.sd-loc:focus-visible{color:#eafffb;}
+.sd-chip{flex:none;font-size:var(--fs-caption);padding:2px 6px;border-radius:5px;
+  color:var(--dim);border:1px solid var(--line-hi);}
+.sd-contact.live .sd-chip{color:#9ff0da;border-color:rgba(125,240,208,.5);}
+.sd-units{list-style:none;margin:0;padding:0;}
+.sd-units li{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:var(--fs-body);color:var(--ink);}
+.sd-note{margin:6px 0 0;font-size:var(--fs-caption);color:var(--dim);}
+.sd-empty{margin:0;font-size:var(--fs-body);color:var(--dim);}
+.swarm-biology summary{cursor:pointer;font-size:var(--fs-caption);color:var(--cyan);}
+.swarm-biology p{font-size:var(--fs-body);line-height:1.5;color:var(--ink);}
+.swarm-biology h4{margin:10px 0 4px;font-size:var(--fs-body);color:var(--cyan);}
+/* scientist council picker (setup-time, over the start-point screen). В палитре хаба, как
+   настройка схватки (UIX-15.2): окно, слоты и карточки из токенов --sf-*. */
+#scipick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
+#scipick.show{display:flex;}
+#scipick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
+  font-family:var(--sf-font);font-variant-numeric:tabular-nums;color:var(--sf-text);background:var(--sf-panel);
+  border:1px solid var(--sf-panel-edge);border-radius:18px;box-shadow:var(--sf-shadow);}
+#scipick .lw-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;
+  padding:10px 12px 10px 18px;border-bottom:1px solid var(--sf-edge);background:none;}
+#scipick .lw-head b{font-size:18px;font-weight:700;letter-spacing:0;color:var(--sf-hi);}
+#scipick button:focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+/* Досье Роя открывается СПРАВА (заказ владельца 2026-09-23): на телефоне — выдвижная
+   панель во всю высоту у правого края, на ПК — приколото в правом столбце (ниже).
+   Без затемнения (жалоба владельца 2026-09-24: «экран чернеет, будто поверх открывается
+   всё»): досье — справка к карте, а не модальное окно. Подложка прозрачна и пропускает
+   нажатия, карта слева видна и живёт; нажатия ловит только сама панель. */
+/* Язычок досье Роя у правого края (заказ владельца 2026-09-24): вход в досье там, где оно
+   выезжает, — вместо кнопки в строке статуса, которой на телефоне не хватало места. */
+#swarm-tab{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:23;display:flex;flex-direction:column;
+  align-items:center;gap:8px;padding:12px 8px;border:1px solid var(--line-hi);border-right:0;border-radius:12px 0 0 12px;
+  background:rgba(3,12,16,.86);color:var(--cyan);box-shadow:0 0 14px rgba(40,200,210,.12);cursor:pointer;
+  font:700 var(--fs-body)/1 system-ui,sans-serif;}
+#swarm-tab[hidden]{display:none;}
+#swarm-tab i{font-style:normal;font-size:18px;line-height:1;}
+#swarm-tab span{writing-mode:vertical-rl;}
+#swarm-tab:focus-visible{outline:2px solid var(--cyan);outline-offset:-3px;}
+#swarm-dossier{position:fixed;inset:0;z-index:60;display:none;align-items:stretch;justify-content:flex-end;padding:0;
+  background:transparent;pointer-events:none;}
+#swarm-dossier.show{display:flex;}
+#swarm-dossier .twbox{pointer-events:auto;}
+/* без затемнения под панелью карта просвечивала бы сквозь стекло — панель плотнее */
+#swarm-dossier:not(.pinned) .twbox{background:rgba(4,14,18,.97);}
+#swarm-dossier .twbox{display:flex;flex-direction:column;width:min(420px,88vw);height:100%;overflow:hidden;
+  padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box;
+  background:var(--glass);border:1px solid var(--cyan);border-right:0;border-radius:14px 0 0 14px;
+  box-shadow:-12px 0 48px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);animation:sd-in .22s ease-out;}
+@keyframes sd-in{from{transform:translateX(28px);opacity:0;}to{transform:none;opacity:1;}}
+@media (prefers-reduced-motion:reduce){#swarm-dossier .twbox{animation:none;}}
+#swarm-dossier .lw-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.sd-fold{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:10px;row-gap:3px;
+  flex:1;min-width:0;border:0;background:none;padding:0;font:inherit;color:inherit;text-align:left;cursor:default;}
+.sd-fold b{grid-column:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* Сводка в шапке — только у СВЁРНУТОГО досье: в развёрнутом она первой строкой тела. */
+.sd-badge{grid-column:1 / -1;display:none;font-size:var(--fs-caption);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sd-chev{display:none;grid-column:2;grid-row:1;}
+.swarm-sync{display:none;}
+@keyframes swarm-intel-scan{to{transform:rotate(360deg);}}
+#swarm-dossier-body,#scipickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
+.sp-cancel{background:transparent;border:1px solid var(--line-hi);color:var(--dim);border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit;font-size:var(--fs-caption);}
+.sp-cancel:hover{border-color:var(--cyan-dim);color:var(--cyan);}
+#scipick .sp-cancel{min-height:40px;padding:0 14px;border-color:var(--sf-edge);border-radius:10px;background:var(--sf-card);
+  color:var(--sf-text);font-size:14px;}
+#scipick .sp-cancel:hover{border-color:var(--sf-edge-hi);color:var(--sf-hi);}
+#scipick .sp-slots{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+#scipick .sp-slot{position:relative;display:flex;flex-direction:column;gap:6px;min-height:104px;padding:14px 16px;border-radius:14px;}
+#scipick .sp-slot.empty{align-items:center;justify-content:center;text-align:center;color:var(--sf-accent);
+  border:1.5px dashed color-mix(in srgb,var(--sf-accent) 55%,transparent);background:color-mix(in srgb,var(--sf-accent) 4%,transparent);}
+#scipick .sp-slot.empty .sp-plus{font-size:22px;line-height:1;}
+#scipick .sp-slot.empty .sp-hint{font-size:14px;font-weight:600;}
+@media (prefers-reduced-motion:no-preference){#scipick .sp-slot.empty{animation:sppulse 1.5s ease-in-out infinite;}}
+@keyframes sppulse{0%,100%{border-color:color-mix(in srgb,var(--sf-accent) 55%,transparent);box-shadow:0 0 0 0 transparent;}
+  50%{border-color:var(--sf-accent);box-shadow:0 0 18px 1px color-mix(in srgb,var(--sf-accent) 30%,transparent);
+  background:color-mix(in srgb,var(--sf-accent) 8%,transparent);}}
+#scipick .sp-slot.filled{border:1px solid var(--sf-accent);background:var(--sf-primary);box-shadow:var(--sf-glow);}
+/* name reserves the ✕-corner (long names like «Командир крыла» wrapped UNDER the
+   remove button and made it look misplaced) */
+#scipick .sp-slot .sp-sn{padding-right:36px;font-size:16px;font-weight:700;color:var(--sf-hi);}
+#scipick .sp-slot .sp-inf{font-size:14px;line-height:1.45;color:var(--sf-text);}
+#scipick .sp-rm{position:absolute;top:8px;right:8px;display:grid;place-items:center;width:32px;height:32px;padding:0;
+  border-radius:9px;background-color:var(--sf-inset);font:inherit;font-size:14px;line-height:1;}
+#scipick .sp-warn{display:flex;gap:8px;margin-top:12px;padding:12px 14px;border:1px solid #6a4a17;border-radius:12px;
+  background:rgba(255,180,58,.09);color:#f4d199;font-size:14px;line-height:1.45;}
+#scipick .sp-h{margin:16px 0 10px;font-size:14px;font-weight:600;line-height:1.4;color:var(--sf-head);}
+/* Ростер — две колонки, а в узком окне (телефон) одна: в половине телефона описание
+   кандидата шло в пять строк по одному слову. */
+#scipick .sp-roster{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,max(200px,calc(50% - 4px))),1fr));gap:8px;}
+#scipick .sp-card{display:flex;flex-direction:column;gap:4px;min-height:72px;padding:12px 14px;border:1px solid var(--sf-edge);
+  border-radius:12px;background:var(--sf-card);color:var(--sf-text);font:inherit;text-align:left;cursor:pointer;}
+#scipick .sp-card:hover:not(:disabled){border-color:var(--sf-edge-hi);}
+#scipick .sp-card .sp-cn{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600;line-height:1.3;}
+#scipick .sp-card .sp-tick{display:grid;place-items:center;flex:none;width:20px;height:20px;margin-left:auto;border-radius:50%;
+  background:var(--sf-accent);color:var(--void);font-size:var(--fs-body);font-weight:800;}
+#scipick .sp-card .sp-inf{font-size:14px;line-height:1.45;color:var(--sf-dim);}
+/* Полный совет гасит остальных, но имя и влияние читаются: по ним выбирают замену. */
+#scipick .sp-card:disabled{cursor:not-allowed;border-style:dashed;background:var(--sf-card-off);color:var(--sf-dim);}
+#scipick .sp-card.picked{border-style:solid;border-color:var(--sf-accent);background:var(--sf-sel);color:var(--sf-hi);}
+#scipick .sp-card.picked .sp-inf{color:var(--sf-text);}
+#scipick .sp-go{width:100%;min-height:52px;margin-top:14px;padding:0 16px;border:1px solid var(--sf-accent);border-radius:12px;
+  background:var(--sf-primary);color:var(--sf-hi);font:inherit;font-size:16px;font-weight:700;box-shadow:var(--sf-glow);cursor:pointer;}
+#scipick .sp-go:hover:not(:disabled){background:var(--sf-primary-hi);}
+#scipick .sp-go:disabled{opacity:.45;box-shadow:none;cursor:not-allowed;}
+@media (prefers-reduced-motion:no-preference){
+  #scipick :is(.sp-card,.sp-rm,.sp-cancel,.sp-go){transition:border-color .15s,background-color .15s,color .15s;}}
+/* Торговец экспедиции («живой курс»): окно того же вида, что рынок (#market). */
+#trader{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#trader.show{display:flex;}
+#trader .trbox{display:flex;flex-direction:column;width:min(440px,94vw);max-height:86vh;overflow:hidden;
+  background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
+  box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.tr-purse{margin-left:auto;margin-right:10px;font-size:var(--fs-body);color:var(--ink);}
+.tr-close{width:28px;height:28px;border-radius:6px;}
+.tr-body{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
+.tr-rule{margin:0 0 10px;font-size:var(--fs-caption);line-height:1.45;color:var(--dim);}
+.tr-goods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:12px;}
+.tr-good{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;padding:6px 4px;border-radius:8px;
+  border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--ink);cursor:pointer;font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+.tr-good.on{border-color:var(--cyan);background:rgba(53,214,230,.1);}
+.tr-shift{font-style:normal;font-size:var(--fs-caption);}
+.tr-shift.up{color:var(--amber);}
+.tr-shift.down{color:var(--cyan);}
+.tr-lbl{font-size:var(--fs-caption);color:var(--dim);margin:4px 0 6px;}
+.tr-amts,.tr-swaps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.tr-amt,.tr-swap{min-width:52px;min-height:40px;padding:6px 10px;border-radius:7px;border:1px solid var(--line);
+  background:transparent;color:var(--ink);cursor:pointer;font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+.tr-amt.on{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.1);}
+.tr-deal{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.tr-go{min-height:44px;padding:8px;border-radius:8px;border:1px solid var(--cyan);background:rgba(53,214,230,.14);
+  color:var(--cyan);cursor:pointer;font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+.tr-go.sell{border-color:var(--amber);color:var(--amber);background:rgba(240,180,80,.1);}
+.tr-go:disabled,.tr-swap:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line);color:var(--dim);background:transparent;}
+.tr-status{min-height:18px;font-size:var(--fs-body);color:var(--ink);}
+/* Связь с союзником главы IV (PVR-7.5): окно того же вида, что торговец; синий — цвет союза. */
+#ally{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#ally.show{display:flex;}
+#ally .albox{display:flex;flex-direction:column;width:min(420px,94vw);max-height:86vh;overflow:hidden;
+  background:var(--glass);border:1px solid #4a8cff;border-radius:10px;
+  box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(74,140,255,.08);}
+.al-emblem{font-style:normal;color:#4a8cff;}
+.al-tag{margin-left:auto;margin-right:10px;padding:1px 8px;border-radius:9px;border:1px solid #4a8cff;color:#4a8cff;font-size:var(--fs-caption);}
+.al-close{width:28px;height:28px;border-radius:6px;}
+.al-body{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
+.al-op{padding:10px 12px;margin-bottom:12px;border-radius:8px;border:1px solid rgba(74,140,255,.55);background:rgba(74,140,255,.08);}
+.al-op.own{border-style:dashed;}
+.al-op-head{font-size:var(--fs-body);color:var(--ink);}
+.al-target{color:#9fc0ff;}
+.al-own,.al-idle{margin:6px 0 0;font-size:var(--fs-caption);line-height:1.45;color:var(--dim);}
+.al-step{margin:6px 0 0;font-size:var(--fs-body);color:var(--cyan);}
+.al-step.al-blocked{color:var(--amber);}
+.al-op-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.al-act{min-height:36px;padding:6px 10px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+.al-lbl{font-size:var(--fs-caption);color:var(--dim);margin:4px 0 6px;}
+.al-orders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:10px;}
+.al-order{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:64px;padding:8px;border-radius:8px;
+  border:1px solid #4a8cff;background:rgba(74,140,255,.1);color:var(--ink);cursor:pointer;font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;text-align:left;}
+.al-order span{font-size:var(--fs-caption);line-height:1.35;color:var(--dim);overflow-wrap:anywhere;}
+.al-order.on{background:rgba(74,140,255,.28);}
+.al-order:disabled{opacity:.4;cursor:not-allowed;}
+.al-status{min-height:18px;font-size:var(--fs-body);color:var(--ink);}
+#devline .dl-ally{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;margin-left:10px;padding:2px 10px;border-radius:10px;
+  border:1px solid #4a8cff;background:rgba(74,140,255,.12);color:#9fc0ff;font:inherit;cursor:pointer;}
+#devline .dl-ally i{font-style:normal;}
+#devline .dl-ally.pulse{animation:ally-pulse 1.2s ease-in-out infinite;}
+@keyframes ally-pulse{50%{background:rgba(74,140,255,.38);box-shadow:0 0 12px rgba(74,140,255,.6);}}
+@media (prefers-reduced-motion:reduce){#devline .dl-ally.pulse{animation:none;background:rgba(74,140,255,.3);}}
+/* Главная цепочка главы IV над задачами пула (PVR-7.5). */
+.mp-chainbox{margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line);}
+.mp-sub{display:block;margin:2px 0 6px;font-size:var(--fs-caption);color:var(--dim);}
+.mp-chain.on{border-color:#8ff5c8;}
+.mp-warn{margin:6px 0;font-size:var(--fs-caption);color:var(--amber);}
+.mp-extract{display:block;width:100%;min-height:40px;margin-top:6px;padding:8px;border-radius:8px;border:1px solid var(--amber);
+  background:rgba(240,180,80,.1);color:var(--amber);cursor:pointer;font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;text-align:left;}
+/* session market (modal, mirrors #tech; tabs mirror .dp-tab) */
+#market{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#market.show{display:flex;}
+#market .mkbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
+  background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
+  box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.mk-close{width:28px;height:28px;border-radius:6px;}
+.mk-tabs{display:flex;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+.mk-tab{padding:6px 11px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
+  font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.mk-tab.on{color:var(--cyan);border-color:var(--cyan-dim);background:rgba(53,214,230,.1);}
+#marketbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
+.mk-form{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px;
+  padding:10px;border:1px solid var(--line-hi);border-radius:9px;background:rgba(255,255,255,.02);}
+.mk-seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+.mk-seg button{padding:6px 10px;border:0;background:transparent;color:var(--dim);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.mk-seg button.on{color:var(--cyan);background:rgba(53,214,230,.12);}
+.mk-in{width:64px;padding:6px 7px;border:1px solid var(--line-hi);border-radius:6px;background:rgba(0,0,0,.25);
+  color:var(--ink);font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+.mk-lbl{font-size:var(--fs-caption);color:var(--dim);}
+.mk-go{margin-left:auto;padding:7px 12px;border-radius:7px;font-size:var(--fs-caption);}
+.mk-sec{margin:12px 0 6px;font-size:var(--fs-caption);color:var(--dim);}
+.mk-sec.buy{color:var(--amber);}
+.mk-row{display:flex;align-items:center;gap:9px;padding:8px 10px;margin-bottom:6px;border:1px solid var(--line-hi);
+  border-radius:8px;background:rgba(255,255,255,.02);}
+.mk-row .mk-qp{font-size:var(--fs-body);color:var(--ink);}
+.mk-row .mk-qp b{color:var(--cyan);}
+.mk-row.buy .mk-qp b{color:var(--amber);}
+.mk-row .mk-who{flex:1;min-width:0;font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mk-btn{flex:none;padding:6px 11px;border-radius:7px;font-size:var(--fs-caption);white-space:nowrap;}
+.mk-empty{padding:10px 2px;font-size:var(--fs-caption);color:var(--dim);opacity:.8;}
+

@@ -10,7 +10,7 @@
  * their own. All chrome text goes through `t()` (RU/EN).
  *
  * The overlay sits ABOVE the HUD but BELOW critical modals (z-index 50; see the
- * `#spotlight` block in build.mjs). For `tap` steps the panels swallow clicks so
+ * `#spotlight` block in prototype/styles/). For `tap` steps the panels swallow clicks so
  * «Далее» is the only way on; for `action`/`state` steps the panels are
  * click-through so the player operates the real HUD to advance.
  */
@@ -139,8 +139,8 @@ function place(node: HTMLElement, r: Rect): void {
 const HIDDEN: Rect = { left: 0, top: 0, width: 0, height: 0 };
 
 // --- Анимации жестов (UIX-8.1) ---------------------------------------------------------
-// Рисунки — SVG без текста, движение — CSS (`#spotlight .sl-g` в build.mjs). Каждый рисунок
-// и без движения показывает жест: при «уменьшить движение» анимация стоит на этом кадре.
+// Рисунки — SVG без текста, движение — CSS (`#spotlight .sl-g` в `prototype/styles/`). Каждый
+// рисунок и без движения показывает жест: при «уменьшить движение» анимация стоит на этом кадре.
 // Курсор стоит на месте через `<g transform>`, а CSS двигает сам путь: CSS-`transform` на
 // элементе заменил бы его атрибут, и курсор прыгнул бы в угол рисунка.
 const CURSOR = 'M0 0v14l3.6-3.4 2.6 5.8 2.2-1-2.6-5.6H11z';

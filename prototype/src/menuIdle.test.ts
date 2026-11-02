@@ -17,26 +17,27 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { gameCss } from '../gameSheets.mjs';
 
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+const GAME_CSS = gameCss();
 const body = (name: string): string =>
   new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(MAIN)?.[1] ?? '';
 
 /** Свойства, которые меняет `@keyframes name` (вложенные блоки кадров — по скобкам). */
 function keyframeProps(name: string): string[] {
-  const at = BUILD.indexOf(`@keyframes ${name}{`);
+  const at = GAME_CSS.indexOf(`@keyframes ${name}{`);
   if (at < 0) return [];
   let depth = 0;
   let end = at;
-  for (let i = BUILD.indexOf('{', at); i < BUILD.length; i++) {
-    if (BUILD[i] === '{') depth++;
-    else if (BUILD[i] === '}' && --depth === 0) {
+  for (let i = GAME_CSS.indexOf('{', at); i < GAME_CSS.length; i++) {
+    if (GAME_CSS[i] === '{') depth++;
+    else if (GAME_CSS[i] === '}' && --depth === 0) {
       end = i;
       break;
     }
   }
-  const block = BUILD.slice(BUILD.indexOf('{', at) + 1, end);
+  const block = GAME_CSS.slice(GAME_CSS.indexOf('{', at) + 1, end);
   return [...new Set([...block.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]!))];
 }
 

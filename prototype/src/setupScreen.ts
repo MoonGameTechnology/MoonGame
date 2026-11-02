@@ -392,7 +392,8 @@ function renderSetupMaps(): void {
 }
 
 function renderSetup(): void {
-  // Сетевой режим прячет решения сервера и показывает шапку партии (`build.mjs`, класс `net`).
+  // Сетевой режим прячет решения сервера и показывает шапку партии (класс `net` в
+  // `prototype/styles/`).
   setupEl.classList.toggle('net', !!netSetup);
   renderSetupMaps();
   $('setup-map-info').textContent = t(

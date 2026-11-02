@@ -1,17 +1,20 @@
 // Шкала текста (UIX-1.2): 12 · 14 · 16 · 20 px, мельче 12 px ничего. Две копии одного факта —
-// `typeScale` в packages/client/src/theme.ts и --fs-* в prototype/build.mjs (скилл
+// `typeScale` в packages/client/src/theme.ts и --fs-* в листах prototype/styles/ (скилл
 // frontend-design §2) — держатся одинаковыми, а размер мельче подписи не возвращается в листы
 // игры: браузерный сторож `smoke:sizes` ловит его на семи экранах, этот — во всех правилах,
 // включая окна, которые сторож не открывает.
 import { readFileSync, readdirSync } from 'node:fs';
+import { gameCss } from '../gameSheets.mjs';
 import { describe, expect, it } from 'vitest';
 import { typeScale, type TypeScale } from '../../packages/client/src/theme';
 
 const read = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const BUILD = read('../build.mjs');
-/** Лист игры и разметка страницы; пульт администратора (`adminCss`) — инструмент, не игра. */
-const GAME = BUILD.slice(BUILD.indexOf('const css = `'), BUILD.indexOf('const adminCss = `'));
-const ROOT = /:root\{([\s\S]*?)\n\}/.exec(BUILD)?.[1] ?? '';
+/** Листы игры (`prototype/styles/`) и разметка страницы из `build.mjs`; пульт администратора
+ *  (`admin.css`) — инструмент, не игра. */
+const GAME =
+  gameCss() + BUILD.slice(BUILD.indexOf('const css = '), BUILD.indexOf('const adminCss = '));
+const ROOT = /:root\{([\s\S]*?)\n\}/.exec(GAME)?.[1] ?? '';
 const CLIENT = read('../../packages/client/index.html');
 
 const VAR: Record<keyof TypeScale, string> = {
@@ -24,7 +27,7 @@ const VAR: Record<keyof TypeScale, string> = {
 /** Листы игры: всё, что `allCss()` склеивает для партии и хаба, кроме Sector Zero — у его
  *  листа свой сторож того же правила (`sectorZeroMenu.test.ts`). */
 const SHEETS: Record<string, string> = {
-  'build.mjs': GAME,
+  'styles/*.css': GAME,
   'holographic.css': read('../holographic.css'),
   'bridge-shell.css': read('../bridge-shell.css'),
   'mobile-console.css': read('../mobile-console.css'),
@@ -59,10 +62,10 @@ function tinySizes(sheet: string): string[] {
   return out;
 }
 
-describe('шкала текста: theme.ts и build.mjs — одна правда (UIX-1.2)', () => {
+describe('шкала текста: theme.ts и листы игры — одна правда (UIX-1.2)', () => {
   it.each(Object.entries(VAR))('%s живёт в %s с тем же значением', (key, name) => {
     const m = new RegExp(`${name}:([^;]+);`).exec(ROOT);
-    expect(m, `${name} нет в :root build.mjs`).not.toBeNull();
+    expect(m, `${name} нет в :root листов игры`).not.toBeNull();
     expect(m![1]).toBe(`${typeScale[key as keyof TypeScale]}px`);
     expect(CLIENT, `запасное значение ${name} в index.html клиента`).toContain(
       `${name}: ${typeScale[key as keyof TypeScale]}px;`,

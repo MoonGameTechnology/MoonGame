@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { gameCss } from '../gameSheets.mjs';
 import { FIRST_GOALS, goalsComplete, mergeDone, metGoals, type GoalSignals } from './firstGoals';
 
 const NONE = Object.fromEntries(FIRST_GOALS.map((g) => [g.id, false])) as GoalSignals;
@@ -69,11 +68,11 @@ describe('goalsComplete', () => {
   });
 });
 
-// The PC placement is one CSS line in build.mjs with no other guard: the phone anchor
+// The PC placement is one CSS line in prototype/styles/ with no other guard: the phone anchor
 // (top:52px, right edge) put the box on the top bar and on the right-docked panel, and
 // the left column only works while the box also clears the tool rail horizontally.
 describe('CSS: the PC checklist is docked left, below the bar and clear of the rail', () => {
-  const css = readFileSync(fileURLToPath(new URL('../build.mjs', import.meta.url)), 'utf8');
+  const css = gameCss();
   const pcRule = css.split('\n').find((l) => /^\s*#goals\{.*left:/.test(l));
 
   it('has a PC rule at all — otherwise this test guards nothing', () => {
