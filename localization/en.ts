@@ -2210,6 +2210,10 @@ export const en: Record<string, string> = {
   'map.fog.old': '✦ old data',
   'map.radar.detect': '◌ detection {n}',
   'map.radar.identify': '● identification {n}',
+  'map.transfer.assault': 'Assault landing',
+  'map.transfer.fleets': '{n} {n|fleet|fleets}',
+  'map.transfer.load': 'Loading',
+  'map.transfer.unload': 'Unloading',
 
   // --- net — Сеть: подключение, разрывы, адрес сервера.
   'net.bad-address': 'Invalid server address',

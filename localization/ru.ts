@@ -2216,6 +2216,10 @@ export const ru: Record<string, string> = {
   'map.fog.old': '✦ старые данные',
   'map.radar.detect': '◌ засечка {n}',
   'map.radar.identify': '● опознание {n}',
+  'map.transfer.assault': 'Штурмовая высадка',
+  'map.transfer.fleets': '{n} {n|флот|флота|флотов}',
+  'map.transfer.load': 'Погрузка',
+  'map.transfer.unload': 'Высадка',
 
   // --- net — Сеть: подключение, разрывы, адрес сервера.
   'net.bad-address': 'Неверный адрес сервера',

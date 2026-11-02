@@ -350,6 +350,49 @@ describe('таймер бомбардировки', () => {
   });
 });
 
+describe('таймеры перевозки на карте', () => {
+  it('над миром без выбора флота — отдельные отсчёты погрузки и высадки; время обновляется по миру', async () => {
+    const { marks, camera, env, frame, home, own, at, put, t } = await boot();
+    camera.centerOn(home.position, 2.4);
+    const startAt = env.world.time;
+    put({ ...own, loading: [
+      { unit: 'militia', count: 2, from: home.id, startAt, doneAt: startAt + 3_600_000 },
+    ], unloading: [
+      { unit: 'militia', count: 1, to: home.id, startAt, doneAt: startAt + 1_800_000 },
+    ] });
+    marks.drawTroopTransferTimers();
+    const texts = frame.named('fillText');
+    expect(texts.map((k) => k.args[0])).toEqual([
+      `▲ ${t('map.transfer.load')} · ${countdownHMS(3_600_000)}`,
+      `▼ ${t('map.transfer.unload')} · ${countdownHMS(1_800_000)}`,
+    ]);
+    const c = at(home.position);
+    expect(texts.every((k) => (k.args[2] as number) < c.y - 76)).toBe(true);
+    expect((texts[1]!.args[2] as number) - (texts[0]!.args[2] as number)).toBe(24);
+    frame.calls.length = 0;
+    env.world = { ...env.world, time: startAt + 60_000 };
+    marks.drawTroopTransferTimers();
+    expect(frame.named('fillText')[0]!.args[0]).toContain(countdownHMS(3_540_000));
+    frame.calls.length = 0;
+    put({ ...own, loading: undefined, unloading: undefined });
+    marks.drawTroopTransferTimers();
+    expect(frame.named('fillText')).toHaveLength(0);
+  });
+
+  it('штурмовая высадка отмечает её цель; чужие заявки и отсутствующая цель не рисуются', async () => {
+    const { marks, env, frame, next, own, put, t } = await boot();
+    const claim = { planetId: next.id, startAt: env.world.time, doneAt: env.world.time + 5_400_000 };
+    put({ ...own, location: next.id, assaultLanding: claim });
+    marks.drawTroopTransferTimers();
+    expect(frame.named('fillText')[0]!.args[0]).toBe(`▼ ${t('map.transfer.assault')} · ${countdownHMS(5_400_000)}`);
+    frame.calls.length = 0;
+    put({ ...own, owner: 'p2', location: next.id, assaultLanding: claim });
+    put({ ...own, id: 'missing-target', location: 'missing', assaultLanding: { ...claim, planetId: 'missing' } });
+    marks.drawTroopTransferTimers();
+    expect(frame.named('fillText')).toHaveLength(0);
+  });
+});
+
 describe('REFM-234 — ракеты и мины', () => {
   it('летящая ракета: пунктир от неё к точке цели цветом владельца; чужая подписана, пока карта крупна; без полёта и в тумане — нет', async () => {
     const { marks, palette, geo, camera, t, env, frame, home, next, at, put } = await boot();
@@ -555,6 +598,7 @@ describe('REFM-234 — стык меток с main.ts', () => {
       'drawMinefields();',
       'drawDevourSieges();',
       'drawBombardTimers();',
+      'drawTroopTransferTimers();',
     ])
       expect(MAIN, call).toContain(call);
     expect(MAIN).toMatch(/drawMissionTargets\(\);\s*drawAllyMarks\(\);/);

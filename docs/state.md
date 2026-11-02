@@ -645,6 +645,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `hero.spawn`, `hero.ability`, `hero.skill.unlock`, `hero.equip/unequip`, `hero.install/uninstall`.
 - Флот: карточка `fleetCard.ts`, десант «кого и сколько» `troopsMenu.ts`, цепочка «◎ Приказ»
   `chainPlanner.ts` (`order.chain`); шаттлы — ангар `hangarPanel.ts`, эскадры `squadronPanel.ts`.
+  Погрузка, выгрузка и штурмовая высадка видны отдельными отсчётами над объектом на карте
+  (`decisions/troopTransferTimers.ts`, `mapMarks.ts`) без выбора флота. Для нескольких
+  своих флотов — их число и срок последней заявки; чужие заявки скрыты.
 - «Коалиции» (`coalitionWindow.ts`): создание, приглашения при любой стойке, исключение
   основателем и выход с подтверждением; карточка показывает 24/48 обычных часов по серверной привязке
   времени, без зависимости от часов устройства. Решения — `decisions/coalitionCreation.ts`;
