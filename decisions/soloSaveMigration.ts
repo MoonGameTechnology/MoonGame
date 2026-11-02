@@ -224,6 +224,18 @@ export const STAND_UP_SOLO_MIGRATION = {
   toDataHash: WOUNDED_TRANSPORT_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: orbital 1.6.0 lands bombardment as one volley per game hour on the
+ *  fleet's own clock (`bombardNextAt`). A saved bombarding fleet has no clock yet and
+ *  starts one at its first world step, so the world reads as is. */
+export const BOMBARD_VOLLEY_SOLO_MIGRATION = {
+  fromRules: STAND_UP_SOLO_MIGRATION.toRules,
+  fromData: STAND_UP_SOLO_MIGRATION.toData,
+  fromDataHash: STAND_UP_SOLO_MIGRATION.toDataHash,
+  toRules: '062f4475b44061',
+  toData: STAND_UP_SOLO_MIGRATION.toData,
+  toDataHash: STAND_UP_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -245,6 +257,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   PRODUCTION_LANES_SOLO_MIGRATION,
   WOUNDED_TRANSPORT_SOLO_MIGRATION,
   STAND_UP_SOLO_MIGRATION,
+  BOMBARD_VOLLEY_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

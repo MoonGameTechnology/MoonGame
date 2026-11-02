@@ -539,8 +539,6 @@ export {
   MITIGATION_CAP,
   TIER_ORDER,
   mitigationFromPool,
-  damageHookQueries,
-  damageFromTraces,
   type Tier,
 } from './util/combat';
 export {
@@ -612,7 +610,7 @@ export {
 export { economyModule, BROWNOUT } from './modules/economy';
 export { movementModule } from './modules/movement';
 export { combatModule } from './modules/combat';
-export { orbitalModule, BOMBARD_FRACTION, fleetBombardPower } from './modules/orbital';
+export { orbitalModule, BOMBARD_FRACTION } from './modules/orbital';
 export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';

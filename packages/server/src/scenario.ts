@@ -251,7 +251,10 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '92'; // Снят `fleet-repair`: ремонта за металл у дока
+export const MODULE_MANIFEST_VERSION = '93'; // Обстрел бьёт залпом раз в игровой час по своим
+// часам флота (`orbital` 1.6.0, `Fleet.bombardNextAt`), как атака в бою, а не непрерывно (заказ
+// владельца 2026-11-02). Членство и порядок не тронуты. Партия на 92 стачивала бы мир без залпов.
+// export const MODULE_MANIFEST_VERSION = '92'; // Снят `fleet-repair`: ремонта за металл у дока
 // больше нет (заказ владельца 2026-11-01), у дока корпус чинится только постепенно. Порядок
 // остальных не тронут. Там же `combat` 3.10.0 — наземные выжившие уходят из боя с ранами, и
 // `construction` 1.8.0 — залеченный госпиталем стек сливается с целыми.
