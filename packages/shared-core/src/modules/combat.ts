@@ -56,6 +56,7 @@ import { fleetHoldFree } from '../state/shuttle';
 import { crossingT } from '../state/roads';
 import { isMineFleet } from '../state/minefields';
 import { isReconFleet } from '../state/recon';
+import { STAND_UP_EVENTS, standingFleet, standsAt, type BattleStandUp } from '../util/standUp';
 
 /** Keep a pinned crossing point off the lane's endpoints (avoids a degenerate
  *  node-equivalent edge); mirrors movement's own EPS. */
@@ -1164,9 +1165,20 @@ export const combatModule: GameModule = {
   // 3.8.0: флот из одних разведчиков пустой мир с орбиты не занимает — только высадкой.
   // 3.9.0: вылет флота отменяет его высадку — `assault.cancelled`, десант на борту.
   // 3.10.0: наземные выжившие уходят из боя с ранами; лечит их госпиталь, а не сам бой.
-  version: '3.10.0',
+  // 3.11.0: флот, вставший у мира не прилётом (верфь, взлёт, раскол, герой), сходится с врагом.
+  version: '3.11.0',
   setup(api) {
     api.provideCapability<BattlePullIn>('battle.pullIn', (at, h) => pullInBystanders(h, at));
+    // Встал у мира без прилёта — бой, как у прибывшего (`util/standUp.ts`, баг 2026-11-02).
+    api.provideCapability<BattleStandUp>('battle.standUp', (fleetId, at, h) => {
+      if (standsAt(h.state, fleetId, at)) engageFleets(h, fleetId, at);
+    });
+    for (const type of Object.keys(STAND_UP_EVENTS)) {
+      api.on(type, (event, h) => {
+        const stood = standingFleet(h.state, type, event.payload);
+        if (stood) engageFleets(h, stood.fleetId, stood.at);
+      });
+    }
 
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
