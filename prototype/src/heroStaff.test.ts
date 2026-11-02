@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { gameCss } from '../gameSheets.mjs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { newGame } from './game';
@@ -335,10 +336,10 @@ describe('штаб героев — разметка панели', () => {
   });
 
   it('палитра редкости в CSS — ПОСИМВОЛЬНАЯ копия `HERO_GRADE_COLORS`', () => {
-    // HERO-12. `build.mjs` не тянет TS, поэтому переменные `--hx-g-*` — копия таблицы
+    // HERO-12. Лист CSS не тянет TS, поэтому переменные `--hx-g-*` — копия таблицы
     // из `decisions/heroIdentity.ts`. Копия без сторожа расходится молча: карту рисует
     // канвас по таблице, штаб — по CSS, и «золотой» стал бы двумя разными золотыми.
-    const css = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+    const css = gameCss();
     for (const [grade, color] of Object.entries(HERO_GRADE_COLORS)) {
       expect(css, grade).toContain(`--hx-g-${grade}:${color};`);
     }
@@ -364,9 +365,7 @@ describe('штаб героев — разметка панели', () => {
 
   it('вкладки идут СЕТКОЙ 2\u00d72, а не четырьмя ячейками в строку', () => {
     // Сторож над CSS: на четверти ширины телефона «Способности» не помещались.
-    const rule = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8').match(
-      /#herobody \.hx-tabs\{([^}]*)\}/,
-    );
+    const rule = gameCss().match(/#herobody \.hx-tabs\{([^}]*)\}/);
     expect(rule).not.toBeNull();
     expect(rule![1]).toContain('grid-template-columns:repeat(2,1fr)');
   });

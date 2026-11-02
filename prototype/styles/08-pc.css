@@ -1,0 +1,219 @@
+/* === PC (mouse-driven desktop): the whole HUD at 1.5× ==========================
+   The UI was sized for phones — on a monitor the 12px console text is unreadably
+   small. zoom:1.5 scales every font/control coherently. Two gotchas, both handled
+   here: (1) vw/vh units inside a zoomed element are ALSO scaled visually (67vw
+   renders as the full screen; calc(100vh - N) overflows it), so every vw/vh used
+   inside a zoomed layer is re-declared below at 1/1.5 of its base value — keep
+   this list in sync when adding vw/vh rules. Для ВЫСОТЫ этой ручной поправки мало:
+   зум не всегда 1.5 (лестница --pcz ниже), поэтому всё, что обязано ВЛЕЗТЬ в экран
+   (докованная панель, список инструментов рейла), считает не от 66.7vh, а от --vph
+   — видимой высоты окна в координатах зумленного слоя; (2) layers whose position/size is
+   set in px from JS (#map canvas, #chatwin drag geometry, #pingpop / #holdtip /
+   the #spotlight ring anchored to getBoundingClientRect) must stay UNZOOMED, or
+   the JS px and the visual px disagree by 1.5× — they are deliberately absent
+   from the zoom list. Percentages resolve against the (zoomed) parent, so they
+   need no compensation — which is why the hub column below uses % and not vw. */
+@media (min-width:900px) and (hover:hover) and (pointer:fine){
+  /* PC HUD magnification. 1.5× on a tall monitor, but that fixed factor made the top
+     bar + devline + bottom rail eat a short window (laptop with a bookmarks bar, 150%
+     OS scale) until the interface clipped off the top and bottom. --pcz steps the zoom
+     down with the viewport HEIGHT (ladder below) so the HUD always fits; mobile is
+     untouched (this whole query is PC-gated). */
+  :root{--pcz:1.5;
+    /* ВИДИМАЯ высота окна, выраженная в тех же px, которыми мерит зумленный слой.
+       Без неё каждое правило «влезь в экран» несло собственную копию догадки
+       «100vh ÷ 1.5» (66.7vh) — и разъезжалось, как только лестница ниже ставила
+       зум 1.4/1.3/1.2/1.1: при zoom:1.2 те же 66.7vh — это уже 80% экрана, и низ
+       HUD уезжал под край окна (игроку кажется, что интерфейс съела панель задач).
+       Считаем от живого зума, а не от «полутора». */
+    --vph:calc(100dvh / var(--pcz));}
+  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#swarm-dossier,#scipick,
+  #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#pirate-intro,#playercard,
+  #settings,#warprompt,#abandon,#pushask,#diplo,#coalwin,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
+  #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
+  /* #buildwin («Здания → Построить») в этом списке не было: окно ехало 1×, пока
+     весь остальной интерфейс шёл в 1.5× — игрок видел мелкий чужой шрифт ровно в
+     одном окне. Его коробка (.twbox) при этом уже была подогнана под ПК ниже, что
+     и маскировало пропажу. Соседи по разметке (#tech, #steward) тут с самого начала. */
+  #buildwin{zoom:var(--pcz,1.5);}
+  /* vw/vh compensations (base values ÷ 1.5 — see the note above) */
+  #toasts{max-width:min(61vw,520px);}
+  /* rail tool list: cap at ~7 items and scroll; the sticky ▲/▾ ticks (not buttons)
+     hint that the list scrolls both ways */
+  /* Список растёт ВВЕРХ от нижнего угла, поэтому его потолок — видимое окно минус
+     шапка с devline (--tbh + 28) и минус собственный низ рейла (14 отступ + 44
+     кнопка-гамбургер + 8 зазор) и те же 14px воздуха: --tbh + 108. Прежние «-120px»
+     этой чехарды не знали и на низком окне (1280×600, зум 1.2) сажали список на
+     devline — те же 9px «интерфейс уехал», что и у панели справа. */
+  #railtools{max-height:min(330px,calc(var(--vph) - var(--tbh) - 108px));}
+  #railtools::before,#railtools::after{display:block;position:sticky;z-index:1;flex:0 0 auto;
+    text-align:center;font-size:var(--fs-caption);line-height:1;padding:1px 0;color:var(--dim);
+    pointer-events:none;}
+  #railtools::before{content:'▲';top:-6px;background:linear-gradient(180deg,rgba(3,12,16,.95) 55%,transparent);}
+  #railtools::after{content:'▼';bottom:-6px;background:linear-gradient(0deg,rgba(3,12,16,.95) 55%,transparent);}
+  /* ONB-7 goals checklist. The phone anchor (top:52px, right edge) is wrong on PC twice
+     over: 52px is INSIDE the 84px top bar, and the right edge is where the sector panel
+     docks — the box sat on top of both. Park it in the free left column instead: flush
+     under the devline, and pushed past the tool rail (left:10px + a 50px-wide tool list)
+     so the rail menu stays uncovered when it is OPEN. The clearance is horizontal on
+     purpose — the rail grows UP from the bottom corner and on a short window its tool
+     list reaches the devline, so no vertical anchor can stay clear of it. */
+  #goals{top:calc(var(--tbh) + 28px);right:auto;left:70px;max-width:min(230px,40vw);}
+  /* content windows widen to ~80% of the screen (53.4vw layout × zoom 1.5) — the
+     console windows outgrew their phone-sized boxes (long RU copy overflowed) */
+  #codex .cxbox{width:53.4vw;max-height:56vh;}
+  #codexhub .chbox{width:53.4vw;max-height:57vh;}
+  #intro .inbox{width:min(560px,61vw);max-height:28vh;}
+  #recap .rcbox{width:min(440px,62.5vw);max-height:57vh;}
+  #playercard .pcbox{width:min(380px,61vw);max-height:57vh;}
+  #settings .setbox{width:min(380px,61vw);max-height:57vh;}
+  #warprompt .wpbox{width:min(360px,61vw);}
+  #diplo .dpbox{width:53.4vw;max-height:58.5vh;}
+  #coalwin .dpbox{width:min(460px,40vw);max-height:58.5vh;}
+  .dp-convo{height:min(41vh,440px);}
+  #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
+  #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
+  #tech .twbox,#steward .twbox,#buildwin .twbox{width:53.4vw;max-height:54.5vh;}
+  #scipick .twbox{width:53.4vw;max-height:58.5vh;}
+  /* Persistent intelligence stays beside the map and never intercepts map input
+     outside its own box. Its height follows the desktop HUD's actual zoom. */
+  /* Приколото в ПРАВОМ столбце (заказ владельца 2026-09-23); свёрнутое — одна шапка со
+     сводкой. В голографическом интерфейсе (единственный на ПК) карточка выбранного плавает
+     у объекта и столбец свободен. Без него карточка встаёт в тот же правый столбец — тогда
+     досье уступает ей место (body.sheet-open) и возвращается в том виде, в каком его оставили. */
+  #swarm-dossier.pinned{inset:auto;right:12px;top:calc(var(--tbh) + 28px);padding:0;z-index:18;
+    width:min(300px,24vw);background:none;backdrop-filter:none;align-items:stretch;justify-content:stretch;}
+  #swarm-dossier.pinned .twbox{width:100%;height:auto;max-height:calc(var(--vph) - var(--tbh) - 150px);
+    padding:0;border-right:1px solid var(--cyan);border-radius:12px;animation:none;}
+  body.sheet-open:not(.holo-ui) #swarm-dossier.pinned{display:none;}
+  #swarm-dossier.pinned #swarm-dossier-close{display:none;}
+  #swarm-dossier.pinned .sd-fold{cursor:pointer;}
+  #swarm-dossier.pinned.folded .sd-badge{display:block;}
+  #swarm-dossier.pinned .sd-chev{display:inline-block;align-self:center;width:8px;height:8px;
+    border-right:1.5px solid var(--cyan);border-bottom:1.5px solid var(--cyan);transform:rotate(45deg);
+    transition:transform .15s ease;}
+  #swarm-dossier.pinned.folded .sd-chev{transform:rotate(-45deg);}
+  #swarm-dossier.pinned.folded #swarm-dossier-body{display:none;}
+  #swarm-dossier.pinned .swarm-sync{display:inline-flex;align-items:center;gap:6px;visibility:hidden;
+    color:var(--cyan);font-size:var(--fs-caption);font-weight:400;white-space:nowrap;}
+  #swarm-dossier.pinned .swarm-sync::before{content:'';width:11px;height:11px;flex:none;
+    border:1px solid var(--cyan-dim);border-top-color:var(--cyan);border-right-color:var(--cyan);border-radius:50%;}
+  #swarm-dossier.pinned.updating .swarm-sync{visibility:visible;}
+  #swarm-dossier.pinned.updating.scan-motion .swarm-sync::before{animation:swarm-intel-scan .7s linear infinite;}
+
+  #market .mkbox{width:53.4vw;max-height:54.5vh;}
+  #trader .trbox{width:40vw;max-height:60vh;}
+  #ally .albox{width:40vw;max-height:60vh;}
+  #constructor .cnbox{width:53.4vw;max-height:60vh;}
+  #endscreen .es-box{width:min(440px,62.5vw);max-height:61vh;}
+  #connect .cbox,#connect .cwrap{width:min(520px,62.5vw);}
+  #connect .ccrest .wm{font-size:clamp(20px,4.33vw,26px);letter-spacing:clamp(3px,1.33vw,8px);}
+  #connect .ccrest .wtag{letter-spacing:clamp(2px,.93vw,5px);}
+  /* skirmish setup on PC: two card-columns — the match (map choice, start world on the
+     map, pace) | the sides (your house, council, rivals) — instead of one narrow scrolling
+     stack. The map grows into the free height; each column scrolls on its own; the title
+     and the button row never leave the screen (UIX-16.1). */
+  #setup .sbox{width:min(1080px,62vw);height:auto;max-height:61vh;padding:18px;
+    border:1px solid var(--sf-panel-edge);border-radius:18px;box-shadow:var(--sf-shadow);}
+  #setup .spane{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr);
+    gap:16px;overflow:hidden;}
+  #setup .scol{display:flex;flex-direction:column;gap:12px;min-height:0;overflow-y:auto;border:1px solid var(--sf-edge);
+    border-radius:14px;padding:16px 18px;background:var(--sf-card-off);}
+  #setup .smap{flex:1 1 0;height:auto;min-height:220px;}
+  #setup .sgo{flex:0 1 340px;margin-left:auto;}
+  #updbar{width:min(440px,calc(66.7vw - 20px));}
+  #testmode .tmbox{width:min(620px,64vw);max-height:61vh;}
+  #sandbox .sbx-box-w{width:min(460px,44vw);max-height:61vh;}
+  #emblempick .ep-box{width:min(340px,61vw);}
+  #corp .corpbox{width:53.4vw;max-height:61vh;}
+  #railtools #rail-settings,#railtools #rail-exit{display:grid;}
+  /* speedbar on PC: exit (⌂) lives in the rail and ▶▶ is dropped; the multiplier set
+     swaps to ×1/×1800/×3600/×7200. (The whole bar's show/hide rides the dev toggle in main.ts.) */
+  .spd .spd-pc-hide{display:none;}
+  .spd .spd-mult-legacy{display:none;}
+  .spd .spd-mult-pc{display:contents;}
+  /* забег (правило 6): ⌂ на ПК спрятан, и черте перед ним разделять нечего */
+  .spd.spd-run .sep{display:none;}
+  /* base (portrait) bottom-sheet panel + the bars it lifts (замер --sheeth, 22.5vh —
+     фолбэк: третья копия той же догадки, из-за которой дыра между рядом и листом
+     вылезала «иногда» — на конкретной раскладке) */
+  #side{max-height:22.5vh;}
+  body.sheet-open #cmdbar,body.sheet-open #speedbar{bottom:calc(var(--sheeth,22.5vh) + 12px);}
+  #fps{top:120px;}
+  /* PC: the docked dossier pane is retired — the dossier follows the cursor as a
+     translucent tooltip instead (#objtip, filled/positioned by main.ts). The tooltip
+     is deliberately NOT in the zoom list (JS places it at pointer coords, and zoom
+     would double them) — its type is therefore sized at 1.5× directly. */
+  #side .pdesc{display:none;}
+  /* Подсказка наведения выше плавающих окон (40) и оверлеев панелей (60): иначе плитка в окне
+     флота открывала её ПОД самим окном (плейтест 2026-09-26). */
+  #objtip{position:fixed;left:0;top:0;z-index:61;display:none;pointer-events:none;opacity:.8;
+    width:max-content;max-width:min(460px,32vw);padding:12px 15px;
+    background:rgba(3,14,18,.95);border:1px solid var(--line-hi);border-radius:9px;
+    box-shadow:0 6px 24px rgba(0,0,0,.55),inset 0 0 0 1px rgba(53,214,230,.06);}
+  #objtip .pd-title{font-size:18px;font-weight:700;color:#eafffb;
+    margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid var(--line);}
+  #objtip .pd-title:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+  #objtip .pd-body{font-size:16px;line-height:1.55;color:#9fc9c4;}
+  #objtip .hl{font-style:normal;font-weight:700;color:var(--amber);text-shadow:0 0 7px rgba(255,180,58,.35);}
+  /* main menu (hub): don't stretch the console across the whole monitor — a
+     centred column at 80% of the screen; the hub's backdrop still fills it all */
+  #hub .hub-banner,#hub .hub-id,#hub .hub-body,#hub .hub-note,#hub .hub-nav{
+    width:80%;margin-left:auto;margin-right:auto;
+    border-left:1px solid var(--line-hi);border-right:1px solid var(--line-hi);}
+}
+/* --pcz ladder: shrink the PC HUD magnification as the window gets shorter so the top
+   bar, devline and bottom rail stop clipping the interface off the top and bottom edges.
+   Same source order = later (smaller max-height) match wins; 1.5× is kept for tall
+   monitors. PC-gated, so mobile/touch layouts never see it. */
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:859px){:root{--pcz:1.4;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:759px){:root{--pcz:1.3;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:679px){:root{--pcz:1.2;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:599px){:root{--pcz:1.1;}}
+/* the right-dock panel layout (the ≥900px landscape query above) re-stated at
+   vw/vh ÷ 1.5 for the zoomed PC HUD — those base rules would otherwise scale
+   to 60vw-wide panels and off-screen heights */
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (orientation:landscape){
+  /* Панель докована сверху (top: --tbh + 28px), поэтому её потолок — ровно остаток
+     ВИДИМОГО окна под шапкой и devline, минус те же 14px воздуха, что у нижнего ряда.
+     Прежняя формула (66.7vh - 88px) вычитала «на глазок» 88px вместо реальных 112 и
+     считала зум всегда полуторным: на 1920×935 панель уезжала на 36px под нижний край
+     окна, унося с собой конец очереди стройки (и подсвеченную цель обучения). */
+  #side{width:min(380px,26.7vw);max-height:calc(var(--vph) - var(--tbh) - 42px);}
+  #cmdbar{left:calc((100% - min(380px,26.7vw)) / 2);}
+  /* time controls hug the right edge — clear of the (now shorter) sector panel and
+     of the fleet command bar centred over the map */
+  #speedbar,body.sheet-open #speedbar{right:14px;}
+  body.sheet-open #cmdbar,body.sheet-open #speedbar{bottom:14px;}
+}
+/* Плотная подача секторной панели на ПК — единственная: тесные отступы, мельче
+   чипы/строки/плитки, подпись шапки в строку с именем мира. Раньше это жило под
+   тумблером «Компактный режим меню» (класс body.compact-panel, выкл по умолчанию);
+   тумблер снят, правила стали обычной ПК-раскладкой. Чистый рестайл — разметка и
+   поведение панели не при чём. */
+@media (min-width:900px) and (hover:hover) and (pointer:fine){
+  #side .pscroll{padding:8px 10px;}
+  #side .phead{gap:8px;margin:0 0 6px;padding-bottom:6px;}
+  #side .phead .pflag{width:12px;height:12px;}
+  #side .ptitle{display:flex;align-items:baseline;gap:8px;min-width:0;}
+  #side .ptitle b{display:inline;font-size:var(--fs-body);flex:0 0 auto;}
+  #side .ptitle span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-size:var(--fs-caption);}
+  #side .pclose{width:22px;height:22px;font-size:var(--fs-caption);}
+  #side .pstats{gap:5px;margin:2px 0 3px;}
+  #side .pstats span{padding:2px 7px;font-size:var(--fs-caption);}
+  #side .pstats .pl{display:none;} /* icon+number chips, as mocked */
+  #side .sec{margin:8px 0 4px;font-size:var(--fs-caption);padding-bottom:3px;}
+  #side .row{margin:2px 0;}
+  #side .asset-row{gap:6px;margin:3px 0;min-height:20px;padding:3px 7px;}
+  #side .asset-row b{min-width:80px;font-size:var(--fs-caption);}
+  #side .bicon{width:17px;height:17px;font-size:var(--fs-caption);}
+  #side button.b{padding:3px 8px;font-size:var(--fs-caption);}
+  #side .ptabs{gap:5px;margin:7px 0 3px;top:-8px;padding-top:8px;margin-top:-8px;}
+  #side .ptab{padding:4px 8px;}
+  #side .ptiles{gap:5px;margin:3px 0 6px;}
+  #side .ptile{min-width:46px;min-height:40px;padding:4px 5px;}
+  #side .ptile .pt-ic{font-size:15px;}
+  #side .conveyor{margin:4px 0 6px;padding:6px;}
+  #side .hint{font-size:var(--fs-caption);margin-top:6px;}
+}

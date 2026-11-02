@@ -167,6 +167,7 @@ prototype/             то, во что играют: клиент и игро�
   src/matchSetup.ts    newGame: посев партии; src/game.ts — фасад реэкспортов
   netserver.ts         хост HTTP+WS; bundle-netserver.mjs → packages/server/dist/proto-server.mjs
   build.mjs            сборка клиента в HTML-файлы prototype/dist/
+  styles/              листы CSS игры; номер в имени листа — его место в каскаде
   *.mjs                харнесы: selfplay.mjs, perf.mjs, report.mjs, смоуки *test.mjs
 decisions/             чистые решения обоих клиентов, тест рядом (README.md)
 localization/          ru.ts, en.ts (ключ → текст), core.ts (t, tData), runtime.ts, bundles.ts
@@ -556,7 +557,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Клавиши ПК по `KeyboardEvent.code` — `decisions/hotkeys.ts` и `pcHotkeys.ts`. Back и Escape:
   стопка слоёв — `backLayers.ts`, Back без слоёв (предупредить, выйти вторым) — `backGesture.ts`.
 - Вид: текст 12/14/16/20 px (`typeScale` в `packages/client/src/theme.ts` = `--fs-*` в
-  `prototype/build.mjs`), кнопки `.btn-main`/`.btn-second`/`.btn-quiet`/`.btn-x`. Палитра
+  `prototype/styles/01-base.css`), кнопки `.btn-main`/`.btn-second`/`.btn-quiet`/`.btn-x`. Палитра
   `--sf-*` — копия `surfaceTheme` из того же `theme.ts`, равенство держит `surfaceTokens.test.ts`.
 - Настройки (`settingsOverlay.ts`): вкладки Звук · Графика · Карта · Управление · Игра, плюс
   Уведомления там, где браузер умеет push; не влезли в строку — переносятся второй строкой.

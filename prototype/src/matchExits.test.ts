@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { gameCss } from '../gameSheets.mjs';
 import {
   BANNER_FORGOTTEN,
   bannerOffersRestart,
@@ -103,7 +104,7 @@ describe('timeControlsShown', () => {
 
 describe('rule 6 in the markup', () => {
   // Что именно несёт полоса в забеге, решает CSS по классу `spd-run` (его ставит кадр).
-  const css = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+  const css = gameCss();
   const hidden = /\.spd\.spd-run ([^{]+)\{display:none;\}/.exec(css)?.[1] ?? '';
 
   it('hides the pace multipliers of both sets, but keeps the pause — it lives here now', () => {

@@ -1,0 +1,21 @@
+:root{color-scheme:dark;--ink:#bfeee6;--dim:#5f8f8c;--cyan:#35d6e6;--line:#0e3b40;--red:#ff5a4d;}
+body{margin:0;padding:18px;background:#02080e;color:var(--ink);
+  font:13px/1.5 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;}
+h1{font-size:16px;letter-spacing:2px;margin:0;color:var(--cyan);}
+p.sub{margin:2px 0 16px;color:var(--dim);}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+input,select,button,textarea{font:inherit;color:var(--ink);background:#041016;
+  border:1px solid var(--line);border-radius:2px;padding:6px 9px;}
+input:focus,select:focus,textarea:focus{outline:1px solid var(--cyan);}
+h2{font-size:14px;letter-spacing:1px;margin:22px 0 10px;color:var(--cyan);}
+#a-news-form input:not([type]),#a-news-form textarea{flex:1 1 280px;max-width:370px;}
+#a-news-list{margin-top:10px;}
+button{cursor:pointer;border-color:var(--cyan);}
+button:hover{background:#062028;}
+button.kick{border-color:var(--red);color:var(--red);}
+button.kick:hover{background:#2a0d0b;}
+#a-status{min-height:20px;color:var(--dim);}
+#a-meta{color:var(--dim);margin:10px 0;}
+table{border-collapse:collapse;width:100%;max-width:760px;}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);}
+th{color:var(--dim);font-weight:normal;text-transform:uppercase;letter-spacing:1px;}

@@ -1,0 +1,923 @@
+:root{
+  --tbh:84px; /* total #top height (row 1 + resource row) — offsets below hang off it */
+  /* resource accent colours (mock): gold coins / steel cube / green sprout /
+     orange bolt / orchid chip — inherited everywhere a resource token appears */
+  --rc-credits:#d9b872;--rc-metal:#bfc8dc;--rc-food:#8ccf96;--rc-energy:#f09a52;
+  --rc-microelectronics:#d795cf;
+  /* Валюты Sector Zero (PVR-6.3, решение владельца 2026-09-23): несут смысл, как --rc-*.
+     Суверены — донат, золото; Варранты — валюта магазина и кузни, фиолетовый; данные — cyan. */
+  --cur-sovereigns:#f2c14e;--cur-warrants:#b48cff;--cur-data:#35d6e6;
+  /* Редкость предмета (PVR-6.4) — лестница героев, hero-progression §0.2: простой зелёный,
+     уникальный синий, мифический фиолетовый, легендарный красный. */
+  --rar-simple:#5fd07a;--rar-unique:#4aa8ff;--rar-mythic:#bb7dff;--rar-legendary:#ff5f57;
+  --cyan:#35d6e6;--cyan-dim:#1c6f78;
+  --grn:#5ff0c0;--grn-dim:#2b7a66;
+  --red:#ff5a4d;--amber:#ffb43a;
+  --ink:#bfeee6;--dim:#5f8f8c;
+  --line:#0e3b40;--line-hi:#1d6b70;
+  --glass:rgba(3,14,18,.82);
+  --void:#030810; /* holographicTheme.void — opaque loading surface */
+  --up:#5ff0a8;--dn:#ff7a6a;--p1:#35d6e6;
+  /* Меню-экраны: настройка схватки, выбор места и остальная семья хаба (UIX-15) — одна палитра
+     на телефоне и ПК. Копия surfaceTheme из packages/client/src/theme.ts, правятся парой
+     (сторож — surfaceTokens.test.ts). Акцент — прежний cyan: var(--cyan) раскрывается здесь,
+     в :root, поэтому голографический вид, где --cyan бледнее, акцент экранов не перекрашивает. */
+  --sf-text:#e2f1f6;--sf-dim:#a9c6d1;--sf-head:#b4d3dd;--sf-hi:#f2fdff;
+  --sf-card:rgba(8,26,38,.72);--sf-card-off:rgba(6,18,27,.5);--sf-inset:rgba(4,16,25,.9);
+  --sf-edge:rgba(118,206,229,.32);--sf-edge-hi:rgba(140,233,242,.7);
+  --sf-panel-from:rgba(10,30,43,.985);--sf-panel-to:rgba(3,12,23,.985);--sf-panel-edge:rgba(118,206,229,.45);
+  --sf-panel:linear-gradient(155deg,var(--sf-panel-from),var(--sf-panel-to));
+  --sf-accent:var(--cyan);
+  --sf-sel:color-mix(in srgb,var(--cyan) 14%,transparent);
+  --sf-primary:linear-gradient(135deg,color-mix(in srgb,var(--cyan) 32%,transparent),color-mix(in srgb,var(--cyan) 8%,transparent) 70%);
+  --sf-primary-hi:linear-gradient(135deg,color-mix(in srgb,var(--cyan) 42%,transparent),color-mix(in srgb,var(--cyan) 12%,transparent) 70%);
+  --sf-glow:0 0 0 1px color-mix(in srgb,var(--cyan) 15%,transparent),0 10px 32px color-mix(in srgb,var(--cyan) 16%,transparent);
+  --sf-shadow:0 18px 50px rgba(0,0,0,.6);
+  --sf-font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;
+  /* Шкала текста (UIX-1.2): четыре размера, мельче 12 px ничего. Копия typeScale из
+     packages/client/src/theme.ts, правятся парой (сторож — typeScale.test.ts). На ПК
+     растёт вместе с интерфейсом зумом --pcz (UIX-2.1). */
+  --fs-caption:12px;--fs-body:14px;--fs-heading:16px;--fs-title:20px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{margin:0;overflow:hidden;color:var(--ink);
+  font:var(--fs-body)/1.45 var(--sf-font);font-variant-numeric:tabular-nums;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  overscroll-behavior:none;touch-action:none;
+  background:radial-gradient(125% 105% at 50% 38%,#04141c 0%,#02080e 58%,#01040a 100%);}
+/* Тело не выделяется (п. 1.6.1.8), а поле ввода обязано: иначе в Safari не вставить текст. */
+input,textarea{user-select:text;-webkit-user-select:text;}
+/* Clear optical projection: thin vector strokes stay sharp without a CRT overlay. */
+#map{position:fixed;inset:0;z-index:0;display:block;touch-action:none;}
+#sector-zero{position:fixed;inset:0;z-index:58;display:none;}
+
+/* Комикс главы (decisions/chapterComics.ts): поверх всего, кроме баннера обновления.
+   Остальные правила — в sector-zero.css. */
+#comic{position:fixed;inset:0;z-index:90;display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+  background:#01040a;}
+
+/* Map entry: a calm projection surface, actual work progress, original lore. */
+#maploading{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;
+  padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));
+  background:var(--void);font-family:system-ui,sans-serif;}
+#maploading .ml-content{width:min(640px,100%);position:relative;}
+#maploading h1{font:inherit;font-size:15px;color:var(--cyan);margin:0 0 28px;}
+#maploading blockquote{margin:0;min-height:3.8em;font-size:clamp(23px,4vw,36px);line-height:1.35;text-wrap:balance;color:var(--ink);}
+#maploading .ml-work{margin-top:clamp(32px,8vh,80px);}
+#maploading .ml-status{display:flex;justify-content:space-between;gap:16px;font-size:var(--fs-body);min-height:22px;color:var(--ink);}
+#maploading progress{appearance:none;display:block;width:100%;height:3px;margin:12px 0 22px;border:0;background:var(--line);color:var(--cyan);}
+#maploading progress::-webkit-progress-bar{background:var(--line);}
+#maploading progress::-webkit-progress-value{background:var(--cyan);box-shadow:0 0 12px var(--cyan-dim);}
+#maploading progress::-moz-progress-bar{background:var(--cyan);box-shadow:0 0 12px var(--cyan-dim);}
+#maploading button{min-height:44px;padding:10px 16px;border:1px solid var(--line-hi);background:transparent;color:var(--ink);font:inherit;cursor:pointer;}
+#maploading button:focus-visible{outline:2px solid var(--cyan);outline-offset:4px;}
+@media(max-height:420px){#maploading h1{margin-bottom:16px;}#maploading .ml-work{margin-top:20px;}#maploading blockquote{min-height:0;font-size:23px;}}
+/* A failed startup is a stable, readable screen, never an animated empty menu. */
+body.app-starting *,body.app-starting *::before,body.app-starting *::after{
+  animation:none!important;transition:none!important;}
+body.app-starting #map{visibility:hidden;}
+/* BOOT-1: до первого шага скрипта — только фон. Разметка большая, и браузер успевал
+   нарисовать её раньше, чем выполнится скрипт: вход в СТАРОМ виде (без класса консоли
+   `holo-ui`) и без подписей, а через полсекунды — новый. Покров снимает `bootstrap.ts`,
+   уже поставив классы консоли и подписи. */
+body.app-booting > *{visibility:hidden!important;}
+body.app-startup-failed > :not(#startup-error):not(#dev-badge){display:none!important;}
+/* AUD-29: the tab that lost Sector Zero to another tab looks like a stopped start, too. */
+#startup-error,#tab-taken{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:18px;padding:24px;
+  padding-bottom:max(24px,env(safe-area-inset-bottom));background:#041016;
+  color:var(--ink);text-align:center;overflow:auto;touch-action:pan-y;}
+#startup-error[hidden]{display:none;}
+#startup-error h1,#tab-taken h1{font-size:22px;line-height:1.3;margin:0;}
+#startup-error p,#tab-taken p{max-width:440px;margin:0;font-size:15px;line-height:1.5;}
+#startup-code{max-width:100%;overflow-wrap:anywhere;user-select:text;font-size:var(--fs-body);color:#9bb4c1;}
+#startup-retry,#tab-taken button{min-width:160px;min-height:48px;padding:12px 20px;font:inherit;font-size:16px;
+  color:var(--ink);background:#0c313b;border:1px solid var(--cyan);border-radius:10px;}
+#startup-retry:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
+/* «Игра в разработке»: плашка видна на любом экране, но не ловит касания и не занимает
+   места в раскладке; окно согласия — один раз на устройство (`decisions/devNotice.ts`). */
+#dev-badge{position:fixed;z-index:100001;left:50%;transform:translateX(-50%);
+  bottom:max(2px,env(safe-area-inset-bottom));pointer-events:none;user-select:none;
+  font:600 var(--fs-caption)/1.2 var(--sf-font);white-space:nowrap;
+  color:var(--amber);opacity:.5;text-shadow:0 0 4px #000,0 0 2px #000;}
+/* Телефон: снизу стоит панель вкладок — плашка уходит в правый край, в поле экрана. */
+@media (max-width:720px),(max-height:500px){
+  #dev-badge{left:auto;bottom:auto;top:50%;right:max(1px,env(safe-area-inset-right));
+    transform:translateY(-50%);writing-mode:vertical-rl;}
+}
+/* Окно — `<dialog>` через `showModal()`: верхний слой и инертный фон, так что Tab и
+   автофокус входа (`fillWelcome`) не уходят к полям под окном. */
+#dev-notice{width:min(400px,calc(100% - 40px));max-width:none;padding:22px 22px 18px;margin:auto;
+  background:#091b20;border:1px solid var(--amber);border-radius:12px;color:var(--ink);text-align:center;
+  box-shadow:0 0 40px rgba(0,0,0,.6);}
+#dev-notice::backdrop{background:rgba(2,8,14,.82);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
+#dev-notice h2{margin:0 0 10px;font-size:18px;line-height:1.3;color:var(--amber);}
+#dev-notice p{margin:0 0 18px;font-size:15px;line-height:1.5;}
+#dev-notice-ack{min-width:160px;min-height:48px;padding:12px 20px;font:inherit;font-size:16px;cursor:pointer;
+  color:var(--ink);background:#0c313b;border:1px solid var(--cyan);border-radius:10px;}
+#dev-notice-ack:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
+
+/* themed scrollbars — angular neon thumb on a dark grid track, in the HUD's tactical key.
+   Firefox gets the colour pair; WebKit gets the full glow/gradient treatment. */
+*{scrollbar-width:thin;scrollbar-color:var(--cyan-dim) rgba(2,9,13,.5);}
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-track{background:rgba(2,9,13,.55);
+  box-shadow:inset 1px 0 0 var(--line),inset -1px 0 0 var(--line);}
+::-webkit-scrollbar-thumb{border-radius:1px;border:1px solid var(--cyan-dim);
+  background:linear-gradient(180deg,rgba(53,214,230,.5),rgba(28,111,120,.6));
+  box-shadow:inset 0 0 6px rgba(53,214,230,.3),0 0 4px rgba(53,214,230,.15);}
+::-webkit-scrollbar-thumb:hover{border-color:var(--cyan);
+  background:linear-gradient(180deg,var(--cyan),var(--cyan-dim));
+  box-shadow:0 0 10px rgba(53,214,230,.6),inset 0 0 6px rgba(53,214,230,.45);}
+::-webkit-scrollbar-thumb:active{background:linear-gradient(180deg,#8ff4fa,var(--cyan));}
+::-webkit-scrollbar-corner{background:transparent;}
+
+/* Two-row command bar. Row 1 (.tbar): back chevron, round crest-avatar, nick + live
+   standing, the victory chip in the middle gap, day card with a next-day countdown.
+   Row 2 (#purse): the resource capsules. The bottom border is the mock's divider. */
+#top{position:fixed;top:0;left:0;right:0;height:var(--tbh);z-index:30;display:flex;flex-direction:column;
+  background:linear-gradient(180deg,rgba(3,13,18,.94),rgba(2,8,12,.82));border-bottom:1px solid var(--line-hi);
+  box-shadow:0 0 22px rgba(40,200,210,.10),inset 0 -1px 0 rgba(53,214,230,.28);}
+.tbar{display:flex;align-items:center;height:48px;flex:0 0 auto;min-width:0;padding-right:10px;}
+/* the ‹ chevron mirrors the hardware Back (history.back()): close the top layer,
+   or arm the double-press "leave the match" hint */
+#topback{flex:0 0 auto;width:34px;height:100%;border:0;background:transparent;color:#c2ced0;
+  font-size:24px;line-height:1;cursor:pointer;padding:0 0 3px;}
+#topback:active{color:var(--cyan);background:rgba(53,214,230,.12);}
+.crest{display:flex;align-items:center;gap:9px;padding:0 10px 0 2px;height:100%;flex:0 1 auto;min-width:0;cursor:pointer;}
+.crest:active{background:rgba(53,214,230,.12);}
+.dia{width:15px;height:15px;transform:rotate(45deg);flex:0 0 auto;border:1.5px solid var(--cyan);
+  box-shadow:0 0 9px rgba(53,214,230,.7),inset 0 0 5px rgba(53,214,230,.35);}
+/* both identity lines CLIP inside .who. The nick had the ellipsis from the start; the
+   standing did not, and an inline nowrap span in a min-width:0 flex item does not stay
+   inside its box — it spilled right, and the ✦ chip (painted later) covered the half that
+   stuck out. On every phone under ~400px the standing read as garbage under the chip. */
+.who{line-height:1.15;min-width:0;overflow:hidden;}
+.who b{display:block;color:#eafffb;font-weight:700;font-size:var(--fs-body);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.who span{display:block;color:#8b9c9e;font-size:var(--fs-caption);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;}
+/* victory chip in the row-1 gap: the ✦ score race the standing is derived from.
+   Tap → plain-words breakdown (the .dstat handler on #top). Hidden until it has text. */
+#tbscore{flex:0 1 auto;margin:0 auto;padding:3px 10px;border-radius:11px;cursor:pointer;
+  color:var(--ink);font-size:var(--fs-caption);font-variant-numeric:tabular-nums;white-space:nowrap;
+  border:1px solid var(--line);background:rgba(3,14,18,.55);}
+#tbscore.win{color:var(--up);border-color:rgba(95,240,168,.5);font-weight:700;}
+#tbscore:empty{display:none;}
+/* кошелёк профиля в шапке забега (runWallet.ts) — вместо эмблемы, очков и дня */
+#tbwallet{display:flex;align-items:center;gap:8px;margin-left:auto;}
+#tbwallet[hidden]{display:none;}
+/* Валюта — кнопка: тап раскрывает её описание (.tw-info). Значок крупный, шапке забега места
+   хватает (заказ владельца 2026-09-24: «увеличить иконки, а то вон сколько места»). */
+:is(#tbwallet,#hubwallet) .tw-cur{display:inline-flex;align-items:center;gap:6px;padding:3px 12px 3px 9px;border:1px solid currentColor;border-radius:999px;
+  background:color-mix(in srgb,currentColor 12%,transparent);font:600 var(--fs-body)/1.4 var(--sf-font);font-variant-numeric:tabular-nums;font-variant-numeric:tabular-nums;
+  cursor:pointer;}
+:is(#tbwallet,#hubwallet) .tw-cur i{font-style:normal;font-size:19px;line-height:1;}
+#tbwallet .tw-cur[aria-expanded="true"]{box-shadow:0 0 0 2px color-mix(in srgb,currentColor 45%,transparent);}
+:is(#tbwallet,#hubwallet) .tw-cur:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
+#tbwallet .tw-info{position:absolute;top:calc(100% + 6px);right:0;z-index:40;margin:0;width:max-content;
+  max-width:min(320px,calc(100vw - 24px));padding:10px 14px;border-radius:10px;border:1px solid currentColor;
+  background:rgba(4,14,18,.97);box-shadow:0 6px 20px rgba(0,0,0,.5);font:500 var(--fs-body)/1.45 system-ui,sans-serif;white-space:normal;}
+#tbwallet .tw-info.tw-sovereigns{color:#ffd978;border-color:rgba(255,207,98,.8);}
+#tbwallet .tw-data{color:var(--cur-data);}
+:is(#tbwallet,#hubwallet) .tw-warrants{color:var(--cur-warrants);}
+/* Суверены в кошельке — та же золотая стеклянная плашка, что фишка на карте (.dl-donate,
+   заказ владельца 2026-09-24 «сделай красивой»): тёмное стекло, золотая кромка, светящийся
+   самоцвет, число золотым градиентом; «+» — золотая клавиша, приставленная к плашке. */
+#tbwallet .tw-sovereigns{color:#ffd978;font-weight:800;border-color:rgba(255,207,98,.75);
+  background:linear-gradient(180deg,rgba(66,46,8,.94) 0%,rgba(26,18,4,.96) 100%);
+  box-shadow:0 0 10px rgba(255,186,52,.28),inset 0 1px 0 rgba(255,238,176,.28);}
+#tbwallet .tw-sovereigns i{display:grid;place-items:center;width:18px;height:18px;color:#fff1bf;
+  filter:drop-shadow(0 0 4px rgba(255,196,70,.9));}
+#tbwallet .tw-sovereigns i svg{display:block;width:18px;height:18px;fill:rgba(255,190,56,.55);stroke-width:1.2;}
+/* «+» у Суверенов раскрывает кнопку ролика под кошельком (run.sovereigns) */
+#tbwallet{position:relative;}
+#tbwallet .tw-plus{min-width:24px;height:24px;margin-left:-5px;border-radius:7px;border:1px solid #fff0b8;cursor:pointer;
+  font:900 15px/1 system-ui,sans-serif;color:#3b2500;
+  background:linear-gradient(180deg,#ffec9e 0%,#ffc93f 55%,#e59a17 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65),inset 0 -1px 0 rgba(120,70,0,.5),0 0 8px rgba(255,190,60,.55);
+  transition:transform .12s,filter .2s;}
+#tbwallet .tw-plus:hover{filter:brightness(1.1);transform:translateY(-1px);}
+#tbwallet .tw-plus:active{transform:translateY(1px);}
+#tbwallet .tw-plus:focus-visible{outline:2px solid #ffe28a;outline-offset:2px;}
+#tbwallet .tw-ad{position:absolute;top:calc(100% + 6px);right:0;z-index:40;white-space:nowrap;padding:8px 14px;border-radius:10px;
+  border:1px solid rgba(255,207,98,.8);color:#ffd978;font:700 var(--fs-body)/1.3 system-ui,sans-serif;cursor:pointer;
+  background:linear-gradient(180deg,rgba(66,46,8,.97) 0%,rgba(26,18,4,.98) 100%);
+  box-shadow:0 6px 20px rgba(0,0,0,.5),0 0 14px rgba(255,186,52,.3),inset 0 1px 0 rgba(255,238,176,.28);}
+#tbwallet .tw-ad:hover{filter:brightness(1.12);}
+/* day card: current game day over a countdown to the next one. Mock palette: neutral
+   outline, teal day, grey countdown. */
+#daycard{flex:0 0 auto;margin-left:10px;padding:5px 12px;border-radius:10px;text-align:center;
+  border:1px solid rgba(148,170,173,.28);background:rgba(6,14,16,.5);}
+#daycard b{display:block;color:#8fdbe0;font-size:var(--fs-body);}
+#daycard span{color:#8b9c9e;font-size:var(--fs-caption);font-variant-numeric:tabular-nums;}
+/* «до след. дня» is a separate node so narrow phones can drop the caption and keep the
+   digits — see the @media (max-width:480px) rule further down. */
+#tbetacap{margin-left:4px;}
+/* the five currencies always fit their row — no scroll. Capsules share the width and
+   shrink together (flex:1 1 0; min-width:0) so the row scales down instead of
+   overflowing. Each capsule = a bare line-glyph + tabular amount + flow, in the mock's
+   MUTED palette: neutral grey outline, grey icon, near-white number (no cyan glow). */
+#purse{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;gap:0;padding:0 8px 4px;}
+/* Содержимое плашки прозрачно для указателя: цель клика — сама плашка .res, которая
+   переживает обновление чисел (patchPurse в main.ts), а не её цифры, пересоздаваемые кадром. */
+#purse .res *{pointer-events:none;}
+.res{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;height:100%;flex:1 1 0;min-width:0;
+  position:relative;overflow:hidden;border:1px solid transparent;border-right-color:var(--line);border-radius:0;background:transparent;}
+.res:last-child{border-right-color:transparent;}
+.res.short{border-color:rgba(255,90,77,.4);}
+/* amount + flow share one "value line" (.rv); the amount owns the room (flex:0 0 auto),
+   the flow rate clips first (phones stack the two — mobile-console.css). */
+.rv{display:flex;align-items:baseline;justify-content:center;gap:3px;min-width:0;overflow:hidden;flex:0 1 auto;}
+.res em{font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;font-style:normal;white-space:nowrap;
+  flex:0 1 auto;min-width:0;overflow:hidden;}
+.res em.up{color:var(--grn,#5ff0a8);}
+.res em.dn{color:var(--red,#ff5a4d);}
+.res.dead{opacity:.34;}
+/* bare icon, no boxed background. The icon is an inline SVG (stroke:currentColor),
+   tinted with the resource's accent colour; the number stays near-white. */
+.res i{flex:0 0 auto;font-style:normal;font-size:14px;line-height:1;color:#a9bec1;
+  font-variant-emoji:text;}
+.res i svg{display:block;width:15px;height:15px;}
+.res[data-res="credits"] i{color:var(--rc-credits);}
+.res[data-res="metal"] i{color:var(--rc-metal);}
+.res[data-res="food"] i{color:var(--rc-food);}
+.res[data-res="energy"] i{color:var(--rc-energy);}
+.res[data-res="microelectronics"] i{color:var(--rc-microelectronics);}
+/* deficit wins over the accent — a resource in the red reads RED, as before */
+.res.short i{color:var(--red,#ff5a4d);text-shadow:0 0 6px rgba(255,90,77,.5);}
+/* resource-tinted tokens in prose (costs, market rows, tech/yield lines).
+   [data-desc] covers the division designer's self-describing cost spans. */
+.rc-credits,[data-desc="res:credits"]{color:var(--rc-credits);}
+.rc-metal,[data-desc="res:metal"]{color:var(--rc-metal);}
+.rc-food,[data-desc="res:food"]{color:var(--rc-food);}
+.rc-energy,[data-desc="res:energy"]{color:var(--rc-energy);}
+.rc-microelectronics,[data-desc="res:microelectronics"]{color:var(--rc-microelectronics);}
+/* Inline resource icon (curIc): the SAME SVG the top bar draws, sized for prose and
+   sitting on the text baseline. One icon + one accent everywhere — the bar teaches
+   the player once, every cost/market/tech line reads instantly after that. */
+.ri{display:inline-flex;vertical-align:-2px;}
+.ri svg{display:block;width:13px;height:13px;}
+/* A cost chip (cost()): icon + amount in the resource's accent, tabular digits so
+   stacked prices align. Bare like the bar capsules — no boxes, the colour IS the
+   grouping. */
+.rcost{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;
+  font-variant-numeric:tabular-nums;}
+/* Not enough of this resource: the chip reads RED (deficit wins over the accent,
+   same rule as the bar) and carries the exact gap — «−N», slightly subdued so the
+   price stays the loudest number. */
+.rcost.short{color:var(--red,#ff5a4d);}
+.rcost.short em.lack{font-style:normal;font-size:max(var(--fs-caption),.86em);opacity:.85;
+  text-shadow:0 0 6px rgba(255,90,77,.35);}
+.rcost-free{opacity:.75;}
+/* UI-RES2: суффикс скорости у чипа («/ч», «/д») — приглушён, чтобы громким оставалось
+   ЧИСЛО, а единица читалась как сноска при нём. */
+.rc-per{font-style:normal;font-size:max(var(--fs-caption),.82em);opacity:.6;margin-left:1px;}
+.res b{color:#e6eeef;font-weight:700;font-size:var(--fs-body);font-variant-numeric:tabular-nums;
+  white-space:nowrap;flex:0 0 auto;}
+/* player emblem — a console crest the player picks in the main menu (hub), worn in the
+   TOP-LEFT corner. Tap → player dossier (bubbles to the .crest handler). */
+#crestmark{width:34px;height:34px;border-radius:50%;flex:0 0 auto;cursor:pointer;padding:0;
+  display:grid;place-items:center;font-size:17px;color:var(--cyan);font-variant-emoji:text;
+  background:rgba(3,12,16,.7);border:1px solid var(--line-hi);
+  box-shadow:inset 0 0 10px rgba(53,214,230,.14),0 0 10px rgba(53,214,230,.12);
+  text-shadow:0 0 8px rgba(53,214,230,.5);}
+#crestmark:hover,#crestmark:active{background:rgba(53,214,230,.16);}
+/* PvE wave readout (PVR-1.2) — стоит сразу за часами, потому что это то же измерение:
+   сколько осталось до следующего события мира.
+   КРАСНЫЙ, а не амбер: первая редакция была амберной, и на снимке она оказалась близнецом
+   золотого чипа Суверенов в двух сантиметрах правее — угроза и деньги читались одинаково.
+   Красный (--red) в этой палитре занят опасностью и с золотом не путается.
+   Без пульсации: строка висит весь матч, мигающая угроза на полчаса утомляет и перестаёт
+   читаться как сигнал вообще. */
+/* Задачи забега — мятный чип-кнопка панели (заказ владельца 2026-09-24). Мята, а не
+   красный волны и не золото Суверенов: задача — то, что игрок делает сам, и цвет её
+   меток на карте тот же. Стоит ПЕРЕД волной, чтобы на узком экране не уехать за край. */
+#devline .dl-missions{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;margin-left:10px;padding:2px 10px;
+  border-radius:11px;cursor:pointer;color:#8ff5c8;font:700 var(--fs-body)/1.4 inherit;white-space:nowrap;
+  font-variant-numeric:tabular-nums;background:rgba(143,245,200,.1);border:1px solid rgba(143,245,200,.5);}
+#devline .dl-missions[aria-expanded="true"]{background:rgba(143,245,200,.22);border-color:#8ff5c8;}
+#devline .dl-missions i{font-style:normal;}
+#missionpanel{position:fixed;top:calc(var(--tbh) + 34px);right:18px;z-index:44;width:min(360px,calc(100vw - 24px));
+  max-height:min(60vh,420px);overflow:auto;padding:10px 12px;border-radius:12px;color:var(--ink);
+  background:rgba(4,16,18,.98);border:1px solid rgba(143,245,200,.55);box-shadow:0 8px 28px rgba(0,0,0,.55),0 0 16px rgba(143,245,200,.12);}
+#missionpanel[hidden]{display:none;}
+#missionpanel .mp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#8ff5c8;
+  font-size:var(--fs-body);}
+#missionpanel .mp-close{min-width:32px;min-height:32px;border-radius:6px;font-size:16px;}
+#missionpanel .mp-hint{margin:2px 0 8px;color:var(--dim);font-size:var(--fs-caption);}
+#missionpanel .mp-row{display:grid;grid-template-columns:18px 1fr auto;align-items:center;gap:2px 8px;width:100%;
+  margin:0 0 6px;padding:8px 10px;border-radius:9px;text-align:left;font:inherit;font-size:var(--fs-body);color:var(--ink);
+  background:rgba(143,245,200,.05);border:1px solid rgba(143,245,200,.22);}
+#missionpanel button.mp-row{cursor:pointer;}
+#missionpanel button.mp-row:hover{background:rgba(143,245,200,.12);border-color:rgba(143,245,200,.5);}
+#missionpanel .mp-row.done{opacity:.7;}
+#missionpanel .mp-row.failed{opacity:.6;border-color:rgba(255,90,77,.35);}
+#missionpanel .mp-row.failed .mp-mark,#missionpanel .mp-row.failed .mp-prog{color:#ff8f86;}
+#missionpanel .mp-mark{grid-row:1/3;font-style:normal;color:#8ff5c8;}
+#missionpanel .mp-prog{color:#8ff5c8;font-variant-numeric:tabular-nums;}
+#missionpanel .mp-reward{grid-column:2;display:flex;gap:10px;font-size:var(--fs-caption);font-variant-numeric:tabular-nums;}
+#missionpanel .mp-reward i{font-style:normal;}
+#missionpanel .mp-reward .tw-data{color:var(--cur-data);}
+#missionpanel .mp-reward .tw-warrants{color:var(--cur-warrants);}
+#missionpanel .mp-go{grid-column:3;font-size:var(--fs-caption);color:#8ff5c8;text-decoration:underline;text-underline-offset:2px;}
+#devline .dl-wave .dl-short{display:none;}
+body.mobile-ui #devline .dl-wave .dl-full{display:none;}
+body.mobile-ui #devline .dl-wave .dl-short{display:inline;}
+#devline .dl-wave{flex:0 0 auto;margin-left:10px;padding:2px 9px;border-radius:11px;
+  color:#ffb3aa;font-weight:700;font-size:var(--fs-body);line-height:1;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+  background:rgba(255,90,77,.08);border:1px solid rgba(255,90,77,.42);}
+/* PVR-4.7: осада «Поглощения мира» над своим миром — тревога ярче волны. */
+#devline .dl-siege{flex:0 0 auto;margin-left:10px;padding:2px 9px;border-radius:11px;
+  color:#fff;font-weight:700;font-size:var(--fs-body);line-height:1;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+  background:rgba(255,90,77,.5);border:1px solid #ff5a4d;}
+/* donate currency (Суверены ◆, gold) sits UNDER the resource bar on the status line,
+   pushed to the right end — so the resource chips get the full top-bar width for numbers.
+   Заказ владельца 2026-09-23: фишка — ПРИМАНКА; 2026-09-24: «сделай красивой» — прежняя
+   сплошная жёлтая таблетка спорила с голографическим HUD. Теперь это та же стеклянная
+   плашка, что у HUD, но в золоте: тёмное стекло с золотой кромкой, светящийся гранёный
+   самоцвет, число золотым градиентом и золотая кнопка «+» — пополнить. Живость — мягкое
+   дыхание кромки и редкий блик, а не мигание всей кнопки. */
+/* Строка статуса прокручивается вбок; когда она шире экрана (телефон, сохранение соло,
+   досье Роя), фишка уезжала за край. sticky держит её у правого края всегда. */
+/* …а хвост соседнего чипа, уехавший в правый отступ строки (14px), прячет маска: сама
+   фишка стоит левее отступа и маской не задета. */
+#devline{-webkit-mask-image:linear-gradient(to left,transparent 14px,#000 14px);
+  mask-image:linear-gradient(to left,transparent 14px,#000 14px);}
+:is(#devline,#hubwallet) .dl-donate{position:sticky;right:0;z-index:1;margin-left:auto;flex:0 0 auto;display:flex;align-items:center;
+  gap:7px;height:26px;padding:0 3px 0 6px;border-radius:8px;cursor:pointer;
+  font:800 var(--fs-body)/1 inherit;font-variant-numeric:tabular-nums;white-space:nowrap;
+  background:linear-gradient(180deg,rgba(66,46,8,.94) 0%,rgba(26,18,4,.96) 100%);
+  border:1px solid rgba(255,207,98,.6);
+  box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 8px rgba(255,186,52,.22),inset 0 1px 0 rgba(255,238,176,.28),
+    inset 0 -6px 12px rgba(0,0,0,.35);
+  transition:transform .12s,filter .2s;}
+/* Дыхание — накладка с яркой кромкой и сиянием, у которой меняется только прозрачность; блик
+   ездит сдвигом. Прозрачность и сдвиг крутит композитор, а тень и цвет рамки главный поток
+   перерисовывал каждый кадр: на эмуляции телефона две такие кнопки (строка статуса под хабом
+   и кошелёк хаба) занимали четверть главного потока меню (замер 2026-10-30). */
+:is(#devline,#hubwallet) .dl-donate::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;
+  border:1px solid rgba(255,226,140,.95);box-shadow:0 0 16px rgba(255,196,70,.45);opacity:0;
+  animation:donateBreath 3.2s ease-in-out infinite;}
+:is(#devline,#hubwallet) .dl-donate:hover{transform:translateY(-1px);filter:brightness(1.15);}
+:is(#devline,#hubwallet) .dl-donate:active{transform:translateY(1px);filter:brightness(.95);}
+:is(#devline,#hubwallet) .dl-donate:focus-visible{outline:2px solid #ffe28a;outline-offset:2px;}
+/* самоцвет: заливка гранями + свечение — читается даже крошечным на телефоне */
+:is(#devline,#hubwallet) .dl-donate i{display:grid;place-items:center;width:18px;height:18px;color:#fff1bf;
+  filter:drop-shadow(0 0 4px rgba(255,196,70,.9));}
+:is(#devline,#hubwallet) .dl-donate i svg{display:block;width:18px;height:18px;fill:rgba(255,190,56,.55);stroke-width:1.2;}
+:is(#devline,#hubwallet) .dl-donate b{font-weight:900;color:#ffd978;
+  background:linear-gradient(180deg,#fff6d2 0%,#ffd466 55%,#e9a326 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  text-shadow:0 0 10px rgba(255,190,60,.25);}
+/* «+» — пополнить: золотая клавиша внутри плашки */
+:is(#devline,#hubwallet) .dl-donate em{display:grid;place-items:center;width:20px;height:20px;border-radius:6px;
+  font-style:normal;font-weight:900;font-size:15px;line-height:1;color:#3b2500;
+  background:linear-gradient(180deg,#ffec9e 0%,#ffc93f 55%,#e59a17 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65),inset 0 -1px 0 rgba(120,70,0,.5),0 0 8px rgba(255,190,60,.5);}
+/* блик: узкая светлая полоса раз в несколько секунд; рамка .dl-glint режет её по плашке —
+   сама кнопка не режет, иначе срезала бы и сияние дыхания */
+:is(#devline,#hubwallet) .dl-glint{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;}
+:is(#devline,#hubwallet) .dl-glint::after{content:"";position:absolute;top:-40%;left:-40%;width:22%;height:180%;
+  background:linear-gradient(90deg,transparent,rgba(255,244,200,.45),transparent);transform:rotate(18deg);
+  animation:donateShine 5s ease-in-out infinite;}
+@keyframes donateBreath{0%,100%{opacity:0;}50%{opacity:1;}}
+/* 773% своей ширины (22% плашки) — те же 170% плашки, что проходил прежний left: −40% → 130% */
+@keyframes donateShine{0%,70%{transform:translateX(0) rotate(18deg);}100%{transform:translateX(773%) rotate(18deg);}}
+@media (prefers-reduced-motion:reduce){
+  :is(#devline,#hubwallet) .dl-donate::before{animation:none;opacity:.45;}
+  :is(#devline,#hubwallet) .dl-glint{display:none;}}
+/* ремонт за Суверены в карточке флота (забег Sector Zero): та же золотая плашка в малом */
+.chip-sov{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;font-size:var(--fs-caption);cursor:pointer;
+  color:#ffd978;border:1px solid rgba(255,207,98,.7);border-radius:6px;
+  background:linear-gradient(180deg,rgba(66,46,8,.9),rgba(26,18,4,.92));
+  box-shadow:0 0 8px rgba(255,186,52,.22),inset 0 1px 0 rgba(255,238,176,.25);}
+.chip-sov:hover{filter:brightness(1.15);box-shadow:0 0 12px rgba(255,196,70,.4),inset 0 1px 0 rgba(255,238,176,.25);}
+.chip-sov i{display:grid;place-items:center;width:12px;height:12px;color:#fff1bf;filter:drop-shadow(0 0 3px rgba(255,196,70,.8));}
+.chip-sov i svg{display:block;width:12px;height:12px;fill:rgba(255,190,56,.55);}
+.chip-sov b{font-weight:900;}
+#toasts{position:fixed;left:50%;top:calc(var(--tbh) + 50px);transform:translateX(-50%);z-index:40;display:flex;
+  flex-direction:column;align-items:center;gap:6px;pointer-events:none;max-width:min(92vw,520px);}
+#toasts .toast{pointer-events:auto;cursor:pointer;background:rgba(3,14,18,.88);border:1px solid var(--line-hi);
+  border-radius:3px;padding:7px 12px;font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--fg);
+  box-shadow:0 0 14px rgba(40,200,210,.14);animation:toast-in .18s ease-out;max-width:100%;
+  overflow-wrap:anywhere;line-height:1.45;}
+#toasts .toast.jump{border-color:var(--cyan);}
+/* PT-07: хранилище браузера не принимает записи. Плашка — первая в стопке тостов и не
+   гаснет сама: её снимает удачная запись или ✕. */
+/* Ширина своя (max-content под потолком): стопка стоит от середины экрана, и без неё
+   плашка на телефоне сжималась в половину ширины, в шесть строк. */
+#savewarn{pointer-events:auto;display:flex;align-items:center;gap:6px;width:max-content;max-width:min(92vw,520px);
+  background:rgba(24,15,3,.92);border:1px solid var(--amber);border-radius:3px;padding:0 0 0 12px;
+  font:var(--fs-body) var(--sf-font);color:var(--fg);line-height:1.45;overflow-wrap:anywhere;}
+#savewarn span{padding:7px 0;}
+#savewarn .btn-x{flex:none;width:40px;min-height:40px;margin:2px;border-radius:3px;font-size:20px;line-height:1;}
+#toasts .toast.out{opacity:0;transform:translateY(-6px);transition:opacity .4s ease,transform .4s ease;}
+@keyframes toast-in{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:none;}}
+#speedbar{position:fixed;right:14px;bottom:14px;z-index:24;display:flex;align-items:center;gap:4px;
+  padding:5px 7px;background:rgba(3,12,16,.78);border:1px solid var(--line-hi);border-radius:3px;
+  box-shadow:0 0 16px rgba(40,200,210,.10);transition:bottom .2s ease;}
+/* --sheeth = ИЗМЕРЕННАЯ высота листа (ставит renderPanel через ResizeObserver).
+   34vh здесь — только фолбэк до первого замера: лист растёт по содержимому при
+   max-height:34vh, поэтому догадка в vh отрывала бы плавающие элементы от него. */
+body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
+#fps{position:fixed;top:calc(var(--tbh) + 36px);right:10px;z-index:25;pointer-events:none;
+  font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--grn);opacity:.72;
+  text-shadow:0 0 6px rgba(0,0,0,.85);}
+.spd button{min-width:30px;height:26px;padding:0 5px;border-radius:2px;cursor:pointer;font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;
+  background:transparent;color:var(--dim);border:1px solid var(--line-hi);}
+.spd button.on{background:rgba(53,214,230,.10);color:var(--cyan);border-color:var(--cyan);box-shadow:inset 0 0 8px rgba(53,214,230,.08);}
+.spd .spddiv{width:1px;height:18px;background:var(--line-hi);margin:0 2px;}
+.spd .spdmini{min-width:26px;font-size:var(--fs-caption);opacity:.9;}
+.spd .sep{width:1px;height:18px;background:var(--line-hi);margin:0 4px;flex:0 0 auto;}
+/* забег Sector Zero (matchExits.ts, правило 6): только пауза и его темп — ‖ ▶ ▶▶, на ПК и
+   на телефоне (в дев-забеге ещё ▶▶▶). Множители сбили бы темп забега. */
+.spd.spd-run .spddiv,.spd.spd-run .spd-mult-legacy,.spd.spd-run .spd-mult-pc{display:none;}
+.spd.spd-run #spd-fast{display:inline-block;}
+/* speed-multiplier sets: mobile keeps the legacy chips, PC swaps in 1/30/60/120. The
+   wrappers are display:contents so their buttons flow in the speedbar flex row. */
+.spd .spd-mult-legacy{display:contents;}
+.spd .spd-mult-pc{display:none;}
+#cmdbar{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:26;display:none;align-items:center;
+  gap:6px;padding:6px 8px;background:rgba(3,12,16,.88);border:1px solid var(--line-hi);border-radius:3px;
+  box-shadow:0 0 22px rgba(40,200,210,.14);}
+#cmdbar.show{display:flex;}
+#cmdbar .cmdlabel{color:var(--dim);font-size:var(--fs-caption);padding-right:4px;white-space:nowrap;}
+/* CHAIN-UX: подпись полоски режима «Приказ» — в отличие от .cmdlabel ВИДНА и на
+   телефоне (счётчик шагов и «~T» — суть полоски, не декор) */
+#cmdbar .chlabel{color:var(--cyan);font-size:var(--fs-caption);padding:0 6px;white-space:nowrap;}
+#cmdbar .chlabel b{color:#eafffb;font-variant-numeric:tabular-nums;}
+#cmdbar .chlabel .chhint{color:var(--dim);font-style:normal;}
+#cmdbar .chlabel .chwarn{color:var(--amber,#f5cf6b);cursor:help;}
+/* Вид кнопок ряда — один из трёх стилей (.btn-main/.btn-second/.btn-quiet, UIX-11.1), вместе с
+   состояниями: включённый режим (.on), красный «Стоп» (.danger), серая кнопка с причиной
+   (aria-disabled — нажатие объясняет запрет). Здесь только размер и раскладка. */
+#cmdbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  min-width:48px;height:44px;padding:4px 7px;font-size:var(--fs-caption);border-radius:9px;}
+#cmdbar button .ci{font-size:17px;line-height:1;}
+#cmdbar button .cl{font-size:var(--fs-caption);}
+/* 🔥 режим огня: поповер-меню над командным рядом (одна кнопка → выбор режима) */
+#cmdbar .cmdpop{position:absolute;bottom:calc(100% + 8px);right:0;display:flex;flex-direction:column;gap:4px;
+  padding:6px;background:rgba(3,12,16,.94);border:1px solid var(--line-hi);border-radius:3px;
+  box-shadow:0 0 18px rgba(40,200,210,.18);min-width:230px;}
+#cmdbar .cmdpop button{flex-direction:row;justify-content:flex-start;gap:8px;height:auto;min-width:0;
+  padding:7px 10px;text-align:left;}
+#cmdbar .cmdpop button b{font-size:var(--fs-caption);white-space:nowrap;}
+#cmdbar .cmdpop button span{font-size:var(--fs-caption);color:var(--dim);text-transform:none;}
+/* ⮐ окошко авто-отхода (2026-09-23): порог корпуса одним тапом — ряд крупных «таблеток»,
+   текущий порог подсвечен; ниже — где флот соберётся. */
+#cmdbar .cmdpop.cmdpop-retr{min-width:min(300px,88vw);gap:8px;padding:10px;}
+#cmdbar .cmdpop-retr p{margin:0;color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;}
+#cmdbar .cmdpop-retr .retr-row{display:flex;gap:6px;}
+#cmdbar .cmdpop-retr .retr-row button{flex:1;justify-content:center;padding:9px 4px;border-radius:6px;min-height:38px;}
+#cmdbar .cmdpop-retr .retr-row button b{font-size:var(--fs-body);}
+#cmdbar .cmdpop-retr .retr-hint{font-size:var(--fs-caption);color:var(--dim);}
+/* ⇅ десант (GRND-1): тот же поповер, но не список приказов, а строки «кого и сколько».
+   Кнопки в нём — компактные глифы в ряд, поэтому базовые правила .cmdpop button
+   (широкая строка с текстом слева) для .tbtns переопределяются. */
+#cmdbar .cmdpop.tpop{min-width:min(320px,86vw);max-width:min(360px,92vw);gap:0;padding:8px 10px 10px;
+  max-height:min(58vh,420px);overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#cmdbar .tpop .thead{color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;
+  white-space:nowrap;}
+#cmdbar .tpop .tlegend{color:var(--dim);font-size:var(--fs-caption);margin:2px 0 4px;}
+#cmdbar .tpop .trow{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;
+  padding:6px 0;border-top:1px solid var(--line);}
+#cmdbar .tpop .tinfo{display:flex;flex-direction:column;gap:1px;min-width:0;}
+#cmdbar .tpop .tname{display:flex;align-items:center;gap:4px;color:var(--ink);
+  font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#cmdbar .tpop .tcnt{color:var(--dim);font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;font-variant-numeric:tabular-nums;}
+#cmdbar .tpop .tcnt em{color:var(--amber);font-style:normal;}
+#cmdbar .tpop .tbtns{display:flex;align-items:center;gap:3px;}
+#cmdbar .tpop .tbtns button{flex-direction:row;justify-content:center;gap:0;min-width:30px;width:30px;
+  height:30px;padding:0;text-align:center;font-size:var(--fs-body);border-radius:5px;}
+/* пресеты «до упора» — форма и вес отличаются от мелкого шага, чтобы под пальцем
+   ▲ и + не читались как одна кнопка: шаг — вторичная кнопка в рамке, пресет — тихая */
+#cmdbar .tpop .tbtns button.tall{font-size:var(--fs-caption);}
+#cmdbar .tpop .tdelta{min-width:30px;text-align:center;color:var(--dim);
+  font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;font-variant-numeric:tabular-nums;}
+#cmdbar .tpop .tdelta.pos{color:var(--grn);}
+#cmdbar .tpop .tdelta.neg{color:var(--amber);}
+#cmdbar .tpop .tnote{color:var(--dim);font-size:var(--fs-caption);line-height:1.45;margin-top:5px;}
+#cmdbar .tpop .tnote.warn{color:var(--amber);}
+#cmdbar .tpop .tacts{display:flex;gap:8px;margin-top:9px;}
+#cmdbar .tpop .tacts .cbtn{flex-direction:row;justify-content:center;height:auto;min-width:0;
+  padding:9px 8px;text-align:center;}
+/* Ряд команд ПРИВЯЗАН к листу, а не к догадке о его высоте: лист приклеен к низу и
+   растёт по содержимому (max-height:34vh), поэтому короткий лист — мир без построек,
+   флот без груза — оставлял между ними дыру в треть экрана. --sheeth приходит замером
+   (см. renderPanel), 34vh остаётся фолбэком до первого кадра. */
+body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
+
+/* contextual build/ship tiles — live inside the build menu + fleet panel (icon +
+   cost/count); tap one for the full dossier, with a "Build here" action for buildables. */
+.ptiles{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px;}
+.ptile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:54px;min-height:50px;
+  padding:6px 7px;cursor:pointer;background:rgba(53,214,230,.05);border:1px solid var(--line-hi);border-radius:5px;color:var(--cyan);}
+.ptile{position:relative;}
+.ptile.vet{border-color:rgba(240,196,106,.55);}
+.ptile .pt-vet{position:absolute;top:3px;left:4px;line-height:0;}
+.sc-vet{display:flex;align-items:center;gap:6px;margin:4px 0 2px;font-size:var(--fs-caption);color:#f0c46a;}
+.ptile:hover{border-color:var(--cyan);background:rgba(53,214,230,.14);box-shadow:0 0 8px rgba(53,214,230,.25);}
+.ptile:active{background:rgba(53,214,230,.24);}
+/* committed one-per-planet building — dimmed, non-ordering (still hover-describes) */
+.ptile.locked{opacity:.4;cursor:not-allowed;background:rgba(120,140,150,.05);border-color:var(--line);color:var(--dim);}
+.ptile.locked:hover{border-color:var(--line);background:rgba(120,140,150,.08);box-shadow:none;}
+.ptile.locked .pt-ic{color:var(--dim);}
+.ptile .pt-ic{font-size:18px;line-height:1;}
+.ptile .pt-c{font-size:var(--fs-caption);color:var(--dim);white-space:nowrap;}
+.pt-mods{display:flex;flex-wrap:wrap;gap:1px;justify-content:center;max-width:70px;}
+.pt-mod{font-size:var(--fs-caption);line-height:1.1;padding:0 1px;border-radius:2px;white-space:nowrap;}
+/* подпись построенного здания: имя обязано читаться, поэтому плитка растягивается под
+   него и переносит длинное имя в две строки, а не режет многоточием — обрезанное
+   «Salvage Metal…» отвечает на вопрос «что это» не лучше голой иконки */
+.ptile .pt-n{font-size:var(--fs-caption);line-height:1.15;color:var(--ink);text-align:center;max-width:76px;}
+.ptile.built{min-width:70px;padding-left:6px;padding-right:6px;}
+/* Bytro-карточка: SVG-силуэт в тайле + мини-бар корпуса стека */
+.ptile .pt-ic .uglyph{display:block;}
+/* Силуэт-глиф корабля, встроенный в текстовые/inline-слоты меню (кнопки корпусов,
+   строки состава, шапка досье, «построить здесь») — центрируем по строке. */
+.uglyph{vertical-align:middle;}
+.bicon .uglyph,.cx-ic .uglyph,.cn-hic .uglyph,.ch-ic .uglyph{display:block;}
+.ptile .pt-hp{width:36px;height:3px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden;}
+.ptile .pt-hp i{display:block;height:100%;background:#3ad17a;}
+.ptile .pt-hp.low i{background:#ff5a4d;}
+/* числа корпуса стека под полоской: «осталось/всего» (заказ владельца 2026-09-25) */
+.ptile .pt-hpn{font-size:var(--fs-caption);line-height:1;color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums;}
+/* шапочный ХП-бар армии + ненавязчивый золотой чип платного ремонта */
+.hullrow{display:flex;align-items:center;gap:7px;}
+.hullrow .hico{opacity:.8;flex:0 0 auto;}
+.hullrow .hbar{flex:1;height:7px;background:rgba(255,255,255,.09);border:1px solid var(--line);overflow:hidden;}
+.hullrow .hbar i{display:block;height:100%;background:#3ad17a;}
+.hullrow .hbar.low i{background:#ff5a4d;}
+.hullrow .hbar.sh i{background:#35d6e6;}
+.hullrow b{flex:0 0 auto;font-size:var(--fs-caption);}
+.holdmeters{display:grid;gap:8px;margin:8px 0;padding:9px 10px;background:rgba(5,19,29,.65);border:1px solid var(--line);border-radius:8px;}
+.holdmeter-head,.holdmeter-note{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;}
+.holdmeter-head{font-size:var(--fs-caption);color:var(--ink);}
+.holdmeter-head>span{color:var(--hold-color);}
+.holdmeter-head b{font-variant-numeric:tabular-nums;white-space:nowrap;}
+.holdmeter-track{display:flex;height:6px;margin:5px 0;background:rgba(190,219,229,.13);border-radius:2px;overflow:hidden;}
+.holdmeter-track i{display:block;height:100%;background:var(--hold-color);flex:none;}
+.holdmeter-track i.reserved{background:repeating-linear-gradient(120deg,transparent 0 3px,var(--hold-color) 3px 5px);}
+.holdmeter-note{font-size:var(--fs-caption);line-height:1.5;color:#a9bcc6;}
+.holdmeter-loading{color:var(--hold-color);}
+.holdmeter.over .holdmeter-head b,.holdmeter.over .holdmeter-note{color:#ff8b7e;}
+.chip-gold{flex:0 0 auto;padding:3px 8px;font-size:var(--fs-caption);cursor:pointer;color:#ffd76a;
+  background:rgba(255,215,106,.08);border:1px solid rgba(255,215,106,.45);border-radius:4px;white-space:nowrap;}
+.chip-gold:hover{background:rgba(255,215,106,.18);box-shadow:0 0 8px rgba(255,215,106,.25);}
+/* ECON-4: net-подпись «→ N ¤» в биде книги (получатель кредитов платит комиссию) */
+.mk-net{color:var(--dim);font-size:var(--fs-caption);margin-left:6px;}
+/* тап по имени армии (заголовок карточки → сводка) */
+.ptitle-btn{background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:left;
+  color:var(--ink);font:inherit;font-weight:700;letter-spacing:inherit;}
+.ptitle-btn:hover{color:var(--cyan);}
+/* пресеты палитры соперников в настройках */
+.set-pals{flex-wrap:wrap;}
+.set-pal{padding:5px 10px;font-size:var(--fs-caption);cursor:pointer;color:var(--dim);
+  background:rgba(53,214,230,.05);border:1px solid var(--line-hi);border-radius:4px;}
+.set-pal.on{color:var(--cyan);border-color:var(--cyan);background:rgba(53,214,230,.14);}
+/* «Доход ресурсов: в час / в сутки» — выбор из двух значений, кнопки крупнее пресетов палитры. */
+.set-rate .set-pal{min-width:96px;min-height:36px;font-size:var(--fs-body);}
+.set-ctl input[type=color]{width:42px;height:26px;padding:0;border:1px solid var(--line-hi);
+  border-radius:4px;background:none;cursor:pointer;}
+/* mini tile (ground garrison): a nameless icon·count chip — hover/tap dossier names it */
+.ptile.mini{flex-direction:row;gap:6px;min-width:0;min-height:0;padding:7px 11px;}
+.ptile.mini .pt-c{font-size:var(--fs-body);color:var(--ink);font-weight:700;}
+/* long-press name bubble over a codex tile (mobile — touch has no hover/title) */
+#holdtip{position:fixed;z-index:60;display:none;max-width:70vw;padding:6px 10px;pointer-events:none;
+  background:rgba(4,16,22,.96);border:1px solid var(--cyan);border-radius:7px;color:var(--cyan);
+  font-size:var(--fs-body);font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.5);}
+/* ONB-1 spotlight — guide-mark overlay (engine: src/spotlight.ts, adapter: src/spotlightDom.ts).
+   z-50 sits ABOVE the HUD (top-bar 30, toasts 40) but BELOW critical modals (endscreen 56,
+   settings 59, scipick/holdtip 60). The four .sl-dim panels frame the target; the element
+   shows through the gap. .sl-passthrough (action/state steps) lets HUD clicks reach the map;
+   default (tap steps) swallows them so «Далее» is the only way forward. */
+#spotlight{position:fixed;inset:0;z-index:50;display:none;}
+/* Canvas guidance owns this tap. Informational toasts return on the next UI step;
+   the persistent save warning stays available. */
+body:has(#spotlight.sl-map) #toasts .toast{visibility:hidden;}
+#spotlight .sl-dim{position:fixed;background:rgba(2,8,11,.72);pointer-events:auto;}
+/* action/state steps: the player must operate the real HUD — let clicks through AND
+   drop the dimming so the map stays fully legible (only the ring marks the target).
+   BUG (found live: "built the mine window, nothing lets me build"): the four .sl-dim
+   panels going pointer-events:none was not enough — #spotlight ITSELF is a
+   position:fixed;inset:0 box at z-index 50 covering the full viewport, and a plain
+   div defaults to pointer-events:auto, so it kept swallowing every tap in the GAP
+   between the dim panels too (i.e. exactly over the real HUD the player was supposed
+   to operate) on every non-tap step. The root must go passthrough too; .sl-bubble
+   (skip/next) stays clickable because a child's explicit pointer-events:auto
+   overrides an ancestor's :none. */
+#spotlight.sl-passthrough{pointer-events:none;}
+#spotlight.sl-passthrough .sl-dim{pointer-events:none;background:transparent;}
+/* Запертый шаг (.sl-gate, src/tourGate.ts): нажать можно ТОЛЬКО подсвеченное место.
+   Корень пропускает нажатия (иначе он же, как box inset:0, съел бы тап в самом окне —
+   см. разбор выше), а четыре затемняющие панели вокруг цели их ГЛУШАТ и остаются
+   видимыми: тёмный экран с одним светлым окном и есть сообщение «жать сюда». */
+/* Шаг-подсказка про жесты (.sl-hands, src/tourGate.ts, правило 5): без цели пузырёк
+   встаёт по центру экрана — ровно туда, где игрок и будет крутить колесо. Тело пузырька
+   пропускает жест на карту, кликабельными остаются только его кнопки. */
+#spotlight.sl-hands .sl-bubble{pointer-events:none;}
+#spotlight.sl-hands .sl-btns{pointer-events:auto;}
+#spotlight.sl-gate{pointer-events:none;}
+#spotlight.sl-gate .sl-dim{pointer-events:auto;}
+/* Gold blink, not the theme's usual cyan: the ring marks "tap HERE" specifically —
+   it needs to read as a distinct call-to-action against the cyan HUD, not blend into
+   it as one more glowing panel. */
+#spotlight .sl-ring{position:fixed;border:2px solid var(--amber);border-radius:8px;pointer-events:none;
+  box-shadow:0 0 0 2px rgba(255,180,58,.35),0 0 18px rgba(255,180,58,.55);animation:sl-pulse 1s ease-in-out infinite;}
+@keyframes sl-pulse{0%,100%{box-shadow:0 0 0 2px rgba(255,180,58,.12),0 0 8px rgba(255,180,58,.2);opacity:.5;}
+  50%{box-shadow:0 0 0 5px rgba(255,180,58,.6),0 0 28px rgba(255,180,58,.95);opacity:1;}}
+#spotlight .sl-bubble{position:fixed;pointer-events:auto;max-width:min(320px,82vw);
+  background:rgba(4,16,22,.97);border:1px solid var(--cyan);border-radius:10px;padding:13px 15px;
+  box-shadow:0 6px 22px rgba(0,0,0,.55);color:var(--ink);}
+#spotlight .sl-arrow{position:absolute;width:12px;height:12px;background:rgba(4,16,22,.97);
+  border:1px solid var(--cyan);transform:rotate(45deg);}
+#spotlight .sl-arrow[data-dir=up]{top:-7px;left:calc(50% - 6px);border-right:none;border-bottom:none;}
+#spotlight .sl-arrow[data-dir=down]{bottom:-7px;left:calc(50% - 6px);border-left:none;border-top:none;}
+#spotlight .sl-arrow[data-dir=left]{left:-7px;top:calc(50% - 6px);border-right:none;border-top:none;}
+#spotlight .sl-arrow[data-dir=right]{right:-7px;top:calc(50% - 6px);border-left:none;border-bottom:none;}
+#spotlight .sl-count{font-size:var(--fs-caption);font-weight:700;color:var(--cyan);margin-bottom:5px;}
+#spotlight .sl-copy{font-size:14px;line-height:1.42;color:var(--ink);}
+/* UIX-8.1: жесты анимацией вместо абзаца. Плитки (src/spotlightDom.ts, набор —
+   decisions/mapGestures.ts): рисунок жеста, имя, что он делает. Палец и курсор — янтарные,
+   как кольцо цели: это тот же призыв «сделай так». Рисунок без движения тоже читается —
+   при «уменьшить движение» анимация стоит на базовом кадре. */
+#spotlight .sl-gest{display:none;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;}
+#spotlight .sl-g{margin:0;padding:6px 6px 7px;border:1px solid var(--line);border-radius:8px;
+  background:rgba(255,255,255,.03);text-align:center;}
+#spotlight .sl-g svg{display:block;width:64px;height:40px;margin:0 auto 3px;overflow:visible;}
+#spotlight .sl-g figcaption{display:flex;flex-direction:column;gap:1px;line-height:1.25;}
+#spotlight .sl-g b{font-size:var(--fs-body);color:var(--ink);font-weight:600;}
+#spotlight .sl-g span{font-size:var(--fs-caption);color:var(--dim);}
+#spotlight .sl-g .f,#spotlight .sl-press .finger{fill:var(--amber);fill-opacity:.85;}
+#spotlight .sl-g .cur,#spotlight .sl-press .cur{fill:var(--ink);stroke:#04121a;stroke-width:1;stroke-linejoin:round;}
+#spotlight .sl-g .tr{fill:none;stroke:var(--cyan);stroke-width:2;stroke-linecap:round;stroke-dasharray:3 3;opacity:.55;}
+#spotlight .sl-g .rp,#spotlight .sl-press .rp{fill:none;stroke:var(--amber);stroke-width:2;opacity:.45;
+  transform-box:fill-box;transform-origin:center;}
+#spotlight .sl-g .r2{transform:scale(1.6);opacity:.25;}
+#spotlight .sl-g .ring{fill:none;stroke:var(--amber);stroke-width:2.5;stroke-dasharray:100;stroke-dashoffset:25;
+  transform-box:fill-box;transform-origin:center;transform:rotate(-90deg);}
+#spotlight .sl-g .body{fill:none;stroke:var(--ink);stroke-width:2;opacity:.8;}
+#spotlight .sl-g .box{fill:rgba(60,200,230,.08);stroke:var(--cyan);stroke-width:1.5;stroke-dasharray:4 3;
+  transform-box:fill-box;transform-origin:0 0;}
+/* Середина жеста — на 10 px правее и ниже середины цели: палец не закрывает подпись кнопки. */
+#spotlight .sl-press{position:fixed;display:none;width:48px;height:48px;margin:-14px 0 0 -14px;pointer-events:none;}
+#spotlight .sl-press svg{width:48px;height:48px;overflow:visible;}
+#spotlight .sl-press .finger{fill-opacity:.55;stroke:#fff3d6;stroke-width:1.5;transform-box:fill-box;transform-origin:center;}
+#spotlight .sl-press .cur{display:none;}
+@media (hover:hover) and (pointer:fine){
+  #spotlight .sl-press .finger{display:none;}
+  #spotlight .sl-press .cur{display:block;}}
+@media (prefers-reduced-motion:no-preference){
+  #spotlight .sl-g .fa{animation:g-pinch-a 1.8s ease-in-out infinite;}
+  #spotlight .sl-g .fb{animation:g-pinch-b 1.8s ease-in-out infinite;}
+  #spotlight .sl-g[data-anim=swipe] .m,#spotlight .sl-g[data-anim=drag] .m{animation:g-slide 1.8s ease-in-out infinite;}
+  #spotlight .sl-g .r1,#spotlight .sl-g .r2{animation:g-ripple 1.6s ease-out infinite;}
+  #spotlight .sl-g .r2{animation-delay:.22s;}
+  #spotlight .sl-g .ring{animation:g-hold 1.8s linear infinite;}
+  #spotlight .sl-g .wh{animation:g-wheel 1.2s ease-in-out infinite;}
+  #spotlight .sl-g .box{animation:g-box 2s ease-in-out infinite;}
+  #spotlight .sl-g[data-anim=shift-box] .m{animation:g-box-cur 2s ease-in-out infinite;}
+  #spotlight .sl-press .finger,#spotlight .sl-press .cur{animation:g-press 1.4s ease-in-out infinite;}
+  #spotlight .sl-press .rp{animation:g-press-rp 1.4s ease-out infinite;}}
+@keyframes g-pinch-a{0%,15%,100%{transform:translate(0,0);}55%,70%{transform:translate(-9px,5px);}}
+@keyframes g-pinch-b{0%,15%,100%{transform:translate(0,0);}55%,70%{transform:translate(9px,-5px);}}
+@keyframes g-slide{0%,10%{transform:translateX(0);opacity:1;}70%{transform:translateX(32px);opacity:1;}
+  85%{transform:translateX(32px);opacity:0;}100%{transform:translateX(0);opacity:0;}}
+@keyframes g-ripple{0%{transform:scale(.7);opacity:.8;}45%,100%{transform:scale(2.1);opacity:0;}}
+@keyframes g-hold{0%{stroke-dashoffset:100;opacity:1;}65%{stroke-dashoffset:0;opacity:1;}100%{stroke-dashoffset:0;opacity:0;}}
+@keyframes g-wheel{0%,100%{transform:translateY(0);}50%{transform:translateY(5px);}}
+@keyframes g-box{0%,10%{transform:scale(.05);opacity:0;}20%{opacity:1;}70%,90%{transform:scale(1);opacity:1;}100%{transform:scale(1);opacity:0;}}
+@keyframes g-box-cur{0%,10%{transform:translate(0,0);}70%,90%{transform:translate(34px,24px);}100%{transform:translate(34px,24px);opacity:0;}}
+@keyframes g-press{0%,100%{transform:scale(1);}30%{transform:scale(.82);}45%{transform:scale(1);}}
+@keyframes g-press-rp{0%,28%{transform:scale(.6);opacity:0;}32%{opacity:.85;}80%,100%{transform:scale(2.3);opacity:0;}}
+#spotlight .sl-btns{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;}
+#spotlight .sl-skip{background:none;border:none;color:var(--dim);font-size:var(--fs-body);cursor:pointer;padding:4px 2px;}
+#spotlight .sl-skip:hover{color:var(--ink);text-decoration:underline;}
+#spotlight .sl-next{background:var(--cyan);border:none;color:#04121a;font-weight:700;font-size:var(--fs-body);
+  padding:7px 16px;border-radius:7px;cursor:pointer;}
+#spotlight .sl-next:hover{filter:brightness(1.08);}
+/* TRN-2: этапное обучение — «Пропустить этап», «Свернуть» и кнопка «Подсказка», которая
+   остаётся на экране, пока подсказка свёрнута. Кнопки этапа в строке переносятся: на
+   телефоне четыре кнопки в одну строку не встают. */
+#spotlight .sl-btns{flex-wrap:wrap;}
+#spotlight .sl-skip-stage,#spotlight .sl-fold,#spotlight .sl-reveal{background:none;border:1px solid var(--line);color:var(--ink);
+  font-size:var(--fs-body);cursor:pointer;padding:5px 9px;border-radius:6px;}
+#spotlight .sl-skip-stage:hover,#spotlight .sl-fold:hover,#spotlight .sl-reveal:hover{border-color:var(--cyan);}
+#spotlight-chip,#training-resume{position:fixed;z-index:50;bottom:100px;right:14px;background:rgba(4,16,22,.95);
+  border:1px solid var(--cyan);color:var(--cyan);font-weight:700;font-size:var(--fs-body);
+  padding:7px 12px;border-radius:16px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5);}
+#spotlight-chip:hover,#training-resume:hover{filter:brightness(1.1);}
+/* codex popup — full stats + description on tile click */
+#codex{position:fixed;inset:0;z-index:46;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#codex.show{display:flex;}
+#codex .cxbox{width:min(440px,94vw);max-height:84vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
+  border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.cx-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-hi);}
+.cx-head .cx-ic{font-size:22px;color:var(--cyan);}
+.cx-head b{font-size:16px;color:#eafffb;flex:1;}
+.cx-head .cx-tag{font-size:var(--fs-caption);color:var(--dim);border:1px solid var(--line);padding:2px 6px;border-radius:2px;}
+/* Число рядом с подписью (замечание владельца 2026-09-25): две колонки вместо строки по краям
+   окна — на ПК окно шириной 800px, и «60» стояло в 700px от «Корпус». Колонка подписей — по
+   самой длинной, но не шире 60%: на узком телефоне длинная подпись переносится. */
+.cx-stats{display:grid;grid-template-columns:fit-content(60%) 1fr;margin-bottom:12px;font-size:var(--fs-body);}
+.cx-stats>.cx-row{display:contents;}
+.cx-stats>.cx-row>span{padding:5px 0;border-bottom:1px solid rgba(14,59,64,.4);}
+.cx-stats>.cx-row>.cx-k{color:var(--dim);padding-right:20px;}
+.cx-stats>.cx-row>.cx-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:left;}
+.udmg{margin:2px 0 12px;}
+.udmg-h{font-size:var(--fs-caption);color:var(--dim);margin-bottom:6px;}
+.udmg-g{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;}
+.udmg-c{display:grid;gap:2px;justify-items:center;text-align:center;padding:6px 2px;border:1px solid rgba(14,59,64,.7);border-radius:6px;background:rgba(10,40,46,.35);min-width:0;}
+.udmg-c b{font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums;}
+.udmg-c span{font-size:var(--fs-caption);color:var(--dim);line-height:1.15;overflow-wrap:anywhere;}
+.udmg-c.off{opacity:.4;}
+.udmg-c b i{font-style:normal;font-size:var(--fs-body);color:var(--dim);font-weight:600;}
+.udmg-h em{font-style:normal;text-transform:none;color:var(--dim);}
+.cx-desc{font-size:var(--fs-body);line-height:1.6;color:#9fc9c4;}
+.cx-build{margin-top:12px;width:100%;padding:12px;cursor:pointer;border-radius:6px;border:1px solid var(--grn-dim);
+  background:rgba(95,240,168,.12);color:var(--grn);font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+.cx-build:active{background:rgba(95,240,168,.24);}
+.cx-close{margin-top:8px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.1);color:var(--cyan);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+
+/* ONB-4 codex/help hub — searchable index over units/buildings/mechanics (pure
+   index: src/codexIndex.ts). Sits at z-45, one below #codex (46) so tapping a
+   result layers the single-article popup on top of the hub. */
+#codexhub{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(1,5,9,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#codexhub.show{display:flex;}
+/* Справочник, открытый из хаба (из арсенала, из «Ещё»), лежит поверх хаба (#hub 52), а не за ним.
+   Класс body.hub-open ставит showHub(); в партии слои остаются прежними. */
+body.hub-open #codexhub{z-index:53;}
+body.hub-open #codex{z-index:54;}
+#codexhub .chbox{width:min(460px,94vw);max-height:86vh;display:flex;flex-direction:column;background:var(--glass);
+  border:1px solid var(--cyan);border-radius:10px;padding:14px 16px 12px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+#codexhub .ch-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-hi);}
+#codexhub .ch-head .cx-ic{font-size:20px;color:var(--cyan);}
+#codexhub .ch-head b{font-size:15px;color:#eafffb;flex:1;}
+#codexhub .ch-search{width:100%;box-sizing:border-box;padding:9px 11px;margin-bottom:10px;border-radius:7px;
+  border:1px solid var(--line-hi);background:rgba(3,12,16,.7);color:var(--ink);font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+#codexhub .ch-search:focus{outline:none;border-color:var(--cyan);}
+#codexhub .ch-body{overflow:auto;}
+#codexhub .ch-sec{font-size:var(--fs-caption);color:var(--dim);margin:8px 0 6px;}
+#codexhub .ch-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:6px;}
+#codexhub .ch-item{display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer;text-align:left;
+  border-radius:7px;border:1px solid var(--line-hi);background:rgba(3,12,16,.6);color:#dfeef2;font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+#codexhub .ch-item:active{background:rgba(53,214,230,.12);border-color:var(--cyan);}
+#codexhub .ch-item .ch-ic{color:var(--cyan);flex:0 0 auto;}
+#codexhub .ch-empty{padding:24px 8px;text-align:center;color:var(--dim);font-size:var(--fs-body);}
+#codexhub .cx-close{margin-top:10px;}
+/* the always-present in-match «?» help button (rail tool) reuses the rail styles */
+/* ONB-3 вводная «впервые» — подсказка одной строкой у низа экрана (UIX-8.1): значок, заголовок,
+   строка и «Понятно». Окно, которое она объясняет, не запирает и не затемняет: нажатия мимо
+   неё проходят насквозь, и первое действие игрока — нажатие или клавиша — её убирает
+   (main.ts). z 61 — над окнами (47) и кабинетами (60), иначе её закрыло бы само
+   объясняемое окно. */
+#intro{position:fixed;left:0;right:0;bottom:0;z-index:61;display:none;justify-content:center;
+  padding:0 max(8px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
+  pointer-events:none;}
+#intro.show{display:flex;}
+#intro .inbox{display:flex;align-items:center;gap:12px;width:min(560px,100%);max-height:42vh;overflow:auto;
+  padding:12px 12px 12px 16px;border:1px solid var(--cyan);border-radius:10px;pointer-events:auto;
+  background:linear-gradient(155deg,rgba(14,40,54,.99),rgba(4,15,24,.99));
+  box-shadow:0 0 0 1px rgba(53,214,230,.45),0 16px 40px rgba(0,0,0,.6);}
+#intro .in-ic{flex:none;font-size:20px;color:var(--cyan);}
+#intro .in-text{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;}
+#intro .in-text b{font-size:15px;font-weight:600;color:#eafffb;}
+#intro .in-text span{font-size:14px;line-height:1.4;color:#cfe9e4;}
+#intro .in-ok{flex:none;min-height:44px;padding:0 16px;cursor:pointer;border-radius:7px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.12);color:var(--cyan);font:700 15px var(--sf-font);font-variant-numeric:tabular-nums;}
+#intro .in-ok:active{background:rgba(53,214,230,.24);}
+/* ONB-5 return digest — "пока тебя не было": events since you left, attention first */
+#recap{position:fixed;inset:0;z-index:57;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#recap.show{display:flex;}
+#recap .rcbox{width:min(440px,94vw);max-height:86vh;display:flex;flex-direction:column;background:var(--glass);
+  border:1px solid var(--cyan);border-radius:10px;padding:14px 16px 12px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+#recap .rc-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:8px;border-bottom:1px solid var(--line-hi);}
+#recap .rc-head .cx-ic{font-size:19px;color:var(--cyan);}
+#recap .rc-head b{font-size:14px;color:#eafffb;flex:1;}
+#recap .rc-body{overflow:auto;}
+#recap .rc-sec{font-size:var(--fs-caption);color:var(--dim);margin:10px 0 6px;}
+#recap .rc-sec.hi{color:var(--amber);}
+#recap .rc-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:8px 10px;margin-bottom:5px;cursor:pointer;
+  border-radius:7px;border:1px solid var(--line-hi);background:rgba(3,12,16,.6);color:#dfeef2;font:500 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;line-height:1.4;}
+#recap .rc-item[data-jump]:active{background:rgba(53,214,230,.12);border-color:var(--cyan);}
+#recap .rc-item .rc-dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto;background:var(--cyan-dim);}
+#recap .rc-item.hi{border-color:rgba(255,180,58,.5);}
+#recap .rc-item.hi .rc-dot{background:var(--amber);box-shadow:0 0 8px rgba(255,180,58,.6);}
+#recap .cx-close{margin-top:10px;}
+/* ONB-7 first-session goals — a small collapsible checklist, onboarding match only.
+   Top-right under the top bar; z-32 above the HUD but below toasts/modals. */
+#goals{position:fixed;top:52px;right:14px;z-index:32;display:none;max-width:min(230px,60vw);}
+#goals.show{display:block;}
+#pirate-intro{position:fixed;top:calc(var(--tbh) + 78px);left:78px;z-index:32;
+  width:min(280px,80vw);padding:12px;background:rgba(4,16,22,.96);border:1px solid #a95e48;
+  border-radius:9px;color:var(--ink);font-size:var(--fs-body);line-height:1.5;}
+#pirate-intro[hidden]{display:none;}
+#pirate-intro .pe-title{color:#ffb399;display:block;padding-right:28px;}
+#pirate-intro .pe-copy{margin:8px 0 10px;}
+#pirate-intro .pe-close{position:absolute;right:4px;top:4px;width:32px;height:32px;border-radius:5px;}
+#pirate-intro .pe-action{min-height:40px;width:100%;border:1px solid #a95e48;border-radius:5px;
+  background:#302128;color:var(--ink);font:inherit;cursor:pointer;}
+body.holo-ui #pirate-intro{left:84px;} /* правее колонки инструментов слева */
+@media(max-width:640px){#pirate-intro,body.holo-ui #pirate-intro{top:auto;left:auto;right:12px;
+  bottom:calc(112px + env(safe-area-inset-bottom,0px));}}
+body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirate-intro{display:none;}
+#goals .gl-box{background:rgba(4,16,22,.94);border:1px solid var(--cyan-dim);border-radius:9px;overflow:hidden;
+  box-shadow:0 4px 16px rgba(0,0,0,.45);}
+#goals .gl-head{display:flex;align-items:center;gap:7px;padding:7px 10px;background:rgba(53,214,230,.08);
+  border-bottom:1px solid var(--line-hi);}
+#goals .gl-head b{flex:1;font-size:var(--fs-caption);color:var(--cyan);}
+#goals .gl-count{font-size:var(--fs-caption);font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
+#goals .gl-tg{width:20px;height:20px;border:none;background:none;color:var(--dim);cursor:pointer;font-size:var(--fs-caption);padding:0;}
+#goals .gl-list{padding:7px 10px 9px;display:flex;flex-direction:column;gap:5px;}
+#goals .gl-item{display:flex;align-items:center;gap:8px;font-size:var(--fs-body);color:var(--dim);line-height:1.3;}
+#goals .gl-item .gl-ck{color:var(--dim);flex:0 0 auto;font-size:var(--fs-body);}
+#goals .gl-item.done{color:#dfeef2;}
+#goals .gl-item.done .gl-ck{color:var(--grn);text-shadow:0 0 8px rgba(95,240,192,.5);}
+/* the collapsed tray — a small badge, not the full header: gives the map its room
+   back instead of just hiding the four rows under a still-full-width bar. */
+#goals .gl-tray{display:flex;align-items:center;gap:5px;min-height:32px;padding:0 10px;
+  border-radius:16px;border:1px solid var(--cyan-dim);background:rgba(4,16,22,.94);
+  color:var(--cyan);font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.45);}
+#goals .gl-tray .gl-count{color:var(--cyan);}
+/* phones: the speed control (⏸▶▶▶ + ×1/×10/×50/×100) wraps onto two ~44px rows
+   above its own bottom:12px anchor — a fixed bottom:70px here used to sit the
+   goals box's lower half right on top of it. Clear the whole stack instead of
+   guessing one row's height. */
+@media (max-width:640px){#goals{top:auto;bottom:calc(120px + env(safe-area-inset-bottom,0px));right:8px;}}
+
+/* player card — tap the top-left crest for your session dossier */
+#playercard{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#playercard.show{display:flex;}
+#playercard .pcbox{width:min(380px,92vw);max-height:86vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
+  border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.pc-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-hi);}
+.pc-head .pc-dia{width:14px;height:14px;transform:rotate(45deg);flex:0 0 auto;border-radius:2px;}
+.pc-head b{font-size:16px;color:#eafffb;flex:1;}
+.pc-head .pc-tag{font-size:var(--fs-caption);color:var(--dim);border:1px solid var(--line);padding:2px 6px;border-radius:2px;}
+.pc-stats{display:flex;flex-direction:column;gap:3px;margin-bottom:10px;}
+.pc-sec{font-size:var(--fs-caption);color:var(--dim);margin:4px 0 6px;}
+.pc-row{display:flex;justify-content:space-between;gap:10px;font-size:var(--fs-body);padding:3px 0;border-bottom:1px solid rgba(14,59,64,.4);}
+.pc-row .pc-k{color:var(--dim);}
+.pc-row .pc-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
+.pc-close{margin-top:10px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.1);color:var(--cyan);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+/* Match dossier → career dossier. Ghost weight: it leaves the match context, so it
+   must not compete with the card's own actions. */
+.pc-dossier{margin-top:10px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--line-hi);
+  background:transparent;color:var(--dim);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+.pc-dossier:active{border-color:var(--cyan);color:var(--cyan);}
+/* resource card — tap a resource chip in the top bar */
+#rescard{position:fixed;inset:0;z-index:51;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#rescard.show{display:flex;}
+#rescard .rc-box{width:min(360px,92vw);max-height:86vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
+  border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.rc-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-hi);}
+.rc-head .rc-ic{width:28px;height:28px;flex:0 0 auto;color:var(--cyan);}
+.rc-head b{font-size:16px;color:#eafffb;flex:1;}
+.rc-stat{display:flex;justify-content:space-between;gap:10px;font-size:var(--fs-body);padding:4px 0;border-bottom:1px solid rgba(14,59,64,.4);}
+.rc-stat .rc-k{color:var(--dim);}
+.rc-stat .rc-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
+.rc-sec{font-size:var(--fs-caption);color:var(--dim);margin:8px 0 4px;}
+.rc-flow{font-size:18px;font-weight:700;text-align:center;padding:8px 0;font-variant-numeric:tabular-nums;}
+.rc-flow.pos{color:#7df0d0;}
+.rc-flow.neg{color:#ff6b6b;}
+.rc-market,.rc-trader{margin-top:12px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan);
+  background:rgba(53,214,230,.12);color:var(--cyan);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+.rc-market:active,.rc-trader:active{background:rgba(53,214,230,.22);}
+/* Пакет снабжения за Суверены (решение владельца 2026-09-24): золото — цвет валюты. */
+.rc-supply{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding:6px 0;font-size:var(--fs-body);}
+.rc-buy{margin-top:8px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cur-sovereigns);
+  background:color-mix(in srgb,var(--cur-sovereigns) 14%,transparent);color:var(--cur-sovereigns);font:600 var(--fs-body)/1.3 system-ui,sans-serif;}
+.rc-buy:disabled{cursor:default;opacity:.45;}
+.rc-note{margin-top:6px;text-align:center;font-size:var(--fs-body);color:var(--dim);}
+.rc-market.disabled{opacity:.4;cursor:default;border-color:var(--line-hi);color:var(--dim);background:transparent;}
+.rc-close{margin-top:8px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.1);color:var(--cyan);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+
+/* settings overlay (hub → «Ещё» → Настройки) — client-only display prefs.
+   UX-SET-1: окно прибито к верху, а не к центру. Вкладки разной высоты («Звук» — две
+   строки, «Карта» — семь), и по центру ряд вкладок прыгал бы под курсором при каждом
+   переключении. */
+#settings{position:fixed;inset:0;z-index:59;display:none;align-items:flex-start;justify-content:center;padding:max(18px,8vh) 18px 18px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#settings.show{display:flex;}
+#settings .setbox{width:min(380px,92vw);max-height:86vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
+  border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.set-row{display:flex;flex-direction:column;gap:9px;padding:6px 0 2px;}
+.set-render-report-text{box-sizing:border-box;width:100%;min-height:180px;resize:vertical;
+  padding:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);
+  font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;user-select:text;-webkit-user-select:text;touch-action:pan-y;}
+.set-lbl{display:flex;flex-direction:column;gap:3px;font-size:var(--fs-body);color:var(--ink);}
+.set-lbl .set-sub{font-size:var(--fs-caption);color:var(--dim);}

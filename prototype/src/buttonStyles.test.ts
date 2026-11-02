@@ -1,13 +1,14 @@
 // Три стиля кнопок (UIX-11.1): главная — действие, ради которого карточка открыта, вторичная —
 // остальные действия, тихая — переход и пояснение. Вид кнопка берёт классом `.btn-main`,
-// `.btn-second`, `.btn-quiet` (лист `build.mjs`), а правило экрана задаёт ей только размер и
-// место. Сторож держит обе половины на переведённых экранах — карточке флота (телефон и ПК),
+// `.btn-second`, `.btn-quiet` (листы `prototype/styles/`), а правило экрана задаёт ей только
+// размер и место. Сторож держит обе половины на переведённых экранах — карточке флота (телефон и ПК),
 // производстве и науке (UIX-11.1), карточке мира, разделении флота, окне боя, рынке, штабе
 // героев, корпорации, итоге партии, входе и обозревателе партий (UIX-11.2), настройке схватки
 // и заставке входа в партию (UIX-16.1), арсенале хаба и его шторке:
 // разметка ставит класс, а лист не красит кнопку поверх него. Правило с id в селекторе
 // перебило бы класс, и кнопка тихо вернулась бы к своему цвету.
 import { readdirSync, readFileSync } from 'node:fs';
+import { gameCss } from '../gameSheets.mjs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { cargoSplit, splitSlots } from '../../decisions/splitPlan';
@@ -26,9 +27,11 @@ beforeAll(() => setLocale('ru'));
 
 const read = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const BUILD = read('../build.mjs');
-const GAME = BUILD.slice(BUILD.indexOf('const css = `'), BUILD.indexOf('const adminCss = `'));
+/** Листы игры (`prototype/styles/`) и разметка страницы из `build.mjs`. */
+const GAME =
+  gameCss() + BUILD.slice(BUILD.indexOf('const css = '), BUILD.indexOf('const adminCss = '));
 const SHEETS: Record<string, string> = {
-  'build.mjs': GAME,
+  'styles/*.css': GAME,
   'bridge-shell.css': read('../bridge-shell.css'),
   'holographic.css': read('../holographic.css'),
   'mobile-console.css': read('../mobile-console.css'),
@@ -495,7 +498,7 @@ describe('крестик ✕ — красная рамка классом .btn-x
           const s = subject(part);
           if (/:not\([^)]*\.btn-x\b/.test(s)) return false; // правило явно обходит крестики
           const bare = s.replace(/::?[\w-]+(\([^)]*\))?/g, '');
-          if (name === 'build.mjs' && part === s && bare === '.btn-x') return false; // сам вид
+          if (name === 'styles/*.css' && part === s && bare === '.btn-x') return false; // сам вид
           return [...bare.matchAll(/[.#][\w-]+/g)].some((m) => marks.has(m[0]));
         }),
       )

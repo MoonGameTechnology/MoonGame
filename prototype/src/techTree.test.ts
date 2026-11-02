@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { gameCss } from '../gameSheets.mjs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t, tData } from '../../localization/runtime';
 import { newGame, data, DAY, HOUR, order, researchTech, advance } from './game';
@@ -263,7 +263,7 @@ describe('дерево технологий — разметка', () => {
   it('вкладки идут СЕТКОЙ, а не лентой с прокруткой — все пять веток видны сразу', () => {
     // Сторож над CSS: у ленты вкладки уезжали за край и до дальних веток надо было
     // досвайпывать. `grid-template-columns` на `.tt-tabs` — то, что это чинит.
-    const css = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+    const css = gameCss();
     const rule = css.match(/\n\.tt-tabs\{([^}]*)\}/);
     expect(rule).not.toBeNull();
     expect(rule![1]).toContain('grid-template-columns');
