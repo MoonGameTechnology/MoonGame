@@ -1072,15 +1072,16 @@ describe('производство — модули открытого отсе�
   });
 
   it('неподходящие корпусу модули свёрнуты в одну строку и разворачиваются', () => {
-    // Защита крейсера: три щита пустоты (для пушек крепости) и завеса роя не встают.
+    // Защита крейсера: три щита пустоты (для пушек крепости), завеса роя и ремонтный
+    // тендер (только флагман героя) не встают.
     const folded = pane({ slot: 1 });
-    expect(folded).toContain(`aria-expanded="false">${t('yard.modules.unfit', { n: 4 })}<`);
+    expect(folded).toContain(`aria-expanded="false">${t('yard.modules.unfit', { n: 5 })}<`);
     expect(folded).not.toContain('cn-mod locked');
     const open = pane({ slot: 1, unfit: true });
     expect(open).toContain(`aria-expanded="true">${t('yard.modules.unfit-hide')}<`);
-    expect((open.match(/cn-mod locked/g) ?? []).length).toBe(4);
-    // Оружие крейсера встаёт всё — сворачивать нечего.
-    expect(pane({ slot: 0 })).not.toContain('data-cnunfit');
+    expect((open.match(/cn-mod locked/g) ?? []).length).toBe(5);
+    // Оружие крейсера: свёрнут один тяговый луч, он только для флагмана героя.
+    expect(pane({ slot: 0 })).toContain(`aria-expanded="false">${t('yard.modules.unfit', { n: 1 })}<`);
   });
 
   it('нет ни одного модуля для отсека — так и сказано, а не пустая колонка', () => {
@@ -1106,8 +1107,8 @@ describe('производство — модули открытого отсе�
     win.fire(click('.cn-mod', { cnmod: 'targeting_array' })); // в открытый отсек оружия
     expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="1"'); // дальше — защита
     win.fire(click('[data-cnsel]', { cnsel: '0' }));
-    win.fire(click('.cn-mod', { cnmod: 'tractor_beam' }));
-    expect(worn(win.html())).toEqual([tData(data.modules.tractor_beam!.name)]);
+    win.fire(click('.cn-mod', { cnmod: 'siege_platform' }));
+    expect(worn(win.html())).toEqual([tData(data.modules.siege_platform!.name)]);
     expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="1"');
   });
 
@@ -1117,8 +1118,8 @@ describe('производство — модули открытого отсе�
     yard.open();
     win.fire(click('.cn-tab', { ctab: 'support' }));
     win.fire(click('.cn-hbtn', { cnhull: 'scout' })); // один отсек системы
-    win.fire(click('.cn-mod', { cnmod: 'salvage_rig' }));
-    expect(win.html()).toContain('data-cnrm="salvage_rig"');
+    win.fire(click('.cn-mod', { cnmod: 'compact_radar' }));
+    expect(win.html()).toContain('data-cnrm="compact_radar"');
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     expect(worn(win.html())).toEqual([tData(data.modules.ion_engine!.name)]);
     expect(win.html()).toContain('data-cnrm="ion_engine"');
@@ -1265,9 +1266,9 @@ describe('производство — редкость и уровень про
     expect(html).toContain('<span class="cn-tst" aria-hidden="true">★2</span>');
     expect(html).toContain(`(${t('rarity.unique')}, ${t('shipcard.stars', { n: 2 })})"`);
     expect(html).toContain(moduleGradeHtml('unique', 2));
-    // ★2 = ×1.2 на вклад модуля и на параметр уникальной ступени: +2.4 скорости, +1.2 защиты.
-    expect(html).toContain(`+2.4 ${t(STAT_KEY.speed!)}`);
-    expect(html).toContain(`+1.2 ${t(STAT_KEY.defense!)}`);
+    // ★2 = ×1.2 на вклад модуля и на параметр уникальной ступени: +1.2 скорости, +0.6 защиты.
+    expect(html).toContain(`+1.2 ${t(STAT_KEY.speed!)}`);
+    expect(html).toContain(`+0.6 ${t(STAT_KEY.defense!)}`);
   });
 
   it('забег: карточка звёздного модуля в колонке отсека — с его звёздами и числом', () => {

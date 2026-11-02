@@ -236,6 +236,20 @@ export const BOMBARD_VOLLEY_SOLO_MIGRATION = {
   toDataHash: STAND_UP_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Lighter ship modules: catalogue 0.1.72 halves the combat and defence numbers of nine
+ *  modules (their base and every rarity line) and the side rarity lines of the radar, cargo,
+ *  siege and mine modules; tractor beam, debris collector and repair tender fit only a hero's
+ *  flagship. Stats and fitting rules only, so a saved world reads as is: a ship already built
+ *  keeps its modules and simply reads the new numbers. */
+export const HALF_MODULES_SOLO_MIGRATION = {
+  fromRules: BOMBARD_VOLLEY_SOLO_MIGRATION.toRules,
+  fromData: BOMBARD_VOLLEY_SOLO_MIGRATION.toData,
+  fromDataHash: BOMBARD_VOLLEY_SOLO_MIGRATION.toDataHash,
+  toRules: '0eb5ffa544097a',
+  toData: '0.1.72',
+  toDataHash: '17cb1050daa7a3',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -258,6 +272,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   WOUNDED_TRANSPORT_SOLO_MIGRATION,
   STAND_UP_SOLO_MIGRATION,
   BOMBARD_VOLLEY_SOLO_MIGRATION,
+  HALF_MODULES_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
