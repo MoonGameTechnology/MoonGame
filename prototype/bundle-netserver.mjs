@@ -19,11 +19,15 @@ import { mkdirSync } from 'node:fs';
  *  там, где pnpm сможет их разрешить — в packages/server/dist, не в prototype/dist. */
 export const outfile = 'packages/server/dist/proto-server.mjs';
 
-export async function bundleNetserver() {
+/** Параметры изолированных сборочных тестов; в рабочем сервере тестового API нет.
+ * @param {{ plugins?: import('esbuild').Plugin[], serverOutfile?: string }} [options]
+ */
+export async function bundleNetserver({ plugins = [], serverOutfile = outfile } = {}) {
   mkdirSync('packages/server/dist', { recursive: true });
   await build({
     entryPoints: ['prototype/netserver.ts'],
-    outfile,
+    outfile: serverOutfile,
+    plugins,
     bundle: true,
     format: 'esm',
     platform: 'node',
@@ -66,7 +70,7 @@ export async function bundleNetserver() {
     outfile: 'packages/server/dist/commerce-migrate.mjs',
     bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg'],
   });
-  return outfile;
+  return serverOutfile;
 }
 
 // Запуск напрямую (`node prototype/bundle-netserver.mjs`) — собрать и выйти. Именно так

@@ -175,10 +175,10 @@ for (const backend of ['memory', 'postgres'] as const)
         expect(await f.economy.upgradeModule(f.accountId, { ...c, allowSoulbound: false })).toEqual(
           { ok: false, code: 'E_SOULBOUND_CONFIRM' },
         );
-        const results = await Promise.all([
-          f.economy.upgradeModule(f.accountId, c),
-          f.economy.upgradeModule(f.accountId, { ...c, requestId: 'second' }),
-        ]);
+        const commands = [c, { ...c, requestId: 'second' }];
+        const results = await Promise.all(
+          commands.map((command) => f.economy.upgradeModule(f.accountId, command)),
+        );
         expect(results.filter((r) => r.ok)).toHaveLength(1);
         expect(await f.market.balance(f.accountId)).toBe(9980);
         expect(await f.arsenal.get(item.itemId)).toMatchObject({ grade: 1, soulbound: true });
@@ -186,7 +186,10 @@ for (const backend of ['memory', 'postgres'] as const)
           ok: false,
           code: backend === 'postgres' ? 'E_NOT_TRADABLE' : 'E_SOULBOUND',
         });
-        expect(await f.economy.upgradeModule(f.accountId, { ...c, mode: 'rarity' })).toEqual({
+        // Either transaction may acquire the PostgreSQL lock first. Only the
+        // committed command owns a receipt whose request id can conflict.
+        const committed = commands[results.findIndex((result) => result.ok)]!;
+        expect(await f.economy.upgradeModule(f.accountId, { ...committed, mode: 'rarity' })).toEqual({
           ok: false,
           code: 'E_IDEMPOTENCY_CONFLICT',
         });

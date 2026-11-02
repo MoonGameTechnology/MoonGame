@@ -42,6 +42,7 @@
     "smoke:diplomacy": "pnpm run prototype && node prototype/diplomacytest.mjs",
     "smoke:registration-reward": "pnpm run prototype && node prototype/registrationrewardtest.mjs",
     "smoke:bots": "node prototype/botpopulationtest.mjs",
+    "smoke:steward": "node prototype/stewardofflinetest.mjs",
     "smoke:bots:chat": "node prototype/botsocialtest.mjs",
     "perf:bots": "node prototype/bot-scheduler-perf.mjs",
     "perf:bots:load": "node prototype/bot-load-perf.mjs",
