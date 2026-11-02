@@ -248,6 +248,8 @@ describe('три стиля кнопок (UIX-11.1)', () => {
     expect(tags).toEqual([
       'openunits:btn-main',
       'openbuild:btn-main',
+      'openbuild:btn-main',
+      'openstation:btn-second',
       'fortress:btn-second',
       'opentech:btn-quiet',
       'forkfortress:btn-main',

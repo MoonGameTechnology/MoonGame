@@ -117,7 +117,7 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
     // `fork_station` on a road fork (see data/seededFortress.test.ts).
     // `empty` stays off combat maps by the owner's ruling (see mapSchema.test.ts).
     const kinds = Object.keys(data.sectorKinds)
-      .filter((k) => k !== 'fork_station' && k !== 'void_station' && k !== 'empty')
+      .filter((k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station' && k !== 'empty')
       .sort();
     expect(has((s) => s.kind)).toEqual(kinds);
     expect(has((s) => s.terrain)).toEqual(Object.keys(data.sectors).sort());

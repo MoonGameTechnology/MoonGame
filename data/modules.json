@@ -148,7 +148,10 @@
       "metal": 40
     },
     "allowed": {
-      "domain": "space"
+      "domain": "space",
+      "excludeTraits": [
+        "immobile"
+      ]
     }
   },
   "targeting_array": {
@@ -607,5 +610,59 @@
         "microelectronics": 20
       }
     }
+  },
+  "station_battery_1": {
+    "name": "Fortress Battery 1",
+    "slot": "weapon",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "attack": 12,
+        "pointDefense": 12
+      }
+    },
+    "cost": {},
+    "allowed": {
+      "units": [
+        "fortress_guns"
+      ]
+    },
+    "rarity": "unique"
+  },
+  "station_battery_2": {
+    "name": "Fortress Battery 2",
+    "slot": "weapon",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "attack": 20,
+        "pointDefense": 20
+      }
+    },
+    "cost": {},
+    "allowed": {
+      "units": [
+        "fortress_guns"
+      ]
+    },
+    "rarity": "mythic"
+  },
+  "station_battery_3": {
+    "name": "Fortress Battery 3",
+    "slot": "weapon",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "attack": 30,
+        "pointDefense": 30
+      }
+    },
+    "cost": {},
+    "allowed": {
+      "units": [
+        "fortress_guns"
+      ]
+    },
+    "rarity": "legendary"
   }
 }

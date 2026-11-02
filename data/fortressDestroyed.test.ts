@@ -162,8 +162,9 @@ describe('гибель крепости — решение владельца 22
     const r = createKernel([stationModule]).applyAction(mine, deploy, ctx(300 * HOUR));
     expect(r.ok, r.ok ? '' : `отказ ${r.code}`).toBe(true);
     if (!r.ok) return;
-    expect(r.state.planets.A?.kind).toBe('void_station');
-    expect(r.state.planets.A?.priorKind, 'новая конверсия обязана запомнить вид заново').toBe('nebula');
+    expect(r.state.planets.A?.kind).toBe('nebula');
+    expect(r.state.planets.A?.priorKind).toBeUndefined();
+    expect(r.state.planets['station-A']?.fortress?.assembly).toBeDefined();
     expect(r.state.players.p1?.resources.metal, 'крепость досталась даром').toBeLessThan(9000);
   });
 

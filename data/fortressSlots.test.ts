@@ -1,3 +1,4 @@
+import { legacyFortressDeploymentContext } from './fixtures/legacyFortress';
 /**
  * СЛОТЫ ПОСТРОЕК (FORT-5.3; решения владельца 10 и 11 — §0.7 роадмапа).
  *
@@ -41,14 +42,14 @@ const act = (type: string, payload: Record<string, unknown>): Action => ({
 });
 /** Поднять крепость и вернуть состояние. */
 function fortress(): GameState {
-  const r = kernel.applyAction(world('asteroid'), act('station.deploy', { planetId: 'A' }), ctx());
+  const r = kernel.applyAction(world('asteroid'), act('station.deploy', { planetId: 'A' }), legacyFortressDeploymentContext(0, data));
   if (!r.ok) throw new Error(`отказ ${r.code}`);
   return r.state;
 }
 const order = (st: GameState, building: string, now = 0): ReturnType<typeof kernel.applyAction> =>
   kernel.applyAction(st, act('building.construct', { planetId: 'A', building }), ctx(now));
 
-describe('слоты построек — решения владельца 10 и 11', () => {
+describe('legacy save compatibility — слоты построек — решения владельца 10 и 11', () => {
   it('крепость 1 уровня вмещает РОВНО ОДНУ постройку, вторая отбивается своим кодом', () => {
     // Второй пункт из шапки: если бы корпус занимал место, эта первая постройка уже не
     // прошла бы, и тест упал бы здесь.

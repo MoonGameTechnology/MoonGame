@@ -383,6 +383,8 @@ export const BuildingLevelSchema = z.object({
 });
 
 export const BuildingDefSchema = z.object({
+  /** Fraction of unshielded fortress damage routed to one internal system. */
+  internalDamageShare: z.number().min(0).max(1).optional(),
   name: z.string(),
   /** Retained for existing worlds and accepted construction orders, but no longer
    *  available for new construction. Omitted on active catalogue entries so old

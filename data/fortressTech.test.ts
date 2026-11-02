@@ -78,7 +78,8 @@ describe('крепость открывается технологией — р�
     const r = deploy(st, 400 * HOUR);
     expect(r.ok, r.ok ? '' : `отказ ${r.code}`).toBe(true);
     if (!r.ok) return;
-    expect(r.state.planets.A?.kind).toBe('void_station');
+    expect(r.state.planets.A?.kind).toBe('asteroid');
+    expect(r.state.planets['station-A']?.fortress?.assembly).toBeDefined();
   });
 
   it('ПРЕДПОСЫЛКА обязательна — технологию крепости не заказать первой', () => {

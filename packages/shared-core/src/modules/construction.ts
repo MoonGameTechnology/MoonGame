@@ -1,3 +1,4 @@
+import { registerConstructionMaintenance } from './construction/maintenance';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type {
   BuildingInstance,
@@ -12,30 +13,27 @@ import type {
 import type { BuildingDef, GameData, ResourceBag, UnitDef } from '../data/schemas';
 import { buildingLevel, buildingMaxLevel } from '../data/schemas';
 import { isBombarded } from '../state/orbit';
-import { fleetAtOwnDock } from '../util/repair';
-import { battleAt, battleLocations } from '../state/battle';
+import { battleAt } from '../state/battle';
 import { forkSiteInBattle } from '../state/forkSite';
 import { allowedBuildings, isBuildable } from '../state/sectorKind';
 import type { Action } from '../action/types';
-import { hoursToMs, timeScaleOf } from '../action/types';
-import { MS_PER_HOUR } from '../util/time';
+import { hoursToMs } from '../action/types';
 import { canAfford, payCost, refundCost } from '../util/treasury';
 import { matchCost, matchUnitCost, matchHours } from '../util/pricing';
 import { buildProgress } from '../util/construction';
 import { isAllied, mitigationFactor, type DamageHookArgs } from '../util/combat';
 import { coverPoints, worldDamageReduction } from '../util/worldCover';
-import { addUnits, mergeStacks } from '../util/stacks';
+import { addUnits } from '../util/stacks';
 import { basedLander, basedMachine, shuttleBayAt } from '../state/shuttle';
 import {
-  bestFleetStat,
-  effectiveStats,
   loadoutCost,
   validateLoadout,
   withBonusSlots,
 } from '../util/loadout';
-import { feedsOnBiomass, isInfected, worksFor } from '../util/infestation';
-import { recordValues } from '../util/records';
+import { isInfected, worksFor } from '../util/infestation';
 import { isBuildLane, orderLane, UNIT_LANES, type BuildLane } from '../state/buildLane';
+import { buildingRepairQuote, stationBerth, FORTRESS_CORE, fortressAssemblyScale,
+  fortressFleetId, refreshFortressBody } from '../state/fortress';
 
 /** Share of the ground assault's round damage that also wears down the planet's
  *  structures (the rest is spent on the defending garrison). Tunable. */
@@ -681,6 +679,10 @@ function damageBuildings(
   recover();
   const survivors: BuildingInstance[] = [];
   for (const b of planet.buildings) {
+    if (planet.fortress && b.type === FORTRESS_CORE) {
+      survivors.push(b); // the core's level record is not a second hull HP pool
+      continue;
+    }
     const def = h.ctx.data.buildings[b.type];
     const maxHp = def ? buildingLevel(def, b.level).hp : 0;
     if (maxHp <= 0) {
@@ -752,6 +754,7 @@ const damageChosenBuildings: BuildingDamage = (h, planetId, hits) => {
     const b = planet.buildings[hit.index];
     const def = b ? h.ctx.data.buildings[b.type] : undefined;
     if (!b || !def || doomed.has(hit.index) || buildingLevel(def, b.level).hp <= 0) continue;
+    if (planet.fortress && b.type === FORTRESS_CORE) continue;
     if (!(hit.amount > 0)) continue;
     b.hp = Math.max(0, b.hp - hit.amount);
     const destroyed = b.hp <= 0;
@@ -798,10 +801,19 @@ const delayFirstOrder: ConstructionDelay = (h, planetId, hours) => {
   if (!first) return null;
   const rest = h.state.scheduled.filter((e) => e !== first);
   const moved = { ...first, at: first.at + hoursToMs(h.ctx, hours) };
+  const p = first.payload as CompletePayload;
+  const site = h.state.planets[planetId];
+  const work = p.kind === 'upgrade' && p.building === FORTRESS_CORE ? site?.fortress?.assembly : undefined;
+  if (site && work) {
+    const readiness = fortressAssemblyScale(site, h.ctx.now);
+    moved.at = Math.max(first.at, work.doneAt) + hoursToMs(h.ctx, hours);
+    Object.assign(work, { from: readiness, startedAt: h.ctx.now, doneAt: moved.at });
+    const body = h.state.fleets[fortressFleetId(site.id)]?.units[0];
+    if (body) refreshFortressBody(site, body, h.ctx.data, readiness);
+  }
   const pos = rest.findIndex((e) => e.at > moved.at || (e.at === moved.at && e.seq > moved.seq));
   rest.splice(pos < 0 ? rest.length : pos, 0, moved);
   h.state.scheduled = rest;
-  const p = first.payload as CompletePayload;
   return {
     kind: p.kind ?? 'building',
     ...(p.building ? { building: p.building } : {}),
@@ -839,16 +851,59 @@ export const constructionModule: GameModule = {
   // 1.8.0: залеченный госпиталем стек сливается с целыми того же вида (раны теперь
   // переживают бой, `combat` 3.10.0).
   // 1.9.0: своя полоса у каждой производственной постройки — верфь, порт, казармы, завод (BLD-2.1).
-  version: '1.9.0',
+  version: '1.10.0',
   setup(api) {
     api.provideCapability<BuildingDamage>('building.damage', damageChosenBuildings);
     api.provideCapability<ConstructionDelay>('construction.delay', delayFirstOrder);
+    api.onAction('building.repair', (action, h) => {
+      const payload = action.payload as { planetId?: string; building?: string; uid?: string };
+      if (typeof payload.planetId !== 'string' || typeof payload.building !== 'string') return h.reject('E_BAD_PAYLOAD');
+      const { planet, player } = ownedPlanet(h, action, payload.planetId);
+      const stopped = suppressed(h, planet.id);
+      if (stopped) return h.reject(stopped);
+      if (planet.fortress && payload.building === FORTRESS_CORE) return h.reject('E_USE_STATION_REPAIR');
+      const instance = payload.uid ? planet.buildings.find((b) => b.uid === payload.uid && b.type === payload.building)
+        : planet.buildings.find((b) => b.type === payload.building);
+      if (!instance || instance.hp <= 0) return h.reject('E_NO_BUILDING');
+      if (instance.repair) return h.reject('E_REPAIR_IN_PROGRESS');
+      const quote = buildingRepairQuote(instance, h.ctx.data);
+      if (!(quote.missingHp > 0)) return h.reject('E_NOTHING_TO_REPAIR');
+      const cost = matchCost(h.state, quote.cost);
+      if (!canAfford(player.resources, cost)) return h.reject('E_INSUFFICIENT');
+      payCost(player.resources, cost);
+      const hours = matchHours(h.state, quote.hours);
+      const doneAt = h.ctx.now + hoursToMs(h.ctx, hours);
+      instance.repair = { owner: action.playerId, remainingHp: quote.missingHp,
+        hpPerHour: quote.missingHp / hours, doneAt };
+      h.schedule(doneAt, 'building.repair.complete', { planetId: planet.id, building: instance.type, uid: instance.uid });
+      h.emit('building.repair.started', { planetId: planet.id, building: instance.type, uid: instance.uid,
+        owner: action.playerId, cost, doneAt });
+    });
+
+    api.on('building.repair.complete', (event, h) => {
+      const p = event.payload as { planetId?: string; building?: string; uid?: string };
+      const planet = p.planetId ? h.state.planets[p.planetId] : undefined;
+      const instance = p.uid ? planet?.buildings.find((b) => b.uid === p.uid)
+        : planet?.buildings.find((b) => b.type === p.building);
+      const repair = instance?.repair;
+      if (!planet || !instance || !repair) return;
+      if (planet.owner !== repair.owner) { delete instance.repair; return; }
+      if (repair.remainingHp > 1e-8) {
+        h.schedule(Math.max(repair.doneAt, h.ctx.now + hoursToMs(h.ctx, repair.remainingHp / repair.hpPerHour)),
+          'building.repair.complete', p);
+        return;
+      }
+      delete instance.repair;
+      h.emit('building.repaired', { planetId: planet.id, building: instance.type, uid: instance.uid, owner: planet.owner });
+    });
+
     api.onAction('building.construct', (action, h) => {
       const payload = action.payload as Partial<ConstructBuildingPayload>;
       if (typeof payload?.planetId !== 'string' || typeof payload?.building !== 'string') {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
+      if (planet.fortress?.assembly?.from === 0) return h.reject('E_UNDER_CONSTRUCTION');
       const stopped = suppressed(h, planet.id);
       if (stopped) {
         return h.reject(stopped); // узел не работает: обстрел либо бой прямо здесь
@@ -956,6 +1011,7 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
+      if (planet.fortress?.assembly?.from === 0) return h.reject('E_UNDER_CONSTRUCTION');
       const stopped = suppressed(h, planet.id);
       if (stopped) {
         return h.reject(stopped); // узел не работает: обстрел либо бой прямо здесь
@@ -1223,7 +1279,10 @@ export const constructionModule: GameModule = {
         return h.reject('E_UNKNOWN_BUILDING');
       }
       const totalDurationMs = hoursToMs(h.ctx, spec.hours);
-      const progress = buildProgress(h.ctx.now, event.at, totalDurationMs);
+      const fortressWork = p.kind === 'upgrade' && p.building === FORTRESS_CORE ? planet.fortress?.assembly : undefined;
+      const progress = fortressWork && p.level !== undefined
+        ? Math.max(0, Math.min(1, fortressAssemblyScale(planet, h.ctx.now) - (p.level - 1)))
+        : buildProgress(h.ctx.now, event.at, totalDurationMs);
       const refund = scaleCost(spec.cost, 1 - progress); // linear, NOT the 50% output threshold
       refundCost(player.resources, refund);
       h.state.scheduled = h.state.scheduled.filter((e) => e.seq !== payload.seq);
@@ -1238,7 +1297,8 @@ export const constructionModule: GameModule = {
         modules: p.modules,
         troop: p.troop,
         progress,
-        remainingHours: spec.hours * (1 - progress),
+        remainingHours: fortressWork ? Math.max(0, fortressWork.doneAt - h.ctx.now) / hoursToMs(h.ctx, 1)
+          : spec.hours * (1 - progress),
         remainingCost: refund,
       };
       planet.pausedConstruction = [...(planet.pausedConstruction ?? []), site];
@@ -1345,6 +1405,11 @@ export const constructionModule: GameModule = {
         h.schedule(h.ctx.now + hoursToMs(h.ctx, 1), 'construction.complete', p);
         return;
       }
+      if (p.building === FORTRESS_CORE && planet.fortress?.assembly &&
+        planet.fortress.assembly.doneAt > h.ctx.now) {
+        h.schedule(planet.fortress.assembly.doneAt, 'construction.complete', p);
+        return;
+      }
       landCompletion(h, planet, p);
       startNextAfter(h, planet, orderLane(h.ctx.data, p));
     });
@@ -1446,8 +1511,9 @@ export const constructionModule: GameModule = {
         if (!instance || !def || instance.level !== p.level - 1) {
           return; // building gone or already changed → drop
         }
+        const wounds = Math.max(0, buildingLevel(def, instance.level).hp - instance.hp);
         instance.level = p.level;
-        instance.hp = buildingLevel(def, p.level).hp;
+        instance.hp = Math.max(0, buildingLevel(def, p.level).hp - wounds);
         syncIssuedGarrison(h, planet);
         h.emit('building.upgraded', {
           planetId: planet.id,
@@ -1465,6 +1531,7 @@ export const constructionModule: GameModule = {
           typeof p.playerId === 'string' ? h.state.players[p.playerId]?.arsenal : undefined;
         const stars = arsenal?.stars;
         const rarity = arsenal?.rarity; // SZE-5.1 — тем же снимком, что звёзды
+        let fleet: Fleet | undefined;
         if (built?.traits.includes('shuttle')) {
           // Готовая машина встаёт в ЭСКАДРУ (SHU-4.2), а не россыпью. Правило живёт в
           // `state/shuttle.ts` — там же, где вся арифметика ангара: своя копия здесь
@@ -1493,6 +1560,15 @@ export const constructionModule: GameModule = {
               stars,
               rarity,
             );
+        } else if (planet.fortress && built?.domain === 'space') {
+          const sequence = (h.state.fleetSeq ?? 0) + 1;
+          h.state.fleetSeq = sequence;
+          const id = `fleet:${p.playerId}:${h.ctx.now}:${sequence}`;
+          const units: UnitStack[] = [];
+          addUnits(units, p.unit, p.count, p.modules, stars, rarity);
+          fleet = { id, owner: p.playerId!, ...stationBerth(h.state, planet),
+            movement: null, units, traits: [], battleId: null };
+          h.state.fleets[id] = fleet;
         } else {
           addUnits(planet.garrison, p.unit, p.count, p.modules, stars, rarity);
         }
@@ -1501,9 +1577,13 @@ export const constructionModule: GameModule = {
           unit: p.unit,
           count: p.count,
           owner: p.playerId,
+          ...(fleet ? { fleetId: fleet.id } : {}),
           ...(p.modules && p.modules.length > 0 ? { modules: p.modules } : {}),
           ...(typeof p.troop === 'string' ? { troop: p.troop } : {}),
         });
+        // Let promotion stamp the fresh stack before arrival can auto-merge its fleet.
+        if (fleet?.edge) h.emit('fleet.parked', { fleetId: fleet.id, edge: fleet.edge });
+        else if (fleet) h.emit('fleet.arrived', { fleetId: fleet.id, at: fleet.location });
       }
     }
 
@@ -1584,172 +1664,6 @@ export const constructionModule: GameModule = {
     // Лечение наземных войск — только госпиталем (решение владельца 2026-11-01): бой больше
     // не возвращает выживших целыми (`combat` 3.10.0), раны затягивает здесь `healRate` живых
     // построек мира. Нет госпиталя — раненый остаётся раненым, как корабль без дока.
-    api.on('time.advanced', (event, h) => {
-      const { from, to } = event.payload as { from: number; to: number };
-      const span = to - from;
-      if (span <= 0) return;
-      const scale = timeScaleOf(h.ctx);
-      const hours = (span / MS_PER_HOUR) * scale;
-      const data = h.ctx.data;
-
-      // Узлы, где идёт бой ЛЮБОЙ фазы, не лечат гарнизон (решение владельца 17).
-      // Прежде условием был только НАЗЕМНЫЙ бой, и это давало странность: флот врага
-      // режется с крепостью на орбите, а её госпиталь спокойно штопает гарнизон.
-      const fighting = battleLocations(h.state);
-
-      const wounded = (stack: UnitStack): boolean => stack.count > 0 && stack.hp !== undefined;
-
-      /** Подлечить один стек — доля от полного HP за час, как и было. Возвращает true,
-       *  если стек стал целым: его тогда можно слить с целыми того же вида. */
-      const mend = (stack: UnitStack, rate: number): boolean => {
-        const unitDef = data.units[stack.unit];
-        if (!unitDef || stack.hp === undefined) return false;
-        const fullHp = stack.count * (effectiveStats(unitDef, stack, data).hp ?? 0);
-        const newHp = Math.min(fullHp, stack.hp + rate * hours * fullHp);
-        if (newHp < fullHp) {
-          stack.hp = newHp;
-          return false;
-        }
-        delete stack.hp;
-        return true;
-      };
-
-      // Кого лечит госпиталь, стоящий на узле: гарнизон САМОГО узла и десант в трюме
-      // припаркованных рядом флотов — своих и СОЮЗНЫХ (FORT-5.9, из описания построек
-      // крепости: «когда флот игрока или союзника рядом, лечатся наземные войска в трюме»).
-      // Прежде трюм не лечил никто и нигде: раненый десант оставался раненым навсегда, если
-      // его не высадить. Только флоты, где есть кого лечить: на большой карте целых трюмов —
-      // подавляющее большинство.
-      const holdsAt = new Map<string, Fleet[]>();
-      for (const fleet of recordValues(h.state.fleets)) {
-        if (fleet.movement || fleet.battleId || !fleet.location) continue;
-        if (!(fleet.landing ?? []).some(wounded)) continue;
-        const host = h.state.planets[fleet.location];
-        if (!host || host.owner === null) continue;
-        if (host.owner !== fleet.owner && !isAllied(h, fleet.owner, host.owner)) continue;
-        const bucket = holdsAt.get(fleet.location) ?? [];
-        bucket.push(fleet);
-        holdsAt.set(fleet.location, bucket);
-      }
-
-      for (const planet of recordValues(h.state.planets)) {
-        if (planet.owner === null) continue;
-        if (fighting.has(planet.id)) continue;
-        const holds = holdsAt.get(planet.id) ?? [];
-        if (!planet.garrison.some(wounded) && holds.length === 0) continue;
-        let totalHealRate = 0;
-        for (const b of planet.buildings) {
-          if (b.hp <= 0) continue; // destroyed building contributes nothing
-          const def = data.buildings[b.type];
-          if (def) totalHealRate += buildingLevel(def, b.level).healRate;
-        }
-        if (totalHealRate <= 0) continue;
-        let healed = false;
-        for (const stack of planet.garrison) if (mend(stack, totalHealRate)) healed = true;
-        // Залеченный стек снова целый — и сливается с целыми того же вида, лоадаута и
-        // выслуги (`mergeStacks`, правило `findHealthyStack`). Иначе гарнизон после каждого
-        // отбитого штурма распадался бы на плитки «×3» и «×2» одного юнита, а погрузка
-        // видела бы только первую из них.
-        if (healed) planet.garrison = mergeStacks([], planet.garrison);
-        for (const fleet of holds) {
-          let mended = false;
-          for (const stack of fleet.landing ?? []) if (mend(stack, totalHealRate)) mended = true;
-          if (mended) fleet.landing = mergeStacks([], fleet.landing ?? []);
-        }
-      }
-
-      // Зачистка органов Роя (решение владельца 2026-09-24: «при захвате не-роем наземные
-      // юниты сражаются с постройками»): на мире не-Роя наземный гарнизон непрерывно
-      // снимает с заражённых построек прочность своим уроном по зданиям
-      // (`stats.buildingDamage` в час). Пока идёт бой на узле — войска заняты боем, и
-      // зачистки нет. У Роя его органы, понятно, никто не трогает.
-      for (const planet of recordValues(h.state.planets)) {
-        if (planet.owner === null || fighting.has(planet.id)) continue;
-        if (!planet.buildings.some((b) => isInfected(data.buildings[b.type]))) continue;
-        if (feedsOnBiomass(h.state, planet.owner, data)) continue;
-        let rate = 0;
-        for (const stack of planet.garrison)
-          rate += stack.count * (data.units[stack.unit]?.stats.buildingDamage ?? 0);
-        if (rate > 0) clearInfected(h, planet, rate * hours);
-      }
-
-      // Ship regen/repair — the two pools mend differently (shields-roadmap §1):
-      //   • SHIELD (`shieldHp`) recharges for free anywhere out of combat, once past a
-      //     short delay after the last hit (`lastDamagedAt`) — the async "hit-and-run"
-      //     loop; paused entirely while in a battle.
-      //   • HULL (`hp`) never regens for free: it repairs ONLY while the fleet is
-      //     stationed over a FRIENDLY world (base rate + a repair building's healRate),
-      //     and hull damage drags the fleet's speed (route.ts) until mended.
-      const SHIELD_REGEN = 0.06; // shield-pool fraction restored per game-hour
-      const SHIELD_REGEN_DELAY = MS_PER_HOUR; // shields stay down this long after a hit
-      for (const fleet of recordValues(h.state.fleets)) {
-        if (fleet.battleId) continue; // a fleet in combat regenerates nothing
-        // Решение владельца 17: пока на узле идёт бой, док не чинит — даже флот, который
-        // сам в драку не втянут. Прежде такой флот спокойно чинился посреди сражения.
-        if (fleet.location !== null && fighting.has(fleet.location)) continue;
-
-        // Корпус чинится у ДРУЖЕСТВЕННОГО мира с верфью или космопортом
-        // (`shipRepair`, shields-roadmap SH-2.1); без дока — только свой `repair_bay` (SHU-5.4). «Дружественный»
-        // с FORT-5.8 значит свой ИЛИ союзный: правило одно на все пути ремонта у дока, и
-        // живёт оно в `fleetAtOwnDock`. Частичный эффект здесь был бы необъяснимым —
-        // ровно так разъезжались два хука наземной защиты форта.
-        let hullRate = 0;
-        const planet = fleet.location ? h.state.planets[fleet.location] : undefined;
-        if (planet && fleetAtOwnDock(fleet, h.state, data, (a, b) => isAllied(h, a, b))) {
-          for (const b of planet.buildings) {
-            if (b.hp <= 0) continue;
-            const def = data.buildings[b.type];
-            if (def) hullRate += buildingLevel(def, b.level).shipRepair;
-          }
-        }
-
-        // Shields regen only over the part of this span past the post-damage delay.
-        const shieldFrom = Math.max(from, (fleet.lastDamagedAt ?? -Infinity) + SHIELD_REGEN_DELAY);
-        const shieldHours = shieldFrom < to ? ((to - shieldFrom) / MS_PER_HOUR) * scale : 0;
-
-        // SM-3.3 «Ремонтный тендер»: лучший `fleetHullRepair` во флоте чинит корпуса ВСЕХ
-        // его стеков — там же и так же, как собственный `repair_bay` чинит свой стек.
-        // Складывается с доком и с `hullRepair`: это разные источники. Нет тендера — 0.
-        const tender = bestFleetStat(fleet.units, 'fleetHullRepair', data);
-
-        for (const stack of fleet.units) {
-          const unitDef = data.units[stack.unit];
-          if (!unitDef) continue;
-
-          // Hull (`hp`): friendly-port repair, plus the stack's own `repair_bay`
-          // (`hullRepair`, SHU-5.4) anywhere out of combat — never a free regen.
-          if (stack.hp !== undefined) {
-            const eff = effectiveStats(unitDef, stack, data);
-            const fullHp = stack.count * (eff.hp ?? 0);
-            const rate = hullRate + (eff.hullRepair ?? 0) + tender;
-            if (fullHp <= 0 || stack.hp >= fullHp) stack.hp = undefined;
-            else if (rate > 0) {
-              const cur = Math.min(fullHp, stack.hp + rate * hours * fullHp);
-              stack.hp = cur >= fullHp ? undefined : cur;
-            }
-          }
-
-          // Shield (`shieldHp`): free out-of-combat regen once past the damage delay.
-          //
-          // Темп = общая база ПЛЮС добавка юнита (`shieldRegen`, FORT-5.10: со ступенью
-          // щита крепости растёт не только размер пула, но и скорость его набора).
-          // Именно ДОБАВКА, а не замена: корпус без этого стата обязан копить щит ровно
-          // с прежней скоростью, иначе правка молча переписала бы весь флот игры.
-          if (stack.shieldHp !== undefined) {
-            const eff = effectiveStats(unitDef, stack, data);
-            const fullShield = stack.count * (eff.shield ?? 0);
-            const shieldRate = SHIELD_REGEN + (eff.shieldRegen ?? 0);
-            if (fullShield <= 0 || stack.shieldHp >= fullShield) stack.shieldHp = undefined;
-            else if (shieldHours > 0) {
-              const cur = Math.min(
-                fullShield,
-                stack.shieldHp + shieldRate * shieldHours * fullShield,
-              );
-              stack.shieldHp = cur >= fullShield ? undefined : cur;
-            }
-          }
-        }
-      }
-    });
+    registerConstructionMaintenance(api, clearInfected);
   },
 };

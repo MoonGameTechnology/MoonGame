@@ -90,6 +90,8 @@ const SELF_RESTRICTED = [
   // крепости — щит он даёт ЕЙ, надевая ступень на её орудия, и на планете надевать его
   // было бы не на что.
   'void_shield',
+  'station_shipyard', 'station_sensor', 'station_reactor', 'station_fabricator',
+  'station_hangar', 'station_medbay', 'station_shield', 'station_defense',
 ];
 
 /**
@@ -143,6 +145,8 @@ const EXPECTED: Record<string, string[] | null> = {
   // ангар, форт с гарнизоном и производство там бессмысленны: корабли и войска с площадки
   // не ушли бы никуда. Остаётся то, что работает на месте: зрение засады и щит орудий.
   fork_station: ['radar', 'void_shield'],
+  station_site: ['station_shipyard', 'station_sensor', 'station_reactor', 'station_fabricator',
+    'station_hangar', 'station_medbay', 'station_shield', 'station_defense'],
 };
 
 describe('shipped province types: what each one hosts (ORB-4 golden table)', () => {

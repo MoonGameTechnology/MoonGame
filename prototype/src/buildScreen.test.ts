@@ -358,6 +358,7 @@ describe('окно построек — разметка', () => {
     const s2 = newGame();
     const pid2 = home(s2);
     s2.planets[pid2]!.buildings.find((b) => b.type === 'mine')!.level = 3;
+    s2.planets[pid2]!.buildings.find((b) => b.type === 'mine')!.hp = buildingLevel(data.buildings.mine!, 3).hp;
     expect(buildRowState(s2, 'p1', pid2, 'mine', probe(s2), noQueue)).toMatchObject({
       st: 'built',
       level: 3,
@@ -469,6 +470,7 @@ describe('окно построек — проводка', () => {
       localQueued: () => false,
       build: (pid, id) => built.push([pid, id]),
       upgrade: (pid, id) => upgraded.push([pid, id]),
+      repair: () => {},
       unitIds: () => ['militia'],
       buildUnit: (pid, id) => built.push([pid, id]),
       openUnitInfo: (id) => opened.push(id),

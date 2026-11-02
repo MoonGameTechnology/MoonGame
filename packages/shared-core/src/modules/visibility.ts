@@ -25,7 +25,11 @@ function snapshot(state: GameState, planetId: PlanetId, now: number): PlanetSnap
   const snap: PlanetSnapshot = {
     owner: planet.owner,
     garrison: planet.garrison.map((s) => ({ ...s })),
-    buildings: planet.buildings.map((b) => ({ ...b })),
+    buildings: planet.buildings.map((b) => {
+      const visible = { ...b };
+      delete visible.repair;
+      return visible;
+    }),
     at: now,
   };
   if (planet.terrain !== undefined) snap.terrain = planet.terrain;
@@ -116,7 +120,7 @@ export const visibilityModule: GameModule = {
   // (`sight.byKind`, решение владельца 2026-09-25). 2.2.0 — висящий патруль шаттлов
   // видит свой круг (SHU-6.7): память пишет и миры под ним. 2.3.0 — корабль, пересёкший
   // границу провинции, узнаёт её тип (`surveyed`, решение владельца 2026-10-23).
-  version: '2.4.0',
+  version: '2.5.0',
   setup(api) {
     // Continuous time advances refresh memory; captures and arrivals refresh it
     // immediately so a just-scouted world is remembered at once.

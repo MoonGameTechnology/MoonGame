@@ -51,7 +51,7 @@ describe('тестовая дуэльная карта — полнота', () =
     // FORT-6.1) появляется, когда крепость ставят на развилку дороги; `void_station` — когда
     // её поднимают на своей провинции (`data/seededFortress.test.ts`).
     const provinceKinds = Object.keys(data.sectorKinds).filter(
-      (k) => k !== 'fork_station' && k !== 'void_station',
+      (k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station',
     );
     expect([...has((id) => map.sectors[id]!.kind)].sort()).toEqual(provinceKinds.sort());
     expect([...has((id) => map.sectors[id]!.terrain)].sort()).toEqual(Object.keys(data.sectors).sort());

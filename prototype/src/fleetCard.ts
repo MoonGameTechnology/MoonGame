@@ -21,6 +21,7 @@ import {
   effectiveStats,
   estimateTravelHours,
   fleetBaseSpeed,
+  fortressSiteOf,
   missingHull,
   previewBattle,
   previewLossCount,
@@ -126,6 +127,8 @@ import { unitGlyphSvg } from './unitGlyphs';
 import { veteranTag } from './veteranChevrons';
 import { hangarSectionHtml, unitRows } from './worldCard';
 import { planet } from './worldQueries';
+import { fortressStatusHtml } from './fortressView';
+import { canOrder } from './game';
 
 /** Что карточке нужно от игры. Мир, выбор, мины, часы и имена флотов — в `main.ts`. */
 export interface FleetCardHost {
@@ -454,6 +457,10 @@ export function fleetPanelHtml(f: Fleet): string {
   const s = game.world();
   const ME = game.me();
   const NAME = game.names();
+  const fortress = fortressSiteOf(s, f.id);
+  if (fortress) return kitCardHeader(ownerColor(f.owner), worldName(s, fortress.id), t('fleet.kind.fortress')) +
+    fortressStatusHtml(s, fortress, ME, (order) => canOrder(s, order)) +
+    `<button class="bw-open btn-second" data-act="openstation" data-arg="${esc(fortress.id)}">${t('fortress.open')}</button>`;
   // Мина (SM-3.6): свой короткий паспорт — заряды, доля за подрыв, прочность. Ракетная
   // (SM-3.7a) — радар, обзор и прочность, а хозяину ещё режим, удар и управление.
   if (isMineFleet(f, data))
