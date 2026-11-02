@@ -85,8 +85,7 @@ import {
   stopNetSetupPoll,
 } from './matchJoin';
 import { initMatchBrowser } from './matchBrowser';
-import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
-import { closeFortressDialog, isFortressDialogOpen } from './fortressDialog';
+import { NATIVE_BACK_LAYERS } from './nativeBackLayers';
 import { isAvaMap, isFrontier, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
@@ -120,7 +119,7 @@ import { worldName } from './planetName';
 // «Производство» — экран заказа (REFM-13, ROS-3.1): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
-import { initHeroStaff } from './heroStaff';
+import { initHeroStaff } from './heroStaffPresentation';
 import {
   COALITION,
   CH_SESSION,
@@ -3064,8 +3063,7 @@ const hide = (id: string): void => document.getElementById(id)?.classList.remove
 const flexed = (id: string): boolean => document.getElementById(id)?.style.display === 'flex';
 
 const BACK_LAYERS: BackLayer[] = [
-  { id: 'match-description', isOpen: isMatchDescriptionOpen, close: closeMatchDescription }, // native top layer
-  { id: 'fortress-order', isOpen: isFortressDialogOpen, close: closeFortressDialog },
+  ...NATIVE_BACK_LAYERS,
   { id: 'comic', isOpen: () => comicPlayer.isOpen(), close: () => comicPlayer.skip() }, // z90
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   { id: 'intro', isOpen: () => shown('intro'), close: () => hide('intro') }, // z61, above the cabinet it explains

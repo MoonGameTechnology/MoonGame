@@ -166,8 +166,13 @@ describe('hotkeys — горячие клавиши ПК (UIX-9.1)', () => {
   it('молчащие слои — ступени лестницы «Назад» выше окон, все и в её порядке', () => {
     // Лестница идёт сверху вниз; первая ступень окон — меню меток (z47).
     const main = readFileSync(new URL('../prototype/src/main.ts', import.meta.url), 'utf8');
+    const native = readFileSync(new URL('../prototype/src/nativeBackLayers.ts', import.meta.url), 'utf8');
     const ladder = main.slice(main.indexOf('const BACK_LAYERS: BackLayer[] = ['));
-    const ids = [...ladder.slice(0, ladder.indexOf('\n];')).matchAll(/\{\s*id: '([\w-]+)'/g)].map((m) => m[1]);
+    const ids = [
+      ...[...native.matchAll(/(?:heroRewardBackLayer\(|\bid: )'([^']+)'/g)].map((m) => m[1]),
+      ...[...ladder.slice(0, ladder.indexOf('\n];')).matchAll(/\{\s*id: '([\w-]+)'/g)].map((m) => m[1]),
+    ];
+    expect(ladder).toMatch(/^const BACK_LAYERS: BackLayer\[\] = \[\s*\.\.\.NATIVE_BACK_LAYERS,/);
     expect(ids.length).toBeGreaterThan(HOTKEY_SILENT_LAYERS.length);
     expect(HOTKEY_SILENT_LAYERS).toEqual(ids.slice(0, ids.indexOf('pingmenu')));
   });

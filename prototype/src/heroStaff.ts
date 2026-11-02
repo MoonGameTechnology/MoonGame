@@ -48,6 +48,7 @@ import { heroGradeKey, heroIdentity } from '../../decisions/heroIdentity';
 import { heroPortraitHtml } from '../../packages/client/src/heroPortraits';
 import { emblemTally } from './fleetTally';
 import { isWingUnit } from './planetSummary';
+import { matchHeroRewards, type HeroReward } from '../../decisions/heroRewards';
 
 type HeroInst = NonNullable<GameState['heroes']>[string];
 export type HeroTab = 'overview' | 'tree' | 'abilities' | 'ship';
@@ -325,7 +326,7 @@ function heroTreeHtml(hero: HeroInst, res: Bag): string {
     });
   }
   if (!rails.length) return `<div class="hx-note">${t('hero.tree.empty')}</div>`;
-  let html = `<div class="hx-tree">`;
+  let html = `<div class="hx-tree ha-tree">`;
   for (const rail of rails) {
     const rn = rail.nodes
       .slice()
@@ -373,9 +374,9 @@ function heroTreeHtml(hero: HeroInst, res: Bag): string {
           : '';
       const tap = rail.own && !owned ? ` data-hnode="${nid}"` : '';
       html +=
-        `<div class="${cls}"${tap}>${conn}<div class="hx-nn"><span class="hx-crest">${crest}</span>${esc(tData(nd.name))}</div>` +
+        `<button type="button" class="${cls}"${tap}${tap ? '' : ' disabled'}>${conn}<div class="hx-nn"><span class="hx-crest">${crest}</span>${esc(tData(nd.name))}</div>` +
         `<div class="hx-nd">${esc(t(nd.description ?? ''))}</div>` +
-        `<div class="hx-nf">${grant}${foot}</div></div>`;
+        `<div class="hx-nf">${grant}${foot}</div></button>`;
     }
     html += `</div>`;
   }
@@ -521,8 +522,8 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
 
   return (
     `<div class="hx-h">${t('hero.slot.head', { u: worn.length, n: slots })}</div>` +
-    `<div class="hx-bays">${bays.join('')}</div>` +
-    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div>${poolHtml}` : '')
+    `<div class="hx-bays ha-ability-grid">${bays.join('')}</div>` +
+    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div><div class="ha-ability-grid">${poolHtml}</div>` : '')
   );
 }
 
@@ -611,7 +612,7 @@ function heroShipHtml(hero: HeroInst): string {
     `<div class="hx-h">${t('hero.ship.slots', { u: installed.length, n: total })}</div>` +
     (deployed ? `<div class="hx-note">${t('hero.ship.refit-docked')}</div>` : '') +
     `<div class="hx-bays">${rows.join('')}</div>` +
-    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div>${poolHtml}` : '')
+    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div><div class="ha-ability-grid">${poolHtml}</div>` : '')
   );
 }
 
@@ -725,6 +726,9 @@ function heroDossierHtml(hero: HeroInst, dossier: string, res: Bag): string {
 }
 /** What the hero staff needs from the match screen. */
 export interface HeroStaffHost {
+  identity?(): string;
+  resetRewards?(): void;
+  received?(rewards: readonly HeroReward[]): void;
   /** The current match state (read fresh on every paint — it is replaced, not mutated). */
   state(): GameState;
   /** Whose roster this is: the seat you are playing. */
@@ -747,9 +751,24 @@ export function initHeroStaff(host: HeroStaffHost): {
   focus: (heroId: string) => boolean;
 } {
   let view: HeroView = { sel: null, tab: 'tree', dossier: null };
+  let previous: HeroInst[] | null = null;
+  let previousMatch = '';
+  let previousTime = 0;
+  let previousPlayer = '';
 
   const paneHtml = (): string => {
     const state = host.state();
+    const roster = ownHeroes(state, host.me());
+    const sameMatch = previousMatch === (host.identity?.() ?? '') && previousPlayer === host.me() && state.time >= previousTime;
+    if (previous && !sameMatch) host.resetRewards?.();
+    if (previous && sameMatch) {
+      const rewards = matchHeroRewards(previous, roster, data);
+      if (rewards.length) host.received?.(rewards);
+    }
+    previous = structuredClone(roster);
+    previousMatch = host.identity?.() ?? '';
+    previousTime = state.time;
+    previousPlayer = host.me();
     view = normalizeHeroView(state, host.me(), view);
     const res = state.players[host.me()]?.resources ?? {};
     // The `#herobody` id keeps the `.hx-*` styling the pane was designed against.

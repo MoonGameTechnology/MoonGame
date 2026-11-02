@@ -1,4 +1,5 @@
 import { buildModuleCopies } from '../../packages/shared-core/src/index';
+import { arsenalHeroesHtml } from './arsenalHeroes';
 /**
  * «Арсенал» — the hub tab over the account's persistent collection and its workshop (ARS-5,
  * REFM-5; переделан по макету, заказ владельца 2026-10-19 и «Делай» 2026-10-20).
@@ -153,7 +154,7 @@ export function starterPreview(): ArsenalItem[] {
   }));
 }
 
-export type ArsenalTab = 'modules' | 'hulls';
+export type ArsenalTab = 'modules' | 'hulls' | 'heroes';
 export type ArsenalConfirm =
   { kind: 'craft'; recipeId: string } | { kind: 'salvage'; itemId: string } | { kind: 'upgrade'; quote: ModuleUpgradeQuote };
 
@@ -171,6 +172,7 @@ export interface ArsenalState {
   /** The module and the ship whose detail is open on each tab. */
   module: string | undefined;
   hull: string | undefined;
+  hero?: string;
   confirm: ArsenalConfirm | null;
   /** A read problem, shown under the head. */
   status: { text: string; error: boolean } | null;
@@ -332,7 +334,8 @@ export function arsenalHtml(s: ArsenalState): string {
     `<small>${t('arsenal.count', { n: list.filter((x) => owns(s.items, x)).length, m: list.length })}</small></button>`;
   const head =
     `<div class="ar-head"><div><h2>${t('hub.nav.arsenal')}</h2><p class="ar-rule">${t('arsenal.rule')}</p></div>` +
-    `<div class="ar-tabs" role="tablist" aria-label="${esc(t('arsenal.tabs'))}">${tab('modules', 'arsenal.tab.modules', modules)}${tab('hulls', 'arsenal.tab.hulls', hulls)}</div></div>`;
+    `<div class="ar-tabs" role="tablist" aria-label="${esc(t('arsenal.tabs'))}">${tab('modules', 'arsenal.tab.modules', modules)}${tab('hulls', 'arsenal.tab.hulls', hulls)}<button type="button" class="ar-tab" role="tab" data-ar-tab="heroes" aria-selected="${s.tab === 'heroes'}">${t('arsenal.tab.heroes')}</button></div></div>`;
+  if (s.tab === 'heroes') return head + arsenalHeroesHtml(s.hero);
   const list = s.tab === 'modules' ? moduleListHtml(s, modules) : hullListHtml(s, hulls);
   return (
     head +
@@ -654,6 +657,8 @@ export interface ArsenalHost {
   canSignIn(): boolean;
   signIn(): void;
   openAuction(): void;
+  openHeroMatch?(): void;
+  openHeroSector?(hero: string): void;
   /** The auction's sell form for this copy. */
   sell(itemId: string): void;
   /** «Снабжение» on its season (rewards are claimed there). */
@@ -683,6 +688,7 @@ export function initArsenal(host: ArsenalHost): {
   let tab: ArsenalTab = 'modules';
   let module: string | undefined;
   let hull: string | undefined;
+  let hero: string | undefined;
   /** The player opened an item: the default (the goal, the first missing) no longer moves it. */
   let chosen = false;
   let confirm: ArsenalConfirm | null = null;
@@ -747,6 +753,7 @@ export function initArsenal(host: ArsenalHost): {
       tab,
       module,
       hull,
+      ...(hero ? { hero } : {}),
       confirm,
       status: readStatus(st),
       notice: actionNotice(st),
@@ -827,11 +834,15 @@ export function initArsenal(host: ArsenalHost): {
     const d = el.dataset;
     if (d.arClose !== undefined) return close();
     if (d.arTab) {
-      tab = d.arTab === 'hulls' ? 'hulls' : 'modules';
+      tab = d.arTab === 'heroes' ? 'heroes' : d.arTab === 'hulls' ? 'hulls' : 'modules';
+      sheetOpen = false;
       confirm = null;
       acting = false;
       return paint();
     }
+    if (d.arHero) { hero = d.arHero; return paint(); }
+    if (d.arHeroMatch !== undefined) return host.openHeroMatch?.();
+    if (d.arHeroSector) return host.openHeroSector?.(d.arHeroSector);
     if (d.arModule) return open('modules', d.arModule, byAttr('data-ar-module', d.arModule));
     if (d.arHull) return open('hulls', d.arHull, byAttr('data-ar-hull', d.arHull));
     if (d.arPick !== undefined) {

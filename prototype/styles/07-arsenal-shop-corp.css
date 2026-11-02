@@ -516,3 +516,23 @@ span.ar-fchip{cursor:default;}
 .mi-reward{position:relative;overflow:hidden;display:grid;gap:10px;margin:12px 0;padding:20px;border:1px solid var(--gold,#e6bf70);border-radius:14px;background:radial-gradient(ellipse at top,rgba(232,187,90,.17),transparent 75%);animation:module-reward-enter .5s ease-out}.mi-reward>.mi-summary{justify-content:center}.mi-reward>strong,.mi-reward>b{text-align:center}.mi-reward .mi-art{width:68px;height:68px}.mi-spark{position:absolute;right:20px;top:18px;color:var(--gold,#e6bf70);font-size:28px;animation:module-spark 1.5s ease-out 2}
 @keyframes module-reward-enter{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}@keyframes module-spark{0%{opacity:0;transform:scale(.5) rotate(-30deg)}45%{opacity:1;transform:scale(1.2)}100%{opacity:.4;transform:scale(1) rotate(40deg)}}
 @media(prefers-reduced-motion:reduce){.mi-reward,.mi-spark{animation:none}}
+.ar-heroes { display: grid; gap: 20px; }
+.ar-hero-roster, .ar-hero-skills, .ar-hero-destinations { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 12px; }
+.ar-hero-roster .ar-hero { display: grid; justify-items: center; align-content: start; gap: 10px; padding: 16px; border: 1px solid #36585e; border-radius: 14px; background: #10232e; color: #edf2ed; font: inherit; cursor: pointer; }
+.ar-hero-roster .ar-hero[aria-pressed=true] { border-color: #92e0cb; box-shadow: inset 0 0 0 1px #92e0cb; }
+.ar-hero-detail { border: 1px solid #36585e; border-radius: 16px; padding: 20px; }
+.ar-hero-detail h3 { margin-top: 0; }
+.ar-hero-skill, .ar-hero-destinations section { padding: 14px; border: 1px solid #36585e; border-radius: 12px; min-width: 0; overflow-wrap: anywhere; }
+.ar-hero-skill i { font-size: 28px; color: #92e0cb; font-style: normal; }
+.ar-hero-skill p, .ar-hero-destinations p { color: #adc4c9; line-height: 1.5; }
+.ar-hero-destinations { margin-top: 20px; }
+.ar-hero-destinations button { min-height: 44px; padding: 10px; white-space: normal; }
+.ar-heroes button:focus-visible { outline: 2px solid #d1f69a; outline-offset: 3px; }
+
+.ar-hero-roster .hero-portrait { width: 84px; height: 84px; }
+
+@media (max-width: 700px) {
+  .ar-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; box-sizing: border-box; }
+  .ar-tab { min-width: 0; min-height: 58px; padding: 6px 3px; flex-direction: column; justify-content: center; gap: 3px; white-space: normal; }
+  .ar-tab small { padding: 1px 5px; }
+}

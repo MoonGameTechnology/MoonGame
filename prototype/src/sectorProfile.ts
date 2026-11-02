@@ -93,6 +93,18 @@ export interface SectorProfileHost {
 
 let game: SectorProfileHost;
 
+type ProgressObserver = (before: SectorZeroProgress | null, after: SectorZeroProgress | null) => void;
+let progressionObserver: ProgressObserver | undefined;
+let progressionEpoch = 0;
+/** Показ наград подписывается на сохранённые изменения, загрузка только сбрасывает очередь. */
+export function observeSectorProgress(observer: ProgressObserver): void {
+  progressionObserver = observer;
+}
+function resetProgressionObserver(): void {
+  progressionEpoch++;
+  progressionObserver?.(null, null);
+}
+
 /**
  * Сохранение забега (PVR-0.3).
  *
@@ -162,6 +174,7 @@ export function initSectorProfile(hooks: SectorProfileHost): void {
   game = hooks;
   if (writeFailing) game.saveFailing(true);
   progressWrite = loadSectorProfile().then(async (pick) => {
+    resetProgressionObserver();
     sectorProgress = parseSectorZeroProgress(pick.raw, data, sectorSeed);
     // Профиль с главами, выигранными до наград-героев, и с уже засчитанными спасениями
     // догоняет их при чтении (heroRecruits §3, §4).
@@ -278,6 +291,8 @@ export function persistSectorProgress(): Promise<boolean> {
 }
 
 export function saveSectorProgress(next: SectorZeroProgress): void {
+  const before = sectorProgress;
+  const epoch = progressionEpoch;
   // Победа в главе приводит её героя (решение владельца 2026-09-23), спасение задачей главы —
   // спасённого (баг-репорт 2026-09-27) — на любом пути засчёта.
   const granted = grantChapterHeroes(next, sectorChapterIds(), data, pveRescues());
@@ -292,7 +307,9 @@ export function saveSectorProgress(next: SectorZeroProgress): void {
   for (const unlock of metaUnlocks(sectorProgress, next))
     getPlatform().analytics.emit('meta_unlock', unlock);
   sectorProgress = next;
-  detach('профиль: запись', persistSectorProgress());
+  detach('профиль: запись', persistSectorProgress().then((saved) => {
+    if (saved && epoch === progressionEpoch && ownsSectorZero()) progressionObserver?.(before, next);
+  }));
   bumpCloudRev();
 }
 
@@ -471,6 +488,7 @@ async function adoptCloud(cloud: CloudProfile, cloudProgress: SectorZeroProgress
   // развилке делается и после него. Меню иначе предложило бы «Продолжить» его и засчитало
   // бы облачному профилю чужой забег.
   game.stopRun();
+  resetProgressionObserver();
   sectorProgress = grantChapterHeroes(
     cloudProgress,
     sectorChapterIds(),
@@ -548,6 +566,7 @@ export function claimSectorZero(): void {
   // время профиль не берётся, а стирается целой копией.
   progressWrite = progressWrite.then(loadSectorProfile).then(async (pick) => {
     if (!pick.raw) return;
+    resetProgressionObserver();
     sectorProgress = parseSectorZeroProgress(pick.raw, data, sectorSeed);
     if (pick.rewrite) await writeSectorProgress(sealProgress(sectorProgress, LOCAL_SEAL));
   });

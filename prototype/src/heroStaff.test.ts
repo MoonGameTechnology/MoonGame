@@ -376,10 +376,10 @@ describe('штаб героев — врождённый узел (AUD-22)', () 
   // отбивает его покупку `E_ALREADY_UNLOCKED`, и экран обязан говорить то же самое, а не
   // вешать цену и кнопку, которая всегда кончится отказом.
   const treeName = (id: string): string => tData(data.heroSkillTrees[id]!.name);
-  /** Начало разметки узла — от его `<div class="hx-node…">` до имени. */
+  /** Начало разметки узла — от его `<button class="hx-node…">` до имени. */
   const nodeHead = (html: string, id: string): string => {
     const at = html.indexOf(treeName(id));
-    return html.slice(html.lastIndexOf('<div class="hx-node', at), at);
+    return html.slice(html.lastIndexOf('<button type="button" class="hx-node', at), at);
   };
 
   it('у Командира «Сонастройка» и «Пси-вуаль» изучены, а узел за ними открыт', () => {
