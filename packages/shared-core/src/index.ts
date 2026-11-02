@@ -556,6 +556,7 @@ export {
 } from './util/groundFire';
 export {
   findHealthyStack,
+  unitCount,
   addUnits,
   sumUnitStat,
   cappedUnitStat,

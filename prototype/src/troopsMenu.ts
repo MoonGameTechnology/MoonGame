@@ -16,9 +16,9 @@
  * прежней секции внутри main.ts не было вовсе.
  *
  * Что обязан знать вызывающий (и почему это ВХОД, а не расчёт внутри):
- * - `garrison`/`hold` — только ЗДОРОВЫЕ стеки с дефолтным лоадаутом: ядро поднимает
- *   на борт лишь их (`findHealthyStack`), побитый в бою стек виден в гарнизоне, но не
- *   грузится. `garrisonAll`/`holdAll` — все стеки, они нужны только для сноски.
+ * - `garrison`/`hold` — сколько единиц ядро согласится поднять/высадить. С 2026-11-02
+ *   это ВСЕ стеки типа, раненые тоже (`army.ts`): раны едут вместе с бойцами.
+ *   `garrisonAll`/`holdAll` — все стеки; сейчас они совпадают с `garrison`/`hold`.
  * - `reserved` — сколько единиц этого типа уже обещано отложенным погрузкам ЛЮБОГО
  *   флота у этого мира: гарнизон общий, и без этого вычета два флота закажут одного
  *   и того же солдата.
@@ -79,8 +79,6 @@ export interface TroopsModel {
   loadTotal: number;
   unloadTotal: number;
   queuedTotal: number;
-  /** Есть ли тип, у которого часть единиц не поднимется (побитые/иной лоадаут). */
-  anyDamaged: boolean;
   /** Место кончилось, а в гарнизоне ещё есть кого брать — «трюм полон». */
   holdFull: boolean;
   /** Брать нечего: весь здоровый гарнизон уже разобран очередями. */
@@ -114,12 +112,10 @@ export function troopsModel(input: TroopsInput): TroopsModel {
   let loadTotal = 0;
   let unloadTotal = 0;
   let queuedTotal = 0;
-  let anyDamaged = false;
   const rows: TroopsRow[] = capped.map(({ u, d }) => {
     if (d > 0) loadTotal += d;
     if (d < 0) unloadTotal += -d;
     queuedTotal += u.queued;
-    if (u.garrisonAll > u.garrison || u.holdAll > u.hold) anyDamaged = true;
     return {
       ...u,
       delta: d,
@@ -142,7 +138,6 @@ export function troopsModel(input: TroopsInput): TroopsModel {
     loadTotal,
     unloadTotal,
     queuedTotal,
-    anyDamaged,
     holdFull: takeable && free < minSize,
     garrisonDry:
       !takeable &&
@@ -245,7 +240,6 @@ export function troopsMenuHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
       : '') +
     (m.holdFull ? `<div class="tnote warn">${esc(t('cargo.hold-full'))}</div>` : '') +
     (m.garrisonDry ? `<div class="tnote warn">${esc(t('cargo.garrison-empty'))}</div>` : '') +
-    (m.anyDamaged ? `<div class="tnote">${esc(t('troops.damaged'))}</div>` : '') +
     `<div class="tnote">${esc(t('troops.timing'))}</div>` +
     `<div class="tacts">` +
     `<button data-cmd="tok" class="cbtn btn-main"${m.valid ? '' : ' disabled'}>${esc(t('split.confirm'))}</button>` +

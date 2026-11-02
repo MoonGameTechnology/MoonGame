@@ -32,7 +32,7 @@ import {
   type Squadron,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
-import { findHealthyStack } from '../../packages/shared-core/src/util/stacks';
+import { unitCount } from '../../packages/shared-core/src/util/stacks';
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import {
   act,
@@ -329,16 +329,14 @@ export function stewardGuardOrders(
     }
     const assaulted = garrisonUnderAssault(state, p.id);
     // What the garrison still holds after the loads planned below (state is
-    // read-only). Counted EXACTLY as `army.load` will resolve it — via
-    // findHealthyStack: only a full-health, default-loadout stack embarks.
-    // Battle-worn troops cannot be lifted (they hold the line; hospitals mend
-    // them) — planning them would bounce off E_NO_ARMY and, worse, mark the
-    // garrison as handled so no ferry would come for anyone.
+    // read-only). Counted EXACTLY as `army.load` will resolve it: every stack of
+    // the type embarks, battle-worn ones too (wounds ride along, 2026-11-02).
+    // Counting fewer would strand the wounded; counting more would bounce off
+    // E_NO_ARMY and mark the garrison as handled so no ferry would come.
     const left = new Map<string, number>();
     for (const s of p.garrison) {
       if (s.count <= 0 || !liftable(s.unit) || left.has(s.unit)) continue;
-      const healthy = findHealthyStack(p.garrison, s.unit);
-      if (!healthy) continue;
+      const total = unitCount(p.garrison, s.unit);
       // Обещанное идущими подъёмами (CARGO-1) стоит в гарнизоне, но уже занято: без
       // вычитания второй паром спланировал бы ту же роту и получил бы `E_NO_ARMY`.
       let claimed = 0;
@@ -347,7 +345,7 @@ export function stewardGuardOrders(
           if (c.from === p.id && c.unit === s.unit) claimed += c.count;
         }
       }
-      left.set(s.unit, Math.max(0, healthy.count - claimed));
+      left.set(s.unit, Math.max(0, total - claimed));
     }
     // Docked fleets fly out — lifting what garrison fits their holds first.
     // ПОГРУЗКА ЗАНИМАЕТ ЧАС (CARGO-1), поэтому «погрузить и улететь одним тиком»

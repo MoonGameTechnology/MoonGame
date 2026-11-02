@@ -4660,7 +4660,6 @@ export const de: Record<string, string> = {
   'tech.state.queued': 'Nr. {n} in der Warteschlange',
   'tech.state.running': 'Wird erforscht',
   'tech.tier': 'Stufe {n}',
-  'troops.damaged': 'beschädigte Einheiten gehen nicht an Bord',
   'troops.hold': 'Frachtraum {a}/{b}',
   'troops.planned': 'bestellt {n}',
   'troops.timing': 'Verladung ≈1Std · Ausschiffung sofort',
