@@ -105,7 +105,7 @@ async function load(over: Partial<SettingsViewHost> = {}, sectorZeroOnly = false
     canvasCompatibilitySupported: () => true,
     setCanvasCompatibility: log('compat'),
   }));
-  vi.doMock('./hubScreen', () => ({ hubAuthorizedBase: () => null }));
+  vi.doMock('./hubScreen', () => ({ hubAuthorizedBase: () => null, news: null }));
   vi.doMock('./mapCamera', () => ({ cam: { scale: 1.5 } }));
   vi.doMock('./mapLayer', () => ({
     backgroundContextEvents: { lost: 0 },

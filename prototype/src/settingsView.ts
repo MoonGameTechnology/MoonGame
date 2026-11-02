@@ -40,14 +40,15 @@ import {
   windowAlpha,
   windowOpacityPct,
 } from './graphicsPrefs';
-import { hubAuthorizedBase } from './hubScreen';
+import { hubAuthorizedBase, news } from './hubScreen';
+import { LOCALE, setLocale } from '../../localization/runtime';
 import { cam } from './mapCamera';
 import { backgroundContextEvents, bgx, mapContextEvents } from './mapLayer';
 import { neutralColor, rivalPaletteId, setSideColors, youColor } from './mapPalette';
 import { setSweepOpacity, sweepOpacity } from './mapRadar';
 import { initPush } from './pushSetup';
 import { blackBoxSessions } from './renderBlackBox';
-import { initSettings } from './settingsOverlay';
+import { initSettings, type SettingsTab } from './settingsOverlay';
 import { serverMatchId } from './netSession';
 import { COLOR } from './sideColors';
 import type { SoundApi } from './sound';
@@ -159,8 +160,8 @@ function applyWindowOpacity(): void {
 }
 
 /** Окно настроек; вход и подписка перечитываются — вкладка «Уведомления» покажет их свежими. */
-export function openSettings(): void {
-  settings.open();
+export function openSettings(tab?: SettingsTab): void {
+  settings.open(tab);
   push?.refresh().catch(() => undefined); // не вышло перечитать — вкладка покажет прошлое
 }
 
@@ -172,6 +173,8 @@ export function initSettingsView(host: SettingsViewHost): void {
   settings = initSettings({
     root: () => root,
     view: () => ({
+      locale: LOCALE,
+      ...(!__SECTOR_ZERO_ONLY__ && news ? { news: news.preferences.html() } : {}),
       sweepOpacity,
       ownPings: game.ownPings(),
       glow: glowOn(),
@@ -205,6 +208,8 @@ export function initSettingsView(host: SettingsViewHost): void {
       // Номер сетевой партии — его копируют и отправляют друзьям (FRIENDS-2).
       ...(serverMatchId() ? { matchId: serverMatchId()! } : {}),
     }),
+    setLocale: (locale) => { setLocale(locale); location.reload(); },
+    mountNews: (root) => news?.preferences.mount(root),
     setSweepOpacity,
     setWindowOpacity: (v) => {
       setWindowOpacity(Math.round(v * 100));
@@ -252,8 +257,8 @@ export function initSettingsView(host: SettingsViewHost): void {
           if (root.classList.contains('show')) settings.render();
         },
       });
-  (document.getElementById('hub-settings') as HTMLElement).addEventListener('click', openSettings);
-  (document.getElementById('hub-gear') as HTMLElement).addEventListener('click', openSettings);
+  (document.getElementById('hub-settings') as HTMLElement).addEventListener('click', () => openSettings());
+  (document.getElementById('hub-gear') as HTMLElement).addEventListener('click', () => openSettings());
   // Rail: settings are reachable mid-match too, not only from the hub's «Ещё» tab.
-  document.getElementById('rail-settings')?.addEventListener('click', openSettings);
+  document.getElementById('rail-settings')?.addEventListener('click', () => openSettings());
 }

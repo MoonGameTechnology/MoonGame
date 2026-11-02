@@ -104,18 +104,19 @@
 #hub .hub-st{font-size:var(--fs-caption);color:var(--dim);margin-top:3px;}
 #hub .hub-st::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#3ad17a;
   box-shadow:0 0 6px #3ad17a;margin-right:6px;vertical-align:middle;}
-/* Язык и настройки — на виду в шапке хаба (заказ владельца 2026-09-25), а не только в «Ещё». */
-#hub .hub-lang,#hub .hub-gear{height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 13px;border-radius:10px;
-  border:1px solid var(--line-hi);background:rgba(3,12,16,.7);color:#d6eef2;cursor:pointer;flex:0 0 auto;
-  font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;}
-#hub .hub-lang .lm-car{font-size:var(--fs-caption);opacity:.7;}
-#hub .hub-gear{border-color:var(--cyan-dim);color:var(--cyan);font-size:var(--fs-body);
-  box-shadow:inset 0 0 10px rgba(53,214,230,.08);}
+/* Main actions stay in the header; language selection lives in settings. */
+#hub .hub-gear,#hub .hub-news{position:relative;height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 13px;border-radius:10px;
+  border:1px solid var(--cyan-dim);background:rgba(3,12,16,.7);color:var(--cyan);cursor:pointer;flex:0 0 auto;
+  font:600 var(--fs-body) var(--sf-font);box-shadow:inset 0 0 10px rgba(53,214,230,.08);}
 #hub .hub-gear .hg-ic{font-size:17px;line-height:1;}
-#hub .hub-lang:hover,#hub .hub-gear:hover{border-color:var(--cyan);color:#fff;box-shadow:0 0 12px rgba(53,214,230,.22);}
-/* На телефоне подписи вытесняли имя командира — остаются значки 🌐 и ⚙. */
-@media (max-width:560px){#hub .hub-lang .lm-cur,#hub .hub-gear .hg-lbl{display:none;}
-  #hub .hub-lang,#hub .hub-gear{padding:0 11px;}}
+#hub .hub-gear:hover,#hub .hub-news:hover{border-color:var(--cyan);color:#fff;box-shadow:0 0 12px rgba(53,214,230,.22);}
+#hub .hub-news{width:44px;padding:0;}
+#hub .hub-news svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+#hub .hub-news:focus-visible{outline:2px solid var(--sf-accent);outline-offset:3px;}
+#hub .news-dot{display:none;position:absolute;top:5px;right:5px;width:10px;height:10px;border:2px solid #06161e;border-radius:50%;background:#ff5f65;}
+#hub .has-news .news-dot{display:block;}
+#hub .hub-wallet-row{display:flex;align-items:center;gap:12px;min-width:0;}
+@media (max-width:560px){#hub .hub-gear .hg-lbl{display:none;}#hub .hub-gear{padding:0 11px;}}
 #hub .hub-msg{position:relative;width:44px;height:44px;border-radius:10px;border:1px solid var(--line-hi);
   background:rgba(3,12,16,.7);color:var(--cyan);font-size:16px;cursor:pointer;flex:0 0 auto;}
 #hub .hub-msg .badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;border-radius:9px;padding:0 4px;
@@ -134,7 +135,7 @@
   font:600 14px/1 system-ui,sans-serif;}
 #hubwallet .tw-cur:hover .hw-go{background:color-mix(in srgb,currentColor 36%,transparent);}
 /* Узкий экран: кошелёк — своей строкой под именем, а не вместо него. */
-@media (max-width:900px){#hub .hub-id{flex-wrap:wrap;row-gap:10px;}#hub .hub-wallet{order:10;flex:1 0 100%;}}
+@media (max-width:900px){#hub .hub-id{flex-wrap:wrap;row-gap:10px;}#hub .hub-wallet-row{order:10;flex:1 0 100%;justify-content:space-between;}}
 #hub .hub-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 16px 14px;}
 #hub .hub-panel{display:flex;flex-direction:column;gap:14px;}
 /* Главная дверь хаба (UIX-10.1, decisions/hubDoor.ts): крупная кнопка в палитре меню над
@@ -200,32 +201,17 @@
 #hub .hm-go{margin-top:10px;min-height:44px;padding:0 18px;border-radius:10px;border:1px solid var(--sf-accent);
   background:var(--sf-sel);color:var(--sf-hi);font:600 15px var(--sf-font);cursor:pointer;}
 #hub .hm-go:hover{border-color:var(--sf-edge-hi);}
-/* CORP-2 «Домой»: лента новостей (newsScreen.ts). Раскладку решает ширина ПАНЕЛИ
-   (контейнер home): на широкой лента — липкой колонкой справа от «Моих партий», на узкой —
-   превью под дверью и вся лента шторкой. Панель прокручивается сама, как арсенал и магазин:
-   так колонка знает высоту видимой части (100cqh) и целиком помещается в неё. */
+/* The home panel keeps the games; news opens from the wallet row. */
 #hp-home{height:100%;overflow-y:auto;overscroll-behavior:contain;container:home / size;}
 #hub .home-grid,#hub .home-main{display:flex;flex-direction:column;gap:14px;min-width:0;}
-#hub .nw-col{display:none;}
-#hub .nw-teaser{display:flex;flex-direction:column;border-radius:14px;border:1px solid var(--sf-panel-edge);
-  background:var(--sf-panel);overflow:hidden;}
-@container home (min-width:760px){
-  #hub .home-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);gap:20px;align-items:start;}
-  #hub .nw-col{display:flex;flex-direction:column;position:sticky;top:0;
-    max-height:max(240px,100cqh);border-radius:14px;
-    border:1px solid var(--sf-panel-edge);background:var(--sf-panel);overflow:hidden;}
-  #hub .nw-col .nw-list{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;}
-  #hub .nw-teaser{display:none;}
-}
 .nw-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:14px 16px 0;}
 .nw-h h3{margin:0;font:600 var(--fs-heading) var(--sf-font);color:var(--sf-hi);}
-.nw-teaser .nw-h{padding-bottom:6px;}
 .nw-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px 12px;border-bottom:1px solid var(--line);}
 .nw-chip{min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--sf-edge);background:var(--sf-inset);
   color:var(--sf-dim);font:600 var(--fs-caption) var(--sf-font);cursor:pointer;white-space:nowrap;}
 .nw-chip[aria-pressed="true"]{border-color:var(--sf-accent);color:var(--sf-hi);background:var(--sf-sel);}
 .nw-chip.mine[aria-pressed="true"]{border-color:var(--grn);color:var(--grn);background:color-mix(in srgb,var(--grn) 10%,transparent);}
-.nw-chip:focus-visible,.nw-all:focus-visible{outline:2px solid var(--sf-accent);outline-offset:-2px;}
+.nw-chip:focus-visible{outline:2px solid var(--sf-accent);outline-offset:-2px;}
 .nw-list{display:flex;flex-direction:column;min-height:0;}
 /* Строка ленты: значок раздела, подпись и время, фраза, кнопки. Цвет раздела — --k. */
 .nw-it{--k:var(--sf-accent);position:relative;display:grid;grid-template-columns:36px minmax(0,1fr);gap:10px;
@@ -258,8 +244,6 @@
 .nw-pill.wait{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 55%,transparent);}
 .nw-empty{margin:0;padding:18px 16px;color:var(--sf-dim);font-size:var(--fs-body);}
 .nw-more{align-self:center;margin:10px 16px 14px;min-height:40px;padding:0 16px;border-radius:10px;}
-.nw-all{min-height:44px;border:0;border-top:1px solid var(--line);background:none;color:var(--sf-accent);
-  font:600 var(--fs-body) var(--sf-font);cursor:pointer;}
 /* Шторка ленты: на телефоне — снизу, на широком экране — окном по центру. Вне тела хаба,
    как шторки арсенала и магазина. */
 #news-sheet{position:fixed;inset:0;z-index:5;display:none;}
@@ -800,3 +784,26 @@
 #profile .pf-close{position:absolute;top:20px;right:16px;width:44px;height:44px;border-radius:12px;
   background-color:var(--sf-card);font-size:18px;z-index:2;}
 
+
+/* Readable controls and subscriptions on 320 px screens as well as desktop. */
+.news-prefs{display:flex;flex-direction:column;gap:16px;color:var(--sf-text);}
+.news-prefs fieldset{margin:0;padding:12px;border:1px solid var(--sf-edge);border-radius:12px;min-width:0;}
+.news-prefs legend{padding:0 6px;color:var(--sf-hi);font-weight:600;}
+.news-pref-topics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;}
+.news-pref-check{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;}
+.news-pref-check input{width:20px;height:20px;flex:none;accent-color:var(--sf-accent);}
+.news-pref-scope,.news-pref-search{display:flex;flex-direction:column;gap:8px;}
+.news-pref-search{margin-top:16px;}
+.news-prefs :is(input[type="search"],select),.set-language select{width:100%;min-height:44px;border:1px solid var(--sf-edge);border-radius:8px;padding:8px 10px;background:var(--sf-inset);color:var(--sf-hi);font:inherit;}
+.set-language select{width:auto;max-width:100%;}
+.news-pref-corp{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);}
+.news-pref-corp>span{min-width:0;overflow-wrap:anywhere;}
+.news-pref-corp button,.news-prefs [data-news-retry]{flex:none;min-height:44px;border-radius:8px;padding:0 12px;font:inherit;}
+.news-prefs [data-news-directory]{max-height:280px;overflow-y:auto;overscroll-behavior:contain;margin-top:8px;}
+.news-prefs .set-sub{margin:0;line-height:1.5;}
+@media (max-width:359px){
+  #hub .hub-wallet-row{gap:8px;}#hub .hub-wallet{gap:5px;}
+  #hubwallet .dl-donate,#hubwallet .tw-cur{font-size:14px;gap:6px;padding-left:8px;}
+  #hubwallet .hw-go{padding:0 8px;margin-left:0;font-size:12px;}
+  .news-pref-topics{grid-template-columns:1fr;}
+}

@@ -2600,6 +2600,7 @@ initHubScreen({
   halt: () => {
     speed = 0;
   },
+  openNewsSettings: () => openSettings('news'),
   refreshAccountDeletion: () => refreshAccountDeletion(), // объявлен ниже, у страниц входа
 });
 
@@ -2647,9 +2648,9 @@ $('cback').addEventListener('click', () => {
   openHub(); // back from the browser → the hub
 });
 // Выбор языка — кнопка со списком (`localeMenu.ts`, заказ владельца 2026-09-25): на экране
-// входа, в хабе и в меню Sector Zero. Выбор сохраняется, перезагрузка перестраивает все
+// входа и в меню Sector Zero. Выбор сохраняется, перезагрузка перестраивает все
 // рендеры на новом языке (кнопки живут только вне партии — терять нечего).
-for (const id of ['clang', 'hub-lang', 'sz-lang'])
+for (const id of ['clang', 'sz-lang'])
   mountLocaleMenu($(id), {
     current: () => LOCALE,
     pick: (locale) => {

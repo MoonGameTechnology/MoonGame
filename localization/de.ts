@@ -3234,8 +3234,6 @@ export const de: Record<string, string> = {
   'rank.total': 'Insgesamt gewertet: {n}',
   'rank.unit.influence': 'Einfl.',
   'rank.unit.xp': 'EP',
-  'news.all': 'Alle Neuigkeiten',
-  'news.all.count': 'Alle Neuigkeiten · {n}',
   'news.applied': 'Bewerbung gesendet',
   'news.battles': 'Zu den Schlachten',
   'news.card.failed': 'Die Karte ist nicht verfügbar',

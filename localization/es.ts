@@ -3230,8 +3230,6 @@ export const es: Record<string, string> = {
   'rank.total': 'total en la clasificación: {n}',
   'rank.unit.influence': 'inf',
   'rank.unit.xp': 'pe',
-  'news.all': 'Todo el canal',
-  'news.all.count': 'Todo el canal · {n}',
   'news.applied': 'Solicitud enviada',
   'news.battles': 'A las batallas',
   'news.card.failed': 'Tarjeta no disponible',

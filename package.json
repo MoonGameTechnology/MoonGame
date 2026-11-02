@@ -45,6 +45,7 @@
     "smoke:bots:chat": "node prototype/botsocialtest.mjs",
     "perf:bots": "node prototype/bot-scheduler-perf.mjs",
     "perf:bots:load": "node prototype/bot-load-perf.mjs",
+    "smoke:news": "pnpm run prototype && node prototype/newstest.mjs",
     "smoke:browser": "node prototype/browsertest.mjs",
     "smoke:browser:install": "node prototype/browsertest.mjs --install",
     "smoke:context": "node prototype/contexttest.mjs",

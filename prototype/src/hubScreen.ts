@@ -70,6 +70,7 @@ export interface HubScreenHost {
   halt(): void;
   /** Перечитать, может ли сервер удалить аккаунт. */
   refreshAccountDeletion(): Promise<void>;
+  openNewsSettings(): void;
 }
 
 let game: HubScreenHost;
@@ -105,6 +106,7 @@ export function showHub(show: boolean): void {
   if (!show) corp?.hideHub();
   // Карточка справочника, открытая в партии (её кнопки строят на выбранном мире), в хаб не переходит.
   if (show) document.getElementById('codex')?.classList.remove('show');
+  news?.setActive(show);
   hubEl.style.display = show ? 'flex' : 'none';
   // Справочник, открытый из хаба (карточка арсенала, плитка «Справка»), встаёт ПОВЕРХ хаба:
   // в партии его слой ниже, а у хаба выше, и раньше он открывался за ним (`prototype/styles/`).
@@ -149,7 +151,6 @@ export function hubTab(tab: string): void {
   // Суверены на той же плашке: баланс знает только сервер, гостю остаётся знак без числа.
   if (tab === 'home' && shop) detach('хаб: кошелёк Суверенов', shop.sync());
   if (tab === 'home' && news) detach('хаб: лента новостей', news.refresh());
-  if (tab !== 'home') news?.close(); // the feed sheet lives over the home panel
   if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
   if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
   if (tab === 'arsenal' && arsenal) detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
@@ -402,6 +403,20 @@ let medalRewards: ReturnType<typeof initMedalRewards> | null = null;
 
 /** Поднять хаб: узлы, вкладки и их экраны, профиль и награду за регистрацию.
  *  Зовётся из `main.ts` один раз, на месте прежней проводки. */
+function createHubNews() {
+  return initNews({
+    button: () => $('hub-news'), sheet: () => $('news-sheet'), identity: profileKey,
+    publicBase: () => {
+      const step = resolveBase(game.serverField(), location.protocol === 'https:');
+      return step.kind === 'ok' ? httpBase(step.base) : null;
+    },
+    authorizedBase: hubAuthorizedBase,
+    note: (text) => { hubNote.textContent = text; }, errText,
+    openCorp: (tab) => { corp?.showSection(tab === 'hq' ? 'base' : 'battles'); hubTab('corp'); },
+    openSettings: () => game.openNewsSettings(), now: () => Date.now(),
+  });
+}
+
 export function initHubScreen(host: HubScreenHost): void {
   game = host;
   hubEl = $('hub');
@@ -499,29 +514,7 @@ export function initHubScreen(host: HubScreenHost): void {
     });
   if (shop && typeof ResizeObserver !== 'undefined')
     new ResizeObserver(() => shop?.relayout()).observe($('hp-shop'));
-  // CORP-2 «Домой»: лента новостей. Экран — `newsScreen.ts`, решения — `decisions/newsFeed.ts`.
-  // Ленту сервер отдаёт без входа, поэтому ей нужен только адрес; сессия хаба — для «Моей
-  // корпорации», карточки корпорации и заявки.
-  if (!__SECTOR_ZERO_ONLY__)
-    news = initNews({
-      column: () => $('news-col'),
-      teaser: () => $('news-teaser'),
-      sheet: () => $('news-sheet'),
-      publicBase: () => {
-        const step = resolveBase(game.serverField(), location.protocol === 'https:');
-        return step.kind === 'ok' ? httpBase(step.base) : null;
-      },
-      authorizedBase: hubAuthorizedBase,
-      note: (text) => {
-        hubNote.textContent = text;
-      },
-      errText,
-      openCorp: (tab) => {
-        corp?.showSection(tab === 'hq' ? 'base' : 'battles');
-        hubTab('corp');
-      },
-      now: () => Date.now(),
-    });
+  if (!__SECTOR_ZERO_ONLY__) news = createHubNews();
   // Main-game supply has its own server-owned state; Sector Zero remains independent.
   if (!__SECTOR_ZERO_ONLY__)
     metaEconomy = initMetaEconomy({

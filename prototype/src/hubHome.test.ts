@@ -99,23 +99,11 @@ describe('главный экран хаба (UIX-10.1)', () => {
     expect(MAIN).toMatch(/initMatchBrowser\(\{[\s\S]*?\n {2}hubTab,\n[\s\S]*?\n\}\);/);
   });
 
-  it('лента новостей вместо «Сводки»: превью под дверью, колонка рядом с партиями (CORP-2)', () => {
-    // «Сводка» и карточка сезона были заглушками без данных — их место заняла лента.
-    expect(HOME).not.toContain('hub.digest');
-    expect(HOME).not.toContain('hub.season');
-    const tutor = HOME.indexOf('id="onboard-nudge"');
-    const teaser = HOME.indexOf('<section class="nw-teaser" id="news-teaser"');
-    const modes = HOME.indexOf('data-i18n="hub.modes"');
-    const mine = HOME.indexOf('id="hub-mine"');
-    const column = HOME.indexOf('<aside class="nw-col" id="news-col"');
-    expect(teaser).toBeGreaterThan(tutor);
-    expect(modes).toBeGreaterThan(teaser);
-    expect(column).toBeGreaterThan(mine);
-    // Превью — в главной колонке экрана, лента ПК — рядом с ней, а не внутри.
-    const main = HOME.slice(HOME.indexOf('<div class="home-main">'), column);
-    expect(main).toContain('id="news-teaser"');
-    expect(main).toContain('id="hub-mine"');
-    // Лента перечитывается при каждом заходе «Домой», как и свои партии.
+  it('новости открываются кнопкой в шапке, главный экран остаётся для игр', () => {
+    expect(HOME).not.toContain('id="news-teaser"');
+    expect(HOME).not.toContain('id="news-col"');
+    expect(HOME).toContain('id="hub-mine"');
+    expect(HUB).toContain("button: () => $('hub-news')");
     expect(HUB).toContain("if (tab === 'home' && news) detach('хаб: лента новостей', news.refresh());");
   });
 });
