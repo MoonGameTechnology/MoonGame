@@ -1,6 +1,6 @@
 /** ПРОИЗВОДСТВО В ХОДЕ БОТА (SLIM-3): линейные корпуса дома и военный заказ. */
 import { matchUnitCost, type UnitStack } from '../../../packages/shared-core/src/index';
-import { buildUnit } from '../../../decisions/actions';
+import { buildUnit, launchFleet } from '../../../decisions/actions';
 import { canOrder } from '../protoKernel';
 import { data } from '../gameData';
 import { ORDER_RESERVE, SHUTTLE_CAP, hasFacilityFor } from './rules';
@@ -105,4 +105,14 @@ export function warFootingOrders(bot: AiTurn, home: HomeTurn): void {
       if (!saveForLine || keepsLineBudget) out.push(buildUnit(ai, base.id, scoutUnit, 1));
     }
   }
+}
+
+/** Поднять флот с базы, пока своих флотов мало (на войне — до четырёх). */
+export function launchHomeFleet(bot: AiTurn, home: HomeTurn): void {
+  const { ai, out, isShipUnit, warFooting, ownFleets } = bot;
+  const { base } = home;
+  // (marine retired: the AI no longer cheap-builds a ground trooper. Its home keeps its
+  //  seeded infantry garrison + orbital-AA building for defence; mobile ground via divisions.)
+  const baseHasShip = base.garrison.some((st) => isShipUnit(st.unit));
+  if (ownFleets < (warFooting ? 4 : 2) && baseHasShip) out.push(launchFleet(ai, base.id));
 }
