@@ -79,3 +79,17 @@ export function armyTransferRows(state: GameState, fleet: Fleet, mine: boolean, 
     ...rows(fleet.landing ?? [], 'hold', fleet.unloading ?? []),
   ];
 }
+
+/** Tutorial readiness follows the same current formation rows as the transfer menu. */
+export function hasPlannedArmyLoad(
+  state: GameState,
+  selection: { fleetId: string; plan: Record<string, number> } | null | undefined,
+  unit: string,
+  data: GameData,
+): boolean {
+  const fleet = selection && state.fleets[selection.fleetId];
+  if (!selection || !fleet?.location) return false;
+  return armyTransferRows(state, fleet, state.planets[fleet.location]?.owner === fleet.owner, data)
+    .some((row) => row.side === 'garrison' && row.unit === unit && row.prepared &&
+      row.garrison > row.reserved && (selection.plan[row.key] ?? 0) > 0);
+}

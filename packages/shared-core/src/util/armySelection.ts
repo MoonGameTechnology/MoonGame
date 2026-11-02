@@ -10,6 +10,15 @@ export interface ArmySelection {
   unit: string;
   count: number;
   sources?: ArmySource[];
+  first?: 'wounded' | 'healthy';
+}
+
+/** Preserve the existing type-only priority when pinning a legacy claim. */
+function sourceOrder(stacks: readonly UnitStack[], first?: ArmySelection['first']): readonly UnitStack[] {
+  if (!first) return stacks;
+  const preferred = (s: UnitStack) =>
+    (s.hp !== undefined || s.shieldHp !== undefined) === (first === 'wounded');
+  return [...stacks.filter(preferred), ...stacks.filter((s) => !preferred(s))];
 }
 
 /** Remaining units per persistent group, after all claims on the same source. */
@@ -24,7 +33,7 @@ export function armyFreeGroups(
   // Old saved orders still reserve their original first-available selection.
   for (const claim of claims)
     if (claim.sources === undefined) {
-      for (const source of selectArmySources(stacks, free, claim.unit, claim.count))
+      for (const source of selectArmySources(stacks, free, claim.unit, claim.count, undefined, claim.first))
         free.set(source.group, (free.get(source.group) ?? 0) - source.count);
     }
   return free;
@@ -36,9 +45,10 @@ export function selectArmySources(
   unit: string,
   count: number,
   group?: string,
+  first?: ArmySelection['first'],
 ): ArmySource[] {
   const sources: ArmySource[] = [];
-  for (const stack of stacks) {
+  for (const stack of sourceOrder(stacks, first)) {
     if (count <= 0) break;
     if (
       stack.unit !== unit ||
@@ -74,6 +84,8 @@ export function prepareArmyGroups(
         armyFreeGroups(stacks, pinned),
         claim.unit,
         claim.count,
+        undefined,
+        claim.first,
       );
       pinned.push(claim);
     }
@@ -94,7 +106,7 @@ export function takeArmySelection(
   claim: ArmySelection,
   count: number,
 ): UnitStack[] {
-  if (claim.sources === undefined) return takeFromStacks(stacks, claim.unit, count);
+  if (claim.sources === undefined) return takeFromStacks([...sourceOrder(stacks, claim.first)], claim.unit, count);
   const moved: UnitStack[] = [];
   for (const source of claim.sources) {
     const stack = stacks.find((s) => s.armyGroup === source.group && s.unit === claim.unit);

@@ -14,6 +14,9 @@ import { cappedUnitStat } from '../util/stacks';
 import { volleyShare } from '../util/volley';
 import { effectiveStats } from '../util/loadout';
 import { deepClone } from '../util/clone';
+import { divertFortressDamage } from '../util/fortressDamage';
+import type { Planet } from './gameState';
+import { refreshFortressBody } from './fortress';
 
 /**
  * Combat preview — «если атакую — что будет?» (ONB-6 / G4, onboarding-roadmap §ONB-6).
@@ -99,6 +102,8 @@ function lossesOf(before: readonly UnitStack[], after: UnitStack[]): UnitStack[]
 /** Одна сторона в многостороннем прогнозе: чем она бьёт и кому враждебна. */
 export interface PreviewSideInput {
   units: readonly UnitStack[];
+  /** Known internal systems of this fortress body, if the side is a fortress. */
+  fortress?: Planet;
   /** Роль в ИДУЩЕМ бою: атакующий бьёт `attack`, обороняющийся отвечает `defense`. В
    *  следующих звеньях цепочки роли раздаёт правило пересцепки (см. {@link previewSides}). */
   role: 'attacker' | 'defender';
@@ -163,6 +168,7 @@ export function previewSides(
 ): MultiBattlePreview {
   // damageUnits мутирует то, что ему дали, — симуляция идёт по приватным копиям.
   const live = input.map((s) => deepClone(s.units as UnitStack[]).filter((x) => x.count > 0));
+  const structures = input.map((s) => s.fortress ? deepClone(s.fortress) : undefined);
   const up = (i: number): boolean => alive(live[i]!);
   const foes = (i: number, j: number): boolean =>
     i !== j && (hostile ? hostile(input[i]!.owner, input[j]!.owner) : true);
@@ -213,7 +219,8 @@ export function previewSides(
     if (!fired) return false;
     for (const i of link) {
       if (!(incoming[i]! > 0)) continue;
-      const pools = byClass[i];
+      incoming[i] = divertFortressDamage(structures[i], live[i]!, incoming[i]!, data).hullInput;
+      const pools = structures[i]?.fortress ? undefined : byClass[i];
       live[i] = pools
         ? damageByClass(
             live[i]!,
@@ -221,6 +228,8 @@ export function previewSides(
             data,
           ).survivors
         : damageUnits(live[i]!, incoming[i]!, data).survivors;
+      const structure = structures[i];
+      if (structure?.fortress) for (const body of live[i]!) refreshFortressBody(structure, body, data);
     }
     return true;
   };

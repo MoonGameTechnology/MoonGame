@@ -17,11 +17,14 @@ import { isAllied } from '../util/combat';
 import { hasMapShare } from '../state/diplomacy';
 import { fleetHoldFree } from '../state/shuttle';
 
+export type LoadFirst = NonNullable<LoadingClaim['first']>;
+
 interface TransferPayload {
   fleetId: string;
   unit: string;
   count?: number;
   group?: string;
+  first?: LoadingClaim['first'];
 }
 
 /**
@@ -86,7 +89,7 @@ function claimedCargo(fleet: Fleet, data: GameData): number {
  */
 export const armyModule: GameModule = {
   id: 'army',
-  version: '1.3.0',
+  version: '1.4.0',
   setup(api) {
     api.onAction('army.prepare', (action, h) => {
       const p = action.payload as { fleetId?: unknown } | undefined;
@@ -133,6 +136,9 @@ export const armyModule: GameModule = {
 
     api.onAction('army.load', (action, h) => {
       const { fleet, planet, def, unit, count, group } = resolve(action, h);
+      const first = (action.payload as Partial<TransferPayload>).first;
+      if (first !== undefined && first !== 'wounded' && first !== 'healthy')
+        return h.reject('E_BAD_PAYLOAD');
       // Поднять можно ТОЛЬКО со своего мира. Союзный гарнизон — не твой ресурс:
       // иначе «помощь» превращалась бы в вывоз чужой обороны.
       if (planet.owner !== action.playerId) {
@@ -158,6 +164,7 @@ export const armyModule: GameModule = {
         unit,
         count,
         group,
+        first,
       );
       // Уже обещанное вычитается ОБА раза: из гарнизона (два флота у одного мира не
       // вычерпают одну роту) и из трюма (два заказа подряд не пообещают один отсек).
@@ -179,6 +186,7 @@ export const armyModule: GameModule = {
         unit,
         count,
         sources,
+        ...(first ? { first } : {}),
         from: planet.id,
         startAt: h.ctx.now,
         doneAt,

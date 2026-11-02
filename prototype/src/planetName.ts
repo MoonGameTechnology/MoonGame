@@ -130,6 +130,8 @@ function namesOf(planets: GameState['planets']): ReadonlyMap<string, string> {
  *  не провинция: её имя по провинции её развилки. Узла нет на карте — остаётся его id:
  *  выдуманное имя назвало бы мир, которого нет. */
 export function worldName(state: Pick<GameState, 'mapId' | 'planets'>, id: string): string {
+  const host = state.planets[id]?.stationHost;
+  if (host) return t('place.province-fortress', { planet: worldName(state, host) });
   const fork = state.planets[id]?.fork;
   if (fork) return t('place.fork-fortress', { planet: worldName(state, fork.province) });
   return provinceName(state.mapId, id) ?? namesOf(state.planets).get(id) ?? id;

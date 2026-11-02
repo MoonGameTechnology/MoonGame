@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   act,
+  deployStation,
+  deployForkFortress,
+  repairStation,
+  repairBuilding,
   allyCancel,
   allyOrder,
   assaultFleet,
@@ -102,6 +106,10 @@ import {
  */
 const P = 'p1';
 const CALLS: ReadonlyArray<readonly [string, Action]> = [
+  ['deployStation', deployStation(P, 'a', ['targeting_array'])],
+  ['deployForkFortress', deployForkFortress(P, 'a', 0)],
+  ['repairStation', repairStation(P, 'station-a')],
+  ['repairBuilding', repairBuilding(P, 'a', 'mine', 'uid:mine')],
   ['deployRocketMine', deployRocketMine(P, 'f1', 'confirmed')],
   ['setRocketMineMode', setRocketMineMode(P, 'mine:1', 'any')],
   ['disarmRocketMine', disarmRocketMine(P, 'mine:1')],
@@ -258,7 +266,7 @@ describe('строители приказов против схем гейта',
     expect(isValidActionPayload('swarm.adapt', swarmAdapt(P, 'veil', 'f1').payload)).toBe(false);
   });
 
-  it('два приказа каталога не строит НИКТО — у игрока нет способа их отдать', () => {
+  it('один приказ каталога не имеет строителя — у игрока нет способа их отдать', () => {
     // Не придирка к списку, а честный замер охвата. Список зафиксирован, чтобы новая дыра
     // не появилась молча, а закрытая — заставила его сократить: так и вышло в AUD-18,
     // когда `hero.move` и `planet.annihilate` ушли из ядра и с шлюза (второй был живым
@@ -266,7 +274,6 @@ describe('строители приказов против схем гейта',
     // `seat.claim`: заявку места подаёт только сервер во входе (`joinSeat.ts`).
     const built = new Set(CALLS.map(([, a]) => a.type));
     expect(CLIENT_ACTION_TYPES.filter((t) => !built.has(t)).sort()).toEqual([
-      'station.deploy',
       'technology.boost',
     ]);
   });

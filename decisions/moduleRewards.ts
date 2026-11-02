@@ -1,9 +1,10 @@
-import type { ArsenalItem } from '../packages/shared-core/src/index';
+import { RARITIES, type ArsenalItem } from '../packages/shared-core/src/index';
 
 export interface ModuleReward {
-  kind: 'received' | 'upgraded';
+  kind: 'received' | 'upgraded' | 'rarity';
   item: ArsenalItem;
   previousGrade: number;
+  previousRarity?: ArsenalItem['rarity'];
 }
 
 /** Compare confirmed inventories, never a preview or an optimistic write. The first
@@ -20,6 +21,8 @@ export function moduleRewards(
     if (!old || old.defId !== item.defId || old.kind !== item.kind)
       return item.origin === 'starter' ? [] : [{ kind: 'received', item, previousGrade: 0 }];
     const previousGrade = old.grade ?? 0;
-    return (item.grade ?? 0) > previousGrade ? [{ kind: 'upgraded', item, previousGrade }] : [];
+    if ((item.grade ?? 0) > previousGrade) return [{ kind: 'upgraded', item, previousGrade }];
+    return item.rarity && RARITIES.indexOf(item.rarity) > RARITIES.indexOf(old.rarity ?? 'simple')
+      ? [{ kind: 'rarity', item, previousGrade, previousRarity: old.rarity }] : [];
   });
 }

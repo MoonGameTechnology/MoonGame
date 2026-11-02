@@ -434,6 +434,23 @@ describe('army — раненые выжившие перевозятся (2026-
     expect(landed.fleets.F?.landing).toEqual([]);
   });
 
+  it('игрок выбирает, кого поднимать первыми: раненых или целых', () => {
+    const kernel = createKernel([armyModule]);
+    const first = (f: 'wounded' | 'healthy'): Action => ({ ...load('F', 'militia', 3), payload: { fleetId: 'F', unit: 'militia', count: 3, first: f } });
+    const w = advanced(kernel, okApply(kernel.applyAction(st(), first('wounded'), ctx)).state, HOUR);
+    expect(w.fleets.F?.landing).toEqual([{ ...wounded, count: 3, hp: 30 }]);
+    expect(w.planets.A?.garrison).toMatchObject([{ unit: 'militia', count: 2 }, { ...wounded, count: 1, hp: 10 }]);
+    const hl = advanced(kernel, okApply(kernel.applyAction(st(), first('healthy'), ctx)).state, HOUR);
+    expect(hl.fleets.F?.landing).toEqual([{ unit: 'militia', count: 2 }, { ...wounded, count: 1, hp: 10 }]);
+    expect(hl.planets.A?.garrison).toMatchObject([{ ...wounded, count: 3, hp: 30 }]);
+  });
+
+  it('неизвестная очерёдность отклоняется', () => {
+    const kernel = createKernel([armyModule]);
+    const bad: Action = { ...load('F', 'militia', 1), payload: { fleetId: 'F', unit: 'militia', count: 1, first: 'random' } };
+    expect(errCode(kernel.applyAction(st(), bad, ctx))).toBe('E_BAD_PAYLOAD');
+  });
+
   it('больше, чем есть во всех стеках, не поднять', () => {
     const kernel = createKernel([armyModule]);
     expect(errCode(kernel.applyAction(st(), load('F', 'militia', 7), ctx))).toBe('E_NO_ARMY');

@@ -447,7 +447,7 @@ export const movementModule: GameModule = {
   id: 'movement',
   // 1.6.0 — unknown territory is explored in flight; only discovered borders halt it.
   // 1.7.0 — a fleet mid-landing may take a course; leaving cancels the landing.
-  version: '1.7.0',
+  version: '1.8.0',
   setup(api) {
     // Closure-scoped cache, shared across actions; keyed by `state.topology` so a
     // hero temp lane mutating `links` invalidates stale routes (see RouteCache).

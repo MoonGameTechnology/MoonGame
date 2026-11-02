@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.72'); // Ship modules: combat and defence numbers halved.
+    expect(data.version).toBe('0.1.74'); // Hero mobilization and research-gated command slots.
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -236,7 +236,7 @@ describe('game data schema (docs/architecture.md §2)', () => {
     const bays = (u: typeof frigate): number =>
       u.slots.weapon + u.slots.defense + u.slots.utility;
     for (const [id, def] of Object.entries(data.units)) {
-      if (id === 'frigate' || id === 'pirate_frigate') continue;
+      if (id === 'frigate' || id === 'pirate_frigate' || def.traits.includes('issued')) continue;
       expect(bays(def), id).toBeLessThan(bays(frigate));
     }
     // Навеска не безразмерна: ЗАЩИТНЫЙ отсек у фрегата один, и второй защитный модуль
@@ -409,6 +409,7 @@ describe('game data schema (docs/architecture.md §2)', () => {
       'drop_training → unit:drop_infantry',
       'field_fortification → building:fort',
       'field_medicine → building:hospital',
+      'field_medicine → building:station_medbay',
       'fiscal_administration → building:tax_office',
       'flagship_command → unit:hero',
       'frigate_design → unit:frigate',
@@ -418,6 +419,7 @@ describe('game data schema (docs/architecture.md §2)', () => {
       'landing_design → unit:landing_shuttle',
       'militia_training → unit:militia',
       'orbital_defense_grid → building:orbital_aa',
+      'orbital_defense_grid → building:station_defense',
       'picket_design → unit:picket_frigate',
       'scout_design → unit:scout',
       'siege_doctrine → unit:siege_lance',
@@ -426,7 +428,9 @@ describe('game data schema (docs/architecture.md §2)', () => {
       'strike_vectors → unit:heavy_striker',
       'vehicle_works → building:factory',
       'void_fortification → building:starfort',
+      'void_shielding → building:station_shield',
       'void_shielding → building:void_shield',
+      'void_shipworks → building:station_hangar',
       'void_shipworks → building:void_hangar',
     ]);
   });

@@ -10,6 +10,11 @@ export function loadoutKey(modules?: readonly string[]): string {
   return [...modules].sort().join(',');
 }
 
+/** Values are part of stack identity: live arsenal upgrades must never refit old ships by merging. */
+export function moduleValueKey(stack: Pick<UnitStack, 'modules' | 'moduleStars' | 'moduleRarity'>): string {
+  return JSON.stringify([...(stack.modules ?? [])].sort().map((id) => [id, stack.moduleStars?.[id] ?? 0, stack.moduleRarity?.[id] ?? '']));
+}
+
 /** A healthy (non-combat) stack of `unit` with the SAME loadout in `stacks`, if
  *  any — full hull AND full shield (both pools undefined), so a battle-damaged or
  *  differently-fitted stack never silently merges. */
@@ -20,6 +25,7 @@ export function findHealthyStack(
   /** Искать стек ТОЙ ЖЕ выслуги (см. {@link serviceKey}) — для слияния: ветераны и новички
    *  одного корпуса не сливаются. Не передано — любая выслуга (поиск источника). */
   battles?: number,
+  values?: Pick<UnitStack, 'moduleStars' | 'moduleRarity'>,
 ): UnitStack | undefined {
   const key = loadoutKey(modules);
   const service = battles === undefined ? null : serviceKey(battles);
@@ -29,6 +35,7 @@ export function findHealthyStack(
       s.hp === undefined &&
       s.shieldHp === undefined &&
       loadoutKey(s.modules) === key &&
+      (values === undefined || moduleValueKey(s) === moduleValueKey({ modules: modules ? [...modules] : undefined, ...values })) &&
       (service === null || serviceKey(s.battles) === service),
   );
 }
@@ -92,9 +99,7 @@ export function rarityOf(
  *  the same type AND loadout when one exists, else appending a fresh stack (which
  *  carries `modules` — and the звёздность `stars` of those modules — when given).
  *
- *  Звёзды в идентичность слияния НЕ входят: они замороженное свойство владельца,
- *  снятое один раз на матч, так что два стека одного игрока с одним лоадаутом всегда
- *  несут одинаковые звёзды (см. {@link UnitStack.moduleStars}). */
+ *  Stars and rarity are pinned per order and participate in merge identity. */
 export function addUnits(
   stacks: UnitStack[],
   unit: string,
@@ -118,7 +123,7 @@ export function addUnits(
   if (merit?.damageDealt !== undefined) carried.damageDealt = merit.damageDealt;
   if (merit?.battles !== undefined) carried.battles = merit.battles;
   if (merit?.promoted !== undefined) carried.promoted = merit.promoted;
-  const stack = findHealthyStack(stacks, unit, modules, carried.battles ?? 0);
+  const stack = findHealthyStack(stacks, unit, modules, carried.battles ?? 0, { moduleStars: stars, moduleRarity: rarity });
   if (stack) {
     // Сливается только стек той же выслуги (`serviceKey`): свежая постройка к ветеранам
     // не доливается, а встаёт отдельно. Усреднение ниже осталось для урона и отметки
@@ -229,7 +234,7 @@ export function mergeStacks(base: UnitStack[], add: UnitStack[]): UnitStack[] {
             o.hp === undefined &&
             o.shieldHp === undefined &&
             o.armyGroup === st.armyGroup &&
-            loadoutKey(o.modules) === loadoutKey(st.modules) &&
+            moduleValueKey(o) === moduleValueKey(st) &&
             serviceKey(o.battles) === serviceKey(st.battles),
         )
       : undefined;

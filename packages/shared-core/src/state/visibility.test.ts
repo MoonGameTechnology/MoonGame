@@ -1522,9 +1522,10 @@ describe('свой бой виден целиком (баг владельца 2
     expect(flash.get('b9')).toEqual(['p2', null, 'p3']);
   });
 
-  it('бой кончился — враг снова прячется в тумане', () => {
+  it('бой кончился и свои ушли — враг снова прячется в тумане', () => {
     const after = laneBattle();
     after.battles = {};
+    delete after.fleets.mine;
     after.fleets.foe = { ...after.fleets.foe!, battleId: null };
     expect(visibleState(after, 'p1', data).fleets.foe).toBeUndefined();
   });

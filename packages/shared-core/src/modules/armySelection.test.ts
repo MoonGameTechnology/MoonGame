@@ -70,6 +70,16 @@ function complete(s: GameState): GameState {
 const prepared = () => apply(initial(), 'army.prepare', { fleetId: 'f' });
 
 describe('explicit army formation selection', () => {
+  it('pins a legacy wounded-first reservation before admitting an exact healthy selection', () => {
+    let s = initial();
+    s.fleets.f!.loading = [{ unit: 'infantry', count: 3, from: 'a', startAt: 0, doneAt: 3_600_000, first: 'wounded' }];
+    s = apply(s, 'army.prepare', { fleetId: 'g' });
+    const wounded = s.planets.a!.garrison[1]!;
+    const healthy = s.planets.a!.garrison[0]!;
+    expect(s.fleets.f!.loading![0]!.sources).toEqual([{ group: wounded.armyGroup, count: 3 }]);
+    s = apply(s, 'army.load', { fleetId: 'g', unit: 'infantry', count: 4, group: healthy.armyGroup });
+    expect(s.fleets.g!.loading![0]!.sources).toEqual([{ group: healthy.armyGroup, count: 4 }]);
+  });
   it('prepares stable identities without changing counts, wounds or the input state', () => {
     const before = initial();
     const after = apply(before, 'army.prepare', { fleetId: 'f' });

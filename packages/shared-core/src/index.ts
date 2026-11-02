@@ -59,6 +59,8 @@ export {
   type SeenPatrol,
   type UnitStack,
   type BuildingInstance,
+  type FortressState,
+  type RepairWork,
   type PausedConstructionSite,
   type QueuedConstruction,
   type ActiveResearch,
@@ -145,6 +147,12 @@ export {
   type TrunkSpan,
 } from './state/roads';
 export { forkPoint, forkSiteEdge, forkSiteId, forkSiteInBattle, isForkSite } from './state/forkSite';
+export {
+  FORTRESS_CORE, FORTRESS_BODY, FORTRESS_DEPLOY_COST, FORTRESS_FLEET_PREFIX,
+  stationSiteId, fortressFleetId, fortressSiteOf, stationBerth, fleetAtStation,
+  serviceSitesForFleet, repairQuote, buildingRepairQuote, fortressRepairQuote,
+  fortressLoadoutHull, issuedFortressModule, refreshFortressBody, type RepairQuote,
+} from './state/fortress';
 export {
   sectorKindDef,
   provinceScore,
@@ -574,6 +582,7 @@ export {
   serviceKey,
   SERVICE_MERGE_CAP,
 } from './util/stacks';
+export { buildModuleCopies, constructionModuleSnapshot } from './util/arsenalLoadout';
 export {
   effectiveStats,
   moduleStarMultiplier,
@@ -704,7 +713,7 @@ export {
 } from './modules/sprawl';
 export { veteranModule } from './modules/veteran';
 export { promotionModule } from './modules/promotion';
-export { armyModule } from './modules/army';
+export { armyModule, type LoadFirst } from './modules/army';
 export { fleetOpsModule } from './modules/fleetOps';
 export { autoRallyModule } from './modules/autoRally';
 export { rallyPointOf } from './state/rallyPoint';
@@ -731,6 +740,7 @@ export {
 } from './modules/hero';
 export type { HeroEffect, HeroEffectArgs } from './modules/hero';
 export { heroEffectsModule } from './modules/heroEffects';
+export { heroActiveCap, activeHeroCount } from './state/heroDeployment';
 export {
   stewardModule,
   stewardActive,

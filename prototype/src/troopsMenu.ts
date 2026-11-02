@@ -25,6 +25,8 @@ export interface TroopsUnitInput extends Partial<ArmyGroupDetails> {
   reserved: number;
   /** Место под одну единицу. */
   cargoSize: number;
+  /** Сколько из `garrison` — в раненых стеках. Нужно, чтобы спросить, кого грузить первыми. */
+  wounded?: number;
 }
 
 export interface TroopsInput {
@@ -37,6 +39,8 @@ export interface TroopsInput {
   reservedCargo: number;
   /** План: ключ группы → знаковая дельта (>0 погрузить, <0 выгрузить). */
   plan: Record<string, number>;
+  /** Игрок нажал «Подтвердить», и меню спрашивает, кого грузить первыми. */
+  asking?: boolean;
 }
 
 export interface TroopsRow extends TroopsUnitInput {
@@ -64,6 +68,11 @@ export interface TroopsModel {
   garrisonDry: boolean;
   /** Есть ли что подтверждать. */
   valid: boolean;
+  /** Перед погрузкой спросить, кого брать первыми: у какого-то типа плана в гарнизоне
+   *  есть и раненые, и целые, а берётся не весь доступный запас. */
+  askFirst: boolean;
+  /** Вопрос «кого первыми» уже на экране. */
+  asking: boolean;
 }
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
@@ -134,6 +143,11 @@ export function troopsModel(input: TroopsInput): TroopsModel {
       free >= minSize &&
       rows.some((r) => r.garrisonAll > 0 || r.reserved > 0),
     valid: loadTotal + unloadTotal > 0,
+    askFirst: rows.some((r) => {
+      const w = r.wounded ?? 0;
+      return !r.group && r.delta > 0 && w > 0 && w < r.garrison && r.delta < r.garrison - r.reserved;
+    }),
+    asking: !!input.asking,
   };
 }
 
@@ -257,10 +271,17 @@ export function troopsMenuHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
     (m.garrisonDry ? `<div class="tnote warn">${esc(t('cargo.garrison-empty'))}</div>` : '') +
     `<div class="tnote">${esc(t('troops.timing'))}</div>` +
     `<div class="tnote">${esc(t('troops.selection-note'))}</div>` +
-    `<div class="tacts">` +
-    `<button data-cmd="tok" class="cbtn btn-main"${m.valid ? '' : ' disabled'}>${esc(t('split.confirm'))}</button>` +
-    `<button data-cmd="tcancel" class="cbtn btn-quiet">${esc(t('ping.cancel'))}</button>` +
-    `</div>` +
+    (m.asking && m.askFirst
+      ? `<div class="tnote">${esc(t('troops.first.ask'))}</div>` +
+        `<div class="tacts">` +
+        `<button data-cmd="tfirst" data-first="wounded" class="cbtn btn-main">${esc(t('troops.first.wounded'))}</button>` +
+        `<button data-cmd="tfirst" data-first="healthy" class="cbtn btn-main">${esc(t('troops.first.healthy'))}</button>` +
+        `<button data-cmd="tcancel" class="cbtn btn-quiet">${esc(t('ping.cancel'))}</button>` +
+        `</div>`
+      : `<div class="tacts">` +
+        `<button data-cmd="tok" class="cbtn btn-main"${m.valid ? '' : ' disabled'}>${esc(t('split.confirm'))}</button>` +
+        `<button data-cmd="tcancel" class="cbtn btn-quiet">${esc(t('ping.cancel'))}</button>` +
+        `</div>`) +
     `</div>`
   );
 }

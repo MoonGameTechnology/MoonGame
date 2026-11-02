@@ -147,10 +147,10 @@ export const relocateAloft = (
 ) => act(playerId, 'shuttle.relocate', { strikeId, ...dest });
 /** Перегрузка ЭСКАДРЫ между космопортом мира и стоящим там носителем (SHU-2.1):
  *  `load` — с мира на борт, `unload` — с борта на мир. Соединение едет целиком. */
-export const loadShuttle = (playerId: string, fleetId: string, squadronId: string) =>
-  act(playerId, 'shuttle.load', { fleetId, squadronId });
-export const unloadShuttle = (playerId: string, fleetId: string, squadronId: string) =>
-  act(playerId, 'shuttle.unload', { fleetId, squadronId });
+export const loadShuttle = (playerId: string, fleetId: string, squadronId: string, planetId?: string) =>
+  act(playerId, 'shuttle.load', { fleetId, squadronId, ...(planetId ? { planetId } : {}) });
+export const unloadShuttle = (playerId: string, fleetId: string, squadronId: string, planetId?: string) =>
+  act(playerId, 'shuttle.unload', { fleetId, squadronId, ...(planetId ? { planetId } : {}) });
 /** Делёж и слияние эскадр в пределах базы (SHU-4.2). */
 export const splitSquadron = (
   playerId: string,
@@ -173,14 +173,19 @@ export const mergeSquadron = (
 ) => act(playerId, 'shuttle.merge', { ...base, squadronId, intoId });
 export const prepareArmy = (playerId: string, fleetId: string) =>
   act(playerId, 'army.prepare', { fleetId });
+/** Explicit group ID, or the legacy wounded/healthy priority for type-only callers. */
 export const loadArmy = (
   playerId: string,
   fleetId: string,
   unit: string,
   count = 1,
-  group?: string,
-) =>
-  act(playerId, 'army.load', { fleetId, unit, count, ...(group !== undefined ? { group } : {}) });
+  groupOrFirst?: string,
+) => act(playerId, 'army.load', {
+  fleetId, unit, count,
+  ...(groupOrFirst === 'wounded' || groupOrFirst === 'healthy'
+    ? { first: groupOrFirst }
+    : groupOrFirst !== undefined ? { group: groupOrFirst } : {}),
+});
 export const unloadArmy = (
   playerId: string,
   fleetId: string,
@@ -250,16 +255,18 @@ export const resumeConstruction = (playerId: string, planetId: string, id: numbe
   act(playerId, 'construction.resume', { planetId, id });
 export const engageFleet = (playerId: string, fleetId: string, targetId: string) =>
   act(playerId, 'fleet.engage', { fleetId, targetId });
-/** Возвести КОСМИЧЕСКУЮ КРЕПОСТЬ на своём узле (`stationModule`): местность становится
- *  владением с орбитой и своим ростером построек. Можно ли — решает `fortressRaise.ts`
- *  тем же правилом, что и редьюсер. */
-export const deployStation = (playerId: string, planetId: string) =>
-  act(playerId, 'station.deploy', { planetId });
+/** Lay a separate immobile fortress at an owned province; terrain stays intact. */
+export const deployStation = (playerId: string, planetId: string, modules?: string[]) =>
+  act(playerId, 'station.deploy', { planetId, ...(modules ? { modules } : {}) });
 /** Поставить космическую крепость на РАЗВИЛКУ тропы `trail` своей провинции `province`
  *  (FORT-6.1): крепость встаёт на ромб развилки, её орудия ловят каждого на этой тропе.
  *  Можно ли — решает `forkFortressRaise` (`fortressRaise.ts`) тем же правилом, что и ядро. */
-export const deployForkFortress = (playerId: string, province: string, trail: number) =>
-  act(playerId, 'station.deploy', { planetId: province, trail });
+export const deployForkFortress = (playerId: string, province: string, trail: number, modules?: string[]) =>
+  act(playerId, 'station.deploy', { planetId: province, trail, ...(modules ? { modules } : {}) });
+export const repairStation = (playerId: string, planetId: string) =>
+  act(playerId, 'station.repair', { planetId });
+export const repairBuilding = (playerId: string, planetId: string, building: string, uid?: string) =>
+  act(playerId, 'building.repair', { planetId, building, ...(uid ? { uid } : {}) });
 /** Begin researching a session technology (one active at a time — technologyModule). */
 export const researchTech = (playerId: string, technology: string) =>
   act(playerId, 'technology.research', { technology });

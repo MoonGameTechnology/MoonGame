@@ -1,3 +1,7 @@
+import { readMatchRewards } from './metaMatchRewards';
+import { moduleQuotes, upgradeModule, selectModule, grantModuleBlueprint, moduleBlueprintOdds } from './moduleProgression';
+import type { ModuleUpgradeCommand } from '@void/protocol';
+import type { GameData } from '@void/shared-core';
 import { createHash, randomUUID } from 'node:crypto';
 import { hashJson as gameDataHash, type ArsenalItem } from '@void/shared-core';
 import { CORP_BACKDROP_STANDARD, CORP_STYLE_STANDARD } from '@void/protocol';
@@ -55,6 +59,8 @@ export interface MatchRewardFacts {
 }
 
 export interface MetaEconomyDeps {
+  moduleData?: Pick<GameData, 'modules' | 'sectorZeroStars'>;
+  moduleSeed?: () => string;
   store: MetaEconomyStore;
   catalog: MetaEconomyCatalog;
   /** Retain fulfilled-order editions while their provider deliveries/refunds remain live. */
@@ -265,6 +271,7 @@ export class MetaEconomy {
       }
       const now = this.now();
       return {
+        ...(this.deps.moduleData ? { moduleUpgrades: await moduleQuotes(tx, accountId, account, items, this.deps.moduleData), warrants: await tx.warrants(accountId), moduleBlueprints: account.moduleBlueprints ?? {}, moduleBlueprintOdds } : {}),
         catalogVersion: this.deps.catalog.version,
         sovereigns: account.sovereigns ?? 0,
         premiumUntil: premiumActive(account, now) ? account.premiumUntil! : null,
@@ -345,26 +352,16 @@ export class MetaEconomy {
     });
   }
 
-  /** A result screen reads committed grants; opening it can never award game value. */
-  async matchRewards(accountId: string, matchId: string): Promise<MetaMatchRewardsView> {
-    // Observe the final commit first. A successful final receipt closes the operation,
-    // so its earlier stage receipts are visible to every following read. Reading stages
-    // first could combine an old empty stage snapshot with a newly committed final.
-    const final = await this.deps.store.receipt(
-      metaSettlementReceiptKey({ accountId, matchId, kind: 'final' }),
-    );
-    const keys = this.deps.catalog.rewards.stageFractions
-      .slice(0, 10)
-      .map((_fraction, index) =>
-        metaSettlementReceiptKey({ accountId, matchId, kind: 'stage', stage: index + 1 }),
-      );
-    const stored = [...(await Promise.all(keys.map((key) => this.deps.store.receipt(key)))), final];
-    const receipts = stored.flatMap((row) => {
-      const result = row?.response as MetaCommandResult | undefined;
-      return result?.ok && result.receipt ? [result.receipt] : [];
-    });
-    const finalResult = final?.response as MetaCommandResult | undefined;
-    return { receipts, finalReady: Boolean(finalResult?.ok && finalResult.receipt) };
+  matchRewards(accountId: string, matchId: string): Promise<MetaMatchRewardsView> {
+    return readMatchRewards(this.deps.store, this.deps.catalog, accountId, matchId);
+  }
+
+  upgradeModule(accountId: string, command: ModuleUpgradeCommand): Promise<MetaCommandResult> {
+    return this.command(accountId, command.requestId, 'module-upgrade', command, (tx, account, receipt) =>
+      upgradeModule(tx, accountId, account, receipt, command, this.deps.moduleData, reject, this.deps.moduleSeed));
+  }
+  selectModule(accountId: string, command: MetaSalvageCommand): Promise<MetaCommandResult> {
+    return this.command(accountId, command.requestId, 'module-select', command, (tx) => selectModule(tx, accountId, command.itemId, reject));
   }
 
   setSupplyGoal(accountId: string, command: MetaSupplyGoalCommand): Promise<MetaCommandResult> {
@@ -1037,6 +1034,7 @@ export class MetaEconomy {
       'settlement',
       facts,
       async (tx, account, receipt) => {
+        if (facts.kind === 'final' && this.deps.moduleData) grantModuleBlueprint(account, receipt, facts.place === 1, this.deps.moduleSeed);
         const policy = this.deps.catalog.rewards;
         const operation = (account.operations[facts.matchId] ??= {
           materials: {},

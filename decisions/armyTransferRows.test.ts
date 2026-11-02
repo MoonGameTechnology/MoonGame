@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, parseGameData, type Fleet } from '../packages/shared-core/src/index';
-import { armyTransferRows } from './armyTransferRows';
+import { armyTransferRows, hasPlannedArmyLoad } from './armyTransferRows';
 
 const stats = { attack: 1, defense: 1, speed: 0, hp: 20, cargoSize: 1 };
 const data = parseGameData({
@@ -79,6 +79,20 @@ function fixture() {
   return { state, fleet };
 }
 describe('army transfer source rows', () => {
+  it('recognizes a selected formation for tutorial readiness and ignores unloads, stale groups and other types', () => {
+    const { state, fleet } = fixture();
+    state.fleets[fleet.id] = fleet;
+    const selected = (plan: Record<string, number>, unit = 'infantry') =>
+      hasPlannedArmyLoad(state, { fleetId: fleet.id, plan }, unit, data);
+    expect(selected({ 'garrison:new': 2 })).toBe(true);
+    expect(selected({ 'garrison:veteran': 1 })).toBe(true);
+    expect(selected({ 'hold:aboard': -1 })).toBe(false);
+    expect(selected({ 'garrison:missing': 1 })).toBe(false);
+    expect(selected({ 'garrison:new': 1 }, 'fort')).toBe(false);
+    expect(selected({})).toBe(false);
+    state.planets.a!.garrison[0]!.count = 0;
+    expect(selected({ 'garrison:new': 1 })).toBe(false);
+  });
   it('distinguishes same-type groups by health and service and subtracts all source reservations', () => {
     const { state, fleet } = fixture();
     const before = structuredClone(state);

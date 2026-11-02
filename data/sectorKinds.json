@@ -17,7 +17,9 @@
     "capturable": true,
     "buildable": true,
     "orbit": false,
-    "allowedBuildings": ["metal_station"],
+    "allowedBuildings": [
+      "metal_station"
+    ],
     "appearance": {
       "color": "#d6a645",
       "label": "asteroid field",
@@ -65,7 +67,9 @@
     "capturable": true,
     "buildable": true,
     "orbit": false,
-    "allowedBuildings": ["metal_station"],
+    "allowedBuildings": [
+      "metal_station"
+    ],
     "appearance": {
       "color": "#5a4a4a",
       "label": "dead world",
@@ -198,7 +202,9 @@
     "capturable": true,
     "buildable": true,
     "orbit": false,
-    "allowedBuildings": ["metal_station"],
+    "allowedBuildings": [
+      "metal_station"
+    ],
     "appearance": {
       "color": "#c98a3a",
       "label": "dense cluster",
@@ -218,5 +224,30 @@
       "shape": "marker"
     },
     "traversable": false
+  },
+  "station_site": {
+    "name": "Space Fortress",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": true,
+    "orbit": false,
+    "traversable": false,
+    "allowedBuildings": [
+      "station_shipyard",
+      "station_sensor",
+      "station_reactor",
+      "station_fabricator",
+      "station_hangar",
+      "station_medbay",
+      "station_shield",
+      "station_defense"
+    ],
+    "appearance": {
+      "color": "#5f8f8c",
+      "label": "fork fortress",
+      "shape": "station"
+    },
+    "stationable": false,
+    "bombardable": false
   }
 }

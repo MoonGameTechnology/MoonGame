@@ -1,3 +1,5 @@
+import type { PlayerArsenal } from './arsenal';
+export type { PlayerArsenal } from './arsenal';
 import { seedRng, type RngState } from '../rng/rng';
 import type { FleetChain } from './chain';
 import type { Coalition, CoalitionClock } from './coalition';
@@ -34,6 +36,9 @@ export interface UnitStack {
   count: number;
   /** Stable server-owned ground formation identity for explicit troop transfers. */
   armyGroup?: string;
+  /** Effective built hull levels of a fortress body. Fractional while assembling;
+   *  absent on ordinary units. Damage remains a separate, persistent HP pool. */
+  stationScale?: number;
   /** Remaining HP pool of this stack during a battle (≤ count × def.hp).
    *  Undefined outside combat = full health. */
   hp?: number;
@@ -54,11 +59,8 @@ export interface UnitStack {
    *  мету НЕ перечитывает, поэтому заточка на ходу уже летающий корабль не меняет —
    *  та же доктрина «нет рефита», что и у самого {@link UnitStack.modules}.
    *
-   *  ⚠️ **В идентичность слияния НЕ входит** (`loadoutKey` её не видит), и это
-   *  осознанно: звёзды — замороженное свойство ВЛАДЕЛЬЦА, снятое один раз на матч,
-   *  поэтому два стека одного игрока с одним лоадаутом всегда несут одинаковые звёзды,
-   *  и слияние ничего не теряет. Начни звёзды меняться под живым матчем — правило
-   *  сломается, и тогда их придётся заводить в ключ.
+   *  Входит в идентичность слияния вместе с редкостью (`moduleValueKey`): живой
+   *  арсенал даёт новым заказам другие значения, а старые стеки сохраняют свои.
    *
    *  Отсутствует / пусто = ★0 у всех, то есть прежние числа байт-в-байт. Записываются
    *  только НЕнулевые звёзды НАДЕТЫХ модулей. */
@@ -109,6 +111,24 @@ export interface BuildingInstance {
   type: BuildingId;
   level: number;
   hp: number;
+  repair?: RepairWork;
+}
+
+/** A prepaid repair restores only this HP budget, never subsequent combat damage. */
+export interface RepairWork {
+  owner: PlayerId;
+  remainingHp: number;
+  hpPerHour: number;
+  doneAt: number;
+}
+
+/** A fortress owns a separate construction site, not the province underneath it. */
+export interface FortressState {
+  level: number;
+  modules?: string[];
+  assembly?: { from: number; to: number; startedAt: number; doneAt: number; paused?: boolean };
+  repair?: RepairWork;
+  damageCursor?: number;
 }
 
 /** A construction/upgrade/unit order cancelled mid-build: the paid-in-full order was
@@ -127,6 +147,7 @@ export interface PausedConstructionSite {
   unit?: UnitId;
   count?: number;
   modules?: ModuleId[];
+  moduleSnapshot?: { stars: Record<string, number>; rarity: Record<string, string> };
   /** Наземный юнит внутри десантного челнока (SHU-5.2). */
   troop?: UnitId;
   /** RULES-2.1: instance uid for upgrade resume (when maxPerPlanet > 1). */
@@ -228,30 +249,6 @@ export interface Player {
   arsenal?: PlayerArsenal;
 }
 
-
-/** The build-permission snapshot of a seat (see `Player.arsenal`): unique, sorted
- *  catalog ids per kind — the shape both the core gate and the UI filter read. */
-export interface PlayerArsenal {
-  /** Buildable hulls → `data.units` ids. */
-  hulls: string[];
-  /** Installable ship modules → `data.modules` ids. */
-  modules: string[];
-  /** Звёздность модулей этого места (SZE-1.1), `id → ★` — снимок меты Sector Zero,
-   *  из которого верфь штампует {@link UnitStack.moduleStars} на всё, что построит за
-   *  забег. Без него стартовый флот летал бы на ★N, а построенное на верфи — на ★0:
-   *  один модуль с двумя разными числами в одном матче. Отсутствует = ★0 у всех
-   *  (обычные матчи — мягкая деградация, как и у самого арсенала). */
-  stars?: Record<string, number>;
-  /** Поднятая редкость модулей этого места (SZE-5.1), `id → ступень` — снимок, из
-   *  которого верфь штампует {@link UnitStack.moduleRarity}. Та же причина, что у
-   *  {@link PlayerArsenal.stars}: иначе стартовый флот и построенное за забег несли бы
-   *  один модуль с разными числами. Отсутствует = базовая редкость у всех. */
-  rarity?: Record<string, string>;
-  /** Лишние слоты корпусов этого места, `корпус → { weapon, defense, utility }` —
-   *  снимок звёзд кораблей Sector Zero (решение владельца 2026-09-26). Верфь проверяет
-   *  набор модулей против слотов корпуса С ЭТОЙ прибавкой. Отсутствует = слоты каталога. */
-  slots?: Record<string, { weapon?: number; defense?: number; utility?: number }>;
-}
 
 /** A live Steward delegation on a player (see `Player.steward`). */
 export interface StewardState {
@@ -583,6 +580,9 @@ export interface Planet {
    *  крепость: у него нет ни лейнов, ни клетки на карте, его не захватывают и не
    *  считают территорией (`state/forkSite.ts`). Отсутствует у всех обычных узлов. */
   fork?: ForkAnchor;
+  /** A fortress's private construction site anchored at an existing province. */
+  stationHost?: PlanetId;
+  fortress?: FortressState;
   /** Relative size / weight of the sector (default 1). Drives how much territory
    *  it claims: a sector's border with a neighbour sits proportionally to their
    *  sizes, so resizing one shifts its neighbours' borders evenly. Undefined = 1. */
@@ -675,6 +675,7 @@ export interface QueuedConstruction {
   unit?: string;
   count?: number;
   modules?: string[];
+  moduleSnapshot?: { stars: Record<string, number>; rarity: Record<string, string> };
   /** Наземный юнит внутри десантного челнока (SHU-5.2). */
   troop?: string;
 }
@@ -773,6 +774,8 @@ export interface LoadingClaim {
   startAt: number;
   /** World-time (ms) the lift finishes. */
   doneAt: number;
+  /** Кого грузить первыми (выбор игрока); нет — порядок гарнизона (`army.ts`). */
+  first?: 'wounded' | 'healthy';
 }
 
 /** Выгрузка десанта на свой или союзный мир (решение владельца 2026-09-26: «на союзном или
@@ -1507,6 +1510,8 @@ export interface Hero {
   cooldowns: Record<string, number>;
   /** False while the hero is dead and awaiting respawn; absent/true ⇒ alive. */
   alive?: boolean;
+  /** Pending deployment; its destination and deadline survive save/restore. */
+  mobilization?: { target: string; startedAt: number; readyAt: number };
   /** Rarity tier (e.g. `common` | `rare` | `legendary` | `main`) → `data.heroGrades`.
    *  Drives BOTH of the hero's budgets, and the core enforces them: how many abilities
    *  may be worn (`skillSlots`, HPR-1.2) and the bonus module bays on top of the hull
@@ -1543,6 +1548,7 @@ export interface Hero {
    *  game-day of downtime would be impossible to explain. `deployHero` stamps this list
    *  onto the ship it forms. Absent/empty ⇒ a bare hull, exactly as before. */
   modules?: ModuleId[];
+  moduleSnapshot?: { stars: Record<string, number>; rarity: Record<string, string> };
   /** Extra bays of this hero's ship beyond the hull and the grade — the Sector Zero hero
    *  stars snapshotted at run start (PVR-6.24: 2★ a defense bay, 3★ a weapon bay). Without
    *  it the run's flagship carried modules its bays did not count: the ship card called them

@@ -54,6 +54,8 @@ describe('API dependency error logging privacy', () => {
         }),
         matchRewards: vi.fn(),
         setSupplyGoal: vi.fn(),
+        upgradeModule: vi.fn(async () => ok),
+        selectModule: vi.fn(async () => ok),
         craft: vi.fn(async () => ok),
         salvage: vi.fn(),
         selectPass: vi.fn(),

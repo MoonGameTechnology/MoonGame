@@ -1,5 +1,6 @@
 import {
   parseArsenalItem,
+  buildModuleCopies,
   validateArsenalItem,
   type ArsenalItem,
   type GameData,
@@ -45,11 +46,14 @@ export function validateStarterArsenal(
 /** Project an account's owned items into the `Player.arsenal` snapshot shape
  *  (ARS-3): unique, sorted catalog ids per kind — blueprints and instances alike
  *  grant buildability (the hybrid ARS-0 model; instance-specific state like grade
- *  stays meta-side until per-item install lands with EC-2). Pure. */
+ *  is projected from the preferred copy for new orders). Pure. */
 export function arsenalSnapshotOf(items: readonly ArsenalItem[]): PlayerArsenal {
   const pick = (kind: ArsenalItem['kind']): string[] =>
     [...new Set(items.filter((i) => i.kind === kind).map((i) => i.defId))].sort();
-  return { hulls: pick('hull'), modules: pick('module') };
+  const copies = buildModuleCopies(items);
+  const stars = Object.fromEntries(copies.filter((i) => i.grade).map((i) => [i.defId, i.grade!]));
+  const rarity = Object.fromEntries(copies.filter((i) => i.rarity).map((i) => [i.defId, i.rarity!]));
+  return { hulls: pick('hull'), modules: copies.map((i) => i.defId), ...(Object.keys(stars).length ? { stars } : {}), ...(Object.keys(rarity).length ? { rarity } : {}) };
 }
 
 /** ARS-6 — merge a corp-rental snapshot into a personal one: the union per kind,
@@ -58,10 +62,14 @@ export function arsenalSnapshotOf(items: readonly ArsenalItem[]): PlayerArsenal 
  *  "mine" from "borrowed for this war" (both live in the one `PlayerArsenal`). */
 export function mergeArsenal(a: PlayerArsenal, b: PlayerArsenal): PlayerArsenal {
   const union = (x: string[], y: string[]): string[] => [...new Set([...x, ...y])].sort();
-  return {
-    hulls: union(a.hulls, b.hulls),
-    modules: union(a.modules, b.modules),
-  };
+  const stars: Record<string, number> = {}, rarity: Record<string, string> = {};
+  for (const id of union(a.modules, b.modules)) {
+    const picked = !a.modules.includes(id) || (b.stars?.[id] ?? 0) > (a.stars?.[id] ?? 0) ? b : a;
+    if (picked.stars?.[id]) stars[id] = picked.stars[id]!;
+    if (picked.rarity?.[id]) rarity[id] = picked.rarity[id]!;
+  }
+  return { hulls: union(a.hulls, b.hulls), modules: union(a.modules, b.modules),
+    ...(Object.keys(stars).length ? { stars } : {}), ...(Object.keys(rarity).length ? { rarity } : {}) };
 }
 
 /** Grant the starter set to an account — idempotent end to end (deterministic item

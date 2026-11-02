@@ -331,13 +331,19 @@ export function onCommandClick(ev: MouseEvent): void {
         cmd === 'tmax'
           ? maxPlan(inp, unit, Number(bEl.dataset.dir) > 0 ? 1 : -1)
           : stepPlan(inp, unit, Number(bEl.dataset.n));
+      delete troopsPlan.asking; // план поменялся — вопрос задаётся заново
     }
-  } else if (cmd === 'tok') {
+  } else if (cmd === 'tok' || cmd === 'tfirst') {
     const st = troopsPlan;
     const inp = st ? troopsInputFor(st.fleetId) : null;
     const at = st ? game.world().fleets[st.fleetId]?.location : undefined;
-    if (st && inp && at) {
-      const { load, unload } = planOrders(troopsModel(inp));
+    const model = inp ? troopsModel(inp) : null;
+    const first = bEl.dataset.first === 'wounded' || bEl.dataset.first === 'healthy' ? bEl.dataset.first : undefined;
+    // В гарнизоне есть и раненые, и целые — спросить, кого грузить первыми (2026-11-02).
+    const ask = !!st && cmd === 'tok' && !!model?.askFirst;
+    if (st && ask) st.asking = true;
+    else if (st && inp && at && model) {
+      const { load, unload } = planOrders(model);
       // Both directions take an hour; only currently free bays can be reserved.
       for (const o of unload) playerOrder(unloadArmy(ME, st.fleetId, o.unit, o.count, o.group));
       // ALLY-LAND. Идущий наземный бой запирает ТОЛЬКО погрузку (ядро: `E_UNDER_ASSAULT`
@@ -345,10 +351,10 @@ export function onCommandClick(ev: MouseEvent): void {
       // раньше один общий гейт резал обе половины: подкрепить осаждённый мир было
       // нельзя — ровно то, ради чего союзная высадка и нужна.
       if (load.length && troopsLiftable(at)) {
-        for (const o of load) playerOrder(loadArmy(ME, st.fleetId, o.unit, o.count, o.group));
+        for (const o of load) playerOrder(loadArmy(ME, st.fleetId, o.unit, o.count, o.group ?? first));
       }
     }
-    drop('troopsPlan');
+    if (!ask) drop('troopsPlan');
   } else if (cmd === 'target') {
     // CHAIN-UX: вход в режим «Приказ» — карта становится рабочей поверхностью,
     // тапы по точкам собирают план (CC-1 цепочка), полоска заменяет ряд команд.

@@ -189,6 +189,16 @@ export class MemoryMetaMarket implements MetaMarket {
     });
   }
 
+  async spendWarrants(accountId: string, amount: number, sourceId: string, at: number): Promise<boolean> {
+    return this.locked(async () => {
+      const balance = await this.ensureWallet(accountId);
+      if (!Number.isSafeInteger(amount) || amount < 0) throw Error('E_BAD_AMOUNT');
+      if (balance < amount) return false;
+      this.wallets.set(accountId, balance - amount);
+      this.journal.push({ id: randomUUID(), accountId, delta: -amount, reason: 'module-upgrade', listingId: sourceId, at });
+      return true;
+    });
+  }
   async balance(accountId: string): Promise<number> {
     return this.ensureWallet(accountId);
   }
@@ -229,11 +239,12 @@ export class MemoryMetaMarket implements MetaMarket {
         ).length >= MAX_META_LISTINGS
       )
         return { ok: false, code: 'E_ORDER_LIMIT' };
+      const { accountId: _owner, preferred: _preference, ...asset } = item;
       const listing = {
         id: randomUUID(),
         sellerId: accountId,
         sellerLogin: login,
-        item,
+        item: asset,
         price,
         createdAt: this.now(),
       };
@@ -444,6 +455,7 @@ type LotRow = {
   form: ArsenalItem['form'];
   def_id: string;
   grade: number | null;
+  progression: Pick<ArsenalItem, 'rarity' | 'upgrade'>;
   soulbound: boolean;
   durability: number | null;
   origin: ArsenalItem['origin'];
@@ -465,6 +477,8 @@ const fromRow = (r: LotRow): MetaMarketListing => ({
     ...(r.durability === null ? {} : { durability: r.durability }),
     origin: r.origin,
     acquiredAt: Number(r.acquired_at),
+    ...(r.progression?.rarity ? { rarity: r.progression.rarity } : {}),
+    ...(r.progression?.upgrade ? { upgrade: r.progression.upgrade } : {}),
   },
 });
 
@@ -573,7 +587,7 @@ export class PostgresMetaMarket implements MetaMarket {
   }
   async listings(): Promise<MetaMarketListing[]> {
     const r = await this.pool.query<LotRow>(
-      'SELECT l.*,a.kind,a.form,a.def_id,a.grade,a.soulbound,a.durability,a.origin,a.acquired_at FROM meta_market_listings l JOIN arsenal a ON a.item_id=l.item_id ORDER BY l.price,l.created_at',
+      'SELECT l.*,a.kind,a.form,a.def_id,a.grade,a.soulbound,a.durability,a.origin,a.acquired_at,a.progression FROM meta_market_listings l JOIN arsenal a ON a.item_id=l.item_id ORDER BY l.price,l.created_at',
     );
     return r.rows.map(fromRow);
   }
@@ -617,7 +631,7 @@ export class PostgresMetaMarket implements MetaMarket {
       ]);
       await c.query('SELECT item_id FROM arsenal WHERE item_id=$1 FOR UPDATE', [itemId]);
       const r = await c.query<LotRow>(
-        `INSERT INTO meta_market_listings(id,seller_id,seller_login,item_id,price,created_at) SELECT $1,$2,$3,a.item_id,$4,$5 FROM arsenal a WHERE a.item_id=$6 AND a.account_id=$2 AND NOT a.soulbound AND ((SELECT count(*) FROM meta_market_listings WHERE seller_id=$2)+(SELECT count(*) FROM meta_material_listings WHERE seller_id=$2))<$7 ON CONFLICT DO NOTHING RETURNING *, (SELECT kind FROM arsenal WHERE item_id=$6), (SELECT form FROM arsenal WHERE item_id=$6), (SELECT def_id FROM arsenal WHERE item_id=$6), (SELECT grade FROM arsenal WHERE item_id=$6), (SELECT soulbound FROM arsenal WHERE item_id=$6), (SELECT durability FROM arsenal WHERE item_id=$6), (SELECT origin FROM arsenal WHERE item_id=$6), (SELECT acquired_at FROM arsenal WHERE item_id=$6)`,
+        `INSERT INTO meta_market_listings(id,seller_id,seller_login,item_id,price,created_at) SELECT $1,$2,$3,a.item_id,$4,$5 FROM arsenal a WHERE a.item_id=$6 AND a.account_id=$2 AND NOT a.soulbound AND ((SELECT count(*) FROM meta_market_listings WHERE seller_id=$2)+(SELECT count(*) FROM meta_material_listings WHERE seller_id=$2))<$7 ON CONFLICT DO NOTHING RETURNING *, (SELECT kind FROM arsenal WHERE item_id=$6), (SELECT form FROM arsenal WHERE item_id=$6), (SELECT def_id FROM arsenal WHERE item_id=$6), (SELECT grade FROM arsenal WHERE item_id=$6), (SELECT soulbound FROM arsenal WHERE item_id=$6), (SELECT durability FROM arsenal WHERE item_id=$6), (SELECT origin FROM arsenal WHERE item_id=$6), (SELECT acquired_at FROM arsenal WHERE item_id=$6), (SELECT progression FROM arsenal WHERE item_id=$6)`,
         [id, accountId, login, price, at, itemId, MAX_META_LISTINGS],
       );
       if (!r.rows[0]) return { ok: false, code: 'E_NOT_TRADABLE' };
@@ -653,7 +667,7 @@ export class PostgresMetaMarket implements MetaMarket {
           : { ok: false, code: 'E_IDEMPOTENCY_CONFLICT' };
       }
       const q = await c.query<LotRow>(
-        'SELECT l.*,a.kind,a.form,a.def_id,a.grade,a.soulbound,a.durability,a.origin,a.acquired_at FROM meta_market_listings l JOIN arsenal a ON a.item_id=l.item_id WHERE l.id=$1 FOR UPDATE',
+        'SELECT l.*,a.kind,a.form,a.def_id,a.grade,a.soulbound,a.durability,a.origin,a.acquired_at,a.progression FROM meta_market_listings l JOIN arsenal a ON a.item_id=l.item_id WHERE l.id=$1 FOR UPDATE',
         [listingId],
       );
       const lot = q.rows[0];
@@ -683,7 +697,7 @@ export class PostgresMetaMarket implements MetaMarket {
         return { ok: false, code: 'E_BALANCE_LIMIT' };
       }
       const moved = await c.query(
-        'UPDATE arsenal SET account_id=$1,acquired_at=$2 WHERE item_id=$3 AND account_id=$4 AND NOT soulbound',
+        "UPDATE arsenal SET account_id=$1,acquired_at=$2,progression=progression-'preferred' WHERE item_id=$3 AND account_id=$4 AND NOT soulbound",
         [accountId, at, lot.item_id, lot.seller_id],
       );
       if (moved.rowCount !== 1) {

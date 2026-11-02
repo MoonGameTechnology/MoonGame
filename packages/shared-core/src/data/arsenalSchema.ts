@@ -41,8 +41,8 @@ export const ArsenalOriginSchema = z.enum([
   'season',
 ]);
 
-/** Upgrade grades (EC-2.1: заточка +1/+2/+3). */
-const GRADE_MAX = 3;
+/** Upgrade grades: +1..+6, with the effective cap enforced by module rarity. */
+const GRADE_MAX = 6;
 
 export const ArsenalItemSchema = z
   .object({
@@ -55,8 +55,13 @@ export const ArsenalItemSchema = z
      *  `hero_fitting` kind is gone with the second fitting system (HPR-1.5.3/1.5.4):
      *  the hero's ship carries the same MODULES as every other hull. */
     defId: z.string().min(1),
-    /** Upgrade grade (EC-2.1, +1..+3) — instances only. */
+    /** Upgrade grade (+1..+6) — instances only. */
     grade: z.number().int().min(1).max(GRADE_MAX).optional(),
+    /** Server-owned progression; survives sale, never supplied by a build command. */
+    rarity: z.enum(['simple', 'unique', 'mythic', 'legendary']).optional(),
+    upgrade: z.object({ attempts: z.number().int().nonnegative(), misses: z.number().int().nonnegative() }).optional(),
+    /** Preferred copy for new builds of this module type. Cleared on transfer. */
+    preferred: z.literal(true).optional(),
     /** Untradable (donat/lootbox anti-RMT, GDD §4.4). Earned/crafted items trade. */
     soulbound: z.boolean().default(false),
     /** Remaining wear (the corp-rent sink, ARS-6) — instances only. Absent = the
@@ -68,7 +73,7 @@ export const ArsenalItemSchema = z
   .superRefine((item, ctx) => {
     // The hybrid rule (ARS-0.1): per-item state belongs to INSTANCES only — a
     // blueprint is a permanent unlock and carries neither grade nor wear.
-    if (item.form === 'blueprint' && item.grade !== undefined) {
+    if (item.form === 'blueprint' && (item.grade !== undefined || item.upgrade !== undefined || item.rarity !== undefined)) {
       ctx.addIssue({ code: 'custom', path: ['grade'], message: 'grade is instance-only' });
     }
     if (item.form === 'blueprint' && item.durability !== undefined) {

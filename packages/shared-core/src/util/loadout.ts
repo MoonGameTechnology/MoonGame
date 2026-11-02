@@ -81,14 +81,41 @@ export function moduleStarMultiplier(star: number, data: GameData): number {
  *  Звёздность модуля (`stack.moduleStars`, SZE-1.1) множит ВКЛАД САМОГО МОДУЛЯ, а не
  *  характеристику корпуса: ★ на пушке усиливает пушку, а голый корабль остаётся голым.
  *  ★0 / отсутствующая карта звёзд → прежняя сумма байт-в-байт. */
+const STATION_COMBAT_STATS = new Set([
+  'hp', 'shield', 'attack', 'defense', 'attackVsInfantry', 'attackVsVehicle',
+  'defenseVsInfantry', 'defenseVsVehicle', 'aaDamage', 'siegeDamage', 'pointDefense',
+]);
+
+function stationStat(value: number | undefined, key: string, scale: number | undefined): number | undefined {
+  if (value === undefined || scale === undefined || !STATION_COMBAT_STATS.has(key)) return value;
+  const result = value * Math.max(0, scale);
+  return result;
+}
+
+function stationStats(stats: Record<string, number>, scale: number | undefined): Record<string, number> {
+  if (scale === undefined) return stats;
+  for (const key of Object.keys(stats)) stats[key] = stationStat(stats[key], key, scale)!;
+  return stats;
+}
+
+function stationModuleScale(key: string, scale: number | undefined): number {
+  return scale !== undefined && STATION_COMBAT_STATS.has(key) ? Math.min(1, Math.max(0, scale)) : 1;
+}
+
+function stationFrame(stats: Record<string, number>, scale: number | undefined, immobile: boolean): Record<string, number> {
+  if (scale !== undefined) stats.hp = Math.max(1, stats.hp ?? 0);
+  if (immobile) stats.speed = 0;
+  return stats;
+}
+
 export function effectiveStats(
   def: UnitDef,
-  stack: Pick<UnitStack, 'modules' | 'moduleStars' | 'moduleRarity'>,
+  stack: Pick<UnitStack, 'modules' | 'moduleStars' | 'moduleRarity' | 'stationScale'>,
   data: GameData,
 ): Record<string, number> {
-  const out: Record<string, number> = { ...def.stats };
+  const out: Record<string, number> = stationStats({ ...def.stats }, stack.stationScale);
   const mods = stack.modules;
-  if (!mods) return out;
+  if (!mods) return stationFrame(out, stack.stationScale, def.traits?.includes('immobile') ?? false);
   const stars = stack.moduleStars;
   for (const id of mods) {
     const m = data.modules[id];
@@ -96,18 +123,18 @@ export function effectiveStats(
     const star = stars?.[id] ?? 0;
     const mult = star > 0 ? moduleStarMultiplier(star, data) : 1;
     for (const [k, v] of Object.entries(m.effects.stats)) {
-      out[k] = (out[k] ?? 0) + v * mult;
+      out[k] = (out[k] ?? 0) + v * mult * stationModuleScale(k, stack.stationScale);
     }
     // Параметры редкости (SZE-5.1) — такой же вклад модуля, поэтому и звезда их множит:
     // «редкость даёт параметр, звёздность усиливает параметры».
     const rarity = stack.moduleRarity?.[id];
     if (rarity !== undefined)
       for (const [k, v] of Object.entries(moduleRarityBonus(m, rarity))) {
-        out[k] = (out[k] ?? 0) + v * mult;
+        out[k] = (out[k] ?? 0) + v * mult * stationModuleScale(k, stack.stationScale);
       }
   }
   for (const k of WHOLE_STATS) if (out[k] !== undefined) out[k] = Math.round(out[k]);
-  return out;
+  return stationFrame(out, stack.stationScale, def.traits?.includes('immobile') ?? false);
 }
 
 /** Одна характеристика из {@link effectiveStats} — то же число теми же сложениями в том же
@@ -116,13 +143,14 @@ export function effectiveStats(
  *  ~6 мс кадра на ×10. */
 export function effectiveStat(
   def: UnitDef,
-  stack: Pick<UnitStack, 'modules' | 'moduleStars' | 'moduleRarity'>,
+  stack: Pick<UnitStack, 'modules' | 'moduleStars' | 'moduleRarity' | 'stationScale'>,
   data: GameData,
   key: string,
 ): number | undefined {
-  let value = ownStat(def.stats, key);
+  if (key === 'speed' && def.traits?.includes('immobile')) return 0;
+  let value = stationStat(ownStat(def.stats, key), key, stack.stationScale);
   const mods = stack.modules;
-  if (!mods) return value;
+  if (!mods) return key === 'hp' && stack.stationScale !== undefined ? Math.max(1, value ?? 0) : value;
   const stars = stack.moduleStars;
   for (const id of mods) {
     const m = data.modules[id];
@@ -130,16 +158,16 @@ export function effectiveStat(
     const star = stars?.[id] ?? 0;
     const mult = star > 0 ? moduleStarMultiplier(star, data) : 1;
     const v = ownStat(m.effects.stats, key);
-    if (v !== undefined) value = (value ?? 0) + v * mult;
+    if (v !== undefined) value = (value ?? 0) + v * mult * stationModuleScale(key, stack.stationScale);
     const rarity = stack.moduleRarity?.[id];
     if (rarity !== undefined) {
       const bonus = ownStat(moduleRarityBonus(m, rarity), key);
-      if (bonus !== undefined) value = (value ?? 0) + bonus * mult;
+      if (bonus !== undefined) value = (value ?? 0) + bonus * mult * stationModuleScale(key, stack.stationScale);
     }
   }
   if (value !== undefined && (WHOLE_STATS as readonly string[]).includes(key))
     value = Math.round(value);
-  return value;
+  return key === 'hp' && stack.stationScale !== undefined ? Math.max(1, value ?? 0) : value;
 }
 
 /** Значение собственного перечислимого ключа — то, что `{ ...bag }` и `Object.entries`

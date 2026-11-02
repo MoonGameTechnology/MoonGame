@@ -8,7 +8,7 @@ import { createDevMatch, loadShippedData } from './scenario';
 import { MemoryAccountStore, MemoryArsenalStore } from './store';
 import { InMemoryRoomRegistry } from './roomRegistry';
 import { grantStarterArsenal } from './arsenal';
-import type { Action } from '@void/shared-core';
+import type { Action, ArsenalItem } from '@void/shared-core';
 
 const data = loadShippedData();
 const starter = [{ kind: 'hull' as const, defId: 'cruiser' }];
@@ -136,6 +136,41 @@ describe('ordinary match arsenal integration', () => {
     expect(await syncAccountArsenal({ ...corporate.deps, isOrdinary: async () => false })).toBe(0);
     expect(corporate.room.state.players.green!.arsenal!.modules).toEqual([]);
     expect(await syncAccountArsenal({ ...corporate.deps, login: 'Unseated' })).toBe(0);
+  });
+
+  describe.each(['select', 'sell'] as const)('%s an upgraded copy', (change) => {
+    it.each<Partial<ArsenalItem>>([
+      { grade: 3 },
+      { rarity: 'unique' },
+      { grade: 3, rarity: 'unique' },
+    ])('refreshes values even when the owned catalog stays the same: %j', async (upgrade) => {
+      const { room, deps } = await fixture();
+      await grantModule(deps.arsenal);
+      const base = (await deps.arsenal.get('crafted'))!;
+      await deps.arsenal.grant({ ...base, ...upgrade, itemId: 'upgraded' });
+      expect(await syncAccountArsenal(deps)).toBe(1);
+      expect(room.state.players.green!.arsenal).toEqual({
+        hulls: ['cruiser'],
+        modules: ['targeting_array'],
+        ...(upgrade.grade ? { stars: { targeting_array: upgrade.grade } } : {}),
+        ...(upgrade.rarity ? { rarity: { targeting_array: upgrade.rarity } } : {}),
+      });
+      const sequence = room.sequence;
+      expect(await syncAccountArsenal(deps)).toBe(0);
+      expect(room.sequence).toBe(sequence);
+      const fleets = structuredClone(room.state.fleets);
+      if (change === 'select') {
+        expect(await deps.arsenal.update({ ...base, preferred: true })).toBe(true);
+      } else {
+        expect(await deps.arsenal.transfer('upgraded', 'account', 'buyer')).toEqual({ ok: true });
+      }
+      expect(await syncAccountArsenal(deps)).toBe(1);
+      expect(room.state.players.green!.arsenal).toEqual({
+        hulls: ['cruiser'], modules: ['targeting_array'],
+      });
+      expect(room.state.fleets).toEqual(fleets);
+      expect(await syncAccountArsenal(deps)).toBe(0);
+    });
   });
 
   it('does not claim a failed durable sync succeeded, and permits a later retry', async () => {

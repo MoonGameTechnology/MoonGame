@@ -379,3 +379,22 @@ describe('REFM-231 — стык с main.ts', () => {
     }
   });
 });
+
+describe('разведчик на линии опознаётся по координатам', () => {
+  it.each([
+    [0, 0.4, false],
+    [0.49, 0.491, true],
+  ])('наблюдатель %s, цель %s: полная видимость %s', async (observer, target, expected) => {
+    const s = base();
+    s.planets.A!.links = ['B'];
+    s.planets.B!.links = ['A'];
+    s.fleets = {
+      own: { ...fleet('own', 'p1', 'A'), location: null, edge: { from: 'A', to: 'B', t: observer } },
+      enemy: { ...fleet('enemy', 'p2', 'B'), location: null, edge: { from: 'A', to: 'B', t: target } },
+    };
+    const { fog } = await boot(s);
+    fog.refreshVision();
+    expect(fog.fleetKnown(s.fleets.enemy!)).toBe(expected);
+    expect(fog.fleetSeen(s.fleets.enemy!)).toBe(expected);
+  });
+});

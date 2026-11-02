@@ -39,7 +39,8 @@
     "researchTimeHours": 5,
     "unlocks": {
       "buildings": [
-        "orbital_aa"
+        "orbital_aa",
+        "station_defense"
       ]
     }
   },
@@ -407,7 +408,8 @@
     ],
     "unlocks": {
       "buildings": [
-        "void_hangar"
+        "void_hangar",
+        "station_hangar"
       ]
     }
   },
@@ -427,7 +429,8 @@
     ],
     "unlocks": {
       "buildings": [
-        "void_shield"
+        "void_shield",
+        "station_shield"
       ]
     }
   },
@@ -764,7 +767,8 @@
     ],
     "unlocks": {
       "buildings": [
-        "hospital"
+        "hospital",
+        "station_medbay"
       ]
     }
   },
@@ -922,6 +926,47 @@
     "dayGate": 3,
     "effects": {
       "radarRangeBonus": 0.12
+    }
+  },
+  "hero_command_ii": {
+    "name": "Second Hero Command",
+    "description": "tech.node.hero-command-ii.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 3,
+    "cost": {
+      "credits": 250,
+      "metal": 160,
+      "microelectronics": 10
+    },
+    "researchTimeHours": 8,
+    "prerequisites": [
+      "flagship_command"
+    ],
+    "dayGate": 2,
+    "effects": {
+      "heroSlots": 1
+    }
+  },
+  "hero_command_iii": {
+    "name": "Third Hero Command",
+    "description": "tech.node.hero-command-iii.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 4,
+    "cost": {
+      "credits": 400,
+      "metal": 280,
+      "microelectronics": 30
+    },
+    "researchTimeHours": 12,
+    "prerequisites": [
+      "hero_command_ii",
+      "logistics_command"
+    ],
+    "dayGate": 5,
+    "effects": {
+      "heroSlots": 1
     }
   }
 }

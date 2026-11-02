@@ -4,6 +4,7 @@ import { deepClone } from '../util/clone';
 import { peekValues } from '../util/draft';
 import { effectiveStat } from '../util/loadout';
 import { recordValues } from '../util/records';
+import { isForkSite } from './forkSite';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { laneIsPublic } from './corridor';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
@@ -300,7 +301,7 @@ function circlesByOwner(
 
 /** Глаз ракетной мины в точке `pos`, а у контактной — `null`. Контактная мина не глаз
  *  (SM-3.6). Ракетная — глаз и радар своего модуля, как и прежде, когда она лежала вне
- *  `fleets` (SM-3.7a): опознаёт по позиции (`positionEyes`). */
+ *  `fleets` (SM-3.7a): опознаёт по позиции. */
 function mineEye(fleet: Fleet, pos: { x: number; y: number }, data: GameData): SightCircle | null {
   const rocket = rocketMineModule(fleet, data);
   return rocket
@@ -360,37 +361,14 @@ export function sightCircles(
   return bloc.flatMap((memberId) => byOwner.get(memberId)!);
 }
 
-/** Круги зрителя, опознающие корабль по его ПОЗИЦИИ, а не по ближайшему узлу: ракетная
- *  мина и висящий патруль (SHU-6.7) висят над дорогой вдали от миров, и правило «опознан
- *  узел — виден флот» не видело бы ровно того, что под ними. Это круги `mine` и `patrol` из
- *  `sightCircles` в том же порядке, но собранные без кругов миров и флотов: вопрос «виден
- *  ли этот флот?» бот задаёт о каждом вражеском флоте, и полный набор кругов на каждый
- *  вопрос стоил на FFA-50 ~4 мс кадра на ×10. */
-function positionEyes(state: GameState, viewerId: PlayerId, data: GameData): SightCircle[] {
-  const bloc = visionBloc(state, viewerId);
-  const byOwner = new Map<PlayerId, SightCircle[]>(bloc.map((id) => [id, []]));
-  for (const fleet of peekValues(state.fleets)) {
-    const out = byOwner.get(fleet.owner);
-    if (!out || !isMineFleet(fleet, data)) continue;
-    const pos = fleetPosition(state, fleet);
-    const eye = pos && mineEye(fleet, pos, data);
-    if (eye) out.push(eye);
-  }
-  patrolEyes(state, byOwner);
-  return bloc.flatMap((id) => byOwner.get(id)!);
-}
-
-/**
- * Чужие флоты, которые зритель опознаёт по ПОЗИЦИИ — в круге ракетной мины или висящего
- * патруля (SHU-6.7), где бы ни стоял их ближайший узел. Мина-флот сюда не входит: у неё
- * своё правило «только вблизи» (`mineFleetVisible`). Экспорт — для клиента, который
- * считает туман сам (соло): копия правила разъехалась бы с проекцией.
- */
+/** Fleets identified at their actual position by any shared sight circle.
+ * Nearest worlds only anchor radar markers; they cannot identify a ship in transit.
+ * Mines and missiles retain their own visibility rules. */
 export function fleetsSeenByPosition(
   state: GameState,
   viewerId: PlayerId,
   data: GameData,
-  eyes: readonly SightCircle[] = positionEyes(state, viewerId, data),
+  eyes: readonly SightCircle[] = sightCircles(state, viewerId, data),
 ): Set<FleetId> {
   const seen = new Set<FleetId>();
   if (eyes.length === 0) return seen;
@@ -725,7 +703,7 @@ export function radarSources(
 function publicProvinces(state: GameState): PlanetId[] {
   return Object.keys(state.planets)
     .sort()
-    .filter((id) => !state.planets[id]!.fork);
+    .filter((id) => !isForkSite(state.planets[id]));
 }
 
 /** Ближайший к точке мир из `ids`; при равенстве — первый по порядку. */
@@ -794,12 +772,12 @@ export function radarSignatures(
       emitters.push({ location, ...at, inTransit: true, strength: fleetSignalStrength(fleet, data) });
       continue;
     }
-    // Опознанный кругом мины или патруля виден целиком — отметка поверх была бы вторым
+    // Опознанный кругом зрения виден целиком — отметка поверх была бы вторым
     // значком одного корабля.
     if (engaged.has(fleet.id) || seenAt.has(fleet.id)) continue;
     const location = fleetNode(state, fleet);
     const at = fleetPosition(state, fleet);
-    if (location === null || identify.has(location) || !at) continue;
+    if (location === null || (fleet.location !== null && identify.has(fleet.location)) || !at) continue;
     const emitter: SignalEmitter = { location, ...at, strength: fleetSignalStrength(fleet, data) };
     const node = state.planets[location]?.position;
     if (node && (node.x !== at.x || node.y !== at.y)) emitter.inTransit = true;
@@ -893,16 +871,16 @@ export function engagementOf(state: GameState, viewerId: PlayerId): Engagement {
 
 /** Ad-hoc query (A4): can `viewerId` see this object at IDENTIFY detail right
  *  now? Exactly the rule `visibleState` projects by — own objects always, a fleet in
- *  the viewer's own battle always (`engagementOf`), others when their node is
- *  currently identified. A radar-only contact answers false
+ *  the viewer's own battle always (`engagementOf`), others by their actual position
+ *  in shared sight circles (or stationed at an identified world). A radar-only contact answers false
  *  (detected is not seen), remembered fog answers false (stale is not now), and
  *  an unknown id answers false (fail-secure). Fog is opt-in: a host that does
  *  not enforce it simply never consults this and everything stays visible.
  *
  *  Computing coverage is the expensive part — a caller checking MANY objects for
  *  one viewer should hoist `identifiedNodes(state, viewerId, data)` once and pass
- *  it as `identified` (the matchRoom event-filter pattern); each call is then a
- *  set lookup. Omitted, the coverage is computed per call. */
+ *  it as `identified` (the matchRoom event-filter pattern); stationed fleets then use a
+ *  set lookup; travelling fleets still require a position check. Omitted, the coverage is computed per call. */
 export function isVisibleTo(
   state: GameState,
   viewerId: PlayerId,
@@ -927,12 +905,13 @@ export function isVisibleTo(
   if (isMissileFleet(fleet, data)) return missileVisible(state, fleet, viewerId, data);
   const battle = fleet.battleId ? state.battles[fleet.battleId] : undefined;
   if (battle && fightsIn(battle, new Set(visionBloc(state, viewerId)))) return true;
+  // A world intel window covers ships stationed there, not a whole outgoing lane.
+  if (fleet.location !== null) {
+    return (identified ?? identifiedNodes(state, viewerId, data)).has(fleet.location) ||
+      spiedPlanets(state, viewerId).has(fleet.location);
+  }
   const at = fleetPositionAt(state, fleet, state.time);
-  if (at && positionEyes(state, viewerId, data).some((c) => inRadius(at, c, c.identify))) return true;
-  const node = fleetNode(state, fleet);
-  if (node === null) return false;
-  // Окно разведки (SPY-8) опознаёт мир вместе с его орбитой, как и в проекции.
-  return (identified ?? identifiedNodes(state, viewerId, data)).has(node) || spiedPlanets(state, viewerId).has(node);
+  return !!at && sightCircles(state, viewerId, data).some((c) => inRadius(at, c, c.identify));
 }
 
 /**
@@ -1303,6 +1282,12 @@ function project(
       // Счётчик вылетов порта (`sortie`): чужие удары сняты целиком (`strikes` выше), а
       // убыль топлива и начавшаяся перезарядка выдали бы скрытый вылет и без них.
       delete planet.sortie;
+      for (const building of planet.buildings) delete building.repair;
+      if (planet.fortress) {
+        if (identify.has(planet.id)) {
+          planet.fortress = { level: planet.fortress.level, damageCursor: planet.fortress.damageCursor };
+        } else delete planet.fortress;
+      }
     }
     // FORT-5.13. `priorKind` — СЛУЖЕБНАЯ память конверсии («чем узел был до крепости»),
     // и наружу она не идёт НИКОМУ: само её наличие выдаёт стоящую крепость, а значение —
@@ -1324,7 +1309,7 @@ function project(
     // (они и есть карта), а площадку, которую зритель не видел ни разу, он не получает
     // вовсе — иначе туман выдавал бы каждую крепость на дорогах. Увиденную помнит, как и
     // любой мир.
-    if (planet.fork && !memory?.[planet.id]) {
+    if (isForkSite(planet) && !memory?.[planet.id]) {
       delete view.planets[planet.id];
       continue;
     }
@@ -1343,7 +1328,11 @@ function project(
     if (snap) {
       planet.owner = snap.owner;
       planet.garrison = snap.garrison.map((s) => ({ ...s }));
-      planet.buildings = snap.buildings.map((b) => ({ ...b }));
+      planet.buildings = snap.buildings.map((b) => {
+        const visible = { ...b };
+        delete visible.repair;
+        return visible;
+      });
       planet.resources = {};
       if (snap.terrain === undefined) delete planet.terrain;
       else planet.terrain = snap.terrain;
@@ -1438,11 +1427,9 @@ function project(
       continue;
     }
     if (engaged.fleets.has(id)) continue; // the enemy in YOUR battle is not a secret
-    const node = fleetNode(view, fleet);
-    // Rocket mines and hanging shuttle patrols (SHU-6.7) identify ships at their
-    // continuous positions, including roads far from any node.
+    // All sight sources identify the actual ship position, including mid-lane.
     if (seenAt.has(id)) continue;
-    if (node !== null && identify.has(node)) continue; // fully identified
+    if (fleet.location !== null && identify.has(fleet.location)) continue; // stationed at an identified world
     delete view.fleets[id];
   }
   // SHU-6.6: удержание патруля у чужого корабля — намерение, как и у мира выше. Режется у

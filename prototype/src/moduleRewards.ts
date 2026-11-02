@@ -18,16 +18,18 @@ const RARITY_KEYS = {
 export function moduleRewardHtml(reward: ModuleReward, remaining: number): string {
   const { item, previousGrade, kind } = reward;
   const def = data.modules[item.defId];
-  const rarity = def?.rarity ?? 'simple';
+  const rarity = item.rarity ?? def?.rarity ?? 'simple';
   const grade = item.grade ?? 0;
-  const title = kind === 'upgraded' ? t('module-reward.upgraded') : t('module-reward.received');
+  const title = kind === 'rarity' ? t('module-reward.rarity-upgraded') : kind === 'upgraded' ? t('module-reward.upgraded') : t('module-reward.received');
   const stars = Array.from(
     { length: grade },
     (_, i) =>
-      `<span class="${kind === 'upgraded' && i < previousGrade ? 'mr-existing' : 'mr-new'}" style="--i:${i}" aria-hidden="true">★</span>`,
+      `<span class="${kind !== 'received' && i < previousGrade ? 'mr-existing' : 'mr-new'}" style="--i:${i}" aria-hidden="true">★</span>`,
   ).join('');
   const gradeText =
-    kind === 'upgraded'
+    kind === 'rarity'
+      ? t('module-reward.rarity-progress', { from: t(RARITY_KEYS[reward.previousRarity ?? def?.rarity ?? 'simple']), to: t(RARITY_KEYS[rarity]) })
+      : kind === 'upgraded'
       ? t('module-reward.progress', { from: previousGrade, to: grade })
       : grade
         ? t('arsenal.copy.grade', { n: grade })

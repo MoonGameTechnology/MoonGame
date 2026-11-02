@@ -442,7 +442,7 @@ function envelopeActionId(envelope: unknown): string {
 function sameArsenal(a: PlayerArsenal, b: PlayerArsenal): boolean {
   const eq = (x: string[], y: string[]): boolean =>
     x.length === y.length && x.every((v, i) => v === y[i]);
-  return eq(a.hulls, b.hulls) && eq(a.modules, b.modules);
+  return eq(a.hulls, b.hulls) && eq(a.modules, b.modules) && JSON.stringify(a.stars ?? {}) === JSON.stringify(b.stars ?? {}) && JSON.stringify(a.rarity ?? {}) === JSON.stringify(b.rarity ?? {});
 }
 
 /** Ally-ping tuning (ephemeral, server-side; never part of the deterministic core). */
@@ -506,6 +506,8 @@ export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new 
 >([
   ['building.constructed', 'owner'],
   ['building.upgraded', 'owner'],
+  ['building.repair.started', 'owner'],
+  ['station.repair.started', 'owner'],
   ['unit.built', 'owner'],
   ['army.load.cancelled', 'owner'],
   ['army.unload.cancelled', 'owner'],
@@ -2262,12 +2264,12 @@ export class MatchRoom {
     await this.commitApply(playerId, action, peer);
   }
 
-  /** LARS-1 — refresh a seat's live build-catalog ownership right before a
-   *  `unit.build` that the BOOT-TIME snapshot (ARS-3) would reject. A no-op unless
+  /** LARS-1 — refresh ownership and selected module values before every
+   *  `unit.build` or `hero.install`. A no-op unless
    *  every precondition holds: `arsenalStore` configured, the seat's `accountId`
    *  known (from `addPeer`), a snapshot present on the player (no snapshot = already
-   *  unrestricted — nothing to refresh), and the requested hull/modules actually miss
-   *  from it. On a hit, submits an internal `arsenal.sync` (own id namespace, own
+   *  unrestricted — nothing to refresh). A changed snapshot submits an internal
+   *  `arsenal.sync` (own id namespace, own
    *  `commitApply` — a REAL, persisted, broadcast, hash-consistent action, never a
    *  silent state patch) BEFORE the caller's `commitApply` for the original action,
    *  so the unchanged ARS-3 check in `construction.ts` sees current ownership. */
@@ -2276,24 +2278,14 @@ export class MatchRoom {
     action: Action,
     isCurrent: () => boolean,
   ): Promise<void> {
-    if (!this.arsenalStore || action.type !== 'unit.build') return;
+    if (!this.arsenalStore || !['unit.build', 'hero.install'].includes(action.type)) return;
     const accountId = this.playerAccountId.get(playerId);
     if (!accountId) return;
     const player = this.stateValue.players[playerId];
     if (!player?.arsenal) return;
-    const payload = action.payload as { unit?: unknown; modules?: unknown } | null;
-    const unit = typeof payload?.unit === 'string' ? payload.unit : undefined;
-    const modules = Array.isArray(payload?.modules)
-      ? payload.modules.filter((m): m is string => typeof m === 'string')
-      : [];
-    const alreadyOwned =
-      (!unit || player.arsenal.hulls.includes(unit)) &&
-      modules.every((m) => player.arsenal!.modules.includes(m));
-    if (alreadyOwned) return; // covered by the boot snapshot — no live read needed
     const fresh = arsenalSnapshotOf(await this.arsenalStore.listOf(accountId));
     if (!isCurrent() || this.playerAccountId.get(playerId) !== accountId) return;
-    if (sameArsenal(player.arsenal, fresh)) return; // still doesn't own it — the
-    // unchanged core check below will reject with E_NOT_OWNED as before
+    if (sameArsenal(player.arsenal, fresh)) return; // no persisted sync needed
     const synced = await this.commitApply(
       playerId,
       {

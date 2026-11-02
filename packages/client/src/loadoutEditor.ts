@@ -255,7 +255,8 @@ function buildModel(
   }
 
   const palette: LoadoutOption[] = Object.entries(data.modules)
-    .filter(([id]) => !ownedModules || ownedModules.has(id))
+    // Battery equipment is issued by fortress buildings, never picked by a player.
+    .filter(([id]) => !id.startsWith('station_battery_') && (!ownedModules || ownedModules.has(id)))
     .map(([id, m]) => {
       const check = canEquip(unit, hull, modules, id, data);
       return {

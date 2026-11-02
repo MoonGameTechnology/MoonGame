@@ -199,6 +199,7 @@ export function troopsInputFor(fleetId: string): TroopsInput | null {
       fleetHoldFree(s, f, data),
     reservedCargo: pendingLoadCargo(fleetId),
     plan: planFor(troopsPlan?.fleetId, fleetId, troopsPlan?.plan),
+    asking: troopsPlan?.fleetId === fleetId && !!troopsPlan.asking,
   };
 }
 

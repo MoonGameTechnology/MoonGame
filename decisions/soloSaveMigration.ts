@@ -250,15 +250,61 @@ export const HALF_MODULES_SOLO_MIGRATION = {
   toDataHash: '17cb1050daa7a3',
 } as const;
 
-/** Army 1.3.0 adds optional formation identities and claim sources. Older claims
- * retain their completion semantics and are pinned before a new explicit selection. */
-export const ARMY_SELECTION_SOLO_MIGRATION = {
+/** Separate player-built fortresses and manual repairs. Existing sites and paid
+ *  work retain their legacy shape; new deployments use station_site. The old
+ *  catalogue definitions remain, so migration only advances the audited pins. */
+export const FORTRESS_MODEL_SOLO_MIGRATION = {
   fromRules: HALF_MODULES_SOLO_MIGRATION.toRules,
   fromData: HALF_MODULES_SOLO_MIGRATION.toData,
   fromDataHash: HALF_MODULES_SOLO_MIGRATION.toDataHash,
-  toRules: '03e22db36f95d4',
-  toData: HALF_MODULES_SOLO_MIGRATION.toData,
-  toDataHash: HALF_MODULES_SOLO_MIGRATION.toDataHash,
+  toRules: '016783459c4258',
+  toData: '0.1.73',
+  toDataHash: '0b767cf7a4b647',
+} as const;
+
+/** Rules-only pair: army 1.3.0 lets a lift order say whether wounded or whole stacks board
+ *  first (an optional `first` on the claim). A saved claim without it boards in garrison
+ *  order as before, so a saved world reads as is. */
+export const LOAD_FIRST_SOLO_MIGRATION = {
+  fromRules: FORTRESS_MODEL_SOLO_MIGRATION.toRules,
+  fromData: FORTRESS_MODEL_SOLO_MIGRATION.toData,
+  fromDataHash: FORTRESS_MODEL_SOLO_MIGRATION.toDataHash,
+  toRules: '1ce24e9a208610',
+  toData: FORTRESS_MODEL_SOLO_MIGRATION.toData,
+  toDataHash: FORTRESS_MODEL_SOLO_MIGRATION.toDataHash,
+} as const;
+
+/** Optional mobilization state and additive main-only research. Existing ships,
+ *  accepted orders and campaign deployments survive; future main deployments use the timer. */
+export const HERO_MOBILIZATION_SOLO_MIGRATION = {
+  fromRules: LOAD_FIRST_SOLO_MIGRATION.toRules,
+  fromData: LOAD_FIRST_SOLO_MIGRATION.toData,
+  fromDataHash: LOAD_FIRST_SOLO_MIGRATION.toDataHash,
+  toRules: '0876d80977cf6d',
+  toData: '0.1.74',
+  toDataHash: '023cd15f09ee90',
+} as const;
+
+/** Optional snapshots pin paid orders and hero loadouts before the next arsenal sync.
+ * Old snapshots remain readable; the existing lazy pinning preserves their values. */
+export const MODULE_PROGRESSION_SOLO_MIGRATION = {
+  fromRules: HERO_MOBILIZATION_SOLO_MIGRATION.toRules,
+  fromData: HERO_MOBILIZATION_SOLO_MIGRATION.toData,
+  fromDataHash: HERO_MOBILIZATION_SOLO_MIGRATION.toDataHash,
+  toRules: '1cabdded184a38',
+  toData: HERO_MOBILIZATION_SOLO_MIGRATION.toData,
+  toDataHash: HERO_MOBILIZATION_SOLO_MIGRATION.toDataHash,
+} as const;
+
+/** Army 1.4.0 adds optional formation identities and claim sources. Older claims
+ * retain their completion semantics and are pinned before a new explicit selection. */
+export const ARMY_SELECTION_SOLO_MIGRATION = {
+  fromRules: MODULE_PROGRESSION_SOLO_MIGRATION.toRules,
+  fromData: MODULE_PROGRESSION_SOLO_MIGRATION.toData,
+  fromDataHash: MODULE_PROGRESSION_SOLO_MIGRATION.toDataHash,
+  toRules: '19a0134f5519be',
+  toData: MODULE_PROGRESSION_SOLO_MIGRATION.toData,
+  toDataHash: MODULE_PROGRESSION_SOLO_MIGRATION.toDataHash,
 } as const;
 
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
@@ -284,6 +330,10 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   STAND_UP_SOLO_MIGRATION,
   BOMBARD_VOLLEY_SOLO_MIGRATION,
   HALF_MODULES_SOLO_MIGRATION,
+  FORTRESS_MODEL_SOLO_MIGRATION,
+  LOAD_FIRST_SOLO_MIGRATION,
+  HERO_MOBILIZATION_SOLO_MIGRATION,
+  MODULE_PROGRESSION_SOLO_MIGRATION,
   ARMY_SELECTION_SOLO_MIGRATION,
 ];
 
