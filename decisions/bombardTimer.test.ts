@@ -1,39 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { bombardTimerShown, nextBuildingFall } from './bombardTimer';
+import { bombardTimerShown, nextVolleyIn } from './bombardTimer';
 
 const HOUR = 3_600_000;
 
-describe('таймер бомбардировки — какая постройка рухнет и когда', () => {
-  it('первая уязвимая постройка по порядку мира: прочность / скорость, в мс мира', () => {
-    const b = [
-      { type: 'mine', hp: 15, maxHp: 20 },
-      { type: 'depot', hp: 30, maxHp: 30 },
-    ];
-    expect(nextBuildingFall(b, 10, HOUR)).toEqual({ building: 'mine', leftMs: 1.5 * HOUR });
-    // Масштаб матча: игровой час короче — и срок короче.
-    expect(nextBuildingFall(b, 10, HOUR / 4)?.leftMs).toBe(0.375 * HOUR);
+describe('таймер бомбардировки — через сколько следующий залп', () => {
+  it('ближайшие часы из нескольких флотов, в мс мира', () => {
+    expect(nextVolleyIn([HOUR], 0)).toBe(HOUR);
+    expect(nextVolleyIn([3 * HOUR, 2 * HOUR + 5_000], HOUR)).toBe(HOUR + 5_000);
   });
 
-  it('неразрушаемая постройка пропускается, как и в уроне ядра', () => {
-    const b = [
-      { type: 'relic', hp: 0, maxHp: 0 },
-      { type: 'depot', hp: 30, maxHp: 30 },
-    ];
-    expect(nextBuildingFall(b, 15, HOUR)).toEqual({ building: 'depot', leftMs: 2 * HOUR });
-  });
-
-  it('сносить нечего или скорость нулевая — таймера нет', () => {
-    expect(nextBuildingFall([], 10, HOUR)).toBeNull();
-    expect(nextBuildingFall([{ type: 'relic', hp: 0, maxHp: 0 }], 10, HOUR)).toBeNull();
-    expect(nextBuildingFall([{ type: 'mine', hp: 5, maxHp: 20 }], 0, HOUR)).toBeNull();
-    expect(nextBuildingFall([{ type: 'mine', hp: 5, maxHp: 20 }], Number.NaN, HOUR)).toBeNull();
+  it('флот без часов не считается; без часов вовсе — таймера нет', () => {
+    expect(nextVolleyIn([undefined, 2 * HOUR], 0)).toBe(2 * HOUR);
+    expect(nextVolleyIn([undefined], 0)).toBeNull();
+    expect(nextVolleyIn([], 0)).toBeNull();
+    expect(nextVolleyIn([Number.NaN], 0)).toBeNull();
   });
 
   it('отсчёт не уходит в минус', () => {
-    expect(nextBuildingFall([{ type: 'mine', hp: -2, maxHp: 20 }], 10, HOUR)).toEqual({
-      building: 'mine',
-      leftMs: 0,
-    });
+    expect(nextVolleyIn([HOUR], 2 * HOUR)).toBe(0);
   });
 
   it('таймер видят только хозяин мира и хозяин обстреливающего флота', () => {

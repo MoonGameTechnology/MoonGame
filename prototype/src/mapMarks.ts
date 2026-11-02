@@ -29,7 +29,7 @@ import { ownInstallations } from '../../decisions/minefields';
 import { missionRingFrame, missionRingPhase, RING_R, RING_W } from '../../decisions/missionRing';
 import type { MissionRow } from '../../decisions/missionView';
 import { ALLY_EMBLEM } from './allyScreen';
-import { bombardFalls } from './bombardClock';
+import { bombardVolleys } from './bombardClock';
 import { BADGE_DY, badgeCount, badgePulse, groupByAnchor, shownOrders, type AnchoredOrder } from './chainBadges';
 import { chainAbilityHoldH, chainMenuAnchor, chainMode, chainRoute, chainStart, chainTravelH } from './chainComposer';
 import { capsuleAt, chainPathLegs, lastStepAtPoint, stackIndexes, type PathLeg } from './chainPathLayout';
@@ -253,14 +253,14 @@ export function drawMinefields(): void {
 }
 
 /** Таймер бомбардировки: под миром, где обстреливает мой флот или обстреливают мой мир, —
- *  плашка «⊗ Ч:ММ:СС» до сноса следующей постройки (`decisions/bombardTimer.ts`). Свой
+ *  плашка «⊗ Ч:ММ:СС» до следующего залпа обстрела (`decisions/bombardTimer.ts`). Свой
  *  обстрел — моим цветом, обстрел моего мира — цветом угрозы. Плашка стоит там же, где
  *  отсчёт осады «Поглощения»; если над миром висят оба, таймер обстрела уходит под него.
- *  Имя постройки — в окне мира и в метке флота: на карте только знак и время. */
+ *  Слова — в подсказке окна мира и метки флота: на карте только знак и время. */
 export function drawBombardTimers(): void {
   const s = game.world();
   const ME = game.me();
-  const marks = bombardFalls(s, ME);
+  const marks = bombardVolleys(s, ME);
   if (marks.length === 0) return;
   const cx = game.ctx();
   const sieged = new Set(devourSieges(s, ME).map((m) => m.target));
@@ -275,7 +275,7 @@ export function drawBombardTimers(): void {
     const c = world(p.position);
     if (!visible(c, 60)) continue;
     const tone = m.mine ? HOSTILE : ownerColor(ME);
-    const label = `⊗ ${countdownHMS(m.fall.leftMs)}`;
+    const label = `⊗ ${countdownHMS(m.leftMs)}`;
     const w = Math.ceil(cx.measureText(label).width) + 12;
     const top = Math.round(c.y + R + 5 + (sieged.has(m.planetId) ? 20 : 0));
     const left = Math.round(c.x - w / 2);

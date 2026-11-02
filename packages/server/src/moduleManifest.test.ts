@@ -124,7 +124,7 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 92: ЧЛЕНСТВО — снят `fleet-repair` (ремонт за металл у дока, заказ владельца 2026-11-01);
 // combat 3.10.0 — наземные выжившие уходят из боя с ранами; construction 1.8.0 —
 // залеченный госпиталем стек сливается с целыми.
-const PINNED_FOR_VERSION = '92';
+const PINNED_FOR_VERSION = '93';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

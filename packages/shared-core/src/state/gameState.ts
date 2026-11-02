@@ -852,9 +852,9 @@ export interface Fleet {
    *  land and is exposed to the planet's orbital AA — no separate "far" safe standoff.
    *  (The value stays `'near'` for back-compat; the old near/far split was collapsed.) */
   orbit?: 'near';
-  /** Whether the fleet is actively bombarding the planet below (in orbit over a
-   *  hostile world). Damages structures and freezes the owner's production. */
+  /** Shelling the hostile world below: its production frozen, a volley at `bombardNextAt` hourly. */
   bombarding?: boolean;
+  bombardNextAt?: number;
   traits: TraitId[];
   /** Id of the battle this fleet is engaged in; absent/null when free to move. */
   battleId?: BattleId | null;

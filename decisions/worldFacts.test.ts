@@ -30,10 +30,9 @@ describe('шапка мира — какие факты и в каком пор�
   });
 
   it('обстрел — состояние мира: сразу за блэкаутом, и для чужого мира тоже (видимость решает хост)', () => {
-    const bombard = { building: 'mine', leftMs: 90_000 };
-    expect(kinds({ blackout: true, bombard, mitigation: 0.1 })).toEqual(['blackout', 'bombard', 'cover']);
-    expect(worldFacts({ ...base, mine: false, bombard })).toEqual([{ kind: 'bombard', ...bombard }]);
-    expect(kinds({ bombard: null })).toEqual([]);
+    expect(kinds({ blackout: true, bombardIn: 90_000, mitigation: 0.1 })).toEqual(['blackout', 'bombard', 'cover']);
+    expect(worldFacts({ ...base, mine: false, bombardIn: 0 })).toEqual([{ kind: 'bombard', leftMs: 0 }]);
+    expect(kinds({ bombardIn: null })).toEqual([]);
   });
 
   it('столица и блэкаут — только о своём мире', () => {

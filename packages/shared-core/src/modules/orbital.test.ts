@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import { combatModule } from './combat';
-import { fleetBombardPower, orbitalModule } from './orbital';
-import { damageFromTraces, damageHookQueries } from '../util/combat';
-import { bombardersOf } from '../state/orbit';
+import { orbitalModule } from './orbital';
 import { interceptModule } from './intercept';
 import { economyModule } from './economy';
 import { constructionModule } from './construction';
@@ -204,51 +202,65 @@ describe('orbital — bombardment effects (GDD §7.4)', () => {
     expect(idle.events.map((e) => e.type)).not.toContain('planet.bombarded');
   });
 
-  // Таймер бомбардировки клиента (`decisions/bombardTimer.ts`) предсказывает снос по
-  // `fleetBombardPower` через `damageHookQueries` → `traceHooks` → `damageFromTraces`.
-  // Сторож: прогноз и настоящий обстрел — одно число, с прикрытием мира и двумя флотами.
-  it('прогноз таймера совпадает с обстрелом: постройка падает ровно в предсказанный миг', () => {
-    const kernel = createKernel([economyModule, ...combatFamily, constructionModule]);
-    const st = stateWith({
-      players: [player('p2', { metal: 0 })],
-      planets: [planet('P', 'p2', { buildings: [['bastion', 1], ['mine', 1]] })], // 30 hp, доля 0.5
-      fleets: [
-        fleet('F', 'p1', 'P', [['cruiser', 1]], { orbit: 'near', bombarding: true }),
-        fleet('G', 'p3', 'P', [['siege', 1]], { orbit: 'near', bombarding: true }),
-        fleet('H', 'p1', 'P', [['cruiser', 2]], { orbit: 'near' }), // стоит, но не обстреливает
-      ],
-    });
-    const shooters = bombardersOf(st, 'P', data);
-    expect(shooters.map((f) => f.id)).toEqual(['F', 'G']);
-    const queries = shooters.flatMap((f) =>
-      damageHookQueries(fleetBombardPower(f, data), {
-        phase: 'bombard',
-        location: 'P',
-        attacker: f.owner,
-        defender: 'p2',
-        attackerFleet: f.id,
-      }),
-    );
-    const traces = kernel.traceHooks(st, queries, ctx)!;
-    let rate = 0;
-    for (let i = 0; i < traces.length; i += 3) {
-      rate += damageFromTraces([traces[i]!.value, traces[i + 1]!.value, traces[i + 2]!.value]);
-    }
-    // Крейсер 5 + осада 30 в час; бастион прикрывает на 50%, рудник ещё на 5%.
-    expect(rate).toBeCloseTo((10 * 0.5 + 30) * 0.45, 9);
-    const fallAt = (30 / rate) * HOUR;
-    const before = okAdvance(kernel.advanceTo(st, at(Math.floor(fallAt) - 1000)));
-    expect(before.state.planets.P?.buildings.map((b) => b.type)).toEqual(['bastion', 'mine']);
-    const after = okAdvance(kernel.advanceTo(st, at(Math.ceil(fallAt) + 1000)));
-    expect(after.state.planets.P?.buildings.map((b) => b.type)).toEqual(['mine']);
-  });
+  // Заказ владельца 2026-11-02: обстрел бьёт залпом раз в игровой час, «как обычная атака
+  // флота, только на планету». Часы — свои у флота (`bombardNextAt`), как у атаки в бою.
+  describe('залп раз в час по своим часам флота', () => {
+    const setup = () =>
+      stateWith({
+        players: [player('p2', { metal: 0 })],
+        planets: [planet('P', 'p2', { buildings: [['depot', 1]] })], // hp 30, прикрытия нет
+        fleets: [fleet('F', 'p1', 'P', [['cruiser', 1]], { orbit: 'near' })], // 5 за залп
+      });
+    const kernel = () => createKernel([economyModule, ...combatFamily, constructionModule]);
+    const depotHp = (st: GameState) => st.planets.P?.buildings.find((b) => b.type === 'depot')?.hp;
 
-  it('прогноз урона: битый или нечисловой след читается как ноль', () => {
-    expect(damageFromTraces([10, 0, 0])).toBe(10);
-    expect(damageFromTraces([10, 0.5, 1])).toBe(7.5);
-    expect(damageFromTraces([10, 0, undefined])).toBe(0);
-    expect(damageFromTraces([Number.NaN, 0, 0])).toBe(0);
-    expect(damageFromTraces([])).toBe(0);
+    it('первый залп — через час после приказа, весь часовой урон разом; до него — ни царапины', () => {
+      const k = kernel();
+      const on = okApply(k.applyAction(setup(), bombard('F', true), at(0)));
+      expect(on.state.fleets.F?.bombardNextAt).toBe(HOUR);
+      const before = okAdvance(k.advanceTo(on.state, at(HOUR - 1)));
+      expect(depotHp(before.state)).toBe(30);
+      expect(before.events.map((e) => e.type)).not.toContain('planet.bombarded');
+      const volley = okAdvance(k.advanceTo(before.state, at(HOUR)));
+      expect(depotHp(volley.state)).toBe(25);
+      expect(volley.state.fleets.F?.bombardNextAt).toBe(2 * HOUR);
+      const second = okAdvance(k.advanceTo(volley.state, at(2 * HOUR + HOUR / 2)));
+      expect(depotHp(second.state)).toBe(20);
+    });
+
+    it('один длинный отрезок и много коротких дают те же залпы', () => {
+      const k = kernel();
+      const on = okApply(k.applyAction(setup(), bombard('F', true), at(0))).state;
+      const long = okAdvance(k.advanceTo(on, at(3 * HOUR + 1000))).state;
+      let short = on;
+      for (let t = 600_000; t <= 3 * HOUR + 1000; t += 600_000) short = okAdvance(k.advanceTo(short, at(t))).state;
+      short = okAdvance(k.advanceTo(short, at(3 * HOUR + 1000))).state;
+      expect(depotHp(long)).toBe(15);
+      expect(depotHp(short)).toBe(15);
+      expect(short.fleets.F?.bombardNextAt).toBe(long.fleets.F?.bombardNextAt);
+    });
+
+    it('повторное «вкл» часы не сбивает, «выкл» их снимает, новое «вкл» заводит заново', () => {
+      const k = kernel();
+      const on = okApply(k.applyAction(setup(), bombard('F', true), at(0))).state;
+      const again = okApply(k.applyAction(on, bombard('F', true), at(HOUR / 2))).state;
+      expect(again.fleets.F?.bombardNextAt).toBe(HOUR);
+      const off = okApply(k.applyAction(again, bombard('F', false), at(HOUR / 2))).state;
+      expect(off.fleets.F?.bombardNextAt).toBeUndefined();
+      const quiet = okAdvance(k.advanceTo(off, at(2 * HOUR))).state;
+      expect(depotHp(quiet)).toBe(30);
+      const reOn = okApply(k.applyAction(quiet, bombard('F', true), at(2 * HOUR))).state;
+      expect(reOn.fleets.F?.bombardNextAt).toBe(3 * HOUR);
+    });
+
+    it('флот, у которого обстрел включён без часов (старое сохранение), бьёт через час от начала отрезка', () => {
+      const k = kernel();
+      const st = setup();
+      st.fleets.F!.bombarding = true;
+      const r = okAdvance(k.advanceTo(st, at(HOUR))).state;
+      expect(depotHp(r)).toBe(25);
+      expect(r.fleets.F?.bombardNextAt).toBe(2 * HOUR);
+    });
   });
 
   it('freezes the production of the bombarded world and wears its structures', () => {

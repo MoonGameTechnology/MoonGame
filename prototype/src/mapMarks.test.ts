@@ -310,19 +310,20 @@ describe('REFM-234 — метки забега', () => {
 });
 
 describe('таймер бомбардировки', () => {
-  it('под обстреливаемым миром — плашка «⊗ Ч:ММ:СС» до сноса постройки: мой мир — цветом угрозы, мой обстрел — моим; не стороне — ничего', async () => {
+  it('под обстреливаемым миром — плашка «⊗ Ч:ММ:СС» до следующего залпа: мой мир — цветом угрозы, мой обстрел — моим; не стороне — ничего', async () => {
     const { marks, palette, env, frame, home, next, own, at, put, patch } = await boot();
-    const { bombardFall } = await import('./bombardClock');
+    const { bombardVolleyIn } = await import('./bombardClock');
     expect(home.buildings.length).toBeGreaterThan(0);
     // Враг обстреливает мой мир: обстрел идёт только в войне.
     patch({ diplomacy: { 'p1|p2': 'war' } });
     put({ ...own, id: 'raider', owner: 'p2', orbit: 'near', bombarding: true, battleId: null } as Fleet);
-    const fall = bombardFall(env.world, home.id, 'p1')!;
-    expect(fall).not.toBeNull();
+    // Часы залпа: через 40 минут.
+    env.world.fleets.raider!.bombardNextAt = env.world.time + 40 * 60_000;
+    expect(bombardVolleyIn(env.world, home.id, 'p1')).toBe(40 * 60_000);
     marks.drawBombardTimers();
     const c = at(home.position);
     const text = frame.named('fillText')[0]!;
-    expect(text.args).toEqual([`⊗ ${countdownHMS(fall.leftMs)}`, c.x, Math.round(c.y + 31 + 5) + 3]);
+    expect(text.args).toEqual([`⊗ ${countdownHMS(40 * 60_000)}`, c.x, Math.round(c.y + 31 + 5) + 3]);
     expect(text.fill).toBe(palette.HOSTILE);
     // Над тем же миром и осада «Поглощения» — таймер обстрела уходит под её отсчёт.
     frame.calls.length = 0;
@@ -338,7 +339,7 @@ describe('таймер бомбардировки', () => {
       fleets: rest,
       planets: { ...env.world.planets, [next.id]: { ...next, owner: 'p2', buildings: home.buildings } },
     };
-    put({ ...own, id: 'mine-bomber', location: next.id, orbit: 'near', bombarding: true, battleId: null } as Fleet);
+    put({ ...own, id: 'mine-bomber', location: next.id, orbit: 'near', bombarding: true, bombardNextAt: env.world.time + 1, battleId: null } as Fleet);
     marks.drawBombardTimers();
     expect(frame.named('fillText')).toHaveLength(1);
     expect(frame.named('fillText')[0]!.fill).toBe(palette.ownerColor('p1'));
