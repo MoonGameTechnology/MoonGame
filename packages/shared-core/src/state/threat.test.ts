@@ -25,7 +25,7 @@ const NOW = 100 * HOUR;
 const ctx: Context = { now: NOW, data };
 
 // Chain map A—B—C, 100 map-units per lane. p1 owns A, so its identify coverage
-// is {A, B} (IDENTIFY_HOPS = 1) — C sits beyond the fog line by construction.
+// reaches 130 units: A and B are identified, C sits beyond the fog line.
 function world(id: string, owner: string | null, x: number, links: string[]): Planet {
   return {
     id,
@@ -58,6 +58,7 @@ function baseState(fleets: Fleet[], diplomacy?: Record<string, 'war' | 'peace'>)
   return {
     ...s,
     time: NOW,
+    sight: { world: 130, fleet: 40, radarScale: 1 },
     planets: {
       A: world('A', 'p1', 0, ['B']),
       B: world('B', null, 100, ['A', 'C']),
@@ -90,7 +91,7 @@ describe('scanNodeThreats — «враг близко» tripwire (ST-3.1)', () =
   });
 
   it('estimates a multi-hop journey: current leg exact + remaining hops at base speed ÷ timeScale', () => {
-    // On C→B, 75% through (anchored to B — inside p1's fog line), then one more
+    // On C→B, 75% through (x=125 — inside p1's 130-unit sight), then one more
     // hop B→A: 100 units at speed 10 = 10 game-hours, compressed by timeScale 2.
     const s = baseState([
       fleet('F1', 'p2', {
@@ -111,9 +112,8 @@ describe('scanNodeThreats — «враг близко» tripwire (ST-3.1)', () =
     expect(threats[0]!.eta).toBe(NOW + 1 * HOUR + (10 * HOUR) / 2);
   });
 
-  it('is fog-honest: the same inbound journey is silent while the ship anchors beyond the fog line', () => {
-    // Same C→B leg but only 25% through — the ship still anchors to C, which p1
-    // does not identify (owned-world coverage reaches only 1 hop: A, B). The
+  it('is fog-honest: the same inbound journey is silent outside actual sight', () => {
+    // Same C→B leg but only 25% through — x=175 is beyond the 130-unit sight. The
     // Steward must not react to what its player could not see.
     const s = baseState([
       fleet('F1', 'p2', {

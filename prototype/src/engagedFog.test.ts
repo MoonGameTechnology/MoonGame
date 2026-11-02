@@ -25,9 +25,9 @@ describe('туман спрашивает о флоте и бое только �
   it('узел флота напрямую спрашивает только fleetKnown', () => {
     expect(count('known(fleetNode(')).toBe(0);
     expect(count('known(fleetNode(', feed)).toBe(0);
-    expect(count('known(fleetNode(', fog)).toBe(1);
+    expect(count('known(fleetNode(', fog)).toBe(0);
     expect(fog).toContain(
-      'return known(fleetNode(f)) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);',
+      'return known(f.location) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);',
     );
   });
 
