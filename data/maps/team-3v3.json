@@ -648,7 +648,7 @@
         "x": 30,
         "y": 600
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "crown_030": {

@@ -113,9 +113,12 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
     const sectors = Object.values(preset.map!.sectors);
     const has = (pick: (s: (typeof sectors)[number]) => string | undefined): string[] =>
       [...new Set(sectors.map(pick).filter((v): v is string => v !== undefined))].sort();
-    // A fork fortress is never authored: it appears when a fortress is set on a road fork.
+    // Fortresses are never authored: a player raises `void_station` on a held province and
+    // `fork_station` on a road fork (see data/seededFortress.test.ts).
     // `empty` stays off combat maps by the owner's ruling (see mapSchema.test.ts).
-    const kinds = Object.keys(data.sectorKinds).filter((k) => k !== 'fork_station' && k !== 'empty').sort();
+    const kinds = Object.keys(data.sectorKinds)
+      .filter((k) => k !== 'fork_station' && k !== 'void_station' && k !== 'empty')
+      .sort();
     expect(has((s) => s.kind)).toEqual(kinds);
     expect(has((s) => s.terrain)).toEqual(Object.keys(data.sectors).sort());
     expect(has((s) => s.planetType)).toEqual(Object.keys(data.planetTypes).sort());

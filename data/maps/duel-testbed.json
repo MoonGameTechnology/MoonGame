@@ -208,7 +208,7 @@
         "x": 200,
         "y": 170
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "observatory": {

@@ -232,7 +232,7 @@
         "x": -380,
         "y": -70
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "empty_space"
     },
     "riftward": {
@@ -300,7 +300,7 @@
         "x": 250,
         "y": 540
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "empty_space"
     },
     "shoal": {

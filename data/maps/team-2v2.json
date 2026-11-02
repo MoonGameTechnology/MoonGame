@@ -538,7 +538,7 @@
         "x": 160,
         "y": -540
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "reach_24": {

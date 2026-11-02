@@ -6,7 +6,9 @@
 на мапдизайн. Это ВИТРИНА, а не рейтинговая карта: честность сторон не держится
 (резолюция владельца), в пул AvA она не входит (`avaEligible` не стоит).
 
-ПОЛНОТА. Каталог выложен целиком: 16 видов (`sectorKinds`), 11 сред (`sectors`), 12 типов
+ПОЛНОТА. Каталог выложен целиком, кроме двух крепостей (`void_station`, `fork_station`):
+их строит только игрок, а крепость, посеянная картой, стоит без ядра и орудий
+(`data/seededFortress.test.ts`). Итого 16 видов (`sectorKinds`), 11 сред (`sectors`), 12 типов
 миров (`planetTypes`). Вид `empty` стоит ТОЛЬКО здесь — две «точки съёмки», где можно
 развернуть станцию (`station.deploy` требует такую клетку). На боевых картах его нет
 (решение владельца 2026-09-22, M2.10); исключение для тестовой карты — резолюция
@@ -95,7 +97,8 @@ region('bubble')
 add('singularity', 150, -150, 'black_hole', 'deep_void')
 add('relic', -130, -170, 'planet', 'deep_void', 'relic_world')
 add('ring', 390, -400, 'planet', 'deep_void', 'ringworld')
-add('station', 200, 170, 'void_station', 'deep_void')
+# Мёртвый мир, а не станция: крепость строит только игрок (fortress-roadmap §0.6).
+add('station', 200, 170, 'dead_world', 'deep_void')
 add('observatory', 450, -50, 'neutral_base', 'deep_void', owner='neutrals')
 add('survey_2', -110, 110, 'empty', 'deep_void')
 add('scorched', 720, -300, 'planet', 'deep_void', 'irradiated')

@@ -85,10 +85,11 @@ for sid, x, y, npc, name in [
         landing=[dict(unit='swarm_lander', count=3)] if npc == 'swarm' else [])
 
 # The old remnant lies off-centre; the traffic can pass on either side.
-# The relic world and the old station sit on the axis, equally far from both teams.
+# The relic world and the dead world sit on the axis, equally far from both teams.
+# Not a station: a fortress is only ever built by a player (docs/fortress-roadmap.md §0.6).
 add('remnant', 60, 40, 'black_hole', 'deep_void')
 add('relic', -20, -520, 'planet', 'deep_void', planetType='relic_world', garrison=[dict(unit='militia', count=2)])
-add('crossing', 30, 600, 'void_station', 'deep_void')
+add('crossing', 30, 600, 'dead_world', 'deep_void')
 FIXED = list(sectors)
 
 # A fixed Poisson sample supplies varied cell sizes and degrees. Each accepted point

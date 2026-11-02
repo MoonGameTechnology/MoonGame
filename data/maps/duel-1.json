@@ -128,7 +128,7 @@
         "x": -470,
         "y": 470
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "empty_space"
     },
     "drift": {
@@ -186,7 +186,7 @@
         "x": 610,
         "y": 360
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "empty_space"
     },
     "shoal": {
