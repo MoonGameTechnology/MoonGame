@@ -16,7 +16,7 @@
  *  · **нулевая длительность — это «готово», а не деление на ноль.** Данные могут не
  *    назвать время стройки; полоса обязана показать 100%, а не NaN.
  */
-import type { GameData, GameState } from '../../packages/shared-core/src/index';
+import type { GameData, GameState, QueuedConstruction } from '../../packages/shared-core/src/index';
 import { matchHours, orderLane } from '../../packages/shared-core/src/index';
 import type { ActiveBuild, BuildLane, ConstructionPayload } from './buildQueue';
 
@@ -55,6 +55,21 @@ export function activeConstruction(
     }
   }
   return best;
+}
+
+/** Идущий и ждущие заказы той полосы мира, куда встанет этот юнит (BLD-2.1): у каждой
+ *  производственной постройки своя очередь, и пехоте не впереди крейсер. */
+export function unitLaneOrders(
+  state: GameState,
+  planetId: string,
+  unit: string,
+  data: Pick<GameData, 'units'>,
+): { active: ActiveBuild | null; queued: QueuedConstruction[] } {
+  const lane = orderLane(data, { kind: 'unit', unit });
+  return {
+    active: activeConstruction(state, planetId, lane, data),
+    queued: (state.planets[planetId]?.buildQueue ?? []).filter((q) => orderLane(data, q) === lane),
+  };
 }
 
 /**

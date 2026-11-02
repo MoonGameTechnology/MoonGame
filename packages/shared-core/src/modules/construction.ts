@@ -280,10 +280,8 @@ function isQueued(
 // Правила, которые из этого следуют (решались здесь — их не было ни в дизайне, ни в
 // коде):
 //
-//  1. **Одна стройка на ПОЛОСУ на мире.** Полоса `buildings` — здание и апгрейд (они
-//     спорят за одну стройплощадку); у юнитов полоса своя у каждой производственной
-//     постройки — `ships`, `shuttles`, `infantry`, `vehicles` (BLD-2.1, `state/buildLane.ts`;
-//     до него юниты стояли в одной `units`, и пехота ждала крейсер). Полосы независимы:
+//  1. **Одна стройка на ПОЛОСУ на мире.** `buildings` — здание и апгрейд (одна площадка),
+//     и по полосе на производственную постройку (BLD-2.1, `state/buildLane.ts`). Полосы независимы:
 //     долгий дом не должен морозить верфь. Ровно это правило ДО BLD-1 стояло в клиенте
 //     прототипа и утверждало, будто «ядро всё равно не примет второй». Не принимало
 //     только ОДИНАКОВЫЙ (`isQueued`); теперь утверждение стало правдой, и две очереди
@@ -307,10 +305,6 @@ function isQueued(
 //
 // Туман: очередь видит только владелец мира (`visibleState`). Это будущее НАМЕРЕНИЕ —
 // ровно то, за что там режут `scheduled` и цепочки приказов.
-
-// Полосы (BLD-2.1): здания отдельно, и у КАЖДОЙ производственной постройки — своя
-// полоса юнитов (верфь, космопорт, казармы, завод). Правило и его словарь — в
-// `state/buildLane.ts`, его же читает клиент.
 
 /** Потолок ждущих заказов в одной полосе одного мира (правило 5). */
 const MAX_BUILD_QUEUE = 5;
@@ -470,19 +464,9 @@ function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): vo
   }
 }
 
-/**
- * Освободилась полоса — будим её. Освободилась полоса ЮНИТОВ — будим все полосы юнитов
- * мира, в фиксированном порядке `UNIT_LANES`. Это мост с BLD-1 (одна общая полоса
- * `units`): в сейве или живой партии того времени за идущей пехотой мог ждать корабль,
- * а по новому правилу полоса кораблей свободна, и разбудить её больше некому. Будить
- * свободную полосу безопасно: `startNextQueued` сам отвечает «занято» или «пусто».
- */
+/** Полоса юнитов будит ВСЕ полосы юнитов (`UNIT_LANES`): мост с общей `units` BLD-1 в сейве. */
 function startNextAfter(h: HandlerContext, planet: Planet, lane: BuildLane): void {
-  if (lane === 'buildings') {
-    startNextQueued(h, planet, lane);
-    return;
-  }
-  for (const l of UNIT_LANES) startNextQueued(h, planet, l);
+  for (const l of lane === 'buildings' ? [lane] : UNIT_LANES) startNextQueued(h, planet, l);
 }
 
 /** Строительные способности здания — те, что гейтят `unit.build`. */
@@ -1373,8 +1357,6 @@ export const constructionModule: GameModule = {
       if (typeof p.planetId !== 'string') return;
       const planet = h.state.planets[p.planetId];
       if (!planet) return;
-      // Повтор, назначенный до BLD-2.1, несёт старую общую полосу `units` — он будит
-      // все полосы юнитов. Неразборчивая полоса — стройка, как и раньше.
       if (p.lane === 'units') startNextAfter(h, planet, 'ships');
       else startNextQueued(h, planet, isBuildLane(p.lane) ? p.lane : 'buildings');
     });
