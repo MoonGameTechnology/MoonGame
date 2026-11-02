@@ -4868,6 +4868,8 @@ export const en: Record<string, string> = {
   'side.world.intel.research': '🔬 Researching: {list}',
   'side.world.intel.offers': '🤝 Talks: {list}',
   'side.world.intel.none': 'none',
+  'side.world.dev': 'Development',
+  'side.world.dev.desc': "Sum over the world's structures. Each level gives 1 point per {n} resources of cost and 1 per build hour.",
   'side.world.vp': 'Victory points',
 
   // --- speed — Панель времени: подсказки множителей, перезапуска и выхода.

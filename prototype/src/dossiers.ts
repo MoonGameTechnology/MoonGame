@@ -19,6 +19,7 @@
  */
 import {
   BASE_BUILDING_DEFENSE,
+  DEVELOPMENT_COST_PER_POINT,
   MITIGATION_CAP,
   buildingLevel,
   buildingMaxLevel,
@@ -570,6 +571,7 @@ export function createDossiers(host: DossierHost): {
       const FACT_DOSSIER: Record<string, [string, string]> = {
         capital: [t('side.world.capital'), t('side.world.capital.note')],
         vp: [t('side.world.vp'), ''],
+        dev: [t('side.world.dev'), t('side.world.dev.desc', { n: DEVELOPMENT_COST_PER_POINT })],
         output: [t('side.world.output'), ''],
       };
       const d = FACT_DOSSIER[key.slice(5)];

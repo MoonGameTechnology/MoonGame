@@ -19,6 +19,8 @@ class FakeEl {
   children: FakeEl[] = [];
   /** Что вернёт `querySelector` по селектору. */
   found: Record<string, FakeEl> = {};
+  /** Что вернёт `querySelectorAll` по селектору. */
+  foundAll: Record<string, FakeEl[]> = {};
   private hide = false;
   private text = '';
   private off = false;
@@ -79,6 +81,9 @@ class FakeEl {
   querySelector(selector: string): FakeEl | null {
     return this.found[selector] ?? null;
   }
+  querySelectorAll(selector: string): FakeEl[] {
+    return this.foundAll[selector] ?? [];
+  }
 }
 
 afterEach(() => {
@@ -104,6 +109,16 @@ function boot() {
   name.textContent = 'Деймос';
   side.found['.ptitle > :first-child'] = name;
   side.found['[data-act="ping"]'] = make();
+  // Метки шапки карточки: развитость и очки победы мира.
+  side.foundAll['.phead .pbadge'] = [
+    ['⬢ 98', 'fact:dev'],
+    ['✦ 10', 'fact:vp'],
+  ].map(([text, key]) => {
+    const mark = make();
+    mark.textContent = text!;
+    mark.dataset.desc = key!;
+    return mark;
+  });
   const noop = (): void => {};
   const hud = initMobileHud({
     side: side as unknown as HTMLElement,
@@ -118,7 +133,7 @@ function boot() {
   });
   hud.sync(true);
   const sheet = body.children.find((el) => el.id === 'mobile-sheet')!;
-  return { hud, sheet, writes: () => made.reduce((n, el) => n + el.writes, 0) };
+  return { hud, sheet, made, writes: () => made.reduce((n, el) => n + el.writes, 0) };
 }
 
 it('кадр без перемен ничего не переписывает в листе', () => {
@@ -145,4 +160,14 @@ it('перемена по-прежнему доходит до листа', () =
   expect(sheet.hidden).toBe(false);
   hud.update('', false, false, []);
   expect(sheet.hidden).toBe(true);
+});
+
+it('все метки шапки карточки переезжают в лист, каждая своей кнопкой', () => {
+  const { hud, made } = boot();
+  hud.update('planet:A', false, false, []);
+  const badges = made.filter((el) => el.className === 'mobile-badge');
+  expect(badges.map((b) => [b.textContent, b.hidden])).toEqual([
+    ['⬢ 98', false],
+    ['✦ 10', false],
+  ]);
 });

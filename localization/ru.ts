@@ -4874,6 +4874,8 @@ export const ru: Record<string, string> = {
   'side.world.intel.research': '🔬 Исследует: {list}',
   'side.world.intel.offers': '🤝 Переговоры: {list}',
   'side.world.intel.none': 'нет',
+  'side.world.dev': 'Развитость',
+  'side.world.dev.desc': 'Сумма по постройкам мира. Каждый уровень даёт 1 очко за {n} ресурсов цены и 1 за час стройки.',
   'side.world.vp': 'Очки победы',
 
   // --- speed — Панель времени: подсказки множителей, перезапуска и выхода.

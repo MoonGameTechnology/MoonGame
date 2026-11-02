@@ -30,6 +30,7 @@ import {
   isForkSite,
   isInhabited,
   MAX_STEWARD_HOLD_POINTS,
+  planetDevelopment,
   rallyPointOf,
 } from '../../packages/shared-core/src/index';
 import { isMineFleet } from '../../packages/shared-core/src/state/minefields';
@@ -709,12 +710,19 @@ export function planetPanelHtml(p: Planet): string {
     sm.victoryPoints > 0 && victoryPointsShown(sectorZeroToolsHidden())
       ? `<span class="pbadge" data-desc="fact:vp" aria-label="${esc(t('side.world.vp'))}">✦ ${sm.victoryPoints}</span>`
       : '';
+  // Развитость мира — тоже рядом с именем (заказ владельца 2026-11-02): сумма по постройкам,
+  // где каждый уровень стоит своей цены и часов стройки (`state/development.ts`).
+  const devPoints = planetDevelopment(data, p);
+  const dev =
+    devPoints > 0
+      ? `<span class="pbadge" data-desc="fact:dev" aria-label="${esc(t('side.world.dev'))}">⬢ ${devPoints}</span>`
+      : '';
   let h = cardHeader(
     ownerColor(p.owner),
     placeName(p.id),
     `${game.devUi() ? `${esc(p.id)} · ` : ''}${p.owner ? NAME[p.owner] : t('side.neutral')} · ${kindName} · ${ptName} · ${sec}`,
     undefined,
-    vp,
+    dev + vp,
   );
   // ШАПКА МИРА (переработка окна, заказ владельца 2026-09-29): под именем — то, чего нет во
   // вкладках (состояние и свойства мира, `decisions/worldFacts.ts`), и действия с миром.

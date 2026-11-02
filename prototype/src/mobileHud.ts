@@ -53,15 +53,20 @@ export function initMobileHud(host: MobileHudHost) {
   close.className = 'mobile-close btn-x';
   close.dataset.mobile = 'close';
   close.textContent = '×';
-  // Метка карточки рядом с именем (`.phead .pbadge`, очки победы мира): шапка карточки на
-  // телефоне скрыта, и метка переезжает сюда. Тап — её досье, как у фишек мира.
-  const badge = document.createElement('button');
-  badge.type = 'button';
-  badge.className = 'mobile-badge';
-  badge.dataset.mobile = 'badge';
-  badge.hidden = true;
+  // Метки карточки рядом с именем (`.phead .pbadge`: развитость и очки победы мира): шапка
+  // карточки на телефоне скрыта, и метки переезжают сюда. Тап — досье метки, как у фишек мира.
+  const BADGE_SLOTS = 2;
+  const badges = Array.from({ length: BADGE_SLOTS }, (_, i) => {
+    const badge = document.createElement('button');
+    badge.type = 'button';
+    badge.className = 'mobile-badge';
+    badge.dataset.mobile = 'badge';
+    badge.dataset.index = String(i);
+    badge.hidden = true;
+    return badge;
+  });
   head.appendChild(grab);
-  head.appendChild(badge);
+  for (const badge of badges) head.appendChild(badge);
   head.appendChild(close);
   // Вкладки «Флот» / «Мир» (UIX-7.1): видны, только когда выбор — свой мир с одним своим
   // флотом; какая из них открыта, решает выбор, а не разметка.
@@ -121,8 +126,7 @@ export function initMobileHud(host: MobileHudHost) {
   let panelNode: ChildNode | null = null;
   let title = '';
   let sub = '';
-  let badgeText = '';
-  let badgeKey = '';
+  let marks: { text: string; key: string; label: string }[] = [];
   // Лист пишется каждый кадр (`update`), а запись того же значения не бесплатна: узел с
   // заново записанным `hidden` браузер заново стилизует, а с заново записанным текстом —
   // ещё и перекладывает. Поэтому пишется только сменившееся.
@@ -173,7 +177,8 @@ export function initMobileHud(host: MobileHudHost) {
     } else if (action === 'close') host.dismiss();
     else if (action === 'ping') host.ping();
     else if (action === 'badge') {
-      if (badgeKey) host.describe(badgeKey);
+      const mark = marks[Number(button.dataset.index)];
+      if (mark?.key) host.describe(mark.key);
     }
     else if (action === 'summary') {
       expand(true);
@@ -238,10 +243,12 @@ export function initMobileHud(host: MobileHudHost) {
         panelNode = host.side.firstChild;
         title =
           host.side.querySelector('.ptitle > :first-child')?.textContent?.replace(/ ▸$/, '') ?? '';
-        const mark = host.side.querySelector<HTMLElement>('.phead .pbadge');
-        badgeText = mark?.textContent ?? '';
-        badgeKey = mark?.dataset.desc ?? '';
-        badge.setAttribute('aria-label', mark?.getAttribute('aria-label') ?? badgeText);
+        marks = [...host.side.querySelectorAll<HTMLElement>('.phead .pbadge')]
+          .slice(0, BADGE_SLOTS)
+          .map((m) => {
+            const text = m.textContent ?? '';
+            return { text, key: m.dataset.desc ?? '', label: m.getAttribute('aria-label') ?? text };
+          });
       }
       // Подпись читается каждый кадр, а не на пересборке листа: живой отсчёт в ней (высадка,
       // `.pn-timer`) патчится на месте, и снимок с пересборки застыл бы на первой цифре.
@@ -277,8 +284,12 @@ export function initMobileHud(host: MobileHudHost) {
       if (grab.disabled !== choosing) grab.disabled = choosing;
       setText(caption, choosing ? t('hud.mobile.choose') : title);
       setText(subtitle, choosing ? t('hud.mobile.choose-hint') : sub);
-      setText(badge, badgeText);
-      setHidden(badge, choosing || !badgeText);
+      badges.forEach((badge, i) => {
+        const mark = marks[i];
+        setText(badge, mark?.text ?? '');
+        setHidden(badge, choosing || !mark?.text);
+        if (mark) setAttr(badge, 'aria-label', mark.label);
+      });
       setAttr(grab, 'aria-label', `${title} — ${t('hud.mobile.details')}`);
       setAttr(close, 'aria-label', t('card.close'));
       setText(detailButton, expanded ? t('hud.mobile.collapse') : t('hud.mobile.details'));
