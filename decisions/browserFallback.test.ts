@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fallbackFor, showServerRow, type BrowserTab } from './browserFallback';
 
-const TABS: BrowserTab[] = ['available', 'active', 'archived'];
+const TABS: BrowserTab[] = ['available', 'active', 'archived', 'corporate'];
 const на = (tab: BrowserTab) => ({ tab });
 
 describe('что вместо списка матчей', () => {

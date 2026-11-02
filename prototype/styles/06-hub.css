@@ -185,13 +185,15 @@
 #hub .hub-card .hc-s{font-size:14px;color:var(--dim);margin-top:4px;line-height:1.4;}
 /* ADDR-4 «Мои партии» — свои партии прямо на главном экране */
 #hub .hm-list{display:flex;flex-direction:column;gap:8px;}
-#hub .hm-row .hm-body{flex:1;min-width:0;}
-#hub .hm-row .hm-addr{font-size:var(--fs-caption);color:var(--dim);margin-top:6px;
-  overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;font-variant-numeric:tabular-nums;}
-#hub .hm-row .hm-btns{display:flex;flex-direction:column;gap:6px;flex:0 0 auto;}
-/* «Продолжить» и «Копировать адрес» — классами .btn-second/.btn-quiet (UIX-11.2): правило
-   #connect .mbtn сюда не доходит, и без них это были кнопки браузера по умолчанию. */
+#hub .hm-row{display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px 12px;}
+#hub .hm-row .hm-body{min-width:0;}
+#hub .hm-row .hm-btns{grid-column:1 / -1;display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;}
 #hub .hm-row .hm-btns .mbtn{min-height:44px;padding:0 14px;border-radius:10px;font-size:var(--fs-body);white-space:nowrap;}
+#hub .hm-row .hm-btns .btn-second{flex:1 1 auto;}
+@media (min-width:700px){
+  #hub .hm-row{grid-template-columns:38px minmax(0,1fr) auto;}
+  #hub .hm-row .hm-btns{grid-column:3;grid-row:1;flex-direction:column;}
+}
 #hub .hm-more{font-size:var(--fs-caption);color:var(--dim);background:transparent;border:none;padding:2px 0;
   cursor:pointer;text-align:left;text-decoration:underline;}
 /* Своих партий нет: строка и дверь туда, где партии берут (правило 6 decisions/myMatches.ts). */

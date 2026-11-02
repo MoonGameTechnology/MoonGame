@@ -15,6 +15,8 @@
  * значения приходят со входа и читаются через `resolveServer`. Поле адреса стоит в
  * карточке «Сервер не отвечает» и видно только при сбое (`browserFallback.ts`, правило 4).
  */
+import { splitCorporateMatches, type MatchPageTab } from '../../decisions/corporateMatches';
+import { matchNumberButton } from './matchNumberButton';
 import { LOCALE, t, tData } from '../../localization/runtime';
 import { isAvaMatchId } from '../../packages/protocol/src/ava';
 import { fallbackFor, showServerRow, type Fallback } from '../../decisions/browserFallback';
@@ -106,7 +108,7 @@ let matchLists: Record<MatchTab, MatchRow[]> | null = null;
  *  переключение вкладок — иначе карточка с адресом пропала бы посреди набора. */
 let loadFailed = false;
 let listShown = false;
-let activeTab: MatchTab = 'available';
+let activeTab: MatchPageTab = 'available';
 /** Выбор фильтров (BRW-3). Живёт в модуле, поэтому тихий переопрос раз в десять секунд
  *  его не сбрасывает — перерисовка читает то же состояние. Между заходами он лежит в
  *  `localStorage` рядом с `void.server`/`void.nick`; `null` — ещё не восстанавливали. */
@@ -273,7 +275,7 @@ function renderFilterPanel(rows: MatchRow[], f: FilterState): FilterControls {
 }
 
 /** Переключить вкладку страницы и перерисовать её. */
-function openTab(tab: MatchTab): void {
+function openTab(tab: MatchPageTab): void {
   activeTab = tab;
   for (const b of Array.from(document.querySelectorAll('.mtab')))
     b.classList.toggle('active', (b as HTMLElement).dataset.tab === tab);
@@ -301,14 +303,13 @@ function renderEmpty(el: HTMLElement, plan: Extract<Fallback, { kind: 'empty' }>
 }
 
 /** Строка матча: карта и режим, ниже день, места, правила и окно входа; справа кнопки. */
-function matchRow(m: MatchRow): HTMLElement {
+function matchRow(m: MatchRow, source: MatchTab): HTMLElement {
   // «В архив» / «Восстановить» — только на своих вкладках. «Описание» доступно везде;
   // кнопкам на телефоне нужен свой ряд, чтобы они не сжимали название карты.
-  const action = rowAction(activeTab, m.status);
+  const action = rowAction(source, m.status);
   const row = document.createElement('div');
   row.className = 'mrow mrow-2';
-  // Номер партии в строке не печатается — как в «Моих партиях» хаба: `m-<uuid>` вытеснял
-  // то, ради чего сюда смотрят. Он остаётся подсказкой строки — для разговора с поддержкой.
+  // Полный номер остаётся в подсказке; компактная кнопка под данными копирует его целиком.
   row.dataset.match = m.matchId;
   row.title = m.matchId;
   const info = document.createElement('div');
@@ -340,7 +341,7 @@ function matchRow(m: MatchRow): HTMLElement {
   // seat — the server already drops fully-closed sessions from this tab, so an open
   // countdown reassures, a soon-to-close one nudges. Unbounded (dev / old server) or
   // other tabs: omitted. Own «Мои»/«Архив» rows don't gate a reconnect, so no window there.
-  const win = joinWindow(m, activeTab);
+  const win = joinWindow(m, source);
   let windowHtml = '';
   if (win.kind === 'closed') windowHtml = `<span class="mwin shut">${t('acc.join-closed')}</span>`;
   else if (win.kind === 'open')
@@ -355,6 +356,7 @@ function matchRow(m: MatchRow): HTMLElement {
     `<div class="mname"><b>${esc(matchName(m))}</b>${modeHtml}${ended}</div>` +
     `<div class="mmeta"><span>${t('browser.day', { n: m.days })}</span>${seats}` +
     `<span>${esc(ruleSummary(m.rules, m.kind))}</span>${windowHtml}</div>`;
+  info.appendChild(matchNumberButton(m.matchId, text => game.status(text)));
   row.appendChild(info);
   const btns = document.createElement('div');
   btns.className = 'mbtns';
@@ -362,7 +364,7 @@ function matchRow(m: MatchRow): HTMLElement {
   join.className = 'mbtn btn-second';
   // «Войти» на партии, где ты уже сидишь, обещает не то: место занято тобой, и речь
   // о возвращении, а не о вступлении.
-  const seated = activeTab !== 'available';
+  const seated = source !== 'available';
   join.textContent = t(m.status === 'ended' ? 'browser.view-map' : seated ? 'browser.resume' : 'browser.join');
   join.addEventListener('click', () => openSessionTab(m.matchId, seated));
   btns.appendChild(join);
@@ -402,18 +404,20 @@ function renderMatches(): void {
   // перерисовке (правило 7) — иначе сохранённая галочка на ушедшей карте вычистила бы
   // список, не показавшись в панели. Считается и с чужой вкладки: число на ярлыке
   // «Доступных» — после фильтра (`matchesPage.ts`, правило 1).
-  const available = matchLists?.available ?? [];
+  const lists = splitCorporateMatches(matchLists);
+  const available = lists?.available ?? [];
   const f = (matchFilter = matchFilter
     ? clampFilter(matchFilter, available)
     : restoreFilter(localStorage.getItem(FILTER_STORE_KEY), available));
   const found = available.filter((m) => matchesFilter(m, f));
-  const counts = tabCounts(matchLists, found.length);
+  const counts = tabCounts(lists, found.length);
   for (const b of Array.from(document.querySelectorAll('.mtab'))) {
-    const n = counts[(b as HTMLElement).dataset.tab as MatchTab];
+    const n = counts[(b as HTMLElement).dataset.tab as MatchPageTab];
     const badge = b.querySelector('.mcount');
     if (badge) badge.textContent = n === null ? '' : String(n);
   }
-  const все = matchLists?.[activeTab] ?? [];
+  const corporate = lists?.corporate ?? [];
+  const все = activeTab === 'corporate' ? corporate.map(item => item.match) : lists?.[activeTab] ?? [];
   const rows = activeTab === 'available' ? found : все;
   const план = fallbackFor({
     loaded,
@@ -453,7 +457,9 @@ function renderMatches(): void {
     return;
   }
   el.textContent = '';
-  for (const m of rows) el.appendChild(matchRow(m));
+  if (activeTab === 'corporate')
+    for (const { match, source } of corporate) el.appendChild(matchRow(match, source));
+  else for (const m of rows) el.appendChild(matchRow(m, activeTab));
 }
 
 /**
@@ -499,7 +505,7 @@ function renderMyMatches(): void {
       `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
       `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +
-      `<div class="hm-addr">${esc(matchNumberText(m.matchId))}</div>` +
+      `<div class="hm-number"></div>` +
       `</div>`;
     const btns = document.createElement('div');
     btns.className = 'hm-btns';
@@ -510,21 +516,7 @@ function renderMyMatches(): void {
     open.textContent = t('browser.resume');
     open.addEventListener('click', () => openSessionTab(m.matchId, true));
     btns.appendChild(open);
-    const copy = document.createElement('button');
-    copy.className = 'mbtn btn-quiet';
-    copy.textContent = t('hub.mine.copy');
-    copy.addEventListener('click', () => {
-      // Буфер обмена может быть недоступен (нет разрешения, небезопасный контекст) —
-      // тогда честно зовём скопировать из строки: номер в ней и написан, целиком.
-      void (navigator.clipboard?.writeText(m.matchId) ?? Promise.reject(new Error('no clipboard')))
-        .then(() => {
-          game.hubNote(t('hub.mine.copied'));
-        })
-        .catch(() => {
-          game.hubNote(t('hub.mine.copy-manual'));
-        });
-    });
-    btns.appendChild(copy);
+    card.querySelector('.hm-number')!.appendChild(matchNumberButton(m.matchId, text => game.hubNote(text)));
     btns.appendChild(descriptionButton(m));
     card.appendChild(btns);
     el.appendChild(card);
@@ -540,7 +532,10 @@ function renderMyMatches(): void {
       // партий там нет ПО ПОСТРОЕНИЮ: сервер не кладёт в `available` матч, где у тебя уже
       // есть место (`MatchRegistry.list`). Без переключения вкладки «ещё 2» приводило бы
       // на заведомо пустой список — проверено вживую.
-      (document.querySelector('.mtab[data-tab="active"]') as HTMLElement | null)?.click();
+      const all = myMatches(matchLists, Number.MAX_SAFE_INTEGER);
+      const rest = all.kind === 'list' ? all.rows.slice(view.rows.length) : [];
+      const tab = rest.length && rest.every(m => isAvaMatchId(m.matchId)) ? 'corporate' : 'active';
+      (document.querySelector(`.mtab[data-tab="${tab}"]`) as HTMLElement | null)?.click();
       game.hubTab('games');
     });
     el.appendChild(more);
@@ -625,7 +620,7 @@ export function initMatchBrowser(host: MatchBrowserHost): void {
 
   for (const btn of Array.from(document.querySelectorAll('.mtab')))
     btn.addEventListener('click', () =>
-      openTab(((btn as HTMLElement).dataset.tab as MatchTab) ?? 'available'),
+      openTab(((btn as HTMLElement).dataset.tab as MatchPageTab) ?? 'available'),
     );
 
   // Кнопки «Обновить список» нет (UIX-17.1): открытая страница освежается сама — тихий
