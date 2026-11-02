@@ -64,6 +64,8 @@ function world(): GameState {
     ],
   };
   const state: GameState = { ...s, time: NOW, planets: { A, B, C, D }, fleets: {} };
+  // Засады проверяем при реальном обзоре всей дороги, а не по известным узлам.
+  state.sight = { world: 300, fleet: 40, radarScale: 1 };
   setStance(state, 'p1', 'p2', 'war');
   return state;
 }
@@ -179,7 +181,9 @@ describe('ROADS-6 — «Хранитель» встаёт в засаду на �
     const s = world();
     s.fleets.e1 = bypassing(s, 'e1', 1, 20);
     s.fleets.w1 = fleet('w1', 'p1', 4, { location: 'B' });
+    s.sight = { world: 0, fleet: 0, radarScale: 1 };
     expect(stewardAmbushes(s, 'p1', ctx, opts({ identified: new Set() }))).toEqual([]);
+    s.sight = { world: 300, fleet: 40, radarScale: 1 };
     setStance(s, 'p1', 'p2', 'peace');
     expect(stewardAmbushes(s, 'p1', ctx, opts())).toEqual([]);
   });
