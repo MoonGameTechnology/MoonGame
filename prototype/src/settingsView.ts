@@ -21,6 +21,7 @@ import {
   setCanvasCompatibility,
 } from './canvasCompatibility';
 import {
+  frameRateMode,
   glowOn,
   mapSharpOn,
   motionOn,
@@ -29,6 +30,7 @@ import {
   setMapSharp,
   setMotion,
   setShowFps,
+  setFrameRate,
   setStarfield,
   setUiScale,
   setWindowOpacity,
@@ -113,6 +115,7 @@ function mapRenderingReport(): string {
       },
       // Настройки «Графики» сейчас: цена кадра карты растёт с каждой из них.
       graphics: {
+        frameRate: frameRateMode(),
         sharp: mapSharpOn(),
         glow: glowOn(),
         starfield: starfieldOn(),
@@ -178,6 +181,7 @@ export function initSettingsView(host: SettingsViewHost): void {
       renderCompatibilityActive: canvasCompatibilityActive(),
       renderCompatibilitySupported: canvasCompatibilitySupported(),
       fps: showFpsOn(),
+      frameRate: frameRateMode(),
       soundOn: snd.enabled(),
       volume: snd.volume(),
       youColor,
@@ -219,6 +223,7 @@ export function initSettingsView(host: SettingsViewHost): void {
     setRenderCompatibility: setCanvasCompatibility,
     renderingReport: mapRenderingReport,
     setFps: setShowFps,
+    setFrameRate,
     setSound: (v) => snd.setEnabled(v),
     setVolume: (v) => snd.setVolume(v),
     previewSound: () => snd.play('tap'),

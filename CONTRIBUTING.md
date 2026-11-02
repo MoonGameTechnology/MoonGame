@@ -201,6 +201,7 @@ supported»), единственная живая замена (`@henkey/postgre
 | `pnpm smoke:context` | `contexttest.mjs` | контекстные действия на карте |
 | `pnpm smoke:pings` | `pingtest.mjs` | три вида меток: выбор, отображение и удаление из списка и попапа; ПК и телефон |
 | `pnpm smoke:zoom` | `zoomtest.mjs` | зум и семантические уровни карты |
+| `pnpm smoke:transfer-fps` | `transferfxfpstest.mjs` | световые потоки погрузки и высадки, отмена и завершение реальных приказов, reduced motion; выбор и сохранение FPS, реальный потолок 30 FPS; RU/EN, ПК и телефоны 390/320 px |
 | `pnpm smoke:frontier` | `frontiertest.mjs` | большая карта Frontier |
 | `pnpm smoke:retreat` | `retreattest.mjs` | кнопка авто-отхода обходит ступени и кладёт приказ в состояние; ручное «Отступить» в бою на ПК — точка тапом по карте уводит флот; в CI — не блокирующим шагом |
 | `pnpm smoke:troop-timers` | `trooptransferstest.mjs` | отсчёты погрузки, выгрузки и штурмовой высадки над объектом без выбора флота: реальные приказы, отмена вылетом и завершение; RU/EN, ПК и телефоны 390/320 px |

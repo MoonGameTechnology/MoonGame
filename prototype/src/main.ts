@@ -176,6 +176,7 @@ import { drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, fla
 import { chainHits, drawAllyMarks, drawBombardTimers, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, drawTroopTransferTimers, initMapMarks, pingHits } from './mapMarks';
 import { drawSweepAfterglow, drawWorlds, initMapWorlds, prepareWorldArt } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
+import { drawTroopTransferEffects } from './mapTransfers';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
 import { backgroundContextEvents, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapMoving, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
 import { blackBoxError, blackBoxFrame, startBlackBox } from './renderBlackBox';
@@ -347,7 +348,8 @@ import {
   startPvEMatch,
   startTraining,
 } from './matchLifecycle';
-import { pcUi, showFpsOn, motionOn, mapSharpOn, mapSlowSeen, markMapSlow } from './graphicsPrefs';
+import { pcUi, showFpsOn, motionOn, mapSharpOn, mapSlowSeen, markMapSlow, frameRateMode } from './graphicsPrefs';
+import { nextFrameSlot, type FrameSlot } from '../../decisions/frameRate';
 import { slowVerdictReachNow } from './slowVerdictReachNow';
 import { initSettingsView, openSettings, push } from './settingsView';
 import { canvasCompatibilityOptions } from './canvasCompatibility';
@@ -1580,6 +1582,7 @@ function renderMap(now: number) {
   drawPatrolRings(); // SHU-6.3: круг патруля и остаток висения — под значками вылетов
   drawSeenPatrols(); // SHU-6.10: чужой висящий патруль в моём обзоре — круг и состав
   drawStrikeTrails(now); // остаток SHU-3.1: вылет в воздухе виден на карте
+  drawTroopTransferEffects(s, ME, cx, hologramTime); // свои погрузки и высадки: световые капсулы
   drawOrdnance(cx, mineView(), ME, world, cam.scale);
   drawMissiles(); // SM-3.7b: летящая ракета — отряд, но рисуется стрелкой с курсом
   mineControls.refresh();
@@ -3570,7 +3573,7 @@ function judgeMapSharpness(nowReal: number, dt: number): void {
   if (notice) toast(t(notice));
 }
 
-function frame(nowReal: number) {
+function frame(nowReal: number, nativeGap: number) {
   flushPinch();
   const wasHolographic = holographic.active();
   const previousViewport = insets();
@@ -3598,7 +3601,7 @@ function frame(nowReal: number) {
     fpsEma = fpsAfter(fpsEma, dt, sinceMenu);
     countNetFrame(dt);
   }
-  judgeMapSharpness(nowReal, dt);
+  judgeMapSharpness(nowReal, nativeGap); // пауза выбранного FPS не означает слабый GPU
   // Отдельный поток расчёта: сначала то, что он прислал (мир, события и исходы своих
   // приказов), потом следующий шаг (`simDriver.ts`).
   syncSim(nowReal);
@@ -3838,10 +3841,15 @@ let frameErrs = 0;
  */
 function frameLoop(nowReal: number) {
   frameAsked = false;
+  const nativeGap = nowReal - lastRafAt;
+  lastRafAt = nowReal;
+  const slot = nextFrameSlot(frameSlot, nowReal, frameRateMode());
+  if (!slot) { askFrame(); return; }
+  frameSlot = slot;
   blackBoxFrame(nowReal, cam.scale, mapPreparation.active);
   let covered = false;
   try {
-    frame(nowReal);
+    frame(nowReal, nativeGap);
     covered = mapCovered();
   } catch (err) {
     blackBoxError(err);
@@ -3855,6 +3863,8 @@ function frameLoop(nowReal: number) {
 }
 
 let frameAsked = false; // a frame is already requested from rAF
+let frameSlot: FrameSlot | null = null;
+let lastRafAt = 0; // every native callback, including deliberately skipped frames
 let menuPause: ReturnType<typeof setTimeout> | undefined; // the menu's pause before the next one
 
 /** Заказать кадр к следующему кадру экрана: пауза меню, если ждала, снимается. */

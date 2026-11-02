@@ -582,6 +582,9 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .set-pal.on{color:var(--cyan);border-color:var(--cyan);background:rgba(53,214,230,.14);}
 /* «Доход ресурсов: в час / в сутки» — выбор из двух значений, кнопки крупнее пресетов палитры. */
 .set-rate .set-pal{min-width:96px;min-height:36px;font-size:var(--fs-body);}
+.set-frame-rate{box-sizing:border-box;width:100%;min-width:0;min-height:44px;padding:8px 12px;
+  font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line-hi);border-radius:6px;}
+.set-frame-rate:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
 .set-ctl input[type=color]{width:42px;height:26px;padding:0;border:1px solid var(--line-hi);
   border-radius:4px;background:none;cursor:pointer;}
 /* mini tile (ground garrison): a nameless icon·count chip — hover/tap dossier names it */

@@ -15,6 +15,7 @@
  * изменились — переехало только объявление.
  */
 import { mapSharp, motionLive } from '../../decisions/mapSharpness';
+import { frameRateOf, type FrameRate } from '../../decisions/frameRate';
 import { readBool, readChoice, readNum, readRaw, writeBool, writeRaw } from './prefs';
 import { breath, type Breath } from './pulseFx';
 
@@ -136,6 +137,14 @@ export const showFpsOn = (): boolean => showFps;
 export function setShowFps(v: boolean): void {
   showFps = v;
   writeBool('void.showFps', v);
+}
+
+/** Потолок кадров карты, по умолчанию 60. «auto» — каждый доступный кадр экрана. */
+let frameRate = frameRateOf(readRaw('void.frameRate'));
+export const frameRateMode = (): FrameRate => frameRate;
+export function setFrameRate(mode: FrameRate): void {
+  frameRate = frameRateOf(mode);
+  writeRaw('void.frameRate', frameRate);
 }
 
 /**
