@@ -239,6 +239,7 @@ export {
 // FOG-LEAK: чей мир в глазах игрока — право прохода и окно войны судят по нему.
 export { knownOwner } from './state/knownOwner';
 export { signatureSize, fleetSignalStrength, radarThreshold, SIG_MEDIUM, SIG_LARGE, SIGNAL_CLUSTER_RADIUS } from './state/radarSignals';
+export { viewSightCircles, sharedRadarSources, type SensorView, type RadarFootprint } from './state/sensorView';
 export type {
   Coverage,
   Engagement,

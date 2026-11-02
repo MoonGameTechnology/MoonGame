@@ -91,6 +91,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   // зрителя: круг и состав), в живом состоянии его не бывает. Что бы там ни лежало, оно
   // не доезжает: проекция пишет своё.
   seenPatrols: 'filtered',
+  sensorView: 'filtered', // проекция заново считает геометрию только для своего зрителя
   strikeSeq: 'stripped', // чужие вылеты сняты целиком — их счётчик выдал бы налёт
   squadronSeq: 'stripped', // эскадра (SHU-4.2) рождается в чужом ангаре за туманом
   // Счётчик id флотов растёт от любого нового флота, и от скрытого пуска ракеты тоже:
@@ -384,6 +385,7 @@ function maximalState(): GameState {
       },
     ],
     // Канарейка, которой в живом состоянии не бывает: проекция обязана её переписать.
+    sensorView: { viewerId: 'CANARY_viewer', circles: [], sharedRadars: [] },
     seenPatrols: [{ owner: 'CANARY_seer', at: { x: 0, y: 0 }, radius: 1, units: [] }],
     strikeSeq: 3,
     squadronSeq: 3,

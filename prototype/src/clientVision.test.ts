@@ -159,7 +159,7 @@ describe('круги везде — граница обзора на карте 
     const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
     const init = /initMapRadar\(\{([\s\S]*?)\n\}\);/.exec(main)?.[1] ?? '';
     expect(init).toContain(
-      "sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),",
+      "sight: () => perWorld('sight', () => viewSightCircles(s, ME, data, worldPlanets())),",
     );
   });
 });
