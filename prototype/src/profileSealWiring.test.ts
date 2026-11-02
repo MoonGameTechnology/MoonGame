@@ -40,7 +40,8 @@ describe('YAG-4.4 — профиль пишется только с печать
     expect(calls.length).toBeGreaterThanOrEqual(4);
     for (const arg of calls) expect(arg).toMatch(/^sealProgress\(.+, LOCAL_SEAL\)\)?$|^blob\)?$/);
     expect(body('persistSectorProgress')).toContain('const blob = sealProgress(sectorProgress, LOCAL_SEAL);');
-    expect(body('saveSectorProgress')).toContain("detach('профиль: запись', persistSectorProgress());");
+    expect(body('saveSectorProgress')).toContain("detach('профиль: запись', persistSectorProgress().then((saved) => {");
+    expect(body('saveSectorProgress')).toContain('if (saved && epoch === progressionEpoch && ownsSectorZero())');
   });
 
   it('флаг «уже запечатывало» встаёт только после того, как запись легла', () => {

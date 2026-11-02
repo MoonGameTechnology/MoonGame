@@ -120,7 +120,7 @@ import { worldName } from './planetName';
 // «Производство» — экран заказа (REFM-13, ROS-3.1): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
-import { initHeroStaff } from './heroStaff';
+import { initHeroStaff } from './heroStaffPresentation';
 import {
   COALITION,
   CH_SESSION,

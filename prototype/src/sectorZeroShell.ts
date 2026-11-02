@@ -1,3 +1,5 @@
+import { heroRewards } from '../../decisions/heroRewards';
+import { initHeroRewards } from './heroRewards';
 /**
  * Оболочка Sector Zero (REFM-211): меню и подготовка, кошелёк в шапке забега, сутки магазина,
  * ролики площадки, комиксы глав, награда героем и вход {@link openSectorZero}.
@@ -72,6 +74,7 @@ import { getPlatform } from './platform/host';
 import { initRunWallet } from './runWallet';
 import {
   changeSectorProgress,
+  observeSectorProgress,
   chapterLater,
   chapterShown,
   claimSectorZero,
@@ -138,6 +141,7 @@ let game: SectorZeroShellHost;
 
 export let sectorPreparation: ReturnType<typeof initSectorZeroPreparation>;
 export let runWallet: ReturnType<typeof initRunWallet>;
+let heroReceipts: ReturnType<typeof initHeroRewards> | undefined;
 export let sectorZeroMenu: ReturnType<typeof initSectorZeroMenu>;
 
 // Витрина магазина ротируется посуточно (`SZE-3.2`). Единственные часы у офлайнового
@@ -184,6 +188,14 @@ export function initSectorZeroShell(hooks: SectorZeroShellHost): void {
     if (runInProgress()) playerOrder(abandonRun(game.me()));
   });
 
+  observeSectorProgress((before, after) => {
+    if (!before || !after) { heroReceipts?.clear(); return; }
+    const receipts = heroRewards(before, after, data);
+    if (receipts.length) {
+      heroReceipts ??= initHeroRewards(data, () => sectorZeroMenu?.isOpen() === true);
+      heroReceipts.add(receipts);
+    }
+  });
   sectorPreparation = initSectorZeroPreparation({
     data,
     // Решения UI принимаются по capability, а не по имени площадки (`platform-adapters.md`).
@@ -450,7 +462,7 @@ export function launchSectorRun(): void {
 /** `replay` — сразу новая попытка той же главы (кнопка итогов «Сыграть главу снова»). Идёт
  *  через открытие меню: оно засчитывает и стирает закончившийся забег, и только потом
  *  стартует новый — тем же путём, что кнопка «Новый забег». */
-export function openSectorZero(preparation = false, replay = false): void {
+export function openSectorZero(preparation: boolean | { hero: string } = false, replay = false): void {
   claimSectorZero();
   recordSectorZeroEntry();
   game.leaveWorld();
@@ -462,7 +474,8 @@ export function openSectorZero(preparation = false, replay = false): void {
   detach(
     'Sector Zero menu',
     sectorZeroMenu.open().then(() => {
-      if (preparation && sectorZeroMenu.isOpen()) sectorPreparation.open();
+      if (preparation && sectorZeroMenu.isOpen()) sectorPreparation.open(typeof preparation === 'object' ? preparation : undefined);
+      heroReceipts?.resume();
       if (replay && sectorZeroMenu.isOpen()) {
         chooseMission(chapter);
         sectorZeroMenu.hide();

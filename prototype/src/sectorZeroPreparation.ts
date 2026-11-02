@@ -9,10 +9,7 @@ import {
   type ShipSlots,
 } from '../../packages/shared-core/src/index';
 import {
-  HERO_UNLOCK_COST,
   MODULE_UNLOCK_COST,
-  sectorHeroSlotItems,
-  sectorHeroSlots,
   forgeLadderOf,
   sectorHullIds,
   sectorHullSlots,
@@ -22,12 +19,7 @@ import {
   sectorHeroShipSlots,
   sectorHeroShipUnit,
   HERO_SHIP_STAR_SLOTS,
-  sectorSkillCard,
-  sectorSkillCost,
-  sectorSlotItem,
-  sectorSkillOpenTo,
   lastRunWarrants,
-  type SectorHero,
   type SectorProgressAction,
   type SectorZeroProgress,
   type ShipSlot,
@@ -47,32 +39,19 @@ import {
   type ShopCapabilities,
 } from '../../decisions/sectorZeroShop';
 import { featuredOffer } from '../../decisions/shopFeatured';
-import { HERO_MAX_STARS, heroStarCost, heroTokenGoal, heroTokenUse } from '../../decisions/heroTokens';
+import { heroTokenGoal } from '../../decisions/heroTokens';
 import { esc, displayUnit } from './format';
 import { catalogPortraitHtml, portraitArt } from './shipArt';
 import { unitDamageHtml } from './unitDamageView';
 import { unitDamageProfile } from '../../decisions/unitDamage';
-import { heroPortraitHtml } from '../../packages/client/src/heroPortraits';
 import { splitSupport } from '../../decisions/supportShips';
-import { heroChapter } from '../../decisions/heroRecruits';
-import { romanChapter } from '../../decisions/chapterRoute';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
 import { selectedBay, slotLayerHtml } from './shipyard';
 import { slotCallouts } from '../../decisions/slotCallouts';
 import type { LoadoutSlotView } from '../../packages/client/src/loadoutEditor';
 import { moduleGroups } from '../../decisions/moduleGroups';
 import { upgradeFx, type UpgradeFx } from '../../decisions/upgradeFx';
-import { skillNodeState, skillTreeLayout } from '../../decisions/skillTreeLayout';
-import { skillTreeHtml, type SkillNodeView } from './academyTree';
-
-/** Вкладки страницы героя в Академии (PVR-6.25). */
-type HeroTab = 'battle' | 'tree' | 'stars';
-/** Состояние узла дерева словом — для экранного диктора (глиф в кружке ему не виден). */
-const NODE_STATE_KEY = {
-  owned: 'sector-zero.academy.node.owned',
-  open: 'sector-zero.academy.node.open',
-  locked: 'sector-zero.academy.node.locked',
-} as const;
+import { sectorHeroArsenalHtml, type HeroArsenalTab } from './sectorHeroArsenal';
 
 interface PreparationHost {
   data: GameData;
@@ -168,7 +147,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
   let heroId = h.progress().selectedHero;
   /** Вкладка страницы героя (PVR-6.25). Переживает смену героя: сравнивая героев, игрок
    *  остаётся в том же разделе. */
-  let heroTab: HeroTab = 'battle';
+  let heroTab: HeroArsenalTab = 'ship';
   /** Узел дерева, чья карточка открыта; у каждого героя своё дерево — сбрасывается при смене. */
   let skillSel: string | null = null;
   /** Во вкладке «Корабли» открыт корабль ЭТОГО героя, а не корпус флота (PVR-6.24). У
@@ -197,12 +176,13 @@ export function initSectorZeroPreparation(h: PreparationHost) {
   ): string =>
     `<button type="button" data-prep="${action}" data-id="${esc(id)}"${disabled ? ' disabled' : ''}${selected ? ' class="selected"' : ''}>${label}</button>`;
 
-  function ships(p: SectorZeroProgress): string {
+  function ships(p: SectorZeroProgress, embedded = false): string {
     const data = h.data;
     // Корабль героя (PVR-6.24, решение владельца 2026-09-25) — такой же корпус со своим
     // набором, только набор у каждого героя свой, а слотов прибавляют его звёзды. Полка
     // «Корабли героев» показывает корабли ВСЕХ героев отряда (решение владельца 2026-09-26),
     // в забег по-прежнему едет корабль выбранного.
+    if (embedded) shipHero = heroId;
     const captainId = shipHero !== null && p.heroes[shipHero] ? shipHero : null;
     const captain = captainId !== null ? p.heroes[captainId] : undefined;
     const onHero = captainId !== null && captain !== undefined;
@@ -437,7 +417,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
       : '';
     // Раскладка как у окна производства: на ПК три колонки — корпуса, корабль, модули
     // отсека; на телефоне одна в том же порядке, корпуса — одной лентой.
-    return `<div class="sz-yard"><div class="sz-grid${column ? ' sz-g3' : ''}">${hulls}${ship}${column}</div></div>`;
+    return `<div class="sz-yard"><div class="sz-grid${embedded ? ' ha-ship-grid' : ''}${column ? ' sz-g3' : ''}">${embedded ? '' : hulls}${ship}${column}</div></div>`;
   }
 
   /**
@@ -620,155 +600,6 @@ export function initSectorZeroPreparation(h: PreparationHost) {
   }
 
   /** Герб героя — первая буква имени в ромбе: запас для героя без портрета. */
-  const crest = (name: string): string =>
-    `<span class="sz-crest" aria-hidden="true"><em>${esc(name.charAt(0).toUpperCase())}</em></span>`;
-  /**
-   * Лицо героя — портрет из общего атласа (`heroPortraits.ts`), того же, что на карте и в
-   * штабе. Герою без портрета достаётся герб: пустая рамка хуже буквы. Закрытый герой —
-   * приглушённым лицом: кто уже в строю, ростер говорит ещё до подписи под карточкой.
-   */
-  const face = (id: string, name: string, locked: boolean): string => {
-    const portrait = heroPortraitHtml(id);
-    return portrait
-      ? `<span class="sz-face${locked ? ' sz-face-locked' : ''}">${portrait}</span>`
-      : crest(name);
-  };
-
-  /**
-   * Академия (PVR-6.6, была «Герои и навыки»): ростер — карточки с гербом и состоянием
-   * («в забеге», «закрыт», ступень подготовки). Страница открытого героя — вкладками
-   * (PVR-6.25): «В бой» — навыки в слотах, «Развитие» — дерево навыков, «Звёзды» — жетоны
-   * и что даёт каждая звезда.
-   */
-  function heroes(p: SectorZeroProgress): string {
-    const data = h.data;
-    // Босс Роя (PVR-4.7) — не герой игрока: его не нанимают и не открывают.
-    const roster = Object.entries(data.heroes)
-      .filter(([, def]) => !def.boss)
-      .map(([id, def]) => {
-        const hero = p.heroes[id];
-        const chapter = heroChapter(id);
-        const state = !hero
-          ? chapter !== null
-            ? t('sector-zero.academy.by-chapter', { n: romanChapter(chapter) })
-            : heroTokenUse(p, id, data) === 'join'
-              ? t('sector-zero.academy.tokens', { n: p.heroTokens[id] ?? 0, goal: heroTokenGoal(p, id, data) ?? 0 })
-              : t('sector-zero.academy.locked')
-          : p.selectedHero === id
-            ? t('sector-zero.prep.hero-selected')
-            : t('sector-zero.academy.rank', { n: hero.level });
-        return button('hero', id, `${face(id, tData(def.name), !hero)}<span><b>${esc(tData(def.name))}</b><small>${state}</small></span>`, false, heroId === id);
-      })
-      .join('');
-    const def = data.heroes[heroId];
-    if (!def) return `<div class="sz-roster">${roster}</div>`;
-    const hero = p.heroes[heroId];
-    const name = esc(tData(def.name));
-    let body = `<div class="sz-hero">${face(heroId, tData(def.name), !hero)}<div><h2>${name}</h2><p class="sz-sub">${esc(t(def.description ?? ''))}</p>`;
-    const byChapter = heroChapter(heroId);
-    // Жетоны героя (`heroTokens.ts`): до прихода — счёт до 10, после — до следующей звезды.
-    const tokens = p.heroTokens[heroId] ?? 0;
-    const goal = heroTokenGoal(p, heroId, data);
-    if (!hero)
-      return `<div class="sz-roster">${roster}</div>${body}${
-        byChapter !== null
-          ? `<p class="sz-hero-reward">${t('sector-zero.academy.by-chapter.hint', { n: romanChapter(byChapter) })}</p>`
-          : goal !== null
-            ? `<p class="sz-hero-reward">${t('sector-zero.academy.tokens.join', { n: tokens, goal })}</p>`
-            : ''
-      }${button('unlock-hero', heroId, t('sector-zero.prep.unlock', { n: HERO_UNLOCK_COST }), p.research < HERO_UNLOCK_COST)}</div></div>`;
-    const selected = p.selectedHero === heroId;
-    const slots = sectorHeroSlots(hero, data);
-    // Звёздность героя — делениями: все звёзды видны сразу, а не угадываются из текста.
-    // Звезда стоит жетоны этого героя и открывает слот навыка (`heroTokens.ts`). Только что
-    // полученная вспыхивает (`upgradeFx.ts`).
-    const freshPip = fx?.kind === 'hero-star' && fx.id === heroId ? fx.star - 1 : -1;
-    const pips = Array.from({ length: HERO_MAX_STARS }, (_, i) => `<i class="${i < hero.level ? 'lit' : ''}${i === freshPip ? ' sz-new' : ''}">★</i>`).join('');
-    body += `<div class="sz-hero-head"><span><span class="sz-pips sz-stars" aria-hidden="true">${pips}</span>${t('sector-zero.prep.hero-level', { n: hero.level, slots })}</span>${button('select-hero', heroId, t(selected ? 'sector-zero.prep.hero-selected' : 'sector-zero.prep.hero-select'), selected, selected)}</div></div></div>`;
-    const heroTabButton = (id: HeroTab, key: string): string =>
-      button('hero-tab', id, t(key), false, heroTab === id);
-    body += `<div class="sz-subtabs">${heroTabButton('battle', 'sector-zero.academy.tab.battle')}${heroTabButton('tree', 'sector-zero.academy.tab.tree')}${heroTabButton('stars', 'sector-zero.academy.tab.stars')}</div>`;
-    const page =
-      heroTab === 'tree'
-        ? skillTree(p, hero)
-        : heroTab === 'stars'
-          ? starsPage(hero, tokens, goal)
-          : battlePage(hero, slots);
-    return `<div class="sz-roster">${roster}</div>${body}${page}`;
-  }
-
-  /** «В бой»: что герой возьмёт в экспедицию — навыки и пассивки в слотах. */
-  function battlePage(hero: SectorHero, slots: number): string {
-    const data = h.data;
-    let out = `<h3>${t('sector-zero.prep.abilities')} · ${hero.equipped.length}/${slots}</h3><div class="sz-cards">`;
-    // В слоты идут способности и надеваемые пассивки (PVR-6.16) — один список, один бюджет.
-    for (const id of sectorHeroSlotItems(heroId, hero, data)) {
-      if (data.heroAbilities[id]?.type.startsWith('spawn_')) continue;
-      const item = sectorSlotItem(id, data)!;
-      const equipped = hero.equipped.includes(id);
-      out += `<article class="sz-card${equipped ? ' selected' : ''}"><h3>${esc(tData(item.name))}</h3><p>${esc(t(item.description ?? ''))}</p>${button('ability', id, t(equipped ? 'hero.slot.remove' : 'hero.slot.equip'), !equipped && hero.equipped.length >= slots, equipped)}</article>`;
-    }
-    return `${out}</div>`;
-  }
-
-  /**
-   * «Развитие»: дерево навыков линиями (`skillTreeLayout` + `academyTree.ts`) и карточка
-   * выбранного узла с покупкой. Изученное, доступное и закрытое различимы без текста; что
-   * именно не хватает закрытому, называет карточка.
-   */
-  function skillTree(p: SectorZeroProgress, hero: SectorHero): string {
-    const data = h.data;
-    const ids = Object.keys(data.heroSkillTrees).filter((id) => sectorSkillOpenTo(data.heroSkillTrees[id]!, heroId, data));
-    const layout = skillTreeLayout(ids, (id) => data.heroSkillTrees[id]?.requires ?? []);
-    const cards: Record<string, { owned: boolean; missing: string[] }> = {};
-    const views: Record<string, SkillNodeView> = {};
-    for (const id of ids) {
-      const card = sectorSkillCard(heroId, hero, id, data);
-      const state = skillNodeState(card);
-      cards[id] = card;
-      views[id] = { name: tData(data.heroSkillTrees[id]!.name), state, stateLabel: t(NODE_STATE_KEY[state]) };
-    }
-    // Без выбора карточка показывает первый доступный узел — то, что можно изучить сейчас.
-    const reading = Object.entries(layout.nodes).sort(([, a], [, b]) => a.row - b.row || a.col - b.col);
-    const sel =
-      skillSel !== null && views[skillSel]
-        ? skillSel
-        : (reading.find(([id]) => views[id]!.state === 'open') ?? reading[0])?.[0];
-    const tree = skillTreeHtml(layout, views, sel ?? null);
-    const hint = `<p class="sz-sub">${t('sector-zero.prep.skill-hint')}</p>`;
-    if (sel === undefined) return `${hint}${tree}`;
-    const node = data.heroSkillTrees[sel]!;
-    const { owned, missing } = cards[sel]!;
-    const cost = sectorSkillCost(sel, data);
-    // Предпосылки называются только когда их НЕ хватает: у открытого узла это шум.
-    const prereq = missing.length
-      ? `<p class="sz-prereq">${t('hero.tree.requires')}: ${missing.map((r) => esc(tData(data.heroSkillTrees[r]!.name))).join(', ')}</p>`
-      : '';
-    const card = `<article class="sz-card sz-tree-card${owned ? ' selected' : missing.length ? ' sz-locked' : ''}"><h3>${esc(tData(node.name))}</h3><p>${esc(t(node.description ?? ''))}</p>${prereq}${button('skill', sel, owned ? t('sector-zero.prep.owned') : t('sector-zero.prep.skill-buy', { n: cost }), owned || missing.length > 0 || p.research < cost, owned)}</article>`;
-    // На широком экране карточка стоит справа от дерева, на телефоне — под ним.
-    return `${hint}<div class="sz-tree-page">${tree}${card}</div>`;
-  }
-
-  /**
-   * «Звёзды»: жетоны героя и лестница звёзд — что даёт каждая (слоты навыков и слот
-   * корабля, `HERO_SHIP_STAR_SLOTS`). Взятые звёзды горят, следующая выделена, у неё — цена.
-   */
-  function starsPage(hero: SectorHero, tokens: number, goal: number | null): string {
-    const data = h.data;
-    const ladder = Array.from({ length: HERO_MAX_STARS }, (_, i) => {
-      const star = i + 1;
-      const ship = HERO_SHIP_STAR_SLOTS[star];
-      const text =
-        t('sector-zero.academy.star.row', { star, slots: sectorHeroSlots({ ...hero, level: star }, data) }) +
-        (ship ? ` · ${t('sector-zero.academy.star.ship', { slot: t(`yard.slot.${ship}`) })}` : '');
-      const cls = star <= hero.level ? ' class="lit"' : star === hero.level + 1 ? ' class="next"' : '';
-      return `<li${cls}>${esc(text)}</li>`;
-    }).join('');
-    const cost = heroStarCost(hero.level);
-    const tokenLine = goal !== null ? `<p class="sz-tokens">${t('sector-zero.academy.tokens', { n: tokens, goal })}</p>` : '';
-    return `<ol class="sz-star-ladder">${ladder}</ol>${tokenLine}${button('upgrade-hero', heroId, cost === null ? t('sector-zero.prep.hero-max') : t('sector-zero.prep.hero-upgrade', { star: hero.level + 1, n: cost }), cost === null || tokens < cost)}`;
-  }
-
   function render(): void {
     const p = h.progress();
     const active = document.activeElement as HTMLElement | null;
@@ -794,7 +625,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     // на телефоне в ряд, без переполнения (Мастерская — в «Кораблях»). Кошелёк прилипает к
     // верху ВМЕСТЕ с вкладками (замечание владельца 2026-09-25: «прокрутил вниз и не вижу,
     // сколько у меня ресурсов для прокачки»): цена стоит у кнопки внизу, а запас — всегда на виду.
-    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}</div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')} <span class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: lastRunWarrants(p) })}` : t('sector-zero.prep.earn')}</span></p>${doubleButton}<div class="sz-stick"><div class="sz-purse"><b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div><div class="sz-tabs">${tabButton('ships', '⬡', 'sector-zero.prep.modules')}${tabButton('shop', '◈', 'sector-zero.prep.shop')}${tabButton('heroes', '✦', 'sector-zero.prep.heroes')}</div></div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
+    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}</div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')} <span class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: lastRunWarrants(p) })}` : t('sector-zero.prep.earn')}</span></p>${doubleButton}<div class="sz-stick"><div class="sz-purse"><b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div><div class="sz-tabs">${tabButton('ships', '⬡', 'sector-zero.prep.modules')}${tabButton('shop', '◈', 'sector-zero.prep.shop')}${tabButton('heroes', '✦', 'sector-zero.prep.heroes')}</div></div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'shop' ? shop(p) : sectorHeroArsenalHtml(p, h.data, { heroId, tab: heroTab, skill: skillSel, fx }, () => ships(p, true))}`;
     fx = null; // отклик отыгран — следующая перерисовка его не повторит
     const shelves = panel.querySelector('.sz-shelves');
     if (shelves) shelves.scrollLeft = shelvesLeft;
@@ -861,7 +692,8 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     else if (kind === 'hero') {
       heroId = id;
       skillSel = null;
-    } else if (kind === 'hero-tab') heroTab = id === 'tree' ? 'tree' : id === 'stars' ? 'stars' : 'battle';
+      bay = undefined;
+    } else if (kind === 'hero-tab') heroTab = id === 'ship' ? 'ship' : id === 'tree' ? 'tree' : id === 'stars' ? 'stars' : 'battle';
     else if (kind === 'skill-node') skillSel = id;
     else {
       let action: SectorProgressAction | null = null;
@@ -976,9 +808,10 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     render();
   });
   return {
-    open: (): void => {
+    open: (selection?: { hero: string }): void => {
       h.sync();
-      heroId = h.progress().selectedHero;
+      heroId = selection && h.data.heroes[selection.hero] && !h.data.heroes[selection.hero]!.boss ? selection.hero : h.progress().selectedHero;
+      if (selection) { tab = 'heroes'; heroTab = 'ship'; bay = undefined; }
       message = '';
       home.hidden = true;
       panel.hidden = false;

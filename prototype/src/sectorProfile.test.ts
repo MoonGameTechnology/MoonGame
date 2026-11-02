@@ -81,6 +81,32 @@ async function reload(platform: Partial<GamePlatform> = {}) {
 
 const rev = (): number => JSON.parse(cell.get(CLOUD_MARK_KEY) ?? '{"rev":0}').rev;
 
+describe('подтверждение развития для анимации', () => {
+  it('передаёт старый и новый профиль только после успешной записи', async () => {
+    const { profile } = await boot();
+    const received = vi.fn();
+    profile.observeSectorProgress(received);
+    const before = profile.sectorProgress;
+    const next = { ...before, research: before.research + 1 };
+    profile.saveSectorProgress(next);
+    expect(received).not.toHaveBeenCalled();
+    await profile.progressWrite;
+    await Promise.resolve();
+    expect(received).toHaveBeenCalledOnce();
+    expect(received).toHaveBeenCalledWith(before, next);
+  });
+  it('отказ хранилища не запускает поздравление', async () => {
+    const { profile } = await boot();
+    const received = vi.fn();
+    profile.observeSectorProgress(received);
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+    profile.saveSectorProgress({ ...profile.sectorProgress, research: 10 });
+    await profile.progressWrite;
+    await Promise.resolve();
+    expect(received).not.toHaveBeenCalled();
+  });
+});
+
 /** Площадка с облаком и вошедшим игроком `p-1`; `cloud` — что лежит в облаке. */
 function cloudPlatform(cloud: string | null = null) {
   const saved: string[] = [];

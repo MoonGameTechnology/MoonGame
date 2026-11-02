@@ -33,7 +33,7 @@
     "packages/shared-core/src/modules/construction.ts::constructionModule.setup": 814,
     "prototype/src/eventFeed.ts::handleEvents": 890,
     "packages/server/src/main.ts::startServer": 842,
-    "prototype/src/sectorZeroPreparation.ts::initSectorZeroPreparation": 831,
+    "prototype/src/sectorZeroPreparation.ts::initSectorZeroPreparation": 685,
     "packages/server/src/wsServer.ts::createMultiplayerServer": 757,
     "prototype/src/rehearsal.ts::runRehearsal": 669,
     "prototype/build.mjs::page": 639,
