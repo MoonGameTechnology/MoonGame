@@ -1,4 +1,4 @@
-/* global window, localStorage, requestAnimationFrame, performance */
+/* global window, localStorage, requestAnimationFrame */
 /** Настройки FPS и перевозки на настоящей карте, ПК/телефон, RU/EN/reduced motion. */
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
