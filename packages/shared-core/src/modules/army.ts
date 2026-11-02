@@ -1,9 +1,17 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Fleet, GameState, LoadingClaim, UnloadingClaim } from '../state/gameState';
+import type { Fleet, LoadingClaim, UnloadingClaim } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { hoursToMs } from '../action/types';
 import { defHasTrait } from '../data/traits';
-import { mergeStacks, takeFromStacks, unitCount } from '../util/stacks';
+import { mergeStacks } from '../util/stacks';
+import {
+  armyFreeGroups,
+  selectArmySources,
+  prepareArmyGroups,
+  armyClaimCount,
+  takeArmySelection,
+  groundClaims,
+} from '../util/armySelection';
 import { garrisonUnderAssault, requireOwnedIdleFleet } from '../util/fleet';
 import { isAllied } from '../util/combat';
 import { hasMapShare } from '../state/diplomacy';
@@ -13,6 +21,7 @@ interface TransferPayload {
   fleetId: string;
   unit: string;
   count?: number;
+  group?: string;
 }
 
 /**
@@ -48,30 +57,11 @@ export const LOAD_HOURS = 1;
  *  же: заявка, а не опека — войска на борту, пока срок не вышел, и улёт её отменяет. */
 export const UNLOAD_HOURS = LOAD_HOURS;
 
-/** Сколько `unit` этого флота уже обещано выгрузкам — второй приказ их не возьмёт. */
-function claimedAboard(fleet: Fleet, unit: string): number {
-  let n = 0;
-  for (const claim of fleet.unloading ?? []) if (claim.unit === unit) n += claim.count;
-  return n;
-}
-
 /** Пустит ли хозяин мира `planetId` войска `playerId` на свою землю (ALLY-LAND): свой мир,
  *  мир союзника и мир того, с кем обмен картами. */
 function mayLand(h: HandlerContext, playerId: string, host: string | null): boolean {
   if (host === playerId) return true;
   return host !== null && (isAllied(h, playerId, host) || hasMapShare(h.state, playerId, host));
-}
-
-/** Units of `unit` at `planetId` already promised to lifts — by ANY fleet docked
- *  there, since one garrison feeds them all. */
-function claimedAt(state: GameState, planetId: string, unit: string): number {
-  let n = 0;
-  for (const fleet of Object.values(state.fleets)) {
-    for (const claim of fleet.loading ?? []) {
-      if (claim.from === planetId && claim.unit === unit) n += claim.count;
-    }
-  }
-  return n;
 }
 
 /** Hold space this fleet's in-progress lifts have already spoken for. */
@@ -96,8 +86,18 @@ function claimedCargo(fleet: Fleet, data: GameData): number {
  */
 export const armyModule: GameModule = {
   id: 'army',
-  version: '1.2.0',
+  version: '1.3.0',
   setup(api) {
+    api.onAction('army.prepare', (action, h) => {
+      const p = action.payload as { fleetId?: unknown } | undefined;
+      if (typeof p?.fleetId !== 'string') return h.reject('E_BAD_PAYLOAD');
+      const fleet = requireOwnedIdleFleet(h, p.fleetId, action.playerId);
+      const planet = h.state.planets[fleet.location];
+      if (!planet) return h.reject('E_NO_PLANET');
+      if (planet.owner === action.playerId)
+        prepareArmyGroups(h.state, planet.garrison, groundClaims(h.state, planet.id), h.ctx.data);
+      prepareArmyGroups(h.state, fleet.landing ?? [], fleet.unloading ?? [], h.ctx.data);
+    });
     /** Validates a load/unload order and resolves the fleet, its planet and the
      *  ground unit def, or rejects. */
     const resolve = (action: { playerId: string; payload: unknown }, h: HandlerContext) => {
@@ -109,6 +109,11 @@ export const armyModule: GameModule = {
       if (!Number.isSafeInteger(count) || count <= 0) {
         return h.reject('E_BAD_PAYLOAD');
       }
+      if (
+        p.group !== undefined &&
+        (typeof p.group !== 'string' || !p.group || p.group.length > 128)
+      )
+        return h.reject('E_BAD_PAYLOAD');
       const fleet = requireOwnedIdleFleet(h, p.fleetId as string, action.playerId);
       const planet = h.state.planets[fleet.location];
       if (!planet) {
@@ -123,11 +128,11 @@ export const armyModule: GameModule = {
       if (def.domain !== 'ground') {
         return h.reject('E_NOT_GROUND'); // only the ground army is transported as cargo
       }
-      return { fleet, planet, def, unit: p.unit, count };
+      return { fleet, planet, def, unit: p.unit, count, group: p.group };
     };
 
     api.onAction('army.load', (action, h) => {
-      const { fleet, planet, def, unit, count } = resolve(action, h);
+      const { fleet, planet, def, unit, count, group } = resolve(action, h);
       // Поднять можно ТОЛЬКО со своего мира. Союзный гарнизон — не твой ресурс:
       // иначе «помощь» превращалась бы в вывоз чужой обороны.
       if (planet.owner !== action.playerId) {
@@ -145,10 +150,18 @@ export const armyModule: GameModule = {
       // Поднимается ЛЮБОЙ стек этого типа, раненый тоже (решение владельца 2026-11-02):
       // с тех пор как раны переживают бой, правило «только здоровые» запирало выживших
       // на мире, где нет госпиталя. Здоровье, оснастка и выслуга едут вместе с ними.
-      const avail = unitCount(planet.garrison, unit);
+      const claims = groundClaims(h.state, planet.id);
+      prepareArmyGroups(h.state, planet.garrison, claims, h.ctx.data);
+      const sources = selectArmySources(
+        planet.garrison,
+        armyFreeGroups(planet.garrison, claims),
+        unit,
+        count,
+        group,
+      );
       // Уже обещанное вычитается ОБА раза: из гарнизона (два флота у одного мира не
       // вычерпают одну роту) и из трюма (два заказа подряд не пообещают один отсек).
-      if (avail - claimedAt(h.state, planet.id, unit) < count) {
+      if (sources.reduce((n, s) => n + s.count, 0) < count) {
         return h.reject('E_NO_ARMY'); // not that many in the garrison
       }
       // Трюм общий с шаттлами (SHU-5.1): места эскадр на борту и улетевших в вылет
@@ -162,7 +175,14 @@ export const armyModule: GameModule = {
       // — требование детерминизма: иначе момент погрузки зависел бы от того, каким
       // шагом звали `advanceTo` (сервер тикает секундами, тест — часами).
       const doneAt = h.ctx.now + hoursToMs(h.ctx, LOAD_HOURS);
-      const claim: LoadingClaim = { unit, count, from: planet.id, startAt: h.ctx.now, doneAt };
+      const claim: LoadingClaim = {
+        unit,
+        count,
+        sources,
+        from: planet.id,
+        startAt: h.ctx.now,
+        doneAt,
+      };
       fleet.loading = fleet.loading ?? [];
       fleet.loading.push(claim);
       h.schedule(doneAt, 'army.load.done', { fleetId: fleet.id });
@@ -201,7 +221,7 @@ export const armyModule: GameModule = {
         if (!planet || !docked || planet.owner !== fleet.owner) continue;
         if (garrisonUnderAssault(h.state, planet.id)) continue;
         const def = h.ctx.data.units[claim.unit];
-        const have = unitCount(planet.garrison, claim.unit);
+        const have = armyClaimCount(planet.garrison, claim);
         if (!def || have <= 0) continue;
         // Берём, сколько ЕСТЬ и сколько влезает: за час гарнизон мог поредеть в бою,
         // а трюм — заполниться соседней заявкой. Частичная погрузка честнее отказа:
@@ -215,7 +235,7 @@ export const armyModule: GameModule = {
         if (take <= 0) continue;
         // `takeFromStacks` делит пул ран пропорционально и копирует оснастку и заслугу,
         // `mergeStacks` не сливает раненый стек со здоровым — раны не размазываются.
-        const moved = takeFromStacks(planet.garrison, claim.unit, take);
+        const moved = takeArmySelection(planet.garrison, claim, take);
         planet.garrison = planet.garrison.filter((s) => s.count > 0);
         fleet.landing = mergeStacks(fleet.landing ?? [], moved);
         h.emit('army.loaded', {
@@ -266,7 +286,7 @@ export const armyModule: GameModule = {
     });
 
     api.onAction('army.unload', (action, h) => {
-      const { fleet, planet, unit, count } = resolve(action, h);
+      const { fleet, planet, unit, count, group } = resolve(action, h);
       // ALLY-LAND. Высадиться можно на свой мир, на мир СОЮЗНИКА (коалиция) и на мир
       // того, с кем заключён ОБМЕН КАРТАМИ (MAPSHARE-1) — оба права даны по взаимному
       // согласию, поэтому пускать чужие войска на свою землю никого не заставляют.
@@ -281,13 +301,28 @@ export const armyModule: GameModule = {
       // а не снимок стеков, поэтому подошедшие войска считаются со следующего раунда.
       // Уже обещанное выгрузкам вычитается: два приказа подряд не высадят одну роту.
       // Высаживается любой стек этого типа, раненый тоже — то же правило, что у погрузки.
-      const carried = unitCount(fleet.landing ?? [], unit);
-      if (carried - claimedAboard(fleet, unit) < count) {
+      const claims = fleet.unloading ?? [];
+      prepareArmyGroups(h.state, fleet.landing ?? [], claims, h.ctx.data);
+      const sources = selectArmySources(
+        fleet.landing ?? [],
+        armyFreeGroups(fleet.landing ?? [], claims),
+        unit,
+        count,
+        group,
+      );
+      if (sources.reduce((n, s) => n + s.count, 0) < count) {
         return h.reject('E_NO_ARMY'); // not that many aboard
       }
       // Час не проходит здесь, как и у погрузки: заявка встаёт в мир и созревает событием.
       const doneAt = h.ctx.now + hoursToMs(h.ctx, UNLOAD_HOURS);
-      const claim: UnloadingClaim = { unit, count, to: planet.id, startAt: h.ctx.now, doneAt };
+      const claim: UnloadingClaim = {
+        unit,
+        count,
+        sources,
+        to: planet.id,
+        startAt: h.ctx.now,
+        doneAt,
+      };
       (fleet.unloading ??= []).push(claim);
       h.schedule(doneAt, 'army.unload.done', { fleetId: fleet.id });
       h.emit('army.unloading', {
@@ -319,9 +354,9 @@ export const armyModule: GameModule = {
         const planet = h.state.planets[claim.to];
         const docked = fleet.location === claim.to && !fleet.movement && !fleet.battleId;
         if (!planet || !docked || !mayLand(h, fleet.owner, planet.owner)) continue;
-        const take = Math.min(claim.count, unitCount(fleet.landing ?? [], claim.unit));
+        const take = Math.min(claim.count, armyClaimCount(fleet.landing ?? [], claim));
         if (take <= 0) continue;
-        const moved = takeFromStacks(fleet.landing ?? [], claim.unit, take);
+        const moved = takeArmySelection(fleet.landing ?? [], claim, take);
         fleet.landing = (fleet.landing ?? []).filter((s) => s.count > 0);
         planet.garrison = mergeStacks(planet.garrison, moved);
         h.emit('army.unloaded', {

@@ -16,6 +16,7 @@ const CLIENT_ACTION_TYPES = [
   'battle.attack',
   'battle.retreat',
   'fleet.layMines',
+  'army.prepare',
   'army.load',
   'army.unload',
   'hero.ability',

@@ -228,6 +228,7 @@ export function mergeStacks(base: UnitStack[], add: UnitStack[]): UnitStack[] {
             o.unit === st.unit &&
             o.hp === undefined &&
             o.shieldHp === undefined &&
+            o.armyGroup === st.armyGroup &&
             loadoutKey(o.modules) === loadoutKey(st.modules) &&
             serviceKey(o.battles) === serviceKey(st.battles),
         )

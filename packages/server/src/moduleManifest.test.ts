@@ -129,7 +129,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // `shared-core/src/gameModules.ts`). Взят порядок прод-хоста: вошли `hunger` и
 // `bot-diplomacy`, `faction`/`sprawl` встали за `tax`, `diplomacy`/`espionage`/`market` —
 // за `auto-rally`, `pve` и семья Роя — сразу за `army`. Партии прод-хоста не тронуты.
-const PINNED_FOR_VERSION = '94';
+// 95: army 1.3.0 — постоянные группы и источники заявок погрузки/выгрузки.
+const PINNED_FOR_VERSION = '95';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

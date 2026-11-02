@@ -250,6 +250,17 @@ export const HALF_MODULES_SOLO_MIGRATION = {
   toDataHash: '17cb1050daa7a3',
 } as const;
 
+/** Army 1.3.0 adds optional formation identities and claim sources. Older claims
+ * retain their completion semantics and are pinned before a new explicit selection. */
+export const ARMY_SELECTION_SOLO_MIGRATION = {
+  fromRules: HALF_MODULES_SOLO_MIGRATION.toRules,
+  fromData: HALF_MODULES_SOLO_MIGRATION.toData,
+  fromDataHash: HALF_MODULES_SOLO_MIGRATION.toDataHash,
+  toRules: '03e22db36f95d4',
+  toData: HALF_MODULES_SOLO_MIGRATION.toData,
+  toDataHash: HALF_MODULES_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -273,6 +284,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   STAND_UP_SOLO_MIGRATION,
   BOMBARD_VOLLEY_SOLO_MIGRATION,
   HALF_MODULES_SOLO_MIGRATION,
+  ARMY_SELECTION_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

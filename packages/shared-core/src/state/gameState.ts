@@ -32,6 +32,8 @@ export type ResourceBag = Record<ResourceId, number>;
 export interface UnitStack {
   unit: UnitId;
   count: number;
+  /** Stable server-owned ground formation identity for explicit troop transfers. */
+  armyGroup?: string;
   /** Remaining HP pool of this stack during a battle (≤ count × def.hp).
    *  Undefined outside combat = full health. */
   hp?: number;
@@ -763,6 +765,7 @@ export type FleetResume = { to: PlanetId } | { toEdge: FleetEdge };
 export interface LoadingClaim {
   unit: string;
   count: number;
+  sources?: Array<{ group: string; count: number }>;
   /** The world the units are lifted from. The lift only completes while the fleet is
    *  still docked THERE — flying away is how a player cancels it. */
   from: PlanetId;
@@ -778,6 +781,7 @@ export interface LoadingClaim {
 export interface UnloadingClaim {
   unit: string;
   count: number;
+  sources?: Array<{ group: string; count: number }>;
   /** Мир, на который высаживаются. Выгрузка завершается, только пока флот стоит ТАМ. */
   to: PlanetId;
   /** Мировое время (мс) начала — клиент рисует по нему заполнение. */

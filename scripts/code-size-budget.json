@@ -22,7 +22,7 @@
     "prototype/selfplay.mjs": 1198,
     "prototype/src/shipyard.ts": 1184,
     "prototype/src/mapInput.ts": 1147,
-    "prototype/src/rehearsal.ts": 1120,
+    "prototype/src/rehearsal.ts": 1024,
     "packages/server/src/wsServer.ts": 1117,
     "packages/client/src/matchHud.ts": 1056,
     "packages/client/src/main.ts": 1025

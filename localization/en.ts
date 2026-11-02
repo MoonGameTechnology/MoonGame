@@ -5082,8 +5082,18 @@ export const en: Record<string, string> = {
   // --- troops — ⇅-меню десанта в ряду команд: шапка, план, сноски.
   'troops.hold': 'hold {a}/{b}',
   'troops.planned': 'ordered {n}',
-  'troops.timing': 'loading ≈1h · unloading is instant',
+  'troops.timing': 'Loading ≈1 h · unloading ≈1 h',
   'troops.title': 'Troops',
+  'troops.at-world': 'On planet: {n}',
+  'troops.aboard': 'Aboard: {n}',
+  'troops.service': 'Service grade: {n}',
+  'troops.recruits': 'Recruits',
+  'troops.battles': 'Battles: {n}',
+  'troops.health': 'Health: {n}%',
+  'troops.reserved': 'Reserved: {n}',
+  'troops.refresh': 'Refresh formations',
+  'troops.transferring': 'Transfer in progress: {n}',
+  'troops.selection-note': 'The order follows the selected formation. Wounds and service are preserved.',
 
   // --- upd — Баннер обновления сборки (APK; в браузере не показывается).
   'upd.apk-only': 'updates are only available in the APK',

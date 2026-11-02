@@ -1,46 +1,25 @@
 /**
- * GRND-1 · «Десант» — модель и разметка меню погрузки/выгрузки наземных частей.
- *
- * Раньше это была секция боковой панели с кнопкой на каждый тип и шагом ровно 1:
- * чтобы поднять пять ополченцев, игрок пять раз тыкал в «▲ Погрузить». Теперь в ряду
- * команд флота стоит кнопка ⇅ «Десант», а по ней раскрывается поповер над рядом — по
- * строке на тип, со счётчиком «сколько» и одним «Подтвердить».
- *
- * Счётчик строки — это ПЛАН, знаковая дельта: `+N` поднять из гарнизона на борт,
- * `−N` высадить с борта в гарнизон. Одна строка на тип закрывает оба направления,
- * поэтому в меню нет вкладок (переключение вкладки обнуляло бы набор) и «выгрузить
- * танки, взять пехоту» делается одним заходом.
- *
- * Модуль ЧИСТЫЙ: ни DOM, ни живого состояния — вход описывает мир числами, выход это
- * модель и строка HTML. Так арифметику «сколько влезет» можно накрыть тестом, чего у
- * прежней секции внутри main.ts не было вовсе.
- *
- * Что обязан знать вызывающий (и почему это ВХОД, а не расчёт внутри):
- * - `garrison`/`hold` — сколько единиц ядро согласится поднять/высадить. С 2026-11-02
- *   это ВСЕ стеки типа, раненые тоже (`army.ts`): раны едут вместе с бойцами.
- *   `garrisonAll`/`holdAll` — все стеки; сейчас они совпадают с `garrison`/`hold`.
- * - `reserved` — сколько единиц этого типа уже обещано отложенным погрузкам ЛЮБОГО
- *   флота у этого мира: гарнизон общий, и без этого вычета два флота закажут одного
- *   и того же солдата.
- * - `reservedCargo` — трюмное место, занятое собственной очередью этого флота.
- * - `cargoSize` — место под одну единицу. Сейчас у всех наземных он 1, но арифметика
- *   всё равно идёт через `floor(free / cargoSize)`: это заявленный data-driven шов.
+ * Army transfer menu: a separate row for each source formation, with its wounds
+ * and service visible. Positive deltas load, negative deltas unload. A plan uses
+ * persistent server-owned group IDs; old callers may still supply unit-only rows.
+ * The pure model reserves actual free cargo, never space from a future unload.
  */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
+import type { ArmyGroupDetails } from '../../decisions/armyTransferRows';
 
-/** Одна строка меню — состояние типа юнита в паре «гарнизон ⇄ трюм». */
-export interface TroopsUnitInput {
+/** Одна строка меню — выбранная группа в гарнизоне или трюме. */
+export interface TroopsUnitInput extends Partial<ArmyGroupDetails> {
   unit: string;
-  /** Здоровых единиц в гарнизоне (то, что ядро реально согласится поднять). */
+  /** Единиц в группе гарнизона, включая раненых. */
   garrison: number;
-  /** Всего единиц в гарнизоне, включая побитые стеки — только для сноски. */
+  /** Всего единиц в группе гарнизона. */
   garrisonAll: number;
-  /** Здоровых единиц в трюме. */
+  /** Доступных единиц в группе трюма после вычета заявок. */
   hold: number;
   /** Всего единиц в трюме, включая побитые. */
   holdAll: number;
-  /** Сколько единиц этого типа уже поднимает ЭТОТ флот (⏳ в подписи). */
+  /** Сколько единиц этой группы уже перевозит ЭТОТ флот (⏳ в подписи). */
   queued: number;
   /** Сколько единиц обещано очередям ВСЕХ флотов у этого мира. */
   reserved: number;
@@ -56,7 +35,7 @@ export interface TroopsInput {
   used: number;
   /** Место, зарезервированное отложенными погрузками этого флота. */
   reservedCargo: number;
-  /** План: unit → знаковая дельта (>0 погрузить, <0 выгрузить). */
+  /** План: ключ группы → знаковая дельта (>0 погрузить, <0 выгрузить). */
   plan: Record<string, number>;
 }
 
@@ -65,7 +44,7 @@ export interface TroopsRow extends TroopsUnitInput {
   delta: number;
   /** Верхняя граница дельты: и гарнизон, и свободный трюм. */
   maxLoad: number;
-  /** Нижняя граница по модулю: сколько здоровых единиц на борту. */
+  /** Нижняя граница по модулю: сколько доступных единиц в группе на борту. */
   maxUnload: number;
 }
 
@@ -81,13 +60,14 @@ export interface TroopsModel {
   queuedTotal: number;
   /** Место кончилось, а в гарнизоне ещё есть кого брать — «трюм полон». */
   holdFull: boolean;
-  /** Брать нечего: весь здоровый гарнизон уже разобран очередями. */
+  /** Брать нечего: весь гарнизон уже разобран очередями. */
   garrisonDry: boolean;
   /** Есть ли что подтверждать. */
   valid: boolean;
 }
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+const rowKey = (row: TroopsUnitInput): string => row.key ?? row.unit;
 
 /** Свести вход к модели: клампит план по обеим границам и считает остаток трюма.
  *  Строки конкурируют за одно и то же место, поэтому потолок погрузки строки — это
@@ -97,11 +77,14 @@ export function troopsModel(input: TroopsInput): TroopsModel {
   // Первый проход: клампим каждую строку по её собственным границам, не глядя на трюм.
   const capped = input.units.map((u) => ({
     u,
-    d: clamp(input.plan[u.unit] ?? 0, -u.hold, Math.max(0, u.garrison - u.reserved)),
+    d:
+      u.prepared === false
+        ? 0
+        : clamp(input.plan[rowKey(u)] ?? 0, -u.hold, Math.max(0, u.garrison - u.reserved)),
   }));
   // Второй проход: место конечно — гасим лишние погрузки по порядку строк.
   let free = base;
-  for (const c of capped) free += -c.d * c.u.cargoSize;
+  for (const c of capped) if (c.d > 0) free -= c.d * c.u.cargoSize;
   for (const c of capped) {
     if (free >= 0) break;
     if (c.d <= 0) continue;
@@ -119,8 +102,14 @@ export function troopsModel(input: TroopsInput): TroopsModel {
     return {
       ...u,
       delta: d,
-      maxLoad: Math.max(d, Math.min(u.garrison - u.reserved, d + Math.floor(free / u.cargoSize))),
-      maxUnload: u.hold,
+      maxLoad:
+        u.prepared === false
+          ? 0
+          : Math.max(
+              d,
+              Math.min(u.garrison - u.reserved, Math.max(0, d) + Math.floor(free / u.cargoSize)),
+            ),
+      maxUnload: u.prepared === false ? 0 : u.hold,
     };
   });
   // Почему «+» серая. Клик по disabled-кнопке ряда не всплывает, объяснить через
@@ -134,7 +123,7 @@ export function troopsModel(input: TroopsInput): TroopsModel {
     capacity: input.capacity,
     used: input.used,
     reservedCargo: input.reservedCargo,
-    freeCargo: Math.max(0, free),
+    freeCargo: Math.max(0, free - capped.reduce((n, c) => n + Math.min(0, c.d) * c.u.cargoSize, 0)),
     loadTotal,
     unloadTotal,
     queuedTotal,
@@ -151,30 +140,29 @@ export function troopsModel(input: TroopsInput): TroopsModel {
 /** Шаг счётчика строки. Как в диалоге разделения флота, шаг КЛАМПИТСЯ, а не
  *  блокируется: «+5» на трёх доступных даст +3, а не откажет. */
 export function stepPlan(input: TroopsInput, unit: string, step: number): Record<string, number> {
-  const row = troopsModel(input).rows.find((r) => r.unit === unit);
+  const row = troopsModel(input).rows.find((r) => rowKey(r) === unit);
   if (!row) return input.plan;
   return { ...input.plan, [unit]: clamp(row.delta + step, -row.maxUnload, row.maxLoad) };
 }
 
 /** Пресет строки: `+1` — набить трюм этим типом доверху, `-1` — высадить всё своё. */
 export function maxPlan(input: TroopsInput, unit: string, dir: 1 | -1): Record<string, number> {
-  const row = troopsModel(input).rows.find((r) => r.unit === unit);
+  const row = troopsModel(input).rows.find((r) => rowKey(r) === unit);
   if (!row) return input.plan;
   return { ...input.plan, [unit]: dir > 0 ? row.maxLoad : -row.maxUnload };
 }
 
-/** Разбить план на два списка приказов. Выгрузка мгновенна и уходит в ядро одним
- *  действием на тип (`count` ядро принимает атомарно), погрузка — в клиентскую
- *  очередь на ~1 игровой час за единицу. */
+/** Приказы на выбранные группы. Погрузка и выгрузка завершаются в ядре через час. */
 export function planOrders(m: TroopsModel): {
-  load: Array<{ unit: string; count: number }>;
-  unload: Array<{ unit: string; count: number }>;
+  load: Array<{ unit: string; count: number; group?: string }>;
+  unload: Array<{ unit: string; count: number; group?: string }>;
 } {
-  const load: Array<{ unit: string; count: number }> = [];
-  const unload: Array<{ unit: string; count: number }> = [];
+  const load: Array<{ unit: string; count: number; group?: string }> = [];
+  const unload: Array<{ unit: string; count: number; group?: string }> = [];
   for (const r of m.rows) {
-    if (r.delta > 0) load.push({ unit: r.unit, count: r.delta });
-    else if (r.delta < 0) unload.push({ unit: r.unit, count: -r.delta });
+    const group = r.group ? { group: r.group } : {};
+    if (r.delta > 0) load.push({ unit: r.unit, count: r.delta, ...group });
+    else if (r.delta < 0) unload.push({ unit: r.unit, count: -r.delta, ...group });
   }
   return { load, unload };
 }
@@ -186,15 +174,29 @@ export interface TroopsMenuOpts {
   name: (unit: string) => string;
 }
 
-const stepBtn = (unit: string, n: number, glyph: string, title: string, off: boolean): string =>
-  `<button class="btn-second" data-cmd="tstep" data-unit="${esc(unit)}" data-n="${n}" title="${esc(title)}" aria-label="${esc(title)}"${off ? ' disabled' : ''}>${glyph}</button>`;
+const stepBtn = (
+  unit: string,
+  n: number,
+  glyph: string,
+  title: string,
+  off: boolean,
+  group = unit,
+): string =>
+  `<button class="btn-second" data-cmd="tstep" data-unit="${esc(unit)}" data-group="${esc(group)}" data-n="${n}" title="${esc(title)}" aria-label="${esc(title)}"${off ? ' disabled' : ''}>${glyph}</button>`;
 
 /** Пресет «до упора»: набить трюм этим типом (dir=1) / высадить всё своё (dir=-1).
  *  Треугольник против «+/−» — намеренная разница формы: крайние значения и мелкий
  *  шаг не должны выглядеть одинаково под пальцем на 30-пиксельной кнопке. Поэтому и
  *  стиль другой (UIX-11.1): шаг — вторичная кнопка в рамке, пресет — тихая, без рамки. */
-const maxBtn = (unit: string, dir: 1 | -1, glyph: string, title: string, off: boolean): string =>
-  `<button data-cmd="tmax" class="tall btn-quiet" data-unit="${esc(unit)}" data-dir="${dir}" title="${esc(title)}" aria-label="${esc(title)}"${off ? ' disabled' : ''}>${glyph}</button>`;
+const maxBtn = (
+  unit: string,
+  dir: 1 | -1,
+  glyph: string,
+  title: string,
+  off: boolean,
+  group = unit,
+): string =>
+  `<button data-cmd="tmax" class="tall btn-quiet" data-unit="${esc(unit)}" data-group="${esc(group)}" data-dir="${dir}" title="${esc(title)}" aria-label="${esc(title)}"${off ? ' disabled' : ''}>${glyph}</button>`;
 
 /** Разметка поповера. Живёт внутри строки #cmdbar, поэтому диспатчится общим
  *  `data-cmd`-обработчиком ряда и не заводит ни своего узла, ни своего слушателя.
@@ -208,17 +210,27 @@ export function troopsMenuHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
       const cls = r.delta > 0 ? 'pos' : r.delta < 0 ? 'neg' : '';
       const loadTitle = t('side.ground.load', { u: nm });
       const unloadTitle = t('side.ground.unload', { u: nm });
-      return `<div class="trow">
+      const group = rowKey(r);
+      const locationKey = r.side === 'garrison' ? 'troops.at-world' : 'troops.aboard';
+      const details = r.side
+        ? `<span class="tgroup-grade">${esc(r.grade ? t('troops.service', { n: r.grade }) : t('troops.recruits'))} · ${esc(t('troops.battles', { n: r.battles ?? 0 }))}</span><span class="tgroup-health${(r.health ?? 100) < 100 ? ' wounded' : ''}">${esc(t('troops.health', { n: r.health ?? 100 }))}<span aria-hidden="true" class="tgroup-bar"><i style="width:${r.health ?? 100}%"></i></span></span>`
+        : '';
+      const countLabel = r.side
+        ? esc(t(locationKey, { n: r.side === 'garrison' ? r.garrisonAll : r.holdAll }))
+        : `${r.garrison} ▸ ${r.hold}`;
+      return `<div class="trow${r.delta ? ' chosen' : ''}" data-troop-group="${esc(group)}">
       <span class="tinfo">
         <span class="tname"><span class="bicon">${opts.icon(r.unit)}</span>${esc(nm)}</span>
-        <span class="tcnt">${r.garrison} ▸ ${r.hold}${r.queued > 0 ? ` <em>⏳${r.queued}</em>` : ''}</span>
+        ${details}
+        <span class="tcnt">${countLabel}${r.queued > 0 ? ` <em>⏳${r.queued}</em>` : ''}</span>
+        ${r.reserved > 0 ? `<span class="tcnt">${esc(t('troops.reserved', { n: r.reserved }))}</span>` : ''}
       </span>
       <span class="tbtns">
-        ${maxBtn(r.unit, -1, '▼', unloadTitle, r.delta <= -r.maxUnload)}
-        ${stepBtn(r.unit, -1, '−', unloadTitle, r.delta <= -r.maxUnload)}
+        ${maxBtn(r.unit, -1, '▼', unloadTitle, r.delta <= -r.maxUnload, group)}
+        ${stepBtn(r.unit, -1, '−', unloadTitle, r.delta <= -r.maxUnload, group)}
         <b class="tdelta ${cls}">${sign}${r.delta}</b>
-        ${stepBtn(r.unit, 1, '+', loadTitle, r.delta >= r.maxLoad)}
-        ${maxBtn(r.unit, 1, '▲', loadTitle, r.delta >= r.maxLoad)}
+        ${stepBtn(r.unit, 1, '+', loadTitle, r.delta >= r.maxLoad, group)}
+        ${maxBtn(r.unit, 1, '▲', loadTitle, r.delta >= r.maxLoad, group)}
       </span>
     </div>`;
     })
@@ -235,12 +247,16 @@ export function troopsMenuHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
     `<div class="thead">${esc(t('troops.title'))} · ${esc(t('troops.hold', { a: m.capacity - m.freeCargo, b: m.capacity }))}${planned}</div>` +
     `<div class="tlegend">${esc(t('side.ground.legend'))}</div>` +
     rows +
+    (m.rows.some((r) => r.prepared === false)
+      ? `<button type="button" class="btn-second" data-cmd="trefresh">${esc(t('troops.refresh'))}</button>`
+      : '') +
     (m.queuedTotal > 0
-      ? `<div class="tnote">${esc(t('side.ground.loading', { n: m.queuedTotal }))}</div>`
+      ? `<div class="tnote">${esc(t('troops.transferring', { n: m.queuedTotal }))}</div>`
       : '') +
     (m.holdFull ? `<div class="tnote warn">${esc(t('cargo.hold-full'))}</div>` : '') +
     (m.garrisonDry ? `<div class="tnote warn">${esc(t('cargo.garrison-empty'))}</div>` : '') +
     `<div class="tnote">${esc(t('troops.timing'))}</div>` +
+    `<div class="tnote">${esc(t('troops.selection-note'))}</div>` +
     `<div class="tacts">` +
     `<button data-cmd="tok" class="cbtn btn-main"${m.valid ? '' : ' disabled'}>${esc(t('split.confirm'))}</button>` +
     `<button data-cmd="tcancel" class="cbtn btn-quiet">${esc(t('ping.cancel'))}</button>` +

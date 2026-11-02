@@ -171,10 +171,24 @@ export const mergeSquadron = (
   squadronId: string,
   intoId: string,
 ) => act(playerId, 'shuttle.merge', { ...base, squadronId, intoId });
-export const loadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>
-  act(playerId, 'army.load', { fleetId, unit, count });
-export const unloadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>
-  act(playerId, 'army.unload', { fleetId, unit, count });
+export const prepareArmy = (playerId: string, fleetId: string) =>
+  act(playerId, 'army.prepare', { fleetId });
+export const loadArmy = (
+  playerId: string,
+  fleetId: string,
+  unit: string,
+  count = 1,
+  group?: string,
+) =>
+  act(playerId, 'army.load', { fleetId, unit, count, ...(group !== undefined ? { group } : {}) });
+export const unloadArmy = (
+  playerId: string,
+  fleetId: string,
+  unit: string,
+  count = 1,
+  group?: string,
+) =>
+  act(playerId, 'army.unload', { fleetId, unit, count, ...(group !== undefined ? { group } : {}) });
 export const launchFleet = (playerId: string, planetId: string) =>
   act(playerId, 'fleet.launch', { planetId });
 export const mergeFleet = (playerId: string, from: string, into: string) =>
@@ -405,7 +419,8 @@ export const allyOrder = (
   target: { planet: string } | { fleet: string },
 ) => act(playerId, 'ally.order', { ally, kind, ...target });
 /** Глава IV: отменить операцию союзника. */
-export const allyCancel = (playerId: string, ally: string) => act(playerId, 'ally.cancel', { ally });
+export const allyCancel = (playerId: string, ally: string) =>
+  act(playerId, 'ally.cancel', { ally });
 /** Reclaim your own lot, refunding its remaining escrow. */
 export const marketCancel = (playerId: string, id: string) =>
   act(playerId, 'market.cancel', { id });

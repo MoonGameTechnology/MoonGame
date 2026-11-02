@@ -924,3 +924,13 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
   font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;user-select:text;-webkit-user-select:text;touch-action:pan-y;}
 .set-lbl{display:flex;flex-direction:column;gap:3px;font-size:var(--fs-body);color:var(--ink);}
 .set-lbl .set-sub{font-size:var(--fs-caption);color:var(--dim);}
+
+/* Explicit troop formations: health and service stay visible beside the quantity. */
+#cmdbar .tpop .tgroup-grade{font-size:var(--fs-caption);color:var(--dim);}
+#cmdbar .tpop .tgroup-health{font-size:var(--fs-caption);color:var(--grn);display:flex;align-items:center;gap:6px;}
+#cmdbar .tpop .tgroup-health.wounded{color:var(--amber);}
+#cmdbar .tpop .tgroup-bar{width:48px;height:4px;border-radius:2px;background:var(--line);overflow:hidden;}
+#cmdbar .tpop .tgroup-bar i{display:block;height:100%;background:currentColor;}
+#cmdbar .tpop .trow.chosen{background:rgba(68,213,223,.08);border-radius:6px;}
+#cmdbar .tpop .trow{padding:8px 3px;grid-template-columns:minmax(0,1fr);}
+#cmdbar .tpop .tbtns{justify-content:flex-end;}
