@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { matchNumberText, parseMatchNumber } from './matchNumber';
+import { compactMatchNumberText, matchNumberText, parseMatchNumber } from './matchNumber';
 
 describe('номер партии', () => {
+  it('groups numeric numbers and abbreviates UUIDs only for display', () => {
+    expect(compactMatchNumberText('48219370')).toBe('№ 48 219 370');
+    const id = 'ava-12345678-1234-4abc-a123-12345678abcd';
+    expect(compactMatchNumberText(id)).toBe('№ ava-12345678…abcd');
+    expect(parseMatchNumber(id)).toBe(id);
+    expect(compactMatchNumberText('proto')).toBe('№ proto');
+  });
   it('правила 1–2: показываем номер, у старой партии — её id', () => {
     expect(matchNumberText('48219370')).toBe('№ 48219370');
     expect(matchNumberText('proto')).toBe('№ proto');

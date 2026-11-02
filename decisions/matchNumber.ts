@@ -23,6 +23,14 @@ export function matchNumberText(matchId: string): string {
   return `№ ${matchId}`;
 }
 
+/** Compact display only; copying and joining always use the complete match id. */
+export function compactMatchNumberText(matchId: string): string {
+  const text = /^\d+$/.test(matchId)
+    ? matchId.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+    : matchId.length > 22 ? `${matchId.slice(0, 12)}…${matchId.slice(-4)}` : matchId;
+  return matchNumberText(text);
+}
+
 /** Правило 3: номер (или id старой партии) из того, что игрок ввёл; `null` — не понял. */
 export function parseMatchNumber(input: string): string | null {
   let raw = input.trim();
