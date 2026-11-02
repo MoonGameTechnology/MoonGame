@@ -1,6 +1,8 @@
 import { seedRng, type RngState } from '../rng/rng';
 import type { FleetChain } from './chain';
 import type { Coalition, CoalitionClock } from './coalition';
+import type { SightRules } from './sensorView';
+export type { SightRules } from './sensorView';
 
 /**
  * The authoritative game state. Stored as JSONB on the server
@@ -1008,6 +1010,8 @@ export interface GameVersion {
 }
 
 export interface GameState {
+  /** Resolved sensors for this viewer, written only by the network projection. */
+  sensorView?: import('./sensorView').SensorView;
   /** Stationary rocket mines and their one-shot missiles; filtered before networking. */
   ordnance?: import('./ordnance').OrdnanceState;
   /** Authored map identity, persisted and public; absent on legacy saves. */
@@ -1818,27 +1822,6 @@ export interface ProvinceSurvey {
   planetType?: string;
   /** Simulation time (ms) of the last crossing. */
   at: number;
-}
-
-/**
- * Зрение — ТОЛЬКО КРУГИ (решение владельца 2026-09-24). Каждый свой мир и флот видит
- * вокруг себя круг полного обзора; радары (постройки, корабли, модули) расширяют его
- * вторым, внешним кругом засечки. Связи между мирами на зрение не влияют: раньше свой
- * мир раскрывал соседей ПО ЛИНИЯМ на любом расстоянии, и игрок видел мир в 781 единице,
- * но не видел мир в 521 без линии. Расстояния — в единицах карты.
- */
-export interface SightRules {
-  /** Радиус полного обзора вокруг каждого своего мира — у вида провинции без своего числа в
-   *  `byKind`. */
-  world: number;
-  /** Свой радиус обзора по виду провинции (`Planet.kind`) вместо `world`. Решение владельца
-   *  2026-09-25 для забега: вокруг себя видят только колонии и космические крепости, по 100;
-   *  захваченное поле, туманность или мёртвый мир — только себя, дальше — радар. */
-  byKind?: Record<string, number>;
-  /** Радиус полного обзора вокруг каждого своего флота — в его фактическом месте. */
-  fleet: number;
-  /** Множитель дальности всех радаров, мировых и корабельных: карты Sector Zero крупнее. */
-  radarScale: number;
 }
 
 /** Множители цен партии (`MatchMap.pricing`, `util/pricing.ts`). */

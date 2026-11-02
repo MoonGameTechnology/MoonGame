@@ -10,6 +10,8 @@ import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
 import { emptyOrdnance, inRadius, isMissileFleet, rocketMineModule } from './ordnance';
 import { visibleMinefields, isMineFleet, mineDetectionRange, mineFleetVisible } from './minefields';
 import { detectSignals, fleetSignalStrength, type RadarSource, type SignalEmitter, type SignatureContact } from './radarSignals';
+import { coverageInCircles, withProjectedSensors, type Coverage, type SightCircle } from './sensorView';
+export type { Coverage, SightCircle } from './sensorView';
 export type { SignatureContact, SignatureSize } from './radarSignals';
 import type { DomainEvent } from '../action/types';
 import type {
@@ -173,14 +175,6 @@ function radarMultiplier(state: GameState, viewerId: PlayerId, data: GameData): 
   return player.arrears?.includes('energy') ? mult * BLACKOUT_MULT : mult;
 }
 
-/** What a viewer senses right now: full detail (`identify`) and the wider
- *  signatures-only ring (`radar`). Exported because a RENDERER needs both halves —
- *  `identifiedNodes` alone answers only the inner one. */
-export interface Coverage {
-  identify: Set<PlanetId>;
-  radar: Set<PlanetId>;
-}
-
 /** The players whose sensors feed `viewerId`'s screen: the viewer plus everyone they
  *  hold the `alliance` stance with — «общая видимость» for a союз / коалиция (in this
  *  model a coalition IS the alliance stance, see `victory.ts`). `pact`/`peace` do NOT
@@ -231,23 +225,6 @@ export function worldRadarReach(state: GameState, planet: Planet, data: GameData
 export function fleetRadarReach(state: GameState, fleet: Fleet, data: GameData): number {
   const scale = sightRulesOf(state).radarScale;
   return fleetRadarRange(fleet, data) * scale * radarMultiplier(state, fleet.owner, data);
-}
-
-/**
- * Один круг зрения: где он стоит, чей он и какие у него два радиуса. Внутренний —
- * полный обзор (опознание), внешний — засечка сигнатур; внешний не меньше внутреннего.
- * Туман считается ТОЛЬКО по этим кругам, и граница обзора на карте рисуется из них же:
- * видно ровно то, что внутри нарисованной границы.
- */
-export interface SightCircle {
-  owner: PlayerId;
-  /** Чей это круг: свой мир, флот, скан героя, ракетная мина или висящий патруль шаттлов
-   *  (SHU-6.7) — клиент выделяет круг выбранного. */
-  source: { kind: 'world' | 'fleet' | 'reveal' | 'mine' | 'patrol'; id: string };
-  x: number;
-  y: number;
-  identify: number;
-  signature: number;
 }
 
 /** Круги игроков `owners` — их собственные глаза и радары, по списку на владельца. Множитель
@@ -702,10 +679,12 @@ export function radarSources(
   viewerId: PlayerId,
   data: GameData,
   planets: readonly Planet[] = recordValues(state.planets),
+  sharedOnly = false,
 ): RadarSource[] {
   const sources: RadarSource[] = [];
   const scale = sightRulesOf(state).radarScale;
   for (const owner of visionBloc(state, viewerId)) {
+    if (sharedOnly && owner === viewerId) continue;
     const mult = scale * radarMultiplier(state, owner, data);
     const add = (at: { x: number; y: number }, range: number, level: number): void => {
       if (range * mult > 0) sources.push({ ...at, range: range * mult, level });
@@ -1032,7 +1011,12 @@ export function viewCoverage(
   data: GameData,
   planets: readonly Planet[] = recordValues(state.planets),
 ): Coverage {
-  if (state.match.status !== 'ended') return sensorCoverage(state, viewerId, data, planets);
+  if (state.match.status !== 'ended') {
+    const sensors = state.sensorView;
+    return sensors?.viewerId === viewerId
+      ? coverageInCircles(planets, sensors.circles)
+      : sensorCoverage(state, viewerId, data, planets);
+  }
   return {
     identify: new Set(planets.map((p) => p.id)),
     radar: new Set(planets.map((p) => p.id)),
@@ -1076,7 +1060,7 @@ function project(
   const spied = spiedPlanets(state, viewerId);
   const identify = spied.size ? new Set([...coverage.identify, ...spied]) : coverage.identify;
   const depth = intelDepth(state, viewerId);
-  const view = deepClone(state) as VisibleState;
+  const view = withProjectedSensors(state, viewerId, data) as VisibleState;
   const ord = visibleOrdnance(state, viewerId);
   if (ord) view.ordnance = ord;
   else delete view.ordnance;

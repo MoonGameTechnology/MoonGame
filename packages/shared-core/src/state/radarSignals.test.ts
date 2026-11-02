@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseGameData, safeParseGameData } from '../data/schemas';
 import { createInitialState, type Fleet, type GameState } from './gameState';
 import { radarSignatures, visibleState } from './visibility';
+import { detectSignals } from './radarSignals';
 
 const data = parseGameData({
   version: 'radar-test',
@@ -265,5 +266,34 @@ describe('radar signal detection', () => {
     const v = visibleState(s, 'me', data);
     expect(v.signatures).toEqual([{ location: 'near', size: 'S', position: { x: 240, y: 0 } }]);
     expect(JSON.stringify(v)).not.toContain('secret');
+  });
+});
+
+
+describe('independent sensor grouping', () => {
+  const emitters = [
+    { location: 'A', x: 0, y: 0, strength: 1 },
+    { location: 'B', x: 40, y: 0, strength: 3 },
+    { location: 'C', x: 80, y: 0, strength: 2 },
+  ];
+  it('preserves a detected group when another radar covers a remote weak signal', () => {
+    const sources = [{ x: 80, y: 0, range: 40, level: 2 }];
+    const expected = [{ location: 'B', size: 'M' }];
+    expect(detectSignals(emitters, sources)).toEqual(expected);
+    expect(detectSignals(emitters, [...sources, { x: 0, y: 0, range: 10, level: 1 }])).toEqual(expected);
+  });
+  it('does not duplicate a contact when sensors overlap or pool their sensitivity', () => {
+    const a = { x: 80, y: 0, range: 40, level: 2 };
+    expect(detectSignals(emitters, [a, a])).toEqual([{ location: 'B', size: 'M' }]);
+    expect(detectSignals(emitters, [{ ...a, level: 1 }, { ...a, level: 1 }])).toEqual([]);
+    const medium = [{ location: 'B', x: 40, y: 0, strength: 8 }];
+    expect(detectSignals(medium, [a, a])).toEqual([{ location: 'B', size: 'M' }]);
+  });
+  it('keeps the group after increasing reach and ignores emissions outside each sensor', () => {
+    const source = { x: 80, y: 0, range: 40, level: 2 };
+    const expected = [{ location: 'B', size: 'M' }];
+    expect(detectSignals(emitters, [{ ...source, range: 80 }])).toEqual(expected);
+    expect(detectSignals(emitters.slice(1), [source])).toEqual(expected);
+    expect(detectSignals([...emitters].reverse(), [source])).toEqual(expected);
   });
 });

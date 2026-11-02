@@ -157,7 +157,7 @@ import {
   typingTarget,
 } from './backGesture';
 import {
-  sightCircles,
+  viewSightCircles,
   type Planet,
   type SightCircle,
   type Squadron,
@@ -387,7 +387,7 @@ import {
 import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, setView, world, worldDist } from './mapCamera';
 import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, restoreFogMemory, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
-import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, ownRadarSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
+import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, radarSweepSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder } from './orderPipeline';
 import {
   forceIntroduced,
@@ -1032,8 +1032,8 @@ initMapRadar({
   ctx: () => cx,
   vw: () => VW,
   vh: () => VH,
-  sources: () => perWorld('radar', ownRadarSources),
-  sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),
+  sources: () => perWorld('radar', radarSweepSources),
+  sight: () => perWorld('sight', () => viewSightCircles(s, ME, data, worldPlanets())),
   planets: worldPlanets,
   note,
   placeName,
@@ -1197,7 +1197,7 @@ initMapFog({
   me: () => ME,
   net: () => NET,
   contacts: () => netSignatures,
-  sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),
+  sight: () => perWorld('sight', () => viewSightCircles(s, ME, data, worldPlanets())),
   planets: worldPlanets,
 });
 

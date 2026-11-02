@@ -13,10 +13,12 @@ import {
 // Радар живёт у своего владельца (`mapRadar.ts`, REFM-239): память контактов снаружи
 // только для чтения, а угол руки задают часы развёртки — робот берёт их своим импортом.
 const hooks = `import { forgetRadarContacts as __forgetRadarContacts, paintedContacts as __painted, SWEEP_DIV as __SWEEP_DIV, SWEEP_PERIOD as __SWEEP_PERIOD } from './mapRadar';
+import { visibleState as __visibleState, viewSightCircles as __viewSightCircles } from '../../packages/shared-core/src/index';
 window.__radarTest = {
   stage(level, grouped = false) {
     const nodes = Object.values(s.planets);
-    const home = nodes.find(p => p.owner === ME);
+    const home = nodes.find(p => p.owner === ME) ?? s.planets[this.homeId];
+    this.homeId = home.id;
     const [a, b] = nodes.filter(p => p.id !== home.id);
     for (const p of nodes) { p.owner = null; p.buildings = []; }
     home.owner = ME;
@@ -27,7 +29,7 @@ window.__radarTest = {
     s.players[ME].faction = 'radar-test';
     s.players[ME].technologies = { completed: [] };
     delete s.players[ME].arrears;
-    delete s.heroes; delete s.intel; delete s.diplomacy; delete s.mapShares;
+    delete s.sensorView; delete s.heroes; delete s.intel; delete s.diplomacy; delete s.mapShares;
     const foe = Object.keys(s.players).find(id => id !== ME);
     const make = (id, location, count) => ({ id, location, owner: foe, movement: null,
       units: [{ unit: 'scout', count }], traits: [] });
@@ -38,6 +40,9 @@ window.__radarTest = {
     return this.read();
   },
   paint() {
+    // Fixture edits move worlds; replace their records to invalidate the spatial grid.
+    s.planets = structuredClone(s.planets);
+    worldMemo = null; planetList = null;
     __fog.vision = __fog.computeVision();
     // Targets are due east: one real sweep crossing, without a ten-second sleep — the
     // sweep clock puts the arm just short of east, then just past it.
@@ -53,6 +58,34 @@ window.__radarTest = {
     this.paint();
     drawRadarContacts(performance.now() + 3 * __SWEEP_PERIOD);
     return this.read();
+  },
+  shared(projected) {
+    this.stage(3);
+    const home = Object.values(s.planets).find(p => p.owner === ME);
+    const [ally, foe] = Object.keys(s.players).filter(id => id !== ME);
+    home.owner = ally;
+    s.players[ally].technologies = { completed: ['deep_survey'] };
+    delete s.players[ally].arrears;
+    s.diplomacy = { [[ME, ally].sort().join('|')]: 'alliance' };
+    const target = s.planets[s.fleets.a.location];
+    target.position = { x: home.position.x + 300, y: home.position.y };
+    s.fleets.a.owner = foe;
+    const edge = Object.values(s.planets).find(p => p.id !== home.id && p.id !== target.id);
+    edge.position = { x: home.position.x + 230, y: home.position.y };
+    if (projected) {
+      s.planets = structuredClone(s.planets);
+      s = __visibleState(s, ME, data);
+      initMapFog({ world: () => s, me: () => ME, net: () => true,
+        contacts: () => s.signatures, sight: () => __viewSightCircles(s, ME, data),
+        planets: () => Object.values(s.planets) });
+    }
+    __forgetRadarContacts();
+    this.paint();
+    const result = { ...this.read(), identifiedEdge: known(edge.id) };
+    if (projected) initMapFog({ world: () => s, me: () => ME, net: () => NET,
+      contacts: () => netSignatures, sight: () => __viewSightCircles(s, ME, data),
+      planets: () => Object.values(s.planets) });
+    return result;
   },
   read() { return { contacts: vision.signatures, painted: [...__painted.values()] }; },
 };`;
@@ -94,8 +127,14 @@ try {
       sensitive.painted.map((c) => c.size),
       ['S'],
     );
+    for (const projected of [false, true]) {
+      const shared = await page.evaluate(p => window.__radarTest.shared(p), projected);
+      assert.deepEqual(shared.contacts.map(c => c.size), ['S'], 'shared contacts, projected=' + projected);
+      assert.deepEqual(shared.painted.map(c => c.size), ['S']);
+      assert.equal(shared.identifiedEdge, true);
+    }
     assert.deepEqual(errors, []);
-    console.log('✓ radar: sensitivity, grouped signal, dispersion and sweep painting');
+    console.log('✓ radar: sensitivity, grouping, dispersion, shared sweep and projected allied technology');
   });
 } finally {
   await browser.close();
