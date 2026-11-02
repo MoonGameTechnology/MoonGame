@@ -712,7 +712,7 @@ export {
 } from './modules/sprawl';
 export { veteranModule } from './modules/veteran';
 export { promotionModule } from './modules/promotion';
-export { armyModule } from './modules/army';
+export { armyModule, type LoadFirst } from './modules/army';
 export { fleetOpsModule } from './modules/fleetOps';
 export { autoRallyModule } from './modules/autoRally';
 export { rallyPointOf } from './state/rallyPoint';
