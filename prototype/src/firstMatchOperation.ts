@@ -179,7 +179,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     ),
     ...details(stage, 'hero-details'),
   ];
-  const deployed = () => !!guideHeroFleet(w(), me);
+  const deployed = (preparing = false) => !!guideHeroFleet(w(), me) || (preparing && !!guideHero(w(), me)?.mobilization);
   const refitted = () => guideHeroModules(w(), me).includes(GUIDE_HERO_MODULE);
   const trained = () =>
     guideTroopsHome(w(), home) + guideUnitsOrdered(w(), home, me, GUIDE_TROOP) >=
@@ -247,25 +247,25 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       'hero',
       'yard',
       '#holo-constructor, #rail-constructor, [data-phone-tab="production"], [data-phone-more="production"]',
-      () => ui.visible('#constructor.show') || deployed(),
+      () => ui.visible('#constructor.show') || deployed(true),
     ),
     step(
       'hero',
       'heroes',
       '[data-ctab="heroes"]',
-      () => ui.visible('[data-htab="ship"]') || deployed(),
+      () => ui.visible('[data-htab="ship"]') || deployed(true),
     ),
     step(
       'hero',
       'pick',
       `[data-hsel="${hero}"]`,
-      () => ui.visible(`.hx-chip.sel[data-hsel="${hero}"]`) || deployed(),
+      () => ui.visible(`.hx-chip.sel[data-hsel="${hero}"]`) || deployed(true),
     ),
     step(
       'hero',
       'ship',
       '[data-htab="ship"]',
-      () => ui.visible(`[data-huninstall="${hero}"]`) || refitted() || deployed(),
+      () => ui.visible(`[data-huninstall="${hero}"]`) || refitted() || deployed(true),
     ),
     step(
       'hero',
@@ -274,8 +274,8 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       () => guideHeroModules(w(), me).length < GUIDE_HERO_START_MODULES.length || refitted(),
     ),
     step('hero', 'install', `[data-hinstall="${hero}"][data-mod="${GUIDE_HERO_MODULE}"]`, refitted),
-    step('hero', 'deploy', `[data-hspawn="${hero}"]`, () => ui.intent('spawn') || deployed()),
-    step('hero', 'world', null, deployed, {
+    step('hero', 'deploy', `[data-hspawn="${hero}"]`, () => ui.intent('spawn') || deployed(true)),
+    step('hero', 'world', null, () => deployed(true), {
       anchor: () => ui.anchor(home),
       reveal: () => ui.show(home),
       gate: true,
@@ -299,7 +299,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       'aviation',
       'wing-wait',
       null,
-      () => guideWingsHome(w(), home) + guideWingsAboard(w(), me) > 0,
+      () => guideWingsHome(w(), home) + guideWingsAboard(w(), me) > 0 && deployed(),
     ),
     step('aviation', 'load', '[data-act="wingload"]', () => guideWingsAboard(w(), me) > 0),
 

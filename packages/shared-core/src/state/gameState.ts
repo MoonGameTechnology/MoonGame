@@ -1529,6 +1529,8 @@ export interface Hero {
   cooldowns: Record<string, number>;
   /** False while the hero is dead and awaiting respawn; absent/true ⇒ alive. */
   alive?: boolean;
+  /** Pending deployment; its destination and deadline survive save/restore. */
+  mobilization?: { target: string; startedAt: number; readyAt: number };
   /** Rarity tier (e.g. `common` | `rare` | `legendary` | `main`) → `data.heroGrades`.
    *  Drives BOTH of the hero's budgets, and the core enforces them: how many abilities
    *  may be worn (`skillSlots`, HPR-1.2) and the bonus module bays on top of the hull

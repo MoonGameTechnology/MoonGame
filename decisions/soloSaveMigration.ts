@@ -274,6 +274,17 @@ export const LOAD_FIRST_SOLO_MIGRATION = {
   toDataHash: FORTRESS_MODEL_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Optional mobilization state and additive main-only research. Existing ships,
+ *  accepted orders and campaign deployments survive; future main deployments use the timer. */
+export const HERO_MOBILIZATION_SOLO_MIGRATION = {
+  fromRules: LOAD_FIRST_SOLO_MIGRATION.toRules,
+  fromData: LOAD_FIRST_SOLO_MIGRATION.toData,
+  fromDataHash: LOAD_FIRST_SOLO_MIGRATION.toDataHash,
+  toRules: '0876d80977cf6d',
+  toData: '0.1.74',
+  toDataHash: '023cd15f09ee90',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -299,6 +310,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   HALF_MODULES_SOLO_MIGRATION,
   FORTRESS_MODEL_SOLO_MIGRATION,
   LOAD_FIRST_SOLO_MIGRATION,
+  HERO_MOBILIZATION_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
