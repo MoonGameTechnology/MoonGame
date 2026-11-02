@@ -79,6 +79,8 @@ export type LayerVerdict =
 // живёт всегда, раскрытость — класс `phone-speed-open` на `body` (`phoneSpeed.ts`).
 // `match-description` — нативный dialog: открытость задаёт showModal(), а не CSS display.
 export const EXTRA_LAYERS: readonly string[] = [
+  'hero-reward',
+  'match-hero-reward',
   'match-description',
   'fortress-order',
   'chain',

@@ -637,6 +637,8 @@ export const TechnologyUnlocksSchema = z.object({
 });
 
 export const TechnologyEffectsSchema = z.object({
+  /** Additional simultaneously deployed heroes; an integer, not a percentage. */
+  heroSlots: z.number().int().min(0).max(2).optional(),
   /** Multiplier on owned planetary production, e.g. 0.1 = +10%. */
   productionBonus: z.number().default(0),
   /** Multiplier on owned fleet movement speed, e.g. 0.15 = +15%. */

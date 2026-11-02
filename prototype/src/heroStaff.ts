@@ -17,6 +17,10 @@
  */
 import {
   effectiveStats,
+  activeHeroCount,
+  heroActiveCap,
+  HERO_ACTIVE_CAP,
+  matchHours,
   heroModuleSlots,
   knownSkillNodes,
   moduleAllowed,
@@ -29,7 +33,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
-import { esc, cost, fmtHrs } from './format';
+import { esc, cost, fmtHrs, countdownHMS } from './format';
 import { HOUR } from './time';
 import {
   castHeroAbility,
@@ -107,7 +111,6 @@ export function normalizeHeroView(state: GameState, me: string, view: HeroView):
   return { ...view, sel: mine[0]!.id };
 }
 
-const HERO_ACTIVE_CAP = 3; // mirrors the core heroModule's active cap (not exported)
 const HERO_BRANCH_RU: Record<string, string> = {
   transhuman: 'hero.branch.transhuman',
   psionic: 'hero.branch.psionic',
@@ -177,9 +180,8 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     .map((id) => state.heroes![id]!)
     .filter((h) => h.owner === me);
   if (!mine.length) return `<div class="hx-note">${t('hero.hq.empty')}</div>`;
-  const active = mine.filter(
-    (h) => h.alive !== false && h.fleetId && state.fleets[h.fleetId],
-  ).length;
+  const active = activeHeroCount(state, me);
+  const cap = heroActiveCap(state, me, data);
   const hero = mine.find((h) => h.id === view.sel) ?? mine[0]!;
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
   const dead = hero.alive === false;
@@ -191,20 +193,30 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     const d = h.archetype !== undefined ? data.heroes[h.archetype] : undefined;
     const dep = h.alive !== false && h.fleetId && state.fleets[h.fleetId];
     const st =
-      h.alive === false ? t('hero.hq.dead') : dep ? t('hero.hq.deployed') : t('hero.hq.reserve');
+      h.mobilization
+        ? t('hero.hq.mobilizing', { time: countdownHMS(h.mobilization.readyAt - state.time) })
+        : h.alive === false ? t('hero.hq.dead') : dep ? t('hero.hq.deployed') : t('hero.hq.reserve');
     chips +=
       `<button class="hx-chip g-${heroGradeKey(h.grade)}${h.id === hero.id ? ' sel' : ''}${d?.branch === 'psionic' ? ' ps' : ''}" data-hsel="${h.id}">` +
       `${heroPortraitHtml(h.archetype)}${esc(heroDisplayName(h))}` +
       `<span class="hx-cst${dep ? ' on' : ''}">${st}</span></button>`;
   }
-  chips += `<span class="hx-cap">${t('hero.hq.deployed-count', { a: active, c: HERO_ACTIVE_CAP })}</span></div>`;
+  chips += `<span class="hx-cap">${t('hero.hq.deployed-count', { a: active, c: cap })}</span></div>`;
+  if (state.techRules?.ruleset === 'main' && cap < HERO_ACTIVE_CAP)
+    chips += `<div class="hx-note">${t('hero.hq.slot-research')}</div>`;
 
   // identity header — name, branch, deploy state, aggregated build bonuses
-  const deploy = dead
+  const mobilizing = hero.mobilization
+    ? t('hero.hq.mobilizing', { time: countdownHMS(hero.mobilization.readyAt - state.time) })
+    : null;
+  const deployLabel = state.techRules?.ruleset === 'main'
+    ? t('hero.hq.mobilize', { h: fmtHrs(matchHours(state, data.units[def?.ship.unit ?? 'hero']?.buildTimeHours || 10)) })
+    : t('hero.hq.deploy');
+  const deploy = mobilizing ? `<span class="hx-note">${esc(mobilizing)}</span>` : dead && (state.techRules?.ruleset !== 'main' || (hero.cooldowns.respawn ?? 0) > state.time)
     ? `<span class="hx-dead">${t('hero.hq.dead')}</span>`
     : fleet
       ? `<span class="hx-dep">⚓ ${esc(typeof fleet.location === 'string' ? fleet.location : t('hero.hq.enroute'))}</span>`
-      : `<button class="hx-btn btn-main" data-hspawn="${hero.id}" ${active >= HERO_ACTIVE_CAP ? 'disabled' : ''}>${t('hero.hq.deploy')}</button>`;
+      : `<button class="hx-btn btn-main" data-hspawn="${hero.id}" ${active >= cap ? 'disabled' : ''}>${esc(deployLabel)}</button>`;
   const bonuses = activePassivesOf(hero)
     .map((p) => `<span class="hx-trait">${esc(heroPassiveLine(p))}</span>`)
     .join('');

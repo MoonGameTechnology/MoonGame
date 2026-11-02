@@ -3,7 +3,8 @@
  * способности и ракетные мины — в прежнем порядке.
  */
 import {
-  HERO_ACTIVE_CAP,
+  activeHeroCount,
+  heroActiveCap,
   abilityRange,
   getStance,
   heroCooldownKey,
@@ -72,14 +73,14 @@ export function heroOrders(bot: AiTurn, pl: Player): void {
 
   // 1. ПОДЪЁМ РОСТЕРА. Матч раздаёт каждому месту четырёх героев, но кораблём
   //    командует только главный — остальные лежат неразвёрнутыми и ждут `hero.spawn`.
-  //    Кэп активных берётся из ядра (`HERO_ACTIVE_CAP`), а не переписывается числом:
+  //    Кэп активных берётся из ядра (`heroActiveCap`), а не переписывается числом:
   //    иначе бот либо держал бы вторую копию правила, либо сыпал `E_HERO_CAP` каждые
   //    два часа. Респаун-кулдаун читается по тому же гроссбуху, что и гейт.
   if (base) {
-    let room = HERO_ACTIVE_CAP - roster.filter(deployed).length;
+    let room = heroActiveCap(state, ai, data) - activeHeroCount(state, ai);
     for (const x of roster) {
       if (room <= 0) break;
-      if (deployed(x) || (x.cooldowns?.respawn ?? 0) > state.time) continue;
+      if (deployed(x) || x.mobilization || (x.cooldowns?.respawn ?? 0) > state.time) continue;
       out.push(spawnHero(ai, x.id, base.id));
       room -= 1;
     }

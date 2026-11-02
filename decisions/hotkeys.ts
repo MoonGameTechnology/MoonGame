@@ -81,6 +81,8 @@ export const SPEED_SLOTS = 4;
  * клавишах уронит его.
  */
 export const HOTKEY_SILENT_LAYERS: readonly string[] = [
+  'hero-reward',
+  'match-hero-reward',
   'match-description',
   'fortress-order',
   'comic',

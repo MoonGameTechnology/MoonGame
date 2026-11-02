@@ -3,6 +3,17 @@ import type { GameData } from '../../packages/shared-core/src/index';
 import { heroPortraitHtml } from '../../packages/client/src/heroPortraits';
 import { t, tData } from '../../localization/runtime';
 import { esc } from './format';
+import type { BackLayer } from './backLayers';
+
+const rewardBack = new Map<string, { dialog: HTMLDialogElement; clear(): void }>();
+/** Закрывает всю очередь: системная кнопка Back равнозначна крестику, не очередной награде. */
+export function heroRewardBackLayer(id: string): BackLayer {
+  return {
+    id,
+    isOpen: () => rewardBack.get(id)?.dialog.open === true,
+    close: () => rewardBack.get(id)?.clear(),
+  };
+}
 
 const TITLES = {
   hero: 'hero-reward.received',
@@ -78,6 +89,7 @@ export function initHeroRewards(data: GameData, visible: () => boolean, id = 'he
     if (opener?.isConnected) opener.focus({ preventScroll: true });
     opener = null;
   }
+  rewardBack.set(id, { dialog, clear });
   dialog.addEventListener('cancel', clear);
   dialog.addEventListener('keydown', (event) => event.stopPropagation());
   dialog.addEventListener('click', (event) => {
