@@ -4,6 +4,7 @@
 // Сторож держит это в листах партии и хаба и в строках локали: регистр слова решает строка,
 // а не `text-transform`.
 import { readFileSync } from 'node:fs';
+import { gameCss } from '../gameSheets.mjs';
 import { describe, expect, it } from 'vitest';
 import { en } from '../../localization/en';
 import { LOCALE_LABEL } from '../../localization/index';
@@ -11,12 +12,14 @@ import { ru } from '../../localization/ru';
 
 const read = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const BUILD = read('../build.mjs');
-/** Лист игры; пульт администратора (`adminCss`) — инструмент, не игра. Sector Zero — эталон
- *  со своим листом, его подписи и так пишутся обычным регистром. */
-const GAME = BUILD.slice(BUILD.indexOf('const css = `'), BUILD.indexOf('const adminCss = `'));
+/** Листы игры (`prototype/styles/`) и разметка страницы из `build.mjs`; пульт администратора
+ *  (`admin.css`) — инструмент, не игра. Sector Zero — эталон со своим листом, его подписи и так
+ *  пишутся обычным регистром. */
+const GAME =
+  gameCss() + BUILD.slice(BUILD.indexOf('const css = '), BUILD.indexOf('const adminCss = '));
 
 const SHEETS: Record<string, string> = {
-  'build.mjs': GAME,
+  'styles/*.css': GAME,
   'holographic.css': read('../holographic.css'),
   'bridge-shell.css': read('../bridge-shell.css'),
   'mobile-console.css': read('../mobile-console.css'),

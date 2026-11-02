@@ -28,7 +28,7 @@ Void Dominion уже имеет фирменный вид — «cyan-on-void gla
 ## 2. Палитра и токены — берутся, а не изобретаются
 
 Источник правды — `packages/client/src/theme.ts` (типизированный) и его зеркало в
-CSS-переменных `prototype/build.mjs`:
+CSS-переменных `:root` в `prototype/styles/01-base.css`:
 
 ```
 cyan #35d6e6 · cyanDim #1c6f78 · red #ff5a4d · amber #ffb43a
@@ -39,7 +39,7 @@ glass rgba(3,14,18,0.82)
 Плюс ресурсные цвета (`--rc-metal`, `--rc-energy`, `--rc-food`, `--rc-credits`,
 `--rc-microelectronics`) — они несут СМЫСЛ (какой ресурс), а не украшают.
 
-Шкала текста (UIX-1.2) — тоже токены, `typeScale` в `theme.ts` и `--fs-*` в `build.mjs`:
+Шкала текста (UIX-1.2) — тоже токены, `typeScale` в `theme.ts` и `--fs-*` в `styles/01-base.css`:
 
 ```
 --fs-caption 12 · --fs-body 14 · --fs-heading 16 · --fs-title 20   (px, до зума ПК)

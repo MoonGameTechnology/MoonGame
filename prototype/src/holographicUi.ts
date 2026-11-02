@@ -8,8 +8,8 @@ import { initFloatingWindows } from './floatingWindows';
 import { narrowLayouts, pcScale } from '../../decisions/pcScale';
 import { fitColumns, fitLayout, type FitLayout } from '../../decisions/selectionWindowFit';
 
-/** Где CSS зумит интерфейс (PC-блок `build.mjs`): ПК с мышью от 900 px. Масштаб считается
- *  только там — иначе `--vph` поделили бы на зум, которого у слоёв нет. */
+/** Где CSS зумит интерфейс (PC-блок `prototype/styles/08-pc.css`): ПК с мышью от 900 px.
+ *  Масштаб считается только там — иначе `--vph` поделили бы на зум, которого у слоёв нет. */
 const PC_ZOOM_QUERY = '(min-width:900px) and (hover:hover) and (pointer:fine)';
 
 interface HolographicHost {

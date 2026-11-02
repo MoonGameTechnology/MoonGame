@@ -4,7 +4,7 @@ body.holo-ui{
   /* UIX-2.1: интерфейс ПК растёт с окном. Масштаб считает `holographicUi.ts`
      (`decisions/pcScale.ts`) и кладёт в --holo-pcz; без него (телефон, планшет) — 1.
      --vph и --vpw — видимые высота и ширина окна в px зумленного слоя (см. PC-блок
-     `build.mjs`): vh и vw внутри слоя под зумом растут вместе с ним, и окно «во весь экран»
+     `styles/08-pc.css`): vh и vw внутри слоя под зумом растут вместе с ним, и окно «во весь экран»
      вылезло бы за край. Поэтому размеры окон ниже — от них, а не от vh и vw. */
   --pcz:var(--holo-pcz,1);--vph:calc(100dvh / var(--pcz));--vpw:calc(100dvw / var(--pcz));--tbh:64px;
   --cyan:#8ce9f2;--cyan-dim:#78adbb;--ink:#d8eaf1;--dim:#a1bac7;
@@ -263,14 +263,14 @@ body.holo-ui #endscreen .es-box{width:min(620px,calc(var(--vpw) * .86));max-heig
 body.holo-ui #battlewin .twbox{width:min(1220px,calc(var(--vpw) * .96));max-height:calc(var(--vph) * .92);}
 body.holo-ui #seatpick .sbox{width:min(520px,calc(var(--vpw) * .95));max-height:calc(var(--vph) * .92);}
 body.holo-ui #connect .mfmenu{max-height:calc(var(--vph) * .38);}
-/* Свои слои голограммы растут вместе со старыми (список зума в PC-блоке `build.mjs`); туда
+/* Свои слои голограммы растут вместе со старыми (список зума в PC-блоке `styles/08-pc.css`); туда
    же окна и экраны, которых в том списке не было: карточка ресурса, список меток, торговец
    и союзник забега, профиль, выбор места, заставка загрузки карты и список языков. Чат
    остаётся в масштабе 1: его перетаскивание и размер считает `chatWindow.ts` в экранных px. */
 @media (min-width:900px) and (hover:hover) and (pointer:fine){
   body.holo-ui :is(.holo-nav,.holo-back,#holo-selection-window,#missionpanel,#swarm-tab,#rescard,#pingpanel,
     #trader,#ally,#profile,#seatpick,#maploading,.locmenu,#key-memo){zoom:var(--pcz);}
-  /* Окна, чей размер задаёт PC-блок `build.mjs` в vw/vh, — те же доли видимого окна. */
+  /* Окна, чей размер задаёт PC-блок `styles/08-pc.css` в vw/vh, — те же доли видимого окна. */
   body.holo-ui #scipick .twbox{width:calc(var(--vpw) * .534);max-height:calc(var(--vph) * .585);}
   body.holo-ui :is(#trader .trbox,#ally .albox){width:calc(var(--vpw) * .4);max-height:calc(var(--vph) * .6);}
   body.holo-ui #sandbox .sbx-box-w{width:min(460px,calc(var(--vpw) * .44));max-height:calc(var(--vph) * .61);}
@@ -473,7 +473,7 @@ body.holo-ui #holo-selection-window.fleet-console.has-info{
 body.holo-ui #holo-selection-window.fleet-console :is(#cmdbar,#side,#side .pscroll,#side .object-brief,#side .fconsole){
   display:contents!important;}
 body.holo-ui #holo-selection-window.fleet-console #side :is(.phead,.pdesc){display:none!important;}
-/* Ручка нижнего листа телефона (build.mjs, узкий экран) — окну она ни к чему. */
+/* Ручка нижнего листа телефона (`styles/`, узкий экран) — окну она ни к чему. */
 body.holo-ui #holo-selection-window.fleet-console #side::before{content:none;}
 body.holo-ui #holo-selection-window.fleet-console :is(.holo-command-body,.fc-comp,.fc-land,#side .object-detail,#cmdbar .tpop){
   min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;
@@ -506,7 +506,7 @@ body.holo-ui #holo-selection-window.fleet-console .fc-vitals{grid-column:comp/en
 .fc-vital.shield .fc-bar i{background:#5fb4ff;}
 .fc-vital.low .fc-bar i{background:var(--red);}
 .fc-repair{display:flex;gap:6px;flex:0 0 auto;}
-/* С #side: иначе `#side b` листа (build.mjs) перекрасит числа обратно в белый. */
+/* С #side: иначе `#side b` из `styles/` перекрасит числа обратно в белый. */
 #side :is(.fc-vv.buff,.fc-stat.buff b){color:var(--up);}
 #side :is(.fc-vv.debuff,.fc-stat.debuff b){color:var(--dn);}
 /* Заголовок колонки: подпись и, у «Состава», значок подсказки рядом. */

@@ -14,10 +14,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { gameCss } from '../gameSheets.mjs';
 
-const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
-/** CSS игры: у админки в том же файле своя страница со своими `body` и `input`. */
-const GAME_CSS = BUILD.slice(0, BUILD.indexOf('const adminCss'));
+/** CSS игры (`prototype/styles/`); у админки свой лист `admin.css` со своими `body` и `input`. */
+const GAME_CSS = gameCss();
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 
 /** Тело CSS-правила ровно с этим селектором — с начала строки, а не хвостом чужого

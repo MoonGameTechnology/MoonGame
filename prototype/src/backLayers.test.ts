@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { gameCss } from '../gameSheets.mjs';
 import {
   closeTopLayer,
   topLayerOpen,
@@ -73,9 +74,8 @@ describe('лестница закрывает верхний слой и тол�
 function overlayIdsFromCss(source: string): Map<string, number> {
   const found = new Map<string, number>();
   // Комментарии прилипают к списку селекторов и рвут разбор (сканер на этом уже
-  // спотыкался), а `${...}` — это JS-интерполяция внутри шаблонной строки со стилями:
-  // её фигурные скобки сбили бы счёт правил. Убираем и то, и другое.
-  const css = source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\$\{[^}]*\}/g, ' ');
+  // спотыкался), поэтому их вырезаем.
+  const css = source.replace(/\/\*[\s\S]*?\*\//g, ' ');
   const rule = /([^{}]+)\{([^{}]*)\}/g;
   let m: RegExpExecArray | null;
   while ((m = rule.exec(css))) {
@@ -91,7 +91,7 @@ function overlayIdsFromCss(source: string): Map<string, number> {
 }
 
 describe('опись полна: каждый оверлей объявлен слоем или не-слоем', () => {
-  const css = read('../build.mjs');
+  const css = gameCss();
   const overlays = overlayIdsFromCss(css);
 
   it('сканер CSS вообще что-то находит (иначе сторож охраняет пустоту)', () => {

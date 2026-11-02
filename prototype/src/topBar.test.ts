@@ -6,8 +6,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { gameCss } from '../gameSheets.mjs';
 
 const build = readFileSync(fileURLToPath(new URL('../build.mjs', import.meta.url)), 'utf8');
+const css = gameCss();
 // Ряд 1 шапки рисует верхняя полоса (`matchTopBar.ts`, REFM-222).
 const topBar = readFileSync(fileURLToPath(new URL('./matchTopBar.ts', import.meta.url)), 'utf8');
 const consoleCss = readFileSync(
@@ -16,7 +18,7 @@ const consoleCss = readFileSync(
 );
 const escape = (selector: string) => selector.replace(/[.#*+?^${}()|[\]\\]/g, '\\$&');
 const rule = (selector: string) =>
-  build.match(new RegExp(`(?:^|\\n)${escape(selector)}\\{[^}]*\\}`))?.[0] ?? '';
+  css.match(new RegExp(`(?:^|\\n)${escape(selector)}\\{[^}]*\\}`))?.[0] ?? '';
 // mobile-console.css проходит через prettier: селектор, пробел, скобка, переносы внутри
 const mobileRule = (selector: string) =>
   consoleCss.match(new RegExp(`(?:^|\\n)${escape(selector)}\\s*\\{[^}]*\\}`))?.[0] ?? '';
@@ -49,7 +51,7 @@ describe('«до след. дня» — отдельный узел, чтобы 
   });
 
   it('узкий телефон подпись прячет', () => {
-    expect(build).toMatch(/@media \(max-width:480px\)\{\s*#tbetacap\{display:none;\}/);
+    expect(css).toMatch(/@media \(max-width:480px\)\{\s*#tbetacap\{display:none;\}/);
   });
 });
 
@@ -57,14 +59,14 @@ describe('узкое правило идёт ПОСЛЕ телефонного �
   // Одинаковая специфичность: решает порядок в файле. Первая версия правки стояла выше
   // блока ≤720px, и тот возвращал прежние отступы — на 320px место снова обрезалось.
   // Ищем само правило, а не строку «@media (max-width:480px)»: она есть и в комментарии.
-  const phone = build.indexOf('@media (max-width:720px), ((hover: none) and (pointer: coarse)');
+  const phone = css.indexOf('@media (max-width:720px), ((hover: none) and (pointer: coarse)');
 
   it('телефонный блок на месте — иначе сканер сторожит пустоту', () => {
     expect(phone).toBeGreaterThan(0);
   });
 
   it('снятая подпись объявлена ниже него', () => {
-    expect(build.indexOf('#tbetacap{display:none;}')).toBeGreaterThan(phone);
+    expect(css.indexOf('#tbetacap{display:none;}')).toBeGreaterThan(phone);
   });
 });
 
