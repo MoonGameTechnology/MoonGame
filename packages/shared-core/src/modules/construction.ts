@@ -185,7 +185,7 @@ const FORT_GARRISON_CAP = 3;
  * Игроковы войска в том же `garrison` не трогаются: выданные отличимы по id юнита,
  * заказать который нельзя (`issued`), — поэтому «чей это стек» не надо угадывать.
  */
-function syncIssuedGarrison(h: HandlerContext, planet: Planet): void {
+function syncIssuedGarrison(h: HandlerContext, planet: Planet, issue = true): void {
   let target = 0;
   for (const b of planet.buildings) {
     if (b.hp <= 0) continue;
@@ -203,6 +203,7 @@ function syncIssuedGarrison(h: HandlerContext, planet: Planet): void {
     if (idx >= 0) planet.garrison.splice(idx, 1);
     return;
   }
+  if (!issue) return; // Damage removes defenders whose source fell; it never recruits replacements.
   if (idx < 0) {
     planet.garrison.push({ unit: GARRISON_UNIT, count: target });
     return;
@@ -703,7 +704,7 @@ function damageBuildings(
   planet.buildings = survivors;
   // Разрушенное здание уносит выданный им гарнизон: иначе защитники пережили бы то, что
   // их породило, и мир остался бы «занят» призраками снесённого форта.
-  syncIssuedGarrison(h, planet);
+  syncIssuedGarrison(h, planet, false);
 }
 
 /** Снять `amount` прочности с заражённых построек мира — по очереди, в порядке массива,
@@ -852,7 +853,7 @@ export const constructionModule: GameModule = {
   // 1.8.0: залеченный госпиталем стек сливается с целыми того же вида (раны теперь
   // переживают бой, `combat` 3.10.0).
   // 1.9.0: своя полоса у каждой производственной постройки — верфь, порт, казармы, завод (BLD-2.1).
-  version: '1.11.0',
+  version: '1.11.1',
   setup(api) {
     api.provideCapability<StructureDamage>('construction.impact', (h, id, amount, owner, covered) => {
       const planet = h.state.planets[id];

@@ -139,6 +139,40 @@ describe('sequential losses and return fire', () => {
     expect(after.fleets['z-first']!.units[0]!.hp).toBe(934);
     expect(after.fleets['a-second']!.units[0]!.hp).toBe(958);
   });
+  it.each([1, 3])('a surviving fort does not replace casualties among %i issued defenders', (count) => {
+    const state = fixture(true);
+    delete state.fleets.guard;
+    delete state.fleets['a-second'];
+    state.battles.battle!.sides = state.battles.battle!.sides.slice(0, 2);
+    state.battles.battle!.sides[0]!.ref = { kind: 'landing', fleetId: 'z-first' };
+    state.fleets['z-first']!.landing = [{ unit: 'a', count: 1 }];
+    state.planets.P!.garrison = [{ unit: 'garrison', count }];
+    state.planets.P!.buildings[0]!.hp = 40;
+    const fortified = parseGameData({
+      ...data,
+      buildings: { cover: { name: 'Fort', hp: 40, defenseBonus: 0.05, issuesGarrison: count } },
+      units: {
+        ...data.units,
+        a: { ...data.units.a!, domain: 'ground', kind: 'infantry',
+          stats: { ...data.units.a!.stats, attack: 30 } }, // 28.5 after the fort's 5% cover
+        garrison: { faction: 'x', domain: 'ground', kind: 'infantry', issued: true,
+          stats: { attack: 0, defense: 9, speed: 0, hp: 26 } },
+      },
+    });
+    const result = kernel.advanceTo(state, { now: 0, data: fortified });
+    if (!result.ok) throw new Error(result.code);
+    expect(result.state.planets.P!.buildings[0]!.hp).toBeGreaterThan(0);
+    const defenders = result.state.planets.P!.garrison.filter((s) => s.unit === 'garrison');
+    expect(defenders.reduce((n, s) => n + s.count, 0)).toBe(count - 1);
+    expect(result.events.filter((e) => e.type === 'unit.died' &&
+      (e.payload as { unit?: string }).unit === 'garrison')).toHaveLength(1);
+    if (count === 1) {
+      expect(result.state.planets.P!.owner).toBe('a');
+      expect(result.state.planets.P!.garrison.find((s) => s.unit === 'a')!.hp).toBeUndefined();
+    } else {
+      expect(defenders[0]!.hp).toBe(49.5);
+    }
+  });
   it('removes a fallen hero aura before replies without killing another hero on event replay', () => {
     const state = fixture();
     // 100 damage kills the 1 HP hero; the remaining 99 leaves 201 HP of escorts.

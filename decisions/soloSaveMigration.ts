@@ -291,7 +291,7 @@ export const ECHELONS_SOLO_MIGRATION = {
   fromRules: HERO_MOBILIZATION_SOLO_MIGRATION.toRules,
   fromData: HERO_MOBILIZATION_SOLO_MIGRATION.toData,
   fromDataHash: HERO_MOBILIZATION_SOLO_MIGRATION.toDataHash,
-  toRules: '0c3046f821319a',
+  toRules: '08554ff861af98',
   toData: '0.1.75',
   toDataHash: '0afbb7f3739821',
 } as const;
