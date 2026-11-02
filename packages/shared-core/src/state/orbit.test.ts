@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bombardedPlanets, isBombarded } from './orbit';
+import { bombardersOf, bombardedPlanets, isBombarded } from './orbit';
 import { setStance } from './diplomacy';
 import { createInitialState, type Fleet, type GameState, type Planet } from './gameState';
 import { fixtureData } from '../testkit/arbitraries';
@@ -81,6 +81,19 @@ describe('isBombarded', () => {
   it('returns true when a hostile fleet is bombarding from the near orbit', () => {
     const st = stateWith([planet('P', 'p1')], [fleet('F', 'p2', 'P', 'near', true)]);
     expect(isBombarded(st, 'P', fixtureData)).toBe(true);
+  });
+
+  it('includes neutral targets, then stops when the target becomes own or allied', () => {
+    const st = stateWith([planet('P', null)], [fleet('F', 'p1', 'P', 'near', true)]);
+    expect(isBombarded(st, 'P', fixtureData)).toBe(true);
+    expect(bombardedPlanets(st, fixtureData)).toEqual(new Set(['P']));
+    expect(bombardersOf(st, 'P', fixtureData).map((f) => f.id)).toEqual(['F']);
+
+    st.planets.P!.owner = 'p1';
+    expect(isBombarded(st, 'P', fixtureData)).toBe(false);
+    st.planets.P!.owner = 'p2';
+    setStance(st, 'p1', 'p2', 'alliance');
+    expect(isBombarded(st, 'P', fixtureData)).toBe(false);
   });
 
   it('returns true if any one of multiple fleets satisfies bombardment conditions', () => {

@@ -180,6 +180,30 @@ describe('orbital — bombardment toggle (fleet.bombard)', () => {
 });
 
 describe('orbital — bombardment effects (GDD §7.4)', () => {
+  it('an accepted neutral-world bombard order damages buildings and troops without taking the world', () => {
+    const kernel = createKernel([...combatFamily, constructionModule]);
+    const st = stateWith({
+      planets: [planet('P', null, { buildings: [['mine', 1]], garrison: [['marine', 2]] })],
+      fleets: [fleet('F', 'p1', 'P', [['cruiser', 2]], { orbit: 'near' })],
+    });
+    const ordered = okApply(kernel.applyAction(st, bombard('F', true), ctx));
+    const first = okAdvance(kernel.advanceTo(ordered.state, at(HOUR)));
+    expect(first.events.map((e) => e.type)).toContain('planet.bombarded');
+    expect(first.state.planets.P?.buildings[0]?.hp).toBe(10);
+    expect(first.state.planets.P?.garrison).toMatchObject([{ count: 2, hp: 38 }]);
+
+    // Orbital fire still leaves the last defender at 1 HP: capturing needs a landing.
+    const worn = okAdvance(kernel.advanceTo(first.state, at(30 * HOUR)));
+    expect(worn.state.planets.P?.buildings).toEqual([]);
+    expect(worn.state.planets.P?.garrison).toMatchObject([{ count: 1, hp: 1 }]);
+    expect(worn.state.planets.P?.owner).toBeNull();
+
+    const stopped = okApply(kernel.applyAction(first.state, bombard('F', false), at(HOUR)));
+    const idle = okAdvance(kernel.advanceTo(stopped.state, at(2 * HOUR)));
+    expect(idle.state.planets.P).toEqual(first.state.planets.P);
+    expect(idle.events.map((e) => e.type)).not.toContain('planet.bombarded');
+  });
+
   // Таймер бомбардировки клиента (`decisions/bombardTimer.ts`) предсказывает снос по
   // `fleetBombardPower` через `damageHookQueries` → `traceHooks` → `damageFromTraces`.
   // Сторож: прогноз и настоящий обстрел — одно число, с прикрытием мира и двумя флотами.
