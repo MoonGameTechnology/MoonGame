@@ -46,7 +46,8 @@ describe('меню в покое — кадр (правило 9 `simClock.ts`)',
     expect(MAIN.match(/requestAnimationFrame\(frameLoop\)/g)).toHaveLength(1);
     expect(body('askFrame')).toContain('requestAnimationFrame(frameLoop)');
     const loop = body('frameLoop');
-    expect(loop).toMatch(/frame\(nowReal\);\s+covered = mapCovered\(\);/);
+    // Дополнительные метрики кадра не меняют проверяемый порядок: рисование → меню.
+    expect(loop).toMatch(/frame\(nowReal(?:,\s*[^)]+)?\);\s+covered = mapCovered\(\);/);
     expect(loop).toContain('nextFrameDelay(covered)');
     expect(loop).toContain('setTimeout(askFrame, wait)');
   });
