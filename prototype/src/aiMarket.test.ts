@@ -154,7 +154,7 @@ describe('AI-BAL-9 — границы книги', () => {
     const s = book({ ...NEUTRAL, microelectronics: 10 }, [
       { id: 'lot:sour', side: 'sell', resource: 'microelectronics', price: 1, amount: 12 },
     ]);
-    // Шкала расположения — прототипное расширение состояния (`approval`, botFavour.ts):
+    // Шкала расположения — расширение состояния `approval` (`shared-core/src/state/botFavour.ts`):
     // 0 у p1 к p2 это глубоко ниже порога эмбарго (35).
     const soured = { ...s, approval: { p1: { p2: 0 } } } as GameState;
     expect(takes(s)).toHaveLength(1);

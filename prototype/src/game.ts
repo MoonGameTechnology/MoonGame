@@ -72,8 +72,9 @@ export {
   isInhabited,
   civicTax,
   inhabitedWorldCount,
+  HUNGER_MULT,
+  hungerModule,
 } from '../../packages/shared-core/src/index';
-export { HUNGER_MULT, hungerModule } from './hunger';
 export { completedUnitSpend, economySnapshot, netIncome, hpOfLevel } from './economy';
 // BAL-5: разложение счёта на слагаемые — читает харнес замера (`selfplay.mjs`).
 export { scoreParts, type ScoreParts } from './scoreParts';
@@ -154,8 +155,8 @@ export {
   FAVOUR_HEAL_PER_DAY,
   botFavour,
   botEmbargoes,
-  approvalView,
-} from './botFavour';
+} from '../../packages/shared-core/src/index';
+export { approvalView } from './botFavour';
 
 // --- heroes + capital --------------------------------------------------------
 export { heroRosterOf } from './heroes';

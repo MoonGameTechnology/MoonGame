@@ -1,11 +1,11 @@
 /**
  * ECON-1 голодная армия — food in the owner's `arrears` (the economy module's
  * unpaid-bill marker) scales their GROUND damage by `HUNGER_MULT`. Ships run on
- * credits, not rations — the orbital phase is untouched. Extracted from `game.ts`
- * (REFP-9): a single `combat.damage` hook, no other game.ts deps. `game.ts` imports
- * `hungerModule` for `MODULES` and re-exports `HUNGER_MULT` for `main.ts` / tests.
+ * credits, not rations — the orbital phase is untouched. A single `combat.damage`
+ * hook. Lived in the prototype (REFP-9) until SLIM-4 gave both hosts one module list
+ * (`gameModules.ts`).
  */
-import type { GameModule } from '../../packages/shared-core/src/index';
+import type { GameModule } from '../kernel/module';
 
 export const HUNGER_MULT = 0.75;
 export const hungerModule: GameModule = {

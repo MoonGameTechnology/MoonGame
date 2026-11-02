@@ -2,7 +2,7 @@
 
 > Индекс-справочник навигации по коду. Сверено из исходников (grep по `api.onAction`/
 > `api.on`/`api.hook`/`api.provideCapability`/`h.emit`), не из памяти. Обновлять при
-> изменении `DEV_MODULES` или добавлении/удалении модуля — см. `CLAUDE.md` «Working
+> изменении `GAME_MODULES` или добавлении/удалении модуля — см. `CLAUDE.md` «Working
 > agreements» (code first, docs after). Не дизайн-док — для дизайна см.
 > `docs/architecture.md`, `docs/modulesystem.md`.
 
@@ -91,7 +91,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `bundle-netserver.mjs` | ОДНА конфигурация сборки бандла на дев и прод — чтобы они не разъехались |
 | `src/main.ts` | клиент целиком: карта, HUD, панели, ввод. Большой (см. блок `REFM` в бэклоге) |
 | `src/setupScreen.ts` · `src/matchJoin.ts` · `src/accountSession.ts` | выбор домов и мест из предложения сетевой сессии, опрос списка, вход и разбор отказов; поздний ответ сохраняет новый аккаунт |
-| `src/protoKernel.ts` | сборка ядра прототипа: список модулей (порядок = контракт детерминизма) + `canOrder`/`canOrderAll` — проба правил с памятью ответов |
+| `src/protoKernel.ts` | сборка ядра прототипа на общем `GAME_MODULES` + `canOrder`/`canOrderAll` — проба правил с памятью ответов |
 | `src/rocketMinesUi.ts` · `minestest.mjs` | карточка ракетной мины и браузерный smoke; `packages/client/src/ordnanceView.ts` рисует отфильтрованные мины и ракеты |
 | `src/diploWindow.ts` · `src/diploRosterView.ts` · `diplomacytest.mjs` | окно дипломатии, поиск и список участников; сортировка/фильтры — `decisions/diploRoster.ts`, браузерная проверка — `pnpm smoke:diplomacy` |
 | `build.mjs` | сборка клиента в самодостаточный HTML; `data-i18n` подставляется из `/localization` |
@@ -110,10 +110,10 @@ Recovery-письма обоих хостов форматирует `scripts/re
 
 ### Модули ядра (`packages/shared-core/src/modules/`)
 
-Полный актуальный порядок — `DEV_MODULES` в `packages/server/src/scenario.ts`;
-версия манифеста меняется при изменении состава/порядка (инвариант #6), сторож —
-`moduleManifest.test.ts`. Счётчики канона и прототипа живут в `docs/state.md` §9.
-Таблица идёт в порядке `DEV_MODULES` (номер — место в массиве) и собрана grep'ом по
+Полный актуальный порядок — `GAME_MODULES` в `packages/shared-core/src/gameModules.ts`,
+один список на оба хоста (SLIM-4); версия манифеста меняется при изменении состава/порядка
+(инвариант #6), сторож — `moduleManifest.test.ts`. Счётчик живёт в `docs/state.md` §9.
+Таблица идёт в порядке `GAME_MODULES` (номер — место в массиве) и собрана grep'ом по
 `api.onAction`/`api.on`/`api.hook`/`api.provideCapability`/`h.emit`/`h.schedule` в файле
 модуля (имена из констант и циклов раскрыты); события, которые модуль шлёт через общие
 утилиты, сюда не попадают.
@@ -126,76 +126,77 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 1 | `sector` | `sector.ts` | — | — | `fleet.speed`, `economy.production`, `combat.damage`, `combat.mitigation` | — | — |
 | 2 | `planet-type` | `planetType.ts` | — | — | `economy.production`, `combat.mitigation` | — | — |
 | 3 | `tax` | `tax.ts` | — | — | `economy.production` | — | — |
-| 4 | `economy` | `economy.ts` | — | `time.advanced` | — | — | — |
-| 5 | `movement` | `movement.ts` | `fleet.move`, `fleet.stop` | `fleet.split`, `fleet.arrival`, `diplomacy.changed` | — | `fleet.course`, `fleet.reconcileVisibility` | `fleet.halted`, `fleet.leg`, `fleet.parked`, `fleet.departed`, `fleet.fork`, `fleet.arrived`, `fleet.transit`, `fleet.stranded` · sched: `fleet.arrival` |
-| 6 | `hero` | `hero.ts` | `hero.ability`, `hero.spawn`, `hero.skill.unlock`, `hero.equip`, `hero.unequip`, `hero.install`, `hero.uninstall` | `fleet.arrived`, `fleet.departed`, `fleet.bombard`, `battle.started`, `planet.captured`, `hero.siege.due`, `hero.path.expire`, `unit.died`, `fleet.destroyed`, `fleet.transit`, `fleet.fork`, `hero.respawn` | `fleet.speed`, `combat.damage`, `salvage.share` | — | `hero.spawned`, `hero.recruited`, `hero.died`, `hero.siege.broken`, `hero.path.created`, `hero.path.expired`, `planet.destroyed`, `hero.siege.started`, `hero.siege.done`, `hero.ability.used`, `hero.respawned`, `hero.skill.unlocked`, `hero.equipped`, `hero.unequipped`, `hero.installed`, `hero.uninstalled` · sched: `hero.respawn`, `hero.path.expire`, `hero.siege.due` |
-| 7 | `heroEffects` | `heroEffects.ts` | — | — | `combat.damage.parallel`, `combat.damage` | `hero.effect.recall`, `hero.effect.aura`, `hero.effect.reveal`, `hero.effect.jump`, `hero.effect.decoy` | `hero.recalled`, `hero.jumped`, `hero.decoyed`, `hero.aura`, `hero.revealed` |
-| 8 | `diplomacy` | `diplomacy.ts` | `diplomacy.declare`, `coalition.create`, `diplomacy.decline`, `coalition.clock.rebase`, `coalition.leave`, `coalition.kick`, `coalition.edit`, `diplomacy.mapshare` | `coalition.departure.due`, `player.eliminated` | — | `diplomacy` | `diplomacy.changed`, `coalition.left`, `coalition.departure.scheduled`, `coalition.joined`, `diplomacy.offered`, `diplomacy.declined`, `coalition.updated`, `diplomacy.mapshare.changed`, `diplomacy.mapshare.offered` · sched: `coalition.departure.due` |
-| 9 | `espionage` | `espionage.ts` | `espionage.spy`, `espionage.recall` | `espionage.resolve`, `espionage.sweep`, `time.advanced` | — | — | `espionage.sent`, `espionage.aborted`, `espionage.posted`, `espionage.failed`, `espionage.detected`, `espionage.succeeded`, `intel.stolen`, `espionage.counter.caught`, `espionage.counter.lost`, `espionage.recalled` · sched: `espionage.resolve` |
-| 10 | `orbital` | `orbital.ts` | `fleet.orbit`, `fleet.bombard` | `fleet.arrived`, `time.advanced` | — | — | `aa.fired`, `planet.bombarded`, `fleet.orbit`, `fleet.bombard` |
-| 11 | `combat` | `combat.ts` | `fleet.assault`, `fleet.retreat`, `battle.retreat`, `battle.attack` | `fleet.arrived`, `fleet.transit`, `diplomacy.changed`, `fleet.intercept`, `fleet.meet`, `player.eliminated`, `assault.landed`, `fleet.departed`, `beachhead.landed`, `combat.tick` | `fleet.speed` | `battle.pullIn` | `battle.started`, `battle.joined`, `assault.landing`, `assault.interrupted`, `assault.cancelled`, `assault.ashore`, `beachhead.landed`, `planet.captured`, `fleet.destroyed`, `battle.resolved`, `fleet.retreated`, `combat.round` · sched: `combat.tick`, `assault.landed` |
-| 12 | `veteran` | `veteran.ts` | — | — | `combat.damage`, `combat.mitigation` | — | — |
-| 13 | `intercept` | `intercept.ts` | — | `fleet.leg`, `fleet.parked`, `battle.started` | — | — | sched: `fleet.intercept`, `fleet.meet` |
-| 14 | `capture-on-arrival` | `captureOnArrival.ts` | — | `fleet.arrived`, `fleet.transit` | — | — | `planet.captured` |
-| 15 | `salvage` | `salvage.ts` | — | `unit.died`, `battle.resolved`, `station.destroyed`, `time.advanced` | — | — | `salvage.paid` |
-| 16 | `construction` | `construction.ts` | `building.construct`, `building.upgrade`, `unit.build`, `construction.cancel`, `construction.resume` | `construction.complete`, `construction.queue.pump`, `station.destroyed`, `planet.captured`, `combat.round`, `planet.bombarded`, `time.advanced` | `combat.mitigation` | `building.damage` | `construction.queued`, `construction.queue.dropped`, `construction.started`, `building.destroyed`, `construction.cancelled`, `construction.resumed`, `building.constructed`, `building.upgraded`, `unit.built` |
-| 17 | `arsenal-sync` | `arsenalSync.ts` | `arsenal.sync` | — | — | — | — |
-| 18 | `station` | `station.ts` | `station.deploy` | `building.constructed`, `building.upgraded`, `building.destroyed`, `fleet.destroyed`, `planet.captured`, `player.eliminated` | `combat.mitigation` | — | `fleet.parked`, `station.destroyed`, `station.deployed` |
-| 19 | `technology` | `technology.ts` | `technology.research`, `technology.boost`, `technology.queue`, `technology.dequeue`, `technology.queue.move` | `time.advanced`, `technology.complete`, `technology.queue.pump` | `construction.requirement`, `economy.production`, `fleet.speed`, `combat.damage.parallel` | `technology.grant` | `technology.research.started`, `technology.research.boosted`, `technology.researched`, `technology.queued`, `technology.dequeued`, `technology.queue.moved`, `technology.queue.dropped` · sched: `technology.complete`, `technology.queue.pump` |
-| 20 | `scientist` | `scientist.ts` | — | — | `research.slots` | — | — |
-| 21 | `steward` | `steward.ts` | `steward.delegate`, `steward.holdpoint`, `steward.report`, `steward.recall` | `planet.captured`, `planet.destroyed`, `station.destroyed`, `time.advanced` | — | — | `steward.delegated`, `steward.holdpoint`, `steward.reported`, `steward.recalled`, `steward.expired` |
-| 22 | `faction` | `faction.ts` | — | — | `construction.requirement`, `economy.production`, `fleet.speed`, `fort.garrisonCap`, `combat.damage.parallel` | — | — |
-| 23 | `sprawl` | `sprawl.ts` | — | — | `economy.production` | — | — |
-| 24 | `market` | `market.ts` | `market.list`, `market.take`, `market.cancel` | — | — | — | `market.listed`, `market.traded`, `market.cancelled` |
-| 25 | `army` | `army.ts` | `army.load`, `army.unload` | `army.load.done`, `fleet.departed`, `army.unload.done` | — | — | `army.loading`, `army.loaded`, `army.load.cancelled`, `army.unload.cancelled`, `army.unloading`, `army.unloaded` · sched: `army.load.done`, `army.unload.done` |
-| 26 | `fleet-ops` | `fleetOps.ts` | `fleet.launch`, `fleet.merge`, `fleet.split`, `fleet.engage` | `fleet.arrived`, `assault.landed`, `assault.interrupted`, `assault.cancelled`, `battle.resolved` | — | — | `fleet.launched`, `fleet.merge.pending`, `fleet.leg`, `fleet.split`, `mine.contact`, `battle.started` · sched: `fleet.arrival`, `combat.tick` |
-| 27 | `promotion` | `promotion.ts` | — | `unit.built` | `combat.damage` | — | — |
-| 28 | `auto-rally` | `autoRally.ts` | `rally.point` | `planet.captured`, `unit.built` | — | — | — |
-| 29 | `shuttle` | `shuttle.ts` | `shuttle.strike`, `shuttle.patrol`, `shuttle.recall`, `shuttle.redirect`, `shuttle.hold`, `shuttle.relocate`, `shuttle.split`, `shuttle.merge`, `shuttle.load`, `shuttle.unload` | `shuttle.arrived`, `shuttle.patrol.resume`, `shuttle.chase`, `shuttle.patrol.tick`, `time.advanced`, `planet.captured`, `pd.reload` | — | `missile.flew` | `shuttle.repelled`, `beachhead.landed`, `planet.captured`, `shuttle.landed`, `shuttle.lost`, `shuttle.diverted`, `shuttle.launched`, `fleet.destroyed`, `shuttle.missileDowned`, `shuttle.hit`, `shuttle.mineCleared`, `pd.mineCleared`, `shuttle.hold.ended`, `shuttle.intercepted`, `planet.bombarded`, `squadron.split`, `squadron.merged`, `shuttle.loaded`, `shuttle.unloaded`, `pd.fired` · sched: `shuttle.arrived`, `shuttle.chase`, `shuttle.patrol.tick`, `shuttle.patrol.resume`, `pd.reload` |
-| 30 | `capital` | `capital.ts` | `capital.designate` | — | — | — | `capital.designated` |
-| 31 | `standing-orders` | `standingOrders.ts` | `order.auto`, `order.retreat`, `order.chain`, `chain.stamp` | `time.advanced` | — | — | — |
-| 32 | `instant-repair` | `instantRepair.ts` | `fleet.instantRepair`, `fleet.premiumRepair` | — | — | — | `fleet.instantRepaired` |
-| 33 | `fleet-repair` | `fleetRepair.ts` | `fleet.repair` | — | — | — | `fleet.repaired` |
-| 34 | `forced-march` | `forcedMarch.ts` | `fleet.forcemarch` | `time.advanced`, `fleet.arrived` | `fleet.speed` | — | — |
-| 35 | `pve` | `pve.ts` | `pve.boon`, `pve.abandon`, `pve.supply` | `time.advanced`, `pve.wave`, `hero.died`, `unit.died`, `shuttle.repelled`, `pd.fired`, `shuttle.intercepted`, `shuttle.lost` | `fleet.speed` | — | `diplomacy.changed`, `pve.boss.spawned`, `pve.started`, `fleet.merged`, `pve.wave.spawned`, `pve.boss.slain`, `pve.boon.taken`, `pve.abandoned`, `pve.supply.delivered` · sched: `pve.wave`, `pve.hold` |
-| 36 | `fleetBrood` | `fleetBrood.ts` | — | `time.advanced`, `pve.wave.spawned`, `fleet.launched`, `fleet.brood.cycle` | — | — | `fleet.brood.grown` |
-| 37 | `swarmMemory` | `swarmMemory.ts` | — | `shuttle.hit` | — | — | `swarm.observed` |
-| 38 | `swarmNet` | `swarmNet.ts` | — | `pve.started`, `swarm.observed`, `swarm.adapt.done`, `fleet.merged`, `fleet.split`, `building.destroyed`, `pve.wave.spawned`, `fleet.arrived`, `fleet.transit`, `fleet.departed`, `fleet.destroyed`, `building.constructed`, `planet.captured`, `unit.built` | — | — | `swarm.net.cut` |
-| 39 | `swarmAdapt` | `swarmAdapt.ts` | `swarm.adapt` | `swarm.adapt.ripe`, `pve.wave.spawned`, `fleet.merged`, `fleet.destroyed` | — | — | `swarm.adapt.started`, `swarm.adapt.done`, `swarm.adapt.lost` · sched: `swarm.adapt.ripe` |
-| 40 | `swarmJournal` | `swarmJournal.ts` | — | `shuttle.repelled` | — | — | `swarm.journal.entry` |
-| 41 | `missionFacts` | `missionFacts.ts` | — | `planet.captured`, `fleet.arrived`, `time.advanced` | — | — | `fleet.joined`, `refuge.found`, `evac.delivered` |
-| 42 | `victory` | `victory.ts` | — | `time.advanced`, `planet.captured`, `fleet.destroyed`, `battle.resolved`, `unit.built`, `pve.hold`, `pve.abandoned`, `extraction.delivered`, `extraction.lost`, `operation.completed`, `operation.lost` | — | — | `match.ended`, `player.eliminated` |
-| 43 | `visibility` | `visibility.ts` | — | `time.advanced`, `planet.captured`, `fleet.arrived`, `fleet.leg` | `time.stop` | — | — |
+| 4 | `faction` | `faction.ts` | — | — | `construction.requirement`, `economy.production`, `fleet.speed`, `fort.garrisonCap`, `combat.damage.parallel` | — | — |
+| 5 | `sprawl` | `sprawl.ts` | — | — | `economy.production` | — | — |
+| 6 | `hunger` | `hunger.ts` | — | — | `combat.damage` | — | — |
+| 7 | `economy` | `economy.ts` | — | `time.advanced` | — | — | — |
+| 8 | `movement` | `movement.ts` | `fleet.move`, `fleet.stop` | `fleet.split`, `fleet.arrival`, `diplomacy.changed` | — | `fleet.course`, `fleet.reconcileVisibility` | `fleet.halted`, `fleet.leg`, `fleet.parked`, `fleet.departed`, `fleet.fork`, `fleet.arrived`, `fleet.transit`, `fleet.stranded` · sched: `fleet.arrival` |
+| 9 | `hero` | `hero.ts` | `hero.ability`, `hero.spawn`, `hero.skill.unlock`, `hero.equip`, `hero.unequip`, `hero.install`, `hero.uninstall` | `fleet.arrived`, `fleet.departed`, `fleet.bombard`, `battle.started`, `planet.captured`, `hero.siege.due`, `hero.path.expire`, `unit.died`, `fleet.destroyed`, `fleet.transit`, `fleet.fork`, `hero.respawn` | `fleet.speed`, `combat.damage`, `salvage.share` | — | `hero.spawned`, `hero.recruited`, `hero.died`, `hero.siege.broken`, `hero.path.created`, `hero.path.expired`, `planet.destroyed`, `hero.siege.started`, `hero.siege.done`, `hero.ability.used`, `hero.respawned`, `hero.skill.unlocked`, `hero.equipped`, `hero.unequipped`, `hero.installed`, `hero.uninstalled` · sched: `hero.respawn`, `hero.path.expire`, `hero.siege.due` |
+| 10 | `heroEffects` | `heroEffects.ts` | — | — | `combat.damage.parallel`, `combat.damage` | `hero.effect.recall`, `hero.effect.aura`, `hero.effect.reveal`, `hero.effect.jump`, `hero.effect.decoy` | `hero.recalled`, `hero.jumped`, `hero.decoyed`, `hero.aura`, `hero.revealed` |
+| 11 | `orbital` | `orbital.ts` | `fleet.orbit`, `fleet.bombard` | `fleet.arrived`, `time.advanced` | — | — | `aa.fired`, `planet.bombarded`, `fleet.orbit`, `fleet.bombard` |
+| 12 | `combat` | `combat.ts` | `fleet.assault`, `fleet.retreat`, `battle.retreat`, `battle.attack` | `fleet.arrived`, `fleet.transit`, `diplomacy.changed`, `fleet.intercept`, `fleet.meet`, `player.eliminated`, `assault.landed`, `fleet.departed`, `beachhead.landed`, `combat.tick` | `fleet.speed` | `battle.pullIn` | `battle.started`, `battle.joined`, `assault.landing`, `assault.interrupted`, `assault.cancelled`, `assault.ashore`, `beachhead.landed`, `planet.captured`, `fleet.destroyed`, `battle.resolved`, `fleet.retreated`, `combat.round` · sched: `combat.tick`, `assault.landed` |
+| 13 | `veteran` | `veteran.ts` | — | — | `combat.damage`, `combat.mitigation` | — | — |
+| 14 | `intercept` | `intercept.ts` | — | `fleet.leg`, `fleet.parked`, `battle.started` | — | — | sched: `fleet.intercept`, `fleet.meet` |
+| 15 | `capture-on-arrival` | `captureOnArrival.ts` | — | `fleet.arrived`, `fleet.transit` | — | — | `planet.captured` |
+| 16 | `salvage` | `salvage.ts` | — | `unit.died`, `battle.resolved`, `station.destroyed`, `time.advanced` | — | — | `salvage.paid` |
+| 17 | `construction` | `construction.ts` | `building.construct`, `building.upgrade`, `unit.build`, `construction.cancel`, `construction.resume` | `construction.complete`, `construction.queue.pump`, `station.destroyed`, `planet.captured`, `combat.round`, `planet.bombarded`, `time.advanced` | `combat.mitigation` | `building.damage` | `construction.queued`, `construction.queue.dropped`, `construction.started`, `building.destroyed`, `construction.cancelled`, `construction.resumed`, `building.constructed`, `building.upgraded`, `unit.built` |
+| 18 | `arsenal-sync` | `arsenalSync.ts` | `arsenal.sync` | — | — | — | — |
+| 19 | `station` | `station.ts` | `station.deploy` | `building.constructed`, `building.upgraded`, `building.destroyed`, `fleet.destroyed`, `planet.captured`, `player.eliminated` | `combat.mitigation` | — | `fleet.parked`, `station.destroyed`, `station.deployed` |
+| 20 | `technology` | `technology.ts` | `technology.research`, `technology.boost`, `technology.queue`, `technology.dequeue`, `technology.queue.move` | `time.advanced`, `technology.complete`, `technology.queue.pump` | `construction.requirement`, `economy.production`, `fleet.speed`, `combat.damage.parallel` | `technology.grant` | `technology.research.started`, `technology.research.boosted`, `technology.researched`, `technology.queued`, `technology.dequeued`, `technology.queue.moved`, `technology.queue.dropped` · sched: `technology.complete`, `technology.queue.pump` |
+| 21 | `scientist` | `scientist.ts` | — | — | `research.slots` | — | — |
+| 22 | `steward` | `steward.ts` | `steward.delegate`, `steward.holdpoint`, `steward.report`, `steward.recall` | `planet.captured`, `planet.destroyed`, `station.destroyed`, `time.advanced` | — | — | `steward.delegated`, `steward.holdpoint`, `steward.reported`, `steward.recalled`, `steward.expired` |
+| 23 | `army` | `army.ts` | `army.load`, `army.unload` | `army.load.done`, `fleet.departed`, `army.unload.done` | — | — | `army.loading`, `army.loaded`, `army.load.cancelled`, `army.unload.cancelled`, `army.unloading`, `army.unloaded` · sched: `army.load.done`, `army.unload.done` |
+| 24 | `pve` | `pve.ts` | `pve.boon`, `pve.abandon`, `pve.supply` | `time.advanced`, `pve.wave`, `hero.died`, `unit.died`, `shuttle.repelled`, `pd.fired`, `shuttle.intercepted`, `shuttle.lost` | `fleet.speed` | — | `diplomacy.changed`, `pve.boss.spawned`, `pve.started`, `fleet.merged`, `pve.wave.spawned`, `pve.boss.slain`, `pve.boon.taken`, `pve.abandoned`, `pve.supply.delivered` · sched: `pve.wave`, `pve.hold` |
+| 25 | `fleetBrood` | `fleetBrood.ts` | — | `time.advanced`, `pve.wave.spawned`, `fleet.launched`, `fleet.brood.cycle` | — | — | `fleet.brood.grown` |
+| 26 | `swarmMemory` | `swarmMemory.ts` | — | `shuttle.hit` | — | — | `swarm.observed` |
+| 27 | `swarmNet` | `swarmNet.ts` | — | `pve.started`, `swarm.observed`, `swarm.adapt.done`, `fleet.merged`, `fleet.split`, `building.destroyed`, `pve.wave.spawned`, `fleet.arrived`, `fleet.transit`, `fleet.departed`, `fleet.destroyed`, `building.constructed`, `planet.captured`, `unit.built` | — | — | `swarm.net.cut` |
+| 28 | `swarmAdapt` | `swarmAdapt.ts` | `swarm.adapt` | `swarm.adapt.ripe`, `pve.wave.spawned`, `fleet.merged`, `fleet.destroyed` | — | — | `swarm.adapt.started`, `swarm.adapt.done`, `swarm.adapt.lost` · sched: `swarm.adapt.ripe` |
+| 29 | `swarmJournal` | `swarmJournal.ts` | — | `shuttle.repelled` | — | — | `swarm.journal.entry` |
+| 30 | `missionFacts` | `missionFacts.ts` | — | `planet.captured`, `fleet.arrived`, `time.advanced` | — | — | `fleet.joined`, `refuge.found`, `evac.delivered` |
+| 31 | `victory` | `victory.ts` | — | `time.advanced`, `planet.captured`, `fleet.destroyed`, `battle.resolved`, `unit.built`, `pve.hold`, `pve.abandoned`, `extraction.delivered`, `extraction.lost`, `operation.completed`, `operation.lost` | — | — | `match.ended`, `player.eliminated` |
+| 32 | `fleet-ops` | `fleetOps.ts` | `fleet.launch`, `fleet.merge`, `fleet.split`, `fleet.engage` | `fleet.arrived`, `assault.landed`, `assault.interrupted`, `assault.cancelled`, `battle.resolved` | — | — | `fleet.launched`, `fleet.merge.pending`, `fleet.leg`, `fleet.split`, `mine.contact`, `battle.started` · sched: `fleet.arrival`, `combat.tick` |
+| 33 | `promotion` | `promotion.ts` | — | `unit.built` | `combat.damage` | — | — |
+| 34 | `auto-rally` | `autoRally.ts` | `rally.point` | `planet.captured`, `unit.built` | — | — | — |
+| 35 | `diplomacy` | `diplomacy.ts` | `diplomacy.declare`, `coalition.create`, `diplomacy.decline`, `coalition.clock.rebase`, `coalition.leave`, `coalition.kick`, `coalition.edit`, `diplomacy.mapshare` | `coalition.departure.due`, `player.eliminated` | — | `diplomacy` | `diplomacy.changed`, `coalition.left`, `coalition.departure.scheduled`, `coalition.joined`, `diplomacy.offered`, `diplomacy.declined`, `coalition.updated`, `diplomacy.mapshare.changed`, `diplomacy.mapshare.offered` · sched: `coalition.departure.due` |
+| 36 | `espionage` | `espionage.ts` | `espionage.spy`, `espionage.recall` | `espionage.resolve`, `espionage.sweep`, `time.advanced` | — | — | `espionage.sent`, `espionage.aborted`, `espionage.posted`, `espionage.failed`, `espionage.detected`, `espionage.succeeded`, `intel.stolen`, `espionage.counter.caught`, `espionage.counter.lost`, `espionage.recalled` · sched: `espionage.resolve` |
+| 37 | `bot-diplomacy` | `botDiplomacy.ts` | — | `diplomacy.offered`, `diplomacy.changed`, `espionage.detected`, `player.eliminated`, `time.advanced` | — | `market.embargo` | `diplomacy.changed`, `diplomacy.declined` |
+| 38 | `market` | `market.ts` | `market.list`, `market.take`, `market.cancel` | — | — | — | `market.listed`, `market.traded`, `market.cancelled` |
+| 39 | `capital` | `capital.ts` | `capital.designate` | — | — | — | `capital.designated` |
+| 40 | `standing-orders` | `standingOrders.ts` | `order.auto`, `order.retreat`, `order.chain`, `chain.stamp` | `time.advanced` | — | — | — |
+| 41 | `shuttle` | `shuttle.ts` | `shuttle.strike`, `shuttle.patrol`, `shuttle.recall`, `shuttle.redirect`, `shuttle.hold`, `shuttle.relocate`, `shuttle.split`, `shuttle.merge`, `shuttle.load`, `shuttle.unload` | `shuttle.arrived`, `shuttle.patrol.resume`, `shuttle.chase`, `shuttle.patrol.tick`, `time.advanced`, `planet.captured`, `pd.reload` | — | `missile.flew` | `shuttle.repelled`, `beachhead.landed`, `planet.captured`, `shuttle.landed`, `shuttle.lost`, `shuttle.diverted`, `shuttle.launched`, `fleet.destroyed`, `shuttle.missileDowned`, `shuttle.hit`, `shuttle.mineCleared`, `pd.mineCleared`, `shuttle.hold.ended`, `shuttle.intercepted`, `planet.bombarded`, `squadron.split`, `squadron.merged`, `shuttle.loaded`, `shuttle.unloaded`, `pd.fired` · sched: `shuttle.arrived`, `shuttle.chase`, `shuttle.patrol.tick`, `shuttle.patrol.resume`, `pd.reload` |
+| 42 | `forced-march` | `forcedMarch.ts` | `fleet.forcemarch` | `time.advanced`, `fleet.arrived` | `fleet.speed` | — | — |
+| 43 | `instant-repair` | `instantRepair.ts` | `fleet.instantRepair`, `fleet.premiumRepair` | — | — | — | `fleet.instantRepaired` |
 | 44 | `effects` | `effects.ts` | — | `planet.captured`, `time.advanced` | — | — | `effect.applied` |
 | 45 | `seatClaim` | `seatClaim.ts` | `seat.claim`, `seat.confirm`, `seat.release`, `seat.kick` | — | — | — | `seat.claimed`, `seat.seated`, `seat.released`, `seat.kicked` |
-| 46 | `trader` | `trader.ts` | `trader.buy`, `trader.sell`, `trader.swap` | — | — | — | `trader.bought`, `trader.sold`, `trader.swapped` |
-| 47 | `loadoutEffects` | `loadoutEffects.ts` | — | — | `combat.retreatToll`, `salvage.share` | — | — |
-| 48 | `minefield` | `minefield.ts` | `fleet.layMines` | `mines.armed`, `fleet.leg`, `fleet.arrived`, `fleet.transit`, `fleet.intercept`, `fleet.meet`, `mine.contact`, `time.advanced` | — | — | `unit.died`, `mines.triggered`, `fleet.destroyed`, `mines.installing`, `mines.laid`, `fleet.parked` · sched: `mines.armed` |
-| 49 | `rocketMines` | `rocketMines.ts` | `fleet.deployRocketMine`, `rocketMine.mode`, `rocketMine.disarm` | `rocketMine.armed`, `rocketMine.scan`, `time.stopped`, `time.advanced`, `rocketMine.flight`, `rocketMine.impact`, `fleet.leg`, `fleet.destroyed`, `fleet.merged`, `battle.started`, `fleet.parked` | `time.stop` | — | `fleet.destroyed`, `rocketMine.launched`, `rocketMine.intercepted`, `rocketMine.installing`, `rocketMine.modeChanged`, `rocketMine.disarmed`, `rocketMine.cancelled`, `rocketMine.ready`, `rocketMine.hit`, `rocketMine.detonated` · sched: `rocketMine.impact`, `rocketMine.scan`, `rocketMine.flight`, `rocketMine.armed` |
-| 50 | `rendezvous` | `rendezvous.ts` | `ally.order`, `ally.cancel` | `fleet.arrived`, `planet.captured`, `fleet.destroyed`, `fleet.merged`, `player.eliminated` | — | — | `diplomacy.changed`, `ally.contact`, `ally.ordered`, `ally.order.cancelled` |
-| 51 | `extraction` | `extraction.ts` | `extraction.start` | `time.advanced`, `fleet.merged`, `fleet.destroyed`, `fleet.arrived`, `ally.contact` | — | — | `extraction.delivered`, `extraction.started`, `extraction.lost`, `extraction.completed` |
-| 52 | `operation` | `operation.ts` | — | `fleet.merged`, `fleet.split`, `time.advanced`, `planet.captured`, `battle.resolved`, `fleet.destroyed`, `evac.delivered` | — | — | `operation.force.broken`, `operation.lost`, `operation.completed` |
-| 53 | `captive` | `captive.ts` | `captive.load` | `planet.captured`, `planet.destroyed`, `fleet.merged`, `fleet.destroyed`, `time.advanced`, `fleet.arrived` | — | — | `captive.lost`, `captive.taken`, `captive.loaded`, `captive.delivered` |
-| 54 | `auto-merge` | `autoMerge.ts` | — | `fleet.arrived` | — | — | — |
+| 46 | `visibility` | `visibility.ts` | — | `time.advanced`, `planet.captured`, `fleet.arrived`, `fleet.leg` | `time.stop` | — | — |
+| 47 | `trader` | `trader.ts` | `trader.buy`, `trader.sell`, `trader.swap` | — | — | — | `trader.bought`, `trader.sold`, `trader.swapped` |
+| 48 | `loadoutEffects` | `loadoutEffects.ts` | — | — | `combat.retreatToll`, `salvage.share` | — | — |
+| 49 | `minefield` | `minefield.ts` | `fleet.layMines` | `mines.armed`, `fleet.leg`, `fleet.arrived`, `fleet.transit`, `fleet.intercept`, `fleet.meet`, `mine.contact`, `time.advanced` | — | — | `unit.died`, `mines.triggered`, `fleet.destroyed`, `mines.installing`, `mines.laid`, `fleet.parked` · sched: `mines.armed` |
+| 50 | `rocketMines` | `rocketMines.ts` | `fleet.deployRocketMine`, `rocketMine.mode`, `rocketMine.disarm` | `rocketMine.armed`, `rocketMine.scan`, `time.stopped`, `time.advanced`, `rocketMine.flight`, `rocketMine.impact`, `fleet.leg`, `fleet.destroyed`, `fleet.merged`, `battle.started`, `fleet.parked` | `time.stop` | — | `fleet.destroyed`, `rocketMine.launched`, `rocketMine.intercepted`, `rocketMine.installing`, `rocketMine.modeChanged`, `rocketMine.disarmed`, `rocketMine.cancelled`, `rocketMine.ready`, `rocketMine.hit`, `rocketMine.detonated` · sched: `rocketMine.impact`, `rocketMine.scan`, `rocketMine.flight`, `rocketMine.armed` |
+| 51 | `rendezvous` | `rendezvous.ts` | `ally.order`, `ally.cancel` | `fleet.arrived`, `planet.captured`, `fleet.destroyed`, `fleet.merged`, `player.eliminated` | — | — | `diplomacy.changed`, `ally.contact`, `ally.ordered`, `ally.order.cancelled` |
+| 52 | `extraction` | `extraction.ts` | `extraction.start` | `time.advanced`, `fleet.merged`, `fleet.destroyed`, `fleet.arrived`, `ally.contact` | — | — | `extraction.delivered`, `extraction.started`, `extraction.lost`, `extraction.completed` |
+| 53 | `operation` | `operation.ts` | — | `fleet.merged`, `fleet.split`, `time.advanced`, `planet.captured`, `battle.resolved`, `fleet.destroyed`, `evac.delivered` | — | — | `operation.force.broken`, `operation.lost`, `operation.completed` |
+| 54 | `captive` | `captive.ts` | `captive.load` | `planet.captured`, `planet.destroyed`, `fleet.merged`, `fleet.destroyed`, `time.advanced`, `fleet.arrived` | — | — | `captive.lost`, `captive.taken`, `captive.loaded`, `captive.delivered` |
+| 55 | `auto-merge` | `autoMerge.ts` | — | `fleet.arrived` | — | — | — |
 
 
 ### Карта хуков (кто регистрирует → кто вызывает)
 
-| hook | регистрируют (в порядке `DEV_MODULES`) | вызывает (`packages/shared-core/src/`) |
+| hook | регистрируют (в порядке `GAME_MODULES`) | вызывает (`packages/shared-core/src/`) |
 |---|---|---|
-| `combat.damage` | `sector` → `hero` → `heroEffects` → `veteran` → `promotion` | `util/combat.ts` |
-| `combat.damage.parallel` | `heroEffects` → `technology` → `faction` | `util/combat.ts` |
+| `combat.damage` | `sector` → `hunger` → `hero` → `heroEffects` → `veteran` → `promotion` | `util/combat.ts` |
+| `combat.damage.parallel` | `faction` → `heroEffects` → `technology` | `util/combat.ts` |
 | `combat.mitigation` | `sector` → `planet-type` → `veteran` → `construction` → `station` | `util/combat.ts` |
 | `combat.retreatToll` | `loadoutEffects` | `modules/combat.ts` |
-| `construction.requirement` | `technology` → `faction` | `modules/construction.ts`, `modules/hero.ts`, `modules/station.ts` |
-| `economy.production` | `sector` → `planet-type` → `tax` → `technology` → `faction` → `sprawl` | `modules/economy.ts` |
+| `construction.requirement` | `faction` → `technology` | `modules/construction.ts`, `modules/hero.ts`, `modules/station.ts` |
+| `economy.production` | `sector` → `planet-type` → `tax` → `faction` → `sprawl` → `technology` | `modules/economy.ts` |
 | `espionage.agents` | — (шов, никто не регистрирует) | `modules/espionage.ts` |
 | `espionage.chance` | — (шов, никто не регистрирует) | `modules/espionage.ts` |
 | `espionage.cost` | — (шов, никто не регистрирует) | `modules/espionage.ts` |
 | `espionage.detect` | — (шов, никто не регистрирует) | `modules/espionage.ts` |
 | `espionage.duration` | — (шов, никто не регистрирует) | `modules/espionage.ts` |
 | `espionage.kill` | — (шов, никто не регистрирует) | `modules/espionage.ts` |
-| `fleet.speed` | `sector` → `hero` → `combat` → `technology` → `faction` → `forced-march` → `pve` | `modules/movement.ts` |
+| `fleet.speed` | `sector` → `faction` → `hero` → `combat` → `technology` → `pve` → `forced-march` | `modules/movement.ts` |
 | `fort.garrisonCap` | `faction` | `modules/construction.ts` |
 | `research.slots` | `scientist` | `modules/technology.ts` |
 | `salvage.share` | `hero` → `loadoutEffects` | `modules/salvage.ts` |
@@ -227,7 +228,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `assault.landed` | `combat`* | `combat`, `fleet-ops` |
 | `assault.landing` | `combat` | — |
 | `battle.joined` | `combat` | — |
-| `battle.resolved` | `combat` | `salvage`, `fleet-ops`, `victory`, `operation` |
+| `battle.resolved` | `combat` | `salvage`, `victory`, `fleet-ops`, `operation` |
 | `battle.started` | `combat`, `fleet-ops` | `hero`, `intercept`, `rocketMines` |
 | `beachhead.landed` | `combat`, `shuttle` | `combat` |
 | `building.constructed` | `construction` | `station`, `swarmNet` |
@@ -252,16 +253,16 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `construction.queued` | `construction` | — |
 | `construction.resumed` | `construction` | — |
 | `construction.started` | `construction` | — |
-| `diplomacy.changed` | `diplomacy`, `pve`, `rendezvous` | `combat` |
-| `diplomacy.declined` | `diplomacy` | — |
+| `diplomacy.changed` | `pve`, `diplomacy`, `bot-diplomacy`, `rendezvous` | `combat`, `bot-diplomacy` |
+| `diplomacy.declined` | `diplomacy`, `bot-diplomacy` | — |
 | `diplomacy.mapshare.changed` | `diplomacy` | — |
 | `diplomacy.mapshare.offered` | `diplomacy` | — |
-| `diplomacy.offered` | `diplomacy` | — |
+| `diplomacy.offered` | `diplomacy` | `bot-diplomacy` |
 | `effect.applied` | `effects` | — |
 | `espionage.aborted` | `espionage` | — |
 | `espionage.counter.caught` | `espionage` | — |
 | `espionage.counter.lost` | `espionage` | — |
-| `espionage.detected` | `espionage` | — |
+| `espionage.detected` | `espionage` | `bot-diplomacy` |
 | `espionage.failed` | `espionage` | — |
 | `espionage.posted` | `espionage` | — |
 | `espionage.recalled` | `espionage` | — |
@@ -275,7 +276,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `extraction.lost` | `extraction` | `victory` |
 | `extraction.started` | `extraction` | — |
 | `fleet.arrival` | `movement`*, `fleet-ops`* | `movement` |
-| `fleet.arrived` | `movement` | `hero`, `orbital`, `combat`, `capture-on-arrival`, `fleet-ops`, `forced-march`, `swarmNet`, `missionFacts`, `visibility`, `minefield`, `rendezvous`, `extraction`, `captive`, `auto-merge` |
+| `fleet.arrived` | `movement` | `hero`, `orbital`, `combat`, `capture-on-arrival`, `swarmNet`, `missionFacts`, `fleet-ops`, `forced-march`, `visibility`, `minefield`, `rendezvous`, `extraction`, `captive`, `auto-merge` |
 | `fleet.bombard` | `orbital` | `hero` |
 | `fleet.brood.cycle` | — | `fleetBrood` |
 | `fleet.brood.grown` | `fleetBrood` | — |
@@ -293,7 +294,6 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `fleet.merged` | `pve` | `swarmNet`, `swarmAdapt`, `rocketMines`, `rendezvous`, `extraction`, `operation`, `captive` |
 | `fleet.orbit` | `orbital` | — |
 | `fleet.parked` | `movement`, `station`, `minefield` | `intercept`, `rocketMines` |
-| `fleet.repaired` | `fleet-repair` | — |
 | `fleet.retreated` | `combat` | — |
 | `fleet.split` | `fleet-ops` | `movement`, `swarmNet`, `operation` |
 | `fleet.stranded` | `movement` | — |
@@ -338,9 +338,9 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `pd.mineCleared` | `shuttle` | — |
 | `pd.reload` | `shuttle`* | `shuttle` |
 | `planet.bombarded` | `orbital`, `shuttle` | `construction` |
-| `planet.captured` | `combat`, `capture-on-arrival`, `shuttle` | `hero`, `construction`, `station`, `steward`, `auto-rally`, `shuttle`, `swarmNet`, `missionFacts`, `victory`, `visibility`, `effects`, `rendezvous`, `operation`, `captive` |
+| `planet.captured` | `combat`, `capture-on-arrival`, `shuttle` | `hero`, `construction`, `station`, `steward`, `swarmNet`, `missionFacts`, `victory`, `auto-rally`, `shuttle`, `effects`, `visibility`, `rendezvous`, `operation`, `captive` |
 | `planet.destroyed` | `hero` | `steward`, `captive` |
-| `player.eliminated` | `victory` | `diplomacy`, `combat`, `station`, `rendezvous` |
+| `player.eliminated` | `victory` | `combat`, `station`, `diplomacy`, `bot-diplomacy`, `rendezvous` |
 | `pve.abandoned` | `pve` | `victory` |
 | `pve.boon.taken` | `pve` | — |
 | `pve.boss.slain` | `pve` | — |
@@ -410,12 +410,12 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `technology.research.boosted` | `technology` | — |
 | `technology.research.started` | `technology` | — |
 | `technology.researched` | `technology` | — |
-| `time.advanced` | kernel (`advanceTo`) | `economy`, `espionage`, `orbital`, `salvage`, `construction`, `technology`, `steward`, `shuttle`, `standing-orders`, `forced-march`, `pve`, `fleetBrood`, `missionFacts`, `victory`, `visibility`, `effects`, `minefield`, `rocketMines`, `extraction`, `operation`, `captive` |
+| `time.advanced` | kernel (`advanceTo`) | `economy`, `orbital`, `salvage`, `construction`, `technology`, `steward`, `pve`, `fleetBrood`, `missionFacts`, `victory`, `espionage`, `bot-diplomacy`, `standing-orders`, `shuttle`, `forced-march`, `effects`, `visibility`, `minefield`, `rocketMines`, `extraction`, `operation`, `captive` |
 | `time.stopped` | kernel (`advanceTo`, по хуку `time.stop`) | `rocketMines` |
 | `trader.bought` | `trader` | — |
 | `trader.sold` | `trader` | — |
 | `trader.swapped` | `trader` | — |
-| `unit.built` | `construction` | `promotion`, `auto-rally`, `swarmNet`, `victory` |
+| `unit.built` | `construction` | `swarmNet`, `victory`, `promotion`, `auto-rally` |
 | `unit.died` | `minefield` | `hero`, `salvage`, `pve` |
 
 `*` у эмитента — событие ПЛАНИРУЕТСЯ (`h.schedule`), то есть срабатывает позже, в
@@ -427,6 +427,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | файл | экспорт | назначение |
 |---|---|---|
 | `kernel/kernel.ts` | `createKernel(modules)` | компиляция immutable kernel |
+| `gameModules.ts` | `GAME_MODULES` | состав и порядок модулей обоих хостов (инвариант #6) |
 | `kernel/kernel.ts` | `Kernel.applyAction(state, action, ctx)` | чистое применение действия |
 | `kernel/kernel.ts` | `Kernel.advanceTo(state, ctx)` | сдвиг часов + scheduled events |
 | `kernel/kernel.ts` | `Kernel.canApply` / `canApplyAll` | «можно ли?» ЗАРАНЕЕ (RULES-1/3) — тот же прогон, результат выброшен |
@@ -434,6 +435,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `state/gameState.ts` | `GameState`, `createInitialState`, `Player`, `Planet`, `Fleet`, `MatchState` | типы состояния |
 | `state/buildFromMap.ts` | `buildStateFromMap(map, data, opts)` | посев матча из карты |
 | `state/diplomacy.ts` | `getStance`, `setStance`, `pairKey`, `DEFAULT_STANCE` | дипломатия |
+| `state/botFavour.ts` | `botFavour`, `botEmbargoes`, `FAVOUR_*` | шкала расположения ботов (счётчик `approval` сеет прототип) |
 | `data/schemas.ts` | `GameDataSchema`, `parseGameData`, `FactionDef`, `UnitDef` | zod-схемы контента |
 | `data/mapSchema.ts` | `MatchMapSchema`, `MatchMap`, `avaShape`, `MapSlot` | zod-схемы карт |
 | `action/types.ts` | `Action`, `Context`, `MatchConfig`, `VictoryConfig`, `timeScaleOf` | типы действий |

@@ -1,7 +1,7 @@
 /**
  * Match setup — seat/setup config types and `newGame`, the pure builder that
  * turns a `SetupConfig` into a playable `GameState`. Extracted from `game.ts`
- * (REFP-20): depends on `map.ts`/`formations.ts`/`botFavour.ts`/`heroes.ts`/
+ * (REFP-20): depends on `map.ts`/`formations.ts`/`heroes.ts`/
  * `ships.ts`/`economy.ts` (all already extracted) + `gameData.ts` + core
  * shared-core helpers. `player`/`fleet`/`ARCHETYPE_OF_GRADE` were private
  * `game.ts` helpers used only by `newGame` — moved here with it rather than
@@ -25,12 +25,12 @@ import {
   type Planet,
   type Player,
   type Fleet,
+  FAVOUR_BASE,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
 import { botCouncil } from './botCouncil';
 import { SECTOR_TYPES, START_CANDIDATES } from './map';
 import { fixedSideMode, isFrontier, isCurrentMap, mapPreset, teamForStart, type MapId } from './mapCatalog';
-import { FAVOUR_BASE } from './botFavour';
 import { DEFAULT_HEROES, heroSlots, type HeroGrade, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 import { hpOfLevel } from './economy';

@@ -1,11 +1,11 @@
 /** РЫНОК В ХОДЕ БОТА (SLIM-3): свои лоты по таблице цен и одна выгодная чужая сделка. */
 import {
   MARKET_COMMISSION,
+  botEmbargoes,
   type MarketSide,
   type Player,
 } from '../../../packages/shared-core/src/index';
 import { marketList, marketTake } from '../../../decisions/actions';
-import { botEmbargoes } from '../botFavour';
 import type { AiTurn } from './turn';
 
 /**
