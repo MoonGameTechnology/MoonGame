@@ -139,11 +139,15 @@ describe('sequential losses and return fire', () => {
     expect(after.fleets['z-first']!.units[0]!.hp).toBe(934);
     expect(after.fleets['a-second']!.units[0]!.hp).toBe(958);
   });
-  it('a destroyed hero loses its aura before surviving escorts return fire', () => {
+  it('removes a fallen hero aura before replies without killing another hero on event replay', () => {
     const state = fixture();
     // 100 damage kills the 1 HP hero; the remaining 99 leaves 201 HP of escorts.
     state.fleets.guard!.units.push({ unit: 'hero', count: 1 });
     state.heroes = {
+      'a-survivor': {
+        id: 'a-survivor', owner: 'd', location: 'P', fleetId: 'reserve',
+        alive: true, abilities: [], cooldowns: {},
+      },
       commander: {
         id: 'commander',
         owner: 'd',
@@ -155,6 +159,10 @@ describe('sequential losses and return fire', () => {
         cooldowns: {},
         activeAuras: [{ bonus: 1, radius: 100, until: 1000 }],
       },
+    };
+    state.fleets.reserve = {
+      id: 'reserve', owner: 'd', location: 'P', movement: null,
+      units: [{ unit: 'hero', count: 1 }], traits: [],
     };
     state.battles.battle!.sides[2]!.nextAttackAt = 1000;
     const heroData = parseGameData({
@@ -170,6 +178,10 @@ describe('sequential losses and return fire', () => {
     });
     if (!result.ok) throw new Error(result.code);
     expect(result.state.heroes!.commander!.alive).toBe(false);
+    expect(result.state.heroes!['a-survivor']!.alive).toBe(true);
+    expect(result.state.heroes!['a-survivor']!.fleetId).toBe('reserve');
+    expect(result.state.heroes!['a-survivor']!.cooldowns.respawn).toBeUndefined();
+    expect(result.state.scheduled.filter((e) => e.type === 'hero.respawn')).toHaveLength(1);
     expect(result.state.fleets['z-first']!.units[0]!.hp).toBeCloseTo(939.7);
     expect(result.events.filter((e) => e.type === 'hero.died')).toHaveLength(1);
   });

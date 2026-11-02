@@ -472,15 +472,18 @@ function killHero(h: HandlerContext, hero: Hero): void {
 }
 
 /** Resolve a hero hull loss while its fleet link and owner are still available. */
-const heroCasualty: HeroCasualty = (h, { unit, fleetId, owner }) => {
+const heroCasualty: HeroCasualty = (h, { unit, fleetId, owner, heroId }) => {
   if (typeof unit !== 'string') return;
-  const commander = typeof fleetId === 'string' ? heroByFleet(h.state, fleetId) : undefined;
+  const commander = typeof heroId === 'string'
+    ? h.state.heroes?.[heroId]
+    : typeof fleetId === 'string' ? heroByFleet(h.state, fleetId) : undefined;
   const hero = commander && unit === heroShipUnit(h, commander)
     ? commander
-    : unit === HERO_UNIT
+    : unit === HERO_UNIT && typeof heroId !== 'string'
       ? commander ?? (typeof owner === 'string' ? heroOf(h.state, owner) : undefined)
       : undefined;
   if (hero && hero.alive !== false) killHero(h, hero);
+  return hero?.id;
 };
 
 /** Why a «Devour World» siege ended without the world dying (`hero.siege.broken`). */
@@ -695,7 +698,7 @@ export const heroModule: GameModule = {
   // 4.6.0: чужая ракета (SM-3.7b) для `hero.spawn` — как отсутствующая цель (`E_NO_PLANET`).
   // 4.8.0: timed hero mobilization and researched command slots.
   // 4.9.0: remove a slain hero's aura before the surviving escort returns fire.
-  version: '4.9.0',
+  version: '4.9.1',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
