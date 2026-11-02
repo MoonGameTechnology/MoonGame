@@ -44,7 +44,7 @@ it('приказ эскадре и её вылет не разделяются �
   expect(slices.flat()).toEqual(actions);
 });
 
-it('деление флота и его вылет не разделяются (ai.ts:723)', () => {
+it('деление флота и его вылет не разделяются (aiTurn/fleets.ts)', () => {
   const actions = [
     splitFleet('a', 'f1', [{ unit: 'frigate', count: 1 }]),
     moveFleet('a', 'f1', 'target'),
