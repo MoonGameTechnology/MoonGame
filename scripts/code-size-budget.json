@@ -61,7 +61,6 @@
     "packages/shared-core/src/modules/diplomacy.ts::diplomacyModule.setup": 342,
     "packages/server/src/authApi.ts::registerAuthApi": 338,
     "prototype/src/techTree.ts::techTreeHtml": 335,
-    "prototype/src/hubScreen.ts::initHubScreen": 325,
     "prototype/src/chatWindow.ts::initChat": 315,
     "prototype/src/dossiers.ts::createDossiers": 302,
     "prototype/src/firstMatchOperation.ts::buildOperationSteps": 301

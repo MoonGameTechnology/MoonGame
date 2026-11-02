@@ -1,332 +1,63 @@
-import { corpShowcaseHtml } from './corpFacilitiesView';
-/**
- * Лента новостей на «Домой» (CORP-2). На ПК — колонка справа от «Моих партий», на
- * телефоне — превью (закреплённые и три свежие) и шторка со всей лентой. Что показать, в
- * каком порядке и куда ведёт строка — `decisions/newsFeed.ts`; здесь сеть, разметка и клики.
- *
- * Ленту сервер отдаёт без входа (`GET /news`, CORP-1), поэтому её видит и гость. Всё, что
- * зависит от читателя, читается с сессией хаба и только когда она есть: членство
- * (`/corps/me`) решает «Мою корпорацию» и заявку, каталог медалей (`/medals`) даёт имя
- * награды, карточка (`/corps/:id`) — состав и влияние. Отказ этих запросов ленту не прячет:
- * строка просто остаётся без кнопок.
- *
- * Прошлую ленту неудачное обновление не стирает: новости — не приказ, и вчерашняя строка
- * честнее пустого места. Стирает её только смена сервера.
- */
+/** News window, account-safe loading and unread badge. Rendering lives in newsView.ts. */
 import { LOCALE, t } from '../../localization/runtime';
 import {
   appendNewsPage,
-  newsApply,
   newsItems,
-  newsCorps,
-  newsLine,
-  newsPlaceholder,
-  newsTeaser,
-  newsTotal,
-  newsWhen,
   nextNewsBefore,
-  NEWS_FILTER_LABEL,
-  NEWS_FILTERS,
   ownCorp,
   parseNewsView,
   showOwnFilter,
-  type NewsCalendar,
+  NEWS_FILTERS,
   type NewsFilter,
-  type NewsItem,
-  type NewsLine,
   type NewsMembership,
-  type NewsPhrase,
-  type NewsPlaceholder,
   type NewsReader,
 } from '../../decisions/newsFeed';
-import type {
-  NewsAnnouncementKind,
-  NewsCorp,
-  NewsEvent,
-  NewsView,
-} from '../../packages/protocol/src/news';
+import { preferredNews, readNews, unreadNews } from '../../decisions/newsPreferences';
+import type { NewsCorp, NewsView } from '../../packages/protocol/src/news';
 import { PROFILE_MEDALS } from '../../packages/protocol/src/playerProfile';
-import {
-  parseCorpRecord,
-  parseMedalDefs,
-  parseMembership,
-  parseMemberships,
-  type CorpMembership,
-  type CorpRecord,
-} from './corp';
+import { parseCorpRecord, parseMedalDefs, parseMembership, parseMemberships } from './corp';
 import { detach } from './detach';
-import { esc, nfmt } from './format';
+import { esc } from './format';
+import { NewsPreferenceStore } from './newsPreferences';
+import {
+  newsCalendar,
+  newsCardHtml,
+  newsFeedHtml,
+  type NewsCard,
+  type NewsPaint,
+} from './newsView';
+export {
+  newsCalendar,
+  newsCardHtml,
+  newsFeedHtml,
+  newsItemHtml,
+  newsPhraseHtml,
+  newsTimeText,
+  type NewsPaint,
+} from './newsView';
 
-// --- таблицы ---------------------------------------------------------------------------
-
-const ANNOUNCEMENT_ICON: Record<NewsAnnouncementKind, string> = {
-  tech: '⚠',
-  update: '⟳',
-  event: '✦',
-};
-const EVENT_ICON: Record<NewsEvent['kind'], string> = {
-  founded: '⬢',
-  level: '▲',
-  medal: '✪',
-  player_medal: '✪',
-  matchup: '⚔',
-  result: '⚑',
-};
-const NEWS_PLACEHOLDER_KEY: Record<Exclude<NewsPlaceholder, null>, string> = {
-  loading: 'news.loading',
-  offline: 'news.offline',
-  empty: 'news.empty',
-  filtered: 'news.filtered',
-};
-const NEWS_RESULT_LABEL: Record<NonNullable<NewsLine['result']>, string> = {
-  win: 'corp.battle.win',
-  loss: 'corp.battle.loss',
-  draw: 'corp.battle.draw',
-};
-
-// --- время (правило 7 решения) ------------------------------------------------------------
-
-/** Полночь сегодня и вчера и первое января по часам игрока. */
-export function newsCalendar(now: number): NewsCalendar {
-  const d = new Date(now);
-  return {
-    today: new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(),
-    yesterday: new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1).getTime(),
-    year: new Date(d.getFullYear(), 0, 1).getTime(),
-  };
-}
-
-const FORMATS = new Map<string, Intl.DateTimeFormat>();
-function dateFormat(kind: 'time' | 'date' | 'date-year'): Intl.DateTimeFormat {
-  const key = `${LOCALE}:${kind}`;
-  let format = FORMATS.get(key);
-  if (!format) {
-    format = new Intl.DateTimeFormat(
-      LOCALE,
-      kind === 'time'
-        ? { hour: '2-digit', minute: '2-digit' }
-        : kind === 'date'
-          ? { day: 'numeric', month: 'short' }
-          : { day: 'numeric', month: 'short', year: 'numeric' },
-    );
-    FORMATS.set(key, format);
-  }
-  return format;
-}
-
-/** Время строки: «14:05», «вчера, 22:10», «18 окт.», «18 окт. 2025 г.». */
-export function newsTimeText(at: number, calendar: NewsCalendar): string {
-  const when = newsWhen(at, calendar);
-  if (when === 'today') return dateFormat('time').format(at);
-  if (when === 'yesterday')
-    return t('news.when.yesterday', { time: dateFormat('time').format(at) });
-  return dateFormat(when).format(at);
-}
-
-// --- разметка ----------------------------------------------------------------------------
-
-/** Всё, из чего рисуется лента. */
-export interface NewsPaint {
-  view: NewsView | null;
-  /** Последнее чтение ленты не удалось. */
-  failed: boolean;
-  filter: NewsFilter;
-  /** Нажата «Моя корпорация». */
-  own: boolean;
-  reader: NewsReader;
-  calendar: NewsCalendar;
-  /** Идёт чтение следующей страницы. */
-  loadingMore: boolean;
-  /** Заявка ушла и ждёт ответа: кнопки заявки погашены. */
-  applying: boolean;
-}
-
-/** Фраза строки: ключ — через локаль, текст администратора — как есть. Экранируется здесь. */
-export function newsPhraseHtml(phrase: NewsPhrase): string {
-  return esc('key' in phrase ? t(phrase.key, phrase.vars) : phrase.text);
-}
-
-function newsIcon(item: NewsItem): string {
-  return item.type === 'announcement'
-    ? ANNOUNCEMENT_ICON[item.announcement.kind]
-    : EVENT_ICON[item.event.kind];
-}
-
-/** Одна строка ленты: подпись раздела и время, фраза, исход своей битвы и кнопки. */
-export function newsItemHtml(item: NewsItem, line: NewsLine, time: string, applying: boolean): string {
-  const cls =
-    `nw-it k-${line.category}` +
-    (line.tone ? ` s-${line.tone}` : '') +
-    (line.pinned ? ' pin' : '') +
-    (line.own ? ' my' : '') + (newsCorps(item).some((c) => c.monument) ? ' corp-monument' : '');
-  const label = (line.pinned ? `${t('news.pinned')} · ` : '') + t(line.labelKey);
-  const card = line.card;
-  const acts =
-    (line.result
-      ? `<span class="nw-pill ${line.result}">${esc(t(NEWS_RESULT_LABEL[line.result]))}</span>`
-      : '') +
-    (card
-      ? `<button type="button" class="btn-quiet nw-btn" data-nw-corp="${esc(card.id)}" data-nw-name="${esc(card.name)}">` +
-        `${esc(t('news.card.open'))}</button>`
-      : '') +
-    (card && line.apply === 'can'
-      ? `<button type="button" class="btn-second nw-btn" data-nw-apply="${esc(card.id)}"${applying ? ' disabled' : ''}>` +
-        `${esc(t('corp.apply'))}</button>`
-      : line.apply === 'sent'
-        ? `<span class="nw-pill wait">${esc(t('news.applied'))}</span>`
-        : '') +
-    (line.battles
-      ? `<button type="button" class="btn-quiet nw-btn" data-nw-battles="${line.battles}">${esc(t('news.battles'))}</button>`
-      : '');
-  return (
-    `<article class="${cls}"><span class="nw-ic" aria-hidden="true">${newsIcon(item)}</span>` +
-    `<div class="nw-b"><div class="nw-top"><span>${esc(label)}</span>` +
-    (line.pinned ? '' : `<time datetime="${new Date(item.at).toISOString()}">${esc(time)}</time>`) +
-    `</div><b class="nw-t">${newsPhraseHtml(line.title)}</b>` +
-    (line.body ? `<p class="nw-x">${newsPhraseHtml(line.body)}</p>` : '') +
-    (acts ? `<div class="nw-a">${acts}</div>` : '') +
-    `</div></article>`
-  );
-}
-
-function rowsHtml(items: readonly NewsItem[], p: NewsPaint): string {
-  return items
-    .map((it) => newsItemHtml(it, newsLine(it, p.reader), newsTimeText(it.at, p.calendar), p.applying))
-    .join('');
-}
-
-function placeholderHtml(placeholder: Exclude<NewsPlaceholder, null>): string {
-  return (
-    `<p class="nw-empty"${placeholder === 'loading' ? ' aria-busy="true"' : ''}>` +
-    `${esc(t(NEWS_PLACEHOLDER_KEY[placeholder]))}</p>`
-  );
-}
-
-/** Лента целиком: заголовок, фильтры, строки и «Показать ещё» — колонка ПК и шторка. */
-export function newsFeedHtml(p: NewsPaint, titleId = ''): string {
-  const only = p.own ? ownCorp(p.reader.membership) : null;
-  const items = p.view ? newsItems(p.view, p.filter, only) : [];
-  const placeholder = newsPlaceholder(p.view, p.failed, items.length);
-  const chips =
-    NEWS_FILTERS.map(
-      (f) =>
-        `<button type="button" class="nw-chip" data-nw-filter="${f}" aria-pressed="${p.filter === f}">` +
-        `${esc(t(NEWS_FILTER_LABEL[f]))}</button>`,
-    ).join('') +
-    (showOwnFilter(p.reader)
-      ? `<button type="button" class="nw-chip mine" data-nw-own aria-pressed="${p.own}">${esc(t('news.filter.own'))}</button>`
-      : '');
-  const more =
-    p.view && nextNewsBefore(p.view) !== null
-      ? `<button type="button" class="btn-second nw-more" data-nw-more${p.loadingMore ? ' disabled aria-busy="true"' : ''}>` +
-        `${esc(t(p.loadingMore ? 'news.loading' : 'news.more'))}</button>`
-      : '';
-  return (
-    `<header class="nw-h"><h3${titleId ? ` id="${titleId}"` : ''}>${esc(t('news.title'))}</h3></header>` +
-    `<div class="nw-chips" role="group" aria-label="${esc(t('news.filter.aria'))}">${chips}</div>` +
-    `<div class="nw-list">${placeholder ? placeholderHtml(placeholder) : rowsHtml(items, p)}${more}</div>`
-  );
-}
-
-/** Превью телефона: закреплённые, три свежие и «Вся лента» (правило 6 решения). */
-export function newsTeaserHtml(p: NewsPaint): string {
-  const items = p.view ? newsTeaser(p.view) : [];
-  const placeholder = newsPlaceholder(p.view, p.failed, items.length);
-  const total = p.view ? newsTotal(p.view) : null;
-  return (
-    `<header class="nw-h"><h3>${esc(t('news.title'))}</h3></header>` +
-    `<div class="nw-list">${placeholder ? placeholderHtml(placeholder) : rowsHtml(items, p)}</div>` +
-    (p.view && !placeholder
-      ? `<button type="button" class="nw-all" data-nw-all>` +
-        `${esc(total === null ? t('news.all') : t('news.all.count', { n: total }))}</button>`
-      : '')
-  );
-}
-
-/** Карточка корпорации: прочитанная, ещё читается или недоступна. */
-export type NewsCard = { corp: CorpRecord; members: CorpMembership[] } | 'loading' | 'failed';
-
-/** Карточка корпорации: состав, влияние, глава и заявка; своей — дверь в кабинет. */
-export function newsCardHtml(
-  corp: NewsCorp,
-  card: NewsCard,
-  reader: NewsReader,
-  applying: boolean,
-  titleId: string,
-): string {
-  const title = `<h3 id="${titleId}">${esc(typeof card === 'object' ? card.corp.name : corp.name)}</h3>`;
-  if (card === 'loading' || card === 'failed')
-    return (
-      title +
-      `<p class="nw-note"${card === 'loading' ? ' aria-busy="true"' : ''}>` +
-      `${esc(t(card === 'loading' ? 'news.card.loading' : 'news.card.failed'))}</p>`
-    );
-  // Кандидат ещё не участник: в составе и среди глав его нет.
-  const roster = card.members.filter((m) => m.role !== 'recruit');
-  const chief = roster.find((m) => m.role === 'head');
-  const facts = [
-    t('corp.members.count', { n: roster.length }),
-    t('news.card.influence', { n: nfmt(card.corp.influence) }),
-    ...(chief ? [t('news.card.head', { login: chief.login })] : []),
-  ];
-  const apply = newsApply(corp, reader);
-  const act =
-    ownCorp(reader.membership) === corp.id
-      ? `<button type="button" class="btn-second" data-nw-cabinet>${esc(t('hub.ally.corp'))}</button>`
-      : apply === 'can'
-        ? `<button type="button" class="btn-main" data-nw-apply="${esc(corp.id)}"${applying ? ' disabled' : ''}>` +
-          `${esc(t('corp.apply'))}</button>`
-        : apply === 'sent'
-          ? `<span class="nw-pill wait">${esc(t('news.applied'))}</span>`
-          : '';
-  return (
-    title +
-    corpShowcaseHtml(card.corp) +
-    `<ul class="nw-facts">${facts.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` +
-    (act ? `<div class="nw-a">${act}</div>` : '')
-  );
-}
-
-// --- экран -------------------------------------------------------------------------------
-
-/** Куда ведёт дверь в кабинет своей корпорации. */
 export type NewsCorpTab = 'hq' | 'current' | 'history';
-
-/** Что ленте нужно от хаба. */
 export interface NewsHost {
-  /** Колонка ленты на ПК (`#news-col`). */
-  column(): HTMLElement;
-  /** Превью на телефоне (`#news-teaser`). */
-  teaser(): HTMLElement;
-  /** Шторка над хабом (`#news-sheet`): вся лента на телефоне и карточка корпорации. */
+  button(): HTMLElement;
   sheet(): HTMLElement;
-  /** HTTP-адрес сервера или `null`, когда сервера нет: самой ленте сессия не нужна. */
+  /** Stable server + account identity, never the rotating session token. */
+  identity(): string;
   publicBase(): string | null;
-  /** Адрес и сессия хаба; `null` — гость. */
   authorizedBase(): Promise<{ base: string; token: string } | null>;
-  /** Строка игроку под хабом (ответ на заявку). */
   note(text: string): void;
-  /** Текст отказа по коду `E_*`. */
   errText(code: string): string;
-  /** Открыть кабинет своей корпорации: штаб, текущую битву или историю. */
   openCorp(tab: NewsCorpTab): void;
-  /** Часы игрока — для «сегодня» и «вчера». */
+  openSettings(): void;
   now(): number;
 }
 
-type NewsSheet =
-  | { kind: 'feed' }
-  /** `back` — карточку открыли из шторки ленты: Back возвращает к ленте. */
-  | { kind: 'corp'; corp: NewsCorp; card: NewsCard; back: boolean };
-
+type NewsSheet = { kind: 'feed' } | { kind: 'corp'; corp: NewsCorp; card: NewsCard; back: boolean };
 type Focus = () => HTMLElement | null | undefined;
-
 interface Answer {
   ok: boolean;
   body: unknown;
 }
 
-/** Запрос к серверу; `null` — до сервера не дошли. Не бросает. */
 async function call(
   url: string,
   token?: string,
@@ -347,297 +78,404 @@ async function call(
   }
 }
 
-const SELECTOR =
-  '[data-nw-filter],[data-nw-own],[data-nw-more],[data-nw-all],[data-nw-corp],' +
-  '[data-nw-apply],[data-nw-battles],[data-nw-cabinet],[data-nw-close]';
+/** One controller survives hub navigation. Refresh generations discard late account responses. */
+class NewsScreen {
+  readonly preferences: NewsPreferenceStore;
+  private view: NewsView | null = null;
+  private identity = '';
+  private failed = false;
+  private filter: NewsFilter = 'all';
+  private own = false;
+  private signedIn = false;
+  private membership: NewsMembership | null | undefined;
+  private medalNames: Record<string, string> = {};
+  private medalsRead = false;
+  private loadingMore = false;
+  private applying = false;
+  private applySeq = 0;
+  private sheet: NewsSheet | null = null;
+  private notice = '';
+  private opener: Focus | null = null;
+  private cardOpener: Focus | null = null;
+  private feedScroll = 0;
+  private seq = 0;
+  private newsToken: string | undefined;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private active = false;
+  private activeVersion = 0;
 
-/** Подключить ленту. Вызывается один раз: вешает делегатов кликов на колонку, превью и
- *  шторку. `refresh` — при каждом заходе на «Домой»; `isOpen`/`close` — ступень Back. */
-export function initNews(host: NewsHost): {
-  refresh: () => Promise<void>;
-  isOpen: () => boolean;
-  close: () => void;
-} {
-  let view: NewsView | null = null;
-  let viewBase: string | null = null;
-  let failed = false;
-  let filter: NewsFilter = 'all';
-  let own = false;
-  let signedIn = false;
-  let membership: NewsMembership | null | undefined;
-  let medalsOn = true;
-  let medalNames: Record<string, string> = {};
-  let medalsRead = false;
-  let loadingMore = false;
-  let applying = false;
-  let sheet: NewsSheet | null = null;
-  /** Строка о заявке внутри шторки: строка хаба под шторкой не видна. */
-  let notice = '';
-  /** Куда вернуть фокус, когда закроется шторка и когда карточка вернётся к ленте. */
-  let opener: Focus | null = null;
-  let cardOpener: Focus | null = null;
-  let feedScroll = 0;
-  /** Поколение чтения: ответ, обогнанный новым обновлением, выбрасывается. */
-  let seq = 0;
+  constructor(private readonly host: NewsHost) {
+    this.preferences = new NewsPreferenceStore({
+      identity: host.identity,
+      authorizedBase: host.authorizedBase,
+      changed: () => this.paint(),
+    });
+    host.button().addEventListener('click', () => {
+      this.openFeed();
+      detach('news: open', this.refresh());
+    });
+    host.sheet().addEventListener('click', (e) => this.onClick(e));
+    host.sheet().addEventListener('keydown', (e) => this.trapFocus(e));
+  }
 
-  const reader = (): NewsReader => ({ signedIn, membership, medalNames, locale: LOCALE,
-    playerMedalNames: Object.fromEntries(PROFILE_MEDALS.map((m) => [m.id, t(`profile.medal.${m.id}`)])) });
-  let newsToken: string | undefined;
-
-  function paint(): void {
-    const r = reader();
-    const p: NewsPaint = {
-      view,
-      failed,
-      filter,
-      own: own && showOwnFilter(r),
-      reader: r,
-      calendar: newsCalendar(host.now()),
-      loadingMore,
-      applying,
+  private reader(): NewsReader {
+    return {
+      signedIn: this.signedIn,
+      membership: this.membership,
+      medalNames: this.medalNames,
+      locale: LOCALE,
+      playerMedalNames: Object.fromEntries(
+        PROFILE_MEDALS.map((m) => [m.id, t(`profile.medal.${m.id}`)]),
+      ),
     };
-    const column = host.column();
-    const list = column.querySelector?.('.nw-list');
-    const keep = list?.scrollTop ?? 0;
-    column.innerHTML = newsFeedHtml(p);
-    const fresh = column.querySelector?.('.nw-list');
-    if (fresh) fresh.scrollTop = keep;
-    host.teaser().innerHTML = newsTeaserHtml(p);
+  }
 
-    const root = host.sheet();
-    const body = root.querySelector?.('.nw-sheet-body');
-    const keepSheet = body?.scrollTop ?? 0;
-    root.innerHTML = sheet
+  private current(my: number, key: string): boolean {
+    return my === this.seq && key === this.host.identity();
+  }
+  private sheetBody(): HTMLElement | null {
+    return this.host.sheet().querySelector('.nw-sheet-body');
+  }
+  private focusClose(): void {
+    this.host.sheet().querySelector<HTMLElement>('.btn-x')?.focus({ preventScroll: true });
+  }
+
+  private paint(): void {
+    this.syncIdentity();
+    const r = this.reader();
+    let preferences = this.preferences.get();
+    const items = this.view ? newsItems(this.view) : [];
+    const shown = this.view
+      ? preferredNews(
+          newsItems(this.view, this.filter, this.own ? ownCorp(r.membership) : null),
+          preferences,
+          r.membership,
+        )
+      : [];
+    if (
+      this.sheet?.kind === 'feed' &&
+      (typeof document === 'undefined' || document.visibilityState !== 'hidden')
+    ) {
+      const next = readNews(preferences, shown);
+      if (next.read.join('\n') !== preferences.read.join('\n')) this.preferences.save(next, false);
+      preferences = next;
+    }
+    const unread = unreadNews(items, preferences, r.membership).length > 0;
+    const button = this.host.button();
+    button.classList.toggle('has-news', unread);
+    button.setAttribute('aria-label', t(unread ? 'news.unread' : 'news.open'));
+    button.setAttribute('title', t(unread ? 'news.unread' : 'news.open'));
+    button.setAttribute('aria-expanded', String(this.sheet !== null));
+    const p: NewsPaint = {
+      view: this.view,
+      failed: this.failed,
+      filter: this.filter,
+      own: this.own && showOwnFilter(r),
+      reader: r,
+      calendar: newsCalendar(this.host.now()),
+      loadingMore: this.loadingMore,
+      applying: this.applying,
+      preferences,
+    };
+    const root = this.host.sheet();
+    const scroll = this.sheetBody()?.scrollTop ?? 0;
+    // Polling replaces markup; keep keyboard focus on the same action when it still exists.
+    const focused =
+      typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+    const focusData = focused && root.contains?.(focused) ? { ...focused.dataset } : null;
+    root.innerHTML = this.sheet
       ? `<div class="nw-scrim" data-nw-close></div>` +
-        `<div class="nw-sheet${sheet.kind === 'corp' ? ' card' : ''}" role="dialog" aria-modal="true" aria-labelledby="nw-sheet-title">` +
+        `<div class="nw-sheet${this.sheet.kind === 'corp' ? ' card' : ''}" role="dialog" aria-modal="true" aria-labelledby="nw-sheet-title">` +
         `<div class="nw-sheet-top"><button type="button" class="btn-x" data-nw-close aria-label="${esc(t('news.close'))}">✕</button></div>` +
-        `<div class="nw-sheet-body">` +
-        (notice ? `<p class="nw-notice" role="status">${esc(notice)}</p>` : '') +
-        (sheet.kind === 'feed'
+        `<div class="nw-sheet-body">${this.notice ? `<p class="nw-notice" role="status">${esc(this.notice)}</p>` : ''}` +
+        (this.sheet.kind === 'feed'
           ? newsFeedHtml(p, 'nw-sheet-title')
-          : newsCardHtml(sheet.corp, sheet.card, r, applying, 'nw-sheet-title')) +
+          : newsCardHtml(this.sheet.corp, this.sheet.card, r, this.applying, 'nw-sheet-title')) +
         `</div></div>`
       : '';
-    root.classList.toggle('open', sheet !== null);
-    const freshSheet = root.querySelector?.('.nw-sheet-body');
-    if (freshSheet) freshSheet.scrollTop = keepSheet;
+    root.classList.toggle('open', this.sheet !== null);
+    const body = this.sheetBody();
+    if (body) body.scrollTop = scroll;
+    if (focusData)
+      Array.from(root.querySelectorAll<HTMLElement>('button'))
+        .find((el) => Object.entries(focusData).every(([key, val]) => el.dataset[key] === val))
+        ?.focus({ preventScroll: true });
   }
 
-  function sheetBody(): Element | null | undefined {
-    return host.sheet().querySelector?.('.nw-sheet-body');
-  }
-
-  function focusClose(): void {
-    host.sheet().querySelector?.<HTMLElement>('.btn-x')?.focus({ preventScroll: true });
-  }
-
-  function openFeed(from: Focus): void {
-    opener = from;
-    sheet = { kind: 'feed' };
-    notice = '';
-    paint();
-    const body = sheetBody();
+  openFeed(): void {
+    this.opener = () => this.host.button();
+    this.sheet = { kind: 'feed' };
+    this.notice = '';
+    this.paint();
+    const body = this.sheetBody();
     if (body) body.scrollTop = 0;
-    focusClose();
+    this.focusClose();
   }
 
-  async function openCard(corp: NewsCorp, from: Focus): Promise<void> {
-    const back = sheet?.kind === 'feed';
+  private async openCard(corp: NewsCorp, from: Focus): Promise<void> {
+    const back = this.sheet?.kind === 'feed';
     if (back) {
-      cardOpener = from;
-      feedScroll = sheetBody()?.scrollTop ?? 0;
-    } else opener = from;
-    const opened: Extract<NewsSheet, { kind: 'corp' }> = { kind: 'corp', corp, card: 'loading', back };
-    sheet = opened;
-    notice = '';
-    paint();
-    const body = sheetBody();
+      this.cardOpener = from;
+      this.feedScroll = this.sheetBody()?.scrollTop ?? 0;
+    } else this.opener = from;
+    const opened: Extract<NewsSheet, { kind: 'corp' }> = {
+      kind: 'corp',
+      corp,
+      card: 'loading',
+      back,
+    };
+    this.sheet = opened;
+    this.notice = '';
+    this.paint();
+    const body = this.sheetBody();
     if (body) body.scrollTop = 0;
-    focusClose();
-    const auth = await host.authorizedBase();
-    const res = auth ? await call(`${auth.base}/corps/${encodeURIComponent(corp.id)}`, auth.token) : null;
-    if (sheet !== opened) return; // карточку закрыли или открыли другую
+    this.focusClose();
+    const key = this.host.identity();
+    const auth = await this.host.authorizedBase();
+    const res =
+      auth && key === this.host.identity()
+        ? await call(`${auth.base}/corps/${encodeURIComponent(corp.id)}`, auth.token)
+        : null;
+    if (this.sheet !== opened || key !== this.host.identity()) return;
     const answer = res?.ok ? (res.body as { corp?: unknown; members?: unknown } | null) : null;
     const record = parseCorpRecord(answer?.corp);
     opened.card = record ? { corp: record, members: parseMemberships(answer?.members) } : 'failed';
-    paint();
+    this.paint();
   }
 
-  /** Убрать шторку без возврата фокуса: игрок уходит в кабинет корпорации. */
-  function dismiss(): void {
-    sheet = null;
-    notice = '';
-    opener = null;
-    cardOpener = null;
-    paint();
+  private dismiss(): void {
+    this.sheet = null;
+    this.notice = '';
+    this.opener = this.cardOpener = null;
+    this.paint();
   }
 
-  /** Ступень Back: карточка, открытая из ленты, сначала возвращает к ленте. */
-  function close(): void {
-    if (!sheet) return;
-    notice = '';
-    if (sheet.kind === 'corp' && sheet.back) {
-      sheet = { kind: 'feed' };
-      paint();
-      const body = sheetBody();
-      if (body) body.scrollTop = feedScroll;
-      cardOpener?.()?.focus({ preventScroll: true });
-      cardOpener = null;
+  isOpen(): boolean {
+    return this.sheet !== null;
+  }
+  close(): void {
+    if (!this.sheet) return;
+    this.notice = '';
+    if (this.sheet.kind === 'corp' && this.sheet.back) {
+      this.sheet = { kind: 'feed' };
+      this.paint();
+      const body = this.sheetBody();
+      if (body) body.scrollTop = this.feedScroll;
+      this.cardOpener?.()?.focus({ preventScroll: true });
+      this.cardOpener = null;
       return;
     }
-    sheet = null;
-    paint();
-    opener?.()?.focus({ preventScroll: true });
-    opener = null;
-    cardOpener = null;
+    this.sheet = null;
+    this.paint();
+    this.opener?.()?.focus({ preventScroll: true });
+    this.opener = this.cardOpener = null;
   }
 
-  async function readMedals(auth: { base: string; token: string }, my: number): Promise<void> {
-    if (medalsRead || !medalsOn || !view?.events.some((e) => e.kind === 'medal')) return;
+  /** Poll only while the hub is active, never overlap interval requests. */
+  setActive(active: boolean): void {
+    this.active = active;
+    ++this.activeVersion;
+    clearTimeout(this.timer);
+    if (!active) {
+      ++this.seq;
+      this.dismiss();
+      return;
+    }
+    this.schedule();
+  }
+
+  private schedule(): void {
+    if (!this.active) return;
+    const version = this.activeVersion;
+    this.timer = setTimeout(() => {
+      const pending =
+        document.visibilityState === 'hidden' || this.isOpen() ? Promise.resolve() : this.refresh();
+      detach(
+        'news: poll',
+        pending.finally(() => {
+          if (version === this.activeVersion) this.schedule();
+        }),
+      );
+    }, 60_000);
+  }
+
+  private async readMedals(
+    auth: { base: string; token: string },
+    my: number,
+    key: string,
+  ): Promise<void> {
+    if (this.medalsRead || !this.view?.events.some((e) => e.kind === 'medal')) return;
     const res = await call(`${auth.base}/medals`, auth.token);
-    if (my !== seq || !res?.ok) return;
-    const defs = parseMedalDefs((res.body as { medals?: unknown } | null)?.medals);
-    medalNames = Object.fromEntries(defs.map((m) => [m.id, m.name]));
-    medalsRead = true;
-    paint();
+    if (!this.current(my, key) || !res?.ok) return;
+    this.medalNames = Object.fromEntries(
+      parseMedalDefs((res.body as { medals?: unknown } | null)?.medals).map((m) => [m.id, m.name]),
+    );
+    this.medalsRead = true;
+    this.paint();
   }
 
-  async function refresh(): Promise<void> {
-    const my = ++seq;
-    // Private achievements must be authorized afresh, including after leaving a corp
-    // or signing out while the same hub instance remains mounted.
-    if (view) view = { ...view, events: view.events.filter((e) => e.kind !== 'player_medal' || e.grade === 1) };
-    loadingMore = false;
-    const base = host.publicBase();
-    if (base !== viewBase) {
-      view = null;
-      viewBase = base;
-      medalNames = {};
-      medalsRead = false;
+  private syncIdentity(): void {
+    if (this.host.identity() !== this.identity) {
+      this.view = null;
+      this.identity = this.host.identity();
+      this.membership = undefined;
+      this.signedIn = false;
+      this.own = false;
+      this.filter = 'all';
+      this.notice = '';
+      this.applying = false;
+      ++this.applySeq;
+      this.medalNames = {};
+      this.medalsRead = false;
+      if (this.sheet?.kind === 'corp') this.sheet = { kind: 'feed' };
     }
-    failed = false;
-    paint();
-    const auth = await host.authorizedBase();
-    if (my !== seq) return;
-    newsToken = auth?.base === base ? auth.token : undefined;
-    const feed = base ? await call(`${base}/news`, newsToken) : null;
-    if (my !== seq) return;
+  }
+
+  async refresh(): Promise<void> {
+    this.syncIdentity();
+    const my = ++this.seq,
+      key = this.host.identity();
+    const base = this.host.publicBase();
+    // Private achievements and membership must be authorized afresh, even on network failure.
+    if (this.view)
+      this.view = {
+        ...this.view,
+        events: this.view.events.filter((e) => e.kind !== 'player_medal' || e.grade === 1),
+      };
+    this.loadingMore = false;
+    this.failed = false;
+    this.paint();
+    const auth = await this.host.authorizedBase();
+    if (!this.current(my, key)) return;
+    this.newsToken = auth?.base === base ? auth.token : undefined;
+    const [feed, me] = await Promise.all([
+      base ? call(`${base}/news`, this.newsToken) : null,
+      auth ? call(`${auth.base}/corps/me`, auth.token) : null,
+    ]);
+    if (!this.current(my, key)) return;
     const next = feed?.ok ? parseNewsView(feed.body) : null;
-    if (next) view = next;
-    else failed = true;
-    signedIn = auth !== null;
-    if (!auth) {
-      membership = undefined;
-      own = false;
-      paint();
-      return;
-    }
-    paint(); // лента — сразу, кнопки читателя — следом
-    const me = await call(`${auth.base}/corps/me`, auth.token);
-    if (my !== seq) return;
+    if (next) this.view = next;
+    else this.failed = true;
+    this.signedIn = auth !== null;
     const answer = me?.ok
       ? (me.body as { membership?: unknown; features?: { medals?: unknown } } | null)
       : null;
     const mine = me?.ok ? parseMembership(answer?.membership) : undefined;
-    // Не прочитали — неизвестно, а не «без корпорации» (правило 4 решения).
-    membership = mine === undefined ? undefined : mine && { corpId: mine.corpId, role: mine.role };
-    medalsOn = answer?.features?.medals !== false;
-    if (!showOwnFilter(reader())) own = false;
-    paint();
-    await readMedals(auth, my);
+    this.membership =
+      mine === undefined ? undefined : mine && { corpId: mine.corpId, role: mine.role };
+    if (!showOwnFilter(this.reader())) this.own = false;
+    this.paint();
+    if (auth && answer?.features?.medals !== false) await this.readMedals(auth, my, key);
   }
 
-  async function loadMore(): Promise<void> {
-    const base = host.publicBase();
-    const before = view ? nextNewsBefore(view) : null;
-    if (loadingMore || before === null || !base || base !== viewBase) return;
-    loadingMore = true;
-    paint();
-    const my = seq;
-    const auth = await host.authorizedBase();
-    if (my !== seq) return;
+  private async loadMore(): Promise<void> {
+    const before = this.view ? nextNewsBefore(this.view) : null;
+    const base = this.host.publicBase();
+    if (this.loadingMore || before === null || !base) return;
+    this.loadingMore = true;
+    this.paint();
+    const my = this.seq,
+      key = this.host.identity();
+    const auth = await this.host.authorizedBase();
+    if (!this.current(my, key)) return;
     const token = auth?.base === base ? auth.token : undefined;
-    if (token !== newsToken) { await refresh(); return; }
-    const res = await call(`${base}/news?before=${before}`, token);
-    if (my !== seq || !view) return; // ленту за это время перечитали целиком
-    loadingMore = false;
-    const page = res?.ok ? parseNewsView(res.body) : null;
-    if (page) view = appendNewsPage(view, page);
-    else host.note(t('news.offline'));
-    paint();
-    if (page) {
-      const auth = await host.authorizedBase();
-      if (auth && my === seq) await readMedals(auth, my);
+    if (token !== this.newsToken) {
+      await this.refresh();
+      return;
     }
+    const res = await call(`${base}/news?before=${before}`, token);
+    if (!this.current(my, key) || !this.view) return;
+    this.loadingMore = false;
+    const page = res?.ok ? parseNewsView(res.body) : null;
+    if (page) {
+      this.view = appendNewsPage(this.view, page);
+      this.notice = '';
+    } else this.notice = t('news.offline');
+    this.paint();
+    if (page && auth) await this.readMedals(auth, my, key);
   }
 
-  async function apply(corpId: string): Promise<void> {
-    if (applying) return;
-    applying = true;
-    paint();
-    const auth = await host.authorizedBase();
-    const res = auth
-      ? await call(`${auth.base}/corps/${encodeURIComponent(corpId)}/apply`, auth.token, {
-          method: 'POST',
-          body: {},
-        })
-      : null;
-    applying = false;
+  private async apply(corpId: string): Promise<void> {
+    if (this.applying) return;
+    this.applying = true;
+    this.paint();
+    const key = this.host.identity(),
+      operation = ++this.applySeq;
+    const current = (): boolean => key === this.host.identity() && operation === this.applySeq;
+    const auth = await this.host.authorizedBase();
+    const res =
+      auth && current()
+        ? await call(`${auth.base}/corps/${encodeURIComponent(corpId)}/apply`, auth.token, {
+            method: 'POST',
+            body: {},
+          })
+        : null;
+    if (!current()) return;
+    this.applying = false;
+    ++this.seq;
+    this.loadingMore = false;
     if (res?.ok) {
-      membership = { corpId, role: 'recruit' }; // the row and the card say «Заявка отправлена»
-      notice = '';
+      this.membership = { corpId, role: 'recruit' };
+      this.notice = '';
     } else {
       const code = (res?.body as { error?: unknown } | null)?.error;
-      notice = '✖ ' + (typeof code === 'string' ? host.errText(code) : t('news.offline'));
-      host.note(notice);
-      if (!sheet) notice = '';
+      this.notice = '✖ ' + (typeof code === 'string' ? this.host.errText(code) : t('news.offline'));
+      this.host.note(this.notice);
     }
-    paint();
+    this.paint();
   }
 
-  function onClick(e: Event): void {
-    const b = (e.target as HTMLElement | null)?.closest?.<HTMLElement>(SELECTOR);
+  private onClick(e: Event): void {
+    const b = (e.target as HTMLElement | null)?.closest<HTMLElement>(
+      '[data-nw-filter],[data-nw-own],[data-nw-more],[data-nw-corp],[data-nw-apply],[data-nw-battles],[data-nw-cabinet],[data-nw-close],[data-nw-settings]',
+    );
     if (!b || (b as HTMLButtonElement).disabled) return;
-    const root = e.currentTarget as HTMLElement;
-    const d = b.dataset;
-    const refocus = (sel: string): void => {
-      paint();
-      root.querySelector?.<HTMLElement>(sel)?.focus({ preventScroll: true });
-    };
+    const d = b.dataset,
+      root = this.host.sheet();
     if (d.nwFilter !== undefined) {
-      filter = NEWS_FILTERS.find((f) => f === d.nwFilter) ?? 'all';
-      refocus(`[data-nw-filter="${filter}"]`);
+      this.filter = NEWS_FILTERS.find((f) => f === d.nwFilter) ?? 'all';
+      this.paint();
     } else if (d.nwOwn !== undefined) {
-      own = !own;
-      refocus('[data-nw-own]');
-    } else if (d.nwMore !== undefined) {
-      detach('лента: следующая страница', loadMore());
-    } else if (d.nwAll !== undefined) {
-      openFeed(() => root.querySelector?.<HTMLElement>('[data-nw-all]'));
-    } else if (d.nwCorp !== undefined) {
+      this.own = !this.own;
+      this.paint();
+    } else if (d.nwMore !== undefined) detach('news: next page', this.loadMore());
+    else if (d.nwCorp !== undefined) {
       const corp = { id: d.nwCorp, name: d.nwName ?? '' };
-      // Id корпорации — данные сервера: в селектор его не вставляют, кнопку ищут сравнением.
       const back = (): HTMLElement | undefined =>
-        Array.from(root.querySelectorAll?.<HTMLElement>('[data-nw-corp]') ?? []).find(
+        Array.from(root.querySelectorAll<HTMLElement>('[data-nw-corp]')).find(
           (el) => el.dataset.nwCorp === corp.id,
         );
-      detach('лента: карточка корпорации', openCard(corp, back));
-    } else if (d.nwApply !== undefined) {
-      detach('лента: заявка в корпорацию', apply(d.nwApply));
-    } else if (d.nwBattles !== undefined) {
-      dismiss();
-      host.openCorp(d.nwBattles === 'history' ? 'history' : 'current');
+      detach('news: corporation card', this.openCard(corp, back));
+    } else if (d.nwApply !== undefined) detach('news: apply', this.apply(d.nwApply));
+    else if (d.nwBattles !== undefined) {
+      this.dismiss();
+      this.host.openCorp(d.nwBattles === 'history' ? 'history' : 'current');
     } else if (d.nwCabinet !== undefined) {
-      dismiss();
-      host.openCorp('hq');
-    } else if (d.nwClose !== undefined) {
-      close();
-    }
+      this.dismiss();
+      this.host.openCorp('hq');
+    } else if (d.nwSettings !== undefined) {
+      this.close();
+      this.host.openSettings();
+    } else if (d.nwClose !== undefined) this.close();
   }
 
-  host.column().addEventListener('click', onClick);
-  host.teaser().addEventListener('click', onClick);
-  host.sheet().addEventListener('click', onClick);
+  private trapFocus(e: KeyboardEvent): void {
+    if (e.key !== 'Tab' || !this.sheet) return;
+    const buttons = Array.from(
+      this.host.sheet().querySelectorAll<HTMLElement>('button:not(:disabled)'),
+    );
+    const first = buttons[0],
+      last = buttons[buttons.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last?.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first?.focus();
+    }
+  }
+}
 
-  return { refresh, isOpen: () => sheet !== null, close };
+export function initNews(host: NewsHost): NewsScreen {
+  return new NewsScreen(host);
 }

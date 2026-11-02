@@ -3235,8 +3235,6 @@ export const pl: Record<string, string> = {
   'rank.total': 'łącznie w rankingu: {n}',
   'rank.unit.influence': 'wpł',
   'rank.unit.xp': 'pd',
-  'news.all': 'Cały kanał',
-  'news.all.count': 'Cały kanał · {n}',
   'news.applied': 'Zgłoszenie wysłane',
   'news.battles': 'Do bitew',
   'news.card.failed': 'Karta niedostępna',
