@@ -1,17 +1,9 @@
+import { volleyShare } from '../util/volley';
 import type { UnitStack } from './gameState';
 import type { GameData } from '../data/schemas';
 import { damageByClass, damageUnits, MAX_COMBAT_ROUNDS, stackHull } from '../util/combat';
-import {
-  addPools,
-  hasGroundTargets,
-  poolsTotal,
-  splitDealt,
-  targetedVolley,
-  type ClassPools,
-  type FireRole,
-} from '../util/groundTargets';
-import { cappedUnitStat } from '../util/stacks';
-import { volleyShare } from '../util/volley';
+import { splitDealt, targetedVolley } from '../util/groundTargets';
+import { combatSequence } from '../util/combatSequence';
 import { effectiveStats } from '../util/loadout';
 import { deepClone } from '../util/clone';
 import { divertFortressDamage } from '../util/fortressDamage';
@@ -21,9 +13,9 @@ import { refreshFortressBody } from './fortress';
 /**
  * Combat preview — «если атакую — что будет?» (ONB-6 / G4, onboarding-roadmap §ONB-6).
  *
- * A PURE what-if over the combat module's own round engine: the same simultaneous
- * round — aggressor fires `attack`, the standing side answers with `defense` — the
- * same tier-ordered pure damage model (`damageUnits`: front→mid→rear,
+ * A PURE what-if over the combat module's own round engine: the same sequential
+ * exchange — aggressor fires `attack`, the standing side answers with `defense` — the
+ * same echelon damage model (`damageUnits`: 50/30/20, equal shares inside each line,
  * ablative shields first, whole units lost as pools drop), the same stalemate
  * valve. Inputs are never mutated (the sim runs on deep clones); no bus, no
  * schedule, no RNG — combat resolution is fully deterministic.
@@ -133,12 +125,9 @@ type Role = PreviewSideInput['role'];
 /**
  * ПРОГНОЗ НА N СТОРОН (MSB-6, UIX-6.3) — зеркало живого боя, правило в правило.
  *
- * РАУНД — тот же, что `combat.tick` 3.x. Предраундовый снимок (сперва ВСЕ залпы, потом
- * весь урон), кап линии огня на сторону. Атакующий делит свой `attack` между всеми
- * враждебными живыми (`volleyShare`, MSB-2), а обороняющийся отвечает КАЖДОМУ атакующему,
- * который его бьёт, полным `defense` по нему одному (§0.0 №1, уточнение 2026-09-28). Сам
- * обороняющийся первым не стреляет: двое обороняющихся друг друга не бьют. Часы у всех
- * атакующих общие — разнесённые «В атаку» по времени залпы прогноз сводит в один раунд.
+ * РАУНД — последовательные обмены: атака, потери, ответ выжившей обороны.
+ * Каждый атакующий фиксирует залп по всем целям до ответов. При одинаковых часах
+ * раньше действует раньше вступившая сторона. Разнесённые часы прогноз сводит в раунд.
  *
  * ЦЕПОЧКА (§0.0 №5). Гибель любой стороны закрывает бой, но выжившие тут же сцепляются
  * заново, поэтому прогноз досчитывает все звенья до конца:
@@ -147,8 +136,7 @@ type Role = PreviewSideInput['role'];
  *    кому-нибудь в новом бою, вступают атакующими. Корабли уносят урон в новое звено;
  *  · на земле (есть сторона `holds`) — как штурм после гибели: мир держит обороняющийся,
  *    враждебные ему берега атакуют. Пал гарнизон — мир берёт первый уцелевший берег этого
- *    звена и уже сам обороняется. Между звеньями наземные стороны возвращаются в покой —
- *    полный корпус и щит у уцелевших стеков, как после любого наземного боя.
+ *    звена и уже сам обороняется. Между звеньями наземные стороны сохраняют повреждения корпуса; щит сбрасывается.
  * Цепочку обрывает предохранитель `MAX_COMBAT_ROUNDS` в любом звене (после ничьей никто
  * не сцепляется, CMB-6) или бой, где стрелять некому.
  *
@@ -186,52 +174,22 @@ export function previewSides(
 
   /** Один раунд звена `link`. Ложь — стрелять некому (никто из атакующих не враг никому). */
   const round = (link: readonly number[], roles: readonly Role[]): boolean => {
-    const incoming = new Array<number>(input.length).fill(0);
-    // Урон по роду войск — то же правило, что в живом раунде (`util/groundTargets.ts`):
-    // против наземных войск залп считается под состав цели и ложится по родам.
-    const byClass = new Array<ClassPools | undefined>(input.length).fill(undefined);
-    const fire = (from: number, targets: readonly number[], role: FireRole): void => {
-      if (targets.some((j) => hasGroundTargets(live[j]!, data))) {
-        for (const j of targets) {
-          const shot = targetedVolley(live[from]!, live[j]!, data, role);
-          const share = volleyShare(shot.total, targets.length);
-          incoming[j]! += share;
-          const pools = splitDealt(shot.pools, shot.total, share);
-          byClass[j] = byClass[j] ? addPools(byClass[j]!, pools) : pools;
+    return combatSequence(link, link.filter(i => roles[i] === 'attacker'), up, foes,
+      i => roles[i] === 'defender', (from, targets, role) => {
+        const shots = targets.map(i => {
+          const shot = targetedVolley(live[from]!, live[i]!, data, role);
+          const damage = volleyShare(shot.total, targets.length);
+          return { i, damage, pools: splitDealt(shot.pools, shot.total, damage) };
+        });
+        for (const { i, damage, pools } of shots) {
+          const structure = structures[i];
+          const hullInput = divertFortressDamage(structure, live[i]!, damage, data).hullInput;
+          live[i] = structure?.fortress
+            ? damageUnits(live[i]!, hullInput, data).survivors
+            : damageByClass(live[i]!, pools, data).survivors;
+          if (structure?.fortress) for (const body of live[i]!) refreshFortressBody(structure, body, data);
         }
-        return;
-      }
-      const share = volleyShare(cappedUnitStat(live[from]!, data, role), targets.length);
-      for (const j of targets) incoming[j]! += share;
-    };
-    // Порядок обмена — порядок живого такта: атакующий бьёт, и тут же ему отвечают
-    // обороняющиеся из его врагов. Числа те же при любом порядке; порядок держит
-    // сложение долей бит в бит.
-    let fired = false;
-    for (const i of link) {
-      if (roles[i] !== 'attacker') continue;
-      const targets = link.filter((j) => foes(i, j));
-      if (targets.length === 0) continue;
-      fired = true;
-      fire(i, targets, 'attack');
-      for (const j of targets) if (roles[j] === 'defender') fire(j, [i], 'defense');
-    }
-    if (!fired) return false;
-    for (const i of link) {
-      if (!(incoming[i]! > 0)) continue;
-      incoming[i] = divertFortressDamage(structures[i], live[i]!, incoming[i]!, data).hullInput;
-      const pools = structures[i]?.fortress ? undefined : byClass[i];
-      live[i] = pools
-        ? damageByClass(
-            live[i]!,
-            { ...pools, other: pools.other + Math.max(0, incoming[i]! - poolsTotal(pools)) },
-            data,
-          ).survivors
-        : damageUnits(live[i]!, incoming[i]!, data).survivors;
-      const structure = structures[i];
-      if (structure?.fortress) for (const body of live[i]!) refreshFortressBody(structure, body, data);
-    }
-    return true;
+      });
   };
 
   /** Следующее звено цепочки: участники в порядке сторон нового боя и их роли, либо

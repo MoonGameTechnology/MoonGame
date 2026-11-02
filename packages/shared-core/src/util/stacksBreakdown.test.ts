@@ -72,14 +72,14 @@ describe('VET-1 — разбивка вклада по стекам', () => {
     }
   });
 
-  it('стек за пределами капа в разбивку не попадает ВОВСЕ, а не строкой с нулём', () => {
-    // 10 копий уже выбирают весь кап — катера не стреляют ни одним стволом.
+  it('каждый живой стек участвует в залпе сверх порога', () => {
+    // Все 14 кораблей стреляют с одним коэффициентом 10/14, включая катера.
     const fleet = stacks([
       ['lance', 10],
       ['cutter', 4],
     ]);
     const breakdown = cappedUnitBreakdown(fleet, data, 'attack');
-    expect(breakdown.map((c) => c.unit)).toEqual(['lance']);
+    expect(breakdown.map((c) => c.unit)).toEqual(['lance', 'cutter']);
   });
 
   it('ключ разбивки — ИНДЕКС стека, а не имя юнита', () => {
@@ -96,15 +96,15 @@ describe('VET-1 — разбивка вклада по стекам', () => {
     expect(breakdown.find((c) => c.index === 1)?.firing).toBe(2);
   });
 
-  it('частично попавший в линию огня стек отдаёт РОВНО свою часть', () => {
+  it('весь стек стреляет с общим коэффициентом численности', () => {
     const fleet = stacks([
       ['lance', 8],
       ['cutter', 6],
     ]);
     const breakdown = cappedUnitBreakdown(fleet, data, 'attack');
     const cutter = breakdown.find((c) => c.unit === 'cutter');
-    expect(cutter?.firing).toBe(COMBAT_UNIT_CAP - 8); // 2 из шести
-    expect(cutter?.damage).toBe(2 * 2.7);
+    expect(cutter?.firing).toBe(6); // 2 из шести
+    expect(cutter?.damage).toBeCloseTo(6 * 2.7 * COMBAT_UNIT_CAP / 14, 10);
   });
 
   it('транспорт без пушек стоит в линии, но его вклад — ноль', () => {

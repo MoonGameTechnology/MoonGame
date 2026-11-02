@@ -173,8 +173,9 @@ describe('ROS-2.2 — ответный урон в момент удара (пр
     // Десять крейсеров по 20 — 200 единиц огня в пределах учёта; ответка это 5% от
     // них, то есть 10, а корпус челнока 10 → ровно одна сбитая машина из восьми.
     const { state, events } = run(world(), strike({ targetFleetId: 'E1' }));
-    expect(home(state)).toBe(7);
-    expect(repelled(events)?.downed).toBe(1);
+    expect(home(state)).toBe(8);
+    expect(repelled(events)?.downed).toBe(0);
+    expect(repelled(events)?.damage).toBeCloseTo(10 * (1 - 96 / 2000), 10);
   });
 
   it('НЕДОБОР ДО КОРПУСА НЕ ПРОПАДАЕТ И НЕ ОКРУГЛЯЕТСЯ ВВЕРХ: один крейсер не сбивает никого', () => {
@@ -200,7 +201,16 @@ describe('ROS-2.2 — зональное ПВО: вот за что платят
     const { events } = run(world({ defenders: [['escort', 1]] }), strike({ targetFleetId: 'E1' }));
     expect(pdDamage(events)).toBe(40);
     // Ответка: доля пушек (20 × 5% = 1) плюс та же зенитка.
-    expect(repelled(events)?.damage).toBe(41);
+    expect(repelled(events)?.damage).toBeCloseTo(41 * (1 - 48 / 200), 10);
+  });
+
+  it('разрушенная ударом зенитка не успевает ответить', () => {
+    const s = world({ aa: true });
+    s.planets.B!.buildings = [{ type: 'zonal_aa', level: 1, hp: 1 }];
+    const { state, events } = run(s, strike({ targetPlanetId: 'B' }));
+    expect(state.planets.B!.buildings).toEqual([]);
+    expect(repelled(events)).toBeUndefined();
+    expect(home(state)).toBe(8);
   });
 
   it('здание с зениткой — обычная постройка: снесли её ударом, и мир снова безответен', () => {
@@ -253,7 +263,7 @@ describe('ROS-2.2 — что ответка НЕ делает (правила 5�
     const mine = state.planets.B?.buildings.find((b) => b.type === 'mine');
     // Восемь машин по siegeDamage 1 бьют ДО того, как ответка их проредила:
     // залпы считаются из одного снимка, как у артиллерии.
-    expect(mine!.hp).toBe(data.buildings.mine!.hp - 8);
+    expect(mine!.hp).toBeCloseTo(data.buildings.mine!.hp - 8 * 0.9, 10);
   });
 
   it('событие ответки называет и стрелка, и цель, и цену — иначе лента боя молчит', () => {

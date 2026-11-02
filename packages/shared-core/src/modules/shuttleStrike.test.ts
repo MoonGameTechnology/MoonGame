@@ -294,7 +294,7 @@ describe('перехват — свои челноки поднимаются н
     const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
     // Долетел ОДИН челнок, и он подбит: 4 недобитых урона из корпуса 10 — бьёт на 60%
     // (SHU-5.7), 1 × siegeDamage 1 × 0.6.
-    expect(mine?.hp).toBeCloseTo(19.4);
+    expect(mine?.hp).toBeCloseTo(20 - 0.6 * 0.9);
   });
 
   it('удар, потерявший ВСЕ машины, до цели не доходит вовсе', () => {
@@ -328,7 +328,7 @@ describe('перехват — свои челноки поднимаются н
     const s = apply(defended({ fuel: 0 }), strike({ targetPlanetId: 'B' }));
     const after = advance(s, 2);
     const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
-    expect(mine?.hp).toBe(18); // оба челнока дошли: 2 × 1
+    expect(mine?.hp).toBeCloseTo(20 - 2 * 0.9, 10); // оба челнока дошли: 2 × 1
   });
 
   it('СВОЙ удар не перехватывают — поднимаются только против чужого', () => {
@@ -365,7 +365,7 @@ describe('перехват — свои челноки поднимаются н
     const s = apply(withBombers, strike({ targetPlanetId: 'B' }));
     const after = advance(s, 2);
     const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
-    expect(mine?.hp).toBe(18); // удар дошёл целиком
+    expect(mine?.hp).toBeCloseTo(20 - 2 * 0.9, 10); // удар дошёл целиком
   });
 });
 
@@ -393,14 +393,14 @@ describe('удар челноков — попадание и возврат (п
     const s = apply(world(), strike({ targetPlanetId: 'B' }));
     const after = advance(s, 2);
     const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
-    expect(mine?.hp).toBe(18);
+    expect(mine?.hp).toBeCloseTo(20 - 2 * 0.95, 10);
   });
 
   it('бомбардировщик по зданиям бьёт заметно сильнее перехватчика', () => {
     const s = apply(withHangar(world(), 'bomber'), strike({ targetPlanetId: 'B', unit: 'bomber' }));
     const after = advance(s, 2);
     const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
-    expect(mine?.hp).toBe(4); // 2 × 8 = 16 против 2 у перехватчика
+    expect(mine?.hp).toBeCloseTo(20 - 16 * 0.95, 10); // 2 × 8 = 16 против 2 у перехватчика
   });
 
   it('по КОРАБЛЯМ обе машины бьют своим attack, осадный стат не участвует', () => {
@@ -421,7 +421,7 @@ describe('удар челноков — попадание и возврат (п
     );
     const after = advance(s, 2);
     const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
-    expect(mine?.hp).toBe(8); // 2 × 6 = 12, как до разделения профилей
+    expect(mine?.hp).toBeCloseTo(20 - 12 * 0.95, 10); // 2 × 6 = 12, как до разделения профилей
   });
 
   it('ЧЕЛНОКИ ВОЗВРАЩАЮТСЯ В ТОТ ЖЕ ПОРТ', () => {

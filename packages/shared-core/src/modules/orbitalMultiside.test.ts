@@ -203,6 +203,8 @@ describe('MSB-7 — обстрел мира уже N-универсален, и 
             .map((e) => (e.payload as { power: number }).power)
         : [];
     // Цель у обстрела одна и она не флот, а мир под килем: делить нечего.
-    for (const p of power(three)) expect(p).toBeCloseTo(power(one)[0]!, 10);
+    // AA deals 120 to one ship, or 40 to each of three. Their bombardment uses remaining HP.
+    expect(power(one)).toEqual([20 * (1 - 120 / 1000)]);
+    for (const p of power(three)) expect(p).toBeCloseTo(20 * (1 - 40 / 1000), 10);
   });
 });

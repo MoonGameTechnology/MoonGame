@@ -20,8 +20,7 @@ const data: GameData = parseGameData({
     // Тяжёлый тыловой корпус. Своей линии у тяжёлых больше нет (ROS-2.1) — линию
     // называет только поле `line`, и исключений из неё не существует.
     gun: { faction: 'x', stats: { attack: 12, defense: 1, speed: 4, hp: 20 }, line: 'rear' },
-    // A ground unit that ASKS for the rear — lines are a ship formation, so the
-    // request must be ignored and the trooper must stand in the front line.
+    // Ground troops honour their declared formation, too.
     trooper: {
       faction: 'x',
       stats: { attack: 6, defense: 6, speed: 3, hp: 24 },
@@ -115,7 +114,7 @@ describe('damageUnits — the pure damage model', () => {
     // поровну, поэтому 100 урона идут 65 во фронт и 35 в тыл (ROS-2.1).
     const units = [stack('healer', 4), stack('cruiser', 2)];
     const { survivors, deaths } = damageUnits(units, 100, data);
-    expect(deaths).toEqual([{ unit: 'cruiser', count: 1 }, { unit: 'healer', count: 3 }]);
+    expect(deaths).toEqual([{ unit: 'healer', count: 3 }, { unit: 'cruiser', count: 1 }]);
     expect(survivors).toEqual([
       { unit: 'healer', count: 1, hp: 5 }, // тыл: 40 − 35
       { unit: 'cruiser', count: 1, hp: 15 }, // фронт: 80 − 65
@@ -132,11 +131,9 @@ describe('damageUnits — the pure damage model', () => {
     damageUnits(units, 100, data);
     expect(units.find((u) => u.unit === 'cruiser')?.hp).toBe(110); // 160 − 50
     expect(units.find((u) => u.unit === 'picket')?.hp).toBe(90); // 120 − 30
-    // Тыловые 20 делятся ВНУТРИ линии по id (`gun` < `healer`): пушки принимают
-    // залп первыми и держат его целиком.
-    expect(units.find((u) => u.unit === 'gun')?.hp).toBe(40); // 60 − 20
-    // Незадетый стек так и остаётся без пула hp: он появляется только при попадании.
-    expect(units.find((u) => u.unit === 'healer')?.hp).toBeUndefined();
+    // Each of the eleven rear units receives 20/11, regardless of its id or HP.
+    expect(units.find((u) => u.unit === 'gun')?.hp).toBeCloseTo(60 - 20 * 3 / 11, 10);
+    expect(units.find((u) => u.unit === 'healer')?.hp).toBeCloseTo(80 - 20 * 8 / 11, 10);
   });
 
   it('re-splits what a dying line could not absorb — no damage is wasted', () => {
@@ -148,7 +145,7 @@ describe('damageUnits — the pure damage model', () => {
     expect(units.find((u) => u.unit === 'cruiser')?.hp).toBe(70); // 160 − 90
   });
 
-  it('sorts by unit id INSIDE a line, so stack order cannot change the outcome', () => {
+  it('shares equally inside a line, independent of stack order', () => {
     const a = [stack('cruiser', 1), stack('frigate', 1)]; // both front
     const b = [stack('frigate', 1), stack('cruiser', 1)];
     damageUnits(a, 30, data);
@@ -156,10 +153,9 @@ describe('damageUnits — the pure damage model', () => {
     expect(a).toEqual(b.slice().reverse());
   });
 
-  it('keeps ground units in ONE line — a ground `line` field is ignored', () => {
-    // `trooper` asks for the rear but is ground: it must take the whole volley,
-    // not 40% of it, so an army is never carved into lines.
-    expect(unitTier(data.units.trooper!)).toBe('front');
+  it('honours ground unit echelons; a lone line takes the full volley', () => {
+    // Rear is the only occupied line, so it receives the whole volley.
+    expect(unitTier(data.units.trooper!)).toBe('rear');
     const units = [stack('trooper', 4)]; // 96 hp
     damageUnits(units, 24, data);
     expect(units[0]?.hp).toBe(72); // all 24 landed
@@ -219,11 +215,11 @@ describe('damageEvenly — урон поровну на каждого юнит�
     expect(deaths).toEqual([{ unit: 'trooper', count: 1 }]);
   });
 
-  it('в отличие от боя, не выбирает стек первым по id', () => {
+  it('плоское распределение отличается от эшелонов', () => {
     const focused = [stack('trooper', 3), stack('walker', 1)];
     damageUnits(focused, 40, data);
-    // Бой: оба наземные, одна линия, `trooper` < `walker` — весь урон на солдат.
-    expect(focused[1]).toEqual({ unit: 'walker', count: 1 });
+    // Formation: walker front takes 65% of 40; trooper rear takes 35%.
+    expect(focused[1]).toEqual({ unit: 'walker', count: 1, hp: 22 });
     const even = [stack('trooper', 3), stack('walker', 1)];
     damageEvenly(even, 40, data);
     expect(even[1]?.hp).toBe(38);

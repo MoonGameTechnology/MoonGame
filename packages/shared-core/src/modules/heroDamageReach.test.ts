@@ -309,7 +309,9 @@ describe('CORE-DMG-3 — бонус героя доходит до НЕБЛИЖ�
     expect(plain.repelled).toBeGreaterThan(0);
     expect(carrierStrike(auraHero('p2', 'B')).repelled).toBeCloseTo(plain.repelled * (1 + AURA), 6);
     // …а герой НАПАДАЮЩЕГО ответку не усиливает — она не его выстрел.
-    expect(carrierStrike(auraHero('p1', 'A')).repelled).toBeCloseTo(plain.repelled, 6);
+    const buffed = carrierStrike(auraHero('p1', 'A'));
+    const full = 2 * data.units.cruiser!.stats.hp;
+    expect(buffed.repelled).toBeCloseTo(plain.repelled * (full - buffed.hit) / (full - plain.hit), 6);
   });
 
   it('ПВО МИРА — аура НЕ доходит: стреляет планета, а не флот', () => {

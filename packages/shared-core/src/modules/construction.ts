@@ -1,5 +1,6 @@
 import type { BuildUnitPayload, CompletePayload } from '../state/construction';
 import { constructionModuleSnapshot, completionModuleSnapshot } from '../util/arsenalLoadout';
+import type { StructureDamage } from '../util/structureDamage';
 import { registerConstructionMaintenance } from './construction/maintenance';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type {
@@ -157,7 +158,7 @@ const FORT_GARRISON_CAP = 3;
  * Игроковы войска в том же `garrison` не трогаются: выданные отличимы по id юнита,
  * заказать который нельзя (`issued`), — поэтому «чей это стек» не надо угадывать.
  */
-function syncIssuedGarrison(h: HandlerContext, planet: Planet): void {
+function syncIssuedGarrison(h: HandlerContext, planet: Planet, issue = true): void {
   let target = 0;
   for (const b of planet.buildings) {
     if (b.hp <= 0) continue;
@@ -175,6 +176,7 @@ function syncIssuedGarrison(h: HandlerContext, planet: Planet): void {
     if (idx >= 0) planet.garrison.splice(idx, 1);
     return;
   }
+  if (!issue) return; // Damage removes defenders whose source fell; it never recruits replacements.
   if (idx < 0) {
     planet.garrison.push({ unit: GARRISON_UNIT, count: target });
     return;
@@ -677,7 +679,7 @@ function damageBuildings(
   planet.buildings = survivors;
   // Разрушенное здание уносит выданный им гарнизон: иначе защитники пережили бы то, что
   // их породило, и мир остался бы «занят» призраками снесённого форта.
-  syncIssuedGarrison(h, planet);
+  syncIssuedGarrison(h, planet, false);
 }
 
 /** Снять `amount` прочности с заражённых построек мира — по очереди, в порядке массива,
@@ -826,8 +828,13 @@ export const constructionModule: GameModule = {
   // 1.8.0: залеченный госпиталем стек сливается с целыми того же вида (раны теперь
   // переживают бой, `combat` 3.10.0).
   // 1.9.0: своя полоса у каждой производственной постройки — верфь, порт, казармы, завод (BLD-2.1).
-  version: '1.11.0',
+  // 1.12.0 combines paid module snapshots with immediate structure casualties.
+  version: '1.12.0',
   setup(api) {
+    api.provideCapability<StructureDamage>('construction.impact', (h, id, amount, owner, covered) => {
+      const planet = h.state.planets[id];
+      if (planet && amount > 0) damageBuildings(h, planet, amount, owner, covered);
+    });
     api.provideCapability<BuildingDamage>('building.damage', damageChosenBuildings);
     api.provideCapability<ConstructionDelay>('construction.delay', delayFirstOrder);
     api.onAction('building.repair', (action, h) => {
@@ -1559,35 +1566,27 @@ export const constructionModule: GameModule = {
       }
     }
 
-    // Постройки мира снижают урон по нему — при штурме (наземная фаза) и при обстреле с
-    // орбиты (решение владельца 2026-09-26: «и на штурм, и на бомбардировку»). Доля
-    // (`worldDamageReduction`) уходит в пул очками `coverPoints` — одна лишь защита мира даёт
-    // ровно свою долю, а с другими источниками пула складывается под его единым потолком.
-    //
-    // Кого именно прикрывают — `fortificationCovers` (решение владельца 5): владельца и
-    // его союзника. Раньше здесь стояло `planet.owner !== a.defender` → выход, то есть
-    // союзник, приведший войска оборонять ВАШ мир, не получал ничего; расхождение было
-    // тихим, потому что все тесты проверяли владельца, а после MSB-4 обороняющихся на
-    // одном мире может быть несколько.
+    // Standing buildings cover the owner and allies against all three ground channels.
+    // Space-fleet cover belongs to station, even when hit by aircraft.
     api.hook<number>('combat.mitigation', (pool, args, h) => {
-      const a = args as { phase?: string; location?: string; defender?: string };
-      if (a.phase !== 'ground' && a.phase !== 'bombard') return pool;
+      const a = args as { phase?: string; location?: string; defender?: string; defenderFleet?: string };
+      if (a.phase !== 'ground' && a.phase !== 'bombard' && a.phase !== 'shuttle') return pool;
+      if (a.phase === 'shuttle' && a.defenderFleet !== undefined) return pool;
       const planet = fortificationCovers(h, a.location, a.defender);
       if (!planet) return pool;
       return pool + coverPoints(worldDamageReduction(planet, h.ctx.data));
     });
 
-    // The ground assault wears down the contested planet's structures each round
-    // (GDD §7.4). The event carries the location and the defending owner, so this
-    // still fires correctly on the round that ENDS the battle — by which point
-    // combat has already removed the battle and may have flipped `planet.owner`.
+    // Compatibility for event-only producers; current combat applies each hit synchronously.
     api.on('combat.round', (event, h) => {
       const p = event.payload as {
         phase?: string;
         location?: string;
         defender?: string;
         dmgToDefender?: number;
+        structuresApplied?: boolean;
       };
+      if (p.structuresApplied) return;
       if (p.phase !== 'ground' || typeof p.location !== 'string') {
         return; // only the ground assault wears structures (orbital is fleet-vs-fleet)
       }
@@ -1618,7 +1617,9 @@ export const constructionModule: GameModule = {
         owner?: string | null;
         hit?: DamageHookArgs;
         factor?: number;
+        structuresApplied?: boolean;
       };
+      if (p.structuresApplied) return;
       if (typeof p.planetId !== 'string' || typeof p.power !== 'number' || p.power <= 0) {
         return;
       }

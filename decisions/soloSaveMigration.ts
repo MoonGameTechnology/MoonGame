@@ -285,15 +285,26 @@ export const HERO_MOBILIZATION_SOLO_MIGRATION = {
   toDataHash: '023cd15f09ee90',
 } as const;
 
-/** Optional snapshots pin paid orders and hero loadouts before the next arsenal sync.
- * Old snapshots remain readable; the existing lazy pinning preserves their values. */
-export const MODULE_PROGRESSION_SOLO_MIGRATION = {
+/** Combat echelons and post-loss replies retain the save's state shape. Existing
+ * hull/shield pools, orders, clocks and RNG survive; later volleys use the new rules. */
+export const ECHELONS_SOLO_MIGRATION = {
   fromRules: HERO_MOBILIZATION_SOLO_MIGRATION.toRules,
   fromData: HERO_MOBILIZATION_SOLO_MIGRATION.toData,
   fromDataHash: HERO_MOBILIZATION_SOLO_MIGRATION.toDataHash,
-  toRules: '1cabdded184a38',
-  toData: HERO_MOBILIZATION_SOLO_MIGRATION.toData,
-  toDataHash: HERO_MOBILIZATION_SOLO_MIGRATION.toDataHash,
+  toRules: '08554ff861af98',
+  toData: '0.1.75',
+  toDataHash: '0afbb7f3739821',
+} as const;
+
+/** Optional snapshots pin paid orders and hero loadouts before the next arsenal sync.
+ * Old snapshots remain readable; the existing lazy pinning preserves their values. */
+export const MODULE_PROGRESSION_SOLO_MIGRATION = {
+  fromRules: ECHELONS_SOLO_MIGRATION.toRules,
+  fromData: ECHELONS_SOLO_MIGRATION.toData,
+  fromDataHash: ECHELONS_SOLO_MIGRATION.toDataHash,
+  toRules: '049dc3b8692491',
+  toData: ECHELONS_SOLO_MIGRATION.toData,
+  toDataHash: ECHELONS_SOLO_MIGRATION.toDataHash,
 } as const;
 
 /** Army 1.4.0 adds optional formation identities and claim sources. Older claims
@@ -302,7 +313,7 @@ export const ARMY_SELECTION_SOLO_MIGRATION = {
   fromRules: MODULE_PROGRESSION_SOLO_MIGRATION.toRules,
   fromData: MODULE_PROGRESSION_SOLO_MIGRATION.toData,
   fromDataHash: MODULE_PROGRESSION_SOLO_MIGRATION.toDataHash,
-  toRules: '19a0134f5519be',
+  toRules: '13fa26ace0540a',
   toData: MODULE_PROGRESSION_SOLO_MIGRATION.toData,
   toDataHash: MODULE_PROGRESSION_SOLO_MIGRATION.toDataHash,
 } as const;
@@ -333,6 +344,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   FORTRESS_MODEL_SOLO_MIGRATION,
   LOAD_FIRST_SOLO_MIGRATION,
   HERO_MOBILIZATION_SOLO_MIGRATION,
+  ECHELONS_SOLO_MIGRATION,
   MODULE_PROGRESSION_SOLO_MIGRATION,
   ARMY_SELECTION_SOLO_MIGRATION,
 ];

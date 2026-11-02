@@ -46,7 +46,7 @@ const stack = (unit: string, count: number, extra: Partial<UnitStack> = {}): Uni
   ...extra,
 });
 
-describe('cappedUnitStat — the Bytro combat line cap', () => {
+describe('cappedUnitStat — soft force-size efficiency', () => {
   it('matches sumUnitStat while the side fits under the cap', () => {
     const units = [stack('gun', 6), stack('pea', 4)];
     expect(cappedUnitStat(units, data, 'attack')).toBe(sumUnitStat(units, data, 'attack')); // 76
@@ -58,26 +58,26 @@ describe('cappedUnitStat — the Bytro combat line cap', () => {
     expect(cappedUnitStat([stack('gun', 200)], data, 'attack')).toBe(10 * 10);
   });
 
-  it('fills the line strongest-first across stacks, independent of stack order', () => {
-    // 6 guns (10) + 8 peas (4): the guns all fire, only 4 peas squeeze in.
+  it('all mixed units fire at the same size coefficient, independent of stack order', () => {
+    // All 14 fire, each at 10/14 efficiency.
     const ab = cappedUnitStat([stack('gun', 6), stack('pea', 8)], data, 'attack');
     const ba = cappedUnitStat([stack('pea', 8), stack('gun', 6)], data, 'attack');
-    expect(ab).toBe(6 * 10 + 4 * 4);
+    expect(ab).toBeCloseTo((6 * 10 + 8 * 4) * 10 / 14, 10);
     expect(ba).toBe(ab);
   });
 
-  it('reads EFFECTIVE stats — a fitted stack outranks a bare one of the same hull', () => {
-    // 3 fitted guns (14) fire first, then 7 of the 9 bare guns (10).
+  it('reads effective loadout stats before the common size coefficient', () => {
+    // All 12 fire at 10/12, including both fitted and bare hulls.
     const units = [stack('gun', 9), stack('gun', 3, { modules: ['targeting'] })];
-    expect(cappedUnitStat(units, data, 'attack')).toBe(3 * 14 + 7 * 10);
+    expect(cappedUnitStat(units, data, 'attack')).toBe((3 * 14 + 9 * 10) * 10 / 12);
   });
 
-  it('the eligible filter excludes units from firing AND from spending the budget', () => {
+  it('eligibility selects weapons while force size includes all living units', () => {
     const units = [stack('howitzer', 2), stack('gun', 12)];
     const artilleryOnly = (def: { traits: string[] }): boolean => def.traits.includes('artillery');
-    expect(cappedUnitStat(units, data, 'attack', artilleryOnly)).toBe(2 * 18);
-    // Unfiltered, the howitzers head the line and the guns fill the rest.
-    expect(cappedUnitStat(units, data, 'attack')).toBe(2 * 18 + 8 * 10);
+    expect(cappedUnitStat(units, data, 'attack', artilleryOnly)).toBeCloseTo(2 * 18 * 10 / 14, 10);
+    // The same size coefficient applies to the unfiltered volley.
+    expect(cappedUnitStat(units, data, 'attack')).toBeCloseTo((2 * 18 + 12 * 10) * 10 / 14, 10);
   });
 
   it('honours a custom cap and skips empty/unknown stacks', () => {

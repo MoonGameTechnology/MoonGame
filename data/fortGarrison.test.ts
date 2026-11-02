@@ -2,8 +2,8 @@
  * ФОРТ ВЫДАЁТ И ЗАБИРАЕТ ГАРНИЗОН (FORT-2.1 + FORT-2.2; решение владельца 6: «прокачка
  * форта даёт больше процента И НЕБОЛЬШОЙ ГАРНИЗОН — юнит „Гарнизон форта“»).
  *
- * Гарнизон — не войско на довольствии, а часть здания: пока форт стоит, стоят и
- * защитники; снесли форт — ушли вместе с ним. Отсюда три вещи, каждая из которых может
+ * Гарнизон выдаётся при постройке и прокачке; обстрел не восполняет его боевые потери.
+ * Снесли форт — оставшиеся защитники ушли вместе с ним. Три вещи, каждая из которых может
  * отвалиться отдельно:
  *   1. форт ставит защитников и ПРОКАЧКА их добавляет;
  *   2. разрушение форта их УНОСИТ — иначе они переживут то, что их породило, и мир
@@ -118,11 +118,11 @@ describe('гарнизон форта — решение владельца 6', 
     // FORT-2.3. Считай потолок по зданию — «потолок 3» означало бы «3 на каждый форт», и
     // правило отменяло бы само себя на второй постройке.
     const twoForts = world([
-      { type: 'fort', level: 3, hp: 100 },
-      { type: 'fort', level: 3, hp: 100 },
+      { type: 'fort', level: 2, hp: 60 },
+      { type: 'fort', level: 3, hp: 85 },
     ]);
     const r = kernel.advanceTo(
-      { ...twoForts, scheduled: [{ id: 'e:0', at: 1, type: 'planet.bombarded', payload: { planetId: 'A', power: 0.0001 }, seq: 0 }], scheduleSeq: 1 },
+      { ...twoForts, scheduled: [{ id: 'e:0', at: 1, type: 'construction.complete', payload: { kind: 'upgrade', planetId: 'A', building: 'fort', level: 3, playerId: 'p1' }, seq: 0 }], scheduleSeq: 1 },
       ctx(HOUR),
     );
     if (!r.ok) throw new Error('advance отказ');
@@ -132,11 +132,11 @@ describe('гарнизон форта — решение владельца 6', 
 
   it('ФРАКЦИЯ двигает потолок, а без модуля фракций работает база', () => {
     const scene = (faction: string) => {
-      const base = world([{ type: 'fort', level: 3, hp: 100 }]);
+      const base = world([{ type: 'fort', level: 2, hp: 60 }]);
       return {
         ...base,
         players: { ...base.players, p1: { ...base.players.p1!, faction } },
-        scheduled: [{ id: 'e:0', at: 1, type: 'planet.bombarded', payload: { planetId: 'A', power: 0.0001 }, seq: 0 }],
+        scheduled: [{ id: 'e:0', at: 1, type: 'construction.complete', payload: { kind: 'upgrade', planetId: 'A', building: 'fort', level: 3, playerId: 'p1' }, seq: 0 }],
         scheduleSeq: 1,
       };
     };

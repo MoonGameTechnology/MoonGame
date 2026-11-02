@@ -25,6 +25,7 @@ import {
   FORTRESS_MODEL_SOLO_MIGRATION as fortressModel,
   LOAD_FIRST_SOLO_MIGRATION as loadFirst,
   HERO_MOBILIZATION_SOLO_MIGRATION as heroMobilization,
+  ECHELONS_SOLO_MIGRATION as echelons,
   MODULE_PROGRESSION_SOLO_MIGRATION as moduleProgression,
   ARMY_SELECTION_SOLO_MIGRATION as armySelection,
   SOLO_MIGRATIONS,
@@ -172,7 +173,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, moduleProgression, armySelection]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -506,4 +507,39 @@ describe('explicit army selection save migration', () => {
     const raw = serializeSoloSave(before, armySelection.fromRules);
     expect(parseCompatibleSoloSave(raw, armySelection.toRules)).toEqual(before);
   });
+});
+
+it('keeps pending hero mobilization and damaged troops when adopting the echelon rules', () => {
+  const before = oldSave();
+  before.state.version = { data: echelons.fromData, dataHash: echelons.fromDataHash, manifest: '1' };
+  before.state.heroes = {
+    reserve: { id: 'reserve', owner: 'p1', location: 'home', cooldowns: {},
+      mobilization: { target: 'home', startedAt: 1000, readyAt: 5000 } },
+  };
+  before.state.planets.A!.garrison = [{ unit: 'infantry', count: 2, hp: 7 }];
+  const raw = serializeSoloSave(before, echelons.fromRules);
+  expect(parseCompatibleSoloSave(raw, echelons.toRules)).toEqual({
+    ...before,
+    state: { ...before.state, version: {
+      ...before.state.version, data: echelons.toData, dataHash: echelons.toDataHash,
+    } },
+  });
+  expect(parseSoloSave(raw, echelons.fromRules)).toEqual(before);
+});
+
+it('preserves the released echelon save through module snapshots and exact army selection', () => {
+  const before = oldSave();
+  before.state.version = { data: echelons.toData, dataHash: echelons.toDataHash, manifest: '1' };
+  before.state.heroes = { reserve: { id: 'reserve', owner: 'p1', location: 'A', cooldowns: {},
+    modules: ['gun'], mobilization: { target: 'A', startedAt: 0, readyAt: 3600000 } } };
+  before.state.planets.A!.garrison = [{ unit: 'militia', count: 3, hp: 12, battles: 4 }];
+  before.state.fleets.f = { id: 'f', owner: 'p1', location: 'A', movement: null, traits: [],
+    units: [{ unit: 'ship', count: 1, modules: ['gun'], moduleStars: { gun: 2 }, moduleRarity: { gun: 'unique' } }],
+    loading: [{ unit: 'militia', count: 2, from: 'A', startAt: 0, doneAt: 3600000 }],
+  };
+  before.state.scheduled.push({ id: 'build:8', type: 'construction.complete', at: 7200000, seq: 8,
+    payload: { kind: 'unit', planetId: 'A', playerId: 'p1', unit: 'ship', count: 1, modules: ['gun'] } });
+  const raw = serializeSoloSave(before, echelons.toRules);
+  expect(parseCompatibleSoloSave(raw, armySelection.toRules)).toEqual(before);
+  expect(parseSoloSave(raw, echelons.toRules)).toEqual(before);
 });

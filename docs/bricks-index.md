@@ -1259,7 +1259,7 @@
 | ROS-1.4 | ✅ | core data proto | `docs/roster-roadmap.md` | Бомбардировщик и профили урона челноков 2026-09-09 |
 | ROS-1.5 | ✅ | core data proto | `docs/roster-roadmap.md` | Десантный челнок: высадка вместо удара 2026-09-09 |
 | ROS-1.6 | ✅ | core proto | `docs/roster-roadmap.md` | Корабли и шаттлы бьют наземные войска 2026-10-12 |
-| ROS-1.6a | ✅ | core | `docs/roster-roadmap.md` | Огонь сверху делит урон по войскам поровну 2026-10-24 |
+| ROS-1.6a | ✅ | core | `docs/roster-roadmap.md` | Огонь сверху делит урон поровну внутри эшелона 2026-10-24 |
 | ROS-1.6b | ✅ | core proto | `docs/roster-roadmap.md` | Огонь сверху бьёт пехоту и технику разной долей 2026-10-24 |
 | ROS-2.1 | ✅ | core data proto | `docs/roster-roadmap.md` | Три линии 50/30/20, артиллерия без ответного огня 2026-09-09 |
 | ROS-2.1a | ✅ | proto | `docs/roster-roadmap.md` | Управление огнём показывается только тем, кто может стрелять 2026-09-09 |
@@ -1348,7 +1348,7 @@
 | PVR-6.30 | ✅ | proto | `docs/sector-zero-roadmap.md` | Окно боя показывает итог |
 | PVR-6.29 | ✅ | core proto | `docs/sector-zero-roadmap.md` | «Флот потерян» и «Завершить экспедицию» |
 | PVR-6.31 | ✅ | proto | `docs/sector-zero-roadmap.md` | Гарнизон и наземные части — плитками с полоской и числами |
-| PVR-6.32 | ✅ | data core proto | `docs/sector-zero-roadmap.md` | Старт главы I на обычном Рое: гарнизон 6, +3 крейсера |
+| PVR-6.32 | ✅ | data core proto | `docs/sector-zero-roadmap.md` | Старт главы I на обычном Рое: гарнизон 6, +6 крейсеров |
 | PVR-6.33 | ✅ | data | `docs/sector-zero-roadmap.md` | Радары забега меньше: множитель ×2,5 → ×1,5 |
 | PVR-6.34 | ✅ | proto | `docs/sector-zero-roadmap.md` | Описание навыка по долгому нажатию в меню приказов |
 | PVR-6.35 | ✅ | proto | `docs/sector-zero-roadmap.md` | ⌂ в экспедиции спрашивает и называет награду |
