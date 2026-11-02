@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { gameCss } from '../gameSheets.mjs';
 import {
   SpotlightTour,
   frameRects,
@@ -370,10 +368,7 @@ describe('spotlightDom overlay CSS — passthrough must cover the ROOT, not just
   // going passthrough too (children can still opt back in with their own
   // explicit pointer-events:auto, e.g. `.sl-bubble`) actually lets touches reach
   // the map. Pin the CSS text so this exact regression can't silently return.
-  const src = readFileSync(
-    path.join(path.dirname(fileURLToPath(import.meta.url)), '../build.mjs'),
-    'utf8',
-  );
+  const src = gameCss();
 
   it('#spotlight.sl-passthrough itself is pointer-events:none (not just its .sl-dim children)', () => {
     expect(src).toMatch(/#spotlight\.sl-passthrough\s*\{\s*pointer-events\s*:\s*none\s*;?\s*\}/);

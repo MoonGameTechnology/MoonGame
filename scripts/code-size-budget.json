@@ -1,7 +1,6 @@
 {
   "about": "Потолки сторожа scripts/codeSize.test.ts (SLIM-1): файлы длиннее 1000 строк и функции длиннее 300. Поднимать потолок — только явно, с причиной в описании PR; опускать — когда код стал короче.",
   "files": {
-    "prototype/build.mjs": 6057,
     "prototype/src/main.ts": 4070,
     "packages/server/src/store/postgres.ts": 3001,
     "packages/server/src/matchRoom.ts": 2934,

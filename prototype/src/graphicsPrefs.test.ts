@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { gameCss } from '../gameSheets.mjs';
 import {
   defaultGlowFx,
   fxBlur,
@@ -111,7 +112,8 @@ describe('графика — счётчик кадров', () => {
 // никакой тест этого не замечает (`#buildwin` так и прожил). Окна-братья по оболочке
 // `.twbox` объявлены в разметке одинаково, поэтому список сверяется с ней.
 describe('CSS: ни одно окно не забыто в списке ПК-зума', () => {
-  const css = readFileSync(fileURLToPath(new URL('../build.mjs', import.meta.url)), 'utf8');
+  const css = gameCss();
+  const markup = readFileSync(fileURLToPath(new URL('../build.mjs', import.meta.url)), 'utf8');
   // Комментарии вырезаются ПЕРЕД разбором: они называют те же id (в т.ч. «#buildwin
   // здесь забыли»), и сканер, читающий их наравне с селекторами, охранял бы сам себя.
   const zoomList = css.slice(0, css.indexOf('{zoom:var(--pcz')).replace(/\/\*[\s\S]*?\*\//g, '');
@@ -122,7 +124,7 @@ describe('CSS: ни одно окно не забыто в списке ПК-з�
   });
 
   it('каждое окно с оболочкой .twbox зумится вместе с остальным интерфейсом', () => {
-    const windows = [...css.matchAll(/id="([\w-]+)"><div class="twbox"/g)].map((m) => m[1]);
+    const windows = [...markup.matchAll(/id="([\w-]+)"><div class="twbox"/g)].map((m) => m[1]);
     expect(windows.length).toBeGreaterThanOrEqual(4);
     for (const id of windows) expect(zoomed.has(`#${id}`), id).toBe(true);
   });

@@ -695,7 +695,7 @@ export function initTopBar(host: TopBarHost): void {
     if (!swarmDossierPinned) closeSwarmDossier();
   });
 
-  // Строка статуса рисуется двумя частями — часы и остальное (`build.mjs`, обе части
+  // Строка статуса рисуется двумя частями — часы и остальное (`prototype/styles/`, обе части
   // `display: contents`). Между ними стояла пауза забега (`YAG-6.2`); по решению владельца
   // 2026-09-24 она живёт в полосе скорости рядом с ▶ и ▶▶ — «там ей логичнее находиться».
   devlineHead = $('devline-head');

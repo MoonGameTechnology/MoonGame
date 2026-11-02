@@ -339,7 +339,7 @@ body.mobile-ui #mobile-sheet.choosing #cmdbar {
 /* Full-bleed, not a floating card: the phone bar is edge-to-edge and square. A rounded
    card cost 8px of margin and 1px of border on EACH side, and the corner radius ate the
    ends of the row on top of that — 18px that row 1 does not have (see the crest/chip/day
-   budget in build.mjs). The base #top already steps its CONTENT inside the notch with
+   budget in styles/). The base #top already steps its CONTENT inside the notch with
    padding, so the background reaching the edge is safe; the bottom line and the shadow
    keep the bar separated from the map. */
 body.mobile-ui #top {

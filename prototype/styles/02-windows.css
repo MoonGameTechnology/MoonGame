@@ -1,0 +1,802 @@
+/* «Управление» (UX-KEYS-1): что нажать — слева моноширинной «клавишей», что будет — справа. */
+/* UX-SET-1: вкладки (Звук · Графика · Карта · Управление · Игра · Уведомления). Ширина — по
+   подписи, а не поровну: «Управление» вдвое длиннее «Звука», и равные доли резали бы её на
+   телефоне. Не влезли в строку — переносятся второй строкой, а не наезжают подписями. */
+.set-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
+.set-tabs button{flex:1 1 auto;min-height:36px;padding:0 8px;white-space:nowrap;border:1px solid var(--line-hi);border-radius:6px;background:transparent;color:var(--dim);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+@media (max-width:360px){.set-tabs{gap:4px;}.set-tabs button{padding:0 5px;font-size:var(--fs-caption);letter-spacing:0;}}
+.set-tabs button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.set-tabs button.on{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
+.set-keys{display:grid;gap:6px;margin:0 0 12px;}
+.set-keys>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line);}
+.set-keys dt{font:600 var(--fs-caption)/1.4 var(--sf-font);font-variant-numeric:tabular-nums;color:var(--cyan);}
+.set-keys dd{margin:0;font-size:var(--fs-caption);line-height:1.45;color:var(--ink);}
+/* «Нижняя панель» телефона (UIX-3.3): три места между Картой и «Ещё» и окна для них. Нажатое
+   место и окно на нём подсвечены, номер места стоит и на месте, и на окне с другого места. */
+.set-bar-hint{margin:0 0 8px;font-size:var(--fs-caption);line-height:1.45;color:var(--dim);}
+.set-bar,.set-bar-picks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0 0 10px;}
+.set-bar{padding:4px;border:1px solid var(--line);border-radius:10px;background:rgba(2,9,15,.6);}
+.set-bar-slot,.set-bar-pick{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;min-width:0;min-height:56px;padding:6px 3px;border:1px solid var(--line-hi);border-radius:8px;
+  background:rgba(53,214,230,.05);color:var(--ink);font:var(--fs-caption)/1.15 var(--sf-font);text-align:center;cursor:pointer;}
+.set-bar-slot span,.set-bar-pick span{max-width:100%;overflow-wrap:break-word;hyphens:auto;}
+.set-bar-slot.on,.set-bar-pick.on{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.14);}
+.set-bar svg,.set-bar-picks svg{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round;}
+/* Уже 375 px «Производство» (85 px подписи) в треть окна настроек не входит: места встают
+   строками во всю ширину, окна — в два столбца. */
+@media (max-width:374px){
+  .set-bar{grid-template-columns:1fr;}
+  .set-bar-picks{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .set-bar-slot{flex-direction:row;justify-content:flex-start;gap:10px;min-height:44px;padding:0 34px 0 10px;text-align:left;}
+  .set-bar-slot .set-bar-at{top:50%;transform:translateY(-50%);}
+}
+.set-bar-at{position:absolute;top:4px;right:5px;min-width:16px;height:16px;border-radius:8px;background:var(--cyan);
+  color:#04111a;font:700 var(--fs-caption)/16px var(--sf-font);font-variant-numeric:tabular-nums;}
+.set-bar-reset{display:block;min-height:44px;margin:0 0 14px auto;padding:0 14px;}
+.set-ctl{display:flex;align-items:center;gap:10px;}
+.set-ctl input[type=range]{flex:1;accent-color:var(--cyan);height:22px;cursor:pointer;}
+.set-val{min-width:42px;text-align:right;font-variant-numeric:tabular-nums;color:var(--cyan);font-weight:700;}
+.set-switch{position:relative;width:46px;height:24px;flex:0 0 auto;cursor:pointer;margin-right:auto;}
+.set-switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;}
+.set-switch .sw-track{position:absolute;inset:0;border-radius:12px;border:1px solid var(--line-hi);
+  background:rgba(6,18,22,.9);transition:border-color .18s,background .18s,box-shadow .18s;pointer-events:none;}
+.set-switch .sw-knob{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;
+  background:var(--dim);transition:left .18s,background .18s,box-shadow .18s;pointer-events:none;}
+.set-switch input:checked ~ .sw-track{border-color:var(--cyan);background:rgba(53,214,230,.16);
+  box-shadow:inset 0 0 10px rgba(53,214,230,.25);}
+.set-switch input:checked ~ .sw-knob{left:25px;background:var(--cyan);box-shadow:0 0 8px rgba(53,214,230,.6);}
+.set-switch input:focus-visible ~ .sw-track{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(53,214,230,.35);}
+
+/* war prompt — confirm before a move declares war on a player you're at peace with */
+#warprompt,#abandon,#pushask{position:fixed;inset:0;z-index:48;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(20,2,1,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#warprompt.show,#abandon.show,#pushask.show{display:flex;}
+#warprompt .wpbox,#abandon .wpbox,#pushask .wpbox{width:min(360px,92vw);background:var(--glass);border:1px solid var(--red);
+  border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 44px rgba(255,90,77,.22),inset 0 0 0 1px rgba(255,90,77,.06);}
+.wp-head{font-size:15px;color:var(--red);text-shadow:0 0 10px rgba(255,90,77,.5);
+  padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid #5a201a;}
+.wp-body{font-size:var(--fs-body);line-height:1.65;color:#e7c6c2;margin-bottom:14px;}
+.wp-body b{color:#ffd9d3;}
+.wp-actions{display:flex;gap:8px;}
+.wp-actions button{flex:1;padding:11px;cursor:pointer;border-radius:6px;font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+.wp-no{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.1);color:var(--cyan);}
+.wp-yes{border:1px solid #7a221c;background:rgba(255,90,77,.16);color:var(--red);}
+.wp-yes:active{background:rgba(255,90,77,.3);}
+/* ⌂ в экспедиции: три действия столбцом — «Завершить и забрать награду» в треть ряда не влезает */
+#abandon.exit .wp-actions{flex-direction:column;}
+/* окно погрузки — тот же слой подтверждения приказа, но не военный: спокойный циан, три действия столбцом */
+#warprompt.calm{background:rgba(1,10,14,.6);}
+#warprompt.calm .wpbox{border-color:var(--cyan-dim);box-shadow:0 0 44px rgba(53,214,230,.16);}
+#warprompt.calm .wp-head{color:var(--cyan);text-shadow:0 0 10px rgba(53,214,230,.45);border-bottom-color:var(--cyan-dim);}
+#warprompt.calm .wp-body{color:var(--ink);}
+#warprompt.calm .wp-actions{flex-direction:column;}
+/* отсчёт контратаки полигона (TRN-3): табло под верхней панелью (её высота — --tbh у каждой
+   раскладки), тап сквозь него проходит */
+#trnraid{position:fixed;top:calc(var(--tbh,84px) + 8px);left:50%;transform:translateX(-50%);z-index:30;
+  max-width:calc(100vw - 24px);padding:6px 12px;border:1px solid var(--red);border-radius:8px;background:var(--glass);
+  color:var(--red);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;text-align:center;pointer-events:none;}
+#trnraid[hidden]{display:none;}
+/* вопрос о push (UIX-4.4): не военный — тот же спокойный циан, «Включить» без красного */
+#pushask{background:rgba(1,10,14,.6);}
+#pushask .wpbox{border-color:var(--cyan-dim);box-shadow:0 0 44px rgba(53,214,230,.16);}
+#pushask .wp-head{color:var(--cyan);text-shadow:0 0 10px rgba(53,214,230,.45);border-bottom-color:var(--cyan-dim);}
+#pushask .wp-body{color:var(--ink);}
+#pushask .wp-yes{border-color:var(--cyan-dim);background:rgba(53,214,230,.18);color:var(--cyan);}
+.lp-after{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.16);color:var(--cyan);}
+.lp-now{border:1px solid #7a5a1c;background:rgba(255,190,77,.1);color:#ffc65a;}
+/* сколько заберёт «Завершить» — цветом данных экспедиций, как кошелёк подготовки */
+.wp-reward{font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--cur-data);margin:-4px 0 14px;}
+
+/* session menu — diplomacy roster + message log (rail: Diplomacy / Dispatches) */
+#diplo{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#diplo.show{display:flex;}
+/* COAL-1: окно коалиций — та же стеклянная коробка, что у дипломатии */
+#coalwin{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#coalwin.show{display:flex;}
+#coalwin .dpbox{display:flex;flex-direction:column;width:min(460px,96vw);max-height:88vh;background:var(--glass);
+  border:1px solid var(--cyan);border-radius:10px;overflow:hidden;
+  box-shadow:0 0 44px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+#coalwin .dp-head .cw-title{font-size:var(--fs-body);color:var(--cyan);margin-right:auto;}
+.cw-body{overflow:auto;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;}
+.cw-cap{font-size:var(--fs-caption);color:var(--dim);}
+.cw-create{min-height:44px;padding:9px 14px;border:1px solid var(--cyan);border-radius:7px;
+  background:rgba(53,214,230,.12);color:var(--cyan);font:700 var(--fs-body) var(--sf-font);cursor:pointer;}
+.cw-create:hover,.cw-create:focus-visible{background:rgba(53,214,230,.2);outline:2px solid var(--cyan);outline-offset:2px;}
+.cw-hint{font-size:var(--fs-caption);color:var(--ink);border:1px dashed var(--line);border-radius:7px;padding:7px 9px;line-height:1.5;}
+.cw-list{display:flex;flex-direction:column;gap:6px;min-height:90px;}
+.cw-row{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:8px;text-align:left;
+  border:1px solid var(--line);background:rgba(53,214,230,.03);color:var(--ink);cursor:pointer;font:inherit;}
+.cw-row:hover{background:rgba(53,214,230,.08);}
+.cw-row.mine{border-color:var(--amber);}
+.cw-emb,.cw-big{flex:0 0 auto;display:grid;place-items:center;color:var(--amber);font-variant-emoji:text;
+  border:1px solid rgba(255,190,77,.45);background:rgba(255,190,77,.08);}
+.cw-emb{width:36px;height:36px;border-radius:8px;font-size:20px;}
+.cw-big{width:58px;height:58px;border-radius:12px;font-size:34px;}
+.cw-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.cw-name{font-weight:700;font-size:var(--fs-body);color:#eafffb;}
+.cw-name em{font-style:normal;font-weight:400;color:var(--amber);font-size:var(--fs-caption);}
+.cw-members,.cw-desc{font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cw-members b{font-weight:600;}
+.cw-seats{flex:0 0 auto;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--cyan);
+  border:1px solid var(--cyan-dim);border-radius:999px;padding:2px 8px;align-self:center;}
+.cw-seats.full{color:var(--amber);border-color:var(--amber);}
+.cw-hero .cw-seats{align-self:flex-start;}
+.cw-back{align-self:flex-start;background:transparent;border:0;color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);cursor:pointer;padding:2px 0;}
+.cw-hero{display:flex;align-items:center;gap:12px;}
+.cw-sec{font-size:var(--fs-caption);color:var(--dim);font-weight:700;margin-top:4px;}
+.cw-mems{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:5px;}
+.cw-mem{display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:var(--fs-body);color:var(--ink);}
+.cw-member-name{min-width:0;overflow-wrap:anywhere;flex:1;}
+.cw-timer{display:block;color:var(--amber);font-size:var(--fs-caption);}
+.cw-invites{display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto;flex-shrink:0;}
+.cw-invite-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.cw-invite-row span{overflow-wrap:anywhere;min-width:0;}
+.cw-invite,.cw-kick{min-height:44px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--cyan);padding:6px 9px;cursor:pointer;font:var(--fs-caption) var(--sf-font);}
+.cw-invite:disabled{color:var(--dim);cursor:default;}
+.cw-kick{color:var(--dim);}
+.cw-kick.sure{color:#ff8f8f;border-color:#ff6b6b;}
+.cw-mem{flex-wrap:wrap;}
+.cw-mem.empty{color:var(--dim);border-style:dashed;justify-content:center;}
+.cw-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+.cw-pick{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;}
+.cw-eb{height:38px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:20px;
+  font-variant-emoji:text;cursor:pointer;}
+.cw-eb.on{color:var(--amber);border-color:var(--amber);background:rgba(255,190,77,.12);}
+#cw-text{width:100%;box-sizing:border-box;resize:vertical;min-height:84px;flex-shrink:0;background:#06181c;color:var(--ink);border:1px solid var(--line);
+  border-radius:7px;padding:7px 9px;font:var(--fs-body) var(--sf-font);}
+#cw-text:focus{outline:none;border-color:var(--cyan-dim);}
+.cw-text{font-size:var(--fs-body);color:var(--ink);line-height:1.5;white-space:pre-wrap;}
+.cw-acts{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;}
+.cw-save,.cw-leave{padding:7px 12px;border-radius:7px;font:700 var(--fs-caption) var(--sf-font);cursor:pointer;background:transparent;}
+.cw-save{border:1px solid var(--cyan);color:var(--cyan);}
+.cw-leave{border:1px solid var(--line);color:var(--dim);}
+.cw-leave.sure{border-color:#ff6b6b;color:#ff8f8f;}
+/* COAL-1: дипломатия внутри лички — висящие предложения и кнопки нового */
+.dp-tdip{border-top:1px solid var(--line-hi);padding:7px 10px;display:flex;flex-direction:column;gap:6px;}
+.dp-offer{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:var(--fs-caption);color:var(--ink);
+  border:1px solid var(--line);border-radius:7px;padding:6px 8px;}
+.dp-offer span{flex:1 1 140px;}
+.dp-offer.in{border-color:var(--amber);background:rgba(255,190,77,.07);}
+.dp-offer.out{color:var(--dim);}
+.dp-dec{padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
+  font:700 var(--fs-caption) var(--sf-font);cursor:pointer;}
+.dp-propose{display:flex;flex-wrap:wrap;align-items:center;gap:5px;font-size:var(--fs-caption);color:var(--dim);}
+.dp-cvnone{font-size:var(--fs-caption);color:var(--dim);padding:8px 6px;line-height:1.5;}
+#diplo .dpbox{display:flex;flex-direction:column;width:min(460px,96vw);max-height:88vh;background:var(--glass);
+  border:1px solid var(--cyan);border-radius:10px;overflow:hidden;
+  box-shadow:0 0 44px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.dp-head{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line-hi);}
+.dp-head b{font-size:var(--fs-caption);color:var(--dim);margin-right:2px;}
+.dp-tab{padding:6px 11px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
+  font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.dp-tab.on{color:var(--cyan);border-color:var(--cyan-dim);background:rgba(53,214,230,.1);}
+.dp-close{margin-left:auto;width:28px;height:28px;border-radius:6px;font-size:var(--fs-body);}
+.dp-sorts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:9px 12px;border-bottom:1px solid var(--line);
+  font-size:var(--fs-caption);color:var(--dim);}
+.dp-sortb{padding:4px 8px;border-radius:5px;border:1px solid var(--line);background:transparent;color:var(--dim);
+  font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.dp-sortb.on{color:var(--cyan);border-color:var(--cyan-dim);background:rgba(53,214,230,.1);}
+.dp-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:0 12px 9px;border-bottom:1px solid var(--line);
+  font-size:var(--fs-caption);color:var(--dim);}
+.dp-fchip{padding:3px 9px;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--dim);
+  font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.dp-fchip.on{color:var(--sc);border-color:var(--sc);background:rgba(53,214,230,.08);}
+.dp-fchip.ty{font-variant-emoji:text;}
+.dp-fchip.ty.on{color:var(--cyan);border-color:var(--cyan-dim);}
+.dp-fsep{width:1px;height:14px;background:var(--line-hi);margin:0 2px;}
+.dp-fclear{margin-left:auto;padding:3px 9px;border-radius:6px;border:1px solid var(--line);background:transparent;
+  color:var(--dim);font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.dp-list{overflow:auto;padding:6px;display:flex;flex-direction:column;gap:4px;}
+.dp-row{display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:9px 10px;border-radius:7px;border:1px solid var(--line);
+  background:rgba(8,28,32,.5);cursor:pointer;}
+.dp-row.me{cursor:default;border-color:var(--cyan-dim);background:rgba(53,214,230,.07);}
+.dp-row.open{border-color:var(--cyan-dim);}
+.dp-ic{font-size:18px;width:20px;text-align:center;font-variant-emoji:text;flex:0 0 auto;}
+.dp-name{flex:1;font-size:var(--fs-body);color:#eafffb;font-weight:700;display:flex;align-items:baseline;gap:6px;min-width:0;}
+.dp-prof{padding:0;border:0;background:none;text-align:left;color:var(--cyan);font:inherit;font-weight:700;cursor:pointer;
+  text-decoration:underline dotted;text-underline-offset:3px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dp-prof:hover{color:#eafffb;}
+.dp-name em{font-style:normal;font-size:var(--fs-caption);color:var(--dim);
+  border:1px solid var(--line);border-radius:3px;padding:1px 4px;flex:0 0 auto;}
+/* Ник впереди; дом и подпись сжимаются многоточием (на телефоне строка переносится, см. mobile-strategy.css). */
+.dp-name .dp-prof{flex:0 1 auto;}
+.dp-name .dp-prof+em{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dp-w{font-size:var(--fs-caption);color:var(--dim);font-variant-numeric:tabular-nums;flex:0 0 auto;}
+.dp-stance{font-size:var(--fs-caption);border:1px solid;border-radius:3px;padding:2px 6px;flex:0 0 auto;font-weight:700;}
+.dp-tag{font-size:var(--fs-caption);color:var(--dim);flex:0 0 auto;}
+/* bot favour (approval) meter — a second line on AI rows: cap ☺ + threshold-ticked bar + tier word */
+.dp-fav{flex:1 0 100%;display:flex;align-items:center;gap:7px;margin-top:1px;cursor:help;}
+.dp-fav-cap{font-size:var(--fs-caption);color:var(--dim);flex:0 0 auto;font-variant-emoji:text;}
+.dp-fav-track{position:relative;flex:1;height:6px;border-radius:3px;background:rgba(120,140,150,.16);
+  border:1px solid var(--line);overflow:hidden;min-width:60px;}
+.dp-fav-fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;transition:width .3s;}
+.dp-fav-tick{position:absolute;top:-1px;bottom:-1px;width:1px;z-index:2;}
+.dp-fav-tick.emb{background:rgba(232,178,74,.85);}
+.dp-fav-tick.war{background:rgba(229,72,77,.9);}
+.dp-fav.ok .dp-fav-fill{background:linear-gradient(90deg,rgba(53,214,230,.5),var(--cyan));}
+.dp-fav.embargo .dp-fav-fill{background:#e8b24a;}
+.dp-fav.war .dp-fav-fill{background:#e5484d;}
+.dp-fav-lbl{font-size:var(--fs-caption);flex:0 0 auto;color:var(--dim);}
+.dp-fav.embargo .dp-fav-lbl{color:#e8b24a;}
+.dp-fav.war .dp-fav-lbl{color:#e5484d;}
+.dp-actions{display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:0 10px 9px 39px;}
+.dp-act{padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
+  font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.dp-act.on{color:var(--sc);border-color:var(--sc);background:rgba(53,214,230,.08);}
+.dp-act.offer{color:var(--sc);border-color:var(--sc);animation:sppulse 1.6s ease-in-out infinite;}
+.dp-act.pend{opacity:.55;}
+.dp-spy{padding:6px 10px;border-radius:6px;border:1px solid var(--amber-dim,#8a6a2f);background:transparent;
+  color:var(--amber);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.dp-spy:hover{border-color:var(--amber);background:rgba(255,180,58,.1);}
+/* MAPSHARE-1: договор об обмене картами — отдельная кнопка, не ступень лестницы стоек,
+   поэтому и цвет свой (не STANCE_COLOR): нейтральный «картографический» зелёный. */
+.dp-map{padding:6px 10px;border-radius:6px;border:1px solid #3f7a5e;background:transparent;
+  color:#6fd6a4;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.dp-map:hover:not(:disabled){border-color:#6fd6a4;background:rgba(111,214,164,.1);}
+.dp-map.on{color:#8ff0c2;border-color:#8ff0c2;background:rgba(111,214,164,.14);}
+.dp-map.offer{color:#8ff0c2;border-color:#8ff0c2;animation:sppulse 1.6s ease-in-out infinite;}
+.dp-map.pend,.dp-map:disabled{opacity:.5;cursor:default;}
+/* FRIENDS-1: вкладка «Друзья» — поиск, заявки, список с присутствием */
+.fr-find{display:flex;gap:8px;padding:2px 0 10px;}
+.fr-q{flex:1;min-width:0;background:rgba(6,18,22,.9);border:1px solid var(--line);border-radius:8px;
+  color:var(--ink);font:inherit;font-size:var(--fs-body);padding:9px 11px;}
+.fr-q:focus{outline:none;border-color:var(--cyan);}
+.fr-b{border-radius:8px;padding:8px 13px;font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;
+  cursor:pointer;white-space:nowrap;}
+/* ✕ «убрать из друзей» и «отозвать заявку» — крестик (.btn-x), остальные кнопки строки — свои. */
+.fr-b:not(.btn-x){border:1px solid var(--line);background:transparent;color:var(--dim);}
+.fr-b:not(.btn-x):hover{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
+.fr-b.ok:not(.btn-x){border-color:var(--cyan-dim);color:var(--cyan);}
+.fr-note{padding:0 0 8px;font-size:var(--fs-caption);color:var(--amber);}
+.fr-list{display:flex;flex-direction:column;gap:8px;}
+.fr-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:10px;background:rgba(6,16,20,.6);}
+.fr-row.req{border-color:var(--cyan-dim);background:rgba(53,214,230,.07);}
+.fr-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--dim);}
+.fr-dot.on{background:var(--grn);}
+.fr-dot.am{background:var(--amber);}
+.fr-dot.off{background:#4a5c62;}
+.fr-txt{flex:1;min-width:0;}
+.fr-txt b{display:block;font-size:var(--fs-body);color:var(--ink);}
+.fr-txt span{display:block;font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fr-acts{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
+.fr-wait{font-size:var(--fs-caption);color:var(--dim);}
+.fr-pick{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 12px 4px 31px;font-size:var(--fs-caption);color:var(--dim);}
+.fr-pick > span{flex:1 0 100%;}
+.fr-priv{display:flex;align-items:flex-start;gap:10px;margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;}
+.fr-priv input{margin-top:3px;accent-color:var(--cyan);}
+.fr-priv b{display:block;font-size:var(--fs-body);color:var(--ink);font-weight:600;}
+.fr-priv span span{display:block;font-size:var(--fs-caption);color:var(--dim);}
+@media(max-width:640px){
+  /* кнопки строки — под палец, как в окне меток */
+  .fr-b{padding:11px 12px;}
+}
+/* RANK-1: вкладка «Рейтинги» — доски командиров и корпораций под общими подвкладками */
+.rk-tabs{display:flex;gap:6px;padding:0 0 10px;}
+.rk-tab{flex:1;padding:9px 10px;border:1px solid var(--line-hi);border-radius:9px;background:transparent;
+  color:var(--dim);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.rk-tab.on{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
+.rk-total{padding:0 2px 8px;font-size:var(--fs-caption);color:var(--dim);}
+.rk-list{display:flex;flex-direction:column;gap:6px;}
+.rk-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);
+  border-radius:10px;background:rgba(6,16,20,.6);}
+/* Своя строка подсвечена НА СВОЁМ месте: поднимать её наверх было бы удобнее и лживее */
+.rk-row.me{border-color:var(--cyan);background:rgba(53,214,230,.10);}
+.rk-n{flex:0 0 30px;text-align:center;font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;font-style:normal;color:var(--dim);}
+.rk-n.top{font-size:15px;}
+.rk-txt{flex:1;min-width:0;}
+.rk-txt b{display:block;font-size:var(--fs-body);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rk-txt span{display:block;font-size:var(--fs-caption);color:var(--dim);}
+.rk-sc{flex:0 0 auto;font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--grn);font-variant-numeric:tabular-nums;}
+.rk-sc i{margin-left:3px;font-style:normal;font-size:var(--fs-caption);color:var(--dim);font-weight:400;}
+/* Моё место, когда оно вне страницы — прикреплено снизу, с НАСТОЯЩИМ номером */
+.rk-mine{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line-hi);}
+.rk-none{font-size:var(--fs-caption);color:var(--dim);text-align:center;padding:4px 0;}
+/* PING-PANEL: список меток коалиции — своих и союзных */
+#pingpanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;display:none;
+  width:min(520px,92vw);max-height:70vh;overflow:auto;background:rgba(6,16,20,.97);
+  border:1px solid var(--line);border-radius:10px;padding:0;box-shadow:0 10px 40px rgba(0,0,0,.6);}
+#pingpanel.show{display:block;}
+.pp-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(46,150,160,.14);}
+.pp-row.off{opacity:.45;}
+.pp-icon{width:24px;text-align:center;font-size:20px;flex:0 0 auto;font-variant-emoji:text;}
+.pp-txt{flex:1;min-width:0;}
+.pp-txt b{display:block;font-size:var(--fs-body);}
+.pp-txt span{display:block;font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* Кнопки строки — стандартные квадратные иконко-кнопки интерфейса (метрика .cw-btn /
+   .lw-close): раньше у них была своя типографика и свои поля. */
+.pp-row button{width:28px;height:28px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:6px;font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+/* ✕ «снять метку» — крестик (.btn-x). */
+.pp-row button:not(.btn-x){border:1px solid var(--line);background:transparent;color:var(--dim);}
+.pp-row button:not(.btn-x):hover{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
+.pp-row button:not(.btn-x):active{background:rgba(53,214,230,.2);}
+.pp-empty{padding:16px 12px;color:var(--dim);font-size:var(--fs-body);}
+.dp-intel{padding:2px 10px 9px 39px;font-size:var(--fs-caption);color:var(--cyan);}
+.dp-intel b{color:#eafffb;}
+/* SPY-UX: вкладка «Шпионаж» — активные окна интела, операции, сессионный журнал */
+.in-hint{margin:2px 0 8px;padding:8px 10px;border:1px solid var(--line-hi);border-radius:8px;
+  font-size:var(--fs-caption);color:var(--dim);line-height:1.55;}
+.in-sec{margin:12px 0 6px;font-size:var(--fs-caption);color:var(--dim);}
+.in-row{display:flex;align-items:center;gap:8px;padding:7px 9px;margin-bottom:6px;
+  border:1px solid var(--line);border-radius:8px;background:rgba(53,214,230,.04);font-size:var(--fs-body);color:var(--ink);}
+.in-row b{color:#eafffb;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.in-row[data-iw]{cursor:pointer;}
+.in-row[data-iw]:active{background:rgba(53,214,230,.12);}
+.in-row .in-k{flex:0 0 auto;color:var(--cyan);}
+.in-row .in-t{margin-left:auto;flex:0 0 auto;color:var(--amber);font-size:var(--fs-caption);white-space:nowrap;}
+.in-row .in-go{flex:0 0 auto;color:var(--dim);}
+.in-row .dp-spy{margin-left:auto;}
+.in-row .dp-spy + .dp-spy{margin-left:0;}
+.in-empty{padding:6px 2px;font-size:var(--fs-caption);color:var(--dim);}
+.in-log{padding:4px 2px;font-size:var(--fs-caption);color:var(--dim);line-height:1.45;border-bottom:1px dashed rgba(29,107,112,.25);}
+.in-log[data-iw]{cursor:pointer;}
+.in-log[data-iw]:active{background:rgba(53,214,230,.12);}
+.dp-intel em{font-style:normal;color:var(--dim);font-size:var(--fs-caption);}
+.dp-msg{margin-left:auto;padding:6px 11px;border-radius:6px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.1);color:var(--cyan);font-size:var(--fs-body);cursor:pointer;}
+.dp-feed{overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:7px;flex:1;min-height:0;}
+.dp-empty{margin:auto;text-align:center;color:var(--dim);font-size:var(--fs-body);line-height:1.8;}
+.dp-line{font-size:var(--fs-body);line-height:1.5;color:#cfe7e3;}
+.dp-line b{color:#eafffb;}
+.dp-nick{cursor:pointer;}
+.dp-nick:hover{text-decoration:underline;}
+.dp-line.sys{color:var(--amber);font-size:var(--fs-caption);}
+/* diplomacy actions reused inside the player card (opened from a chat nick) — drop the
+   roster's icon-column indent so the buttons align to the card's edges */
+#playercard .dp-actions{padding:0;}
+#playercard .dp-intel{padding:6px 0 0;}
+.dp-when{display:inline-block;min-width:60px;color:var(--dim);font-size:var(--fs-caption);
+  font-variant-numeric:tabular-nums;margin-right:6px;}
+.dp-compose{display:flex;gap:6px;padding:9px 10px;border-top:1px solid var(--line-hi);}
+.dp-compose input{flex:1;min-width:0;background:#06181c;color:var(--ink);border:1px solid var(--line);
+  border-radius:6px;padding:9px 10px;font:400 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+.dp-compose input:focus{outline:none;border-color:var(--cyan-dim);}
+.dp-send{flex:0 0 auto;width:42px;border-radius:6px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.14);color:var(--cyan);font-size:14px;cursor:pointer;}
+/* conversations: chat list (left) + open thread (right), coalition pinned on top */
+.dp-convo{display:flex;height:min(62vh,440px);}
+.dp-cvlist{width:130px;flex:0 0 auto;overflow:auto;border-right:1px solid var(--line-hi);
+  padding:6px;display:flex;flex-direction:column;gap:3px;}
+.dp-cv{display:flex;align-items:center;gap:7px;width:100%;padding:7px 7px;border-radius:7px;
+  border:1px solid transparent;background:transparent;cursor:pointer;text-align:left;}
+.dp-cv:hover{background:rgba(53,214,230,.06);}
+.dp-cv.on{border-color:var(--cyan-dim);background:rgba(53,214,230,.1);}
+.dp-cv.coal{border-bottom:1px solid var(--line);border-radius:7px 7px 0 0;}
+.dp-cv-ic{font-size:15px;flex:0 0 auto;font-variant-emoji:text;width:17px;text-align:center;}
+.dp-cv-nm{display:flex;flex-direction:column;min-width:0;font-size:var(--fs-body);color:#eafffb;font-weight:700;}
+.dp-cv-nm em{font-style:normal;font-weight:400;font-size:var(--fs-caption);color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92px;}
+.dp-thread{flex:1;min-width:0;display:flex;flex-direction:column;}
+.dp-thhead{padding:9px 12px;border-bottom:1px solid var(--line-hi);font-size:var(--fs-body);font-weight:700;
+  color:var(--cyan);font-variant-emoji:text;}
+.dp-line.me b{color:var(--cyan);}
+.dp-line.ping{cursor:pointer;color:var(--amber);}
+.dp-line.ping:hover{text-decoration:underline;}
+.dp-jump{font-size:var(--fs-caption);color:var(--dim);border:1px solid var(--line);border-radius:3px;
+  padding:1px 4px;margin-left:5px;white-space:nowrap;}
+.dp-ping{flex:0 0 auto;width:40px;border-radius:6px;border:1px solid var(--amber);
+  background:rgba(255,180,58,.12);color:var(--amber);font-size:15px;cursor:pointer;font-variant-emoji:text;}
+/* ally ping marker popup (tap a pin on the map) */
+#pingpop{position:fixed;z-index:45;display:none;transform:translate(-50%,calc(-100% - 14px));
+  width:172px;background:var(--glass);border:1px solid var(--amber);border-radius:8px;padding:8px 10px;
+  box-shadow:0 0 22px rgba(0,0,0,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#pingpop.show{display:block;}
+/* Надбавки параметра флота (тап по числу в окне флота): кто и насколько двигает число.
+   Ставится JS по getBoundingClientRect параметра, поэтому, как #pingpop, вне списка зума.
+   Зелёный — бафы, красный — дебафы; у корпуса и щита строки — входящий урон. */
+#statpop{position:fixed;left:0;top:0;z-index:43;display:none;width:min(264px,calc(100vw - 16px));
+  overflow:auto;overscroll-behavior:contain;background:var(--glass);border:1px solid var(--line-hi);
+  border-radius:8px;padding:8px 11px 9px;box-shadow:0 0 22px rgba(0,0,0,.6);
+  -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);font-size:var(--fs-caption);line-height:1.4;}
+#statpop.show{display:block;}
+.sp-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+.sp-head b{font-size:var(--fs-caption);color:var(--cyan);}
+.sp-val{font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
+.sp-desc{margin:4px 0 0;color:var(--dim);}
+.sp-sub{margin:7px 0 1px;font-size:var(--fs-caption);color:var(--dim);}
+.sp-row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-top:1px solid var(--line);}
+.sp-head + .sp-row,.sp-desc + .sp-row{margin-top:6px;}
+.sp-row b{font-variant-numeric:tabular-nums;white-space:nowrap;}
+.sp-row.total{font-weight:700;border-top-color:var(--line-hi);}
+.sp-none{margin-top:6px;padding-top:4px;border-top:1px solid var(--line);color:var(--dim);}
+.sp-val.buff,.sp-row.buff b{color:var(--up);}
+.sp-val.debuff,.sp-row.debuff b{color:var(--dn);}
+/* Слово-термин (UIX-9.4): пунктир снизу значит «у слова есть объяснение». Подсказка
+   (.termtip) — свой узел в body, место ставит JS по getBoundingClientRect слова, поэтому,
+   как #statpop, вне списка зума. Стопкой: термин в подсказке открывает следующую поверх,
+   поэтому фон плотный — сквозь стекло читались бы строки нижней подсказки.
+   На сенсорном экране цель касания чуть растёт по вертикали полями — строка от них не растёт.
+   Больше 4 px нельзя: поля термина на следующей строке перекрыли бы термин над ним. */
+.term{text-decoration:underline dotted;text-decoration-color:var(--cyan-dim);text-underline-offset:3px;
+  border-radius:3px;cursor:help;}
+.term:hover,.term:focus-visible,.term[aria-describedby]{color:var(--ink);text-decoration-color:var(--cyan);}
+.term:focus-visible{outline:1px solid var(--cyan);outline-offset:2px;}
+@media (pointer:coarse){.term{padding-block:4px;}}
+.termtip{position:fixed;left:0;top:0;z-index:62;width:max-content;max-width:min(300px,calc(100vw - 16px));
+  overflow:auto;overscroll-behavior:contain;background:var(--sf-panel),var(--void);border:1px solid var(--line-hi);
+  border-radius:8px;padding:8px 11px 9px;box-shadow:0 0 22px rgba(0,0,0,.6);
+  font-size:var(--fs-caption);line-height:1.45;text-align:left;}
+.termtip b{display:block;margin-bottom:3px;font-size:var(--fs-caption);color:var(--cyan);}
+.termtip p{margin:0;color:var(--dim);}
+/* Число с надбавками в листе флота: тот же цвет, что в шапке всплывашки, и курсор-указатель —
+   по числу можно тапнуть. */
+#side [data-stat]{cursor:pointer;}
+#side .pstats span.buff,#side .hullrow b.buff{color:var(--up);}
+#side .pstats span.debuff,#side .hullrow b.debuff{color:var(--dn);}
+/* TGT-1: target-order composer — opens beside the marked world (CC-1 chains) */
+#tgted{position:fixed;z-index:46;display:none;transform:translate(-50%,calc(-100% - 16px));
+  width:208px;background:var(--glass);border:1px solid var(--cyan);border-radius:8px;padding:8px 10px;
+  box-shadow:0 0 22px rgba(0,0,0,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#tgted.show{display:block;}
+.tg-top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:5px;}
+.tg-top b{font-size:var(--fs-caption);color:var(--cyan);font-variant-emoji:text;}
+.tg-top span{font-size:var(--fs-caption);color:var(--dim);}
+.tg-plan{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;min-height:22px;}
+.tg-plan button{padding:3px 6px;border-radius:5px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.08);color:var(--cyan);font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.tg-plan i{font-size:var(--fs-caption);color:var(--dim);align-self:center;}
+.tg-add{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px;}
+.tg-add button{padding:4px 6px;border-radius:5px;border:1px solid rgba(255,255,255,.22);
+  background:rgba(255,255,255,.05);color:#dfe9ec;font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.tg-add button:disabled{opacity:.35;cursor:default;}
+.tg-act{display:flex;gap:5px;}
+.tg-act button{flex:1;padding:5px 6px;border-radius:5px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.1);color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.tg-act button:disabled{opacity:.35;cursor:default;}
+.tg-act .tg-drop{border-color:#7a221c;background:rgba(255,90,77,.12);color:var(--red);flex:0 0 auto;}
+.pp-top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:5px;}
+.pp-top b{font-size:var(--fs-caption);font-variant-emoji:text;}
+.pp-top span{font-size:var(--fs-caption);color:var(--dim);font-variant-numeric:tabular-nums;}
+.pp-top span{margin-left:auto;}
+/* ✕ всплывашки — крестик (.btn-x): вид даёт он, здесь только размер. */
+.pp-close{flex:0 0 auto;align-self:center;width:24px;height:24px;margin:-2px -4px 0 0;padding:0;border-radius:5px;
+  font:inherit;font-size:var(--fs-caption);}
+@media (pointer:coarse){.pp-close{width:30px;height:30px;}}
+.pp-desc{font-size:var(--fs-caption);line-height:1.4;color:#e7d6b8;margin-bottom:7px;word-break:break-word;}
+.pp-desc i{color:var(--dim);}
+.pp-act{display:flex;gap:5px;}
+.pp-act button{flex:1;padding:5px 6px;border-radius:5px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.1);color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.pp-act .pp-del{border-color:#7a221c;background:rgba(255,90,77,.12);color:var(--red);}
+/* province ping composer: pick a destination (coalition chat / a player's DM) for a
+   map ping on the selected province. Centered modal, like #splitdlg. */
+#pingmenu{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;
+  padding:18px;background:rgba(2,8,11,.62);backdrop-filter:blur(2px);}
+#pingmenu.show{display:flex;}
+#pingmenu .pm-box{width:min(360px,92vw);background:var(--glass);border:1px solid var(--amber);
+  border-radius:12px;padding:16px 16px 14px;box-shadow:0 0 30px rgba(0,0,0,.6);}
+#pingmenu .pm-head{display:flex;align-items:center;gap:8px;font-size:var(--fs-body);color:var(--amber);font-variant-emoji:text;margin-bottom:3px;}
+#pingmenu .pm-head>span{flex:1;min-width:0;}
+#pingmenu .pm-close{flex:0 0 auto;width:28px;height:28px;border-radius:6px;font:inherit;} /* вид — .btn-x */
+#pingmenu .pm-head b{color:#eafffb;}
+#pingmenu .pm-sub{color:var(--dim);font-size:var(--fs-caption);line-height:1.5;margin-bottom:11px;}
+#pingmenu .pm-kinds{display:flex;gap:6px;margin:10px 0;}
+#pingmenu .pm-kind{flex:1;min-height:44px;padding:8px 3px;border:1px solid var(--dim);border-radius:6px;background:transparent;color:var(--ink);font:inherit;font-size:var(--fs-caption);font-variant-emoji:text;}
+#pingmenu .pm-kind[aria-pressed="true"]{border-color:var(--amber);color:var(--amber);background:rgba(255,196,90,.12);}
+#pingmenu .pm-text{width:100%;box-sizing:border-box;margin-bottom:12px;padding:8px 10px;border-radius:6px;
+  border:1px solid var(--cyan-dim);background:rgba(4,14,18,.7);color:#eafffb;font:inherit;font-size:var(--fs-body);}
+#pingmenu .pm-lbl{color:var(--dim);font-size:var(--fs-caption);margin:2px 0 6px;}
+#pingmenu .pm-dst{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;margin-bottom:6px;
+  padding:9px 11px;border-radius:7px;border:1px solid var(--line-hi);background:rgba(53,214,230,.06);
+  color:var(--ink);font:inherit;font-size:var(--fs-body);font-weight:700;text-align:left;cursor:pointer;font-variant-emoji:text;}
+#pingmenu .pm-dst:hover{background:rgba(53,214,230,.14);border-color:var(--cyan);}
+#pingmenu .pm-dst.coal{border-color:var(--amber);background:rgba(255,196,90,.08);}
+#pingmenu .pm-dst .pm-ic{flex:0 0 auto;}
+#pingmenu .pm-dst em{margin-left:auto;color:var(--dim);font-weight:400;font-style:normal;font-size:var(--fs-caption);}
+
+/* status strip below the top bar: the in-game clock + the donate currency on the right
+   (day/countdown live in the #daycard, victory progress in the #tbscore chip above).
+   The strip is TRANSPARENT — the map runs under it, so it carries no backdrop and no
+   divider; the clock leans on its own text-shadow over bright provinces, and the gold
+   capsule brings its own. Being see-through it must also be click-through, or it would
+   eat map pans along its band — only its two children take input back. */
+#devline{position:fixed;top:var(--tbh);left:0;right:0;height:28px;z-index:24;display:flex;align-items:center;gap:14px;
+  padding:0 14px;background:transparent;color:var(--dim);font-size:var(--fs-caption);
+  white-space:nowrap;overflow-x:auto;scrollbar-width:none;pointer-events:none;}
+#devline::-webkit-scrollbar{display:none;}
+#devline > *{pointer-events:auto;}
+#devline #clock{color:var(--grn);font-variant-numeric:tabular-nums;flex:0 0 auto;
+  text-shadow:0 0 7px rgba(0,0,0,.9),0 0 3px rgba(0,0,0,.85);}
+
+/* left-corner tool rail — collapsed to a single hamburger by default; tapping it expands
+   the wired tools UPWARD (primary icon nearest the thumb). The tools live in their own
+   panel that sizes to its buttons, so nothing overflows the rail. */
+#rail{position:fixed;left:10px;bottom:14px;top:auto;z-index:26;display:flex;flex-direction:column;
+  align-items:flex-start;gap:8px;}
+#railtools{display:none;flex-direction:column;gap:5px;padding:6px;background:rgba(3,12,16,.82);
+  border:1px solid var(--line-hi);border-radius:12px;box-shadow:0 0 16px rgba(0,0,0,.5);
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+  /* Short viewports (landscape / small phones): the bottom-anchored rail grows UP and
+     used to overrun the top bar (z-index 30 > 26), pushing «Дипло» off-screen / under
+     the top bar so a tap hit the top bar instead. Cap the tool list to the space above
+     the toggle+bottom and below the top bar, and scroll inside it. dvh overrides vh
+     where supported (mobile URL-bar aware); no effect on tall screens (list fits). */
+  max-height:calc(100vh - 120px);max-height:calc(100dvh - 120px);
+  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;}
+#railtools::-webkit-scrollbar{display:none;}
+#rail.open #railtools{display:flex;}
+/* п. 1.10.1: открытое меню — над всплывающими сообщениями (#toasts, z 40), иначе они лежат
+   поверх пунктов и ловят нажатие; окна, которые меню открывает, — выше (44+). */
+#rail.open{z-index:41;}
+#railtools .rlbl{display:none;font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--dim);line-height:1;}
+#railtools button{position:relative;width:38px;height:38px;background:transparent;border:0;cursor:pointer;
+  font-size:18px;color:var(--dim);border-radius:8px;font-variant-emoji:text;display:grid;place-items:center;}
+#railtools button:hover,#railtools button:active{color:var(--cyan);background:rgba(53,214,230,.12);text-shadow:0 0 8px rgba(53,214,230,.6);}
+#railtoggle{width:44px;height:44px;display:grid;place-items:center;cursor:pointer;font-size:20px;font-variant-emoji:text;
+  color:var(--cyan);background:rgba(3,12,16,.85);border:1px solid var(--line-hi);border-radius:12px;
+  box-shadow:0 0 16px rgba(0,0,0,.5);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
+#railtoggle:hover,#rail.open #railtoggle{background:rgba(53,214,230,.16);text-shadow:0 0 8px rgba(53,214,230,.6);}
+#rail .railbadge{position:absolute;top:2px;right:2px;min-width:14px;height:14px;border-radius:7px;
+  background:var(--amber,#f0b429);color:#08131a;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;
+  display:grid;place-items:center;padding:0 3px;}
+.dp-compose.dp-off{align-items:center;gap:8px;}
+.dp-compose .dp-offtxt{color:var(--dim);font-size:var(--fs-caption);}
+#rail .badge{position:absolute;right:5px;top:4px;min-width:15px;height:15px;border-radius:8px;
+  background:var(--red);color:#180605;font:700 var(--fs-caption)/15px var(--sf-font);font-variant-numeric:tabular-nums;text-align:center;
+  box-shadow:0 0 8px rgba(255,90,77,.7);}
+/* settings/leave-session rail tools are a PC addition — hidden on phones (the PC
+   media block below turns them on), so the mobile rail stays exactly as it was.
+   Double-id selector: must outweigh the phone query's "#railtools button". */
+#railtools #rail-settings,#railtools #rail-exit{display:none;}
+
+#side{position:fixed;left:58px;right:14px;bottom:0;top:auto;width:auto;max-height:34vh;overflow:hidden;z-index:20;
+  display:none;align-items:stretch;padding:0;background:rgba(3,14,18,.6);border:1px solid var(--line-hi);
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+  box-shadow:0 0 26px rgba(0,0,0,.6),0 0 0 1px rgba(53,214,230,.08),inset 0 0 30px rgba(53,214,230,.04);
+  clip-path:polygon(0 9px,9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%);}
+/* scrollable content (left) + a dossier pane glued to the right edge, filling the
+   panel's otherwise-empty space. The pane shows the hovered object's description. */
+.pscroll{flex:1 1 auto;min-width:0;overflow:auto;padding:13px 15px;touch-action:pan-y;}
+/* dossier pane: a FIXED-width reserved column (was fit-content, which reflowed the
+   left content every time a longer/shorter dossier was hovered — buttons jumped).
+   A stable basis keeps .pscroll's width constant no matter what's hovered; a long
+   dossier scrolls inside the pane instead of resizing the whole panel. */
+.pdesc{flex:0 0 44%;min-width:200px;overflow-y:auto;overflow-x:hidden;
+  padding:14px 16px;border-left:1px solid var(--line-hi);border-radius:0 10px 10px 0;
+  background:rgba(53,214,230,.045);}
+.pdesc .pd-title{font-size:14px;font-weight:700;color:#eafffb;margin-bottom:9px;
+  padding-bottom:7px;border-bottom:1px solid var(--line);}
+.pdesc .pd-body{font-size:var(--fs-body);line-height:1.65;color:#9fc9c4;}
+.pdesc .pd-empty{font-size:var(--fs-caption);line-height:1.6;color:var(--dim);font-style:italic;}
+.pdesc .hl{font-style:normal;font-weight:700;color:var(--amber);text-shadow:0 0 7px rgba(255,180,58,.35);}
+#side .sec{margin:14px 0 6px;font-size:var(--fs-caption);color:var(--dim);
+  border-bottom:1px solid var(--line);padding-bottom:4px;}
+#side .row{margin:4px 0;}
+#side .dim{color:var(--dim);}
+#side .qgo{color:var(--cyan);text-decoration:underline dotted;text-underline-offset:2px;cursor:pointer;}
+#side b{color:#eafffb;}
+#side .hint{color:#74b0aa;font-size:var(--fs-caption);margin-top:9px;line-height:1.55;border-left:2px solid var(--line-hi);padding-left:8px;}
+.phead{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding-bottom:10px;border-bottom:1px solid var(--line-hi);}
+.pflag{width:14px;height:14px;transform:rotate(45deg);flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(0,0,0,.4);}
+.ptitle{flex:1 1 auto;min-width:0;}
+.ptitle b{display:block;color:#eafffb;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ptitle span{color:var(--dim);font-size:var(--fs-caption);}
+/* Крестик карточки — как у всех окон (.tw-close, .dp-close, .mk-close…): вид даёт .btn-x
+   (заказ владельца 2026-09-29 «кнопки где-то красные, где-то не красные» — одинаково везде;
+   2026-10-12 — все крестики в красной рамке). */
+.pclose{flex:0 0 auto;width:24px;height:24px;font-size:var(--fs-caption);border-radius:7px;}
+/* Очки победы мира — в шапке рядом с именем (заказ владельца 2026-09-29). */
+.pbadge{flex:none;padding:3px 8px;border:1px solid var(--line);border-radius:4px;font-size:var(--fs-body);
+  color:var(--ink);background:rgba(53,214,230,.06);white-space:nowrap;}
+.pstats{display:flex;gap:7px;flex-wrap:wrap;margin:2px 0 4px;}
+.pstats span{background:rgba(53,214,230,.06);border:1px solid var(--line);padding:4px 9px;font-size:var(--fs-caption);color:var(--ink);}
+.effects{display:flex;gap:5px;flex-wrap:wrap;margin:2px 0 4px;}
+/* Шапка мира (переработка окна мира, 2026-09-29): под именем — факты о мире и действия с
+   ним. Фишка — СВОЙСТВО или СОСТОЯНИЕ мира, а не счётчик: состав считают вкладки. */
+.pfacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 6px;}
+.pfact{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid var(--line);border-radius:4px;
+  background:rgba(53,214,230,.06);font-size:var(--fs-caption);line-height:1.35;color:var(--ink);white-space:nowrap;}
+.pfact.good{color:var(--grn);border-color:var(--grn-dim);}
+.pfact.bad{color:var(--red);border-color:currentColor;}
+.pfact.cyan{color:var(--cyan);}
+.pfact i{font-style:normal;}
+.pfact i.up{color:var(--up);}
+.pfact i.dn{color:var(--dn);}
+.pacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-left:auto;}
+/* Выход мира — «/ч» один раз, в конце строки, а не у каждого ресурса. */
+.pfact .rcost:not(:last-child) .rc-per{display:none;}
+/* Липкие вкладки заходят вверх на 13px (чтобы закрыть отступ листа при прокрутке) и под
+   шапкой мира наезжали бы на её последнюю строку. */
+.pfacts + .ptabs{margin-top:0;}
+.effect-tag{background:rgba(53,214,230,.04);border:1px solid var(--line-hi);padding:3px 8px;font-size:var(--fs-caption);color:var(--dim);border-radius:3px;white-space:nowrap;}
+.ptabs{display:flex;gap:6px;margin:10px 0 4px;flex-wrap:wrap;
+  position:sticky;top:-13px;z-index:5;padding-top:13px;margin-top:-13px;
+  background:rgba(3,14,18,.92);backdrop-filter:blur(4px);}
+.ptab{cursor:pointer;background:rgba(53,214,230,.04);border:1px solid var(--line);color:var(--dim);
+  padding:6px 10px;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;border-radius:2px;}
+.ptab b{margin-left:7px;color:var(--ink);}
+.ptab.on{color:var(--cyan);border-color:var(--cyan);background:rgba(53,214,230,.14);box-shadow:0 0 12px rgba(53,214,230,.2);}
+/* wrap (don't overflow) so a trailing Select/Upgrade button never laps onto the
+   neighbouring column when the panel is laid out in narrow multi-column blocks */
+/* thin outline so each menu object reads as one discrete, selectable card; the
+   border warms up on hover, echoing the dossier that lights up on the right. */
+.asset-row{display:flex;align-items:center;gap:8px;margin:5px 0;min-height:24px;flex-wrap:wrap;
+  padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:rgba(53,214,230,.02);
+  transition:border-color .12s ease,background .12s ease;}
+.asset-row:hover{border-color:var(--cyan-dim);background:rgba(53,214,230,.07);}
+.asset-row b{flex:1 1 auto;min-width:96px;font-size:var(--fs-body);}
+.asset-row .b{margin-left:auto;}
+.asset-row .prod{color:var(--grn);}
+/* VET-5: значок медали ветерана в строке состава. Один символ на линию — всё, что
+   влезает рядом с иконкой корпуса, числом и именем на телефоне; имя степени уезжает в
+   title. Цвет растёт со степенью, поэтому ветерана видно, не читая подписи: приглушённый
+   циан → белый → янтарь → золото с ореолом. Значок НЕ ловит указатель (pointer-events):
+   строка целиком — кнопка кодекса, и тап по медали обязан открывать ту же карточку, а не
+   проваливаться. */
+.umedal{font-size:var(--fs-caption);line-height:1;flex:0 0 auto;opacity:.92;pointer-events:none;}
+.umedal.g1{color:var(--dim);}
+.umedal.g2{color:#dfe9ec;}
+.umedal.g3{color:var(--amb);}
+.umedal.g4{color:#ffd76a;text-shadow:0 0 6px rgba(255,215,106,.55);}
+/* Список построенного идёт СТОЛБИКОМ, строка на здание (заказ владельца по скриншоту):
+   сетка крупных плиток переносилась на два ряда уже на четырёх постройках, длинные
+   имена ломались надвое, и секция съедала пол-листа. Строка — кнопка, поэтому ей нужны
+   ширина на всю колонку, курсор и сброс кнопочных умолчаний шрифта. */
+.blist{display:flex;flex-direction:column;margin:4px 0 8px;}
+.asset-row.built,.asset-row.unit,.asset-row.cat{width:100%;margin:3px 0;cursor:pointer;font:inherit;color:inherit;text-align:left;}
+.asset-row.built .dim,.asset-row.unit .dim,.asset-row.cat .dim{margin-left:auto;font-size:var(--fs-caption);white-space:nowrap;}
+/* Каталог заказа — те же строки: та же ширина, та же правая колонка с ценой. Запертая
+   строка гаснет так же, как запертая плитка (.ptile.locked выше), — иначе «серую»
+   строку продолжали бы жать, а якорей заказа у неё уже нет и ничего не происходит. */
+.asset-row.cat.locked{opacity:.4;cursor:not-allowed;background:rgba(120,140,150,.05);color:var(--dim);}
+.asset-row.cat.locked:hover{border-color:var(--line);background:rgba(120,140,150,.08);}
+.bicon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-right:7px;
+  border:1px solid var(--line-hi);background:rgba(53,214,230,.07);color:var(--cyan);font-size:var(--fs-body);}
+.asset-row .bicon{margin-right:0;flex:0 0 auto;}
+.conveyor{margin:6px 0 8px;padding:8px;border:1px solid var(--line);background:rgba(53,214,230,.04);}
+.conveyor .current{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;font-size:var(--fs-caption);}
+.conveyor .current span{color:var(--grn);font-size:var(--fs-caption);}
+.conveyor .current.idle span{color:var(--dim);}
+.conveyor .current em{color:var(--dim);font-style:normal;}
+.conveyor .bar{height:4px;margin:7px 0;background:rgba(53,214,230,.08);overflow:hidden;}
+.conveyor .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--grn),var(--cyan));box-shadow:0 0 10px rgba(125,240,208,.6);}
+.conveyor .queue{display:flex;gap:6px;flex-wrap:wrap;}
+.conveyor .queue span{display:flex;align-items:center;gap:4px;border:1px solid var(--line);background:rgba(2,9,13,.55);padding:3px 6px;font-size:var(--fs-caption);color:var(--ink);}
+.conveyor .queue em{font-style:normal;color:var(--dim);margin-right:5px;}
+.conveyor .queue.empty{color:var(--dim);font-size:var(--fs-caption);}
+.conveyor .current button,.conveyor .queue button,.conveyor .paused button{cursor:pointer;
+  font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;padding:2px 6px;border-radius:2px;line-height:1.3;}
+/* ✕ отмены постройки и снятия из очереди — крестики (.btn-x); ▶ возобновить — своя рамка. */
+.conveyor .paused button{border:1px solid var(--line-hi);background:transparent;color:var(--dim);}
+.conveyor .paused button:hover{color:var(--cyan);border-color:var(--cyan);}
+.conveyor .paused{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.conveyor .paused span{display:flex;align-items:center;gap:4px;border:1px solid var(--amber,#f0b429);
+  background:rgba(240,180,41,.08);padding:3px 6px;font-size:var(--fs-caption);color:var(--ink);}
+.conveyor .paused em{font-style:normal;color:var(--amber,#f0b429);margin-right:2px;}
+button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(--fs-caption);}
+/* Три стиля кнопок (UIX-11.1) — на всю игру, эталон — Sector Zero и дверь хаба. Экран задаёт
+   кнопке размер и место, а вид она берёт классом: главная — действие, ради которого карточка
+   открыта (одна на карточку), вторичная — остальные действия, тихая — переход и пояснение.
+   Правило экрана поэтому не красит такую кнопку: селектор с id перебил бы класс. */
+.btn-main,.btn-second,.btn-quiet{font-family:var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.btn-main{border:1px solid var(--sf-accent);background:var(--sf-primary);color:var(--sf-hi);font-weight:700;
+  box-shadow:var(--sf-glow);}
+.btn-main:hover:not(:disabled,[aria-disabled="true"]){background:var(--sf-primary-hi);}
+.btn-second{border:1px solid var(--sf-edge);background:var(--sf-card);color:var(--sf-text);font-weight:600;box-shadow:none;}
+.btn-second:hover:not(:disabled,[aria-disabled="true"]){border-color:var(--sf-edge-hi);}
+.btn-quiet{border:1px solid transparent;background:none;color:var(--sf-accent);font-weight:500;box-shadow:none;}
+.btn-quiet:hover:not(:disabled,[aria-disabled="true"]){text-decoration:underline;text-underline-offset:3px;}
+/* Включённый режим (прицел «Курса», порог отхода) — черта снизу, как у выбранной вкладки. */
+.btn-second.on{border-color:var(--sf-accent);background:var(--sf-sel);color:var(--sf-hi);
+  box-shadow:inset 0 -2px 0 var(--sf-accent);}
+.btn-main.on{background:var(--sf-primary-hi);box-shadow:inset 0 -2px 0 var(--sf-hi),var(--sf-glow);}
+/* Красный — состояние, а не четвёртый стиль: приказ, который обрывает начатое. */
+.btn-second.danger{border-color:color-mix(in srgb,var(--red) 45%,transparent);color:var(--red);}
+:is(.btn-main,.btn-second,.btn-quiet):is(:disabled,[aria-disabled="true"]){border-color:var(--sf-edge);
+  background:var(--sf-card-off);color:var(--sf-dim);box-shadow:none;opacity:.6;cursor:not-allowed;}
+.btn-quiet:is(:disabled,[aria-disabled="true"]){border-color:transparent;background:none;}
+/* Серая кнопка с причиной нажимается: нажатие говорит, почему нельзя (cmdBtn, why). */
+:is(.btn-main,.btn-second,.btn-quiet)[aria-disabled="true"]{cursor:help;}
+:is(.btn-main,.btn-second,.btn-quiet):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+/* Крестик ✕ — закрыть окно, панель, плашку или убрать строку списка. Заказ владельца
+   2026-10-12: «все кнопки крестик обвести красным, чтоб выделялись из общего фона». Вид у всех
+   крестиков один и даёт его класс, как у трёх стилей выше: правило экрана задаёт крестику
+   размер, место и, если нужна, подложку (background-color). Держит buttonStyles.test.ts. */
+.btn-x{border:1px solid var(--red);background:transparent;color:var(--ink);cursor:pointer;}
+.btn-x:hover{color:var(--red);background-color:color-mix(in srgb,var(--red) 14%,transparent);}
+.btn-x:active{background-color:color-mix(in srgb,var(--red) 24%,transparent);}
+.btn-x:focus-visible{outline:2px solid var(--red);outline-offset:2px;}
+
+/* desktop: spread the panel's scrollable sections into side-by-side columns,
+   divided by faint vertical rules, instead of one tall single-width stack. Each
+   .block stays whole (never split across a column). Phones reset this below. */
+.pcols{column-width:240px;column-gap:18px;column-rule:1px solid var(--line);}
+.pcols .block{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;margin-bottom:10px;}
+.pcols .block:first-child .sec:first-child{margin-top:0;}
+
+/* split-fleet modal */
+#splitdlg{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#splitdlg .sbox{width:min(440px,94vw);max-height:84vh;overflow:auto;background:var(--glass);
+  border:1px solid var(--cyan);border-radius:10px;padding:18px 18px 14px;
+  box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+#splitdlg .shead{font-size:14px;color:var(--cyan);}
+#splitdlg .shead b{color:#eafffb;}
+#splitdlg .ssub{margin:6px 0 12px;color:var(--dim);font-size:var(--fs-caption);line-height:1.5;}
+#splitdlg .srow{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;
+  padding:7px 0;border-top:1px solid var(--line);}
+#splitdlg .sname{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:var(--ink);font-weight:700;}
+#splitdlg .smods{display:flex;flex-wrap:wrap;gap:2px;}
+#splitdlg .smod{font:400 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;line-height:1.3;padding:0 3px;border-radius:2px;
+  background:rgba(53,214,230,.12);color:var(--cyan);white-space:nowrap;}
+#splitdlg .shead2{margin-top:12px;padding-top:9px;border-top:1px solid var(--cyan-dim);
+  font-size:var(--fs-caption);color:var(--cyan);}
+#splitdlg .scargo{margin-top:7px;color:var(--dim);font-size:var(--fs-caption);text-align:right;}
+#splitdlg .scargo b{color:#eafffb;}
+#splitdlg .scargo.bad{color:var(--red);}
+#splitdlg .scargo.bad b{color:var(--red);}
+#splitdlg .scur{min-width:26px;text-align:center;color:#eafffb;font-variant-numeric:tabular-nums;}
+#splitdlg .snew{min-width:42px;text-align:right;color:var(--grn);font-weight:700;font-variant-numeric:tabular-nums;}
+#splitdlg .sbtns{display:flex;gap:4px;}
+/* Флагман героя не отделяется (ядро: E_HERO_UNIT) — строка без кнопок, с пометкой. */
+#splitdlg .sstays{justify-self:center;padding:0 8px;color:var(--dim);font-size:var(--fs-caption);}
+#splitdlg .ssub.shero{margin-top:-6px;color:#e6c77a;}
+#splitdlg .sbtns button{min-width:34px;height:30px;padding:0 7px;border-radius:2px;font-size:var(--fs-caption);}
+#splitdlg .sfoot{margin:13px 0 2px;color:var(--dim);font-size:var(--fs-body);text-align:center;}
+#splitdlg .sfoot b{color:#eafffb;}
+#splitdlg .sactions{display:flex;gap:10px;justify-content:center;margin-top:10px;}
+#splitdlg .sactions .cbtn{flex:1;max-width:160px;padding:11px 10px;border-radius:7px;font-size:var(--fs-body);}
+
+/* event log lives in a tap-to-open window (rail ≡), not a permanent panel */
+#logwin{position:fixed;inset:0;z-index:46;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#logwin.show{display:flex;}
+#logwin .lwbox{display:flex;flex-direction:column;width:min(440px,94vw);max-height:70vh;overflow:hidden;
+  background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
+  box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.lw-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line-hi);}
+.lw-head b{font-size:var(--fs-body);color:var(--cyan);}
+.lw-close{width:28px;height:28px;border-radius:6px;}
+#logwin .lw-head b{flex:1;} /* push the buttons to the right when the recap button is present */
+.lw-recap{width:28px;height:28px;margin-right:6px;border-radius:6px;border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);cursor:pointer;}
+.lw-recap:active{background:rgba(53,214,230,.2);}
+#log{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:10px 14px;
+  font:var(--fs-caption)/1.6 var(--sf-font);font-variant-numeric:tabular-nums;color:#73b6a2;scrollbar-width:thin;}
+#log div::before{content:"> ";color:var(--grn-dim);}
+/* запись журнала с местом: кнопка ⌖ ведёт камеру к нему с пингом */
+#log .lg-row{display:flex;align-items:flex-start;gap:6px;}
+#log .lg-row::before{flex:none;}
+#log .lg-row span{flex:1;min-width:0;}
+.lg-ping{flex:none;width:28px;height:24px;padding:0;border-radius:6px;border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);font-size:15px;line-height:1;cursor:pointer;}
+.lg-ping:active{background:rgba(53,214,230,.2);}
+/* UIX-4.2: «Ждёт решения» над журналом — бои и письма с кнопкой «Показать» */
+#log-pending:empty{display:none;}
+#log-pending{padding:10px 14px;border-bottom:1px solid var(--line-hi);display:flex;flex-direction:column;gap:6px;}
+.lw-pend-title{font-size:var(--fs-caption);color:var(--cyan);}
+.lw-pend-row{display:flex;align-items:center;gap:10px;font-size:var(--fs-body);color:var(--fg,#d8f3ee);}
+.lw-pend-row span{flex:1;min-width:0;}
+.lw-pend-show{flex:none;min-height:44px;padding:0 14px;}
+
+/* technologies + steward + heroes windows (modal, mirror #logwin) */
+#tech,#steward,#battlewin{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#tech.show,#steward.show,#battlewin.show{display:flex;}
+/* Окно построек — тот же каркас, но НИЖЕ кодекса (z46): тап по строке открывает
+   карточку здания, и она обязана лечь ПОВЕРХ окна, а не под ним. */
+#buildwin{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#buildwin.show{display:flex;}
+#tech .twbox,#steward .twbox,#battlewin .twbox,#buildwin .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
+  background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
+  box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.tw-close{width:28px;height:28px;border-radius:6px;}
+#techbody,#stewardbody,#battlewinbody,#herobody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
+#buildwinbody{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0;}
+/* heroes window: roster cards + abilities / skill tree / fittings */
+#herobody .hx-card{border:1px solid var(--line-hi);border-radius:10px;padding:11px 13px;margin-bottom:12px;background:rgba(53,214,230,.04);}
+#herobody .hx-card.dead{opacity:.55;border-style:dashed;}
+#herobody .hx-name{font-weight:700;color:#eafffb;font-size:var(--fs-body);}
+#herobody .hx-sub{font-size:var(--fs-caption);color:var(--dim);margin-top:2px;line-height:1.5;}
+#herobody .hx-h{font-size:var(--fs-caption);color:var(--dim);margin:10px 0 4px;}
+#herobody .hx-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:var(--fs-caption);}
+#herobody .hx-grow{flex:1;min-width:0;}
+#herobody .hx-an{color:var(--cyan);font-weight:600;}
+#herobody .hx-note{font-size:var(--fs-caption);color:var(--dim);line-height:1.45;}
+#herobody .hx-btn{padding:5px 10px;border-radius:7px;font-size:var(--fs-caption);white-space:nowrap;}
+#herobody .hx-badge{font-size:var(--fs-caption);border:1px solid var(--line-hi);border-radius:5px;padding:2px 6px;color:var(--dim);white-space:nowrap;}
+#herobody .hx-badge.on{border-color:#7df0d0;color:#9ff0da;}
+#herobody .hx-badge.cd{border-color:#e2a15a;color:#e2a15a;}

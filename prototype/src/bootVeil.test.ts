@@ -8,6 +8,7 @@
 // Четвёртое звено — харнесовые сборки без `bootstrap.ts`: покров они снимают сами.
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { gameCss } from '../gameSheets.mjs';
 
 const build = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
 const boot = readFileSync(new URL('./bootstrap.ts', import.meta.url), 'utf8');
@@ -16,7 +17,7 @@ const kit = readFileSync(new URL('../harnessKit.mjs', import.meta.url), 'utf8');
 describe('BOOT-1 — покров до первого шага скрипта', () => {
   it('страница рождается под покровом, и покров прячет всё, кроме фона', () => {
     expect(build).toContain('<body data-entry="${entry}" class="app-booting">');
-    expect(build).toContain('body.app-booting > *{visibility:hidden!important;}');
+    expect(gameCss()).toContain('body.app-booting > *{visibility:hidden!important;}');
   });
 
   it('фон тёмный с первого кадра — раньше большого стиля', () => {

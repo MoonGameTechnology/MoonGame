@@ -90,7 +90,7 @@ export const EXTRA_LAYERS: readonly string[] = [
 ];
 
 /**
- * ОПИСЬ ВСЕХ ОВЕРЛЕЕВ. Ключ — id из CSS (`prototype/build.mjs`), значение — вердикт.
+ * ОПИСЬ ВСЕХ ОВЕРЛЕЕВ. Ключ — id из CSS (`prototype/styles/`), значение — вердикт.
  *
  * Тест `backLayers.test.ts` сверяет опись с реальным CSS в обе стороны: оверлей без
  * вердикта роняет гейт, вердикт `'layer'` без ветки в лестнице main.ts — тоже. Поэтому

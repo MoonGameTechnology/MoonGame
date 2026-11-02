@@ -99,7 +99,7 @@ export const DEFAULT_CHAT_CFG: ChatCfg = {
 
 /** A font colour the window accepts: the colour input's own format. */
 const CHAT_COLOR = /^#[0-9a-f]{6}$/i;
-/** The feed's own text colour (`.dp-line` in build.mjs), the picker's starting value. */
+/** The feed's own text colour (`.dp-line` in prototype/styles/), the picker's starting value. */
 const CHAT_INK = '#cfe7e3';
 
 export const DEFAULT_CHAT_GEOM: ChatGeom = { x: 12, y: 0, w: 360, h: 300 };

@@ -1,9 +1,9 @@
 // HUD-DOCK: два дефекта низа экрана заперты тестами с разных сторон — логика режимов
-// чистой моделью, а привязка ряда к листу сканом самой CSS: правило живёт в build.mjs
-// строкой, у неё нет другого сторожа, и вернуть догадку в vh случайной правкой легко.
+// чистой моделью, а привязка ряда к листу сканом самой CSS: правило живёт в листе
+// `prototype/styles/` строкой, у неё нет другого сторожа, и вернуть догадку в vh случайной
+// правкой легко.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { gameCss } from '../gameSheets.mjs';
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
 
 const CALM: DockState = {
@@ -52,7 +52,7 @@ describe('высота листа уезжает в calc() — мусор туд
 });
 
 describe('CSS: ряд привязан к ЗАМЕРУ листа, а не к догадке в vh', () => {
-  const css = readFileSync(fileURLToPath(new URL('../build.mjs', import.meta.url)), 'utf8');
+  const css = gameCss();
   // Только правила, которые ПОДНИМАЮТ плавающий элемент над листом. Широкие раскладки
   // сажают ряд обратно на дно (bottom:14px), а один rule двигает #speedbar по горизонтали
   // (right:calc(...)) — им высота листа не нужна, и сканер не должен их трогать.
@@ -85,7 +85,7 @@ describe('CSS: ряд привязан к ЗАМЕРУ листа, а не к д
 // окна вместе с концом очереди стройки. Живой браузер это ловит, гейт — нет, поэтому
 // формулы сторожит скан.
 describe('CSS: докованные слои ПК считают потолок от ВИДИМОГО окна', () => {
-  const css = readFileSync(fileURLToPath(new URL('../build.mjs', import.meta.url)), 'utf8');
+  const css = gameCss();
   // Селектор повторяется (телефонный базовый + ПК-докованный), поэтому ищем не «первое
   // правило про #side», а именно те, что считают от --vph.
   const vphRules = css.split('\n').filter((l) => l.includes('var(--vph)') && l.includes('{'));

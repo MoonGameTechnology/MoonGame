@@ -46,7 +46,7 @@
 | REFM-248 | ✅ | proto | `docs/backlog.md` | Проводка настроек |
 | REFM-249 | ✅ | proto | `docs/backlog.md` | Окна забега: торговец, союзник, подсказка пиратов, комиксы |
 | SLIM-1 | ✅ | proto srv core | `docs/backlog.md` | Сторож размеров. |
-| SLIM-2 | ⏳ | proto | `docs/backlog.md` | CSS из build.mjs в файлы. |
+| SLIM-2 | ✅ | proto | `docs/backlog.md` | CSS из build.mjs в файлы. |
 | SLIM-3 | ⏳ | proto | `docs/backlog.md` | Мозг ботов по фазам. |
 | SLIM-4 | ⏳ | core srv proto | `docs/backlog.md` | Один список модулей ядра. |
 | SLIM-5 | ⏳ | srv | `docs/backlog.md` | Хранилища сервера по доменам. |

@@ -1,6 +1,6 @@
 /* global window, localStorage */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { gameCss } from './gameSheets.mjs';
 import { build } from 'esbuild';
 import { serve, launchBrowser } from './harnessKit.mjs';
 const bundle = await build({ stdin: { contents: `
@@ -15,7 +15,7 @@ window.deletionAllowed = true;
 window.refreshDeletion = mountAccountDeletion(() => window.currentServer, () => { window.accepted = true; }, () => window.deletionAllowed);
 void window.refreshDeletion();
 `, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, write: false, format: 'iife', platform: 'browser' });
-const visibilityRule = readFileSync('prototype/build.mjs', 'utf8').match(/#hub #hub-delete-account\[hidden\]\{[^}]+\}/)?.[0];
+const visibilityRule = gameCss().match(/#hub #hub-delete-account\[hidden\]\{[^}]+\}/)?.[0];
 assert.ok(visibilityRule);
 const site = await serve({ '/': `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>#hub .hub-tile{display:flex}${visibilityRule}</style></head><body><a id="cl-privacy">Политика</a><div id="hub"><button class="hub-tile" id="hub-delete-account">Удалить аккаунт</button></div><script>${bundle.outputFiles[0].text}</script></body></html>` });
 const browser = await launchBrowser();
