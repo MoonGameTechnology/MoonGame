@@ -5,7 +5,7 @@
     "packages/server/src/store/postgres.ts": 3001,
     "packages/server/src/matchRoom.ts": 2934,
     "packages/shared-core/src/modules/shuttle.ts": 2878,
-    "prototype/src/ai.ts": 2788,
+    "prototype/src/ai.ts": 1880,
     "prototype/netserver.ts": 2092,
     "packages/shared-core/src/state/gameState.ts": 1897,
     "packages/shared-core/src/modules/construction.ts": 1755,
@@ -29,7 +29,7 @@
     "packages/client/src/main.ts": 1025
   },
   "functions": {
-    "prototype/src/ai.ts::baseAiOrders": 2090,
+    "prototype/src/ai.ts::baseAiOrders": 1418,
     "prototype/src/corpScreen.ts::initCorp": 1160,
     "packages/shared-core/src/modules/shuttle.ts::shuttleModule.setup": 939,
     "packages/shared-core/src/modules/construction.ts::constructionModule.setup": 912,

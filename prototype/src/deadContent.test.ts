@@ -12,10 +12,10 @@
 // исходник — это то, что бот реально умеет. Прецедент такой проверки в репозитории уже
 // есть — `aiProfile.test.ts` тоже читает исходники, чтобы утверждение о боте не
 // разъехалось с ботом.
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { data } from './gameData';
 import { deadContentCandidates, splitDeadContent } from './deadContent';
+import { botSource } from '../botSource.mjs';
 
 describe('AI-BAL-10 — диагноз мёртвого контента', () => {
   it('does not diagnose retired extractors as dead content even when never built or seeded', () => {
@@ -86,7 +86,7 @@ describe('AI-BAL-10 — диагноз мёртвого контента', () =>
     // ферме, тест покраснеет и заставит переписать диагноз, а не оставит его в отчёте
     // как унаследованную правду. Проверяется РЕПЕРТУАР (что бот умеет), а не факт
     // постройки: сколько раз он это построил — вопрос к прогону, а не к исходнику.
-    const ai = readFileSync('prototype/src/ai.ts', 'utf8');
+    const ai = botSource();
     const split = splitDeadContent(
       ['farm', 'power_plant', 'radar', 'frigate', 'starfort', 'spaceport'],
       ai,
