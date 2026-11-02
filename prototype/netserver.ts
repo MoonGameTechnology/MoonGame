@@ -64,6 +64,7 @@ import { creditProfileMatch } from '../packages/server/src/profileCredit';
 import { MemoryBotRosterStore, PostgresBotRosterStore, type BotRosterStore, type BotAssignment, type BotIdentity } from '../packages/server/src/botRoster';
 import { botMatchLimit, startBotArrivals, botPopulationConfig, prepareBotPopulation, recoverBotMatch, recoverBotPopulation, settleBotMatch } from '../packages/server/src/botPopulation';
 import { StaggeredAi } from './src/aiScheduler';
+import { serverAiHeartbeat } from './src/serverAiClock';
 import { aiOrderSlices } from './src/aiOrderSlices';
 import { botAcceptsOffer, botBehaviorOrders, botStyle } from './src/botBehavior';
 import { botSocialAvailable, createBotSocial } from '../packages/server/src/botSocial';
@@ -656,7 +657,7 @@ async function createHostedMatch(
   modeId?: string,
   requestedTimeScale?: number,
 ): Promise<HostedMatch> {
-  let connected = 0; // live players in THIS match (gates the empty-seat AI)
+  let connected = 0; // live players in THIS match (gates substitutes, not delegated Stewards)
   // CORP-5: битва корпораций. Её мир собирает оркестратор (`raiseAvaBattle`), а не `newGame`.
   const ava = isAvaMatchId(id);
   // The shared offline scheduler (assigned after `room` below). `observe` re-arms it,
@@ -985,10 +986,10 @@ async function createHostedMatch(
     // (corporation-wars.md §7): атакует только вошедший игрок, экономика и оборона идут сами.
     // Жители карты (пираты, рой, нейтралы) живут, как в обычной партии (CORP-8).
     if (ava && !room.state.players[seat]?.npc) return null;
-    // Offline population keeps its own empires active. The grace-based human
-    // stand-in keeps the existing watched-room policy.
-    if (connected === 0) return null;
     const posture = stewardActive(room.state, seat, room.state.time);
+    // A delegated watch is autonomous even with zero sockets. Ordinary human
+    // stand-ins retain the watched-room rule; they must not inherit this exception.
+    if (connected === 0 && posture === null) return null;
     const eligibleAt = aiEligibleAt.get(seat);
     const graceExpired = !!room.state.players[seat]?.npc || eligibleAt === undefined || Date.now() >= eligibleAt;
     const decision = seatAiDecision(humans.has(seat), posture, graceExpired);
@@ -998,7 +999,9 @@ async function createHostedMatch(
     if (aiBusy || aiStopped) return;
     aiBusy = true;
     try {
-      while (!aiStopped && !aiClockStalled && room.isStarted && (connected > 0 || botSeats.size > 0 || avaBots.size > 0) && room.state.match.status !== 'ended') {
+      // Eligibility belongs to aiPolicy. With no eligible seats, step() returns
+      // worked:false and this pass stops without polling or planning any orders.
+      while (!aiStopped && !aiClockStalled && room.isStarted && room.state.match.status !== 'ended') {
         if (driversBusy) {
           await new Promise<void>((resolve) => setTimeout(resolve, 16));
           continue;
@@ -1108,11 +1111,7 @@ async function createHostedMatch(
     heartbeatMs: HEARTBEAT_MS,
     // One room timer, paced to the existing staggered two-game-hour AI cycle.
     // It does not add sockets or affect the real online-player count.
-    backgroundHeartbeatMs: () => {
-      if ((!botSeats.size && !avaBots.size) || !room.isStarted || room.state.match.status === 'ended') return null;
-      const delay = aiSchedule.nextDelay(room.state.time, Object.keys(room.state.players), aiPolicy);
-      return delay === null ? null : Math.max(HEARTBEAT_MS, delay / room.clockScale);
-    },
+    backgroundHeartbeatMs: () => serverAiHeartbeat(room, aiSchedule, aiPolicy, HEARTBEAT_MS),
     maxDelayMs: MAX_TIMER_MS,
     onTick: ({ progressed }) => {
       // ECON-6: почасовой экономический срез в пайплайн наблюдений (JSONL — кривые
