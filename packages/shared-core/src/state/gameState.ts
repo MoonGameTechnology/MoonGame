@@ -32,6 +32,9 @@ export type ResourceBag = Record<ResourceId, number>;
 export interface UnitStack {
   unit: UnitId;
   count: number;
+  /** Effective built hull levels of a fortress body. Fractional while assembling;
+   *  absent on ordinary units. Damage remains a separate, persistent HP pool. */
+  stationScale?: number;
   /** Remaining HP pool of this stack during a battle (≤ count × def.hp).
    *  Undefined outside combat = full health. */
   hp?: number;
@@ -107,6 +110,24 @@ export interface BuildingInstance {
   type: BuildingId;
   level: number;
   hp: number;
+  repair?: RepairWork;
+}
+
+/** A prepaid repair restores only this HP budget, never subsequent combat damage. */
+export interface RepairWork {
+  owner: PlayerId;
+  remainingHp: number;
+  hpPerHour: number;
+  doneAt: number;
+}
+
+/** A fortress owns a separate construction site, not the province underneath it. */
+export interface FortressState {
+  level: number;
+  modules?: string[];
+  assembly?: { from: number; to: number; startedAt: number; doneAt: number; paused?: boolean };
+  repair?: RepairWork;
+  damageCursor?: number;
 }
 
 /** A construction/upgrade/unit order cancelled mid-build: the paid-in-full order was
@@ -581,6 +602,9 @@ export interface Planet {
    *  крепость: у него нет ни лейнов, ни клетки на карте, его не захватывают и не
    *  считают территорией (`state/forkSite.ts`). Отсутствует у всех обычных узлов. */
   fork?: ForkAnchor;
+  /** A fortress's private construction site anchored at an existing province. */
+  stationHost?: PlanetId;
+  fortress?: FortressState;
   /** Relative size / weight of the sector (default 1). Drives how much territory
    *  it claims: a sector's border with a neighbour sits proportionally to their
    *  sizes, so resizing one shifts its neighbours' borders evenly. Undefined = 1. */

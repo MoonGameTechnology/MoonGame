@@ -86,6 +86,7 @@ import {
 } from './matchJoin';
 import { initMatchBrowser } from './matchBrowser';
 import { closeMatchDescription, isMatchDescriptionOpen } from './matchDescription';
+import { closeFortressDialog, isFortressDialogOpen } from './fortressDialog';
 import { isAvaMap, isFrontier, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
@@ -360,7 +361,7 @@ import { reframePresentation } from './holographicLayout';
 import { initMarket } from './marketScreen';
 import { linkedAlly } from '../../decisions/allyPanel';
 import { extractionCandidates } from '../../decisions/chapterChain';
-import { captiveLoad, extractionStart } from '../../decisions/actions';
+import { captiveLoad, extractionStart, repairBuilding } from '../../decisions/actions';
 import { captiveCandidates } from '../../decisions/captive';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
 import { initChat } from './chatWindow';
@@ -2350,6 +2351,7 @@ const buildWin = initBuildScreen({
     coreQueue(pid, 'buildings').some((q) => q.building === id),
   build: (pid, id) => enqueueBuild(pid, { kind: 'building', id, count: 1 }),
   upgrade: (pid, id) => enqueueBuild(pid, { kind: 'upgrade', id, count: 1 }),
+  repair: (pid, id, uid) => { playerOrder(repairBuilding(ME, pid, id, uid)); },
   // Юнитные вкладки окна стройки (BUILD-2): тот же путь, которым их строила боковая
   // панель, — ростер по вкладке, заказ через ту же очередь, карточка через тот же кодекс.
   // Новой логики здесь нет и быть не должно: окно переехало, правила остались.
@@ -3063,6 +3065,7 @@ const flexed = (id: string): boolean => document.getElementById(id)?.style.displ
 
 const BACK_LAYERS: BackLayer[] = [
   { id: 'match-description', isOpen: isMatchDescriptionOpen, close: closeMatchDescription }, // native top layer
+  { id: 'fortress-order', isOpen: isFortressDialogOpen, close: closeFortressDialog },
   { id: 'comic', isOpen: () => comicPlayer.isOpen(), close: () => comicPlayer.skip() }, // z90
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   { id: 'intro', isOpen: () => shown('intro'), close: () => hide('intro') }, // z61, above the cabinet it explains

@@ -199,6 +199,7 @@ type Base = { planetId: string } | { fleetId: string };
 
 /** Ответы игры, которые тест подменяет, и следы модуля у соседей. */
 interface Env {
+  fortressDraft: Parameters<typeof import('./fortressDialog')['openFortressDialog']> | null;
   world: GameState;
   mobile: boolean;
   pc: boolean;
@@ -283,6 +284,7 @@ async function boot({ tip = true } = {}) {
   vi.resetModules();
   const page = fakePage(tip);
   const env: Env = {
+    fortressDraft: null,
     world: null as unknown as GameState,
     mobile: false,
     pc: false,
@@ -323,6 +325,9 @@ async function boot({ tip = true } = {}) {
   // Карточки рисуют их владельцы (`worldCard.ts`, `fleetCard.ts`): здесь — метка, чью
   // карточку лист позвал, и разметка теста внутри неё.
   const card = (who: string) => `<div class="card" data-card="${who}">${env.body}</div>`;
+  vi.doMock('./fortressDialog', () => ({
+    openFortressDialog: (...args: Parameters<typeof import('./fortressDialog')['openFortressDialog']>) => { env.fortressDraft = args; },
+  }));
   vi.doMock('./worldCard', () => ({
     forkPanelHtml: (f: { province: string; trail: number }) =>
       card(`fork:${f.province}:${f.trail}`),
@@ -952,7 +957,6 @@ describe('REFM-225 — нажатия по листу', () => {
     const H = home.id;
     put(ship('A', H));
     const cases: Array<[string, string, 'world' | 'fleet', Action]> = [
-      ['fortress', '', 'world', game.deployStation('p1', H)],
       ['cancelbuild', '2', 'world', game.cancelConstruction('p1', H, 2)],
       ['resumebuild', '1', 'world', game.resumeConstruction('p1', H, 1)],
       ['dequeue', '3', 'world', game.cancelConstruction('p1', H, 3)],
@@ -1205,23 +1209,46 @@ describe('REFM-225 — нажатия по листу', () => {
     expect([inter.strikeAim, env.notes, env.sent.length]).toEqual([null, [], 1]);
   });
 
+  it('opens a fortress loadout before spending resources and selects the separate site only after confirmation', async () => {
+    const { inter, env, home, show, press, orders } = await boot();
+    const decide = await import('../../decisions/actions');
+    const core = await import('../../packages/shared-core/src/index');
+    inter.pickWorld(home.id);
+    show(button('fortress'));
+    press('[data-act="fortress"]');
+    expect(orders()).toEqual([]);
+    const [draft, province, trail] = env.fortressDraft!;
+    expect([province, trail]).toEqual([home.id, undefined]);
+    const action = decide.deployStation('p1', province, ['targeting_array']);
+    if (draft.order(action)) draft.placed();
+    expect(orders()).toEqual([bare(action)]);
+    expect(inter.selPlanet).toBe(core.stationSiteId(home.id));
+  });
+
   it('крепость на развилке: встала — выбрана как мир; отказ оставляет развилку', async () => {
     const { inter, env, home, show, press, orders } = await boot();
     const decide = await import('../../decisions/actions');
     const core = await import('../../packages/shared-core/src/index');
     const fork = { province: home.id, trail: 1 };
+    const confirm = () => {
+      const [draft, province, trail] = env.fortressDraft!;
+      if (draft.order(decide.deployForkFortress('p1', province, trail!, []))) draft.placed();
+    };
     inter.pickFork(fork);
     env.refuse = true;
     show(button('forkfortress'));
     press('[data-act="forkfortress"]');
+    expect(orders()).toEqual([]);
+    confirm();
     expect(inter.selFork).toEqual(fork);
     env.refuse = false;
     show(button('forkfortress'));
     press('[data-act="forkfortress"]');
+    confirm();
     expect([inter.selFork, inter.selPlanet]).toEqual([null, core.forkSiteId(home.id, 1)]);
     expect(orders()).toEqual([
-      bare(decide.deployForkFortress('p1', home.id, 1)),
-      bare(decide.deployForkFortress('p1', home.id, 1)),
+      bare(decide.deployForkFortress('p1', home.id, 1, [])),
+      bare(decide.deployForkFortress('p1', home.id, 1, [])),
     ]);
   });
 

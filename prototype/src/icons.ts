@@ -34,6 +34,14 @@ export const BUILD_ICON: Record<string, string> = {
   metal_station: '⛏', // утилизационная станция — металл из обломков
   hospital: '✚', // полевой госпиталь: единственный источник лечения гарнизона
   factory: '⌬', // завод техники: постройка наземной техники и эскадрилий
+  station_shipyard: '⊟',
+  station_sensor: '⊚',
+  station_reactor: 'ϟ',
+  station_fabricator: '▣',
+  station_hangar: '⊟',
+  station_medbay: '✚',
+  station_shield: '◌',
+  station_defense: '⌁',
   shipyard: '⊟', // верфь: без неё корабль на мире не заложить (YARD-1)
   swarm_hive: '⬢', // PVR-4.4: наземный орган выращивания
   swarm_synapse: '▣',

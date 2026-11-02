@@ -80,6 +80,7 @@ export type LayerVerdict =
 // `match-description` — нативный dialog: открытость задаёт showModal(), а не CSS display.
 export const EXTRA_LAYERS: readonly string[] = [
   'match-description',
+  'fortress-order',
   'chain',
   'aim',
   'rail',

@@ -139,9 +139,9 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 14 | `intercept` | `intercept.ts` | — | `fleet.leg`, `fleet.parked`, `battle.started` | — | — | sched: `fleet.intercept`, `fleet.meet` |
 | 15 | `capture-on-arrival` | `captureOnArrival.ts` | — | `fleet.arrived`, `fleet.transit` | — | — | `planet.captured` |
 | 16 | `salvage` | `salvage.ts` | — | `unit.died`, `battle.resolved`, `station.destroyed`, `time.advanced` | — | — | `salvage.paid` |
-| 17 | `construction` | `construction.ts` | `building.construct`, `building.upgrade`, `unit.build`, `construction.cancel`, `construction.resume` | `construction.complete`, `construction.queue.pump`, `station.destroyed`, `planet.captured`, `combat.round`, `planet.bombarded`, `time.advanced` | `combat.mitigation` | `building.damage` | `construction.queued`, `construction.queue.dropped`, `construction.started`, `building.destroyed`, `construction.cancelled`, `construction.resumed`, `building.constructed`, `building.upgraded`, `unit.built` |
+| 17 | `construction` | `construction.ts` | `building.construct`, `building.upgrade`, `building.repair`, `unit.build`, `construction.cancel`, `construction.resume` | `construction.complete`, `construction.queue.pump`, `building.repair.complete`, `station.destroyed`, `planet.captured`, `combat.round`, `planet.bombarded`, `time.advanced` | `combat.mitigation` | `building.damage` | `construction.queued`, `construction.queue.dropped`, `construction.started`, `building.destroyed`, `construction.cancelled`, `construction.resumed`, `building.constructed`, `building.upgraded`, `unit.built` |
 | 18 | `arsenal-sync` | `arsenalSync.ts` | `arsenal.sync` | — | — | — | — |
-| 19 | `station` | `station.ts` | `station.deploy` | `building.constructed`, `building.upgraded`, `building.destroyed`, `fleet.destroyed`, `planet.captured`, `player.eliminated` | `combat.mitigation` | — | `fleet.parked`, `station.destroyed`, `station.deployed` |
+| 19 | `station` | `station.ts` | `station.deploy`, `station.repair` | `station.complete`, `station.repair.complete`, `construction.started`, `construction.cancelled`, `construction.resumed`, `time.advanced`, `building.constructed`, `building.upgraded`, `building.destroyed`, `fleet.destroyed`, `planet.captured`, `player.eliminated` | `combat.mitigation` | — | `fleet.parked`, `station.destroyed`, `station.deployed`, `station.completed`, `station.repair.started`, `station.repaired` |
 | 20 | `technology` | `technology.ts` | `technology.research`, `technology.boost`, `technology.queue`, `technology.dequeue`, `technology.queue.move` | `time.advanced`, `technology.complete`, `technology.queue.pump` | `construction.requirement`, `economy.production`, `fleet.speed`, `combat.damage.parallel` | `technology.grant` | `technology.research.started`, `technology.research.boosted`, `technology.researched`, `technology.queued`, `technology.dequeued`, `technology.queue.moved`, `technology.queue.dropped` · sched: `technology.complete`, `technology.queue.pump` |
 | 21 | `scientist` | `scientist.ts` | — | — | `research.slots` | — | — |
 | 22 | `steward` | `steward.ts` | `steward.delegate`, `steward.holdpoint`, `steward.report`, `steward.recall` | `planet.captured`, `planet.destroyed`, `station.destroyed`, `time.advanced` | — | — | `steward.delegated`, `steward.holdpoint`, `steward.reported`, `steward.recalled`, `steward.expired` |
@@ -163,7 +163,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 38 | `market` | `market.ts` | `market.list`, `market.take`, `market.cancel` | — | — | — | `market.listed`, `market.traded`, `market.cancelled` |
 | 39 | `capital` | `capital.ts` | `capital.designate` | — | — | — | `capital.designated` |
 | 40 | `standing-orders` | `standingOrders.ts` | `order.auto`, `order.retreat`, `order.chain`, `chain.stamp` | `time.advanced` | — | — | — |
-| 41 | `shuttle` | `shuttle.ts` | `shuttle.strike`, `shuttle.patrol`, `shuttle.recall`, `shuttle.redirect`, `shuttle.hold`, `shuttle.relocate`, `shuttle.split`, `shuttle.merge`, `shuttle.load`, `shuttle.unload` | `shuttle.arrived`, `shuttle.patrol.resume`, `shuttle.chase`, `shuttle.patrol.tick`, `time.advanced`, `planet.captured`, `pd.reload` | — | `missile.flew` | `shuttle.repelled`, `beachhead.landed`, `planet.captured`, `shuttle.landed`, `shuttle.lost`, `shuttle.diverted`, `shuttle.launched`, `fleet.destroyed`, `shuttle.missileDowned`, `shuttle.hit`, `shuttle.mineCleared`, `pd.mineCleared`, `shuttle.hold.ended`, `shuttle.intercepted`, `planet.bombarded`, `squadron.split`, `squadron.merged`, `shuttle.loaded`, `shuttle.unloaded`, `pd.fired` · sched: `shuttle.arrived`, `shuttle.chase`, `shuttle.patrol.tick`, `shuttle.patrol.resume`, `pd.reload` |
+| 41 | `shuttle` | `shuttle.ts` | `shuttle.strike`, `shuttle.patrol`, `shuttle.recall`, `shuttle.redirect`, `shuttle.hold`, `shuttle.relocate`, `shuttle.split`, `shuttle.merge`, `shuttle.load`, `shuttle.unload` | `shuttle.arrived`, `shuttle.patrol.resume`, `shuttle.chase`, `shuttle.patrol.tick`, `time.advanced`, `planet.captured`, `station.destroyed`, `pd.reload` | — | `missile.flew` | `shuttle.repelled`, `beachhead.landed`, `planet.captured`, `shuttle.landed`, `shuttle.lost`, `shuttle.diverted`, `shuttle.launched`, `fleet.destroyed`, `shuttle.missileDowned`, `shuttle.hit`, `shuttle.mineCleared`, `pd.mineCleared`, `shuttle.hold.ended`, `shuttle.intercepted`, `planet.bombarded`, `squadron.split`, `squadron.merged`, `shuttle.loaded`, `shuttle.unloaded`, `pd.fired` · sched: `shuttle.arrived`, `shuttle.chase`, `shuttle.patrol.tick`, `shuttle.patrol.resume`, `pd.reload` |
 | 42 | `forced-march` | `forcedMarch.ts` | `fleet.forcemarch` | `time.advanced`, `fleet.arrived` | `fleet.speed` | — | — |
 | 43 | `instant-repair` | `instantRepair.ts` | `fleet.instantRepair`, `fleet.premiumRepair` | — | — | — | `fleet.instantRepaired` |
 | 44 | `effects` | `effects.ts` | — | `planet.captured`, `time.advanced` | — | — | `effect.applied` |
@@ -387,8 +387,13 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `shuttle.unloaded` | `shuttle` | — |
 | `squadron.merged` | `shuttle` | — |
 | `squadron.split` | `shuttle` | — |
+| `station.complete`, `station.repair.complete` | `station` (scheduled) | `station` |
+| `station.completed`, `station.repair.started`, `station.repaired` | `station` | — |
+| `station.internal.damaged` | `util/combat.ts` | — |
+| `building.repair.complete` | `construction` (scheduled) | `construction` |
+| `building.repair.started`, `building.repaired` | `construction` | — |
 | `station.deployed` | `station` | — |
-| `station.destroyed` | `station` | `salvage`, `construction`, `steward` |
+| `station.destroyed` | `station` | `salvage`, `construction`, `steward`, `shuttle` |
 | `steward.delegated` | `steward` | — |
 | `steward.expired` | `steward` | — |
 | `steward.holdpoint` | `steward` | — |
@@ -614,3 +619,12 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `docs/roadmap.md` | роадмап |
 | `docs/game-modes-roadmap.md` | режимы игры (GM-0..GM-4) |
 | `docs/explanations/` | ADR-библиотека решений |
+
+Fortress lifecycle and repair quotes: `packages/shared-core/src/state/fortress.ts`;
+conserved hull/internal damage shared by live combat and forecasts:
+`packages/shared-core/src/util/fortressDamage.ts`. Prototype controls:
+`prototype/src/fortressDialog.ts`, `prototype/src/fortressView.ts`, `buildScreen.ts`.
+
+Owned helpers keep the module graph unchanged: `modules/station/lifecycle.ts`
+registers station assembly/repairs; `modules/construction/maintenance.ts` registers
+construction maintenance at the original point in setup.

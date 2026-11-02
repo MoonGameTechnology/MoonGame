@@ -35,9 +35,10 @@ export function forkSiteId(province: PlanetId, trail: number): PlanetId {
   return `fork-${province}-${trail}`;
 }
 
-/** Узел — площадка крепости на развилке, а не провинция. */
-export function isForkSite(planet: Pick<Planet, 'fork'> | undefined): boolean {
-  return planet?.fork !== undefined;
+/** Off-graph fortress site (fork or province berth), excluded from territory/topology.
+ *  The historical export name stays stable for existing clients and saves. */
+export function isForkSite(planet: Pick<Planet, 'fork' | 'stationHost'> | undefined): boolean {
+  return planet?.fork !== undefined || planet?.stationHost !== undefined;
 }
 
 /** Точка развилки: где тропа `trail` провинции `province` расходится к соседям. Null —
@@ -75,7 +76,10 @@ export function forkSiteEdge(state: GameState, anchor: ForkAnchor): FleetEdge | 
  * развилки меньше провинции, орудия в бою стоят на `exit → province` с `1 - t` (замечание
  * Codex на #1416).
  */
-export function forkSiteInBattle(state: GameState, site: Pick<Planet, 'fork'> | undefined): boolean {
+export function forkSiteInBattle(state: GameState, site: Pick<Planet, 'fork' | 'stationHost'> | undefined): boolean {
+  if (site?.stationHost) {
+    return Object.values(state.battles).some((battle) => battle.location === site.stationHost);
+  }
   if (!site?.fork) return false;
   const at = forkSiteEdge(state, site.fork);
   if (!at) return false;

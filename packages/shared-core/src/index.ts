@@ -59,6 +59,8 @@ export {
   type SeenPatrol,
   type UnitStack,
   type BuildingInstance,
+  type FortressState,
+  type RepairWork,
   type PausedConstructionSite,
   type QueuedConstruction,
   type ActiveResearch,
@@ -145,6 +147,12 @@ export {
   type TrunkSpan,
 } from './state/roads';
 export { forkPoint, forkSiteEdge, forkSiteId, forkSiteInBattle, isForkSite } from './state/forkSite';
+export {
+  FORTRESS_CORE, FORTRESS_BODY, FORTRESS_DEPLOY_COST, FORTRESS_FLEET_PREFIX,
+  stationSiteId, fortressFleetId, fortressSiteOf, stationBerth, fleetAtStation,
+  serviceSitesForFleet, repairQuote, buildingRepairQuote, fortressRepairQuote,
+  fortressLoadoutHull, issuedFortressModule, refreshFortressBody, type RepairQuote,
+} from './state/fortress';
 export {
   sectorKindDef,
   provinceScore,

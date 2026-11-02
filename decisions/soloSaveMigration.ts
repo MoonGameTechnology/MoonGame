@@ -250,6 +250,18 @@ export const HALF_MODULES_SOLO_MIGRATION = {
   toDataHash: '17cb1050daa7a3',
 } as const;
 
+/** Separate player-built fortresses and manual repairs. Existing sites and paid
+ *  work retain their legacy shape; new deployments use station_site. The old
+ *  catalogue definitions remain, so migration only advances the audited pins. */
+export const FORTRESS_MODEL_SOLO_MIGRATION = {
+  fromRules: HALF_MODULES_SOLO_MIGRATION.toRules,
+  fromData: HALF_MODULES_SOLO_MIGRATION.toData,
+  fromDataHash: HALF_MODULES_SOLO_MIGRATION.toDataHash,
+  toRules: '09fea4f0cd268e',
+  toData: '0.1.73',
+  toDataHash: '1225f30538de14',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -273,6 +285,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   STAND_UP_SOLO_MIGRATION,
   BOMBARD_VOLLEY_SOLO_MIGRATION,
   HALF_MODULES_SOLO_MIGRATION,
+  FORTRESS_MODEL_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

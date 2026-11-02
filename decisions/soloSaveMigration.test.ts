@@ -22,6 +22,7 @@ import {
   STAND_UP_SOLO_MIGRATION as standUp,
   BOMBARD_VOLLEY_SOLO_MIGRATION as bombardVolley,
   HALF_MODULES_SOLO_MIGRATION as halfModules,
+  FORTRESS_MODEL_SOLO_MIGRATION as fortressModel,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -167,7 +168,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -426,5 +427,20 @@ describe('lighter ship modules save migration (0.1.71 → 0.1.72)', () => {
     const result = parseCompatibleSoloSave(raw, halfModules.toRules);
     expect(result).toEqual({ ...before, state: { ...before.state, version: shipped } });
     expect(parseSoloSave(raw, halfModules.fromRules)).toEqual(before);
+  });
+});
+
+describe('separate fortress release compatibility', () => {
+  it('preserves an old fortress, its paid orders, clock and RNG while advancing the audited catalogue pins', () => {
+    const before = oldSave();
+    before.state.planets.A!.kind = 'void_station';
+    before.state.planets.A!.priorKind = 'asteroid';
+    before.state.planets.A!.buildings.push({ type: 'starfort', level: 1, hp: 45 });
+    before.state.version = { data: fortressModel.fromData, dataHash: fortressModel.fromDataHash, manifest: '1' };
+    const raw = serializeSoloSave(before, fortressModel.fromRules);
+    const restored = parseCompatibleSoloSave(raw, fortressModel.toRules);
+    expect(restored).toEqual({ ...before, state: { ...before.state,
+      version: { data: fortressModel.toData, dataHash: fortressModel.toDataHash, manifest: '1' },
+    } });
   });
 });

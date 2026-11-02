@@ -4,6 +4,7 @@ import { deepClone } from '../util/clone';
 import { peekValues } from '../util/draft';
 import { effectiveStat } from '../util/loadout';
 import { recordValues } from '../util/records';
+import { isForkSite } from './forkSite';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { laneIsPublic } from './corridor';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
@@ -725,7 +726,7 @@ export function radarSources(
 function publicProvinces(state: GameState): PlanetId[] {
   return Object.keys(state.planets)
     .sort()
-    .filter((id) => !state.planets[id]!.fork);
+    .filter((id) => !isForkSite(state.planets[id]));
 }
 
 /** Ближайший к точке мир из `ids`; при равенстве — первый по порядку. */
@@ -1303,6 +1304,12 @@ function project(
       // Счётчик вылетов порта (`sortie`): чужие удары сняты целиком (`strikes` выше), а
       // убыль топлива и начавшаяся перезарядка выдали бы скрытый вылет и без них.
       delete planet.sortie;
+      for (const building of planet.buildings) delete building.repair;
+      if (planet.fortress) {
+        if (identify.has(planet.id)) {
+          planet.fortress = { level: planet.fortress.level, damageCursor: planet.fortress.damageCursor };
+        } else delete planet.fortress;
+      }
     }
     // FORT-5.13. `priorKind` — СЛУЖЕБНАЯ память конверсии («чем узел был до крепости»),
     // и наружу она не идёт НИКОМУ: само её наличие выдаёт стоящую крепость, а значение —
@@ -1324,7 +1331,7 @@ function project(
     // (они и есть карта), а площадку, которую зритель не видел ни разу, он не получает
     // вовсе — иначе туман выдавал бы каждую крепость на дорогах. Увиденную помнит, как и
     // любой мир.
-    if (planet.fork && !memory?.[planet.id]) {
+    if (isForkSite(planet) && !memory?.[planet.id]) {
       delete view.planets[planet.id];
       continue;
     }
@@ -1343,7 +1350,11 @@ function project(
     if (snap) {
       planet.owner = snap.owner;
       planet.garrison = snap.garrison.map((s) => ({ ...s }));
-      planet.buildings = snap.buildings.map((b) => ({ ...b }));
+      planet.buildings = snap.buildings.map((b) => {
+        const visible = { ...b };
+        delete visible.repair;
+        return visible;
+      });
       planet.resources = {};
       if (snap.terrain === undefined) delete planet.terrain;
       else planet.terrain = snap.terrain;

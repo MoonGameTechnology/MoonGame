@@ -1166,7 +1166,8 @@ export const combatModule: GameModule = {
   // 3.9.0: вылет флота отменяет его высадку — `assault.cancelled`, десант на борту.
   // 3.10.0: наземные выжившие уходят из боя с ранами; лечит их госпиталь, а не сам бой.
   // 3.11.0: флот, вставший у мира не прилётом (верфь, взлёт, раскол, герой), сходится с врагом.
-  version: '3.11.0',
+  // 3.12.0: separate fortress hull/internal-system damage routing.
+  version: '3.12.0',
   setup(api) {
     api.provideCapability<BattlePullIn>('battle.pullIn', (at, h) => pullInBystanders(h, at));
     // Встал у мира без прилёта — бой, как у прибывшего (`util/standUp.ts`, баг 2026-11-02).

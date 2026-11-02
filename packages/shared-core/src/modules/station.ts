@@ -1,43 +1,26 @@
+import { registerFortressLifecycle, syncModelGuns } from './station/lifecycle';
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Context } from '../action/types';
+import { hoursToMs, type Context } from '../action/types';
 import { buildingLevel, type ResourceBag } from '../data/schemas';
 import type { Planet, PlayerId, UnitStack } from '../state/gameState';
-import { effectiveStats } from '../util/loadout';
+import { effectiveStats, loadoutCost, validateLoadout } from '../util/loadout';
 import { canAfford, payCost } from '../util/treasury';
-import { matchCost } from '../util/pricing';
+import { matchCost, matchHours } from '../util/pricing';
 import type { DamageHookArgs } from '../util/combat';
 import { coverPoints, worldDamageReduction } from '../util/worldCover';
 import { isCapturable, isStationable } from '../state/sectorKind';
 import { forkPoint, forkSiteEdge, forkSiteId, isForkSite } from '../state/forkSite';
+import { stationSiteId, fortressLoadoutHull, issuedFortressModule, FORTRESS_DEPLOY_COST } from '../state/fortress';
 
 /**
- * КОСМИЧЕСКАЯ КРЕПОСТЬ (`fortress-roadmap.md` §0.6, решение владельца 2026-09-15).
- *
- * Местность на карте почти вся незастраиваема: на туманности, кладбище, ионном шторме,
- * плотной туманности и вспышке нельзя возвести НИЧЕГО. Это 90 узлов из 121 на карте
- * прототипа — декорация с бонусами к скорости и живучести. Крепость — тот шаг, который
- * превращает захваченную декорацию в развиваемое владение с орбитой и своим ростером
- * построек: захват делает узел твоим, крепость делает его полезным.
- *
- * `station.deploy` переводит СВОЙ узел в вид `void_station`, после чего обычный
- * `building.construct` поднимает на нём радар, верфь, форт и прочее из ростера вида.
- * Крепость — настоящее владение: оставил без прикрытия, и враг занимает её прилётом,
- * как любой другой узел.
- *
- * ДВА ПРАВИЛА, И ОБА ПРИШЛИ ОТ ВЛАДЕЛЬЦА, А НЕ ИЗ УДОБСТВА КОДА:
- *
- * 1. **Только на ЗАХВАЧЕННОЙ территории.** Прежде требовался флот-якорь на узле; теперь
- *    доказательством служит само владение — там, где ты не был, узел твоим не стал бы.
- *    Это заодно закрывает незахватываемые виды (пустота, обломки, чёрная дыра) без
- *    отдельного запрета: своими они не становятся никогда.
- * 2. **На всех видах, кроме тех, где уже есть планета** — и кроме уже стоящей крепости.
- *    Правило живёт В ДАННЫХ (`sectorKinds.stationable`), а не строкой `'planet'` здесь:
- *    иначе каждый новый вид местности пришлось бы вспоминать руками.
- *
- * Прежняя форма требовала узел вида `empty` и технический юнит-конвертер; и то и другое
- * снято решением владельца, см. §0.6 роадмапа («что эти решения отменяют»).
- *
- * New mechanic = new module + data; the kernel is untouched, state stays pure JSON.
+ * Space fortresses (owner decision, 2026-11-02).
+ * New catalogues supply station_site: deploy creates an off-graph construction
+ * site and a single immobile body at its physical berth. The host province is
+ * untouched; readiness, wounds and manual repairs live on that body. Internals
+ * have their own HP. One existing station module owns both this lifecycle and
+ * the legacy void_station / fork_station compatibility paths below.
+ * Scenario stations and already converted saves keep their accepted contracts;
+ * minimal historical catalogues without station_site also use the legacy path.
  */
 
 const STATION_KIND = 'void_station';
@@ -73,7 +56,7 @@ export const STATION_CORE = CORE_BUILDING;
  *  него — это ровно тот способ, которым интерфейс начинает обещать то, что редьюсер
  *  отклоняет (прецедент ORB-4 записан в `main.ts`: три собственных `?? BUILDABLE` развели
  *  клиентское правило с данными). Одно число, один дом. */
-export const STATION_COST: ResourceBag = { metal: 120 };
+export const STATION_COST: ResourceBag = FORTRESS_DEPLOY_COST;
 
 /**
  * ОРУДИЯ КРЕПОСТИ — неподвижный отряд, которым крепость ВОЮЕТ (FORT-5.4, решение
@@ -124,7 +107,8 @@ const SHIELD_STEPS = ['void_shield_i', 'void_shield_ii', 'void_shield_iii'] as c
 /** Какая ступень щита надета на крепость: по уровню живого здания щитов. Нет здания
  *  (не построено или снесено) → щита нет, и это не «ноль щита», а отсутствие модуля. */
 function shieldStep(planet: Planet): string | null {
-  const b = planet.buildings.find((x) => x.type === SHIELD_BUILDING && x.hp > 0);
+  const b = planet.buildings.find((x) =>
+    (x.type === SHIELD_BUILDING || x.type === 'station_shield') && x.hp > 0);
   if (!b) return null;
   return SHIELD_STEPS[Math.min(Math.max(b.level, 1), SHIELD_STEPS.length) - 1] ?? null;
 }
@@ -160,6 +144,10 @@ function fitShield(stack: UnitStack, step: string | null, ctx: Context): void {
  * мгновенной аптечкой.
  */
 function syncStationGuns(h: HandlerContext, planet: Planet): void {
+  if (planet.fortress) {
+    syncModelGuns(h, planet);
+    return;
+  }
   const id = gunsFleetId(planet.id);
   const existing = h.state.fleets[id];
   const core = planet.buildings.find((b) => b.type === CORE_BUILDING && b.hp > 0);
@@ -216,18 +204,25 @@ function syncStationGuns(h: HandlerContext, planet: Planet): void {
 function releaseForkSite(h: HandlerContext, site: Planet): void {
   const owner = site.owner;
   site.owner = null;
+  delete site.fortress;
+  h.state.scheduled = h.state.scheduled.filter((event) =>
+    !(['station.complete', 'station.repair.complete'].includes(event.type) &&
+      (event.payload as { planetId?: string }).planetId === site.id));
   h.emit('station.destroyed', { planetId: site.id, owner });
 }
+
+/** The separate body has one HP pool. Newly completed structure adds capacity,
+ *  not healing: keep the absolute wound amount while readiness changes. */
 
 export const stationModule: GameModule = {
   id: 'station',
   // 1.1.0: постройки крепости прикрывают её орудия (FORT-5.16, замечание Codex на #1389).
   // 1.2.0: прикрытие — только отряду из одних орудий (находка Codex на #1393).
   // 1.3.0: крепость на развилке — новая точка постройки (FORT-6.1).
-  version: '1.3.0',
+  version: '1.4.0',
   setup(api) {
     api.onAction('station.deploy', (action, h: HandlerContext) => {
-      const { planetId, trail } = action.payload as { planetId?: string; trail?: unknown };
+      const { planetId, trail, modules } = action.payload as { planetId?: string; trail?: unknown; modules?: unknown };
       if (typeof planetId !== 'string') return h.reject('E_BAD_PAYLOAD');
       if (trail !== undefined && !(Number.isInteger(trail) && (trail as number) >= 0)) {
         return h.reject('E_BAD_PAYLOAD');
@@ -247,7 +242,8 @@ export const stationModule: GameModule = {
       // ветка, а тот же запрет. У развилки своё место: она должна быть, и одна развилка —
       // одна крепость (площадка с хозяином — там уже стоит чья-то).
       const anchor = trail === undefined ? null : { province: planetId, trail: trail as number };
-      const siteId = anchor ? forkSiteId(anchor.province, anchor.trail) : planetId;
+      const model = h.ctx.data.sectorKinds['station_site'] !== undefined;
+      const siteId = anchor ? forkSiteId(anchor.province, anchor.trail) : model ? stationSiteId(planetId) : planetId;
       const site = h.state.planets[siteId];
       if (anchor) {
         if (!forkSiteEdge(h.state, anchor)) return h.reject('E_NOT_STATIONABLE');
@@ -255,7 +251,26 @@ export const stationModule: GameModule = {
       } else if (!isStationable(h.ctx.data, node)) {
         return h.reject('E_NOT_STATIONABLE');
       }
-      const cost = matchCost(h.state, STATION_COST);
+      if (model && site?.owner !== undefined && site.owner !== null) return h.reject('E_NOT_STATIONABLE');
+      if (model && !h.ctx.data.units[GUNS_UNIT]) return h.reject('E_UNKNOWN_UNIT');
+      if (modules !== undefined && (!Array.isArray(modules) || modules.some((x) => typeof x !== 'string'))) {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const chosen = (modules ?? []) as string[];
+      if (player.arsenal && chosen.some((id) => !player.arsenal!.modules.includes(id))) return h.reject('E_NOT_OWNED');
+      if (chosen.some(issuedFortressModule)) {
+        return h.reject('E_STATION_MODULE');
+      }
+      if (chosen.length > 0) {
+        const body = fortressLoadoutHull(h.ctx.data);
+        if (!model || !body) return h.reject('E_BAD_PAYLOAD');
+        const fit = validateLoadout(GUNS_UNIT, body, chosen, h.ctx.data);
+        if (!fit.ok) return h.reject(fit.code);
+      }
+      const cost = { ...matchCost(h.state, STATION_COST) };
+      for (const [key, value] of Object.entries(matchCost(h.state, loadoutCost(chosen, h.ctx.data)))) {
+        cost[key] = (cost[key] ?? 0) + value;
+      }
       if (!canAfford(player.resources, cost)) return h.reject('E_INSUFFICIENT');
 
       // Ядро обязано быть в каталоге: без него крепость вышла бы бестелесной — без HP,
@@ -278,6 +293,26 @@ export const stationModule: GameModule = {
 
       payCost(player.resources, cost);
       const coreHp = buildingLevel(core, 1).hp;
+      if (model) {
+        const point = anchor ? forkPoint(h.state, anchor)! : node.position;
+        const fresh: Planet = {
+          id: siteId, owner: action.playerId, kind: 'station_site',
+          position: { x: point.x, y: point.y }, links: [], resources: {}, buildings: [
+            { type: CORE_BUILDING, level: 1, hp: coreHp },
+          ], garrison: [], traits: [],
+          ...(anchor ? { fork: anchor } : { stationHost: planetId }),
+          fortress: { level: 1, modules: [...chosen], assembly: { from: 0, to: 1,
+            startedAt: h.ctx.now,
+            doneAt: h.ctx.now + hoursToMs(h.ctx, matchHours(h.state, core.buildTimeHours)),
+          } },
+        };
+        h.state.planets[siteId] = fresh;
+        syncModelGuns(h, fresh, true);
+        h.schedule(fresh.fortress!.assembly!.doneAt, 'station.complete', { planetId: siteId });
+        h.emit('station.deployed', { planetId: siteId, owner: action.playerId,
+          ...(anchor ? { fork: anchor } : { host: planetId }), doneAt: fresh.fortress!.assembly!.doneAt });
+        return;
+      }
       if (anchor) {
         // Площадка развилки: при первой крепости здесь её ещё нет — заводим; после гибели
         // прежней она стоит пустой и принимает новую (id тот же — развилка та же).
@@ -313,17 +348,24 @@ export const stationModule: GameModule = {
       h.emit('station.deployed', { planetId, owner: action.playerId });
     });
 
+    registerFortressLifecycle(api);
+
     // Прокачка ядра добавляет орудия; разрушение — снимает их вместе с ядром. Здание
     // ЩИТОВ ходит теми же событиями, но у него значима ещё и ПОСТРОЙКА: ядро игрок не
     // строит (оно приходит с конверсией), а щит — обычная стройка из ростера.
-    const WATCHED: readonly string[] = [CORE_BUILDING, SHIELD_BUILDING];
+    const WATCHED: readonly string[] = [CORE_BUILDING, SHIELD_BUILDING, 'station_shield', 'station_defense'];
     for (const evt of ['building.constructed', 'building.upgraded', 'building.destroyed'] as const) {
       api.on(evt, (event, h) => {
         const p = event.payload as { planetId?: string; building?: string };
         if (typeof p.building !== 'string' || !WATCHED.includes(p.building)) return;
         if (typeof p.planetId !== 'string') return;
         const planet = h.state.planets[p.planetId];
-        if (planet) syncStationGuns(h, planet);
+        if (planet) {
+          if (planet.fortress && p.building === CORE_BUILDING && evt === 'building.upgraded') {
+            delete planet.fortress.assembly;
+          }
+          syncStationGuns(h, planet);
+        }
       });
     }
 
@@ -359,7 +401,7 @@ export const stationModule: GameModule = {
       const planetId = planetOfGunsFleet(p.fleetId);
       if (planetId === null) return;
       const planet = h.state.planets[planetId];
-      if (!planet || !planet.buildings.some((b) => b.type === CORE_BUILDING)) return;
+      if (!planet || (!planet.fortress && !planet.buildings.some((b) => b.type === CORE_BUILDING))) return;
       // Крепость на развилке гибнет иначе: площадка остаётся (вид у неё свой и не менялся),
       // а развилка освобождается (FORT-6.1).
       if (isForkSite(planet)) {

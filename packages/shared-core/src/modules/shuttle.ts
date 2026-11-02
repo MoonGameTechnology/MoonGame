@@ -93,7 +93,8 @@ import { addUnits, cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 import { deepClone } from '../util/clone';
-import { dockHullRate, fleetAtOwnDock, fleetHangarRepairRate } from '../util/repair';
+import { dockHullRate, fleetHangarRepairRate } from '../util/repair';
+import { serviceSitesForFleet } from '../state/fortress';
 import { recordValues } from '../util/records';
 import { battleLocations } from '../state/battle';
 
@@ -1935,7 +1936,7 @@ export const shuttleModule: GameModule = {
   // 1.17.0: урон удара по войскам мира делится поровну на каждого юнита, а не фокусом
   //         (ROS-1.6a, то же правило, что у обстрела с орбиты).
   // 1.18.0: удар по миру бьёт технику и пехоту разной долей атаки (ROS-1.6b).
-  version: '1.18.0',
+  version: '1.19.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -2245,12 +2246,15 @@ export const shuttleModule: GameModule = {
       action: { playerId: string; payload: unknown },
       h: HandlerContext,
     ): { fleet: Fleet; planet: Planet; squadronId: string } => {
-      const p = action.payload as { fleetId?: string; squadronId?: string };
+      const p = action.payload as { fleetId?: string; squadronId?: string; planetId?: string };
       if (typeof p?.fleetId !== 'string' || typeof p?.squadronId !== 'string') {
         return h.reject('E_BAD_PAYLOAD');
       }
       const fleet = requireOwnedIdleFleet(h, p.fleetId, action.playerId);
-      const planet = fleet.location ? h.state.planets[fleet.location] : undefined;
+      const ports = serviceSitesForFleet(h.state, fleet).filter((site) => site.owner === action.playerId);
+      if (!p.planetId && fleet.location && h.state.planets[fleet.location]?.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      const planet = p.planetId ? ports.find((site) => site.id === p.planetId)
+        : ports.find((site) => site.id === fleet.location) ?? ports.find((site) => shuttleBayAt(site, h.ctx.data) > 0);
       if (!planet) return h.reject('E_NO_PLANET');
       if (planet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
       return { fleet, planet, squadronId: p.squadronId };
@@ -2607,9 +2611,9 @@ export const shuttleModule: GameModule = {
       for (const fleet of recordValues(h.state.fleets)) {
         if (!fleet.hangar?.length || fleet.battleId) continue;
         if (fleet.location !== null && fighting.has(fleet.location)) continue;
-        const docked =
-          fleet.location !== null && fleetAtOwnDock(fleet, h.state, data, (a, b) => isAllied(h, a, b));
-        const dock = docked ? dockHullRate(h.state.planets[fleet.location!]!, data) : 0;
+        const ports = serviceSitesForFleet(h.state, fleet, (a, b) => isAllied(h, a, b));
+        if (ports.some((port) => fighting.has(port.id))) continue;
+        const dock = ports.reduce((rate, port) => rate + dockHullRate(port, data), 0);
         mend(fleet.hangar, dock + fleetHangarRepairRate(fleet, data));
       }
     });
@@ -2630,6 +2634,16 @@ export const shuttleModule: GameModule = {
         owner: planet.owner,
         count: lost,
       });
+    });
+
+    api.on('station.destroyed', (event, h: HandlerContext) => {
+      const p = event.payload as { planetId?: string; owner?: string };
+      const site = p.planetId ? h.state.planets[p.planetId] : undefined;
+      if (!site) return;
+      const lost = hangarUsed(site);
+      delete site.hangar;
+      delete site.sortie;
+      if (lost > 0) h.emit('shuttle.lost', { baseId: site.id, baseKind: 'planet', owner: p.owner, count: lost });
     });
 
     /**

@@ -1,3 +1,4 @@
+import { legacyFortressDeploymentContext } from './fixtures/legacyFortress';
 /**
  * ЯДРО КОСМИЧЕСКОЙ КРЕПОСТИ (FORT-5.2; решения владельца 9, 10, 13, 18 — §0.7 роадмапа).
  *
@@ -68,10 +69,10 @@ const act = (type: string, payload: Record<string, unknown>): Action => ({
   id: 's:p1:1', type, playerId: 'p1', payload, issuedAt: 0,
 });
 
-describe('ядро крепости — решения владельца 9/10/13/18 в шипнутом каталоге', () => {
+describe('legacy save compatibility — ядро крепости — решения владельца 9/10/13/18 в шипнутом каталоге', () => {
   it('`station.deploy` ставит ядро САМ: крепость не бывает бестелесной', () => {
     const kernel = createKernel([stationModule]);
-    const r = kernel.applyAction(world('asteroid'), act('station.deploy', { planetId: 'A' }), ctx());
+    const r = kernel.applyAction(world('asteroid'), act('station.deploy', { planetId: 'A' }), legacyFortressDeploymentContext(0, data));
     if (!r.ok) throw new Error(`отказ ${r.code}`);
     const built = r.state.planets.A?.buildings ?? [];
     expect(r.state.planets.A?.kind).toBe('void_station');
@@ -92,7 +93,7 @@ describe('ядро крепости — решения владельца 9/10/1
       units: [{ unit: 'cruiser', count: 1 }], landing: [], traits: [], battleId: null, orbit: 'near',
     };
     const kernel = createKernel([stationModule, orbitalModule]);
-    const raised = kernel.applyAction(world('asteroid', [enemy]), act('station.deploy', { planetId: 'A' }), ctx());
+    const raised = kernel.applyAction(world('asteroid', [enemy]), act('station.deploy', { planetId: 'A' }), legacyFortressDeploymentContext(0, data));
     if (!raised.ok) throw new Error(`отказ ${raised.code}`);
     const r = kernel.advanceTo(raised.state, ctx(1.1 * HOUR));
     if (!r.ok) throw new Error(`advance отказ ${r.code}`);

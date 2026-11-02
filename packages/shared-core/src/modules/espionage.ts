@@ -1,4 +1,5 @@
 import { hoursToMs } from '../action/types';
+import { FORTRESS_CORE } from '../state/fortress';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { BuildingDamage, BuildingHit, ConstructionDelay, DelayedOrder } from './construction';
 import type { TechnologyGrant } from './technology';
@@ -274,6 +275,7 @@ function sabotage(h: HandlerContext, planetId: string): { building: string; dest
   const planet = h.state.planets[planetId]!;
   const pool: { index: number; maxHp: number }[] = [];
   planet.buildings.forEach((b, index) => {
+    if (planet.fortress && b.type === FORTRESS_CORE) return;
     const def = h.ctx.data.buildings[b.type];
     const maxHp = def ? buildingLevel(def, b.level).hp : 0;
     if (maxHp > 0 && b.hp > 0) pool.push({ index, maxHp });
@@ -389,7 +391,7 @@ export const espionageModule: GameModule = {
   // 1.7.0: разведка копится слоями, агент стоит до отзыва (SPY-13).
   // 1.8.0: подрыв экономики (SPY-15). 1.9.0: раскрытие — новость для всех (SPY-16).
   // 1.10.0: до трёх агентов на мире, волна складывает шансы (SPY-17).
-  version: '1.11.0',
+  version: '1.12.0',
   setup(api) {
     // SPY-15: a disrupted world produces `DISRUPT_FACTOR` of its output. A span never
     // runs across the end (it is a scheduled event), so «until ≥ now» at the span's end
