@@ -151,11 +151,11 @@ describe('SHU-5.4 — ремонтный ангар', () => {
     expect(advance(world(hurt(false)), 4).fleets.CR?.hangar?.[0]?.damage).toBe(5);
   });
 
-  it('в данных игры модуль стоит во вспомогательном слоте и чинит 5%/ч', () => {
+  it('в данных игры модуль стоит во вспомогательном слоте и чинит 2,5%/ч', () => {
     const shipped = JSON.parse(
       readFileSync(new URL('../../../../data/modules.json', import.meta.url), 'utf8'),
     );
     expect(shipped.repair_bay.slot).toBe('utility');
-    expect(shipped.repair_bay.effects.stats.hullRepair).toBe(0.05);
+    expect(shipped.repair_bay.effects.stats.hullRepair).toBe(0.025);
   });
 });

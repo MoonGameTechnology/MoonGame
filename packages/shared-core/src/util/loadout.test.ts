@@ -267,13 +267,13 @@ describe('HPR-1.5.1 — the shipped hero hull takes ordinary ship modules', () =
       { modules: ['targeting_array', 'ablative_plating', 'ion_engine'] },
       shipped,
     );
-    expect(fitted.attack).toBe((base.attack ?? 0) + 4);
-    expect(fitted.hp).toBe((base.hp ?? 0) + 12);
-    expect(fitted.speed).toBe((base.speed ?? 0) + 2);
+    expect(fitted.attack).toBe((base.attack ?? 0) + 2);
+    expect(fitted.hp).toBe((base.hp ?? 0) + 6);
+    expect(fitted.speed).toBe((base.speed ?? 0) + 1);
     // The combat/artillery path (`sumUnitStat`) sees the same numbers — a fitted
     // hero stack is genuinely stronger, not merely annotated.
     const stack: UnitStack = { unit: 'hero', count: 1, modules: ['targeting_array'] };
-    expect(sumUnitStat([stack], shipped, 'attack')).toBe((base.attack ?? 0) + 4);
+    expect(sumUnitStat([stack], shipped, 'attack')).toBe((base.attack ?? 0) + 2);
   });
 
   it('the bays are BOUNDED and still honour a module’s own allow rule', () => {

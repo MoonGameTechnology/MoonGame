@@ -192,7 +192,7 @@ describe('арсенал — список', () => {
     expect(html).toContain('class="ar-mc r-unique miss goal" data-ar-module="tractor_beam"');
     expect(html).toContain('Материалы 28/35');
     expect(html).toContain('Хватает материалов'); // осадная платформа: сервер разрешает сборку
-    expect(html).toContain('+4 атака');
+    expect(html).toContain('+2 атака');
   });
 
   it('копии сведены в одну карточку со счётом, цель помечена', () => {
