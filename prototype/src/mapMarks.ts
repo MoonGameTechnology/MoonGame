@@ -1,7 +1,7 @@
 /**
  * Метки карты (REFM-234): то, что стоит на карте, пока верно в мире, — цели задач забега с
  * флажком, цель операции союзника и знак носителя, летящие ракеты, минные поля и установки,
- * осада «Поглощения мира» с отсчётом, таймер бомбардировки, булавки меток коалиции и линии отправленных цепочек
+ * осада «Поглощения мира» с отсчётом, таймеры бомбардировки и перевозки войск, булавки меток коалиции и линии отправленных цепочек
  * «Приказ» с черновиком открытого режима.
  *
  * Что метить, решают чистые модели (`missionRing.ts`, `allyPanel.ts`, `devourSiege.ts`,
@@ -26,6 +26,7 @@ import type { ChapterStep } from '../../decisions/chapterChain';
 import { devourSieges } from '../../decisions/devourSiege';
 import { mineCard } from '../../decisions/mineCard';
 import { ownInstallations } from '../../decisions/minefields';
+import { troopTransferTimers } from '../../decisions/troopTransferTimers';
 import { missionRingFrame, missionRingPhase, RING_R, RING_W } from '../../decisions/missionRing';
 import type { MissionRow } from '../../decisions/missionView';
 import { ALLY_EMBLEM } from './allyScreen';
@@ -35,12 +36,12 @@ import { chainAbilityHoldH, chainMenuAnchor, chainMode, chainRoute, chainStart, 
 import { capsuleAt, chainPathLegs, lastStepAtPoint, stackIndexes, type PathLeg } from './chainPathLayout';
 import { chainTimeline, draftFinish, stepGlyph, stepHours } from './chainPlanner';
 import type { SessionMsg } from './conversations';
-import { fleetAnchor, fleetOriginPx, fleetPos } from './fleetGeometry';
+import { fleetAnchor, fleetOriginPx, fleetPos, orbitRingRadius } from './fleetGeometry';
 import { countdownHMS, fmtEta } from './format';
 import { HOUR, data, type ChainStep } from './game';
 import { fxBlur, glowOn, motionOn } from './graphicsPrefs';
 import { drawHolographicPing } from './holographicEffects';
-import { cam, visible, world } from './mapCamera';
+import { cam, insets, viewWidth, visible, world } from './mapCamera';
 import { fleetSeen } from './mapFog';
 import { HOSTILE, LOCK, TAU, ownerColor } from './mapPalette';
 import { RING_OFFSETS, dropInAlpha, pinPulse, pingPhase, ringAlpha, ringProgress, ringRadius, ringWidth } from './pingPulse';
@@ -250,6 +251,55 @@ export function drawMinefields(): void {
     cx.textAlign = 'left'; cx.fillText(m.label, 26, 15);
     cx.restore();
   }
+}
+
+/** Свои перевозки — над объектом, выше голограммы типа; видны без выбора флота и на
+ *  схеме. Разные направления стоят отдельными строками, одинаковые собраны по флотам.
+ *  По сроку заявка показывает ноль до подтверждения мира, после отмены метки нет. */
+export function drawTroopTransferTimers(): void {
+  const s = game.world();
+  const marks = troopTransferTimers(Object.values(s.fleets), game.me(), s.time);
+  if (marks.length === 0) return;
+  const cx = game.ctx();
+  cx.save();
+  cx.textAlign = 'center';
+  cx.textBaseline = 'middle';
+  cx.font = '600 12px ui-monospace, monospace';
+  cx.lineWidth = 1;
+  for (const m of marks) {
+    const p = s.planets[m.target];
+    if (!p) continue;
+    const c = world(p.position);
+    if (!visible(c, 160)) continue;
+    // Над кольцом и вынесенными наружу подписями флотов, даже при близком зуме.
+    const clearance = Math.max(76, orbitRingRadius(p) + 82);
+    const top = Math.max(insets().top + 6, Math.round(c.y - clearance - m.rows.length * 24));
+    const bottom = top + m.rows.length * 24 - 2;
+    if (bottom < c.y - 31) {
+      cx.strokeStyle = rgba(ownerColor(game.me()), 0.4);
+      cx.beginPath();
+      cx.moveTo(c.x, bottom);
+      cx.lineTo(c.x, c.y - 31);
+      cx.stroke();
+    }
+    m.rows.forEach((row, i) => {
+      const name = row.kind === 'load' ? t('map.transfer.load')
+        : row.kind === 'unload' ? t('map.transfer.unload') : t('map.transfer.assault');
+      const count = row.fleets > 1 ? ` · ${t('map.transfer.fleets', { n: row.fleets })}` : '';
+      const label = `${row.kind === 'load' ? '▲' : '▼'} ${name}${count} · ${countdownHMS(row.leftMs)}`;
+      const w = Math.ceil(cx.measureText(label).width) + 12;
+      const left = Math.max(6, Math.min(viewWidth() - w - 6, Math.round(c.x - w / 2)));
+      const y = top + i * 24;
+      const tone = row.kind === 'assault' ? '#ffb347' : ownerColor(game.me());
+      cx.fillStyle = 'rgba(4,10,12,.95)';
+      cx.fillRect(left, y, w, 22);
+      cx.strokeStyle = tone;
+      cx.strokeRect(left + 0.5, y + 0.5, w - 1, 21);
+      cx.fillStyle = tone;
+      cx.fillText(label, left + w / 2, y + 11);
+    });
+  }
+  cx.restore();
 }
 
 /** Таймер бомбардировки: под миром, где обстреливает мой флот или обстреливают мой мир, —
