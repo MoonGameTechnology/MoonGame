@@ -1,0 +1,21 @@
+{
+  "version": "module-progression-v1",
+  "blueprints": {
+    "firstPlaceChance": 0.25,
+    "otherPlaceChance": 0.08,
+    "tiers": [
+      {
+        "rarity": "unique",
+        "weight": 70
+      },
+      {
+        "rarity": "mythic",
+        "weight": 25
+      },
+      {
+        "rarity": "legendary",
+        "weight": 5
+      }
+    ]
+  }
+}

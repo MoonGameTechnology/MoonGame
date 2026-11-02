@@ -1,3 +1,5 @@
+import type { PlayerArsenal } from './arsenal';
+export type { PlayerArsenal } from './arsenal';
 import { seedRng, type RngState } from '../rng/rng';
 import type { FleetChain } from './chain';
 import type { Coalition, CoalitionClock } from './coalition';
@@ -52,11 +54,8 @@ export interface UnitStack {
    *  мету НЕ перечитывает, поэтому заточка на ходу уже летающий корабль не меняет —
    *  та же доктрина «нет рефита», что и у самого {@link UnitStack.modules}.
    *
-   *  ⚠️ **В идентичность слияния НЕ входит** (`loadoutKey` её не видит), и это
-   *  осознанно: звёзды — замороженное свойство ВЛАДЕЛЬЦА, снятое один раз на матч,
-   *  поэтому два стека одного игрока с одним лоадаутом всегда несут одинаковые звёзды,
-   *  и слияние ничего не теряет. Начни звёзды меняться под живым матчем — правило
-   *  сломается, и тогда их придётся заводить в ключ.
+   *  Входит в идентичность слияния вместе с редкостью (`moduleValueKey`): живой
+   *  арсенал даёт новым заказам другие значения, а старые стеки сохраняют свои.
    *
    *  Отсутствует / пусто = ★0 у всех, то есть прежние числа байт-в-байт. Записываются
    *  только НЕнулевые звёзды НАДЕТЫХ модулей. */
@@ -125,6 +124,7 @@ export interface PausedConstructionSite {
   unit?: UnitId;
   count?: number;
   modules?: ModuleId[];
+  moduleSnapshot?: { stars: Record<string, number>; rarity: Record<string, string> };
   /** Наземный юнит внутри десантного челнока (SHU-5.2). */
   troop?: UnitId;
   /** RULES-2.1: instance uid for upgrade resume (when maxPerPlanet > 1). */
@@ -226,30 +226,6 @@ export interface Player {
   arsenal?: PlayerArsenal;
 }
 
-
-/** The build-permission snapshot of a seat (see `Player.arsenal`): unique, sorted
- *  catalog ids per kind — the shape both the core gate and the UI filter read. */
-export interface PlayerArsenal {
-  /** Buildable hulls → `data.units` ids. */
-  hulls: string[];
-  /** Installable ship modules → `data.modules` ids. */
-  modules: string[];
-  /** Звёздность модулей этого места (SZE-1.1), `id → ★` — снимок меты Sector Zero,
-   *  из которого верфь штампует {@link UnitStack.moduleStars} на всё, что построит за
-   *  забег. Без него стартовый флот летал бы на ★N, а построенное на верфи — на ★0:
-   *  один модуль с двумя разными числами в одном матче. Отсутствует = ★0 у всех
-   *  (обычные матчи — мягкая деградация, как и у самого арсенала). */
-  stars?: Record<string, number>;
-  /** Поднятая редкость модулей этого места (SZE-5.1), `id → ступень` — снимок, из
-   *  которого верфь штампует {@link UnitStack.moduleRarity}. Та же причина, что у
-   *  {@link PlayerArsenal.stars}: иначе стартовый флот и построенное за забег несли бы
-   *  один модуль с разными числами. Отсутствует = базовая редкость у всех. */
-  rarity?: Record<string, string>;
-  /** Лишние слоты корпусов этого места, `корпус → { weapon, defense, utility }` —
-   *  снимок звёзд кораблей Sector Zero (решение владельца 2026-09-26). Верфь проверяет
-   *  набор модулей против слотов корпуса С ЭТОЙ прибавкой. Отсутствует = слоты каталога. */
-  slots?: Record<string, { weapon?: number; defense?: number; utility?: number }>;
-}
 
 /** A live Steward delegation on a player (see `Player.steward`). */
 export interface StewardState {
@@ -673,6 +649,7 @@ export interface QueuedConstruction {
   unit?: string;
   count?: number;
   modules?: string[];
+  moduleSnapshot?: { stars: Record<string, number>; rarity: Record<string, string> };
   /** Наземный юнит внутри десантного челнока (SHU-5.2). */
   troop?: string;
 }
@@ -1539,6 +1516,7 @@ export interface Hero {
    *  game-day of downtime would be impossible to explain. `deployHero` stamps this list
    *  onto the ship it forms. Absent/empty ⇒ a bare hull, exactly as before. */
   modules?: ModuleId[];
+  moduleSnapshot?: { stars: Record<string, number>; rarity: Record<string, string> };
   /** Extra bays of this hero's ship beyond the hull and the grade — the Sector Zero hero
    *  stars snapshotted at run start (PVR-6.24: 2★ a defense bay, 3★ a weapon bay). Without
    *  it the run's flagship carried modules its bays did not count: the ship card called them

@@ -486,6 +486,7 @@ describe('MatchRoom · LARS-1 live arsenal sync', () => {
       wasRead: () => read,
       store: {
         grant: (item) => inner.grant(item),
+        update: (item) => inner.update(item),
         get: (itemId) => inner.get(itemId),
         listOf: (accountId) => {
           read = true;
@@ -557,7 +558,7 @@ describe('MatchRoom · LARS-1 live arsenal sync', () => {
     expect(peer.rejections().some((r) => r.code === 'E_NOT_OWNED')).toBe(true);
   });
 
-  it('a hull already covered by the boot snapshot never triggers a live read', async () => {
+  it('a sold hull is revoked even when the boot snapshot still grants it', async () => {
     const { store, wasRead } = tracking(new MemoryArsenalStore());
     const room = await roomWithSnapshot(store);
     const peer = new MemoryPeer();
@@ -565,7 +566,7 @@ describe('MatchRoom · LARS-1 live arsenal sync', () => {
 
     await room.receive('green', peer, raw(build('cruiser'))); // no modules — hull is already owned
 
-    expect(wasRead()).toBe(false);
-    expect(peer.rejections()).toHaveLength(0);
+    expect(wasRead()).toBe(true);
+    expect(peer.rejections().some((r) => r.code === 'E_NOT_OWNED')).toBe(true);
   });
 });

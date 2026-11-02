@@ -1,3 +1,4 @@
+import { heroShipStack, rememberHeroModule } from '../util/heroLoadout';
 import { sectorKindDef } from '../state/sectorKind';
 import { hoursToMs } from '../action/types';
 import type {
@@ -16,7 +17,6 @@ import type {
   PlayerId,
   ResourceBag,
   TempLane,
-  UnitStack,
 } from '../state/gameState';
 import { stacksHaveTrait } from '../data/traits';
 import { getStance, stanceToRelation } from '../state/diplomacy';
@@ -30,7 +30,6 @@ import { fleetForOrder } from '../util/fleet';
 import { canInstall } from '../util/fitting';
 import { knownSkillNodes } from '../util/heroSkills';
 import { moduleAllowed, type SlotCounts } from '../util/loadout';
-import { rarityOf, starsOf } from '../util/stacks';
 import { canAfford, payCost } from '../util/treasury';
 
 /**
@@ -330,7 +329,7 @@ function formHeroShip(h: HandlerContext, hero: Hero, at: PlanetId): string {
     owner: hero.owner,
     location: at,
     movement: null,
-    units: [heroShipStack(h, hero)],
+    units: [heroShipStack(h, hero, heroShipUnit(h, hero))],
     traits: [],
     orbit: 'near',
   };
@@ -429,22 +428,6 @@ export function heroModuleSlots(hero: Hero, unit: string, data: GameData): SlotC
  *  An empty set leaves the key ABSENT rather than writing `[]` — a stack's loadout is
  *  part of its merge identity, so an empty array would split stacks that used to merge
  *  and change old behaviour for heroes that own no modules. */
-function heroShipStack(h: HandlerContext, hero: Hero): UnitStack {
-  const stack: UnitStack = { unit: heroShipUnit(h, hero), count: 1 };
-  const mods = hero.modules;
-  if (mods !== undefined && mods.length > 0) {
-    stack.modules = [...mods];
-    // Звёзды и редкость модулей — из СНИМКА арсенала места, как у верфи (SZE-1.1/5.1):
-    // иначе возрождённый корабль героя выходил бы с голыми ★0 (PVR-6.24). Нет снимка
-    // (обычный матч) — полей нет, стек байт-в-байт прежний.
-    const arsenal = h.state.players[hero.owner]?.arsenal;
-    const own = starsOf(stack.modules, arsenal?.stars);
-    if (own) stack.moduleStars = own;
-    const raised = rarityOf(stack.modules, arsenal?.rarity);
-    if (raised) stack.moduleRarity = raised;
-  }
-  return stack;
-}
 
 export function equippedOf(hero: Hero): string[] {
   if (hero.equipped !== undefined) return hero.equipped;
@@ -1075,7 +1058,7 @@ export const heroModule: GameModule = {
       if (onCooldown(hero, 'respawn', h.ctx.now)) return h.reject('E_RESPAWN_COOLDOWN');
       const requirement = h.hook<{ allowed: boolean; code?: string }>(
         'construction.requirement', { allowed: true },
-        { playerId: action.playerId, kind: 'unit', id: heroShipStack(h, hero).unit },
+        { playerId: action.playerId, kind: 'unit', id: heroShipStack(h, hero, heroShipUnit(h, hero)).unit },
       );
       if (!requirement.allowed) return h.reject(requirement.code ?? 'E_TECH_LOCKED');
       // Target resolution: a world (own; allied with the `spawn_allied` marker) or —
@@ -1281,7 +1264,7 @@ export const heroModule: GameModule = {
         }[gate.reason];
         return h.reject(code);
       }
-      hero.modules = [...installed, moduleId];
+      rememberHeroModule(hero, moduleId, arsenal);
       h.emit('hero.installed', { owner: action.playerId, heroId, moduleId });
     });
 

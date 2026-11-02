@@ -1,10 +1,11 @@
+import { pinLegacyModuleSnapshots } from '../util/arsenalLoadout';
 import type { GameModule } from '../kernel/module';
 import type { PlayerArsenal } from '../state/gameState';
 
 /**
  * LARS-1 — the server-only driver that refreshes a seat's live build-catalog
  * ownership mid-match (LARS-0.2: only "what can be built" goes live; already-built
- * ships are untouched — no-refit doctrine intact). `unit.build`/`hero.fit` keep
+ * ships are untouched — no-refit doctrine intact). `unit.build`/`hero.install` keep
  * exactly the ARS-3 snapshot check (`construction.ts`/`hero.ts`) unchanged — this
  * module's only job is to REPLACE `Player.arsenal` with a freshly-read
  * `ArsenalStore` projection, so that unchanged check sees current ownership on
@@ -35,9 +36,12 @@ export const arsenalSyncModule: GameModule = {
       // degradation) — syncing one in only makes sense for a seat that already
       // started arsenal-gated (the server only ever submits this for those).
       if (!player.arsenal) return h.reject('E_NO_SNAPSHOT');
+      pinLegacyModuleSnapshots(h.state, action.playerId, player.arsenal);
       player.arsenal = {
         hulls: [...new Set(payload.hulls)].sort(),
         modules: [...new Set(payload.modules)].sort(),
+        ...(payload.stars ? { stars: { ...payload.stars } } : {}),
+        ...(payload.rarity ? { rarity: { ...payload.rarity } } : {}),
       };
     });
   },

@@ -31,6 +31,7 @@ export interface MetaOperationState {
 }
 
 export interface MetaEconomyAccount {
+  moduleBlueprints?: Record<string, number>;
   materials: MaterialLot[];
   /** Sovereigns ◆: the paid currency, credited only by a verified Commerce entitlement.
    *  Absent on accounts that never held any. */
