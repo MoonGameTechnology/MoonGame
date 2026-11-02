@@ -1,8 +1,10 @@
 /**
  * Общие правила хода бота: запас казны, гандикап слабого профиля, детерминированный шум
- * решений и порядок обхода миров. Их читают все фазы хода (`aiTurn/*.ts`) и фасад `ai.ts`.
+ * решений, порядок обхода миров, предел и ростер челноков, наземные цеха. Их читают фазы
+ * хода (`aiTurn/*.ts`) и фасад `ai.ts`.
  */
 import type { GameState, Planet } from '../../../packages/shared-core/src/index';
+import { data } from '../gameData';
 
 /** Запас казны сверх цены заказа (мера та же, что у построек бота). */
 export const ORDER_RESERVE: Record<string, number> = { metal: 60, credits: 60 };
@@ -113,4 +115,41 @@ export function worldsInOrder(state: GameState, ai: string, salt: string, skille
 export function ownsModule(state: GameState, ai: string, id: string): boolean {
   const arsenal = state.players[ai]?.arsenal;
   return !arsenal || arsenal.modules.includes(id);
+}
+
+/** Предел челноков КАЖДОГО рода — картонные, дорогие по микроэлектронике, конкурируют
+ *  с крейсерами за тот же дефицитный ресурс. Считаются все машины места: в ангарах
+ *  портов и кораблей и в воздухе (`shuttlesOwned`), но не в составе флотов — челнок с
+ *  SHU-1.1 живёт в ангаре базы и во флот не попадает никогда. */
+export const SHUTTLE_CAP = 3;
+
+/**
+ * Ударный ростер челноков (SHU-3.2) — кого бот СТРОИТ и кого ПОСЫЛАЕТ.
+ *
+ * Перехватчика в списке нет намеренно, и это не пропуск: его работа — встречать чужие
+ * вылеты (база поднимает звено сама, SHU-1.3) и держать патруль над базой (SHU-6.8,
+ * `PATROL_WING`). Строит его бот отдельным правилом (`campaign.ts`); послать его бить корпуса
+ * значило бы измерить не ту роль — у него `attack` 4 против 20 у бомбардировщика (ROS-1.4).
+ *
+ * Тяжёлый страйкер (SHU-5.6) стоит ПЕРВЫМ: заказы идут по порядку списка, и дефицитная
+ * микроэлектроника достаётся сперва ему — его `strikeRange` 260 против 150 у ударного
+ * достаёт соседнюю провинцию (§0.5). Пока «Ударные векторы» не изучены, ядро его заказ
+ * отбивает, проба `canOrder` это видит, и очередь просто переходит к ударному.
+ */
+export const STRIKE_SHUTTLES = ['heavy_striker', 'bomber', 'landing_shuttle'] as const;
+
+/** Стоит ли на мире ЖИВОЕ здание, в котором можно заложить ИМЕННО ЭТОТ юнит: пехоте
+ *  нужны казармы, технике — завод (ROS-1.1). Зеркало ядерного `hasGroundFacility`
+ *  (`construction.ts`), того самого гейта, который отбивает `unit.build` кодами
+ *  `E_NO_BARRACKS` / `E_NO_FACTORY`.
+ *
+ *  Род войск читается из ДАННЫХ (`UnitDef.kind`), а не из списка id: иначе новый
+ *  наземный юнит молча выпал бы из репертуара бота и снова стал «мёртвым контентом»
+ *  в замерах — ровно тот диагноз, ради которого писался AI-BAL-3. */
+export function hasFacilityFor(p: Planet, unit: string): boolean {
+  const flag =
+    data.units[unit]?.kind === 'vehicle'
+      ? 'enablesVehicleConstruction'
+      : 'enablesInfantryConstruction';
+  return p.buildings.some((b) => b.hp > 0 && data.buildings[b.type]?.[flag] === true);
 }

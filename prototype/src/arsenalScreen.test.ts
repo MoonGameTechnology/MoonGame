@@ -529,11 +529,14 @@ describe('арсенал — вкладка', () => {
     server();
     const written: ArsenalItem[][] = [];
     const painted: string[] = [];
-    const host = hostOf({ readCache: () => [dropA], writeCache: (i) => written.push([...i]) });
+    const confirmed = vi.fn();
+    const host = hostOf({ readCache: () => [dropA], writeCache: (i) => written.push([...i]), confirmed });
     const arsenal = initArsenal(host);
     const loading = arsenal.refresh();
     painted.push(host.root().innerHTML);
+    expect(confirmed).not.toHaveBeenCalled();
     await loading;
+    expect(confirmed).toHaveBeenCalledExactlyOnceWith(owned());
     expect(painted[0]).toContain('data-ar-module="targeting_array"');
     expect(arsenal.items()).toHaveLength(owned().length);
     expect(written).toHaveLength(1);
@@ -546,11 +549,13 @@ describe('арсенал — вкладка', () => {
       vi.fn(async () => Promise.reject(new Error('offline'))),
     );
     const written: unknown[] = [];
-    const host = hostOf({ readCache: () => [dropA], writeCache: (i) => written.push(i) });
+    const confirmed = vi.fn();
+    const host = hostOf({ readCache: () => [dropA], writeCache: (i) => written.push(i), confirmed });
     const arsenal = initArsenal(host);
     await arsenal.refresh();
     expect(arsenal.items()).toEqual([dropA]);
     expect(written).toEqual([]);
+    expect(confirmed).not.toHaveBeenCalled();
     expect(host.root().innerHTML).toContain('Сервер не ответил');
     expect(host.root().innerHTML).toContain('data-ar-refresh');
   });

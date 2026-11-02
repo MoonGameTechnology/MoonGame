@@ -2,8 +2,7 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { BuildingInstance, Fleet, UnitStack } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { buildingLevel } from '../data/schemas';
-import { hoursToMs, timeScaleOf, type Context } from '../action/types';
-import { MS_PER_HOUR } from '../util/time';
+import { hoursToMs, type Context } from '../action/types';
 import { cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { requireOwnedIdleFleet } from '../util/fleet';
 import { isActivelyBombarding } from '../state/orbit';
@@ -96,11 +95,8 @@ function nearOrbitHostiles(
  *  made to wreck buildings by making it a strong warship too.
  *
  *  The choice is per HULL, not per fleet, so a mixed fleet needs one firing line
- *  over both formulas — hence the formula form of `cappedUnitStat`.
- *
- *  Exported for the client's bombardment timer: it predicts the next building to fall
- *  from this very number, run through the same damage hooks. */
-export function fleetBombardPower(fleet: Fleet, data: GameData): number {
+ *  over both formulas — hence the formula form of `cappedUnitStat`. */
+function fleetBombardPower(fleet: Fleet, data: GameData): number {
   return cappedUnitStat(fleet.units, data, (stats) => {
     const siege = stats.siegeDamage ?? 0;
     return siege > 0 ? siege : (stats.attack ?? 0) * BOMBARD_FRACTION;
@@ -118,14 +114,12 @@ function shipGroundPower(
 }
 
 /** Resolves the orbital layer over one continuous time span: planetary AA fires
- *  at near-orbit attackers (unless a ground assault keeps it busy), and each
- *  bombarding fleet wears the world's structures (and freezes its production —
- *  enforced in economy/construction via `isBombarded`) and, weakly, its garrison
- *  (ROS-1.6).
+ *  at near-orbit attackers (unless a ground assault keeps it busy). Bombardment is
+ *  not here: it fires on each fleet's own hourly clock ({@link fireBombardVolley}).
  *
  *  Optimized with a fleet-by-location index and a ground-assault set so the
  *  cost is O(planets + fleets + battles) instead of O(planets × fleets). */
-function runOrbital(h: HandlerContext, from: number, to: number, hours: number): void {
+function runOrbital(h: HandlerContext, from: number, to: number): void {
   const data = h.ctx.data;
 
   // Pre-index fleets by location — O(fleets).
@@ -237,56 +231,89 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
         }
       }
     }
-    // Bombardment — each hostile bombarding fleet shells the structures below.
-    // The rule (incl. the pinned-in-melee exception and why it exists) is THE
-    // shared predicate `isActivelyBombarding` — the same one the economy /
-    // construction freeze reads, so damage and freeze can't disagree. Here it
-    // gets combat's capability-aware hostility; resume = re-issue after the
-    // battle (finishBattle resets `bombarding` on release).
-    if (localFleets) {
-      const hostile = (a: string, b: string): boolean => isHostile(h, a, b);
-      for (const f of localFleets) {
-        if (isActivelyBombarding(h.state, f, hostile, data)) {
-          const hit: DamageHookArgs = {
-            phase: 'bombard',
-            location: planetId,
-            attacker: f.owner,
-            defender: planet.owner,
-            attackerFleet: f.id, // обстрел ведёт флот на орбите (CORE-DMG-3)
-          };
-          const power = fleetBombardPower(f, data) * hours;
-          if (power > 0) {
-            // CORE-DMG-1: the shelling power is scaled at the SOURCE, before it leaves
-            // on the bus — `construction` applies whatever arrives, so hooking here is
-            // the only place that knows who is firing.
-            // Единственный канал, чей урон НЕ проходит через приёмник с брендом:
-            // обстрел уезжает по шине, а `construction` уже сам стачивает им постройки.
-            // Тип в payload события не уедет (по шине идёт JSON), поэтому шов тут
-            // остаётся явным и держится тестом `damageHookScope.test.ts` (CORE-DMG-2).
-            const shelling = hookedDamage(h, power, hit);
-            // `hit` и `factor` — чем этот обстрел срезан: постройки, которые он снесёт,
-            // перестают прикрывать мир для остатка того же урона, и `construction`
-            // пересчитывает его по ходу (FORT-5.15, замечание Codex на #1389). Без этого
-            // весь отрезок шёл бы под прикрытием его начала.
-            h.emit('planet.bombarded', {
-              planetId,
-              power: shelling,
-              owner: planet.owner,
-              by: f.owner,
-              hit,
-              factor: mitigationFactor(h, hit),
-            });
-          }
-          // ROS-1.6: тот же обстрел бьёт и войска мира — слабо и без последнего бойца
-          // (`util/groundFire.ts`). Те же аргументы хука: прикрытие мира режет и этот урон.
-          const troops = shipGroundPower(f, planet, data);
-          const onTroops = troops.total * hours;
-          if (onTroops > 0) {
-            fireOnGarrison(h, planet, hookedDamage(h, onTroops, hit), f.owner, troops.weights);
-          }
-        }
-      }
+
+  }
+}
+
+/** Start a fleet's bombardment clock: the first volley lands one game hour from now,
+ *  like the first strike of a melee attack order (`battle.attack`). */
+function armBombard(h: HandlerContext, fleet: Fleet): void {
+  fleet.bombardNextAt = h.ctx.now + hourIntervalMs(h.ctx);
+}
+
+/** Every bombardment volley due in the span `(from, to]`, in (instant, fleet id) order.
+ *  The clock is absolute (`fleet.bombardNextAt`), so one long span and many short ones
+ *  land the same volleys at the same instants. A fleet that stopped bombarding drops its
+ *  clock; one left bombarding without a clock (an old save) starts it at the span start. */
+function runBombardment(h: HandlerContext, from: number, to: number): void {
+  const hourMs = hourIntervalMs(h.ctx);
+  const due: Array<{ at: number; fleet: Fleet }> = [];
+  for (const f of recordValues(h.state.fleets)) {
+    if (!f.bombarding) {
+      if (f.bombardNextAt !== undefined) delete f.bombardNextAt;
+      continue;
     }
+    if (f.bombardNextAt === undefined) f.bombardNextAt = from + hourMs;
+    for (let at = f.bombardNextAt; at <= to; at += hourMs) due.push({ at, fleet: f });
+  }
+  due.sort((a, b) => a.at - b.at || (a.fleet.id < b.fleet.id ? -1 : a.fleet.id > b.fleet.id ? 1 : 0));
+  for (const { at, fleet } of due) {
+    // A volley earlier in this span may have ended the bombardment (the fleet is gone
+    // or no longer shelling): its later volleys do not land.
+    if (h.state.fleets[fleet.id] !== fleet || !fleet.bombarding) continue;
+    fireBombardVolley(h, fleet);
+    fleet.bombardNextAt = at + hourMs;
+  }
+}
+
+/** One bombardment volley: an hour's worth of the fleet's shelling, landed at once
+ *  (owner's order 2026-11-02: «каждый час, как обычная атака флота, только на планету»).
+ *  It hits the world's structures (and, weakly, its garrison, ROS-1.6). The production
+ *  freeze is not a volley: it holds the whole time bombardment is on (`isBombarded`).
+ *  The rule for WHO shells (incl. the pinned-in-melee exception) is THE shared predicate
+ *  `isActivelyBombarding` — the same one the economy / construction freeze reads, so
+ *  damage and freeze can't disagree. Here it gets combat's capability-aware hostility. */
+function fireBombardVolley(h: HandlerContext, f: Fleet): void {
+  const data = h.ctx.data;
+  const planetId = f.location;
+  const planet = planetId === null ? undefined : h.state.planets[planetId];
+  if (planetId === null || !planet) return;
+  const hostile = (a: string, b: string): boolean => isHostile(h, a, b);
+  if (!isActivelyBombarding(h.state, f, hostile, data)) return;
+  const hit: DamageHookArgs = {
+    phase: 'bombard',
+    location: planetId,
+    attacker: f.owner,
+    defender: planet.owner,
+    attackerFleet: f.id, // обстрел ведёт флот на орбите (CORE-DMG-3)
+  };
+  const power = fleetBombardPower(f, data); // per game hour = per volley
+  if (power > 0) {
+    // CORE-DMG-1: the shelling power is scaled at the SOURCE, before it leaves
+    // on the bus — `construction` applies whatever arrives, so hooking here is
+    // the only place that knows who is firing.
+    // Единственный канал, чей урон НЕ проходит через приёмник с брендом:
+    // обстрел уезжает по шине, а `construction` уже сам стачивает им постройки.
+    // Тип в payload события не уедет (по шине идёт JSON), поэтому шов тут
+    // остаётся явным и держится тестом `damageHookScope.test.ts` (CORE-DMG-2).
+    const shelling = hookedDamage(h, power, hit);
+    // `hit` и `factor` — чем этот залп срезан: постройки, которые он снесёт,
+    // перестают прикрывать мир для остатка того же урона, и `construction`
+    // пересчитывает его по ходу (FORT-5.15, замечание Codex на #1389).
+    h.emit('planet.bombarded', {
+      planetId,
+      power: shelling,
+      owner: planet.owner,
+      by: f.owner,
+      hit,
+      factor: mitigationFactor(h, hit),
+    });
+  }
+  // ROS-1.6: тот же залп бьёт и войска мира — слабо и без последнего бойца
+  // (`util/groundFire.ts`). Те же аргументы хука: прикрытие мира режет и этот урон.
+  const troops = shipGroundPower(f, planet, data);
+  if (troops.total > 0) {
+    fireOnGarrison(h, planet, hookedDamage(h, troops.total, hit), f.owner, troops.weights);
   }
 }
 
@@ -306,7 +333,9 @@ export const orbitalModule: GameModule = {
   // 1.3.0: обстрел бьёт и войска мира, без последнего бойца (ROS-1.6).
   // 1.4.0: урон обстрела по войскам делится поровну на каждого юнита, а не фокусом (ROS-1.6a).
   // 1.5.0: обстрел бьёт пехоту и технику разной долей атаки (ROS-1.6b).
-  version: '1.5.0',
+  // 1.6.0: обстрел бьёт залпом раз в игровой час по своим часам флота, как атака в бою
+  //        (`fleet.bombardNextAt`), а не непрерывно.
+  version: '1.6.0',
   setup(api) {
     // A single orbit (GDD §7.4): arriving = stationed in orbit, not bombarding
     // until ordered. Registered BEFORE the melee module in the manifest, so this
@@ -318,6 +347,7 @@ export const orbitalModule: GameModule = {
       if (fleet && !fleet.battleId) {
         fleet.orbit = 'near';
         fleet.bombarding = false;
+        delete fleet.bombardNextAt;
       }
     });
 
@@ -369,12 +399,16 @@ export const orbitalModule: GameModule = {
           return h.reject('E_NO_SHIPS');
         }
       }
+      // The volley clock, like a melee attack order: a repeated «on» never restarts it,
+      // «off» drops it.
+      if (!on) delete fleet.bombardNextAt;
+      else if (!fleet.bombarding || fleet.bombardNextAt === undefined) armBombard(h, fleet);
       fleet.bombarding = on;
       h.emit('fleet.bombard', { fleetId, on, owner: action.playerId });
     });
 
     // The orbital layer accrues over continuous time, like the economy (AA fires
-    // in discrete volleys on the from→to grid; bombardment accrues by hours).
+    // in discrete volleys on the from→to grid; bombardment has its own volley clock).
     // Its place in the manifest fixes the order in which the layers accrue
     // within one span (invariant #6).
     api.on('time.advanced', (event, h) => {
@@ -383,7 +417,8 @@ export const orbitalModule: GameModule = {
       if (span <= 0) {
         return;
       }
-      runOrbital(h, from, to, (span / MS_PER_HOUR) * timeScaleOf(h.ctx));
+      runOrbital(h, from, to);
+      runBombardment(h, from, to);
     });
   },
 };

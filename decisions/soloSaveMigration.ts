@@ -224,16 +224,28 @@ export const STAND_UP_SOLO_MIGRATION = {
   toDataHash: WOUNDED_TRANSPORT_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: orbital 1.6.0 lands bombardment as one volley per game hour on the
+ *  fleet's own clock (`bombardNextAt`). A saved bombarding fleet has no clock yet and
+ *  starts one at its first world step, so the world reads as is. */
+export const BOMBARD_VOLLEY_SOLO_MIGRATION = {
+  fromRules: STAND_UP_SOLO_MIGRATION.toRules,
+  fromData: STAND_UP_SOLO_MIGRATION.toData,
+  fromDataHash: STAND_UP_SOLO_MIGRATION.toDataHash,
+  toRules: '062f4475b44061',
+  toData: STAND_UP_SOLO_MIGRATION.toData,
+  toDataHash: STAND_UP_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** Lighter ship modules: catalogue 0.1.72 halves the combat and defence numbers of nine
  *  modules (their base and every rarity line) and the side rarity lines of the radar, cargo,
  *  siege and mine modules; tractor beam, debris collector and repair tender fit only a hero's
  *  flagship. Stats and fitting rules only, so a saved world reads as is: a ship already built
  *  keeps its modules and simply reads the new numbers. */
 export const HALF_MODULES_SOLO_MIGRATION = {
-  fromRules: STAND_UP_SOLO_MIGRATION.toRules,
-  fromData: STAND_UP_SOLO_MIGRATION.toData,
-  fromDataHash: STAND_UP_SOLO_MIGRATION.toDataHash,
-  toRules: '1d50f897132512',
+  fromRules: BOMBARD_VOLLEY_SOLO_MIGRATION.toRules,
+  fromData: BOMBARD_VOLLEY_SOLO_MIGRATION.toData,
+  fromDataHash: BOMBARD_VOLLEY_SOLO_MIGRATION.toDataHash,
+  toRules: '0eb5ffa544097a',
   toData: '0.1.72',
   toDataHash: '17cb1050daa7a3',
 } as const;
@@ -259,6 +271,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   PRODUCTION_LANES_SOLO_MIGRATION,
   WOUNDED_TRANSPORT_SOLO_MIGRATION,
   STAND_UP_SOLO_MIGRATION,
+  BOMBARD_VOLLEY_SOLO_MIGRATION,
   HALF_MODULES_SOLO_MIGRATION,
 ];
 

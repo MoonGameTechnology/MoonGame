@@ -239,6 +239,7 @@ export {
 // FOG-LEAK: чей мир в глазах игрока — право прохода и окно войны судят по нему.
 export { knownOwner } from './state/knownOwner';
 export { signatureSize, fleetSignalStrength, radarThreshold, SIG_MEDIUM, SIG_LARGE, SIGNAL_CLUSTER_RADIUS } from './state/radarSignals';
+export { viewSightCircles, sharedRadarSources, type SensorView, type RadarFootprint } from './state/sensorView';
 export type {
   Coverage,
   Engagement,
@@ -539,8 +540,6 @@ export {
   MITIGATION_CAP,
   TIER_ORDER,
   mitigationFromPool,
-  damageHookQueries,
-  damageFromTraces,
   type Tier,
 } from './util/combat';
 export {
@@ -612,7 +611,7 @@ export {
 export { economyModule, BROWNOUT } from './modules/economy';
 export { movementModule } from './modules/movement';
 export { combatModule } from './modules/combat';
-export { orbitalModule, BOMBARD_FRACTION, fleetBombardPower } from './modules/orbital';
+export { orbitalModule, BOMBARD_FRACTION } from './modules/orbital';
 export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';

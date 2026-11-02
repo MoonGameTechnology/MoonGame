@@ -20,6 +20,7 @@ import {
   PRODUCTION_LANES_SOLO_MIGRATION as productionLanes,
   WOUNDED_TRANSPORT_SOLO_MIGRATION as woundedTransport,
   STAND_UP_SOLO_MIGRATION as standUp,
+  BOMBARD_VOLLEY_SOLO_MIGRATION as bombardVolley,
   HALF_MODULES_SOLO_MIGRATION as halfModules,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
@@ -166,7 +167,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, halfModules]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -402,10 +403,19 @@ describe('the rules-only stand-up battle pair (0.1.71 → 0.1.71)', () => {
   });
 });
 
+describe('the rules-only bombardment volley pair (0.1.71 → 0.1.71)', () => {
+  it('reads a save of the stand-up battle release under the new rules unchanged', () => {
+    const before = oldSave();
+    before.state.version = { data: bombardVolley.fromData, dataHash: bombardVolley.fromDataHash, manifest: '1' };
+    const raw = serializeSoloSave(before, bombardVolley.fromRules);
+    expect(parseCompatibleSoloSave(raw, bombardVolley.toRules)).toEqual(before);
+  });
+});
+
 describe('lighter ship modules save migration (0.1.71 → 0.1.72)', () => {
   const shipped = { data: halfModules.toData, dataHash: halfModules.toDataHash, manifest: '1' };
 
-  it('reads a save of the stand-up battle release with only its catalogue pin moved', () => {
+  it('reads a save of the bombardment volley release with only its catalogue pin moved', () => {
     const before = oldSave();
     before.state.version = {
       data: halfModules.fromData,

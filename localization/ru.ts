@@ -340,6 +340,13 @@ export const ru: Record<string, string> = {
   'refuge.offer':
     'Основное соединение противника идёт к докам. Мы можем задержать его, но для атаки комплекса придётся оставить вам меньше сил',
   'refuge.offer.accept': 'Охранять доки',
+  'module-reward.received': 'Модуль получен',
+  'module-reward.upgraded': 'Новая звезда!',
+  'module-reward.progress': 'Звёздность: {from} → {to}',
+  'module-reward.saved': 'Уже в твоём арсенале',
+  'module-reward.continue': 'Продолжить',
+  'module-reward.close': 'Закрыть все награды',
+  'module-reward.remaining': 'Ещё наград: {n}',
   'chain.title': 'Операция главы',
   'chain.contact': 'Связь: прибыть к точке встречи',
   'chain.archive': 'Архив: очистить станцию от Роя',
@@ -2209,6 +2216,10 @@ export const ru: Record<string, string> = {
   'map.fog.old': '✦ старые данные',
   'map.radar.detect': '◌ засечка {n}',
   'map.radar.identify': '● опознание {n}',
+  'map.transfer.assault': 'Штурмовая высадка',
+  'map.transfer.fleets': '{n} {n|флот|флота|флотов}',
+  'map.transfer.load': 'Погрузка',
+  'map.transfer.unload': 'Высадка',
 
   // --- net — Сеть: подключение, разрывы, адрес сервера.
   'net.bad-address': 'Неверный адрес сервера',
@@ -4845,7 +4856,7 @@ export const ru: Record<string, string> = {
     'Эскадра стоит в ангаре порта, на карте её нет. «{b}» поднимает вылет — цель выберите тапом по карте. Корабль с трюмом возит эскадру с собой: трюм — в панели флота.',
   'side.world.blackout': 'блэкаут: радары и ПКО −50%',
   'side.world.mitigation': 'Защита построек: −{n}% урона',
-  'side.world.bombard-fall': 'Обстрел: {b} рухнет через {t}',
+  'side.world.bombard-next': 'Следующий залп обстрела через {t}',
   'side.world.capital': 'Столица',
   'side.world.capital.note': 'Здесь возрождаются герои и меняют модули',
   'side.world.defense': 'оборона {p}',

@@ -337,6 +337,13 @@ export const en: Record<string, string> = {
   'refuge.offer':
     'The enemy main force is heading for the docks. We can hold it off, but that leaves you fewer forces for the assault on the complex',
   'refuge.offer.accept': 'Guard the docks',
+  'module-reward.received': 'Module acquired',
+  'module-reward.upgraded': 'Star upgraded!',
+  'module-reward.progress': 'Stars: {from} → {to}',
+  'module-reward.saved': 'Already in your arsenal',
+  'module-reward.continue': 'Continue',
+  'module-reward.close': 'Close all rewards',
+  'module-reward.remaining': 'More rewards: {n}',
   'chain.title': 'Chapter operation',
   'chain.contact': 'Link: reach the rendezvous',
   'chain.archive': 'Archive: clear the station of the Swarm',
@@ -2203,6 +2210,10 @@ export const en: Record<string, string> = {
   'map.fog.old': '✦ old data',
   'map.radar.detect': '◌ detection {n}',
   'map.radar.identify': '● identification {n}',
+  'map.transfer.assault': 'Assault landing',
+  'map.transfer.fleets': '{n} {n|fleet|fleets}',
+  'map.transfer.load': 'Loading',
+  'map.transfer.unload': 'Unloading',
 
   // --- net — Сеть: подключение, разрывы, адрес сервера.
   'net.bad-address': 'Invalid server address',
@@ -4839,7 +4850,7 @@ export const en: Record<string, string> = {
     'The squadron sits in the port hangar and never appears on the map. "{b}" sends a sortie out — pick the target by tapping the map. A ship with a hold takes a squadron along: the hold is in the fleet panel.',
   'side.world.blackout': 'blackout: radars and interdiction −50%',
   'side.world.mitigation': 'Structure cover: −{n}% damage',
-  'side.world.bombard-fall': 'Bombardment: {b} falls in {t}',
+  'side.world.bombard-next': 'Next bombardment volley in {t}',
   'side.world.capital': 'Capital',
   'side.world.capital.note': 'Heroes respawn and re-fit modules here',
   'side.world.defense': 'defense {p}',

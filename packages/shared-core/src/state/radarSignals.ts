@@ -53,27 +53,9 @@ function within(a: { x: number; y: number }, b: { x: number; y: number }, radius
   return dx * dx + dy * dy <= radius * radius;
 }
 
-/** Coarse contacts over nearby emitters. Each sensor keeps its own reach AND quality:
- * a short sensitive dish cannot lend its sensitivity to a distant basic dish.
- * Only emissions inside that sensor's range contribute to what it detects. */
-export function detectSignals(
-  emitters: readonly SignalEmitter[],
-  sources: readonly RadarSource[],
-): SignatureContact[] {
-  const sensors = [...sources].sort(
-    (a, b) => a.x - b.x || a.y - b.y || a.range - b.range || a.level - b.level,
-  );
-  const ordered = emitters
-    .filter((e) => e.strength > 0 && sources.some((s) => within(e, s, s.range)))
-    .sort(
-      (a, b) =>
-        a.x - b.x ||
-        a.y - b.y ||
-        (a.location < b.location ? -1 : a.location > b.location ? 1 : 0) ||
-        a.strength - b.strength,
-    );
+/** Groups are anchored within 40 units; a chain cannot connect distant fleets. */
+function groupSignals(ordered: readonly SignalEmitter[]): SignalEmitter[][] {
   const groups: SignalEmitter[][] = [];
-  // Local grid avoids scanning every existing group for every ship on large maps.
   const cells = new Map<string, number[]>();
   for (const emitter of ordered) {
     const gx = Math.floor(emitter.x / SIGNAL_CLUSTER_RADIUS);
@@ -96,27 +78,52 @@ export function detectSignals(
     }
     groups[index]!.push(emitter);
   }
-  const contacts: SignatureContact[] = [];
-  for (const group of groups) {
-    let strongest = 0;
-    let anchor: SignalEmitter | undefined;
-    for (const source of sensors) {
-      let strength = 0;
-      let first: SignalEmitter | undefined;
-      for (const e of group) {
-        if (!within(e, source, source.range)) continue;
-        strength += e.strength;
-        first ??= e;
-      }
-      if (strength > strongest && strength >= radarThreshold(source.level)) {
-        strongest = strength;
-        anchor = first;
-      }
+  return groups;
+}
+
+function compareSignals(a: SignalEmitter, b: SignalEmitter): number {
+  return (
+    a.x - b.x ||
+    a.y - b.y ||
+    (a.location < b.location ? -1 : a.location > b.location ? 1 : 0) ||
+    a.strength - b.strength
+  );
+}
+
+/** Each radar groups only emissions in its own range and applies its own sensitivity.
+ * Adding a sensor cannot repartition what an existing sensor detects. Shared contacts
+ * merge only AFTER detection; their strength is the strongest reading, never a sum. */
+export function detectSignals(
+  emitters: readonly SignalEmitter[],
+  sources: readonly RadarSource[],
+): SignatureContact[] {
+  const ordered = emitters.filter((e) => e.strength > 0).sort(compareSignals);
+  // Co-located/overlapping radars often report the same anchor; retain its best reading.
+  const readings = new Map<SignalEmitter, number>();
+  for (const source of sources) {
+    // Increasing reach appends farther emissions, preserving all nearer groups.
+    const distance = (e: SignalEmitter): number => (e.x - source.x) ** 2 + (e.y - source.y) ** 2;
+    const local = ordered
+      .filter((e) => within(e, source, source.range))
+      .sort((a, b) => distance(a) - distance(b) || compareSignals(a, b));
+    const groups = groupSignals(local);
+    for (const group of groups) {
+      const strength = group.reduce((sum, e) => sum + e.strength, 0);
+      const anchor = group.reduce((first, e) => (compareSignals(e, first) < 0 ? e : first));
+      if (strength >= radarThreshold(source.level) && strength > (readings.get(anchor) ?? 0))
+        readings.set(anchor, strength);
     }
-    if (!anchor) continue;
-    const contact: SignatureContact = { location: anchor.location, size: signatureSize(strongest) };
-    if (anchor.inTransit) contact.position = { x: anchor.x, y: anchor.y };
-    contacts.push(contact);
   }
-  return contacts.sort((a, b) => (a.location < b.location ? -1 : a.location > b.location ? 1 : 0));
+  const resolved = [...readings].map(([anchor, strength]) => ({ ...anchor, strength }));
+  return groupSignals(resolved.sort(compareSignals))
+    .map((group) => {
+      const strongest = group.reduce((best, e) => (e.strength > best.strength ? e : best));
+      const contact: SignatureContact = {
+        location: strongest.location,
+        size: signatureSize(strongest.strength),
+      };
+      if (strongest.inTransit) contact.position = { x: strongest.x, y: strongest.y };
+      return contact;
+    })
+    .sort((a, b) => (a.location < b.location ? -1 : a.location > b.location ? 1 : 0));
 }

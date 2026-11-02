@@ -157,7 +157,7 @@ import {
   typingTarget,
 } from './backGesture';
 import {
-  sightCircles,
+  viewSightCircles,
   type Planet,
   type SightCircle,
   type Squadron,
@@ -173,7 +173,7 @@ import { forgetBorderLayer, initBorderLayer } from './borderLayer';
 import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawRallyPoint, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
 import { drawAimPreview, drawAssaultTargets, drawCourseReach, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
 import { drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
-import { chainHits, drawAllyMarks, drawBombardTimers, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, initMapMarks, pingHits } from './mapMarks';
+import { chainHits, drawAllyMarks, drawBombardTimers, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, drawTroopTransferTimers, initMapMarks, pingHits } from './mapMarks';
 import { drawSweepAfterglow, drawWorlds, initMapWorlds, prepareWorldArt } from './mapWorlds';
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
@@ -387,7 +387,7 @@ import {
 import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, setView, world, worldDist } from './mapCamera';
 import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, restoreFogMemory, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
-import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, ownRadarSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
+import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, radarSweepSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder } from './orderPipeline';
 import {
   forceIntroduced,
@@ -1032,8 +1032,8 @@ initMapRadar({
   ctx: () => cx,
   vw: () => VW,
   vh: () => VH,
-  sources: () => perWorld('radar', ownRadarSources),
-  sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),
+  sources: () => perWorld('radar', radarSweepSources),
+  sight: () => perWorld('sight', () => viewSightCircles(s, ME, data, worldPlanets())),
   planets: worldPlanets,
   note,
   placeName,
@@ -1197,7 +1197,7 @@ initMapFog({
   me: () => ME,
   net: () => NET,
   contacts: () => netSignatures,
-  sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),
+  sight: () => perWorld('sight', () => viewSightCircles(s, ME, data, worldPlanets())),
   planets: worldPlanets,
 });
 
@@ -1615,6 +1615,7 @@ function renderMap(now: number) {
   drawMinefields(); // SM-3.5: свои минные поля «💣 ×заряд» и установки
   drawDevourSieges(); // PVR-4.7: осада «Поглощения мира» над своим миром — кольцо-часы и отсчёт
   drawBombardTimers(); // таймер обстрела: до сноса следующей постройки мира
+  drawTroopTransferTimers(); // погрузка и высадка: отсчёт над объектом без выбора флота
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
   drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром

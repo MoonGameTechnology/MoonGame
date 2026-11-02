@@ -197,7 +197,7 @@ describe('REFM-239 — дальность и источники', () => {
       };
     });
     const { radar } = await boot(w);
-    const own = radar.ownRadarSources();
+    const own = radar.radarSweepSources();
     expect(own.worlds.map((v) => v.at)).toEqual([{ x: 0, y: 0 }]);
     expect(own.worlds[0]!.reach).toBe(radar.planetRadar(w.planets.A!));
     expect(own.fleets.map((v) => v.fleet.id)).toEqual(['s']);
@@ -210,9 +210,9 @@ describe('REFM-239 — дальность и источники', () => {
       st.planets.A!.buildings = [{ type: 'radar', level: 1, hp: 18 }];
     });
     const { radar, env } = await boot(w);
-    expect(radar.ownRadarSources().worlds).toHaveLength(1);
+    expect(radar.radarSweepSources().worlds).toHaveLength(1);
     env.planets = Object.values(w.planets).filter((p) => p.id !== 'A');
-    expect(radar.ownRadarSources().worlds).toEqual([]);
+    expect(radar.radarSweepSources().worlds).toEqual([]);
   });
 
   it('чужому миру — только масштаб режима; мир без массива слуха не имеет', async () => {
@@ -415,8 +415,8 @@ describe('REFM-239 — стык с main.ts', () => {
       'ctx: () => cx,',
       'vw: () => VW,',
       'vh: () => VH,',
-      "sources: () => perWorld('radar', ownRadarSources),",
-      "sight: () => perWorld('sight', () => sightCircles(s, ME, data, worldPlanets())),",
+      "sources: () => perWorld('radar', radarSweepSources),",
+      "sight: () => perWorld('sight', () => viewSightCircles(s, ME, data, worldPlanets())),",
       'planets: worldPlanets,',
       'note,',
       'placeName,',
@@ -428,7 +428,7 @@ describe('REFM-239 — стык с main.ts', () => {
 
   it('состояние радара меняют только двери владельца', () => {
     expect(MAIN).not.toMatch(
-      /\bfunction (sweepGlow|ownRadarSources|drawScanSweep|updateRadarContacts|drawRadarContacts|fleetRadar|planetRadar|drawSignatureAt|drawUnionTier|drawRadarCoverage|drawRadarRange|setSweepOpacity)\(/,
+      /\bfunction (sweepGlow|radarSweepSources|drawScanSweep|updateRadarContacts|drawRadarContacts|fleetRadar|planetRadar|drawSignatureAt|drawUnionTier|drawRadarCoverage|drawRadarRange|setSweepOpacity)\(/,
     );
     expect(MAIN).not.toMatch(/\bradarMemory\.|\b(sweepArms|sweepAng|sweepPrevAng|SWEEP_DIV)\b/);
     expect(MAIN).not.toMatch(/^\s*(netSignatures|sweepOn|sweepOpacity) = /m);
@@ -441,5 +441,45 @@ describe('REFM-239 — стык с main.ts', () => {
 
   it('модуль не тянет `main.ts`', () => {
     expect(RADAR).not.toMatch(/from '\.\/main'/);
+  });
+});
+
+describe('общий обзор радара', () => {
+  it('shared radar contacts must be painted even without an own radar', async () => {
+    const w = base(st => {
+      st.planets.B!.position.x = 2300;
+      st.planets.C!.buildings = [{ type: 'radar', level: 3, hp: 38 }];
+      st.players.p3 = player('p3');
+      st.diplomacy = { 'p1|p2': 'alliance' };
+      st.fleets.target = fleet('target', 'p3', 'scout_drone', 'B');
+    });
+    const { visibleState } = await import('../../packages/shared-core/src/index');
+    const { data } = await import('./gameData');
+    const view = visibleState(w, 'p1', data);
+    expect(view.signatures).toHaveLength(1);
+    const { radar, env, fog } = await boot(view, { net: true });
+    env.contacts = view.signatures;
+    env.sources = radar.radarSweepSources();
+    fog.refreshVision();
+    for (let i = 0; i <= 120; i++) {
+      radar.drawScanSweep(i * radar.SWEEP_PERIOD / 60);
+      radar.updateRadarContacts(i * radar.SWEEP_PERIOD / 60);
+    }
+    expect(radar.paintedContacts.size).toBe(1);
+  });
+  it('client must keep a world identified through allied radar technology', async () => {
+    const w = base(st => {
+      st.planets.B!.position.x = 2230;
+      st.planets.C!.buildings = [{ type: 'radar', level: 3, hp: 38 }];
+      st.players.p2!.technologies = { completed: ['deep_survey'] };
+      st.diplomacy = { 'p1|p2': 'alliance' };
+    });
+    const { visibleState, identifiedNodes } = await import('../../packages/shared-core/src/index');
+    const { data } = await import('./gameData');
+    expect(identifiedNodes(w, 'p1', data).has('B')).toBe(true);
+    const view = visibleState(w, 'p1', data);
+    const { fog } = await boot(view, { net: true });
+    fog.refreshVision();
+    expect(fog.known('B')).toBe(true);
   });
 });

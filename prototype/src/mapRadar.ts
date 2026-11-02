@@ -1,6 +1,6 @@
 /**
  * Радар на карте (REFM-239): развёртка, контакты, которые она красит, и обе картины
- * дальности. Лучи своих радаров и их угол (`drawScanSweep`, `ownRadarSources`, яркость
+ * дальности. Лучи своих радаров и их угол (`drawScanSweep`, `radarSweepSources`, яркость
  * засветки `sweepGlow`), контакты (`updateRadarContacts`, `drawRadarContacts`, метка
  * сигнатуры `drawSignatureAt`), дальность флота и мира (`fleetRadar`, `planetRadar`),
  * сводная граница обзора (`drawRadarCoverage`) и дальномер выбранного мира
@@ -17,6 +17,7 @@
  */
 import {
   fleetRadarReach,
+  sharedRadarSources,
   sightRulesOf,
   worldRadarReach,
   type Fleet,
@@ -56,7 +57,7 @@ export interface MapRadarHost {
   vw(): number;
   /** Высота экрана в CSS-пикселях. */
   vh(): number;
-  /** Свои источники развёртки с дальностью — из кэша кадра (`perWorld`), раз на мир. */
+  /** Источники развёртки с общими радарами — из кэша кадра (`perWorld`), раз на мир. */
   sources(): RadarSources;
   /** Круги обзора блока зрения — из кэша кадра, те же, по которым ядро считает туман. */
   sight(): SightCircle[];
@@ -81,7 +82,7 @@ export function initMapRadar(host: MapRadarHost): void {
 // The backdrop (deep-space + nebulae + radar grid + star ticks) is part of the cached
 // static layer (see paintSky / blitStaticLayer). This is the only live backdrop bit:
 // a slow radar sweep across the plotting table — console chrome that follows the
-// HARDWARE: one rotating arm per OWN radar source (planet array / radar ship),
+// HARDWARE: one rotating arm per shared radar source (planet array / radar ship),
 // pivoted on the source and clipped to ITS reach; co-located sources collapse into
 // one arm showing only the farthest radius. All arms share one rotation phase; map
 // blips light up as an arm crosses them (radar "ping" afterglow). sweepOn guards
@@ -138,12 +139,13 @@ export function sweepGlow(c: { x: number; y: number }): number {
   return sweepOn ? armsGlow(sweepArms, c, sweepAng, TAU) : 0;
 }
 
-/** Свои источники радарной развёртки с дальностью: миры и флоты, у которых радар есть. */
+/** Источники развёртки: свои миры и флоты, плюс готовые отпечатки радаров союзников. */
 export interface RadarSources {
   worlds: Array<{ at: { x: number; y: number }; reach: number }>;
   fleets: Array<{ fleet: Fleet; reach: number }>;
+  shared?: Array<{ x: number; y: number; range: number }>;
 }
-export function ownRadarSources(): RadarSources {
+export function radarSweepSources(): RadarSources {
   const s = game.world();
   const ME = game.me();
   const worlds: RadarSources['worlds'] = [];
@@ -160,7 +162,7 @@ export function ownRadarSources(): RadarSources {
     const reach = fleetRadar(f);
     if (reach > 0) fleets.push({ fleet: f, reach });
   }
-  return { worlds, fleets };
+  return { worlds, fleets, shared: sharedRadarSources(s, ME, data, game.planets()) };
 }
 
 export function drawScanSweep(now: number) {
@@ -168,7 +170,7 @@ export function drawScanSweep(now: number) {
   sweepArms = [];
   sweepOn = false;
   if (!cx.createConicGradient) return; // graceful: skip on engines without it
-  // One arm per OWN radar source, pivoted on the array / the ship itself (a moving
+  // One arm per shared radar source, pivoted on the array / the ship itself (a moving
   // ship carries its arm along). Sources sharing a pivot (a radar world with a
   // radar ship docked) merge — only the farthest radius is shown.
   const raw: SweepArm[] = [];
@@ -180,6 +182,7 @@ export function drawScanSweep(now: number) {
   // Дальности — из памяти по миру (шаг 9 плавности), а положение флота — каждым кадром.
   const radar = game.sources();
   for (const w of radar.worlds) add(w.at, w.reach);
+  for (const source of radar.shared ?? []) add(source, source.range);
   for (const { fleet, reach } of radar.fleets) {
     const pos = fleetPos(fleet);
     if (pos) add(pos, reach);
