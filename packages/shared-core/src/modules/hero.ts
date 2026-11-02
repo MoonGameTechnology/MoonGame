@@ -1,3 +1,5 @@
+import { activeHeroCount, heroActiveCap } from '../state/heroDeployment';
+import { registerHeroDeployment } from './hero/deployment';
 import { sectorKindDef } from '../state/sectorKind';
 import { hoursToMs } from '../action/types';
 import type {
@@ -19,14 +21,11 @@ import type {
   UnitStack,
 } from '../state/gameState';
 import { stacksHaveTrait } from '../data/traits';
-import { getStance, stanceToRelation } from '../state/diplomacy';
-import { bossFallen, heroByFleet, heroNode } from '../state/heroes';
+import { heroByFleet, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
 import { isCapturable } from '../state/sectorKind';
 import { laneIsPublic } from '../state/corridor';
-import { isForkSite } from '../state/forkSite';
 import { isAllied } from '../util/combat';
-import { fleetForOrder } from '../util/fleet';
 import { canInstall } from '../util/fitting';
 import { knownSkillNodes } from '../util/heroSkills';
 import { moduleAllowed, type SlotCounts } from '../util/loadout';
@@ -60,8 +59,9 @@ import { canAfford, payCost } from '../util/treasury';
  * HERO-3 (docs/heroes.md) — manual deploy: `hero.spawn {heroId, at}` raises the hero's
  * ship at an OWNED world (unit from the archetype's `ship.unit`, default `hero`),
  * gated by liveness (`E_HERO_ALIVE`), the respawn cooldown (`E_RESPAWN_COOLDOWN`),
- * spawn legality (`E_BAD_SPAWN`) and the per-player active cap of 3 (`E_HERO_CAP`);
- * the scheduled auto-respawn honors the same cap and shares the same deploy body.
+ * spawn legality (`E_BAD_SPAWN`) and the researched active cap (`E_HERO_CAP`);
+ * main-game deployment reserves a place until mobilization completes. The scheduled
+ * auto-respawn honors the same cap and shares the same deploy body.
  * HERO-8: CARRYING an ability of type `spawn_allied` / `spawn_fleet` widens the legal
  * targets to allied worlds (diplomacy `alliance`) / the player's own fleets (the hero
  * boards the host, which then carries the hero aura).
@@ -128,18 +128,7 @@ const HERO_UNIT = 'hero';
 const HERO_COMBAT_BONUS = 0.05;
 /** Game-hours before a slain projection hero respawns at its home world. */
 const HERO_RESPAWN_HOURS = 24;
-/** Max heroes a player may have DEPLOYED (commanding a live ship) at once —
- *  docs/heroes.md: «игрок может выставить до трёх одновременно». Exported because
- *  a caller that decides WHETHER to raise a hero has to know the ceiling: without
- *  it the prototype's test bot would either hold a second copy of the number or
- *  spam `hero.spawn` into `E_HERO_CAP` every tick (AI-BAL-8). */
-export const HERO_ACTIVE_CAP = 3;
-/** Ability TYPES that passively relax the `hero.spawn` target gate (HERO-8): a hero
- *  CARRYING an ability of the type may form its ship aboard one of the player's own
- *  fleets / at an allied world. Markers read by `hero.spawn`, not castable effects
- *  (casting one still fail-secures to `E_NO_EFFECT`). */
-const SPAWN_FLEET_TYPE = 'spawn_fleet';
-const SPAWN_ALLIED_TYPE = 'spawn_allied';
+export { HERO_ACTIVE_CAP } from '../state/heroDeployment';
 
 function heroOf(state: GameState, playerId: PlayerId): Hero | undefined {
   // Instance-keyed roster: the player's FIRST hero by SORTED instance id (BF-13).
@@ -289,32 +278,12 @@ function passiveBonus(
   return total;
 }
 
-/** How many of `owner`'s heroes currently command a live ship (the HERO_ACTIVE_CAP
- *  ledger). A stale `fleetId` (ship already gone) does not count. */
-function activeHeroCount(state: GameState, owner: PlayerId): number {
-  return Object.values(state.heroes ?? {}).filter(
-    (x) =>
-      x.owner === owner &&
-      x.alive !== false &&
-      x.fleetId !== undefined &&
-      state.fleets[x.fleetId] !== undefined,
-  ).length;
-}
-
 /** The hull the hero's ship is made of: the archetype's `ship.unit`, else the default
  *  projection `hero` unit (graceful when the archetype/data is absent). */
 function heroShipUnit(h: HandlerContext, hero: Hero): string {
   return (
     (hero.archetype !== undefined ? h.ctx.data.heroes[hero.archetype]?.ship.unit : undefined) ??
     HERO_UNIT
-  );
-}
-
-/** Does the hero CARRY an ability of the given effect `type`? (HERO-8 marker check —
- *  the ability relaxes a gate by being equipped, not by being cast.) */
-function carriesAbilityType(h: HandlerContext, hero: Hero, type: string): boolean {
-  return (hero.abilities ?? []).some(
-    (id) => typeof id === 'string' && h.ctx.data.heroAbilities[id]?.type === type,
   );
 }
 
@@ -356,7 +325,7 @@ function recruitOnArrival(h: HandlerContext, fleetId: string, at: string): void 
   // An already deployed/owned archetype must not turn into a second copy of that hero.
   let hero = Object.values(h.state.heroes ?? {}).find((x) => x.owner === fleet.owner && x.archetype === archetype);
   if (!hero) {
-    if (activeHeroCount(h.state, fleet.owner) >= HERO_ACTIVE_CAP) return;
+    if (activeHeroCount(h.state, fleet.owner) >= heroActiveCap(h.state, fleet.owner, h.ctx.data)) return;
     const id = `recruit:${fleet.owner}:${at}`;
     hero = {
       id, owner: fleet.owner, archetype, grade: 'common', location: at,
@@ -711,7 +680,7 @@ export const heroModule: GameModule = {
   // 4.4.0: map-authored hero rescue on arrival, with one-time persisted recruitment facts.
   // 4.5.0: герой не появляется на крепости у развилки — это не мир (FORT-6.1).
   // 4.6.0: чужая ракета (SM-3.7b) для `hero.spawn` — как отсутствующая цель (`E_NO_PLANET`).
-  version: '4.7.0',
+  version: '4.8.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
@@ -1031,97 +1000,7 @@ export const heroModule: GameModule = {
     // same, and the hero rides with it (ability origin, the capital check).
     api.on('fleet.fork', followShip);
 
-    // Respawn: the hero re-forms as a fresh one-ship fleet at its capital (`home`) if
-    // still held, else its last node, else any world the player holds. Homeless — or
-    // held back by the active cap (HERO-3) — ⇒ stays dead; the manual `hero.spawn`
-    // below is the player's retry path once a world / cap slot frees up.
-    api.on('hero.respawn', (event, h) => {
-      const { heroId } = (event.payload ?? {}) as { heroId?: string };
-      if (typeof heroId !== 'string') return;
-      const hero = h.state.heroes?.[heroId];
-      if (!hero || hero.alive) return;
-      const owner = hero.owner;
-      if (activeHeroCount(h.state, owner) >= HERO_ACTIVE_CAP) return;
-      // Крепость на развилке — не мир (FORT-6.1): у её площадки нет лейнов, и корабль,
-      // поднятый там, не ушёл бы никуда.
-      const owned = (id: PlanetId | undefined): id is PlanetId =>
-        id !== undefined &&
-        h.state.planets[id]?.owner === owner &&
-        !isForkSite(h.state.planets[id]);
-      const at = [hero.home, hero.location].find(owned) ?? Object.keys(h.state.planets).sort().find(owned);
-      if (at === undefined) return;
-      const fleetId = formHeroShip(h, hero, at);
-      h.emit('hero.respawned', { owner, heroId, fleetId, at });
-    });
-
-    // HERO-3 — manual deploy: raise the hero's ship at an owned world. Complements the
-    // scheduled auto-respawn: it deploys roster heroes that never had a ship, and it is
-    // the recovery path when the auto-respawn found the player homeless or capped.
-    api.onAction('hero.spawn', (action, h) => {
-      const { heroId, at } = action.payload as { heroId?: string; at?: string };
-      if (typeof heroId !== 'string' || typeof at !== 'string') return h.reject('E_BAD_PAYLOAD');
-      const hero = h.state.heroes?.[heroId];
-      if (!hero) return h.reject('E_NO_HERO');
-      if (hero.owner !== action.playerId) return h.reject('E_FORBIDDEN');
-      if (bossFallen(hero, h.ctx.data)) return h.reject('E_HERO_FALLEN'); // PVR-4.7
-      // Already commanding a live ship. `alive` is stamped by deploy and cleared ONLY
-      // by death (unit.died / fleet.destroyed) — check the flag, not just a live
-      // fleetId: a host may delete/rename the carrier without a death (fleet.merge),
-      // and a stale fleetId must not re-mint a second free flagship (BF-3 dupe).
-      if (hero.alive === true) return h.reject('E_HERO_ALIVE');
-      if (hero.fleetId !== undefined && h.state.fleets[hero.fleetId] !== undefined) {
-        return h.reject('E_HERO_ALIVE');
-      }
-      if (onCooldown(hero, 'respawn', h.ctx.now)) return h.reject('E_RESPAWN_COOLDOWN');
-      const requirement = h.hook<{ allowed: boolean; code?: string }>(
-        'construction.requirement', { allowed: true },
-        { playerId: action.playerId, kind: 'unit', id: heroShipStack(h, hero).unit },
-      );
-      if (!requirement.allowed) return h.reject(requirement.code ?? 'E_TECH_LOCKED');
-      // Target resolution: a world (own; allied with the `spawn_allied` marker) or —
-      // with the `spawn_fleet` marker (HERO-8) — one of the player's own fleets.
-      const planet = h.state.planets[at];
-      // Чужая ракета (SM-3.7b) — как отсутствующая цель: её id предсказуем, и `E_BAD_SPAWN`
-      // вместо `E_NO_PLANET` подтвердил бы пуск, скрытый туманом (A06, замечание Codex на #1503).
-      const host = planet === undefined ? fleetForOrder(h.state, at, action.playerId, h.ctx.data) : undefined;
-      if (!planet && !host) return h.reject('E_NO_PLANET');
-      if (planet) {
-        // Площадка крепости на развилке — не мир (FORT-6.1): уйти оттуда кораблю некуда.
-        if (isForkSite(planet)) return h.reject('E_BAD_SPAWN');
-        const own = planet.owner === action.playerId;
-        const allied =
-          !own &&
-          planet.owner !== null &&
-          carriesAbilityType(h, hero, SPAWN_ALLIED_TYPE) &&
-          stanceToRelation(getStance(h.state, action.playerId, planet.owner)) === 'ally';
-        if (!own && !allied) return h.reject('E_BAD_SPAWN');
-      } else if (host) {
-        if (host.owner !== action.playerId || !carriesAbilityType(h, hero, SPAWN_FLEET_TYPE)) {
-          return h.reject('E_BAD_SPAWN');
-        }
-        // Появиться РЯДОМ с флотом можно только там, где у флота есть узел: в полёте
-        // его нет вовсе. Раньше герой садился на борт и в пути тоже — теперь он
-        // формирует собственный флот, а формировать его в пустоте не на чем.
-        if (host.movement || typeof host.location !== 'string') {
-          return h.reject('E_HOST_IN_TRANSIT');
-        }
-      }
-      if (activeHeroCount(h.state, action.playerId) >= HERO_ACTIVE_CAP) {
-        return h.reject('E_HERO_CAP');
-      }
-      if (planet) {
-        const fleetId = formHeroShip(h, hero, at);
-        h.emit('hero.spawned', { owner: action.playerId, heroId, fleetId, at });
-      } else if (host) {
-        // Резолюция владельца 2026-09-08: каждый герой ведёт СВОЙ флот. Маркер
-        // `spawn_fleet` теперь не сажает на борт, а разрешает выйти ТАМ, где стоит
-        // свой флот, — отдельным флотом рядом. Тактический смысл (развернуться
-        // вперёд, а не только дома) сохранён целиком, инвариант не нарушен.
-        const at = host.location as PlanetId; // гейт выше уже отверг флот в пути
-        const fleetId = formHeroShip(h, hero, at);
-        h.emit('hero.spawned', { owner: action.playerId, heroId, fleetId, at, beside: host.id });
-      }
-    });
+    registerHeroDeployment(api, { formHeroShip, heroShipUnit });
 
     // HERO-7 — unlock a skill-tree node. The tree is pure data: branch/requires/cost
     // gate the order, and the grants simply extend the hero's own ability/passive

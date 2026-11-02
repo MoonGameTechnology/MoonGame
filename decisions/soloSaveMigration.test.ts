@@ -19,6 +19,7 @@ import {
   HOSPITAL_WOUNDS_SOLO_MIGRATION as hospitalWounds,
   PRODUCTION_LANES_SOLO_MIGRATION as productionLanes,
   WOUNDED_TRANSPORT_SOLO_MIGRATION as woundedTransport,
+  HERO_MOBILIZATION_SOLO_MIGRATION as heroMobilization,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -164,7 +165,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, heroMobilization]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -389,4 +390,19 @@ describe('the rules-only wounded transport pair (0.1.71 → 0.1.71)', () => {
     const raw = serializeSoloSave(before, woundedTransport.fromRules);
     expect(parseCompatibleSoloSave(raw, woundedTransport.toRules)).toEqual(before);
   });
+});
+
+it('migrates the exact hero deployment release without removing ships, reserves or pending orders', () => {
+  const before = oldSave();
+  before.state.version = { data: heroMobilization.fromData, dataHash: heroMobilization.fromDataHash, manifest: '1' };
+  before.state.heroes = {
+    main: { id: 'main', owner: 'p1', location: 'home', cooldowns: {}, alive: true, fleetId: 'f1' },
+    reserve: { id: 'reserve', owner: 'p1', location: 'home', cooldowns: {} },
+  };
+  const raw = serializeSoloSave(before, heroMobilization.fromRules);
+  const result = parseCompatibleSoloSave(raw, heroMobilization.toRules);
+  expect(result).toEqual({ ...before, state: { ...before.state, version: {
+    ...before.state.version, data: heroMobilization.toData, dataHash: heroMobilization.toDataHash,
+  } } });
+  expect(parseSoloSave(raw, heroMobilization.fromRules)).toEqual(before);
 });

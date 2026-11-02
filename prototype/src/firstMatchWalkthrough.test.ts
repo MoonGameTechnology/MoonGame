@@ -140,7 +140,7 @@ describe('guided first match: every chapter is playable by real orders', () => {
     expect(at()).toBe('hero.yard'); // still in reserve
     s = act(s, 'hero.spawn', { heroId: guideHero(s, ME)!.id, at: HOME });
     expect(guideHeroModules(s, ME)).toEqual(['repair_bay', GUIDE_HERO_MODULE]);
-    expect(guideHeroFleet(s, ME)?.location).toBe(HOME);
+    expect(guideHeroFleet(s, ME)).toBeUndefined();
 
     // Ground: barracks, then militia.
     expect(at()).toBe('ground.barracks-catalog');
@@ -162,7 +162,7 @@ describe('guided first match: every chapter is playable by real orders', () => {
     expect(at()).toBe('aviation.bomber-catalog');
     s = act(s, 'unit.build', { planetId: HOME, unit: GUIDE_WING });
     expect(at()).toBe('aviation.wing-wait');
-    s = until(s, (x) => guideWingsHome(x, HOME) > 0);
+    s = until(s, (x) => guideWingsHome(x, HOME) > 0 && !!guideHeroFleet(x, ME));
     expect(at()).toBe('aviation.load');
     const hero = guideHeroFleet(s, ME)!.id;
     const squadron = s.planets[HOME]!.hangar![0]!.id;
