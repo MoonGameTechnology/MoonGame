@@ -7,7 +7,6 @@
  * re-exports for main.ts / netserver.ts / tests (until REFP-28).
  */
 import {
-  BASE_RESEARCH_SLOTS,
   buildingLevel,
   buildingMaxLevel,
   matchCost,
@@ -20,8 +19,6 @@ import {
   MARKET_COMMISSION,
   moduleAllowed,
   slotUsage,
-  technologyLock,
-  techInMatch,
   hangarMachines,
   fleetPositionAt,
   fleetHoldFree,
@@ -57,7 +54,6 @@ import { fleetHangarRepairRate } from '../../packages/shared-core/src/util/repai
 // сенсоров — проход по всему флоту, а спрашивают про него десятки миров подряд.
 import { identifiedNodes, isVisibleTo } from '../../packages/shared-core/src/state/visibility';
 import { canOrder, canOrderAll } from './protoKernel';
-import { doctrineRanks } from './botDoctrine';
 import { isForkSite } from '../../packages/shared-core/src/state/forkSite';
 import {
   moveFleet,
@@ -69,7 +65,6 @@ import {
   canTraverse,
   marketList,
   marketTake,
-  researchTech,
   splitFleet,
   strikeShuttle,
   loadShuttle,
@@ -100,7 +95,6 @@ import { holdsPatrol } from '../../decisions/patrolMarks';
 import { frontRebase } from '../../decisions/frontRebase';
 import { isLander, landerTroopCandidates } from '../../decisions/landerTroops';
 import { botEmbargoes } from './botFavour';
-import { netIncome } from './economy';
 import { data } from './gameData';
 import type { MarketSide } from '../../packages/shared-core/src/index';
 import { planAllyOperation } from '../../decisions/allyOperation';
@@ -109,6 +103,9 @@ import { openTurn, type AiProfile } from './aiTurn/turn';
 import { consolidateFleets, expansionMoves, retreatLosingFleets } from './aiTurn/fleets';
 import { declareWarOnLeader } from './aiTurn/war';
 import { finishTurn } from './aiTurn/finish';
+import { openHome } from './aiTurn/home';
+import { economyOrders } from './aiTurn/economy';
+import { researchOrders } from './aiTurn/research';
 import { ORDER_RESERVE, ownsModule, worldsInOrder } from './aiTurn/rules';
 import {
   isPirateClan,
@@ -172,12 +169,6 @@ const SHUTTLE_CAP = 3;
  *  хватало на штурм. */
 const CARRIER_CAP = 2;
 
-/** Сколько часов дохода бот готов копить на узел своей ветки (копилка доктрины). Полсуток
- *  оказались много: космос отдавал стройку узлам и проигрывал середину партии (`selfplay
- *  200` sp/alt: побед 45/41%). Без копилки вершину ветки брали 8–23% мест, с 4 часами —
- *  15–56%, а побед у космоса 48/40%. */
-const DOCTRINE_SAVE_HOURS = 4;
-
 /**
  * Ударный ростер челноков (SHU-3.2) — кого бот СТРОИТ и кого ПОСЫЛАЕТ.
  *
@@ -227,12 +218,6 @@ const TRADE_BOOK: Record<string, { keep: number; bid?: number; ask?: number }> =
 };
 /** Столько кредитов бот НЕ тратит на рынке — казна нужна стройке и войскам. */
 const TRADE_CREDIT_FLOOR = 300;
-/** С какого запаса металла не отстающее место вкладывает лишнее в доход (а не в армию). */
-const LEADER_METAL_SURPLUS = 600;
-/** Что ведущее место улучшает дома, по порядку: кредиты, налог, микроэлектроника. */
-const LEADER_UPGRADES = ['refinery', 'tax_office', 'fabricator'] as const;
-
-
 
 /** Стоит ли на мире ЖИВОЕ здание, в котором можно заложить ИМЕННО ЭТОТ юнит: пехоте
  *  нужны казармы, технике — завод (ROS-1.1). Зеркало ядерного `hasGroundFacility`
@@ -468,327 +453,23 @@ function baseAiOrders(
   /** Флоты, которые общий бот не сливает (дозорный маяка, посты сети Роя). */
   pinned: ReadonlySet<string>,
 ): Action[] {
-  // Ход по фазам (SLIM-3): подготовка хода и флоты — в `aiTurn/`, порядок фаз прежний.
+  // Ход по фазам (SLIM-3): подготовка хода, флоты, хозяйство и наука — в `aiTurn/`, порядок
+  // фаз прежний.
   const bot = openTurn(state, ai, posture, profile, pinned);
   if (bot === null) return [];
   consolidateFleets(bot);
   if (bot.skilled) retreatLosingFleets(bot);
   expansionMoves(bot);
   if (!bot.defensive) declareWarOnLeader(bot);
-  const { out, pad, pirate, swarmInhabitant, skilled, lineUnit, scoutUnit, militiaUnit, doctrine, army, groundRoster, groundDefenders, defensive, isShipUnit, capturable, d, warFooting, base, trailing, ownFleets } = bot;
+  const { out, pad, pirate, skilled, lineUnit, scoutUnit, militiaUnit, army, groundRoster, groundDefenders, defensive, isShipUnit, capturable, d, warFooting, base, ownFleets } = bot;
   // Build + launch from this AI's home base (its first developed owned world).
   const pl = state.players[ai];
   if (base && pl) {
-    // Keep the lights on first: a bot whose energy/food NET flow is negative (or already
-    // in arrears) raises a plant/farm before anything else — brownouts halve its economy.
-    // One plant is not a cap (owner's decision 2026-10-07): the bot used to stop at the
-    // first farm/reactor of the match and then lived in arrears, which no player would
-    // do — so self-play reported a food/energy pressure that only the bot felt. Like a
-    // player, it adds the next one on its first own world that lacks it (home first,
-    // then by id — a stable order, invariant #1), but keeps ONE of a kind in the queue,
-    // so the flow it reads next tick already counts the plant it ordered.
-    const flow = netIncome(state, ai);
-    const has = (b: string): boolean =>
-      Object.values(state.planets).some(
-        (p) => p.owner === ai && p.buildings.some((x) => x.type === b),
-      );
-    for (const [need, b] of [
-      ['energy', 'power_plant'],
-      ['food', 'farm'],
-    ] as const) {
-      if ((flow[need] ?? 0) >= 0 && !(pl.arrears ?? []).includes(need)) continue;
-      const queued = state.scheduled.some((e) => {
-        if (e.type !== 'construction.complete') return false;
-        const q = e.payload as { kind?: string; planetId?: string; building?: string };
-        return (
-          q.kind === 'building' && q.building === b && state.planets[q.planetId ?? '']?.owner === ai
-        );
-      });
-      if (queued) continue;
-      const cost = matchCost(state, data.buildings[b]?.cost) ?? {};
-      if (!Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + pad(r, 60))) continue;
-      const site = [
-        base,
-        ...Object.values(state.planets)
-          .filter((p) => p.owner === ai && p.id !== base.id)
-          .sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0)),
-      ].find(
-        (p) =>
-          !p.buildings.some((x) => x.type === b) &&
-          canOrder(state, buildBuilding(ai, p.id, b)) === null,
-      );
-      if (site) out.push(buildBuilding(ai, site.id, b));
-    }
-    // Economy chain (self-play M4: mine/refinery/tax office were DEAD content for the
-    // bot — it bought all its metal on the market): raise the first missing credit
-    // engine at the home base (refinery → tax office), and put a metal mine on each
-    // captured PRIZE world — one link at a time, only when comfortably affordable,
-    // and never over the same build already queued (no reject spam).
-    const pendingBuild = (planetId: string, b: string): boolean =>
-      state.scheduled.some((e) => {
-        if (e.type !== 'construction.complete') return false;
-        const q = e.payload as { kind?: string; planetId?: string; building?: string };
-        return q.kind === 'building' && q.planetId === planetId && q.building === b;
-      });
-    const affordable = (b: string): boolean => {
-      const cost = matchCost(state, data.buildings[b]?.cost) ?? {};
-      return Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + pad(r, 60));
-    };
-    /** Разрешает ли ЯДРО это здание здесь и сейчас, если отвлечься от денег.
-     *
-     *  Спрашиваем, а не переводим правило заново (RULES-1): ядро может запретить
-     *  постройку по причине, о которой бот не знает — например, орбитальное ПКО до
-     *  `orbital_defense_grid` (ORB-1). Звено цепочки, которое нельзя построить, надо
-     *  ПРОПУСТИТЬ: критерий «не построено и не в очереди» держал бы его вечно, и до
-     *  следующего звена бот не дошёл бы никогда. Деньги спрашиваются отдельно, потому
-     *  что нехватка средств — это «подожди», а не «нельзя». `canOrder` мемоизирован по
-     *  состоянию, так что цепочка стоит один прогон на здание за тик. */
-    const buildAllowed = (planetId: string, b: string): boolean => {
-      const code = canOrder(state, buildBuilding(ai, planetId, b));
-      return code === null || code === 'E_INSUFFICIENT';
-    };
-    // ECON-7: fabricator joins the chain — microelectronics gates warships now
-    // (cruiser/siege cost micro), so a bot without a fab eventually can't build a
-    // fleet. Built once the credit/tax engine is up; keeps micro produced AND spent.
-    // YARD-1: `spaceport` встал в цепочку вторым звеном. Он больше не приезжает даром
-    // вместе с домом (дом несёт ВЕРФЬ), а без него у бота нет ни ангара, ни челноков —
-    // то есть целый пласт боя выпал бы из измерения. Место в цепочке не случайное:
-    // сперва чистые деньги (`refinery`), потом порт, который и торгует, и открывает
-    // ангар, и только затем множитель с микроэлектроникой.
-    const incomeChain = ['refinery', 'spaceport', 'tax_office', 'fabricator'] as const;
-    for (const b of incomeChain) {
-      if (has(b)) continue;
-      if (affordable(b) && !pendingBuild(base.id, b)) out.push(buildBuilding(ai, base.id, b));
-      break; // one link at a time — wait out the current one either way
-    }
-    // Тяжёлый стапель (армия под ветку, `heavyYard`) — звено после цепочки дохода: верфь
-    // дома улучшается до верха. Идущее улучшение ядро отбивает `E_ALREADY_QUEUED`.
-    const yard = base.buildings.find((x) => x.type === 'shipyard' && x.hp > 0);
-    const yardDef = data.buildings['shipyard'];
-    if (
-      army.heavyYard &&
-      yard &&
-      yardDef &&
-      yard.level < buildingMaxLevel(yardDef) &&
-      incomeChain.every(has)
-    ) {
-      const cost = matchCost(state, buildingLevel(yardDef, yard.level + 1).cost);
-      const order = upgradeBuilding(ai, base.id, 'shipyard');
-      if (
-        Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + pad(r, 60)) &&
-        canOrder(state, order) === null
-      )
-        out.push(order);
-    }
-    for (const p of worldsInOrder(state, ai, 'mine', skilled)) {
-      if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
-      if (p.buildings.some((x) => x.type === 'mine') || pendingBuild(p.id, 'mine')) continue;
-      if (!affordable('mine')) break;
-      out.push(buildBuilding(ai, p.id, 'mine'));
-      break; // spread the economy one world per tick
-    }
-    // Invest while metal is tight, keeping one usable line hull and the normal
-    // order reserve. A rich treasury does not need another source of stockpiles.
-    // Only one mining investment may be pending anywhere in the empire.
-    const minePending =
-      out.some(
-        (a) =>
-          (a.type === 'building.construct' || a.type === 'building.upgrade') &&
-          (a.payload as { building?: string }).building === 'mine',
-      ) ||
-      Object.values(state.planets).some(
-        (p) =>
-          p.owner === ai &&
-          [...(p.buildQueue ?? []), ...(p.pausedConstruction ?? [])].some(
-            (q) => (q.kind === 'building' || q.kind === 'upgrade') && q.building === 'mine',
-          ),
-      ) ||
-      state.scheduled.some((e) => {
-        if (e.type !== 'construction.complete') return false;
-        const q = e.payload as { kind?: string; planetId?: string; building?: string };
-        return (
-          (q.kind === 'building' || q.kind === 'upgrade') &&
-          q.building === 'mine' &&
-          state.planets[q.planetId ?? '']?.owner === ai
-        );
-      });
-    if (skilled && !minePending && data.buildings.mine) {
-      const hull = matchUnitCost(state, data.units[lineUnit]) ?? {};
-      const reserve = (r: string): number => (hull[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0);
-      for (const p of [
-        base,
-        ...worldsInOrder(state, ai, 'mine-upgrade', skilled).filter((p) => p.id !== base.id),
-      ]) {
-        if (p.owner !== ai || p.kind !== 'planet') continue;
-        const mine = p.buildings.find((b) => b.type === 'mine' && b.hp > 0);
-        if (!mine || mine.level >= buildingMaxLevel(data.buildings.mine)) continue;
-        if (p.buildQueue?.length || p.pausedConstruction?.length) continue;
-        if (
-          out.some(
-            (a) =>
-              (a.type === 'building.construct' || a.type === 'building.upgrade') &&
-              (a.payload as { planetId?: string }).planetId === p.id,
-          )
-        )
-          continue;
-        const cost = matchCost(state, buildingLevel(data.buildings.mine, mine.level + 1).cost);
-        if (
-          (pl.resources.metal ?? 0) >=
-          (cost.metal ?? 0) + 2 * (hull.metal ?? 0) + pad('metal', ORDER_RESERVE.metal ?? 0)
-        )
-          continue;
-        if (
-          !Object.keys({ ...cost, ...hull, ...ORDER_RESERVE }).every(
-            (r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + reserve(r),
-          )
-        )
-          continue;
-        const order = upgradeBuilding(ai, p.id, 'mine');
-        if (canOrder(state, order) !== null) continue;
-        out.push(order);
-        break;
-      }
-    }
-    // МЁРТВЫЙ МИР — тоже экономика (AI-BAL-8). До аннигиляции ни одного `dead_world` на
-    // карте прототипа не существовало, поэтому `metal_station` числилась мёртвым
-    // контентом «по УСЛОВИЮ» (AI-BAL-10, случай «в»). Теперь герой их создаёт — но обычная
-    // шахта на пустыре запрещена (`allowedBuildings: ['metal_station']`), а правило шахты
-    // выше берёт только `kind === 'planet'`, так что без этой ветки аннигиляция оставляла
-    // бы после себя ровно пустырь. Салвага и есть плата за разрушенный мир: 30 металла в
-    // час против 10 базовых.
-    if (skilled) {
-      for (const p of worldsInOrder(state, ai, 'salvage', skilled)) {
-        if (p.owner !== ai || p.kind !== 'dead_world') continue;
-        if (
-          p.buildings.some((x) => x.type === 'metal_station') ||
-          pendingBuild(p.id, 'metal_station')
-        ) {
-          continue;
-        }
-        if (!affordable('metal_station')) break;
-        out.push(buildBuilding(ai, p.id, 'metal_station'));
-        break; // одна стройка за тик — как и с шахтой
-      }
-    }
-    // Ведущее место вкладывает лишний металл в доход (решение владельца 2026-10-08:
-    // «если впереди, может думать, куда ещё потратить, кроме лишней армии»). Металл к
-    // 30-му дню копился до ~44k, а кредитов не было. Порядок: улучшить дома
-    // переработку, налоговую и фабрикатор, потом поставить переработку на своём мире без
-    // неё — она стоит один металл и даёт кредиты. Одна стройка за тик, как у шахт.
-    if (!trailing && (pl.resources.metal ?? 0) >= pad('metal', LEADER_METAL_SURPLUS)) {
-      const pendingUpgrade = (planetId: string, b: string): boolean =>
-        state.scheduled.some((e) => {
-          if (e.type !== 'construction.complete') return false;
-          const q = e.payload as { kind?: string; planetId?: string; building?: string };
-          return q.kind === 'upgrade' && q.planetId === planetId && q.building === b;
-        });
-      const invest = (): Action | null => {
-        for (const b of LEADER_UPGRADES) {
-          const def = data.buildings[b];
-          const inst = base.buildings.find((x) => x.type === b);
-          if (!def || !inst || inst.level >= buildingMaxLevel(def)) continue;
-          if (pendingUpgrade(base.id, b)) continue;
-          const cost = matchCost(state, buildingLevel(def, inst.level + 1).cost);
-          if (!Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + pad(r, 60)))
-            continue;
-          const order = upgradeBuilding(ai, base.id, b);
-          if (canOrder(state, order) === null) return order;
-        }
-        if (!affordable('refinery')) return null;
-        for (const p of worldsInOrder(state, ai, 'refinery', skilled)) {
-          if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
-          if (p.buildings.some((x) => x.type === 'refinery') || pendingBuild(p.id, 'refinery'))
-            continue;
-          const order = buildBuilding(ai, p.id, 'refinery');
-          if (canOrder(state, order) === null) return order;
-        }
-        return null;
-      };
-      const order = invest();
-      if (order) out.push(order);
-    }
-    // ТОЛЬКО СИЛЬНЫЙ (AI-BAL-1.1): технологии исследует сильный профиль, слабый — нет.
-    // Слабый и есть «прежний простой соперник»; сильного игрок выбирает сам в соло
-    // (AIDIFF-1), и его же берёт прогон баланса — ему нужна работающая ветка эффектов.
-    //
-    // Технологии: игровой бот не исследует НИ ОДНОЙ из 25 (self-play: 0 за 300 матчей),
-    // поэтому вся ветка эффектов — бонусы к добыче, скорости и урону, гейты контента —
-    // не участвовала в измерении баланса вовсе. Правило намеренно минимальное: бот не
-    // «строит билд», он просто не оставляет исследовательские слоты пустыми.
-    //
-    // Что можно взять, решает САМО ЯДРО — `technologyLock` (prerequisites / day-gate /
-    // conditions), а не копия правил здесь: разъедься копия с модулем, бот начал бы
-    // спамить отказами, и первым признаком была бы не ошибка, а тихо изменившийся баланс.
-    // Слоты считаем по базовой константе, а не по хуку `research.slots` (хук живёт внутри
-    // ядра и снаружи не вызывается): с учёным слотов может быть больше, тогда бот
-    // недоиспользует лишний — это честный недобор, а не отказ.
-    const techState = pl.technologies;
-    const activeTech = techState?.active ?? [];
-    const doneTech = techState?.completed ?? [];
-    // RQ-1: у места есть очередь исследований — это план игрока, и слоты кормит она (насос
-    // ядра). Бот, сидящий за игрока (Хранитель, подмена), её не обгоняет своим выбором.
-    const playerPlan = (techState?.queue?.length ?? 0) > 0;
-    if (!swarmInhabitant && !playerPlan && (skilled || state.techRules?.ruleset === 'main') && activeTech.length < BASE_RESEARCH_SLOTS) {
-      const costOf = (id: string): Record<string, number> =>
-        matchCost(state, data.technologies[id]?.cost) ?? {};
-      /** Чего не хватает на узел — с запасом `ORDER_RESERVE`, как у заказов войск. Прежний
-       *  запас 60 на всё держал и микроэлектронику, а её у бота 40–150, и узлы второго
-       *  тира (30–80 микроэлектроники) за 14 дней не брались почти никогда. */
-      const shortOf = (id: string): string[] =>
-        Object.entries(costOf(id))
-          .filter(([r, v]) => (pl.resources[r] ?? 0) < v + pad(r, ORDER_RESERVE[r] ?? 0))
-          .map(([r]) => r);
-      // Доктрина: узлы своей ветки идут вперёд цены (ранг `doctrineRanks`). Без доктрины
-      // ранг у всех один, и порядок прежний — по цене.
-      const ranks =
-        doctrine !== undefined
-          ? doctrineRanks(data.technologies, doctrine, (id) => techInMatch(state, id, data))
-          : undefined;
-      const rank = (id: string): number => {
-        const def = data.technologies[id]!;
-        if (def.ruleset === 'main' && def.tier === 1 && def.unlocks.units?.length) return -1;
-        return ranks?.get(id) ?? 2;
-      };
-      const open = Object.keys(data.technologies)
-        .filter((id) => {
-          const def = data.technologies[id];
-          if (!def) return false;
-          if (doneTech.includes(id) || activeTech.some((a) => a.technology === id)) return false;
-          return technologyLock(def, state, ai, data, id) === null;
-        })
-        // Дешёвое и быстрое вперёд — это не «оптимальный порядок», а ДЕТЕРМИНИРОВАННЫЙ:
-        // id последним ключом сортировки, чтобы порядок не зависел от перебора объекта
-        // (иначе один и тот же сид разыгрался бы по-разному, инвариант #1).
-        .sort((a, b) => {
-          const da = data.technologies[a]!;
-          const db = data.technologies[b]!;
-          const sum = (c: Record<string, number> = {}): number =>
-            Object.values(c).reduce((n, v) => n + v, 0);
-          return (
-            rank(a) - rank(b) ||
-            sum(da.cost) - sum(db.cost) ||
-            (da.researchTimeHours ?? 0) - (db.researchTimeHours ?? 0) ||
-            (a < b ? -1 : a > b ? 1 : 0)
-          );
-        });
-      const pick = open.find((id) => shortOf(id).length === 0);
-      // КОПИЛКА ДОКТРИНЫ. Узел своей ветки, на который не хватает, бот не меняет на дешёвое
-      // чужое, а копит: если доход закрывает нехватку за `DOCTRINE_SAVE_HOURS`, место ничего
-      // другого не исследует, а заказы войск, тратящие недостающее, ждут (`finishTurn`).
-      // Без копилки ветка не шла: стройка съедала металл и кредиты каждый тик, и шаттловое
-      // место за 14 дней не доходило до «Ударных векторов», а с ними и до тяжёлого страйкера.
-      // Доход не закроет нехватку за этот срок — узел не цель, и бот берёт что по карману.
-      const goal = open.find(
-        (id) =>
-          rank(id) < Math.min(2, pick !== undefined ? rank(pick) : 2) &&
-          shortOf(id).every((r) => {
-            const gap = (costOf(id)[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0) - (pl.resources[r] ?? 0);
-            return (flow[r] ?? 0) > 0 && gap <= (flow[r] ?? 0) * DOCTRINE_SAVE_HOURS;
-          }),
-      );
-      if (goal !== undefined) bot.saving = new Set(shortOf(goal));
-      else if (pick !== undefined) out.push(researchTech(ai, pick));
-    }
+    // Хозяйство и наука дома (SLIM-3) — в `aiTurn/`, порядок прежний.
+    const home = openHome(bot, base, pl);
+    economyOrders(bot, home);
+    researchOrders(bot, home);
+    const { pendingBuild, affordable, buildAllowed } = home;
     // Сколько машин рода `unit` у места. Предел спрашивают и слот линейного корабля (армия
     // под ветку), и заказ челноков ниже.
     // СЧЁТ ИДЁТ ПО АНГАРАМ И ВОЗДУХУ, а не по флотам. `shipsOwned` смотрит в состав
