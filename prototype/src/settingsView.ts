@@ -15,7 +15,9 @@ import type { RateUnit } from '../../decisions/rateUnit';
 import { sharpnessMatters } from '../../decisions/mapSharpness';
 import {
   canvasCompatibilityActive,
+  canvasCompatibilityChosen,
   canvasCompatibilityRequested,
+  canvasCompatibilitySupported,
   setCanvasCompatibility,
 } from './canvasCompatibility';
 import {
@@ -102,7 +104,13 @@ function mapRenderingReport(): string {
       schema: 1,
       build: currentBuild(),
       userAgent: navigator.userAgent,
-      compatibility: { active, requested, restartPending: active !== requested },
+      // `chosen: null` — игрок тумблер не трогал, режим решает вердикт «слабое».
+      compatibility: {
+        active,
+        requested,
+        chosen: canvasCompatibilityChosen(),
+        restartPending: active !== requested,
+      },
       // Настройки «Графики» сейчас: цена кадра карты растёт с каждой из них.
       graphics: {
         sharp: mapSharpOn(),
@@ -168,7 +176,7 @@ export function initSettingsView(host: SettingsViewHost): void {
       motion: motionOn(),
       renderCompatibility: canvasCompatibilityRequested(),
       renderCompatibilityActive: canvasCompatibilityActive(),
-      renderCompatibilitySupported: /Android/i.test(navigator.userAgent),
+      renderCompatibilitySupported: canvasCompatibilitySupported(),
       fps: showFpsOn(),
       soundOn: snd.enabled(),
       volume: snd.volume(),

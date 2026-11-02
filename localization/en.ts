@@ -4622,7 +4622,7 @@ export const en: Record<string, string> = {
     'breathing of markers, glows and engines; off freezes them without hiding them; a weak device turns it off by itself',
   'settings.gfx.render-compat': 'Rendering compatibility',
   'settings.gfx.render-compat.hint':
-    'requests software map rendering; may lower FPS; applies after restart',
+    'requests software map rendering; may lower FPS; applies after restart; a weak device turns it on by itself',
   'settings.gfx.render-compat.pending': 'Change pending restart',
   'settings.gfx.render-report': 'Rendering report',
   'settings.gfx.render-report.hint':

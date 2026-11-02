@@ -33,8 +33,14 @@
  *    в том же треде, 2026-10-25). Тот же вердикт выключает «Движение слоёв», если игрок его не
  *    выбирал, а система и так не просит меньше движения: стоящую голограмму кадр не
  *    перерисовывает (`decisions/livingBorderLayer.ts`, правило 5). Выбор игрока сильнее и здесь.
- *    Кадры судят устройство, пока вердикту есть что поменять: чёткость или движение
- *    ({@link slowVerdictReach}).
+ * 6. **Слабое устройство включает и «Совместимость отрисовки»** (ответ владельца в том же треде,
+ *    2026-11-01: на его телефоне режим убрал артефакты и зависание быстрого зума). Режим просит у
+ *    браузера программную отрисовку холстов карты вместо очереди видеочипа, а попросить её можно
+ *    только при создании холста: вердикт включает режим со следующего запуска. Режим есть там, где
+ *    у него есть тумблер (Android), и выбор игрока сильнее и здесь.
+ *
+ * Кадры судят устройство, пока вердикту есть что поменять: чёткость, движение или режим
+ * отрисовки ({@link slowVerdictReach}).
  */
 
 /** Сколько кадров матча судят устройство (правило 1). */
@@ -70,24 +76,39 @@ export function motionLive(chosen: boolean | null, reducedMotion: boolean, slow:
   return chosen ?? (!reducedMotion && !slow);
 }
 
-/** Что поменял бы вердикт «слабое» (правила 3–5). */
+/** Просит ли карта программную отрисовку: выбор игрока, а без него — слабое ли устройство там,
+ *  где у режима есть тумблер (правило 6). */
+export function canvasCompatible(
+  chosen: boolean | null,
+  slow: boolean,
+  supported: boolean,
+): boolean {
+  return chosen ?? (supported && slow);
+}
+
+/** Что поменял бы вердикт «слабое» (правила 3–6). */
 export interface SlowVerdictReach {
   /** Чёткость: экрану есть что понижать, и игрок её не выбирал. */
   readonly sharp: boolean;
   /** Движение: игрок его не выбирал, и система не просит меньше движения. */
   readonly motion: boolean;
+  /** Режим отрисовки со следующего запуска: у режима есть тумблер, и игрок его не трогал. */
+  readonly compat: boolean;
 }
 
-/** Что поменял бы вердикт «слабое» на этом экране при этих выборах (правила 3–5). */
+/** Что поменял бы вердикт «слабое» на этом экране при этих выборах (правила 3–6). */
 export function slowVerdictReach(
   screenDpr: number,
   sharpChosen: boolean | null,
   motionChosen: boolean | null,
   reducedMotion: boolean,
+  compatChosen: boolean | null,
+  compatSupported: boolean,
 ): SlowVerdictReach {
   return {
     sharp: sharpnessMatters(screenDpr) && sharpChosen === null,
     motion: motionChosen === null && !reducedMotion,
+    compat: compatSupported && compatChosen === null,
   };
 }
 
@@ -98,10 +119,17 @@ export type FramePool = 'all' | 'gesture';
 /** Какие суды этого сеанса уже сказали, что устройство их кадры держит (правило 1). */
 export type PoolsFine = Readonly<Record<FramePool, boolean>>;
 
-/** Судят ли кадры этого сеанса устройство (правила 1–5): вердикту есть что поменять, его ещё нет,
+/** Судят ли кадры этого сеанса устройство (правила 1–6): вердикту есть что поменять, его ещё нет,
  *  и не каждый суд сказал, что устройство держит его кадры. */
 export function judgingFrames(reach: SlowVerdictReach, slow: boolean, fine: PoolsFine): boolean {
-  return (reach.sharp || reach.motion) && !slow && !(fine.all && fine.gesture);
+  return (reach.sharp || reach.motion || reach.compat) && !slow && !(fine.all && fine.gesture);
+}
+
+/** Ключ сообщения о вердикте: что поменялось на экране. `null` — не поменялось ничего, ведь
+ *  режиму отрисовки нужен перезапуск (правило 6). */
+export function slowVerdictNotice(reach: SlowVerdictReach): string | null {
+  if (reach.sharp) return reach.motion ? 'settings.gfx.slow.auto' : 'settings.gfx.map-sharp.auto';
+  return reach.motion ? 'settings.gfx.motion.auto' : null;
 }
 
 /** Слабое ли устройство по промежуткам между кадрами матча, мс (правило 1); `null` — кадров

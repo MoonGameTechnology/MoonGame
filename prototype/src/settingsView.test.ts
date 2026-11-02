@@ -99,6 +99,8 @@ async function load(over: Partial<SettingsViewHost> = {}, sectorZeroOnly = false
   vi.doMock('./canvasCompatibility', () => ({
     canvasCompatibilityActive: () => false,
     canvasCompatibilityRequested: () => true,
+    canvasCompatibilityChosen: () => null,
+    canvasCompatibilitySupported: () => true,
     setCanvasCompatibility: log('compat'),
   }));
   vi.doMock('./hubScreen', () => ({ hubAuthorizedBase: () => null }));
@@ -253,7 +255,8 @@ describe('REFM-248 · диагностика рендера', () => {
     expect(report).toMatchObject({
       schema: 1,
       build: 'b1',
-      compatibility: { active: false, requested: true, restartPending: true },
+      // Тумблер не трогали, а вердикт «слабое» уже просит режим у следующего запуска.
+      compatibility: { active: false, requested: true, chosen: null, restartPending: true },
       viewport: { width: 390, height: 844, devicePixelRatio: 3, renderDpr: 3 },
       canvas: { width: 1170, cssWidth: 390, events: { lost: 1 } },
       background: { contextLost: false, events: { lost: 0 } },
