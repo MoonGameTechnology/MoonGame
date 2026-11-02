@@ -794,6 +794,8 @@ export interface LoadingClaim {
   startAt: number;
   /** World-time (ms) the lift finishes. */
   doneAt: number;
+  /** Кого грузить первыми (выбор игрока); нет — порядок гарнизона (`army.ts`). */
+  first?: 'wounded' | 'healthy';
 }
 
 /** Выгрузка десанта на свой или союзный мир (решение владельца 2026-09-26: «на союзном или

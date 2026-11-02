@@ -6,7 +6,7 @@
     "packages/server/src/matchRoom.ts": 2936,
     "packages/shared-core/src/modules/shuttle.ts": 2897,
     "prototype/netserver.ts": 2092,
-    "packages/shared-core/src/state/gameState.ts": 1904,
+    "packages/shared-core/src/state/gameState.ts": 1906,
     "packages/shared-core/src/modules/construction.ts": 1669,
     "packages/shared-core/src/modules/combat.ts": 1766,
     "packages/shared-core/src/data/schemas.ts": 1725,

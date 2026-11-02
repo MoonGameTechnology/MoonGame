@@ -5083,6 +5083,9 @@ export const en: Record<string, string> = {
   'troops.hold': 'hold {a}/{b}',
   'troops.planned': 'ordered {n}',
   'troops.timing': 'loading ≈1h · unloading is instant',
+  'troops.first.ask': 'Who boards first?',
+  'troops.first.wounded': 'Wounded',
+  'troops.first.healthy': 'Healthy',
   'troops.title': 'Troops',
 
   // --- upd — Баннер обновления сборки (APK; в браузере не показывается).

@@ -5088,6 +5088,9 @@ export const ru: Record<string, string> = {
   'troops.hold': 'трюм {a}/{b}',
   'troops.planned': 'заказано {n}',
   'troops.timing': 'погрузка ≈1 ч · выгрузка сразу',
+  'troops.first.ask': 'Кого грузить первыми?',
+  'troops.first.wounded': 'Раненых',
+  'troops.first.healthy': 'Здоровых',
   'troops.title': 'Десант',
 
   // --- upd — Баннер обновления сборки (APK; в браузере не показывается).

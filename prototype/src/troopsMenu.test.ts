@@ -271,3 +271,28 @@ describe('troopsMenuHtml — разметка поповера', () => {
     expect(html).not.toContain('data-at=');
   });
 });
+
+describe('кого грузить первыми (раненых или здоровых)', () => {
+  const mixed = (plan: Record<string, number>, asking = false) =>
+    input({ units: [unit({ unit: 'militia', garrison: 5, garrisonAll: 5, wounded: 2 })], plan, asking });
+
+  it('спрашивает, только если в гарнизоне есть и раненые, и целые, а берётся не всё', () => {
+    expect(troopsModel(mixed({ militia: 3 })).askFirst).toBe(true);
+    expect(troopsModel(mixed({ militia: 5 })).askFirst).toBe(false); // берут всех — порядок не важен
+    expect(troopsModel(mixed({ militia: -1 })).askFirst).toBe(false); // выгрузка не спрашивает
+    const allHealthy = input({ units: [unit({ unit: 'militia', garrison: 5, garrisonAll: 5, wounded: 0 })], plan: { militia: 3 } });
+    expect(troopsModel(allHealthy).askFirst).toBe(false);
+    const allWounded = input({ units: [unit({ unit: 'militia', garrison: 5, garrisonAll: 5, wounded: 5 })], plan: { militia: 3 } });
+    expect(troopsModel(allWounded).askFirst).toBe(false);
+  });
+
+  it('на вопросе вместо «Подтвердить» — две кнопки выбора и отмена', () => {
+    const o = { icon: () => '', name: (u: string) => u };
+    const html = troopsMenuHtml(troopsModel(mixed({ militia: 3 }, true)), o);
+    expect(html).toContain('Кого грузить первыми?');
+    expect(html).toContain('data-cmd="tfirst" data-first="wounded"');
+    expect(html).toContain('data-cmd="tfirst" data-first="healthy"');
+    expect(html).not.toContain('data-cmd="tok"');
+    expect(troopsMenuHtml(troopsModel(mixed({ militia: 3 })), o)).toContain('data-cmd="tok"');
+  });
+});

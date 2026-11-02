@@ -23,6 +23,7 @@ import {
   BOMBARD_VOLLEY_SOLO_MIGRATION as bombardVolley,
   HALF_MODULES_SOLO_MIGRATION as halfModules,
   FORTRESS_MODEL_SOLO_MIGRATION as fortressModel,
+  LOAD_FIRST_SOLO_MIGRATION as loadFirst,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -168,7 +169,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -442,5 +443,14 @@ describe('separate fortress release compatibility', () => {
     expect(restored).toEqual({ ...before, state: { ...before.state,
       version: { data: fortressModel.toData, dataHash: fortressModel.toDataHash, manifest: '1' },
     } });
+  });
+});
+
+describe('the rules-only load-first pair (0.1.73 → 0.1.73)', () => {
+  it('reads a save of the fortress release under the new rules unchanged', () => {
+    const before = oldSave();
+    before.state.version = { data: loadFirst.fromData, dataHash: loadFirst.fromDataHash, manifest: '1' };
+    const raw = serializeSoloSave(before, loadFirst.fromRules);
+    expect(parseCompatibleSoloSave(raw, loadFirst.toRules)).toEqual(before);
   });
 });

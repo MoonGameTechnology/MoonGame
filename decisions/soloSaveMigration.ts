@@ -262,6 +262,18 @@ export const FORTRESS_MODEL_SOLO_MIGRATION = {
   toDataHash: '0b767cf7a4b647',
 } as const;
 
+/** Rules-only pair: army 1.3.0 lets a lift order say whether wounded or whole stacks board
+ *  first (an optional `first` on the claim). A saved claim without it boards in garrison
+ *  order as before, so a saved world reads as is. */
+export const LOAD_FIRST_SOLO_MIGRATION = {
+  fromRules: FORTRESS_MODEL_SOLO_MIGRATION.toRules,
+  fromData: FORTRESS_MODEL_SOLO_MIGRATION.toData,
+  fromDataHash: FORTRESS_MODEL_SOLO_MIGRATION.toDataHash,
+  toRules: '1ce24e9a208610',
+  toData: FORTRESS_MODEL_SOLO_MIGRATION.toData,
+  toDataHash: FORTRESS_MODEL_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -286,6 +298,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   BOMBARD_VOLLEY_SOLO_MIGRATION,
   HALF_MODULES_SOLO_MIGRATION,
   FORTRESS_MODEL_SOLO_MIGRATION,
+  LOAD_FIRST_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

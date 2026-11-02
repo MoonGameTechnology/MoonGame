@@ -1,5 +1,5 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Fleet, GameState, LoadingClaim, UnloadingClaim } from '../state/gameState';
+import type { Fleet, GameState, LoadingClaim, UnitStack, UnloadingClaim } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { hoursToMs } from '../action/types';
 import { defHasTrait } from '../data/traits';
@@ -13,6 +13,24 @@ interface TransferPayload {
   fleetId: string;
   unit: string;
   count?: number;
+  first?: LoadFirst;
+}
+
+/** Очерёдность погрузки: сначала раненые стеки или сначала целые (выбор игрока, 2026-11-02). */
+export type LoadFirst = NonNullable<LoadingClaim['first']>;
+
+const isWounded = (s: UnitStack): boolean => s.hp !== undefined || s.shieldHp !== undefined;
+
+/** Снять `count` единиц `unit` из `stacks`, начиная с раненых или с целых стеков, если
+ *  игрок выбрал очерёдность. Фильтр отдаёт те же объекты стеков, поэтому `takeFromStacks`
+ *  уменьшает их на месте, как и без выбора. */
+function takeInOrder(stacks: UnitStack[], unit: string, count: number, first?: LoadFirst): UnitStack[] {
+  if (!first) return takeFromStacks(stacks, unit, count);
+  const wantWounded = first === 'wounded';
+  const head = takeFromStacks(stacks.filter((s) => isWounded(s) === wantWounded), unit, count);
+  const got = head.reduce((n, s) => n + s.count, 0);
+  const tail = got < count ? takeFromStacks(stacks.filter((s) => isWounded(s) !== wantWounded), unit, count - got) : [];
+  return [...head, ...tail];
 }
 
 /**
@@ -96,7 +114,7 @@ function claimedCargo(fleet: Fleet, data: GameData): number {
  */
 export const armyModule: GameModule = {
   id: 'army',
-  version: '1.2.0',
+  version: '1.3.0',
   setup(api) {
     /** Validates a load/unload order and resolves the fleet, its planet and the
      *  ground unit def, or rejects. */
@@ -128,6 +146,10 @@ export const armyModule: GameModule = {
 
     api.onAction('army.load', (action, h) => {
       const { fleet, planet, def, unit, count } = resolve(action, h);
+      const first = (action.payload as Partial<TransferPayload>).first;
+      if (first !== undefined && first !== 'wounded' && first !== 'healthy') {
+        return h.reject('E_BAD_PAYLOAD');
+      }
       // Поднять можно ТОЛЬКО со своего мира. Союзный гарнизон — не твой ресурс:
       // иначе «помощь» превращалась бы в вывоз чужой обороны.
       if (planet.owner !== action.playerId) {
@@ -163,6 +185,7 @@ export const armyModule: GameModule = {
       // шагом звали `advanceTo` (сервер тикает секундами, тест — часами).
       const doneAt = h.ctx.now + hoursToMs(h.ctx, LOAD_HOURS);
       const claim: LoadingClaim = { unit, count, from: planet.id, startAt: h.ctx.now, doneAt };
+      if (first) claim.first = first;
       fleet.loading = fleet.loading ?? [];
       fleet.loading.push(claim);
       h.schedule(doneAt, 'army.load.done', { fleetId: fleet.id });
@@ -215,7 +238,7 @@ export const armyModule: GameModule = {
         if (take <= 0) continue;
         // `takeFromStacks` делит пул ран пропорционально и копирует оснастку и заслугу,
         // `mergeStacks` не сливает раненый стек со здоровым — раны не размазываются.
-        const moved = takeFromStacks(planet.garrison, claim.unit, take);
+        const moved = takeInOrder(planet.garrison, claim.unit, take, claim.first);
         planet.garrison = planet.garrison.filter((s) => s.count > 0);
         fleet.landing = mergeStacks(fleet.landing ?? [], moved);
         h.emit('army.loaded', {
