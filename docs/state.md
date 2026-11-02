@@ -314,6 +314,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   батарей раз в час, ближних зениток — раз в 15 минут). Орбита есть у видов с `orbit` в
   `data/sectorKinds.json`: `planet`, `void_station`, `pirate_base`, `neutral_base`.
 - `station` — `station.deploy`: свой узел без планеты становится крепостью `void_station`.
+  Карты основной игры крепость не кладут, её строит только игрок (`data/seededFortress.test.ts`);
+  сюжетные станции кампании и обучения остаются `void_station` (решение владельца 2026-11-02).
 - `minefield` — `fleet.layMines`, мина — неподвижный отряд в `fleets`; `rocketMines` —
   `fleet.deployRocketMine`, `rocketMine.mode/disarm`.
 - `shuttle` — 10 приказов `shuttle.*`: шаттлы стоят в космопорте мира и бьют от своего узла.

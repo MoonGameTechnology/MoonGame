@@ -2124,7 +2124,7 @@
         "x": -2962,
         "y": -1896
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "lights_107": {
@@ -2878,7 +2878,7 @@
         "x": -1628,
         "y": 1834
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "lights_191": {
@@ -3323,7 +3323,7 @@
         "x": 129,
         "y": -553
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "lights_238": {

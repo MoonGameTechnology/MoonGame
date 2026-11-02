@@ -47,9 +47,12 @@ describe('тестовая дуэльная карта — полнота', () =
   it('на ней ВСЕ виды провинций, все среды и все типы миров каталога', () => {
     const has = (pick: (id: string) => string | undefined): Set<string> =>
       new Set(ids.map(pick).filter((v): v is string => v !== undefined));
-    // Площадка крепости на развилке (`fork_station`, FORT-6.1) провинцией не бывает: она
-    // появляется в игре, когда крепость ставят на развилку дороги, и на карту её не кладут.
-    const provinceKinds = Object.keys(data.sectorKinds).filter((k) => k !== 'fork_station');
+    // Обе крепости карта не кладёт — их строит игрок. Площадка на развилке (`fork_station`,
+    // FORT-6.1) появляется, когда крепость ставят на развилку дороги; `void_station` — когда
+    // её поднимают на своей провинции (`data/seededFortress.test.ts`).
+    const provinceKinds = Object.keys(data.sectorKinds).filter(
+      (k) => k !== 'fork_station' && k !== 'void_station',
+    );
     expect([...has((id) => map.sectors[id]!.kind)].sort()).toEqual(provinceKinds.sort());
     expect([...has((id) => map.sectors[id]!.terrain)].sort()).toEqual(Object.keys(data.sectors).sort());
     expect([...has((id) => map.sectors[id]!.planetType)].sort()).toEqual(Object.keys(data.planetTypes).sort());

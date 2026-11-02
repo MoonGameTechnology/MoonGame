@@ -14,7 +14,9 @@
  * - areas follow the templates of `docs/map-terrain-regions-concept.md` §5.3–5.5 (core →
  *   shell → edge from the area's anchor), they are labels only (`regions`, M2.15);
  * - the whole catalogue of kinds, terrains and world types is on the map, except `empty`
- *   (kept off combat maps) and the fork fortress (only a player builds it);
+ *   (kept off combat maps) and both fortresses, `void_station` and `fork_station`: only a
+ *   player builds them (`docs/fortress-roadmap.md` §0.6); a map that seeds one gets a
+ *   fortress without its core and guns;
  * - wrecks are a rare find: one graveyard and one debris field per map (owner,
  *   2026-10-14);
  * - geometry is an irregular sample, never mirrored quadrants; the owner trades a little
@@ -449,7 +451,7 @@ function generate(seats, cfg) {
       [null, ['dead_world', 'planet/barren', 'asteroid'], 'deep_void'],
     ],
     expanse: () => [
-      [1, 'void_station', 'deep_void'],
+      [1, 'dead_world', 'deep_void'],
       [2, 'dead_world', 'deep_void'],
       [null, ['planet/terran', 'dead_world', 'asteroid', 'planet/barren'], 'empty_space'],
     ],
@@ -459,7 +461,7 @@ function generate(seats, cfg) {
       [null, ['dead_world', 'planet/barren', 'asteroid'], 'empty_space'],
     ],
     hub: () => [
-      [3, ['planet/relic_world', 'void_station', 'planet/ringworld'], 'deep_void'],
+      [3, ['planet/relic_world', 'dead_world', 'planet/ringworld'], 'deep_void'],
       [6, ['dead_world', 'asteroid'], 'deep_void'],
       [null, ['dead_world', 'planet/terran', 'asteroid', 'planet/barren'], 'empty_space'],
     ],
@@ -837,7 +839,7 @@ function finish(seats, cfg, g) {
   const missing = (field, catalogue) =>
     Object.keys(catalogue).filter((k) => !all.some((s) => s[field] === k));
   const kinds = missing('kind', data.sectorKinds).filter(
-    (k) => k !== 'empty' && k !== 'fork_station',
+    (k) => k !== 'empty' && k !== 'fork_station' && k !== 'void_station',
   );
   if (kinds.length) fail.push(`kinds ${kinds}`);
   if (missing('terrain', data.sectors).length)

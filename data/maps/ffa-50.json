@@ -2855,7 +2855,7 @@
         "x": 2040,
         "y": -5956
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "suns_013": {
@@ -3060,7 +3060,7 @@
         "x": -1369,
         "y": 1162
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "suns_038": {
@@ -4606,7 +4606,7 @@
         "x": -2713,
         "y": -1347
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "suns_199": {
@@ -6168,7 +6168,7 @@
         "x": 2784,
         "y": -2109
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "suns_372": {
@@ -6261,7 +6261,7 @@
         "x": -784,
         "y": 5045
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "suns_380": {
@@ -7116,7 +7116,7 @@
         "x": -5089,
         "y": 45
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "suns_476": {
@@ -7912,7 +7912,7 @@
         "x": 4965,
         "y": 1289
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "suns_566": {
@@ -8333,7 +8333,7 @@
         "x": -2476,
         "y": -5953
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "suns_614": {
@@ -8482,7 +8482,7 @@
         "x": -282,
         "y": -660
       },
-      "kind": "void_station",
+      "kind": "dead_world",
       "terrain": "deep_void"
     },
     "suns_632": {

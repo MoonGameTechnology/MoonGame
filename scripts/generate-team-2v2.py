@@ -82,7 +82,8 @@ for sid, x, y, npc, name in [
 # The old remnant lies off-centre; the traffic can pass on either side.
 add('remnant', 70, 130, 'black_hole', 'deep_void')
 add('relic', -210, -270, 'planet', 'deep_void', planetType='relic_world', garrison=[dict(unit='militia', count=2)])
-add('crossing', 160, -540, 'void_station', 'deep_void')
+# Not a station: a fortress is only ever built by a player (docs/fortress-roadmap.md §0.6).
+add('crossing', 160, -540, 'dead_world', 'deep_void')
 FIXED = list(sectors)
 
 # A fixed Poisson sample supplies varied cell sizes and degrees. Each accepted point
