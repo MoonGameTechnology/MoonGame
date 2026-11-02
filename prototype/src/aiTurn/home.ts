@@ -2,7 +2,13 @@
  * ДОМ В ХОДЕ БОТА (SLIM-3): база места, его казна и общие вопросы к стройке, которые задают
  * фазы хозяйства, науки и производства. Собирается раз за ход, если у места есть база.
  */
-import { matchCost, type Planet, type Player } from '../../../packages/shared-core/src/index';
+import {
+  hangarMachines,
+  matchCost,
+  type Planet,
+  type Player,
+  type UnitStack,
+} from '../../../packages/shared-core/src/index';
 import { buildBuilding } from '../../../decisions/actions';
 import { netIncome } from '../economy';
 import { data } from '../gameData';
@@ -18,6 +24,8 @@ export interface HomeTurn {
   readonly pendingBuild: (planetId: string, b: string) => boolean;
   readonly affordable: (b: string) => boolean;
   readonly buildAllowed: (planetId: string, b: string) => boolean;
+  /** Сколько машин рода `unit` у места: в ангарах портов и кораблей и в воздухе. */
+  readonly shuttlesOwned: (unit: string) => number;
 }
 
 export function openHome(bot: AiTurn, base: Planet, pl: Player): HomeTurn {
@@ -50,5 +58,23 @@ export function openHome(bot: AiTurn, base: Planet, pl: Player): HomeTurn {
     const code = canOrder(state, buildBuilding(ai, planetId, b));
     return code === null || code === 'E_INSUFFICIENT';
   };
-  return { base, pl, flow, has, pendingBuild, affordable, buildAllowed };
+  // Сколько машин рода `unit` у места. Предел спрашивают и слот линейного корабля (армия
+  // под ветку), и заказ челноков ниже.
+  // СЧЁТ ИДЁТ ПО АНГАРАМ И ВОЗДУХУ, а не по флотам. `shipsOwned` смотрит в состав
+  // флотов и в гарнизон, а челнок с SHU-1.1 не бывает ни там, ни там — он лежит в
+  // ангаре базы. Пока предел считался тем счётчиком, он не срабатывал НИКОГДА: бот
+  // заказывал челнок каждый тик до упора в `E_HANGAR_FULL` и платил за это отказами
+  // весь матч. SHU-6.8: в счёт входят и ангары кораблей, и эскадры в воздухе.
+  // Перехватчики теперь держат патруль, а ударные эскадры перелетают к фронту, и предел
+  // по одному ангару порта стал бы конвейером: эскадра ушла — порт заказывает новую.
+  const shuttlesOwned = (unit: string): number => {
+    const count = (stacks: readonly UnitStack[]): number =>
+      stacks.reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0);
+    let n = 0;
+    for (const p of Object.values(state.planets)) if (p.owner === ai) n += count(hangarMachines(p));
+    for (const f of Object.values(state.fleets)) if (f.owner === ai) n += count(hangarMachines(f));
+    for (const st of state.strikes ?? []) if (st.owner === ai) n += count(st.units);
+    return n;
+  };
+  return { base, pl, flow, has, pendingBuild, affordable, buildAllowed, shuttlesOwned };
 }
