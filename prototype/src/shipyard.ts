@@ -44,6 +44,7 @@ import {
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { esc, displayUnit, cost as priceHtml, fmtDur, fmtEta } from './format';
+import { patchLiveTimers } from './liveTimers';
 import { hoursLeft, progressPct, unitLaneOrders } from './buildProgress';
 import { HOUR } from './time';
 import { motionOn } from './graphicsPrefs';
@@ -920,6 +921,7 @@ export function initShipyard(host: YardHost): {
     const scroller = host.root().querySelector('#constructorbody');
     if (scroller && keep) scroller.scrollTop = keep;
     paintedTab = tab;
+    patchLiveTimers(host.root(), host.state().time); // сроки героев (`liveTimers.ts`)
   }
 
   /** The loadout editor for the current order over `modules` — the core-validated model. */
@@ -1155,7 +1157,7 @@ export function initShipyard(host: YardHost): {
       // Do not even build the expensive hero HTML while touch/inertial scrolling is active.
       // The next 1s host tick catches up after the 180ms idle guard expires.
       if (heroScrolling) return;
-      if (host.heroPaneHtml() === renderedHeroBody) return;
+      if (host.heroPaneHtml() === renderedHeroBody) return patchLiveTimers(host.root(), host.state().time);
       const scroll = host.root().querySelector('#constructorbody')?.scrollTop ?? 0;
       const focused = document.activeElement as HTMLElement | null;
       const focusAttrs = focused && host.root().contains(focused)

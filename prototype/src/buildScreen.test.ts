@@ -439,6 +439,7 @@ describe('окно построек — проводка', () => {
         contains: (c: string) => classes.has(c),
       },
       querySelector: () => null,
+      querySelectorAll: () => [],
       addEventListener: (_t: string, h: (ev: unknown) => void) => {
         handler = h;
       },

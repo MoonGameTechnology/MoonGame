@@ -26,6 +26,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import { statSourceKey } from '../../decisions/statModifiers';
 import type { Dossier } from './dossiers';
+import { liveRender, liveText } from './liveTimers.fixture';
 import type { SectorType } from './map';
 import { HOUR } from './time';
 
@@ -175,7 +176,6 @@ async function boot(over: Record<string, unknown> = {}) {
     fleetInfoFor: () => env.info,
     consoleFleet: () => (env.console ? (env.s.fleets[env.console] ?? null) : null),
     mineView: () => env.ordnance,
-    mapNow: () => env.s.time,
     fleetTitleOf: (id) => `Флот «${id}»`,
     sectorType: (id) => env.types[id],
     strikeSquadron: (st) => ({
@@ -200,6 +200,8 @@ const act = (name: string): string => `data-act="${name}"`;
 /** Подзаголовок шапки: всё, что стоит в `<span>` рядом с именем. */
 const sub = (html: string): string =>
   /<div class="ptitle">.*?<span>([^<]*)<\/span>/s.exec(html)![1]!;
+/** Что увидит игрок после живого патча к моменту `now`: текст без тегов. */
+const seen = (html: string, now: number): string => liveText(html, now);
 
 // Первая загрузка карточки тянет ядро, данные и решения — секунды под нагрузкой полного гейта.
 // Граф греется один раз; тесты после `vi.resetModules()` берут его из кеша трансформаций.
@@ -286,8 +288,13 @@ describe('какую карточку получает флот', () => {
     );
     const html = card('X1');
     expect(html).toContain(t('missile.card.rule'));
-    expect(html).toContain('1:00:00');
+    // Остаток полёта — живой узел (`liveTimers.ts`): цифры ставит патч, а разметка с часами
+    // не меняется, иначе лист пересобирался бы каждый кадр.
+    expect(seen(html, now)).toContain('1:00:00');
     expect(html).not.toContain('class="chip"');
+    env.s.time = now + 0.5 * HOUR;
+    expect(card('X1')).toBe(html);
+    expect(seen(html, env.s.time)).toContain('0:30:00');
   });
 });
 
@@ -329,6 +336,26 @@ describe('свой флот', () => {
       env.s.time = doneAt - 0.25 * HOUR;
       expect(card('F3')).toBe(before);
     }
+  });
+
+  it('метка обстрела: срок залпа и подсказка — живые узлы, разметка не тикает с часами', async () => {
+    const { env, card, put } = await boot({ types: { N: { capturable: true, orbit: true } } });
+    env.s.diplomacy = { 'p1|p2': 'war' } as unknown as GameState['diplomacy'];
+    const volleyAt = env.s.time + HOUR;
+    put(
+      fleet('F3', 'p1', 'N', [{ unit: 'cruiser', count: 3 }], {
+        orbit: 'near',
+        bombarding: true,
+        bombardNextAt: volleyAt,
+      } as Partial<Fleet>),
+    );
+    const html = card('F3');
+    const live = liveRender(html, env.s.time);
+    expect(live).toContain(`title="${t('side.world.bombard-next', { t: '1:00:00' })}"`);
+    expect(seen(html, env.s.time)).toContain(`${t('effect.bombarding')} · 1:00:00`);
+    env.s.time = volleyAt - 0.25 * HOUR;
+    expect(card('F3')).toBe(html);
+    expect(seen(html, env.s.time)).toContain(`${t('effect.bombarding')} · 0:15:00`);
   });
 
   it('хромой флот помечен в шапке, полоса корпуса краснеет', async () => {
@@ -412,7 +439,11 @@ describe('свой флот', () => {
     env.s.minefields = { readyAt: { F3: env.s.time + HOUR } } as unknown as GameState['minefields'];
     const html = card('F3');
     expect(html).toContain(`${act('laymines')} data-arg="F3" disabled`);
-    expect(html).toContain(t('side.fleet.mines.cooldown', { in: '1:00:00' }));
+    expect(seen(html, env.s.time)).toContain(t('side.fleet.mines.cooldown', { in: '1:00:00' }));
+    // Кнопка не пересобирается с отсчётом: под курсором она не мигает.
+    env.s.time += 0.5 * HOUR;
+    expect(card('F3')).toBe(html);
+    expect(seen(html, env.s.time)).toContain(t('side.fleet.mines.cooldown', { in: '0:30:00' }));
     // Без заградителя строки нет.
     expect(card('F1')).not.toContain(act('laymines'));
   });
@@ -1025,7 +1056,6 @@ describe('стык с main.ts', () => {
       'fleetInfoFor: () => fleetInfoFor,',
       '  consoleFleet,\n',
       '  mineView,\n',
-      '  mapNow,\n',
       '  fleetTitleOf,\n',
       'sectorType: sectorTypeOf,',
       '  strikeSquadron,\n',

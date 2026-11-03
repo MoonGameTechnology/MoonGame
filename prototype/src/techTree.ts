@@ -33,8 +33,7 @@ import { DAY, HOUR } from './time';
 import { esc, cost, displayUnit, fmtDur, fmtEta } from './format';
 import { dequeueTech, moveQueuedTech, queueTech, researchTech } from '../../decisions/actions';
 import { isGrantOnlyTech } from './techCoverage';
-
-const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
+import { LIVE_FORMATS, liveBarHtml, liveTimerHtml, patchLiveTimers, type LiveFormats } from './liveTimers';
 
 export const TECH_BRANCHES: Array<{ key: string; label: string }> = [
   { key: 'industry', label: 'tech.branch.industry' },
@@ -100,6 +99,15 @@ export function fmtClock(ms: number): string {
   const sec = String(total % 60).padStart(2, '0');
   return h > 0 ? `${h}:${m}:${sec}` : `${m}:${sec}`;
 }
+
+/** Живые сроки окна (`liveTimers.ts`): часы шапки, срок в строке темы целыми часами (как
+ *  было), число часов на кнопке досье. */
+export const TECH_LIVE: LiveFormats = {
+  ...LIVE_FORMATS,
+  clock: fmtClock,
+  hup: (ms) => fmtEta(Math.ceil(ms / HOUR)),
+  h: (ms) => String(Math.ceil(ms / HOUR)),
+};
 
 type TechDefLike = (typeof data.technologies)[string];
 type TechCond = TechDefLike['conditions'][number];
@@ -205,26 +213,21 @@ export function techTreeHtml(
   const freeSlot = activeList.length < slots;
   const canQueue = (id: string): boolean => queueableTechnology(state, me, data, id) === null;
   // Состояние узла в порядке проверок ядра (technologyLock): prereq → день → условия.
-  const nodeState = (id: string): { st: string; prog: number; eta: number } => {
+  // Идущая тема несёт начало и срок, а не долю и остаток: те менялись бы с часами, и окно
+  // пересобиралось бы под пальцем; полосу и сроки ставят живые узлы (`liveTimers.ts`).
+  const nodeState = (id: string): { st: string; from: number; at: number } => {
     const td = techs[id]!;
-    if (done.has(id)) return { st: 'done', prog: 1, eta: 0 };
+    if (done.has(id)) return { st: 'done', from: 0, at: 0 };
     const act = activeList.find((a) => a.technology === id);
-    if (act) {
-      const total = act.completesAt - act.startedAt;
-      return {
-        st: 'res',
-        prog: total > 0 ? clamp((state.time - act.startedAt) / total, 0, 1) : 1,
-        eta: Math.max(0, Math.ceil((act.completesAt - state.time) / HOUR)),
-      };
-    }
+    if (act) return { st: 'res', from: act.startedAt, at: act.completesAt };
     // RQ-1: место в очереди — отдельное состояние: тема уже в плане, повторно её не
     // ставят, а снять можно из полосы очереди или из досье.
-    if (queue.includes(id)) return { st: 'queued', prog: 0, eta: 0 };
-    if ((td.prerequisites ?? []).some((p) => !done.has(p))) return { st: 'chain', prog: 0, eta: 0 };
+    if (queue.includes(id)) return { st: 'queued', from: 0, at: 0 };
+    if ((td.prerequisites ?? []).some((p) => !done.has(p))) return { st: 'chain', from: 0, at: 0 };
     if (gateOf(td) > 0 && state.time - started < gateOf(td) * DAY)
-      return { st: 'gate', prog: 0, eta: 0 };
-    if ((td.conditions ?? []).some((c) => !techCondOk(state, me, c))) return { st: 'cond', prog: 0, eta: 0 };
-    return { st: 'avail', prog: 0, eta: 0 };
+      return { st: 'gate', from: 0, at: 0 };
+    if ((td.conditions ?? []).some((c) => !techCondOk(state, me, c))) return { st: 'cond', from: 0, at: 0 };
+    return { st: 'avail', from: 0, at: 0 };
   };
   // Счётчик «готово/всего» на вкладке — навигация без клика: где ещё осталось
   // что исследовать, видно с одного взгляда, не обходя все пять веток.
@@ -299,7 +302,7 @@ export function techTreeHtml(
       : '';
     let right: string;
     if (st.st === 'done') right = `<span class="tt-st done">✓ ${t('tech.state.done')}</span>`;
-    else if (st.st === 'res') right = `<span class="tt-st run">⚗ ${fmtEta(st.eta)}</span>`;
+    else if (st.st === 'res') right = `<span class="tt-st run">⚗ ${liveTimerHtml(st.at, 'hup')}</span>`;
     else if (st.st === 'queued')
       right = `<span class="tt-st q">⏳ ${t('tech.state.queued', { n: queue.indexOf(id) + 1 })}</span>`;
     else if (st.st === 'avail' && freeSlot && affordable)
@@ -318,7 +321,7 @@ export function techTreeHtml(
       `<div class="tt-ifoot"><span>${techCost(price, res)}</span>` +
       `<span class="tt-idur">${fmtDur(matchHours(state, td.researchTimeHours))}</span></div>` +
       (st.st === 'res'
-        ? `<span class="tt-prog"><i style="width:${Math.round(st.prog * 100)}%"></i></span>`
+        ? `<span class="tt-prog">${liveBarHtml(st.from, st.at)}</span>`
         : '') +
       `</div>`;
   }
@@ -331,14 +334,11 @@ export function techTreeHtml(
       activeList
         .map((a) => {
           const td = techs[a.technology];
-          const total = a.completesAt - a.startedAt;
-          const pct = total > 0 ? Math.round(clamp((state.time - a.startedAt) / total, 0, 1) * 100) : 100;
-          const left = Math.max(0, a.completesAt - state.time);
           return (
             `<div class="tt-nowrow" data-now="${esc(a.technology)}"><i class="tt-nowdot"></i>` +
             `<b>${esc(tData(td?.name ?? a.technology))}</b>` +
-            `<span class="tt-nowt">${fmtClock(left)}</span>` +
-            `<span class="tt-prog"><i style="width:${pct}%"></i></span></div>`
+            `<span class="tt-nowt">${liveTimerHtml(a.completesAt, 'clock')}</span>` +
+            `<span class="tt-prog">${liveBarHtml(a.startedAt, a.completesAt)}</span></div>`
           );
         })
         .join('') +
@@ -465,7 +465,7 @@ export function techTreeHtml(
         : st.st === 'done'
           ? `<button class="tt-mbtn wait btn-main" disabled>✓ ${t('tech.action.done')}</button>`
           : st.st === 'res'
-            ? `<button class="tt-mbtn wait btn-main" disabled>⏳ ${t('tech.action.running', { n: st.eta })}</button>`
+            ? `<button class="tt-mbtn wait btn-main" disabled>⏳ ${t('tech.action.running', { n: liveTimerHtml(st.at, 'h') })}</button>`
             : st.st === 'gate'
               ? `<button class="tt-mbtn wait btn-main" disabled>🔒 ${t('tech.action.opens-day', { n: gate + 1 })}</button>`
               : st.st === 'chain'
@@ -582,6 +582,7 @@ export function initTechTree(host: TechHost): {
         after.scrollTop = sy;
       }
     }
+    patchLiveTimers(body, host.state().time, TECH_LIVE);
     if (modalPop) {
       // Класс мутирует DOM, но кэш сравнивает СТРОКУ разметки, а не живой DOM —
       // .pop не делает кэш вечно «грязным».

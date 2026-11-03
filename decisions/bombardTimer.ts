@@ -14,13 +14,20 @@
  * 5. **Отсчёт не уходит в минус**: между сроком и его обработкой миром игрок видит ноль.
  */
 
-/** Правила 1–3 и 5: сколько мс мира до ближайшего залпа, или `null`, если часов нет. */
-export function nextVolleyIn(clocks: readonly (number | undefined)[], now: number): number | null {
+/** Правила 1–3: когда ближайший залп (мировые мс), или `null`, если часов нет. Окно, которое
+ *  сравнивает разметку, пишет этот срок, а не остаток: остаток менялся бы с часами. */
+export function nextVolleyAt(clocks: readonly (number | undefined)[]): number | null {
   let next: number | null = null;
   for (const at of clocks) {
     if (at === undefined || !Number.isFinite(at)) continue;
     if (next === null || at < next) next = at;
   }
+  return next;
+}
+
+/** Правила 1–3 и 5: сколько мс мира до ближайшего залпа, или `null`, если часов нет. */
+export function nextVolleyIn(clocks: readonly (number | undefined)[], now: number): number | null {
+  const next = nextVolleyAt(clocks);
   return next === null ? null : Math.max(0, next - now);
 }
 

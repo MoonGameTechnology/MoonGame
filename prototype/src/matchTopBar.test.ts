@@ -23,6 +23,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import type { MissionRow } from '../../decisions/missionView';
 import { clockHM, countdownHMS } from './format';
+import { liveTimerHtml } from './liveTimers';
 import { stewFmtDur } from './stewardScreen';
 import { DAY, HOUR } from './time';
 
@@ -97,6 +98,9 @@ class FakeEl {
   }
   querySelector(): null {
     return null;
+  }
+  querySelectorAll(): FakeEl[] {
+    return [];
   }
   /** Нажатие по узлу; `target` — во что попал палец (по умолчанию сам узел). */
   click(target: unknown = this): void {
@@ -414,7 +418,14 @@ describe('строка статуса', () => {
     m.renderTopBar([]);
     const tail = el('devline-status').innerHTML;
     expect(tail).toContain(t('hud.wave', { n: 2, m: 5 }));
-    expect(tail).toContain(t('hud.wave.next', { in: countdownHMS(90 * 60_000) }));
+    // В разметке — срок волны под живой патч, а не цифры (`liveTimers.ts`): с цифрами полоса
+    // с её кнопками пересобиралась бы каждую игровую секунду.
+    const nextAt = env.s.time + 90 * 60_000;
+    expect(tail).toContain(t('hud.wave.next', { in: liveTimerHtml(nextAt, 'hms') }));
+    const writes = el('devline-status').htmlWrites;
+    env.s = { ...env.s, time: env.s.time + 25 * 60_000 } as GameState;
+    m.renderTopBar([]);
+    expect(el('devline-status').htmlWrites).toBe(writes);
   });
 
   it('чип союзника — только в забеге после встречи, мигает по хуку игры', async () => {

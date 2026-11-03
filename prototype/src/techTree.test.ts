@@ -5,8 +5,11 @@ import { newGame, data, DAY, HOUR, order, researchTech, advance } from './game';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { MAX_RESEARCH_QUEUE } from '../../packages/shared-core/src/index';
 import { queueTech } from '../../decisions/actions';
+import { fmtEta } from './format';
+import { liveRender, plainText } from './liveTimers.fixture';
 import {
   TECH_BRANCHES,
+  TECH_LIVE,
   branchLabel,
   fmtClock,
   techCost,
@@ -21,6 +24,11 @@ import {
 // REFM-9: locale pinned RU (see format.test.ts — Node has no browser language, so the
 // runtime would fall back to EN and the label assertions would drift).
 beforeAll(() => setLocale('ru'));
+// Окно ставит живые сроки по `querySelectorAll` (`liveTimers.ts`), и с ним в подставном теле
+// оживает и вспышка очереди, которой нужен `CSS.escape` браузера.
+beforeAll(() => {
+  (globalThis as { CSS?: { escape(s: string): string } }).CSS ??= { escape: (v) => v };
+});
 
 /** Live tech defs minus the account-perk pseudo-nodes the tree never shows. */
 /** Настоящие узлы дерева. Грант-узлы (мета-прокачка, усиления забега) окну не
@@ -61,6 +69,7 @@ function fakeBody(): HTMLElement & { html: () => string; scroll: () => [number, 
   const el = {
     innerHTML: '',
     querySelector: (sel: string) => (sel === '.tt-scroll' ? scroll : null),
+    querySelectorAll: () => [],
     html: () => el.innerHTML,
     scroll: () => [scroll.scrollLeft, scroll.scrollTop] as [number, number],
   };
@@ -393,14 +402,20 @@ describe('дерево технологий — разметка', () => {
     } as never;
     const html = techTreeHtml(st, 'p1', 'space', id);
     expect(html).toContain('st-res');
-    expect(html).toContain('width:50%'); // полоса ровно посередине
     expect(html).toContain('tt-mbtn wait'); // повторно запустить нельзя
-    expect(html).toContain('5'); // осталось 5 ч
+    // Доля и сроки — живые узлы: игрок видит их после патча, а разметка с часами не меняется
+    // (иначе окно пересобиралось бы каждые полсекунды вместе с кнопками под курсором).
+    const seen = liveRender(html, st.time, TECH_LIVE);
+    expect(seen).toContain('style="width:50%"'); // полоса ровно посередине
+    expect(plainText(seen)).toContain(`⏳ ${t('tech.action.running', { n: 5 })}`); // 5 ч
     // ETA видна прямо в СТРОКЕ, а не только в досье
-    expect(html).toContain('tt-st run');
+    expect(seen).toContain(`<span class="tt-st run">⚗ <span class="pn-timer" data-at="${st.time + 5 * HOUR}" data-fmt="hup">${fmtEta(5)}</span>`);
     // …и вынесена в закреплённую шапку — ради неё экран и открывают повторно
     expect(html).toContain('tt-now');
-    expect(html).toContain('5:00:00');
+    expect(seen).toContain('5:00:00');
+    st.time += 90 * 60_000;
+    expect(techTreeHtml(st, 'p1', 'space', id)).toBe(html);
+    expect(liveRender(html, st.time, TECH_LIVE)).toContain('3:30:00');
   });
 
   it('без идущего исследования закреплённой шапки нет', () => {
@@ -563,6 +578,7 @@ describe('досье технологии — без мигания на жив�
       },
       querySelector: (sel: string) =>
         sel === '.tt-scroll' ? scroll : sel === '.tt-mwin' && html.includes('tt-mwin') ? mwin : null,
+      querySelectorAll: () => [],
       html: () => html,
       writes: () => writes,
       popped: () => classes.has('pop'),

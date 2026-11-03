@@ -37,7 +37,7 @@ import { chainStripHtml, chainTimeline, draftFinish } from './chainPlanner';
 import { stayingFleets, stripState } from './chainStripState';
 import { selectedFleetIds } from './fleetGeometry';
 import { fleetCallsign } from './fleetName';
-import { displayUnit, esc, fmtEta, fmtHrs } from './format';
+import { displayUnit, esc, fmtEta } from './format';
 import { MAX_CHAIN_STEPS, RETREAT_THRESHOLDS, canOrder, data, stopFleet } from './game';
 import { pcUi } from './graphicsPrefs';
 import {
@@ -69,6 +69,7 @@ import {
   stageDraft,
   troopsPlan,
 } from './interaction';
+import { liveTimerHtml, patchLiveTimers } from './liveTimers';
 import { fleetNode } from './mapFog';
 import { youColor } from './mapPalette';
 import { mobileOrderBar } from './mobileHud';
@@ -520,12 +521,11 @@ export function renderCmdBar(): void {
         castOptionsOf(castHero)
           .map((opt) => {
             const ad = data.heroAbilities[opt.id]!;
+            // Срок кулдауна — живой узел (`liveTimers.ts`): цифры пересобирали бы весь ряд.
             const sub =
               opt.cdH > 0
-                ? t('cmd.cast.cooldown', { h: fmtHrs(opt.cdH) })
-                : opt.ranged
-                  ? t('cmd.cast.needs-target')
-                  : t('cmd.cast.self');
+                ? t('cmd.cast.cooldown', { h: liveTimerHtml(opt.readyAt, 'hrs') })
+                : t(opt.ranged ? 'cmd.cast.needs-target' : 'cmd.cast.self');
             // Описание навыка: удержание на телефоне открывает сводку `ab:` (как у плиток и
             // строк), наведение на ПК — подсказку (заказ владельца 2026-09-25).
             const hint = ad.description ? ` title="${esc(t(ad.description))}"` : '';
@@ -586,6 +586,7 @@ export function renderCmdBar(): void {
     const pop = cmdbar.querySelector('.cmdpop');
     if (!hadPop && pop && game.holo()) pop.scrollIntoView({ block: 'nearest' });
   }
+  patchLiveTimers(cmdbar, game.world().time);
   cmdbar.classList.add('show');
 }
 

@@ -73,6 +73,7 @@ function fakeWin(): HTMLElement & {
   const el = {
     innerHTML: '',
     querySelector: () => null,
+    querySelectorAll: () => [],
     classList: {
       add: (c: string) => classes.add(c),
       remove: (c: string) => classes.delete(c),

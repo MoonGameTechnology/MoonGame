@@ -33,8 +33,8 @@ import {
 } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
-import { esc, cost, fmtHrs, countdownHMS } from './format';
-import { HOUR } from './time';
+import { esc, cost, fmtHrs } from './format';
+import { liveTimerHtml } from './liveTimers';
 import {
   castHeroAbility,
   unlockHeroSkill,
@@ -194,7 +194,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     const dep = h.alive !== false && h.fleetId && state.fleets[h.fleetId];
     const st =
       h.mobilization
-        ? t('hero.hq.mobilizing', { time: countdownHMS(h.mobilization.readyAt - state.time) })
+        ? t('hero.hq.mobilizing', { time: liveTimerHtml(h.mobilization.readyAt, 'hms') })
         : h.alive === false ? t('hero.hq.dead') : dep ? t('hero.hq.deployed') : t('hero.hq.reserve');
     chips +=
       `<button class="hx-chip g-${heroGradeKey(h.grade)}${h.id === hero.id ? ' sel' : ''}${d?.branch === 'psionic' ? ' ps' : ''}" data-hsel="${h.id}">` +
@@ -207,12 +207,12 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
 
   // identity header — name, branch, deploy state, aggregated build bonuses
   const mobilizing = hero.mobilization
-    ? t('hero.hq.mobilizing', { time: countdownHMS(hero.mobilization.readyAt - state.time) })
+    ? t('hero.hq.mobilizing', { time: liveTimerHtml(hero.mobilization.readyAt, 'hms') })
     : null;
   const deployLabel = state.techRules?.ruleset === 'main'
     ? t('hero.hq.mobilize', { h: fmtHrs(matchHours(state, data.units[def?.ship.unit ?? 'hero']?.buildTimeHours || 10)) })
     : t('hero.hq.deploy');
-  const deploy = mobilizing ? `<span class="hx-note">${esc(mobilizing)}</span>` : dead && (state.techRules?.ruleset !== 'main' || (hero.cooldowns.respawn ?? 0) > state.time)
+  const deploy = mobilizing ? `<span class="hx-note">${mobilizing}</span>` : dead && (state.techRules?.ruleset !== 'main' || (hero.cooldowns.respawn ?? 0) > state.time)
     ? `<span class="hx-dead">${t('hero.hq.dead')}</span>`
     : fleet
       ? `<span class="hx-dep">⚓ ${esc(typeof fleet.location === 'string' ? fleet.location : t('hero.hq.enroute'))}</span>`
@@ -471,10 +471,11 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
       continue;
     }
     const ad = data.heroAbilities[ab]!;
-    const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - now);
+    // Срок кулдауна — живой узел (`liveTimers.ts`): цифры в разметке пересобирали бы окно.
+    const cdAt = hero.cooldowns?.[heroCdKey(ad.type)] ?? 0;
     const cast =
-      cdLeft > 0
-        ? `<span class="hx-badge cd">${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}</span>`
+      cdAt > now
+        ? `<span class="hx-badge cd">${t('hero.abil.cooldown', { h: liveTimerHtml(cdAt, 'hrs') })}</span>`
         : HERO_CASTABLE.has(ad.type)
           ? `<button class="hx-btn btn-second" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
           : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;

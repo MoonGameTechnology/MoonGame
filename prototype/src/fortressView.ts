@@ -7,8 +7,8 @@ import { repairBuilding, repairStation } from '../../decisions/actions';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { cost, esc, fmtEta } from './format';
-import { HOUR } from './time';
 import { fleetHangar, planetHangar, hasHangar, transferOffer, type HangarView } from './hangarPanel';
+import { liveTimerHtml } from './liveTimers';
 import { actionButton } from './panelKit';
 
 /** Services share the physical berth used by the server's dock and hangar gates. */
@@ -41,9 +41,11 @@ export function buildingRepairHtml(
   if (!def) return '';
   const max = buildingLevel(def, building.level).hp;
   const health = `<span>${t('fortress.building-hp', { hp: Math.ceil(building.hp), max })}</span>`;
-  if (building.repair) return `<div class="bw-foot">${health}<span>${esc(t('repair.running', {
-    time: fmtEta(Math.max(0, building.repair.doneAt - state.time) / HOUR),
-  }))}</span></div>`;
+  // Сроки ремонта и сборки — живые узлы (`liveTimers.ts`): цифры в разметке пересобирали бы
+  // окно и карточку мира с часами, вместе с кнопками под курсором.
+  if (building.repair) return `<div class="bw-foot">${health}<span>${t('repair.running', {
+    time: liveTimerHtml(building.repair.doneAt),
+  })}</span></div>`;
   const quote = buildingRepairQuote(building, data);
   if (!(quote.missingHp > 0) || state.planets[planetId]?.owner !== me) return `<div class="building-health">${health}</div>`;
   const block = probe(repairBuilding(me, planetId, building.type, building.uid));
@@ -67,12 +69,12 @@ export function fortressStatusHtml(state: GameState, site: Planet, me: string, p
   if (body.modules?.length) html += `<div>${esc(t('fortress.equipment'))}: ${body.modules
     .map((id) => esc(tData(data.modules[id]?.name ?? id))).join(' · ')}</div>`;
   if (site.owner === me) {
-    if (site.fortress.assembly) html += `<div class="dim">${esc(t(site.fortress.assembly.paused ? 'fortress.paused' : 'fortress.assembling', {
-      time: fmtEta(Math.max(0, site.fortress.assembly.doneAt - state.time) / HOUR),
-    }))}</div>`;
-    if (site.fortress.repair) html += `<div>${esc(t('repair.running', {
-      time: fmtEta(Math.max(0, site.fortress.repair.doneAt - state.time) / HOUR),
-    }))}</div>`;
+    if (site.fortress.assembly) html += `<div class="dim">${t(site.fortress.assembly.paused ? 'fortress.paused' : 'fortress.assembling', {
+      time: liveTimerHtml(site.fortress.assembly.doneAt),
+    })}</div>`;
+    if (site.fortress.repair) html += `<div>${t('repair.running', {
+      time: liveTimerHtml(site.fortress.repair.doneAt),
+    })}</div>`;
     else {
       const quote = fortressRepairQuote(state, site, data);
       const blocked = quote.missingHp > 0 && probe(repairStation(me, site.id)) !== null;

@@ -16,7 +16,7 @@ describe('devourSieges — таймер осады над миром игрок�
   it('отсчёт и доля пройденного — от записи осады', () => {
     const s = state(HOUR, [hero('b', { target: 'home', victim: 'me', since: 0, until: 4 * HOUR })]);
     expect(devourSieges(s, 'me')).toEqual([
-      { target: 'home', archetype: 'leviathan', leftMs: 3 * HOUR, progress: 0.25 },
+      { target: 'home', archetype: 'leviathan', leftMs: 3 * HOUR, until: 4 * HOUR, progress: 0.25 },
     ]);
   });
 

@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { spyOffer, windowLeftH } from './spyOffer';
-
-const ЧАС = 3_600_000;
+import { spyOffer } from './spyOffer';
 
 describe('шпионаж — кому предлагаем', () => {
   it('чужой мир с владельцем и деньгами — можно купить', () => {
@@ -30,19 +28,5 @@ describe('шпионаж — живое окно', () => {
 describe('шпионаж — цена', () => {
   it('НЕХВАТКА ГАСИТ, НО НЕ ПРЯЧЕТ: цена должна остаться на виду', () => {
     expect(spyOffer(false, true, false, false)).toBe('buy-disabled');
-  });
-});
-
-describe('шпионаж — остаток окна', () => {
-  it('живое окно считает часы', () => {
-    expect(windowLeftH(5 * ЧАС, 2 * ЧАС, ЧАС)).toBe(3);
-  });
-
-  it('ИСТЁКШЕЕ ОКНО — НОЛЬ, А НЕ МИНУС: «осталось −3ч» это поломка', () => {
-    expect(windowLeftH(2 * ЧАС, 5 * ЧАС, ЧАС)).toBe(0);
-  });
-
-  it('ровно в момент истечения — ноль', () => {
-    expect(windowLeftH(5 * ЧАС, 5 * ЧАС, ЧАС)).toBe(0);
   });
 });

@@ -58,6 +58,7 @@ function fakePage() {
     innerHTML: '',
     classList: { add: () => {}, remove: () => {} },
     querySelector: () => null,
+    querySelectorAll: () => [], // живой патч ряда (`liveTimers.ts`)
     addEventListener: (type: string, fn: unknown) => listeners.push([type, fn]),
   };
   const menu = {

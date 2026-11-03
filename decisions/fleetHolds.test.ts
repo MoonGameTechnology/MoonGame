@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseGameData, type Fleet, type GameState } from '../packages/shared-core/src/index';
-import { fleetAloftPlaces, fleetHolds, holdBadgePosition } from './fleetHolds';
+import { fleetAloftPlaces, fleetHolds, holdBadgePosition, holdProgress } from './fleetHolds';
 
 const data = parseGameData({
   version: '0.1.0',
@@ -79,7 +79,6 @@ describe('fleet hold occupancy', () => {
         ],
       }),
       data,
-      0,
     );
     expect(meters).toMatchObject([
       { kind: 'troops', used: 6, capacity: 6, free: 0, reserved: 0 },
@@ -95,7 +94,7 @@ describe('fleet hold occupancy', () => {
     const aloft = fleetAloftPlaces(state, f, data);
     expect(aloft).toBe(3);
     expect(fleetAloftPlaces({ strikes: [] } as unknown as GameState, f, data)).toBe(0);
-    expect(fleetHolds(f, data, 0, aloft)).toMatchObject([
+    expect(fleetHolds(f, data, aloft)).toMatchObject([
       { kind: 'troops', used: 0, capacity: 6, free: 6 },
       { kind: 'hangar', used: 4, capacity: 10 },
     ]);
@@ -104,27 +103,29 @@ describe('fleet hold occupancy', () => {
   it('shows an empty hold but omits a fleet with no transport space', () => {
     // No shuttles aboard → no shuttle meter: the hold is one, and its free space is
     // already on the troops meter.
-    expect(fleetHolds(fleet(), data, 0)).toMatchObject([
+    expect(fleetHolds(fleet(), data)).toMatchObject([
       { kind: 'troops', used: 0, capacity: 10, free: 10 },
     ]);
-    expect(fleetHolds(fleet({ units: [{ unit: 'scout', count: 1 }] }), data, 0)).toEqual([]);
+    expect(fleetHolds(fleet({ units: [{ unit: 'scout', count: 1 }] }), data)).toEqual([]);
   });
 
   it('reserves the entire load before arrival and does not pretend it is aboard', () => {
     const f = fleet({ landing: [{ unit: 'infantry', count: 1 }], loading: [claim] });
     const before = structuredClone(f);
-    expect(fleetHolds(f, data, 25)[0]).toMatchObject({
+    const meter = fleetHolds(f, data)[0]!;
+    expect(meter).toMatchObject({
       used: 1,
       reserved: 6,
       free: 3,
       usedFraction: 0.1,
       reservedFraction: 0.6,
-      loadingProgress: 0.25,
+      loadingWindows: [{ startAt: 0, doneAt: 100, volume: 6 }],
     });
+    expect(holdProgress(meter.loadingWindows, 25)).toBe(0.25);
     // The snapshot, not the local animation clock, transfers custody.
-    expect(fleetHolds(f, data, 200)[0]).toMatchObject({ used: 1, reserved: 6, loadingProgress: 1 });
+    expect(holdProgress(meter.loadingWindows, 200)).toBe(1);
     expect(f).toEqual(before);
-    expect(fleetHolds({ ...f, loading: [] }, data, 25)[0]).toMatchObject({ reserved: 0, free: 9 });
+    expect(fleetHolds({ ...f, loading: [] }, data)[0]).toMatchObject({ reserved: 0, free: 9 });
     expect(
       fleetHolds(
         {
@@ -136,7 +137,6 @@ describe('fleet hold occupancy', () => {
           ],
         },
         data,
-        100,
       )[0],
     ).toMatchObject({ used: 7, reserved: 0, free: 3 });
   });
@@ -145,7 +145,6 @@ describe('fleet hold occupancy', () => {
     const meter = fleetHolds(
       fleet({ landing: [{ unit: 'tank', count: 4 }], loading: [claim] }),
       data,
-      50,
     )[0]!;
     expect(meter).toMatchObject({
       used: 12,
@@ -162,23 +161,27 @@ describe('fleet hold occupancy', () => {
     const leaving = { unit: 'tank', count: 1, to: 'home', startAt: 0, doneAt: 100 };
     const f = fleet({ landing: [{ unit: 'tank', count: 2 }], unloading: [leaving] });
     // Сходящие ещё в трюме: занятое не уменьшилось, место не освободилось до снимка.
-    expect(fleetHolds(f, data, 40)[0]).toMatchObject({
-      used: 6,
-      free: 4,
-      reserved: 0,
-      unloading: 3,
-      unloadingProgress: expect.closeTo(0.4),
-    });
-    expect(fleetHolds(fleet({ landing: [{ unit: 'tank', count: 2 }] }), data, 40)[0]).toMatchObject({
+    const meter = fleetHolds(f, data)[0]!;
+    expect(meter).toMatchObject({ used: 6, free: 4, reserved: 0, unloading: 3 });
+    expect(holdProgress(meter.unloadingWindows, 40)).toBeCloseTo(0.4);
+    expect(fleetHolds(fleet({ landing: [{ unit: 'tank', count: 2 }] }), data)[0]).toMatchObject({
       unloading: 0,
-      unloadingProgress: 0,
+      unloadingWindows: [],
     });
   });
 
   it('zero-length and not-yet-started loading windows never produce invalid progress', () => {
-    expect(
-      fleetHolds(fleet({ loading: [{ ...claim, doneAt: 0 }] }), data, 0)[0]!.loadingProgress,
-    ).toBe(1);
-    expect(fleetHolds(fleet({ loading: [claim] }), data, -20)[0]!.loadingProgress).toBe(0);
+    const lifts = (c: typeof claim) => fleetHolds(fleet({ loading: [c] }), data)[0]!.loadingWindows;
+    expect(holdProgress(lifts({ ...claim, doneAt: 0 }), 0)).toBe(1);
+    expect(holdProgress(lifts(claim), -20)).toBe(0);
+    expect(holdProgress([], 50)).toBe(0);
+  });
+
+  it('weighs several lifts by their volume', () => {
+    // Танк (3 места) на полпути, пехотинец (1 место) только начал: (3·0.5 + 1·0) / 4.
+    const early = { unit: 'tank', count: 1, from: 'home', startAt: 0, doneAt: 100 };
+    const late = { unit: 'infantry', count: 1, from: 'home', startAt: 50, doneAt: 150 };
+    const meter = fleetHolds(fleet({ loading: [early, late] }), data)[0]!;
+    expect(holdProgress(meter.loadingWindows, 50)).toBeCloseTo(1.5 / 4);
   });
 });
