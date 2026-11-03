@@ -21,6 +21,7 @@ import { arsenalItemName } from './arsenalScreen';
 import {
   CAT_ICON,
   CAT_KEY,
+  effectsLine,
   TAB_KEY,
   itemCat,
   itemIcon,
@@ -146,7 +147,7 @@ function offerRowHtml(
     return `<div class="mm-offer"><span>${esc(l.sellerLogin)} · ×${nfmt(l.quantity)}</span><b>⌖ ${nfmt(l.price)}</b><button type="button" ${l.mine ? 'data-mm-material-cancel' : 'data-mm-material-buy'}="${esc(l.id)}"${l.mine ? disabled : tradeDisabled}>${l.mine ? t('auction.cancel') : t('auction.buy')}</button></div>`;
   }
   const l = offer.lot;
-  return `<div class="mm-offer r-${esc(tierOf(l.item))}"><span>${esc(l.sellerLogin)} · ${l.item.kind === 'module' && l.item.form === 'instance' ? esc(t('rarity.' + tierOf(l.item))) : ''} ${stars(l.item)}</span><b>⌖ ${nfmt(l.price)}</b><button type="button" ${l.mine ? 'data-mm-cancel' : 'data-mm-buy'}="${esc(l.id)}"${l.mine ? disabled : tradeDisabled}>${l.mine ? t('auction.cancel') : t('auction.buy')}</button></div>`;
+  return `<div class="mm-offer r-${esc(tierOf(l.item))}"><span>${esc(l.sellerLogin)} · ${l.item.kind === 'module' && l.item.form === 'instance' ? esc(t('rarity.' + tierOf(l.item))) : ''} ${stars(l.item)}</span><b>⌖ ${nfmt(l.price)}</b><button type="button" ${l.mine ? 'data-mm-cancel' : 'data-mm-buy'}="${esc(l.id)}"${l.mine ? disabled : tradeDisabled}>${l.mine ? t('auction.cancel') : t('auction.buy')}</button>${effectsLine(l.item)}</div>`;
 }
 
 function buyHtml(view: MarketView, ui: MarketUi, disabled: string, tradeDisabled: string): string {

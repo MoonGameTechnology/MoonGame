@@ -13,7 +13,8 @@ import {
 } from '../../decisions/auctionHouse';
 import { arsenalItemName } from './arsenalScreen';
 import { esc, nfmt } from './format';
-import { itemCat, itemIcon, matches, sheet, stars, tierOf } from './marketParts';
+import { moduleItemHtml } from './moduleProgression';
+import { effectsLine, itemCat, itemIcon, matches, sheet, stars, tierOf } from './marketParts';
 
 /** Лот торгов, как его отдаёт `GET /meta-market` (`AuctionLotView`): имени лидера нет. */
 export interface AuctionLot {
@@ -45,7 +46,7 @@ function rowHtml(lot: AuctionLot, now: number, tradeDisabled: string): string {
     : lot.leading
       ? `<span class="mm-pill lead">${t('auction.bid.leading')}</span>`
       : `<button type="button" class="mm-primary" data-mm-open="bid:${esc(lot.id)}"${tradeDisabled}>${t('auction.bid.place')}</button>`;
-  return `<article class="mm-lot r-${esc(tierOf(lot.item))}${lot.leading ? ' lead' : ''}"><span class="mm-ic" aria-hidden="true">${itemIcon(lot.item)}</span><div class="mm-lot-info"><b>${esc(arsenalItemName(lot.item))} ${stars(lot.item)}</b><span>${esc(lot.sellerLogin)}${lot.bids ? ` · ${t('auction.bid.count', { n: lot.bids })}` : ''}</span><span>${price(lot)}</span>${lot.buyout === undefined ? '' : `<span>${t('auction.bid.buyout', { n: nfmt(lot.buyout) })}</span>`}</div><div class="mm-lot-side">${timer(lot, now)}${action}</div></article>`;
+  return `<article class="mm-lot r-${esc(tierOf(lot.item))}${lot.leading ? ' lead' : ''}"><span class="mm-ic" aria-hidden="true">${itemIcon(lot.item)}</span><div class="mm-lot-info"><b>${esc(arsenalItemName(lot.item))} ${stars(lot.item)}</b><span>${esc(lot.sellerLogin)}${lot.bids ? ` · ${t('auction.bid.count', { n: lot.bids })}` : ''}</span><span>${price(lot)}</span>${lot.buyout === undefined ? '' : `<span>${t('auction.bid.buyout', { n: nfmt(lot.buyout) })}</span>`}${effectsLine(lot.item)}</div><div class="mm-lot-side">${timer(lot, now)}${action}</div></article>`;
 }
 
 export function bidsHtml(
@@ -71,7 +72,7 @@ export function bidsHtml(
     sheet(
       arsenalItemName(lot.item),
       itemIcon(lot.item),
-      `<dl class="mm-kv"><dt>${lot.current === undefined ? t('auction.bid.start') : t('auction.bid.current')}</dt><dd>⌖ ${nfmt(lot.current ?? lot.start)}</dd><dt>${t('auction.bid.minimum')}</dt><dd>⌖ ${nfmt(lot.minimum)}</dd><dt>${t('auction.bid.ends')}</dt><dd>${timer(lot, now)}</dd></dl><label class="mm-field">${t('auction.bid.amount')} <input data-mm-bid-amount="${esc(lot.id)}" type="number" min="${lot.minimum}" step="1" inputmode="numeric" value="${lot.minimum}"></label><p class="mm-fee">${t('auction.bid.hold')}</p><button type="button" class="mm-primary" data-mm-bid="${esc(lot.id)}"${tradeDisabled}>${t('auction.bid.place')}</button>${lot.buyout === undefined ? '' : `<button type="button" class="mm-ghost" data-mm-buyout="${esc(lot.id)}" data-mm-buyout-amount="${lot.buyout}"${tradeDisabled}>${t('auction.bid.buyout-do', { n: nfmt(lot.buyout) })}</button>`}`,
+      `${moduleItemHtml(lot.item)}<dl class="mm-kv"><dt>${lot.current === undefined ? t('auction.bid.start') : t('auction.bid.current')}</dt><dd>⌖ ${nfmt(lot.current ?? lot.start)}</dd><dt>${t('auction.bid.minimum')}</dt><dd>⌖ ${nfmt(lot.minimum)}</dd><dt>${t('auction.bid.ends')}</dt><dd>${timer(lot, now)}</dd></dl><label class="mm-field">${t('auction.bid.amount')} <input data-mm-bid-amount="${esc(lot.id)}" type="number" min="${lot.minimum}" step="1" inputmode="numeric" value="${lot.minimum}"></label><p class="mm-fee">${t('auction.bid.hold')}</p><button type="button" class="mm-primary" data-mm-bid="${esc(lot.id)}"${tradeDisabled}>${t('auction.bid.place')}</button>${lot.buyout === undefined ? '' : `<button type="button" class="mm-ghost" data-mm-buyout="${esc(lot.id)}" data-mm-buyout-amount="${lot.buyout}"${tradeDisabled}>${t('auction.bid.buyout-do', { n: nfmt(lot.buyout) })}</button>`}`,
     )
   );
 }

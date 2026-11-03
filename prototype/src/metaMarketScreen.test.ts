@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defaultMarketUi, initMetaMarket, metaMarketHtml } from './metaMarketScreen';
 import { t } from '../../localization/runtime';
+import { moduleItemEffects } from './moduleProgression';
+import { esc } from './format';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -58,6 +60,10 @@ describe('meta market screen', () => {
       { ...defaultMarketUi, open: 'module:instance:ion_engine' },
     );
     expect(opened).toContain('data-mm-buy="lot"');
+    // Покупатель видит фактические бонусы копии (с её звёздами) до покупки.
+    const effects = moduleItemEffects(tradable);
+    expect(effects.length).toBeGreaterThan(0);
+    expect(opened).toContain(`<small class="mm-eff">${esc(effects.join(' · '))}</small>`);
     const sell = metaMarketHtml(
       {
         balance: 420,
@@ -317,6 +323,7 @@ describe('meta market screen', () => {
     });
     expect(sheet).toContain('data-mm-bid-amount="a1" type="number" min="126"');
     expect(sheet).toContain('data-mm-buyout="a1" data-mm-buyout-amount="900"');
+    expect(sheet).toContain('class="mi-effects"');
   });
 
   it('offers a timed sale in the sell sheet and shows own timed lots on the shelf', () => {
