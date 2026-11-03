@@ -4339,10 +4339,6 @@ export const ru: Record<string, string> = {
   'rail.toggle.title': 'Инструменты',
 
   // --- seatpick — Выбор фракции и места перед входом в сетевой матч.
-  'seatpick.bonus.amber': '+15% скорость флотов',
-  'seatpick.bonus.azure': '+12% экономика',
-  'seatpick.bonus.crimson': '+10% урон',
-  'seatpick.bonus.violet': '+5% экономика и +5% урон',
   'seatpick.cancel': 'Назад',
   'seatpick.go': 'Занять место',
   'seatpick.load-failed': 'Не удалось загрузить места',

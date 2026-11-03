@@ -21,7 +21,8 @@ import type { GameData } from '../packages/shared-core/src/index';
 import { hashUnit } from './sectorZeroForge';
 import { lootShare } from './moduleRarity';
 import { heroChapter } from './heroRecruits';
-import { newSectorHero, type SectorZeroProgress } from './sectorZeroProgress';
+import { newSectorHero } from './sectorZeroRules';
+import type { SectorZeroProgress } from './sectorZeroProgress';
 
 /** Сколько жетонов приводит героя. */
 export const HERO_TOKENS_TO_JOIN = 10;

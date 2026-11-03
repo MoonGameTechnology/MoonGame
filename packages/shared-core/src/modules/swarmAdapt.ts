@@ -56,7 +56,7 @@ import { hoursToMs } from '../action/types';
 import { canAfford, payCost } from '../util/treasury';
 import { canEquip } from '../util/loadout';
 import { fleetHolder, knowledgeOf, swarmNet, type SwarmKnown, type SwarmNetView } from '../util/swarmNet';
-import { recalled } from './swarmMemory';
+import { recalled } from '../state/swarmRecall';
 export type { SwarmAdaptProject };
 
 /** Отложенный срок проекта. Своё имя, а не `swarm.adapt.done`: объявление о готовности

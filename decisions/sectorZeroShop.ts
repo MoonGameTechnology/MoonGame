@@ -26,12 +26,8 @@
 import { knownSkillNodes, type GameData } from '../packages/shared-core/src/index';
 import { hashUnit } from './sectorZeroForge';
 import { HERO_MAX_STARS, heroTokenUse } from './heroTokens';
-import {
-  sectorSkillLegal,
-  SHOP_AD_REFRESHES_PER_DAY,
-  lastRunWarrants,
-  type SectorZeroProgress,
-} from './sectorZeroProgress';
+import { sectorSkillLegal, SHOP_AD_REFRESHES_PER_DAY, lastRunWarrants } from './sectorZeroRules';
+import type { SectorZeroProgress } from './sectorZeroProgress';
 
 /** Чем платят. Перечисление закрытое: новый способ — это изменение экономики, а не данных. */
 export type PayKind = 'warrants' | 'sovereigns' | 'ad';

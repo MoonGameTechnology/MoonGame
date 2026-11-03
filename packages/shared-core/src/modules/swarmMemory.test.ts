@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
-import { swarmMemoryModule, recalled, STRIKE_KIND } from './swarmMemory';
+import { swarmMemoryModule, STRIKE_KIND } from './swarmMemory';
+import { recalled } from '../state/swarmRecall';
 import type { GameModule } from '../kernel/module';
 import { createInitialState, type GameState, type Player } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';

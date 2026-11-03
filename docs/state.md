@@ -237,7 +237,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 55 модулей в `packages/shared-core/src/modules`, по файлу на механику; порядок исполнения —
 `GAME_MODULES` (`packages/shared-core/src/gameModules.ts`), один на оба хоста, счётчик — §9.
 Модули не импортируют друг друга: события, хуки и возможности, а без модуля работает базовый дефолт
-([modulesystem.md](modulesystem.md)). События и хуки по модулям — [CODE-MAP.md](../CODE-MAP.md).
+([modulesystem.md](modulesystem.md)). Значение из соседнего модуля запрещает ESLint, тип — можно
+(SLIM-7); общие чистые функции лежат в `state/` и `util/`. События и хуки по модулям — [CODE-MAP.md](../CODE-MAP.md).
 
 - **Приказы.** Модули обрабатывают 86 типов действий, игрок может прислать 74: у каждого есть
   zod-схема в `actionPayloadSchemas` (`packages/shared-core/src/actions/payloadSchemas.ts`),
