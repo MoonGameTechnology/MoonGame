@@ -31,6 +31,7 @@ import {
   CAPITAL_VICTORY_SOLO_MIGRATION as capitalVictory,
   SPY_DEVELOPMENT_SOLO_MIGRATION as spyDevelopment,
   INTERCEPT_TURRET_SOLO_MIGRATION as interceptTurret,
+  CLOAK_FIELD_SOLO_MIGRATION as cloakField,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -176,7 +177,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -565,6 +566,20 @@ describe('the intercept turret catalogue pair (0.1.76 → 0.1.77)', () => {
       ...before,
       state: { ...before.state, version: {
         ...before.state.version, data: interceptTurret.toData, dataHash: interceptTurret.toDataHash,
+      } },
+    });
+  });
+});
+
+describe('the cloak field catalogue and rules pair (0.1.77 → 0.1.78)', () => {
+  it('reads a save of the previous release and moves only the pins', () => {
+    const before = oldSave();
+    before.state.version = { data: cloakField.fromData, dataHash: cloakField.fromDataHash, manifest: '1' };
+    const raw = serializeSoloSave(before, cloakField.fromRules);
+    expect(parseCompatibleSoloSave(raw, cloakField.toRules)).toEqual({
+      ...before,
+      state: { ...before.state, version: {
+        ...before.state.version, data: cloakField.toData, dataHash: cloakField.toDataHash,
       } },
     });
   });

@@ -141,6 +141,9 @@ export function heroOrders(bot: AiTurn, pl: Player): void {
       .filter((id) => {
         const md = data.modules[id];
         if (!md || installed.includes(id) || !ownsModule(state, ai, id)) return false;
+        // Маскировочное поле (SM-4.3) бот не ставит: выбор «дешёвое вперёд» раздал бы его
+        // каждому герою, а играть скрытностью бот не умеет (план SM-4.3, 2026-11-03).
+        if ((md.effects.stats.cloak ?? 0) > 0) return false;
         if (!moduleAllowed(hull, hullDef, md)) return false;
         return used[md.slot] < hullDef.slots[md.slot] + (bonus?.[md.slot] ?? 0);
       })

@@ -38,6 +38,7 @@ import { isMissileFleet, isRocketMineFleet } from '../../packages/shared-core/sr
 import { t, tData } from '../../localization/runtime';
 import { aloftCard, type AloftCard } from '../../decisions/aloftCard';
 import { anchoredPopover } from '../../decisions/anchoredPopover';
+import { cloakFacts } from '../../decisions/cloakTag';
 import { fleetAloftPlaces, fleetHolds } from '../../decisions/fleetHolds';
 import { ambushOf } from '../../decisions/forkAmbush';
 import { landColumnShown } from '../../decisions/landColumn';
@@ -446,6 +447,8 @@ function effectTagText(tag: EffectTag): string {
       return `🍽 ${t('effect.hunger')}`;
     case 'point-defense':
       return `🛡 ${t('effect.point-defense', { n: tag.n })}`;
+    case 'cloak':
+      return `◌ ${tag.broken ? t('effect.cloak-broken') : t('effect.cloak', { n: tag.pct })}`;
   }
 }
 
@@ -698,6 +701,7 @@ function fleetEffectsHtml(f: Fleet, boosted: boolean, nTr: number): string {
       patrol: f.owner === ME && holdsPatrol(s.strikes, f.hangar, { kind: 'fleet', id: f.id }, ME),
       troops: nTr,
       pointDefense: pd,
+      cloak: cloakFacts(s, f, data),
     },
     ME,
     s.players[ME]?.arrears ?? [],
@@ -712,6 +716,10 @@ function fleetEffectsHtml(f: Fleet, boosted: boolean, nTr: number): string {
     if (tag.kind === 'bombarding' && volleyAt !== null) {
       const tip = liveTipAttrs(volleyAt, 'hms', t('side.world.bombard-next', { t: LIVE_SLOT }));
       h += `<span class="effect-tag pn-tip"${tip}>${effectTagText(tag)} · ${liveTimerHtml(volleyAt, 'hms')}</span>`;
+    } else if (tag.kind === 'cloak' && tag.brokenUntil !== null) {
+      // Сорванное поле несёт таймер: когда оно заработает снова.
+      const tip = liveTipAttrs(tag.brokenUntil, 'hms', t('effect.cloak-back', { t: LIVE_SLOT }));
+      h += `<span class="effect-tag pn-tip"${tip}>${effectTagText(tag)} · ${liveTimerHtml(tag.brokenUntil, 'hms')}</span>`;
     } else h += `<span class="effect-tag">${effectTagText(tag)}</span>`;
   }
   return h + `</div>`;

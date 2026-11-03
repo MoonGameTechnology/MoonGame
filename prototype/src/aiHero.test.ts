@@ -220,6 +220,14 @@ describe('AI-BAL-8 — железо корабля (`hero.install`)', () => {
     }
   });
 
+  it('маскировочное поле не ставит, даже когда другого модуля в арсенале нет (SM-4.3)', () => {
+    const s = docked(rich(game2()));
+    const arsenal = s.players.p2!.arsenal;
+    s.players.p2!.arsenal = { hulls: arsenal?.hulls ?? Object.keys(data.units), modules: ['cloak_field'] };
+    const mods = payloads<{ heroId: string; moduleId: string }>(orders(s), 'hero.install');
+    expect(mods.map((m) => m.moduleId)).not.toContain('cloak_field');
+  });
+
   it('слабый бот железо ставит тоже (слабый знает то же, 2026-09-28)', () => {
     const s = atWeakTurn(docked(rich(game2())), 'full');
     expect(only(orders(s, 'weak'), 'hero.install').length).toBeGreaterThan(0);

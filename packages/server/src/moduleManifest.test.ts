@@ -130,7 +130,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // `bot-diplomacy`, `faction`/`sprawl` встали за `tax`, `diplomacy`/`espionage`/`market` —
 // за `auto-rally`, `pve` и семья Роя — сразу за `army`. Партии прод-хоста не тронуты.
 // 97 combines echelons, paid module snapshots and exact army groups. Order is unchanged.
-const PINNED_FOR_VERSION = '97';
+// 98: ЧЛЕНСТВО — `cloak-field` 1.0.0 перед `auto-merge`, срыв маскировочного поля (SM-4.3).
+const PINNED_FOR_VERSION = '98';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -202,6 +203,7 @@ const PINNED_MODULE_IDS = [
   'extraction', // PVR-7.3: накопитель архива главы IV
   'operation', // PVR-8.3: контракт операции главы VI
   'captive', // PVR-9.5: пленный главы V «Голос Единения»
+  'cloak-field', // SM-4.3: срыв маскировочного поля
   'auto-merge', // долетевший флот вливается в свой, стоящий в узле (заказ владельца 2026-10-03)
 ];
 

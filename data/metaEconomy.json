@@ -55,6 +55,16 @@
         "technology_archives": 1
       },
       "salvage": { "ferroalloys": 7, "control_circuits": 5, "energy_cells": 4 }
+    },
+    "cloak_field": {
+      "defId": "cloak_field",
+      "ingredients": {
+        "technical_composites": 25,
+        "control_circuits": 25,
+        "energy_cells": 16,
+        "technology_archives": 1
+      },
+      "salvage": { "technical_composites": 6, "control_circuits": 6, "energy_cells": 4 }
     }
   },
   "rewards": {
@@ -194,7 +204,8 @@
       "mine_layer": 200,
       "siege_platform": 220,
       "tractor_beam": 220,
-      "rocket_mine_layer": 360
+      "rocket_mine_layer": 360,
+      "cloak_field": 360
     },
     "offers": {
       "premium_7": { "category": "premium", "price": 149, "premiumDays": 7 },
@@ -241,6 +252,7 @@
       "module_siege_platform": { "category": "modules", "modules": ["siege_platform"] },
       "module_tractor_beam": { "category": "modules", "modules": ["tractor_beam"] },
       "module_rocket_mine_layer": { "category": "modules", "modules": ["rocket_mine_layer"] },
+      "module_cloak_field": { "category": "modules", "modules": ["cloak_field"] },
       "materials_personal": {
         "category": "materials",
         "price": 60,

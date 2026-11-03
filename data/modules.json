@@ -640,6 +640,28 @@
       }
     }
   },
+  "cloak_field": {
+    "name": "Cloak Field",
+    "description": "module.cloak-field.desc",
+    "rarity": "legendary",
+    "slot": "utility",
+    "tag": "horizontal",
+    "effects": {
+      "stats": {
+        "cloak": 0.2
+      }
+    },
+    "cost": {
+      "metal": 100,
+      "microelectronics": 30
+    },
+    "allowed": {
+      "domain": "space",
+      "units": [
+        "hero"
+      ]
+    }
+  },
   "station_battery_1": {
     "name": "Fortress Battery 1",
     "slot": "weapon",

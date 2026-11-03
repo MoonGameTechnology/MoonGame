@@ -100,7 +100,9 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '97'; // Эшелоны, снимки модулей и точные группы войск.
+export const MODULE_MANIFEST_VERSION = '98'; // SM-4.3: ЧЛЕНСТВО — `cloak-field` 1.0.0 перед
+// `auto-merge`, срыв маскировочного поля; новое поле флота `cloakBrokenUntil`.
+// export const MODULE_MANIFEST_VERSION = '97'; // Эшелоны, снимки модулей и точные группы войск.
 // Членство и порядок прежние; объединённые правила требуют отдельной версии.
 // 95: эшелоны; 96: предварительная ветка выбора войск до интеграции эшелонов.
 // 94 — SLIM-4: один список модулей на оба хоста

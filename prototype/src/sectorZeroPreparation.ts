@@ -88,6 +88,7 @@ const stats: Record<string, string> = {
   fleetHullRepair: 'loadout.stat.fleet-repair',
   mineCharge: 'loadout.stat.mine-charge',
   mineHit: 'loadout.stat.mine-hit',
+  cloak: 'loadout.stat.cloak',
 };
 /** Вклад звёздного модуля — дробный (6 × 1.1 в плавающей точке даёт 6.6000000000000005),
  *  поэтому показываем округлённым до десятых. Округление ТОЛЬКО для показа: считает
@@ -109,7 +110,7 @@ const effectText = (values: Record<string, number>): string =>
     .map(([key, value]) => `${esc(t(stats[key] ?? key))} ${statValue(key, value, true)}`)
     .join(' · ');
 /** Порядок строк сравнения — тот же, что у полосы статов корабля. */
-const STAT_ORDER = ['attack', 'defense', 'hp', 'shield', 'speed', 'shieldRegen', 'hullRepair', 'fleetHullRepair', 'cargoCapacity', 'radarRange', 'pointDefense', 'siegeDamage', 'retreatPull', 'salvageBonus', 'mineCharge', 'mineHit'];
+const STAT_ORDER = ['attack', 'defense', 'hp', 'shield', 'speed', 'shieldRegen', 'hullRepair', 'fleetHullRepair', 'cargoCapacity', 'radarRange', 'pointDefense', 'siegeDamage', 'retreatPull', 'salvageBonus', 'mineCharge', 'mineHit', 'cloak'];
 /**
  * «Было → станет» списком (PVR-6.5): одна разметка на корабль и на улучшение модуля. Прибавка
  * зелёная, потеря красная — цвет несёт смысл, а число рядом дублирует его для тех, кто

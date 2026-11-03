@@ -23,6 +23,7 @@ export const MODULE_ICON: Record<string, string> = {
   ablative_plating: '🧱',
   point_defense_array: '✴',
   rocket_mine_layer: '✺',
+  cloak_field: '◌',
   void_shield_i: '🔰',
   void_shield_ii: '🔰',
   void_shield_iii: '🔰',

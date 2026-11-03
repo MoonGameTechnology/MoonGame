@@ -19,6 +19,7 @@ export const PERCENT_STATS: ReadonlySet<string> = new Set([
   'retreatPull',
   'salvageBonus',
   'mineHit',
+  'cloak',
 ]);
 
 export function isPercentStat(stat: string): boolean {

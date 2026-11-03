@@ -850,6 +850,9 @@ export interface Fleet {
   /** Shelling the hostile world below: its production frozen, a volley at `bombardNextAt` hourly. */
   bombarding?: boolean;
   bombardNextAt?: number;
+  /** Маскировочное поле (SM-4.3) сорвано до этого времени: бой, обстрел или вылет шаттлов.
+   *  Пишет модуль `cloakField` и только флоту, несущему поле. */
+  cloakBrokenUntil?: number;
   traits: TraitId[];
   /** Id of the battle this fleet is engaged in; absent/null when free to move. */
   battleId?: BattleId | null;

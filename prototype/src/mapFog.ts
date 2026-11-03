@@ -20,6 +20,7 @@ import {
   engagementOf,
   fleetNodeAt,
   fleetsSeenByPosition,
+  seenAtNode,
   patrolsSeenBy,
   radarSignatures,
   viewCoverage,
@@ -288,7 +289,10 @@ export function fleetKnown(f: Fleet): boolean {
  *  спрашивается напрямую (сторож `engagedFog.test.ts`). */
 function fleetSeenHere(f: Fleet): boolean {
   if (game.world().match.status === 'ended') return true;
-  return known(f.location) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);
+  // Флот под маскировочным полем (SM-4.3) опознанный мир не выдаёт, кроме шпиона на нём, —
+  // то же правило ядра (`seenAtNode`); глаза по позиции уже сжаты полем в `seenAt`.
+  const atNode = !vision || seenAtNode(game.world(), game.me(), f, vision.identify, data);
+  return atNode || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);
 }
 
 /** Виден ли бой: его узел опознан ИЛИ в нём дерусь я (или мой блок зрения). */
