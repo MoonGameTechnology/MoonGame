@@ -12,7 +12,7 @@ import { MemoryMetaMarket, PostgresMetaMarket, type MetaMarket } from './metaMar
 import { MAX_BUY_ORDERS, validOrderTerms } from './metaOrders';
 
 const KEY = 'module:instance:ion_engine';
-const item = (itemId: string, accountId: string, defId = 'ion_engine') => ({
+const anyItem = (itemId: string, accountId: string, defId: string) => ({
   itemId,
   accountId,
   kind: 'module' as const,
@@ -36,6 +36,8 @@ describe('buy order terms', () => {
 
 interface Stand {
   market: MetaMarket;
+  /** Тип под заказ: в общей базе Postgres он свой у каждого прогона, чужие лоты не мешают. */
+  defId: string;
   arsenal: ArsenalStore;
   ids: (name: string) => string;
   credit(accountId: string, amount: number): Promise<void>;
@@ -49,6 +51,7 @@ function memoryStand(): Stand {
   return {
     market,
     arsenal,
+    defId: 'ion_engine',
     ids: (name) => name,
     credit: async (id, amount) => {
       await market.creditWarrants(id, amount, 'fixture', 'fixture', 0);
@@ -60,6 +63,9 @@ function memoryStand(): Stand {
 function scenarios(make: () => Promise<Stand>): void {
   it('freezes the order, buys an offer at or below it later and refunds the change', async () => {
     const s = await make();
+    const KEY = `module:instance:${s.defId}`;
+    const item = (itemId: string, accountId: string, defId = s.defId) =>
+      anyItem(itemId, accountId, defId);
     try {
       const [buyer, seller, one, two, other] = ['buyer', 'seller', 'one', 'two', 'other'].map(
         s.ids,
@@ -119,6 +125,9 @@ function scenarios(make: () => Promise<Stand>): void {
 
   it('fills at once from the cheapest offers, never buys its own lot and caps open orders', async () => {
     const s = await make();
+    const KEY = `module:instance:${s.defId}`;
+    const item = (itemId: string, accountId: string, defId = s.defId) =>
+      anyItem(itemId, accountId, defId);
     try {
       const [buyer, seller, a, b, own] = ['buyer', 'seller', 'a', 'b', 'own'].map(s.ids) as [
         string,
@@ -178,6 +187,7 @@ describe.skipIf(!databaseUrl)('buy orders — PostgreSQL', () => {
     market.setEconomy(new PostgresMetaEconomyStore(pool));
     return {
       market,
+      defId: `ord_${Date.now()}_${Math.floor(Math.random() * 1e9)}`,
       arsenal: new PostgresArsenalStore(pool),
       ids: (name) => {
         used.add(`${name}-${suffix}`);
