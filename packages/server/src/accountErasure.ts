@@ -95,8 +95,8 @@ const PERSONAL_ROWS = [
 // ids, balances, sequence numbers and third-party receipts intact.
 const JSON_RECORDS = [
   [
-    "SELECT id AS key, jsonb_build_object('state',state,'clock',clock,'economy_observations',economy_observations,'economy_activity',economy_activity,'career',career) AS value FROM matches WHERE id>$1 ORDER BY id LIMIT 100",
-    "UPDATE matches SET state=$2::jsonb->'state',clock=NULLIF($2::jsonb->'clock','null'::jsonb),economy_observations=NULLIF($2::jsonb->'economy_observations','null'::jsonb),economy_activity=NULLIF($2::jsonb->'economy_activity','null'::jsonb),career=NULLIF($2::jsonb->'career','null'::jsonb) WHERE id=$1",
+    "SELECT id AS key, jsonb_build_object('state',state,'clock',clock,'economy_observations',economy_observations,'economy_activity',economy_activity,'career',career,'match_reward_progress',match_reward_progress) AS value FROM matches WHERE id>$1 ORDER BY id LIMIT 100",
+    "UPDATE matches SET state=$2::jsonb->'state',clock=NULLIF($2::jsonb->'clock','null'::jsonb),economy_observations=NULLIF($2::jsonb->'economy_observations','null'::jsonb),economy_activity=NULLIF($2::jsonb->'economy_activity','null'::jsonb),career=NULLIF($2::jsonb->'career','null'::jsonb),match_reward_progress=NULLIF($2::jsonb->'match_reward_progress','null'::jsonb) WHERE id=$1",
   ],
   [
     'SELECT id AS key,infrastructure AS value FROM corps WHERE id>$1 ORDER BY id LIMIT 100',

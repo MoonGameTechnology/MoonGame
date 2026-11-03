@@ -165,6 +165,8 @@ export function createMatchLoader(
       initialReceipts,
       initialSeq: snap.seq,
       initialCareer: snap.career,
+      initialMatchRewardProgress: snap.matchRewardProgress,
+      initialEconomyActivity: snap.economyActivity,
       initialCreatedAt: snap.createdAt,
       initialEndedAt: snap.endedAt,
       careerAccounts: deps.careerAccounts

@@ -526,6 +526,9 @@ export interface DevMatchOptions {
   initialCreatedAt?: number;
   initialEndedAt?: number;
   initialCareer?: MatchSnapshot['career'];
+  initialMatchRewardProgress?: MatchSnapshot['matchRewardProgress'];
+  initialEconomyActivity?: MatchSnapshot['economyActivity'];
+  matchRewardPolicy?: import('./matchRewardPolicy').MatchRewardPolicy;
   careerAccounts?: Record<string, string>;
   /** Strict commit-before-broadcast durable write (see `MatchRoom.persist`). */
   persist?: (snapshot: MatchSnapshot, receipt: StoredReceipt) => Promise<void>;
@@ -667,6 +670,9 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
     initialReceipts: options.initialReceipts,
     initialSeq: options.initialSeq,
     initialCareer: options.initialCareer,
+    initialMatchRewardProgress: options.initialMatchRewardProgress,
+    initialEconomyActivity: options.initialEconomyActivity,
+    matchRewardPolicy: options.matchRewardPolicy,
     initialCreatedAt: options.initialCreatedAt,
     initialEndedAt: options.initialEndedAt,
     careerAccounts: options.careerAccounts,

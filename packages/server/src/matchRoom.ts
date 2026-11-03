@@ -60,6 +60,9 @@ import { InMemoryEphemeralStore, type EphemeralStore } from './ephemeral';
 import { PerKeyWindow } from './rateLimit';
 import { detach } from './detach';
 import { captureMetaEconomyActivity, type OwnOrder } from './metaEconomyActivity';
+import { foldMatchRewardProgress, type MatchRewardProgress } from './matchRewardProgress';
+import type { MatchRewardPolicy } from './matchRewardPolicy';
+import { isMeaningfulRewardOrder } from './matchRewardOrder';
 
 export interface RoomPeer {
   /** `compress: false` keeps this one message out of socket compression (a `ws` option). */
@@ -103,6 +106,9 @@ export interface MatchRoomOptions {
   initialCreatedAt?: number;
   initialEndedAt?: number;
   initialCareer?: CareerLedger;
+  initialMatchRewardProgress?: MatchRewardProgress;
+  matchRewardPolicy?: MatchRewardPolicy;
+  initialEconomyActivity?: MatchSnapshot['economyActivity'];
   careerAccounts?: Record<string, string>;
   /** Attach `hashState(view)` to snapshots so the client can detect desync: every full
    *  snapshot (welcome, resync) and one delta per player every `STATE_HASH_EVERY_MS`.
@@ -592,7 +598,8 @@ export class MatchRoom {
   /** Durable write for strict commit-before-broadcast (see options.persist). */
   private readonly persist?: (snapshot: MatchSnapshot, receipt: StoredReceipt) => Promise<void>;
   /** Server-side participation evidence, never part of the deterministic state or wire view. */
-  private economyActivity: Record<string, string[]> = {};
+  private economyActivity: Record<string, string[]>;
+  private matchRewardProgress: MatchRewardProgress | undefined;
   private readonly careerTracking: boolean;
   private career: CareerLedger;
   private careerHumans: CareerOwners;
@@ -697,6 +704,10 @@ export class MatchRoom {
     };
     this.kernel = options.kernel;
     this.data = options.data;
+    this.economyActivity = structuredClone(options.initialEconomyActivity ?? {});
+    this.matchRewardProgress = structuredClone(options.initialMatchRewardProgress ??
+      (options.matchRewardPolicy && options.initialSeq === undefined && options.initialState.match.status !== 'ended'
+        ? { policy: options.matchRewardPolicy, players: {} } : undefined));
     this.serverOrders = options.serverOrders;
     // PVE-0.2 — the mode is consumed HERE, once, and never again: `config` is private
     // and readonly, so a resolved match has nothing left to swap mid-flight (GDD §2,
@@ -932,6 +943,10 @@ export class MatchRoom {
       running: this.isClockRunning && state.match.status !== 'ended',
       ...(coalitionTransitions.length > 0 ? { coalitionTransitions } : {}),
     };
+  }
+
+  get matchRewardSnapshot(): MatchRewardProgress | undefined {
+    return structuredClone(this.matchRewardProgress);
   }
 
   get careerSnapshot(): CareerLedger | undefined {
@@ -1717,6 +1732,8 @@ export class MatchRoom {
       this.stateValue,
       order,
     );
+    this.matchRewardProgress = foldMatchRewardProgress(this.matchRewardProgress, this.stateValue, plan.state,
+      plan.events, this.careerHumans, this.data, order);
     this.career = foldCareerEvents(this.career, plan.events, this.stateValue, this.careerHumans);
     this.stateValue = plan.state;
     if (plan.state.match.status === 'ended') this.endedAtValue ??= endedAt ?? this.now();
@@ -1738,7 +1755,8 @@ export class MatchRoom {
    *  connection. Drivers (AI, Steward, host bookkeeping) submit without a peer. */
   private ownOrder(plan: CommittablePlan, action: Action, peer?: RoomPeer): OwnOrder | undefined {
     return peer && plan.kind === 'applied'
-      ? { playerId: action.playerId, at: plan.at, wall: this.now() }
+      ? { playerId: action.playerId, at: plan.at, wall: this.now(), type: action.type,
+          meaningful: isMeaningfulRewardOrder(action, plan.advanced, plan.state) }
       : undefined;
   }
 
@@ -1930,6 +1948,8 @@ export class MatchRoom {
       r.events,
       this.stateValue,
     );
+    this.matchRewardProgress = foldMatchRewardProgress(this.matchRewardProgress, this.stateValue, r.state,
+      r.events, this.careerHumans, this.data);
     this.career = foldCareerEvents(this.career, r.events, this.stateValue, this.careerHumans);
     this.stateValue = r.state;
     if (r.state.match.status === 'ended') this.endedAtValue ??= this.now();
@@ -2189,6 +2209,8 @@ export class MatchRoom {
       ...(this.careerTracking
         ? { career: foldCareerEvents(this.career, events, this.stateValue, this.careerHumans) }
         : {}),
+      matchRewardProgress: foldMatchRewardProgress(this.matchRewardProgress, this.stateValue, state,
+        events, this.careerHumans, this.data, order),
       economyActivity: captureMetaEconomyActivity(
         this.economyActivity,
         events,

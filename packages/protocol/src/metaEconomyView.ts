@@ -65,7 +65,7 @@ export interface MetaSeasonView {
 /** The end-of-match drop tables as the server rolls them, so the arsenal can disclose
  *  the odds instead of keeping a copy that could drift from the server's file. */
 export interface MetaDropOddsView {
-  /** A drop is guaranteed on the `pityAfter`-th consecutive dry match. */
+  /** A drop is guaranteed on the `pityAfter`-th dry match; 0 disables that guarantee. */
   pityAfter: number;
   /** Chance by final place, ascending `maxPlace`: the first row with `place <= maxPlace`. */
   byPlace: Array<{ maxPlace: number; chance: number }>;
@@ -153,6 +153,23 @@ export interface MetaEconomyView {
 }
 
 export interface MetaCommandReceipt {
+  /** Final match calculation, including a durable zero-award eligibility decision. */
+  matchReward?: {
+    version: number;
+    reason: 'active' | 'eliminated' | 'inactive' | 'no-contribution';
+    score: number;
+    scoreDivisor: number;
+    /** Per-match Sovereign ceiling applied after the division. */
+    maxSovereigns: number;
+    kills: number;
+    killsPerWarrant: number;
+    baseWarrants: number;
+    killWarrants: number;
+    baseMaterials: number;
+    veteranPoints: number;
+    veteranMaterials: number;
+    moduleChance: number;
+  };
   id: string;
   kind: string;
   at: number;
@@ -164,7 +181,7 @@ export interface MetaCommandReceipt {
   sovereignsSpent?: number;
   /** Premium account expiry after the purchase. */
   premiumUntil?: number;
-  /** Sovereigns credited by the premium daily claim or by medal rewards. */
+  /** Sovereigns credited by match/medal rewards or the premium daily claim. */
   sovereignsGranted?: number;
   /** The corporation base style or backdrop bought or applied. */
   corpStyle?: string;

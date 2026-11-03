@@ -6,6 +6,13 @@ import { esc, nfmt } from './format';
 import { detach } from './detach';
 import { unitTitle } from './dossiers';
 
+const reasonKey = {
+  active: 'end.rewards.reason.active',
+  eliminated: 'end.rewards.reason.eliminated',
+  inactive: 'end.rewards.reason.inactive',
+  'no-contribution': 'end.rewards.reason.no-contribution',
+} as const;
+
 export interface MatchRewardsReader {
   matchId(): string | null;
   read(matchId: string): Promise<MetaMatchRewardsView>;
@@ -19,6 +26,8 @@ export function matchRewardsHtml(
   const materials = new Map<string, { name: string; quantity: number }>();
   let xp = 0;
   let warrants = 0;
+  let sovereigns = 0;
+  let calculation: NonNullable<MetaMatchRewardsView['receipts'][number]['matchReward']> | undefined;
   const finds: string[] = [];
   const seen = new Set<string>();
   for (const receipt of view?.receipts ?? []) {
@@ -36,6 +45,8 @@ export function matchRewardsHtml(
     }
     xp += receipt.seasonXp ?? 0;
     warrants += receipt.warrants ?? 0;
+    sovereigns += receipt.sovereignsGranted ?? 0;
+    calculation ??= receipt.matchReward;
     if (receipt.drop) {
       const name =
         receipt.drop.kind === 'hull'
@@ -51,18 +62,48 @@ export function matchRewardsHtml(
     .map((m) => row(m.name, m.quantity));
   if (xp > 0) rows.push(row(t('end.rewards.season-xp'), xp));
   if (warrants > 0) rows.push(row(t('end.rewards.warrants'), warrants));
+  if (sovereigns > 0) rows.push(row(t('end.rewards.sovereigns'), sovereigns));
   rows.push(...finds.map((name) => `<li><span>${esc(name)}</span></li>`));
   const status = failed
     ? t('end.rewards.unavailable')
     : loading && !view
       ? t('end.rewards.loading')
-      : !rows.length
-        ? t('end.rewards.none')
-        : !view?.finalReady
-          ? t('end.rewards.partial')
-          : '';
+      : calculation &&
+          (calculation.reason === 'inactive' || calculation.reason === 'no-contribution')
+        ? t(reasonKey[calculation.reason])
+        : !rows.length
+          ? t('end.rewards.none')
+          : !view?.finalReady
+            ? t('end.rewards.partial')
+            : '';
+  const breakdown =
+    calculation && ['active', 'eliminated'].includes(calculation.reason)
+      ? [
+          t(reasonKey[calculation.reason]),
+          t('end.rewards.score-calculation', {
+            score: nfmt(calculation.score),
+            divisor: nfmt(calculation.scoreDivisor),
+            cap: nfmt(calculation.maxSovereigns),
+          }),
+          t('end.rewards.kill-calculation', {
+            base: calculation.baseWarrants,
+            kills: calculation.kills,
+            divisor: calculation.killsPerWarrant,
+            bonus: calculation.killWarrants,
+          }),
+          t('end.rewards.material-calculation', {
+            base: calculation.baseMaterials,
+            points: calculation.veteranPoints,
+            bonus: calculation.veteranMaterials,
+          }),
+          t('end.rewards.module-chance', { chance: Math.round(calculation.moduleChance * 100) }),
+        ]
+          .map((line) => `<p class="es-note">${esc(line)}</p>`)
+          .join('')
+      : '';
   return (
     `<section class="es-run es-rewards"><h3>${rows.length ? t('end.rewards.title') : t('supply.title')}</h3><ul>${rows.join('')}</ul>` +
+    breakdown +
     (status ? `<p class="es-note" role="status">${esc(status)}</p>` : '') +
     `<p class="es-note">${t('end.rewards.automatic')}</p><button type="button" class="es-btn btn-quiet" data-es="rewards-refresh"${loading ? ' disabled' : ''}>${t('end.rewards.refresh')}</button></section>`
   );

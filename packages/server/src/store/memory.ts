@@ -124,6 +124,8 @@ export class MemoryMatchStore implements MatchStore {
       }
       return clone({
         ...snapshot,
+        ...((snapshot.matchRewardProgress ?? prev?.matchRewardProgress)
+          ? { matchRewardProgress: snapshot.matchRewardProgress ?? prev?.matchRewardProgress } : {}),
         createdAt: prev?.createdAt ?? snapshot.createdAt ?? Date.now(),
         ...(snapshot.status === 'ended'
           ? { endedAt: prev?.endedAt ?? snapshot.endedAt ?? Date.now() }
