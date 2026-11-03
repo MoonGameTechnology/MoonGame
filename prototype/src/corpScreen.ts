@@ -7,6 +7,7 @@ import type { CorpBattlesView, CorpWarView } from '../../packages/protocol/src/c
 import { corpBattleReportHtml, corpBattlesViewHtml } from './corpBattlesView';
 import { parseCorpInfrastructure } from '../../decisions/corpInfrastructure';
 import { parseCorpStyle } from '../../decisions/corpStyle';
+import { INFLUENCE_AUDIT_KEY, influenceEntry } from '../../decisions/corpTreasury';
 import type { CorpInfrastructureView } from '../../packages/protocol/src/corpInfrastructure';
 import type { MetaCorpStyleView } from '../../packages/protocol/src/corpStyle';
 import { corpBuildingsHtml, updateCorpConstructionCountdown } from './corpBuildingsView';
@@ -567,6 +568,8 @@ export function initCorp(host: CorpHost): {
     if (entry.action === 'showcase') return t('corp.audit.showcase');
     if (entry.action === 'emblem') return t('corp.audit.emblem') +
       (isCorpEmblemId(entry.detail) ? ` · ${t(CORP_EMBLEM_LABEL[entry.detail])}` : '');
+    const moved = entry.action === 'influence' ? influenceEntry(entry.detail) : null;
+    if (moved?.kind) return t(INFLUENCE_AUDIT_KEY[moved.kind], { n: `${moved.n > 0 ? '+' : ''}${moved.n}`, corp: moved.ref ? corpNameOf(moved.ref) : '' });
     if (entry.action === 'building_income') return t('corp.buildings.income-earned', { n: entry.detail ?? '0' });
     const name = infrastructure?.buildings.find((b) => b.id === entry.target)?.nameKey;
     if (name && entry.action === 'building_complete') return t('corp.buildings.completed', { name: t(name), n: entry.detail ?? '' });

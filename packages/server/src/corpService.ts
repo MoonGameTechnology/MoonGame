@@ -5,6 +5,7 @@ import { randomInt } from 'node:crypto';
 import { CORP_NAME_COUNT, generatedCorpName } from './corpNames';
 import type { CorpMembership, CorpRecord, CorpRole, CorpStore, CorpSummary } from './store';
 import type { CorpShowcaseResult } from '@void/protocol';
+import { influenceDetail } from './avaEconomy';
 
 /**
  * CORP-0 — the corporation service: membership + the fixed RBAC from
@@ -107,7 +108,7 @@ export class CorpService {
           at: this.now(),
           actor: 'system',
           action: 'influence',
-          detail: `+${influence}`,
+          detail: influenceDetail(influence, 'start'),
         });
       }
       return created;

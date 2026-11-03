@@ -78,3 +78,12 @@ export function liveShare(report: AvaBattleReport | null | undefined, side: AvaS
   if (seats.length === 0) return 1;
   return seats.filter((s) => s.accountId !== null).length / seats.length;
 }
+
+/** Why influence moved, for the corp's audit log. */
+export type InfluenceKind = 'challenge' | 'refund' | 'win' | 'start';
+
+/** The audit `detail` of an influence movement: structure only, the client words it in
+ *  the reader's locale (`corp.audit.influence.<kind>`); `ref` is the challenged corp. */
+export function influenceDetail(n: number, kind: InfluenceKind, ref?: string): string {
+  return JSON.stringify({ n, kind, ...(ref === undefined ? {} : { ref }) });
+}

@@ -7,6 +7,7 @@ import {
   challengeGroups,
   opponentOffer,
   topCorpFighters,
+  pairRepeats,
   winBonus,
   type CorpBattleTab,
 } from '../../decisions/corpBattles';
@@ -271,7 +272,7 @@ function opponentsView(p: CorpBattlesPaint): string {
                   p.busy,
                   ` data-corpformat="${offer.format}"`,
                 ) +
-                `<small>${fmt(offer.format)} · ${esc(t('corp.combat.price', { n: offer.cost }))} · ${esc(t('corp.combat.reward', { n: winBonus(offer.cost, p.corp.rating, r.rating) }))}</small>`;
+                `<small>${fmt(offer.format)} · ${esc(t('corp.combat.price', { n: offer.cost }))} · ${esc(t('corp.combat.reward', { n: winBonus(offer.cost, p.corp.rating, r.rating, pairRepeats(p.view?.results ?? [], p.corp.corpId, r.corpId, p.now)) }))}</small>`;
             else if (offer.kind === 'answer' || offer.kind === 'active')
               action = `<button type="button" class="btn-second" data-battletab="${offer.kind === 'answer' ? 'challenges' : 'now'}">${esc(t(offer.kind === 'answer' ? 'corp.combat.answer' : 'corp.combat.to-current'))}</button>`;
             else action = hint(OFFER[offer.kind]);

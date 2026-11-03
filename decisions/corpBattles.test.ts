@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   battlePostPath,
+  pairRepeats,
   battleRating,
   winBonus,
   battleAttention,
@@ -237,5 +238,18 @@ describe('the win bonus a challenge promises (CORP-19)', () => {
     expect(winBonus(100, 1000, 1800)).toBe(200); // at most double
     expect(winBonus(100, 1600, 1000)).toBe(50); // at least half
     expect(battleRating(undefined)).toBe(1000);
+  });
+  it('a rematch inside the week promises half, the third one nothing', () => {
+    const week = 7 * 24 * 3600 * 1000;
+    const fought = [
+      { challengerCorp: 'a', targetCorp: 'b', at: 100 },
+      { challengerCorp: 'b', targetCorp: 'a', at: 200 },
+      { challengerCorp: 'a', targetCorp: 'c', at: 300 },
+    ];
+    expect(pairRepeats(fought, 'a', 'b', 1000)).toBe(2);
+    expect(pairRepeats(fought.slice(0, 1), 'a', 'b', 1000)).toBe(1);
+    expect(pairRepeats(fought, 'a', 'b', 200 + week)).toBe(0);
+    expect(winBonus(100, 1000, 1000, 1)).toBe(50);
+    expect(winBonus(100, 1000, 1000, 2)).toBe(0);
   });
 });

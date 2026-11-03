@@ -25,11 +25,30 @@ export function battleRating(rating: number | undefined): number {
 }
 
 /** CORP-19: the bonus a challenger rated `mine` wins over a target rated `theirs` at
- *  `cost` — the server's rule for a first battle of the pair with no bots, before the
- *  daily cap (`packages/server/src/avaEconomy.ts`). The stake comes back on top of it. */
-export function winBonus(cost: number, mine?: number, theirs?: number): number {
+ *  `cost` after `repeats` battles of the pair inside the window — the server's rule with
+ *  no bots, before the daily cap (`packages/server/src/avaEconomy.ts`). The stake comes
+ *  back on top of it. */
+export function winBonus(cost: number, mine?: number, theirs?: number, repeats = 0): number {
   const k = 1 + (battleRating(theirs) - battleRating(mine)) / ECONOMY.ratingSpread;
-  return Math.round(cost * Math.min(ECONOMY.bonusMax, Math.max(ECONOMY.bonusMin, k)));
+  const repeat = ECONOMY.pairBonus[Math.min(repeats, ECONOMY.pairBonus.length - 1)]!;
+  return Math.round(cost * Math.min(ECONOMY.bonusMax, Math.max(ECONOMY.bonusMin, k)) * repeat);
+}
+
+/** Battles of `me` with `rival` settled inside the repeat window before `now`: the count the
+ *  server cuts a rematch's bonus by (`pairBonus`). */
+export function pairRepeats(
+  results: readonly { challengerCorp: string; targetCorp: string; at: number }[],
+  me: string,
+  rival: string,
+  now: number,
+): number {
+  const since = now - ECONOMY.pairWindowMs;
+  return results.filter(
+    (r) =>
+      r.at > since &&
+      ((r.challengerCorp === me && r.targetCorp === rival) ||
+        (r.challengerCorp === rival && r.targetCorp === me)),
+  ).length;
 }
 const object = (x: unknown): x is Record<string, unknown> =>
   !!x && typeof x === 'object' && !Array.isArray(x);

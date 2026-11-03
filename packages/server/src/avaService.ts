@@ -25,7 +25,7 @@ import {
   type AvaFormat,
   type AvaFormatCatalog,
 } from './avaFormats';
-import { liveShare, settleBattle } from './avaEconomy';
+import { influenceDetail, liveShare, settleBattle } from './avaEconomy';
 import { corpMedalNews } from './corpNews';
 import type { MedalCatalog } from './medalCatalog';
 
@@ -272,7 +272,7 @@ export class AvaService {
       at,
       actor: who.accountId,
       action: 'influence',
-      detail: `-${cost}: вызов ${targetCorpId}`,
+      detail: influenceDetail(-cost, 'challenge', targetCorpId),
     });
     return { ok: true, id: challenge.id };
   }
@@ -550,11 +550,11 @@ export class AvaService {
     await this.corps.adjustRating(matchup.targetCorp, payout.rating.target, economy.ratingStart);
     if (payout.refund > 0) {
       await this.corps.addInfluence(matchup.challengerCorp, payout.refund);
-      await this.audit(matchup.challengerCorp, at, `+${payout.refund}: ставка ${matchupId}`);
+      await this.audit(matchup.challengerCorp, at, influenceDetail(payout.refund, 'refund'));
     }
     if (winnerCorp !== null && payout.bonus > 0) {
       await this.corps.addInfluence(winnerCorp, payout.bonus);
-      await this.audit(winnerCorp, at, `+${payout.bonus}: победа ${matchupId}`);
+      await this.audit(winnerCorp, at, influenceDetail(payout.bonus, 'win'));
     }
     // AVA-9: the public feed row goes LAST and best-effort — the settlement already
     // committed (endMatchup is the exactly-once gate); a feed hiccup must not fail it.
@@ -690,7 +690,7 @@ export class AvaService {
       at: this.now(),
       actor: 'system',
       action: 'influence',
-      detail: `+${challenge.cost}: возврат`,
+      detail: influenceDetail(challenge.cost, 'refund'),
     });
   }
 

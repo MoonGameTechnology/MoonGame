@@ -11,8 +11,9 @@
  * 2. **Доход зданий — одной строкой на отрезок.** Сервер записывает его при каждом чтении
  *    базы мелкими долями; доли подряд (между другими движениями) складываются в одну
  *    строку со временем самой свежей — иначе журнал пришлось бы листать ради «+1 ⟡».
- * 3. **Сумма влияния битв — только из числа в начале записи** (`+150: …`, `-100: …`).
- *    Запись без такого числа выпадает: неизвестная сумма в казне хуже пропуска.
+ * 3. **Сумма влияния битв — только из числа записи:** `n` в `{"n":…,"kind":…}` (CORP-19)
+ *    или число в начале старой записи (`+150: …`). Запись без числа выпадает: неизвестная
+ *    сумма в казне хуже пропуска.
  * 4. **Доход в сутки — по зданиям**, чтобы было видно, откуда он берётся.
  */
 import type { CorpInfrastructureView } from '../packages/protocol/src/corpInfrastructure';
@@ -59,14 +60,51 @@ export function corpLedger(journal: readonly CorpJournalEntry[]): CorpLedgerRow[
       }
       if (!e.target || !detail || !amount(detail.level) || !amount(detail.cost)) continue;
       if (detail.cost <= 0) continue;
-      out.push({ kind: 'build', at: e.at, delta: -detail.cost, buildingId: e.target, level: detail.level });
+      out.push({
+        kind: 'build',
+        at: e.at,
+        delta: -detail.cost,
+        buildingId: e.target,
+        level: detail.level,
+      });
     } else if (e.action === 'influence') {
-      const m = /^([+-]\d+):/.exec(e.detail ?? '');
-      const n = m ? Number(m[1]) : NaN;
+      const n = influenceEntry(e.detail)?.n ?? NaN;
       if (amount(n) && n !== 0) out.push({ kind: 'battle', at: e.at, delta: n });
     }
   }
   return out;
+}
+
+/** Почему двигалось влияние (CORP-19): сервер пишет только структуру, слова — ключ локали. */
+export type InfluenceKind = 'challenge' | 'refund' | 'win' | 'start';
+/** Ключ локали строки журнала по причине; `{n}` — сумма со знаком, `{corp}` — соперник. */
+export const INFLUENCE_AUDIT_KEY: Record<InfluenceKind, string> = {
+  challenge: 'corp.audit.influence.challenge',
+  refund: 'corp.audit.influence.refund',
+  win: 'corp.audit.influence.win',
+  start: 'corp.audit.influence.start',
+};
+const INFLUENCE_KINDS: readonly string[] = Object.keys(INFLUENCE_AUDIT_KEY);
+
+/** Запись `influence` журнала: `{"n":…,"kind":…,"ref"?:…}`, а у старых записей — `+150: …`
+ *  (сумма без причины, `kind` тогда нет). Неразборчивая запись — null. */
+export function influenceEntry(
+  detail: string | undefined,
+): { n: number; kind?: InfluenceKind; ref?: string } | null {
+  const legacy = /^([+-]\d+)(?::|$)/.exec(detail ?? '');
+  if (legacy) return { n: Number(legacy[1]) };
+  try {
+    const d = JSON.parse(detail ?? '') as { n?: unknown; kind?: unknown; ref?: unknown } | null;
+    if (!d || !amount(d.n) || typeof d.kind !== 'string' || !INFLUENCE_KINDS.includes(d.kind))
+      return null;
+    return {
+      n: d.n,
+      kind: d.kind as InfluenceKind,
+      ...(typeof d.ref === 'string' ? { ref: d.ref } : {}),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Правило 4: доход в сутки по зданиям текущих уровней. */
