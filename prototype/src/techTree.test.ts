@@ -6,7 +6,7 @@ import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { MAX_RESEARCH_QUEUE } from '../../packages/shared-core/src/index';
 import { queueTech } from '../../decisions/actions';
 import { fmtEta } from './format';
-import { liveRender } from './liveTimers.fixture';
+import { liveRender, plainText } from './liveTimers.fixture';
 import {
   TECH_BRANCHES,
   TECH_LIVE,
@@ -407,7 +407,7 @@ describe('дерево технологий — разметка', () => {
     // (иначе окно пересобиралось бы каждые полсекунды вместе с кнопками под курсором).
     const seen = liveRender(html, st.time, TECH_LIVE);
     expect(seen).toContain('style="width:50%"'); // полоса ровно посередине
-    expect(seen.replace(/<[^>]+>/g, '')).toContain(`⏳ ${t('tech.action.running', { n: 5 })}`); // 5 ч
+    expect(plainText(seen)).toContain(`⏳ ${t('tech.action.running', { n: 5 })}`); // 5 ч
     // ETA видна прямо в СТРОКЕ, а не только в досье
     expect(seen).toContain(`<span class="tt-st run">⚗ <span class="pn-timer" data-at="${st.time + 5 * HOUR}" data-fmt="hup">${fmtEta(5)}</span>`);
     // …и вынесена в закреплённую шапку — ради неё экран и открывают повторно

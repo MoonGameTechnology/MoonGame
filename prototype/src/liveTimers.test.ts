@@ -15,7 +15,7 @@ import {
   liveTipAttrs,
   patchLiveTimers,
 } from './liveTimers';
-import { liveRender } from './liveTimers.fixture';
+import { liveRender, plainText } from './liveTimers.fixture';
 import { HOUR } from './time';
 
 beforeAll(() => setLocale('ru'));
@@ -44,7 +44,7 @@ describe('живой патч', () => {
     const now = 10 * HOUR;
     const html = liveTimerHtml(now + 2.5 * HOUR) + liveTimerHtml(now + 90 * 60_000, 'hms') +
       liveTimerHtml(now + 14 * HOUR, 'hrs');
-    expect(liveRender(html, now).replace(/<[^>]+>/g, '|')).toBe(
+    expect(plainText(liveRender(html, now), '|')).toBe(
       `|${fmtEta(2.5)}||${countdownHMS(90 * 60_000)}||${fmtHrs(14)}|`,
     );
   });

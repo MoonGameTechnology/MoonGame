@@ -26,7 +26,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import { statSourceKey } from '../../decisions/statModifiers';
 import type { Dossier } from './dossiers';
-import { liveRender } from './liveTimers.fixture';
+import { liveRender, liveText } from './liveTimers.fixture';
 import type { SectorType } from './map';
 import { HOUR } from './time';
 
@@ -201,7 +201,7 @@ const act = (name: string): string => `data-act="${name}"`;
 const sub = (html: string): string =>
   /<div class="ptitle">.*?<span>([^<]*)<\/span>/s.exec(html)![1]!;
 /** Что увидит игрок после живого патча к моменту `now`: текст без тегов. */
-const seen = (html: string, now: number): string => liveRender(html, now).replace(/<[^>]+>/g, '');
+const seen = (html: string, now: number): string => liveText(html, now);
 
 // Первая загрузка карточки тянет ядро, данные и решения — секунды под нагрузкой полного гейта.
 // Граф греется один раз; тесты после `vi.resetModules()` берут его из кеша трансформаций.

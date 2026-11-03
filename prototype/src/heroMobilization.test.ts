@@ -11,7 +11,7 @@ import {
   heroModule,
 } from '../../packages/shared-core/src/index';
 import { initHeroStaff } from './heroStaff';
-import { liveRender } from './liveTimers.fixture';
+import { liveText } from './liveTimers.fixture';
 import { techFx } from './techTree';
 import { setLocale, t } from '../../localization/runtime';
 import { HOUR } from './time';
@@ -134,7 +134,7 @@ describe('main-game hero mobilization', () => {
     });
     const before = staff.paneHtml();
     // Отсчёт — живой узел (`liveTimers.ts`): цифры ставит патч, разметка с часами не меняется.
-    const seen = (html: string): string => liveRender(html, current.time).replace(/<[^>]+>/g, '');
+    const seen = (html: string): string => liveText(html, current.time);
     expect(seen(before)).toContain('Мобилизация: 20:00:00');
     expect(before).toContain(t('hero.hq.deployed-count', { a: 1, c: 1 }));
     expect(before).not.toContain(`data-hspawn="${heroes[0]!.id}"`);

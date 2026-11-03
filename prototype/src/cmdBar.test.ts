@@ -382,7 +382,7 @@ describe('REFM-226 — поповеры ряда', () => {
   it('✨ только у флота с героем; поповер — по пункту на навык, на кулдауне погашен', async () => {
     const { cb, inter, env, page, fleet, select, cmds } = await boot();
     const { esc, fmtHrs } = await import('./format');
-    const { liveRender } = await import('./liveTimers.fixture');
+    const { liveText } = await import('./liveTimers.fixture');
     const { HOUR } = await import('./game');
     select(fleet.id);
     env.world = { ...env.world, heroes: {} } as GameState;
@@ -401,7 +401,7 @@ describe('REFM-226 — поповеры ряда', () => {
     expect(casts[0]).toContain('data-ab="corridor" data-hero="h-test" data-desc="ab:corridor"');
     expect(casts[0]).toContain(' disabled');
     // Срок — живой узел: ряд с кнопками удара не пересобирается с часами кулдауна.
-    const seen = liveRender(casts[0]!, env.world.time).replace(/<[^>]+>/g, '');
+    const seen = liveText(casts[0]!, env.world.time);
     expect(seen).toContain(t('cmd.cast.cooldown', { h: fmtHrs(2) }));
     const writes = page.bar.writes;
     env.world = { ...env.world, time: env.world.time + 0.75 * HOUR };

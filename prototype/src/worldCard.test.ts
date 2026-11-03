@@ -26,7 +26,7 @@ import {
 import { buildingName, fmtEta, resLine } from './format';
 import { data } from './gameData';
 import { fleetHangar, planetHangar } from './hangarPanel';
-import { liveRender } from './liveTimers.fixture';
+import { liveRender, liveText } from './liveTimers.fixture';
 import type { SectorType } from './map';
 import { worldName } from './planetName';
 import type { Snapshot } from './scanMemory';
@@ -198,7 +198,7 @@ const sub = (html: string): string =>
 /** Кнопка действия панели по `data-act` и `data-arg`. */
 const act = (name: string, arg: string): string => `data-act="${name}" data-arg="${arg}"`;
 /** Что увидит игрок после живого патча к моменту `now` (`liveTimers.ts`): текст без тегов. */
-const seen = (html: string, now: number): string => liveRender(html, now).replace(/<[^>]+>/g, '');
+const seen = (html: string, now: number): string => liveText(html, now);
 
 // Первая загрузка карточки тянет ядро, данные и решения — секунды под нагрузкой полного гейта.
 // Граф греется один раз; тесты после `vi.resetModules()` берут его из кеша трансформаций.

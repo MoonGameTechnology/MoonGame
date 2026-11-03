@@ -9,7 +9,7 @@ import type { FleetHold } from '../../decisions/fleetHolds';
 import { t } from '../../localization/runtime';
 import { FLEET_COUNT_FONT } from '../../packages/client/src/fleetCountBadge';
 import { drawFleetHoldBadge, fleetHoldsHtml } from './fleetHoldView';
-import { liveRender } from './liveTimers.fixture';
+import { liveText, plainText } from './liveTimers.fixture';
 import { VETERAN_GOLD } from './veteranChevrons';
 
 interface Call {
@@ -109,8 +109,8 @@ describe('шкала трюма в листе флота', () => {
       }),
     ]);
     // Цифр в разметке нет: лист сравнивает её строкой, и процент пересобирал бы его с кнопками.
-    const seen = (now: number): string => liveRender(html, now).replace(/<[^>]+>/g, '');
-    expect(html.replace(/<[^>]+>/g, '')).toContain(t('cargo.meter.loading', { n: 2, p: '…' }));
+    const seen = (now: number): string => liveText(html, now);
+    expect(plainText(html)).toContain(t('cargo.meter.loading', { n: 2, p: '…' }));
     expect(seen(100)).toContain(t('cargo.meter.loading', { n: 2, p: 75 }));
     expect(seen(100)).toContain(t('cargo.meter.unloading', { n: 1, p: 0 }));
     expect(seen(200)).toContain(t('cargo.meter.loading', { n: 2, p: 100 }));

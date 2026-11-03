@@ -8,7 +8,7 @@ import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { HERO_GRADE_COLORS } from '../../decisions/heroIdentity';
 import { countdownHMS, fmtHrs } from './format';
-import { liveRender } from './liveTimers.fixture';
+import { liveText } from './liveTimers.fixture';
 import { HOUR } from './time';
 import {
   HERO_TABS,
@@ -724,7 +724,7 @@ describe('штаб героев — Учёный', () => {
 // Цифры отсчёта в разметке меняли её с каждым шагом часов: окно «Производство → Герои»
 // пересобиралось, и кнопки под курсором мигали (как «Штурм» на высадке, #1801).
 describe('штаб героев — живые сроки', () => {
-  const seen = (html: string, now: number): string => liveRender(html, now).replace(/<[^>]+>/g, '');
+  const seen = (html: string, now: number): string => liveText(html, now);
 
   it('кулдаун способности и мобилизация — сроком в разметке, цифры ставит живой патч', () => {
     const s = staffed();

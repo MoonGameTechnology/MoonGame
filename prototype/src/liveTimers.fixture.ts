@@ -56,3 +56,13 @@ export function liveRender(html: string, now: number, formats?: LiveFormats): st
     return `<${tag}${attrs}${extra}>${dots !== undefined ? el.textContent : ''}`;
   });
 }
+
+/** Текст разметки без тегов: то, что прочтёт игрок. Для проверок, а не очистка HTML. */
+export function plainText(html: string, sep = ''): string {
+  return html.split(/<[^>]*>/).join(sep);
+}
+
+/** Что увидит игрок после живого патча к моменту `now`: текст без тегов. */
+export function liveText(html: string, now: number, formats?: LiveFormats): string {
+  return plainText(liveRender(html, now, formats));
+}
