@@ -147,6 +147,23 @@ try {
       await page.waitForFunction(() => !document.querySelector('[data-mm-buy]'));
       await page.locator('#module-reward[open] .rarity-unique').waitFor();
       await page.locator('[data-module-reward="next"]').click();
+      // Торги: alice выставляет копию на 12 часов, bob ставит минимум.
+      await page.evaluate(() => window.moduleChain.actor('alice'));
+      await page.locator('[data-mm-tab="sell"]').click();
+      await page.locator('[data-mm-open^="item:"]').first().click();
+      await page.locator('[data-mm-mode="bid"]').click();
+      await page.locator('[data-mm-price]').fill('120');
+      await page.locator('[data-mm-hours="12"]').click();
+      await page.locator('[data-mm-auction-open]').click();
+      await page.locator('.mm-slot.used .mm-timer').waitFor();
+      await page.screenshot({ path: resolve(out, `auction-shelf-${width}.png`) });
+      await page.evaluate(() => window.moduleChain.actor('bob'));
+      await page.locator('[data-mm-tab="bids"]').click();
+      await page.locator('[data-mm-open^="bid:"]').click();
+      await page.screenshot({ path: resolve(out, `auction-bid-${width}.png`) });
+      await page.locator('[data-mm-bid]').click();
+      await page.locator('.mm-pill.lead').waitFor();
+      await page.screenshot({ path: resolve(out, `auction-bids-${width}.png`) });
       const bought = await f.arsenal.get('target');
       assert.equal(bought.accountId, 'bob');
       assert.equal(bought.grade, 1);

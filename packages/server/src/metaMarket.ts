@@ -7,6 +7,7 @@ import type { MaterialLot, MetaMaterialListing, MetaMarketPurchase } from '@void
 export type { MetaMaterialListing, MetaMarketPurchase } from '@void/protocol';
 import type { MetaEconomyStore, MetaEconomyTransaction } from './metaEconomyStore';
 import { memoryEconomyLock } from './memoryEconomyLock';
+import { MemoryMetaAuctions, PostgresMetaAuctions, type AuctionState, type MetaAuctions } from './metaAuction';
 
 export const META_MARKET_FEE = 0.08;
 /**
@@ -33,6 +34,8 @@ export interface MetaMarketListing {
   item: ArsenalItem;
   price: number;
   createdAt: number;
+  /** Лот на торгах (`metaAuction.ts`): `price` — начальная цена. Нет поля — продажа по цене. */
+  auction?: AuctionState;
 }
 
 type ReservedMaterialListing = MetaMaterialListing & { reserved: MaterialLot[] };
@@ -106,6 +109,8 @@ export interface MetaMarket {
     tradeId: string,
   ): Promise<MetaMarketResult<MetaMarketPurchase>>;
   cancelMaterial(accountId: string, listingId: string): Promise<MetaMarketResult>;
+  /** Торги со ставками в той же книге лотов. */
+  auctionHouse(): MetaAuctions;
 }
 
 /** Development adapter. Mutations share one promise tail, mirroring a DB transaction. */
@@ -208,7 +213,9 @@ export class MemoryMetaMarket implements MetaMarket {
   async listings(): Promise<MetaMarketListing[]> {
     return this.locked(async () =>
       structuredClone(
-        [...this.lots.values()].sort((a, b) => a.price - b.price || a.createdAt - b.createdAt),
+        [...this.lots.values()]
+          .filter((lot) => !lot.auction)
+          .sort((a, b) => a.price - b.price || a.createdAt - b.createdAt),
       ),
     );
   }
@@ -275,7 +282,7 @@ export class MemoryMetaMarket implements MetaMarket {
           ? (structuredClone(previous.result) as MetaMarketResult<MetaMarketPurchase>)
           : { ok: false, code: 'E_IDEMPOTENCY_CONFLICT' };
       const lot = this.lots.get(listingId);
-      if (!lot) return { ok: false, code: 'E_NO_LISTING' };
+      if (!lot || lot.auction) return { ok: false, code: 'E_NO_LISTING' };
       if (lot.sellerId === accountId) return { ok: false, code: 'E_OWN_LISTING' };
       const balance = await this.ensureWallet(accountId);
       if (balance < lot.price) return { ok: false, code: 'E_INSUFFICIENT' };
@@ -438,11 +445,33 @@ export class MemoryMetaMarket implements MetaMarket {
     });
   }
 
+  /** Есть ли предмет в книге — по цене или на торгах (`isItemListed`). */
+  hasListedItem(itemId: string): Promise<boolean> {
+    return this.locked(async () => [...this.lots.values()].some((lot) => lot.item.itemId === itemId));
+  }
+
+  auctionHouse(): MetaAuctions {
+    return new MemoryMetaAuctions({
+      now: this.now,
+      feeRate: META_MARKET_FEE,
+      lots: this.lots,
+      sellerLots: (id) => [...this.lots.values(), ...this.materialLots.values()].filter((x) => x.sellerId === id).length,
+      receipts: this.receipts,
+      arsenal: this.arsenal,
+      wallet: (id) => this.ensureWallet(id),
+      setWallet: (id, amount) => void this.wallets.set(id, amount),
+      journal: (...entries) => void this.journal.push(...entries.map((e) => ({ id: randomUUID(), ...e }))),
+      locked: (work) => this.locked(work),
+      run: (accounts, work) => (this.economy ? this.economy.transaction(accounts, work) : this.locked(() => work())),
+    });
+  }
+
   cancel(accountId: string, listingId: string): Promise<MetaMarketResult> {
     return this.locked(async () => {
       const lot = this.lots.get(listingId);
       if (!lot) return { ok: false, code: 'E_NO_LISTING' };
       if (lot.sellerId !== accountId) return { ok: false, code: 'E_FORBIDDEN' };
+      if (lot.auction?.bids) return { ok: false, code: 'E_HAS_BIDS' };
       this.lots.delete(listingId);
       return { ok: true };
     });
@@ -592,7 +621,7 @@ export class PostgresMetaMarket implements MetaMarket {
   }
   async listings(): Promise<MetaMarketListing[]> {
     const r = await this.pool.query<LotRow>(
-      'SELECT l.*,a.kind,a.form,a.def_id,a.grade,a.soulbound,a.durability,a.origin,a.acquired_at,a.progression FROM meta_market_listings l JOIN arsenal a ON a.item_id=l.item_id ORDER BY l.price,l.created_at',
+      'SELECT l.*,a.kind,a.form,a.def_id,a.grade,a.soulbound,a.durability,a.origin,a.acquired_at,a.progression FROM meta_market_listings l JOIN arsenal a ON a.item_id=l.item_id WHERE l.ends_at IS NULL ORDER BY l.price,l.created_at',
     );
     return r.rows.map(fromRow);
   }
@@ -673,7 +702,7 @@ export class PostgresMetaMarket implements MetaMarket {
           : { ok: false, code: 'E_IDEMPOTENCY_CONFLICT' };
       }
       const q = await c.query<LotRow>(
-        'SELECT l.*,a.kind,a.form,a.def_id,a.grade,a.soulbound,a.durability,a.origin,a.acquired_at,a.progression FROM meta_market_listings l JOIN arsenal a ON a.item_id=l.item_id WHERE l.id=$1 FOR UPDATE',
+        'SELECT l.*,a.kind,a.form,a.def_id,a.grade,a.soulbound,a.durability,a.origin,a.acquired_at,a.progression FROM meta_market_listings l JOIN arsenal a ON a.item_id=l.item_id WHERE l.id=$1 AND l.ends_at IS NULL FOR UPDATE',
         [listingId],
       );
       const lot = q.rows[0];
@@ -931,9 +960,15 @@ export class PostgresMetaMarket implements MetaMarket {
 
   async cancel(accountId: string, listingId: string): Promise<MetaMarketResult> {
     const r = await this.pool.query(
-      'DELETE FROM meta_market_listings WHERE id=$1 AND seller_id=$2',
+      'DELETE FROM meta_market_listings WHERE id=$1 AND seller_id=$2 AND bids=0',
       [listingId, accountId],
     );
-    return r.rowCount === 1 ? { ok: true } : { ok: false, code: 'E_NO_LISTING' };
+    if (r.rowCount === 1) return { ok: true };
+    const held = await this.pool.query('SELECT 1 FROM meta_market_listings WHERE id=$1 AND seller_id=$2', [listingId, accountId]);
+    return { ok: false, code: held.rowCount ? 'E_HAS_BIDS' : 'E_NO_LISTING' };
+  }
+
+  auctionHouse(): MetaAuctions {
+    return new PostgresMetaAuctions(this.pool, () => this.economy, this.now, META_MARKET_FEE, this.faucet);
   }
 }

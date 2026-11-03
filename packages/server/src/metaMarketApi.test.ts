@@ -88,6 +88,77 @@ describe('meta market HTTP API', () => {
     await app.close();
   });
 
+  it('opens a timed lot, takes bids and never shows the leader to others', async () => {
+    const arsenal = new MemoryArsenalStore();
+    await arsenal.grant({
+      itemId: 'lot-item',
+      accountId: 'seller',
+      kind: 'module',
+      form: 'instance',
+      defId: 'ion_engine',
+      soulbound: false,
+      origin: 'drop',
+      acquiredAt: 1,
+    });
+    const market = new MemoryMetaMarket(arsenal, () => 1, 500);
+    const app = Fastify();
+    registerMetaMarketApi(app, {
+      market,
+      auctionSweepMs: 0,
+      identify: (r: FastifyRequest) => {
+        const login = r.headers['x-user'];
+        return Promise.resolve(typeof login === 'string' ? { accountId: login, login } : null);
+      },
+    });
+    const post = (user: string, url: string, payload: object) =>
+      app.inject({ method: 'POST', url, headers: { 'x-user': user }, payload });
+    expect(
+      (
+        await post('seller', '/meta-market/auction/open', {
+          itemId: 'lot-item',
+          start: 100,
+          hours: 7,
+        })
+      ).statusCode,
+    ).toBe(400);
+    const opened = await post('seller', '/meta-market/auction/open', {
+      itemId: 'lot-item',
+      start: 100,
+      buyout: 400,
+      hours: 12,
+    });
+    expect(opened.statusCode).toBe(200);
+    const id = (opened.json() as { listing: { id: string } }).listing.id;
+    expect(
+      (
+        await post('bidder', '/meta-market/auction/bid', {
+          listingId: id,
+          amount: 120,
+          tradeId: 'b1',
+        })
+      ).json(),
+    ).toMatchObject({ ok: true, balance: 380 });
+    const leader = (
+      await app.inject({ url: '/meta-market', headers: { 'x-user': 'bidder' } })
+    ).json() as { auctions: object[] };
+    expect(leader.auctions[0]).toMatchObject({
+      id,
+      current: 120,
+      minimum: 126,
+      bids: 1,
+      leading: true,
+      mine: false,
+    });
+    const other = (
+      await app.inject({ url: '/meta-market', headers: { 'x-user': 'other' } })
+    ).json() as { auctions: object[]; listings: object[] };
+    expect(other.auctions[0]).toMatchObject({ leading: false });
+    expect(JSON.stringify(other.auctions)).not.toContain('bidder');
+    expect(other.listings).toEqual([]);
+    expect((await post('seller', '/meta-market/cancel', { listingId: id })).statusCode).toBe(409);
+    await app.close();
+  });
+
   it('пишущие маршруты под per-IP лимитом (EC-0.3 wash-trading), чтение свободно', async () => {
     const market = new MemoryMetaMarket(new MemoryArsenalStore(), () => 1, 500);
     const app = Fastify();
