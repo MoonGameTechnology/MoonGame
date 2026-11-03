@@ -154,7 +154,7 @@ JSONL. Root guard контролирует свободный диск, inode и
 packages/
   shared-core/src/     ядро: детерминированная симуляция без сети и БД
     kernel/            kernel.ts: createKernel, applyAction, advanceTo, canApply; module.ts
-    modules/           55 модулей механик; порядок ядра — GAME_MODULES в gameModules.ts
+    modules/           56 модулей механик; порядок ядра — GAME_MODULES в gameModules.ts
     state/             gameState.ts (GameState), visibility.ts (туман), buildFromMap.ts (посев)
     action/, actions/  types.ts (Action, Context, MatchConfig), matchMode.ts; payloadSchemas.ts
     data/              schemas.ts (zod-схемы GameData), mapSchema.ts, loadGameData.ts
@@ -234,7 +234,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 
 ## 5. Модули ядра
 
-55 модулей в `packages/shared-core/src/modules`, по файлу на механику; порядок исполнения —
+56 модулей в `packages/shared-core/src/modules`, по файлу на механику; порядок исполнения —
 `GAME_MODULES` (`packages/shared-core/src/gameModules.ts`), один на оба хоста, счётчик — §9.
 Модули не импортируют друг друга: события, хуки и возможности, а без модуля работает базовый дефолт
 ([modulesystem.md](modulesystem.md)). События и хуки по модулям — [CODE-MAP.md](../CODE-MAP.md).
@@ -411,8 +411,12 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 Флот на линии опознаётся по своей текущей позиции в кругах зрения блока, а не по
 ближайшему узлу. Это общее правило для соло, серверной проекции и радарных отметок;
 разведка мира раскрывает стоящие у него флоты, но не всю исходящую линию.
+Маскировочное поле флагмана героя (`state/cloak.ts`, модуль `cloak-field`) сжимает для
+его флота чужие круги опознания и дальность радара на `1 − cloak`; опознанный мир такой
+флот не выдаёт. Поле сорвано в бою, при обстреле и час после боя, залпа или вылета шаттлов
+(`Fleet.cloakBrokenUntil`); шпион на мире и скан героя его видят.
 
-## 6. Данные (`data/*.json`, версия `0.1.77`)
+## 6. Данные (`data/*.json`, версия `0.1.78`)
 
 Контент — данные: новая сущность или число — правка JSON, а не кода (скилл `add-game-content`).
 Имя в JSON английское, текст — ключ `data.<слаг>` в обеих локалях (`prototype/src/i18n.test.ts`).
@@ -421,7 +425,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 | --- | --- | --: |
 | `units` | корабли и наземка домов, флагман, Рой, пираты, служебные (мины, ракета) | 35 |
 | `technologies` | технологии основной игры | 50 |
-| `buildings` `modules` `factions` `scientists` | постройки, модули, фракции, учёные | 34·25·7·7 |
+| `buildings` `modules` `factions` `scientists` | постройки, модули, фракции, учёные | 34·26·7·7 |
 | `heroes` и ещё 4 `hero*` | архетипы, способности, пассивки, узлы дерева, грейды | 6·12·13·19·4 |
 | `sectorKinds` `sectors` `planetTypes` | виды узлов, местность, типы планет | 17·11·12 |
 | `modes` `events` `resources` | режимы, правила событий, ресурсы | 15·6·6 |
@@ -435,7 +439,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `packages/server` читает фрагменты с диска, браузерам и хосту игроков их вшивает сборщик через
   `data/bundle.ts`. У большинства каталогов дефолт `{}`: пропавший фрагмент не роняет загрузку, а
   пустеет — ловит `data/bundle.test.ts`. Форму и ссылки держит `schemas.test.ts`, поведение
-  контента — 48 тестов `data/*.test.ts`. Вне бандла — серверные `starterArsenal`, `dropTables`,
+  контента — 49 тестов `data/*.test.ts`. Вне бандла — серверные `starterArsenal`, `dropTables`,
   `metaEconomy`, `medals`, `corpBuildings` (§8): своя проверка, кривой файл — отказ запуска.
 - **Пин.** Партия хранит `version.data` и отпечаток бандла `version.dataHash`; сверка — §2.
 - **Как менять.** Правка бандла — `version` в `data/manifest.json`, пин в `schemas.test.ts` (гейт),
@@ -978,13 +982,13 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 Готовность по этапам и продуктам — [readiness.md](readiness.md), путь к выпуску —
 [release-path.md](release-path.md). Здесь — состав ядра и технические долги.
 
-**55 модулей** на микроядре: столько файлов в `packages/shared-core/src/modules` (без тестов).
+**56 модулей** на микроядре: столько файлов в `packages/shared-core/src/modules` (без тестов).
 Оба хоста собирают весь каталог одним списком (SLIM-4): `MODULES` прототипа и `DEV_MODULES`
 канонического сервера — это `GAME_MODULES` из ядра.
 
 | Сборка | Модулей | Состав |
 | --- | --: | --- |
-| `GAME_MODULES` (оба хоста, `gameModules.ts`) | **55** | весь каталог ядра |
+| `GAME_MODULES` (оба хоста, `gameModules.ts`) | **56** | весь каталог ядра |
 
 §9 — единственный дом этих чисел: `scripts/docs-check.mjs` сверяет их с кодом (файлы каталога и
 закреплённый список `moduleManifest.test.ts`), другие доки ссылаются сюда. Состав и порядок —

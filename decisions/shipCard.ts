@@ -91,6 +91,7 @@ export const SHIP_CARD_STATS = [
   'salvageBonus',
   'mineCharge',
   'mineHit',
+  'cloak',
 ] as const;
 
 const ALWAYS = new Set<string>(['attack', 'defense', 'hp', 'speed']);

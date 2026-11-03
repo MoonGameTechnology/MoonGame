@@ -21,6 +21,8 @@
  *    отсутствие метки читается правильно.
  * 6. **Пустая полоса не рисуется совсем.** Заголовок «Эффекты» без единой метки выглядит
  *    как поломка загрузки, а не как «с флотом всё спокойно».
+ * 7. **Маскировочное поле — только на своём флоте** (SM-4.3): сила поля и время, когда оно
+ *    снова заработает после боя, — сведения, которых у противника быть не должно.
  */
 
 /** Метка эффекта: вид и числа для подписи. Текст берёт вызывающая сторона из локали. */
@@ -31,7 +33,11 @@ export type EffectTag =
   | { kind: 'patrol' }
   | { kind: 'blackout' }
   | { kind: 'hunger' }
-  | { kind: 'point-defense'; n: number };
+  | { kind: 'point-defense'; n: number }
+  /** Маскировочное поле (SM-4.3): `pct` — на сколько ближе чужие замечают флот;
+   *  `brokenUntil` — поле сорвано (бой, обстрел, вылет), до какого времени, `null` — пока
+   *  идёт бой или обстрел. */
+  | { kind: 'cloak'; pct: number; broken: boolean; brokenUntil: number | null };
 
 /** Состояние флота, сведённое к тому, о чём говорят метки. */
 export interface FleetFacts {
@@ -46,6 +52,8 @@ export interface FleetFacts {
   troops: number;
   /** Суммарное зональное ПВО (см. {@link pointDefenseTotal}). */
   pointDefense: number;
+  /** Маскировочное поле на борту (правило 7). Нет поля — поле не передаётся. */
+  cloak?: { pct: number; broken: boolean; brokenUntil: number | null };
 }
 
 /**
@@ -99,5 +107,8 @@ export function fleetEffects(f: FleetFacts, me: string, arrears: readonly string
     if (hungerShown(arrears, f.troops)) tags.push({ kind: 'hunger' });
   }
   if (pointDefenseShown(f.pointDefense)) tags.push({ kind: 'point-defense', n: f.pointDefense });
+  // Правило 7: маскировка — только на СВОЁМ флоте. На чужом метка выдала бы, что у врага
+  // есть поле и когда оно снова заработает.
+  if (f.cloak && f.cloak.pct > 0 && f.owner === me) tags.push({ kind: 'cloak', ...f.cloak });
   return tags;
 }

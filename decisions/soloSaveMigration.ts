@@ -352,6 +352,19 @@ export const INTERCEPT_TURRET_SOLO_MIGRATION = {
   toDataHash: '032a24eea7e673',
 } as const;
 
+/** Catalogue + rules pair: the cloak field (SM-4.3) is a new legendary module for the hero
+ *  flagship, and the kernel gains the `cloak-field` module that marks when a cloaked fleet
+ *  gives itself away (`Fleet.cloakBrokenUntil`). No saved ship carries the field, and the mark
+ *  is optional, so a save of the previous release reads as is. */
+export const CLOAK_FIELD_SOLO_MIGRATION = {
+  fromRules: INTERCEPT_TURRET_SOLO_MIGRATION.toRules,
+  fromData: INTERCEPT_TURRET_SOLO_MIGRATION.toData,
+  fromDataHash: INTERCEPT_TURRET_SOLO_MIGRATION.toDataHash,
+  toRules: '1714d25eaa57a3',
+  toData: '0.1.78',
+  toDataHash: '0f9abfa796f0e3',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -384,6 +397,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   CAPITAL_VICTORY_SOLO_MIGRATION,
   SPY_DEVELOPMENT_SOLO_MIGRATION,
   INTERCEPT_TURRET_SOLO_MIGRATION,
+  CLOAK_FIELD_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

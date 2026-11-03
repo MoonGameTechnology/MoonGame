@@ -17,7 +17,7 @@
     "packages/server/src/metaEconomy.ts": 1358,
     "packages/server/src/store/memory.ts": 1316,
     "packages/shared-core/src/modules/hero.ts": 1161,
-    "prototype/src/fleetCard.ts": 1287,
+    "prototype/src/fleetCard.ts": 1290,
     "prototype/src/eventFeed.ts": 1282,
     "prototype/selfplay.mjs": 1198,
     "prototype/src/shipyard.ts": 1185,

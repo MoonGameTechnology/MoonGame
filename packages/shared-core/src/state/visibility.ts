@@ -9,6 +9,7 @@ import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { laneIsPublic } from './corridor';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
 import { emptyOrdnance, inRadius, isMissileFleet, rocketMineModule } from './ordnance';
+import { cloakedReach, eyeReach, fleetCloak } from './cloak';
 import { visibleMinefields, isMineFleet, mineDetectionRange, mineFleetVisible } from './minefields';
 import { detectSignals, fleetSignalStrength, type RadarSource, type SignalEmitter, type SignatureContact } from './radarSignals';
 import { coverageInCircles, withProjectedSensors, type Coverage, type SightCircle } from './sensorView';
@@ -375,9 +376,24 @@ export function fleetsSeenByPosition(
   for (const fleet of Object.values(state.fleets)) {
     if (fleet.owner === viewerId || isMineFleet(fleet, data) || isMissileFleet(fleet, data)) continue;
     const at = fleetPosition(state, fleet);
-    if (at && eyes.some((c) => inRadius(at, c, c.identify))) seen.add(fleet.id);
+    const cloak = fleetCloak(state, fleet, data);
+    if (at && eyes.some((c) => inRadius(at, c, eyeReach(c, cloak)))) seen.add(fleet.id);
   }
   return seen;
+}
+
+/** Опознан ли флот тем, что стоит у опознанного мира. Флот под маскировочным полем этим не
+ *  выдаётся (его ищут глаза по позиции, {@link fleetsSeenByPosition}) — кроме шпиона на
+ *  самом мире. */
+export function seenAtNode(
+  state: GameState,
+  viewerId: PlayerId,
+  fleet: Fleet,
+  identify: ReadonlySet<PlanetId>,
+  data: GameData,
+): boolean {
+  if (fleet.location === null || !identify.has(fleet.location)) return false;
+  return fleetCloak(state, fleet, data) === 0 || spiedPlanets(state, viewerId).has(fleet.location);
 }
 
 /**
@@ -740,6 +756,7 @@ export function radarSignatures(
   const engaged = engagementOf(state, viewerId).fleets;
   const emitters: SignalEmitter[] = [];
   const mineEmitters: Array<{ emitter: SignalEmitter; reach: number }> = [];
+  const cloakEmitters: Array<{ emitter: SignalEmitter; cloak: number }> = [];
   let eyes: SightCircle[] | undefined;
   let provinces: PlanetId[] | undefined;
   for (const fleet of Object.values(state.fleets)) {
@@ -777,11 +794,13 @@ export function radarSignatures(
     if (engaged.has(fleet.id) || seenAt.has(fleet.id)) continue;
     const location = fleetNode(state, fleet);
     const at = fleetPosition(state, fleet);
-    if (location === null || (fleet.location !== null && identify.has(fleet.location)) || !at) continue;
+    if (location === null || seenAtNode(state, viewerId, fleet, identify, data) || !at) continue;
     const emitter: SignalEmitter = { location, ...at, strength: fleetSignalStrength(fleet, data) };
     const node = state.planets[location]?.position;
     if (node && (node.x !== at.x || node.y !== at.y)) emitter.inTransit = true;
-    emitters.push(emitter);
+    const cloak = fleetCloak(state, fleet, data);
+    if (cloak > 0) cloakEmitters.push({ emitter, cloak });
+    else emitters.push(emitter);
   }
   // Decoys obey the same sensitivity, proximity and expiry rules as real emissions.
   for (const hero of Object.values(state.heroes ?? {})) {
@@ -797,6 +816,9 @@ export function radarSignatures(
   // A coarse blip carries no mine id, owner, launch doctrine or module configuration.
   for (const { emitter, reach } of mineEmitters)
     contacts.push(...detectSignals([emitter], sources.map((r) => ({ ...r, range: Math.min(r.range, reach) }))));
+  // Маскировочное поле (SM-4.3): тот же радар, но с меньшей дальностью для этого флота.
+  for (const { emitter, cloak } of cloakEmitters)
+    contacts.push(...detectSignals([emitter], sources.map((r) => ({ ...r, range: cloakedReach(r.range, cloak) }))));
   return contacts;
 }
 
@@ -906,12 +928,14 @@ export function isVisibleTo(
   const battle = fleet.battleId ? state.battles[fleet.battleId] : undefined;
   if (battle && fightsIn(battle, new Set(visionBloc(state, viewerId)))) return true;
   // A world intel window covers ships stationed there, not a whole outgoing lane.
+  const cloak = fleetCloak(state, fleet, data);
   if (fleet.location !== null) {
-    return (identified ?? identifiedNodes(state, viewerId, data)).has(fleet.location) ||
-      spiedPlanets(state, viewerId).has(fleet.location);
+    if (spiedPlanets(state, viewerId).has(fleet.location)) return true;
+    // Под маскировочным полем опознанный мир флот не выдаёт — только глаза по позиции.
+    if (cloak === 0) return (identified ?? identifiedNodes(state, viewerId, data)).has(fleet.location);
   }
   const at = fleetPositionAt(state, fleet, state.time);
-  return !!at && sightCircles(state, viewerId, data).some((c) => inRadius(at, c, c.identify));
+  return !!at && sightCircles(state, viewerId, data).some((c) => inRadius(at, c, eyeReach(c, cloak)));
 }
 
 /**
@@ -1429,7 +1453,7 @@ function project(
     if (engaged.fleets.has(id)) continue; // the enemy in YOUR battle is not a secret
     // All sight sources identify the actual ship position, including mid-lane.
     if (seenAt.has(id)) continue;
-    if (fleet.location !== null && identify.has(fleet.location)) continue; // stationed at an identified world
+    if (seenAtNode(state, viewerId, state.fleets[id]!, identify, data)) continue; // stationed at an identified world
     delete view.fleets[id];
   }
   // SHU-6.6: удержание патруля у чужого корабля — намерение, как и у мира выше. Режется у

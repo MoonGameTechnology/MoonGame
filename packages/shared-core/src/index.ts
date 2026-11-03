@@ -244,7 +244,10 @@ export {
   patrolsSeenBy,
   worldRadarReach,
   fleetRadarReach,
+  // SM-4.3: маскировочное поле — опознанный мир не выдаёт флот под полем.
+  seenAtNode,
 } from './state/visibility';
+export { CLOAK_BREAK_MS, CLOAK_CAP, cloakBroken, fleetCloak, fleetCloakRating } from './state/cloak';
 // FOG-LEAK: чей мир в глазах игрока — право прохода и окно войны судят по нему.
 export { knownOwner } from './state/knownOwner';
 export { signatureSize, fleetSignalStrength, radarThreshold, SIG_MEDIUM, SIG_LARGE, SIGNAL_CLUSTER_RADIUS } from './state/radarSignals';

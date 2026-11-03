@@ -300,7 +300,7 @@ function fireBombardVolley(h: HandlerContext, f: Fleet): void {
   if (power > 0) {
     const structuresApplied = wearStructures(h, planetId, shelling, planet.owner, { hit, factor });
     h.emit('planet.bombarded', { planetId, power: shelling, owner: planet.owner, by: f.owner,
-      hit, factor, structuresApplied });
+      fleetId: f.id, hit, factor, structuresApplied });
   }
 
 }

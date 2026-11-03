@@ -1,4 +1,4 @@
 {
-  "version": "0.1.77",
+  "version": "0.1.78",
   "description": "Void Dominion game-data bundle. Version is pinned per match (docs/architecture.md §4.4)."
 }

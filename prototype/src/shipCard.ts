@@ -45,6 +45,7 @@ const STAT_LABEL: Record<string, string> = {
   pointDefense: 'shipcard.stat.pd',
   siegeDamage: 'loadout.stat.siege',
   shuttleDamage: 'loadout.stat.air-damage',
+  cloak: 'loadout.stat.cloak',
   retreatPull: 'loadout.stat.retreat-pull',
   salvageBonus: 'loadout.stat.salvage',
   fleetHullRepair: 'loadout.stat.fleet-repair',

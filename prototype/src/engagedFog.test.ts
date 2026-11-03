@@ -26,8 +26,11 @@ describe('туман спрашивает о флоте и бое только �
     expect(count('known(fleetNode(')).toBe(0);
     expect(count('known(fleetNode(', feed)).toBe(0);
     expect(count('known(fleetNode(', fog)).toBe(0);
+    // Опознанный узел выдаёт флот тем же правилом, что ядро: маскировочное поле (SM-4.3)
+    // его прячет, шпион на мире — нет (`seenAtNode`).
+    expect(fog).toContain('const atNode = !vision || seenAtNode(game.world(), game.me(), f, vision.identify, data);');
     expect(fog).toContain(
-      'return known(f.location) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);',
+      'return atNode || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);',
     );
   });
 
