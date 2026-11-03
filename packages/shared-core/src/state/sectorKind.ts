@@ -1,5 +1,5 @@
 import type { GameData, SectorKindAppearance, SectorKindDef } from '../data/schemas';
-import type { Planet } from './gameState';
+import type { Planet, BuildingInstance } from './gameState';
 
 /**
  * Province-type accessors (map-roadmap.md M2.1). A province's `kind` is the single
@@ -35,6 +35,17 @@ export function sectorKindDef(data: GameData, planet: Pick<Planet, 'kind'>): Sec
  *  prize, every other kind a flat lower worth). The territory term of `computeScore`. */
 export function provinceScore(data: GameData, planet: Pick<Planet, 'kind'>): number {
   return sectorKindDef(data, planet).scoreValue;
+}
+
+/** Building worth on one province: sum all levels before integer division, so
+ * splitting construction into several buildings never multiplies rounding loss. */
+export function provinceBuildingScore(data: GameData, planet: { buildings: readonly Pick<BuildingInstance, 'type' | 'level'>[] },
+  divisor = data.scoring.buildingDivisor): number {
+  const raw = planet.buildings.reduce(
+    (sum, building) => sum + (data.buildings[building.type]?.scoreValue ?? 0) * building.level,
+    0,
+  );
+  return divisor === 1 ? raw : Math.floor(raw / divisor);
 }
 
 /** Can this sector be owned (captured)? Empty space cannot. */

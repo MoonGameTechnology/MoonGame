@@ -29,7 +29,6 @@ import {
   defenderOf,
   effectiveStats,
   isForkSite,
-  isInhabited,
   MAX_STEWARD_HOLD_POINTS,
   MS_PER_DAY,
   previewBattle,
@@ -57,7 +56,7 @@ import type {
   UnitStack,
 } from '@void/shared-core';
 import { assaultSteps } from '../../../decisions/assaultOrder';
-import { capitalOffer, holdOffer, type CapitalOffer, type HoldOffer } from '../../../decisions/worldOrders';
+import { worldCapitalOffer, holdOffer, type CapitalOffer, type HoldOffer } from '../../../decisions/worldOrders';
 import { mergePlan } from '../../../decisions/mergeOrders';
 import {
   canConfirmSplit,
@@ -704,11 +703,7 @@ export function createWorldModel(
     // «Обитаемость» и техгейт Хранителя спрашиваются у ЯДРА (`isInhabited`,
     // `stewardUnlocked`), а не переписываются: обе зависят от игровых ДАННЫХ и молча
     // разъехались бы на первом новом типе мира или новой технологии.
-    capital: capitalOffer(
-      mine,
-      state.capital?.[viewerId] === planet.id,
-      !!data && isInhabited(data, planet),
-    ),
+    capital: worldCapitalOffer(state, viewerId, planet, data),
     // Крепость на развилке — не мир: точкой удержания её ядро не принимает (`steward` 1.1.0),
     // но старую точку на ней снять можно.
     hold: holdOffer(

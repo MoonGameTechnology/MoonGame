@@ -28,6 +28,7 @@
  */
 
 import { t } from '../../localization/runtime';
+import type { VictoryConfig } from '../../packages/shared-core/src/index';
 
 /** Вкладки обозревателя. */
 export type MatchTab = 'available' | 'active' | 'archived';
@@ -35,7 +36,7 @@ export type MatchTab = 'available' | 'active' | 'archived';
 /** Правила партии в том виде, в каком их отдаёт сервер. */
 export interface MatchRules {
   timeScale?: number;
-  victory?: { dominationPercent?: number; scoreLimit?: number; coalitionFactor?: number; endsAt?: number };
+  victory?: Pick<VictoryConfig, 'dominationPercent' | 'scoreLimit' | 'coalitionFactor' | 'endsAt' | 'capitalCapture'>;
 }
 
 /** Часовой «окна нет»: всё, что дальше десятилетия, — бесконечность (правило 2). */
@@ -48,6 +49,8 @@ export const ENTRY_SOON_MS = 24 * 60 * 60 * 1000;
 export function ruleSummary(r: MatchRules, kind?: 'pvp' | 'pve'): string {
   const parts = [`×${r.timeScale ?? 1}`];
   if (kind === 'pve') return parts.join(' · ');
+  if (r.victory?.capitalCapture)
+    return [...parts, t('browser.description.capitals')].join(' · ');
   if (r.victory?.scoreLimit) parts.push(t('browser.description.score', { n: r.victory.scoreLimit }));
   if (r.victory?.dominationPercent)
     parts.push(t('browser.goal.map', { p: Math.round(r.victory.dominationPercent * 100) }));

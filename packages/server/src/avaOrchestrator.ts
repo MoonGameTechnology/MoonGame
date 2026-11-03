@@ -285,7 +285,7 @@ export class AvaOrchestrator {
         manifest: this.manifest,
       }),
       mapId: map.id,
-      ...(modeId !== undefined ? { modeId } : {}),
+      ...(modeId !== undefined && map.mode === undefined ? { modeId } : {}),
     };
     const matchId = avaMatchId(matchupId);
 

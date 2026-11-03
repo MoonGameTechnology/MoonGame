@@ -1,5 +1,6 @@
 import {
   MAP_SCORE_LIMITS,
+  hasFixedSides,
   mapVictoryRules,
   matchMapEdges,
   parseMatchMap,
@@ -160,6 +161,8 @@ const FIXED_SIDE_MODE: Partial<Record<MapId, string>> = {
 };
 /** The fixed-side mode of a team map; `undefined` for every other map. */
 export function fixedSideMode(mapId: string | undefined): string | undefined {
+  const declared = mapId !== undefined && isCurrentMap(mapId) ? mapPreset(mapId).map?.mode : undefined;
+  if (declared && hasFixedSides(declared)) return declared;
   return mapId === undefined ? undefined : FIXED_SIDE_MODE[mapId as MapId];
 }
 
@@ -178,11 +181,15 @@ export function scoreLimitFor(state: Pick<GameState, 'mapId'>): number {
 /** Условия победы карты для конфига матча — один источник для локальной симуляции
  *  (`protoKernel.ctx`) и сетевого хоста (`netserver.ts`); доля захвата у дуэли и FFA на
  *  четверых своя (BAL-16). Карта вне таблицы играет до порога `nexus`. */
-export function victoryFor(state: Pick<GameState, 'mapId'>): {
+export function victoryFor(state: Pick<GameState, 'mapId' | 'modeId'>): {
   scoreLimit: number;
   dominationPercent?: number;
+  capitalCapture?: boolean;
 } {
-  return mapVictoryRules(state.mapId) ?? { scoreLimit: SCORE_LIMITS.nexus };
+  return {
+    ...(mapVictoryRules(state.mapId) ?? { scoreLimit: SCORE_LIMITS.nexus }),
+    ...(state.modeId && data.modes[state.modeId]?.victory.capitalCapture ? { capitalCapture: true } : {}),
+  };
 }
 /** Geometry comes from the authoritative snapshot, including custom scenarios. */
 export function mapNodesFromState(state: GameState): MapNode[] {

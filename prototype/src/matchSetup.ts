@@ -543,6 +543,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   return {
     ...base,
     mapId: preset.id,
+    match: { ...base.match, buildingScoreDivisor: data.scoring.buildingDivisor },
     // Режим пишется ТОЛЬКО когда он задан: пустое поле в состоянии и отсутствие поля —
     // разные вещи для ленты браузера, которая молчание читает как «режим неизвестен».
     ...(fixedMode ? { modeId: fixedMode }

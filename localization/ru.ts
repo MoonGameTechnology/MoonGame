@@ -502,6 +502,8 @@ export const ru: Record<string, string> = {
   'browser.description.entry': 'Вход новых игроков',
   'browser.description.entry-open': 'Открыт',
   'browser.description.goal': 'Условия победы',
+  'browser.description.capitals': 'Захватить все вражеские столицы',
+  'browser.description.no-deadline': 'Без ограничения времени',
   'browser.description.mode': 'Режим',
   'browser.description.number': 'Номер партии',
   'browser.description.players': 'Игроки',
@@ -630,6 +632,7 @@ export const ru: Record<string, string> = {
   'ai.end.op.evacuate': 'люди выведены',
   'ai.end.pve-evac-lost': 'беженцев осталось меньше, чем нужно вывести',
   'ai.end.score': 'достижением лимита очков',
+  'ai.end.capital-capture': 'захватом вражеских столиц',
   'ai.end.timeout': 'истечением времени',
 
   // --- arsenal — «Арсенал»: коллекция аккаунта, фильтр, пустое состояние.
@@ -1511,6 +1514,7 @@ export const ru: Record<string, string> = {
   'corp.combat.ready-players': 'Готовы к битве: {n}',
   'corp.combat.reason.domination': 'Победа по контролю территории',
   'corp.combat.reason.elimination': 'Противник разгромлен',
+  'corp.combat.reason.capital-capture': 'Захват вражеских столиц',
   'corp.combat.reason.score': 'Достигнута цель по очкам',
   'corp.combat.reason.timeout': 'Время битвы истекло',
   'corp.combat.refresh': 'Обновить',
@@ -1526,6 +1530,7 @@ export const ru: Record<string, string> = {
   'corp.combat.roster-until': 'Состав фиксируется {date}',
   'corp.combat.rostered': 'В составе',
   'corp.combat.save-ready': 'Объявить готовность',
+  'corp.combat.capitals': 'Столицы',
   'corp.combat.score': 'Наши очки / цель',
   'corp.combat.seat-score': '{score} очк. · {land} сект.',
   'corp.combat.sent': 'Вызов отправлен',
@@ -1906,6 +1911,8 @@ export const ru: Record<string, string> = {
   'data.overseer': 'Куратор',
   'data.planet': 'Планета',
   'data.planetary-bastions': 'Планетарные бастионы',
+  'data.capital-duel': '1×1 · Захват столицы',
+  'data.capital-2v2': '2×2 · Захват столиц',
   'data.duel': 'Дуэль',
   'data.scout-drone': 'разведдрон',
   'data.siege-lance': 'осадная пика',
@@ -3088,6 +3095,7 @@ export const ru: Record<string, string> = {
   'err.ava-steward': 'Хранитель не ведёт битву корпораций',
   'err.bad-effect': 'способность настроена некорректно',
   'err.bad-payload': 'некорректный приказ',
+  'err.capital-locked': 'в этом режиме стартовая столица закреплена',
   'err.bad-posture': 'неизвестный режим Хранителя',
   'err.bad-spawn': 'здесь нельзя развернуть героя',
   'err.bad-target': 'недопустимая цель',
@@ -3886,6 +3894,8 @@ export const ru: Record<string, string> = {
   'rescard.trader': 'Торговец',
   'rescard.close': 'Закрыть',
   'rescard.no-trade': 'Кредиты — валюта, их нельзя продать на рынке',
+  'hud.capital.progress': '♜ {n}/{total}',
+  'hud.capital.tip': 'Захватите все вражеские столицы ({n}/{total}). Стартовые столицы закреплены.',
   'hud.score.tip':
     '✦ {score}/{limit}: мир — 50, прочий сектор — 10, здания добавляют по уровню (у вас {w} {w|мир|мира|миров}, {s} {s|сектор|сектора|секторов}). Победа: ✦ {limit}, уничтожение соперников или доминирование.',
 

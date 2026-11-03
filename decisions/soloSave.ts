@@ -69,7 +69,8 @@ export function parseSoloSave(raw: string | null, rules: string): SoloSave | nul
       !record(s.match) ||
       s.match.status !== 'ongoing' ||
       s.pve !== undefined ||
-      (s.modeId !== undefined && (typeof s.modeId !== 'string' || !hasFixedSides(s.modeId))) ||
+      (s.modeId !== undefined && (typeof s.modeId !== 'string' ||
+        (!hasFixedSides(s.modeId) && s.modeId !== 'capital_duel'))) ||
       typeof s.mapId !== 'string'
     )
       return null;

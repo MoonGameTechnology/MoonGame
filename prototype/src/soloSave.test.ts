@@ -7,6 +7,7 @@ import { hashJson } from '../../packages/shared-core/src/index';
 import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
 import { SOLO_SAVE_KEY, soloSaveStore } from './soloSaveLocal';
 import { createScanMemory } from './scanMemory';
+import { CAPITAL_VICTORY_SOLO_MIGRATION, parseCompatibleSoloSave } from '../../decisions/soloSaveMigration';
 
 const rules = hashJson({ data, modules: kernel.manifest });
 function checkpoint(): SoloSave {
@@ -23,6 +24,29 @@ function checkpoint(): SoloSave {
   };
 }
 describe('normal single-player checkpoint', () => {
+  it('restores a new capital duel with its saved scoring coefficient', () => {
+    const save = checkpoint();
+    save.state = newGame({ mapId: 'duel-1', seats: networkSeats('1v1', 'duel-1') });
+    save.memory = [];
+    const restored = parseSoloSave(serializeSoloSave(save, rules), rules);
+    expect(restored?.state.modeId).toBe('capital_duel');
+    expect(restored?.state.match.buildingScoreDivisor).toBe(3);
+  });
+  it('upgrades an old team checkpoint without changing its world or legacy victory/scoring rules', () => {
+    const save = checkpoint();
+    save.state = newGame({ mapId: 'team-2v2', seats: networkSeats('2v2', 'team-2v2') });
+    save.state.modeId = 'team_2v2';
+    delete save.state.match.buildingScoreDivisor;
+    const m = CAPITAL_VICTORY_SOLO_MIGRATION;
+    save.state.version = { ...save.state.version, data: m.fromData, dataHash: m.fromDataHash };
+    save.memory = [];
+    const restored = parseCompatibleSoloSave(serializeSoloSave(save, m.fromRules), m.toRules);
+    expect(restored?.state).toEqual({ ...save.state, version: {
+      ...save.state.version, data: m.toData, dataHash: m.toDataHash,
+    } });
+    expect(restored?.state.modeId).toBe('team_2v2');
+    expect(restored?.state.match.buildingScoreDivisor).toBeUndefined();
+  });
   it('restores the full world and host policies without applying offline time', () => {
     const save = checkpoint();
     const home = Object.values(save.state.planets).find((p) => p.owner === 'p1')!;
@@ -66,7 +90,7 @@ describe('normal single-player checkpoint', () => {
     save.memory = [];
     const restored = parseSoloSave(serializeSoloSave(save, rules), rules);
     expect(restored?.state).toEqual(JSON.parse(JSON.stringify(save.state)));
-    expect(restored?.state.modeId).toBe('team_2v2');
+    expect(restored?.state.modeId).toBe('capital_2v2');
     expect(Object.values(restored!.state.players).filter(p => p.npc)).toHaveLength(8);
     expect(Object.values(restored!.state.players).filter(p => !p.npc).map(p => p.team)).toEqual(['A', 'A', 'B', 'B']);
   });

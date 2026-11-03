@@ -10,12 +10,13 @@ import type {
 import type { HandlerContext, GameModule } from '../kernel/module';
 import type { MatchConfig, VictoryConfig } from '../action/types';
 import { MS_PER_DAY } from '../util/time';
-import { isCapturable, provinceScore } from '../state/sectorKind';
+import { isCapturable, provinceScore, provinceBuildingScore } from '../state/sectorKind';
 import { isForkSite } from '../state/forkSite';
 import { getStance } from '../state/diplomacy';
 import { isOrdnanceFleet } from '../state/ordnance';
 import { hasFixedSides } from '../action/matchMode';
 import { recordValues } from '../util/records';
+import { capitalVictoryStatus } from '../state/capitalVictory';
 
 /** The base rules, exported so the `standard` mode preset (`data/modes.json`) can be
  *  pinned to them by test instead of to copied literals — the same fact now lives in
@@ -35,7 +36,8 @@ const SESSION_MAX_DAYS: Record<number, number> = { 1: 100, 2: 60, 4: 30 };
 const DEFAULT_SESSION_DAYS = 100;
 
 /** The numeric race rules; `scripted` is a switch of the evaluator, not a published rule. */
-export type VictoryRules = Required<Omit<VictoryConfig, 'scripted'>>;
+export type VictoryRules = Required<Omit<VictoryConfig, 'scripted' | 'capitalCapture'>> &
+  Pick<VictoryConfig, 'capitalCapture'>;
 
 /** Effective numeric rules used by this evaluator and published by the server.
  *  The mode must already be resolved. Return a fresh allowlisted object so a
@@ -43,6 +45,7 @@ export type VictoryRules = Required<Omit<VictoryConfig, 'scripted'>>;
 export function effectiveVictoryRules(config?: MatchConfig): VictoryRules {
   const victory = config?.victory;
   return {
+    ...(victory?.capitalCapture ? { capitalCapture: true as const } : {}),
     scoreLimit: victory?.scoreLimit ?? DEFAULT_SCORE_LIMIT,
     dominationPercent: victory?.dominationPercent ?? DEFAULT_DOMINATION_PERCENT,
     coalitionFactor: victory?.coalitionFactor ?? DEFAULT_COALITION_FACTOR,
@@ -95,13 +98,8 @@ function computeScores(h: HandlerContext): Record<PlayerId, MatchScore> {
     // other kind a flat lower worth — GDD §8.1) plus its structures. A building
     // scales with its level, so investment — and its loss — shows. Planet *type*
     // (terran/oceanic) and terrain drive economy/defense, not score.
-    let planetScore = provinceScore(data, planet);
-    for (const building of planet.buildings) {
-      const def = data.buildings[building.type];
-      if (def) {
-        planetScore += def.scoreValue * building.level;
-      }
-    }
+    const planetScore = provinceScore(data, planet) +
+      provinceBuildingScore(data, planet, h.state.match.buildingScoreDivisor ?? 1);
     // Extension seam (GDD §8.1: computeScore = base + Σ hooks): modules add
     // per-province score (tech / faction / improvements) on top of the data base.
     // No contributor ⇒ base returned unchanged.
@@ -484,6 +482,17 @@ function evaluateVictory(h: HandlerContext): void {
     }
   }
 
+  // Capitals remain objectives after their original owner loses all territory.
+  // The one-active-seat shortcut belongs to the legacy races below.
+  if (!h.state.pve && h.ctx.config?.victory?.capitalCapture) {
+    eliminateLandless(h, scores, activeBefore);
+    const result = capitalVictoryStatus(h.state, h.ctx.config.modeId);
+    h.state.match.capitalObjectives = result.objectives;
+    if (result.winner)
+      endMatch(h, highestScore(scores, result.winner) ?? result.winner[0]!, 'capital-capture', result.winner);
+    return;
+  }
+
   if (activeBefore.length < 2 && fixedVictoryUnits(h, activeBefore) === undefined) {
     // A solo exploration map can still have hostile inhabitants. They never
     // receive a PvP victory, but taking the lone commander's last world is a loss.
@@ -613,7 +622,7 @@ export const victoryModule: GameModule = {
   // 1.8.0: последний союз в фиксированном 2v2 побеждает совместно.
   // 1.9.0: fixed teams use the persisted roster and the resolved mode for every PvP ending.
   // 1.10.0: бой за планету игрока: победителю +40, проигравшему −5% его счёта (BAL-16).
-  version: '1.10.0',
+  version: '1.11.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));

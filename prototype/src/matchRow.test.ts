@@ -14,6 +14,11 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
 describe('строка матча — сводка правил', () => {
+  it('для захвата столиц показывает одну цель без очковой гонки', () => {
+    expect(ruleSummary({ timeScale: 24, victory: {
+      capitalCapture: true, scoreLimit: 560, dominationPercent: 0.8,
+    } })).toBe(`×24 · ${t('browser.description.capitals')}`);
+  });
   it('скорость есть всегда, по умолчанию ×1', () => {
     expect(ruleSummary({})).toBe('×1');
     expect(ruleSummary({ timeScale: 20 })).toBe('×20');

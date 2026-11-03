@@ -26,6 +26,7 @@ import resources from './resources.json';
 import units from './units.json';
 import factions from './factions.json';
 import buildings from './buildings.json';
+import scoring from './scoring.json';
 import events from './events.json';
 import sectors from './sectors.json';
 import sectorKinds from './sectorKinds.json';
@@ -56,6 +57,7 @@ export const FRAGMENTS: Record<string, unknown> = {
   'units.json': units,
   'factions.json': factions,
   'buildings.json': buildings,
+  'scoring.json': scoring,
   'events.json': events,
   'sectors.json': sectors,
   'sectorKinds.json': sectorKinds,

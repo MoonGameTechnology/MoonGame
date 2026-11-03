@@ -23,7 +23,7 @@ import type { AvaBattleReport, AvaSeatReport, AvaSession, AvaSide } from './stor
  */
 
 /** How the battle ended, as the breakdown keeps it: the four ways an AvA match ends. */
-const REASONS = ['domination', 'elimination', 'score', 'timeout'] as const;
+const REASONS = ['domination', 'elimination', 'score', 'timeout', 'capital-capture'] as const;
 
 /** Seats a breakdown may list: 10 на 10 is the largest format, with room to spare. */
 const MAX_SEATS = 40;
@@ -197,7 +197,7 @@ export function avaWarView(input: {
   side: AvaSide;
   session: Pick<AvaSession, 'seats' | 'warAt' | 'warDeclaredAt'>;
   state: GameState;
-  rules: Pick<VictoryRules, 'scoreLimit' | 'coalitionFactor' | 'dominationPercent'>;
+  rules: Pick<VictoryRules, 'scoreLimit' | 'coalitionFactor' | 'dominationPercent' | 'capitalCapture'>;
   data: GameData;
   logins: Readonly<Record<string, string>>;
 }): AvaWarView | null {
@@ -227,10 +227,17 @@ export function avaWarView(input: {
   const goal =
     own.length === 1 ? rules.scoreLimit : rules.scoreLimit * own.length * rules.coalitionFactor;
   const signedUp = rival.filter((seat) => accountOf.has(seat.playerId)).length;
+  const targetCapitals = rival.map((seat) => state.match.capitalObjectives?.[seat.playerId]);
+  const ownIds = new Set(own.map((seat) => seat.playerId));
   return {
     matchupId: input.matchupId,
     side,
     phase,
+    ...(rules.capitalCapture ? {
+      capitalCapture: true as const,
+      capitalsCaptured: targetCapitals.filter((c) => c?.owner && ownIds.has(c.owner)).length,
+      capitalsRequired: rival.length,
+    } : {}),
     ...(warAt === undefined ? {} : { warAt }),
     score: mine.reduce((sum, seat) => sum + seat.score, 0),
     scoreGoal: Math.round(goal),

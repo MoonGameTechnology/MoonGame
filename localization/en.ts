@@ -498,6 +498,8 @@ export const en: Record<string, string> = {
   'browser.description.entry': 'New players joining',
   'browser.description.entry-open': 'Open',
   'browser.description.goal': 'Victory conditions',
+  'browser.description.capitals': 'Capture every enemy capital',
+  'browser.description.no-deadline': 'No time limit',
   'browser.description.mode': 'Mode',
   'browser.description.number': 'Match number',
   'browser.description.players': 'Players',
@@ -626,6 +628,7 @@ export const en: Record<string, string> = {
   'ai.end.op.evacuate': 'survivors evacuated',
   'ai.end.pve-evac-lost': 'fewer survivors are left than must be evacuated',
   'ai.end.score': 'by score limit',
+  'ai.end.capital-capture': 'by capturing the enemy capitals',
   'ai.end.timeout': 'on the clock',
 
   // --- arsenal — «Арсенал»: коллекция аккаунта, фильтр, пустое состояние.
@@ -1502,6 +1505,7 @@ export const en: Record<string, string> = {
   'corp.combat.ready-players': 'Ready to fight: {n}',
   'corp.combat.reason.domination': 'Territorial victory',
   'corp.combat.reason.elimination': 'Opponent eliminated',
+  'corp.combat.reason.capital-capture': 'Enemy capitals captured',
   'corp.combat.reason.score': 'Score goal reached',
   'corp.combat.reason.timeout': 'Battle time expired',
   'corp.combat.refresh': 'Refresh',
@@ -1517,6 +1521,7 @@ export const en: Record<string, string> = {
   'corp.combat.roster-until': 'Roster locks {date}',
   'corp.combat.rostered': 'On roster',
   'corp.combat.save-ready': 'Declare readiness',
+  'corp.combat.capitals': 'Capitals',
   'corp.combat.score': 'Our score / goal',
   'corp.combat.seat-score': '{score} pts · {land} sectors',
   'corp.combat.sent': 'Challenge sent',
@@ -1898,6 +1903,8 @@ export const en: Record<string, string> = {
   'data.overseer': 'Overseer',
   'data.planet': 'Planet',
   'data.planetary-bastions': 'Planetary Bastions',
+  'data.capital-duel': '1v1 · Capital Capture',
+  'data.capital-2v2': '2v2 · Capital Capture',
   'data.duel': 'Duel',
   'data.scout-drone': 'scout drone',
   'data.siege-lance': 'siege lance',
@@ -3081,6 +3088,7 @@ export const en: Record<string, string> = {
   'err.ava-steward': 'the Steward does not run a corporation battle',
   'err.bad-effect': 'the ability is misconfigured',
   'err.bad-payload': 'malformed order',
+  'err.capital-locked': 'starting capitals are fixed in this mode',
   'err.bad-posture': 'unknown Steward posture',
   'err.bad-spawn': 'a hero cannot be deployed here',
   'err.bad-target': 'invalid target',
@@ -3877,6 +3885,8 @@ export const en: Record<string, string> = {
   'rescard.trader': 'Trader',
   'rescard.close': 'Close',
   'rescard.no-trade': 'Credits are the currency — not tradeable on the market',
+  'hud.capital.progress': '♜ {n}/{total}',
+  'hud.capital.tip': 'Capture every enemy capital ({n}/{total}). Starting capitals are fixed.',
   'hud.score.tip':
     '✦ {score}/{limit}: a world — 50, any other province — 10, buildings add per level (you hold {w} {w|world|worlds}, {s} {s|province|provinces}). Win at ✦ {limit}, by eliminating rivals, or by domination.',
 

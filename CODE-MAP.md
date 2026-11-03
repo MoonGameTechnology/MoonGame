@@ -437,11 +437,12 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `kernel/kernel.ts` | `Kernel.advanceTo(state, ctx)` | сдвиг часов + scheduled events |
 | `kernel/kernel.ts` | `Kernel.canApply` / `canApplyAll` | «можно ли?» ЗАРАНЕЕ (RULES-1/3) — тот же прогон, результат выброшен |
 | `state/radarSignals.ts` | `detectSignals`, `signatureSize`, `radarThreshold` | сила сигнала группы и чувствительность радара; `visibility.ts:radarSignatures` собирает источники и скрытые контакты |
-| `state/gameState.ts` | `GameState`, `createInitialState`, `Player`, `Planet`, `Fleet`, `MatchState` | типы состояния |
+| `state/gameState.ts` | `GameState`, `createInitialState`, `Player`, `Planet`, `Fleet`; реэкспорт `MatchState` | типы состояния |
+| `state/matchState.ts` · `state/capitalVictory.ts` | `MatchState`, `capitalVictoryStatus` | результат, закреплённый вес зданий и публичные цели столиц |
 | `state/buildFromMap.ts` | `buildStateFromMap(map, data, opts)` | посев матча из карты |
 | `state/diplomacy.ts` | `getStance`, `setStance`, `pairKey`, `DEFAULT_STANCE` | дипломатия |
 | `state/botFavour.ts` | `botFavour`, `botEmbargoes`, `FAVOUR_*` | шкала расположения ботов (счётчик `approval` сеет прототип) |
-| `data/schemas.ts` | `GameDataSchema`, `parseGameData`, `FactionDef`, `UnitDef` | zod-схемы контента |
+| `data/schemas.ts` · `data/victorySchema.ts` | `GameDataSchema`, `parseGameData`, `ModeVictorySchema`, `ScoringRulesSchema` | zod-схемы контента и правил победы |
 | `data/mapSchema.ts` | `MatchMapSchema`, `MatchMap`, `avaShape`, `MapSlot` | zod-схемы карт |
 | `action/types.ts` | `Action`, `Context`, `MatchConfig`, `VictoryConfig`, `timeScaleOf` | типы действий |
 | `util/time.ts` | `MS_PER_DAY`, `MS_PER_HOUR` | константы времени |
@@ -576,7 +577,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `buildings.json` | здания |
 | `factions.json` | семь фракций: четыре дома (azure, crimson, amber, violet), легаси-пара vanguard, swarm и NPC pirates |
 | `technologies.json` | технологии |
-| `modes.json` | режимы игры — восемь пресетов (`standard`, `pve_waves`, `training`, `duel`, `team_2v2`…`team_5v5`): `victory` + `teamFormat` + опц. `modules[]`/`pve` |
+| `modes.json` · `scoring.json` | 15 пресетов, включая `capital_duel` / `capital_2v2`; вес очков зданий для новых партий |
 | `market.json` | список товаров сессионной биржи (`goods`) |
 | `scientists.json` | научные лидеры |
 | `heroes.json` | архетипы героев |
