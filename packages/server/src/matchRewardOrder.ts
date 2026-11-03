@@ -27,7 +27,30 @@ export function isMeaningfulRewardOrder(
   const player = action.playerId;
   if (!isDeepStrictEqual(before.players[player]?.resources, after.players[player]?.resources))
     return true;
-  const payload = action.payload as { fleetId?: unknown; planetId?: unknown } | null;
+  const payload = action.payload as {
+    fleetId?: unknown;
+    planetId?: unknown;
+    battleId?: unknown;
+  } | null;
+  if (action.type === 'battle.retreat') {
+    const id = payload?.battleId;
+    const battle =
+      typeof id === 'string' && Object.hasOwn(before.battles, id) ? before.battles[id] : undefined;
+    return (
+      !!battle &&
+      battle.phase === 'orbital' &&
+      battle.sides.some((side) => {
+        if (side.ref.kind !== 'fleet' || side.owner !== player) return false;
+        const fleetId = side.ref.fleetId;
+        const fleet = Object.hasOwn(before.fleets, fleetId) ? before.fleets[fleetId] : undefined;
+        return (
+          fleet?.owner === player &&
+          fleet.battleId === id &&
+          !isDeepStrictEqual(fleet, after.fleets[fleetId])
+        );
+      })
+    );
+  }
   const fleet = payload?.fleetId;
   if (
     typeof fleet === 'string' &&
