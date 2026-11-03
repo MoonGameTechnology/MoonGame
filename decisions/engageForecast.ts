@@ -9,8 +9,8 @@
  *
  * 1. **Итог — словом: победа, ничья, поражение.** Цвет лишь дублирует слово (`tone`): на
  *    экране без цвета или у игрока, который его не различает, прогноз читается так же.
- * 2. **Время — в игровых часах.** Раунд боя — игровой час (`combat.ts`, `roundIntervalMs`),
- *    поэтому часы до конца — это число раундов прогноза.
+ * 2. **Время — в игровых часах.** До начала боя это оценка по раундам; в текущем бою
+ *    прогноз учитывает личные сроки залпов и оставшуюся перезарядку.
  * 3. **Потери — в процентах корпуса, своих и чужих.** Доля корпуса, а не штук: флот,
  *    стёртый до одного процента прочности, не выглядит «целым».
  *
@@ -25,6 +25,7 @@ export type EngageVerdict = 'win' | 'draw' | 'loss';
 export interface EngageForecastInput {
   outcome: 'attacker' | 'defender' | 'stalemate';
   roundsEst: number;
+  hoursEst?: number;
   attacker: { damageFraction: number };
   defender: { damageFraction: number };
 }
@@ -35,7 +36,7 @@ export interface EngageForecastCard {
   verdictKey: 'engage.forecast.win' | 'engage.forecast.draw' | 'engage.forecast.loss';
   /** Цвет, дублирующий слово. */
   tone: 'positive' | 'neutral' | 'negative';
-  /** Игровых часов до конца боя (раунд = час). */
+  /** Игровых часов до конца боя. */
   hours: number;
   /** Доля своего корпуса, которую прогноз теряет, в целых процентах 0…100. */
   ownLossPct: number;
@@ -54,7 +55,7 @@ export function engageForecastCard(pv: EngageForecastInput): EngageForecastCard 
     verdict,
     verdictKey: `engage.forecast.${verdict}`,
     tone: verdict === 'win' ? 'positive' : verdict === 'loss' ? 'negative' : 'neutral',
-    hours: Math.max(0, pv.roundsEst),
+    hours: Math.max(0, pv.hoursEst ?? pv.roundsEst),
     ownLossPct: pct(pv.attacker.damageFraction),
     foeLossPct: pct(pv.defender.damageFraction),
   };

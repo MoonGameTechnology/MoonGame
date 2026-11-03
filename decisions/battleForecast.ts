@@ -35,6 +35,7 @@ import {
   type GameData,
   type GameState,
   type Planet,
+  type PreviewClock,
   type UnitStack,
 } from '../packages/shared-core/src/index';
 import { engageForecastCard, type EngageForecastCard } from './engageForecast';
@@ -47,6 +48,8 @@ export interface ForecastSide {
   role: 'attacker' | 'defender';
   /** Explicit attack override, independently of the initial role. */
   attackOrdered?: boolean;
+  /** Known personal deadline; the caller supplies the current match clock. */
+  nextAttackAt?: number;
   /** Текущий состав: стеки вместе с остатком корпуса (`hp`). */
   units: readonly UnitStack[];
   /** Владелец: по нему спрашивается вражда сторон. */
@@ -79,6 +82,7 @@ export function battleForecast(
   sides: readonly ForecastSide[],
   data: GameData,
   hostile: Hostility = (a, b) => a !== b,
+  clock?: PreviewClock,
 ): EngageForecastCard | null {
   const me = sides.find((s) => s.mine);
   if (!me || sides.some((s) => !alive(s.units))) return null;
@@ -88,7 +92,7 @@ export function battleForecast(
     !s.mine && !s.ally && hostile(me.owner, s.owner) ? [i] : [],
   );
   if (foes.length === 0) return null;
-  const sim = previewSides(sides, data, hostile);
+  const sim = previewSides(sides, data, hostile, clock);
   const standing = (idx: number[]): boolean => idx.some((i) => alive(sim.sides[i]!.survivors));
   /** Доля общего корпуса сторон `idx`, которую прогноз теряет (правило 3). */
   const lost = (idx: number[]): number => {
@@ -106,6 +110,7 @@ export function battleForecast(
   return engageForecastCard({
     outcome: won ? 'attacker' : beaten ? 'defender' : 'stalemate',
     roundsEst: sim.roundsEst,
+    ...(sim.hoursEst !== undefined ? { hoursEst: sim.hoursEst } : {}),
     attacker: { damageFraction: lost(mine) },
     defender: { damageFraction: lost(foes) },
   });

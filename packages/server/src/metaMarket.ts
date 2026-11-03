@@ -51,6 +51,7 @@ export interface MemoryMetaMarketState {
   materialLots: [string, ReservedMaterialListing][];
   journal: MetaMarketLedgerEntry[];
   receipts: [string, MarketReceipt][];
+  orders?: [string, BuyOrder][];
 }
 
 function publicMaterialListing(lot: ReservedMaterialListing): MetaMaterialListing {
@@ -146,6 +147,7 @@ export class MemoryMetaMarket implements MetaMarket {
       materialLots: [...this.materialLots],
       journal: this.journal,
       receipts: [...this.receipts],
+      orders: [...this.orders],
     });
   }
 
@@ -154,6 +156,8 @@ export class MemoryMetaMarket implements MetaMarket {
     this.lots.clear();
     this.materialLots.clear();
     this.receipts.clear();
+    this.orders.clear(); // та же карта: её держит MemoryMetaOrders
+    for (const [key, value] of state.orders ?? []) this.orders.set(key, value);
     for (const [key, value] of state.wallets) this.wallets.set(key, value);
     for (const [key, value] of state.lots) this.lots.set(key, value);
     for (const [key, value] of state.materialLots) this.materialLots.set(key, value);

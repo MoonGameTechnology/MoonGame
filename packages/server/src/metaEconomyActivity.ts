@@ -16,6 +16,9 @@ type ActivityRole = 'defense' | 'logistics' | 'objectives' | 'orders' | 'ordersU
 /** An order the player sent from their own client and the world applied. AI, Steward
  *  and host bookkeeping submit without a client, so they never count as presence. */
 export interface OwnOrder {
+  /** Accepted action type, used by final rewards to exclude bookkeeping/no-op controls. */
+  type?: string;
+  meaningful?: boolean;
   playerId: string;
   /** Game time the order was applied at. */
   at: number;

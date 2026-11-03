@@ -33,7 +33,7 @@ export interface MetaOperationState {
 export interface MetaEconomyAccount {
   moduleBlueprints?: Record<string, number>;
   materials: MaterialLot[];
-  /** Sovereigns ◆: the paid currency, credited only by a verified Commerce entitlement.
+  /** Sovereigns ◆: credited by verified Commerce and authoritative game rewards.
    *  Absent on accounts that never held any. */
   sovereigns?: number;
   /** Premium account expiry (epoch ms); absent or past = no premium. */

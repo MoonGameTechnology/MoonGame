@@ -78,6 +78,15 @@ describe('прогноз в окне боя (UIX-6.2)', () => {
     expect(worn).toMatchObject({ verdict: 'loss', hours: 1, ownLossPct: 100 });
   });
 
+  it.each([1, 24])('оставшееся время учитывает личный срок залпа при ×%s', scale => {
+    const intervalMs = 3_600_000 / scale;
+    const now = 10 * intervalMs;
+    const sides = [{ ...side(true, 'attacker', 20), nextAttackAt: now + intervalMs / 2 },
+      side(false, 'defender', 1)];
+    const card = battleForecast(sides, data, undefined, { now, intervalMs });
+    expect(card).toMatchObject({ verdict: 'win', hours: .5, foeLossPct: 100 });
+  });
+
   it('ТРИ СТОРОНЫ: вердикт — по всей цепочке, а не по первой гибели (UIX-6.3)', () => {
     // Все против всех. Первым падает слабый враг; бой на этом не кончается — мой флот
     // сходится со вторым врагом и добивает его.

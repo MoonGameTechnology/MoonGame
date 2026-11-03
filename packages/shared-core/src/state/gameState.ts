@@ -906,6 +906,8 @@ export interface BattleSide {
   role: 'attacker' | 'defender';
   /** Current order. The original role remains the capture/report anchor. */
   stance?: 'attack' | 'defense';
+  /** Temporary fire mode while retreat reassigns report anchors; expires on relink. */
+  roleStance?: 'attack' | 'defense';
   /** Personal attack cycle; defenders have neither field. */
   attackStartedAt?: number;
   nextAttackAt?: number;

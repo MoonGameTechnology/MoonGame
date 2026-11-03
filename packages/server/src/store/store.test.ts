@@ -43,6 +43,8 @@ import { AVA_FEED_KINDS, isAvaFeedEntry } from './types';
 import { SYSTEM_BOT_NICKNAMES } from '../botNicknames';
 import { PostgresArchiveCatalog } from '../matchArchiveCatalog';
 import { archiveMetadataOf, archiveStateBytes } from '../matchArchiveMetadata';
+import { loadMetaEconomyCatalog } from '../metaEconomyCatalog';
+import { loadShippedData } from '../scenario';
 import type {
   AccountStore,
   AnnouncementStore,
@@ -81,6 +83,23 @@ function snap(matchId: string, seq: number, s: GameState): MatchSnapshot {
 // `uniq` decouples runs on the shared Postgres tables (ids must not collide).
 function matchStoreContract(name: string, make: () => MatchStore, uniq: (p: string) => string): void {
   describe(`MatchStore — ${name}`, () => {
+    it('retains final reward evidence and policy through reloads and refuses stale overwrites', async () => {
+      const store = make();
+      const matchId = uniq('final-rewards');
+      const progress: NonNullable<MatchSnapshot['matchRewardProgress']> = {
+        policy: loadMetaEconomyCatalog(loadShippedData()).finalMatch!,
+        players: { tenure: { accountId: 'fighter', claimedAt: 0, startedAt: 0, orders: 12,
+          lastOrderAt: 900, endedAt: 1000, eliminated: true, peakScore: 601,
+          kills: 37, battles: ['defense'], veteranPoints: 0 } },
+      };
+      await store.save({ ...snap(matchId, 10, state()), matchRewardProgress: progress });
+      expect((await store.load(matchId))?.matchRewardProgress).toEqual(progress);
+      const stale = structuredClone(progress); stale.players.tenure!.kills = 999;
+      await store.save({ ...snap(matchId, 9, state()), matchRewardProgress: stale });
+      expect((await store.load(matchId))?.matchRewardProgress).toEqual(progress);
+      await store.save(snap(matchId, 11, state())); // a legacy metadata writer must not erase evidence
+      expect((await store.load(matchId))?.matchRewardProgress).toEqual(progress);
+    });
     it('round-trips a snapshot byte-for-byte', async () => {
       const store = make();
       const s = state();

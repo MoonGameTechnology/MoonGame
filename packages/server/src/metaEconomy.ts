@@ -1,4 +1,6 @@
 import { readMatchRewards } from './metaMatchRewards';
+import { finalRewardFactsSchema, type FinalRewardFacts } from './matchRewardFacts';
+import { settleFinalMatch } from './matchRewardSettlement';
 import { moduleQuotes, upgradeModule, selectModule, grantModuleBlueprint, moduleBlueprintOdds } from './moduleProgression';
 import type { ModuleUpgradeCommand } from '@void/protocol';
 import type { GameData } from '@void/shared-core';
@@ -47,6 +49,7 @@ type OperationMetric = (typeof metricNames)[number];
 
 /** Only the authoritative committed-match adapter may create these facts. */
 export interface MatchRewardFacts {
+  finalReward?: FinalRewardFacts;
   matchId: string;
   accountId: string;
   kind: 'stage' | 'final';
@@ -337,7 +340,11 @@ export class MetaEconomy {
             })),
           };
         }),
-        drops: {
+        drops: this.deps.catalog.finalMatch ? {
+          pityAfter: 0,
+          byPlace: [{ maxPlace: 999, chance: this.deps.catalog.finalMatch.moduleChance }],
+          pool: this.deps.catalog.finalMatch.modulePool.map((entry) => ({ kind: 'module' as const, ...entry })),
+        } : {
           pityAfter: this.deps.dropTables.pityAfter,
           byPlace: [...this.deps.dropTables.byPlace]
             .sort((a, b) => a.maxPlace - b.maxPlace)
@@ -1006,6 +1013,9 @@ export class MetaEconomy {
   }
 
   settle(facts: MatchRewardFacts): Promise<MetaCommandResult> {
+    if (facts.finalReward && (facts.kind !== 'final' || !finalRewardFactsSchema.safeParse(facts.finalReward).success ||
+      facts.participation !== ['active', 'eliminated'].includes(facts.finalReward.reason)))
+      return Promise.resolve({ ok: false, code: 'E_META_FACTS' });
     if (
       !validKey(facts.matchId) ||
       !Number.isSafeInteger(facts.occurredAt) ||
@@ -1027,13 +1037,26 @@ export class MetaEconomy {
     ) {
       return Promise.resolve({ ok: false, code: 'E_META_FACTS' });
     }
-    if (!facts.participation) return Promise.resolve({ ok: false, code: 'E_NOT_PARTICIPATING' });
+    if (!facts.participation && !facts.finalReward) return Promise.resolve({ ok: false, code: 'E_NOT_PARTICIPATING' });
     return this.command(
       facts.accountId,
       metaEconomyFingerprint([facts.matchId, facts.kind, facts.stage ?? 0]),
       'settlement',
       facts,
       async (tx, account, receipt) => {
+        if (facts.finalReward) {
+          if (account.operations[facts.matchId]) reject('E_MATCH_SETTLED');
+          const { materials, eligible } = await settleFinalMatch(tx, account, receipt, facts, facts.finalReward);
+          this.grantMaterials(account, materials, false, 'match', receipt.id, facts.occurredAt, receipt);
+          const seasonXp = eligible ? this.deps.catalog.rewards.seasonXp : 0;
+          account.operations[facts.matchId] = { materials, metrics: { ...facts.seasonFacts }, seasonXp,
+            finalized: true, policyVersion: `match-final-${facts.finalReward.policy.version}` };
+          if (eligible) {
+            if (this.deps.moduleData) grantModuleBlueprint(account, receipt, facts.place === 1, this.deps.moduleSeed);
+            await this.progressSeason(tx, facts, account, seasonXp, { ...facts.seasonFacts, matches: 1 }, receipt);
+          }
+          return;
+        }
         if (facts.kind === 'final' && this.deps.moduleData) grantModuleBlueprint(account, receipt, facts.place === 1, this.deps.moduleSeed);
         const policy = this.deps.catalog.rewards;
         const operation = (account.operations[facts.matchId] ??= {

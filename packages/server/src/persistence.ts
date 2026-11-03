@@ -240,6 +240,7 @@ export function snapshotOf(room: MatchRoom): MatchSnapshot {
     state,
     economyActivity: room.economyActivitySnapshot,
     career: room.careerSnapshot,
+    matchRewardProgress: room.matchRewardSnapshot,
     ...(clock ? { clock } : {}),
   };
 }

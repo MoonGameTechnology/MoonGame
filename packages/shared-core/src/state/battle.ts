@@ -26,7 +26,7 @@ export function sidesOf(battle: Battle): readonly BattleSide[] {
 
 /** Current fire order, with support for battles saved before personal clocks. */
 export function attacks(side: BattleSide): boolean {
-  return (side.stance ?? (side.role === 'attacker' ? 'attack' : 'defense')) === 'attack';
+  return (side.stance ?? side.roleStance ?? (side.role === 'attacker' ? 'attack' : 'defense')) === 'attack';
 }
 
 /** Stable identity even when participants leave or the list grows. */

@@ -358,6 +358,7 @@ export function battleWindowHtml(
               ...(s.relation === 'ally' ? { ally: true } : {}),
               role: s.role,
               ...(s.attackOrdered ? { attackOrdered: true } : {}),
+              ...(s.nextAttackAt !== undefined ? { nextAttackAt: s.nextAttackAt } : {}),
               units: s.stacks ?? s.units,
               owner: s.owner,
               ...(s.ref?.kind === 'fleet' ? { key: s.ref.fleetId } : {}),

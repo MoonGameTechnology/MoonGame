@@ -116,6 +116,56 @@ describe('combat lifecycle preserves personal clocks', () => {
     expect(survivor(result.state, 'a')?.attackCount).toBe(0);
   });
 
+  it.each([false, true])('retreat does not invent a persistent attack order (explicit=%s)', explicit => {
+    const state = world();
+    state.fleets.d = { id: 'd', owner: 'd', location: 'P', movement: null,
+      units: [{ unit: 'ship', count: 1, hp: 1 }], traits: [], battleId: 'battle:0' };
+    state.battles['battle:0']!.sides.push({ ref: { kind: 'fleet', fleetId: 'd' },
+      owner: 'd', role: 'attacker', nextAttackAt: 2 * HOUR });
+    if (explicit) state.battles['battle:0']!.sides[2]!.stance = 'attack';
+    const left = retreat(state, 'b').state;
+    left.fleets.b!.location = 'Q'; // the retreating fleet has left the encounter
+    expect(attacks(survivor(left, 'c')!)).toBe(true);
+    const result = advance(JSON.parse(JSON.stringify(left)), HOUR);
+    expect(survivor(result.state, 'c')?.role).toBe('defender');
+    expect(attacks(survivor(result.state, 'c')!)).toBe(explicit);
+    expect(survivor(result.state, 'c')?.stance).toBe(explicit ? 'attack' : undefined);
+  });
+
+  it.each([{ offset: 1, scale: 1 }, { offset: 1.5, scale: 1 }, { offset: 1.5, scale: 24 }])(
+    'forecast mirrors clocks after the first attacker dies (offset=$offset, scale=$scale)', ({ offset, scale }) => {
+    const state = world();
+    const hour = HOUR / scale;
+    for (const side of state.battles['battle:0']!.sides) {
+      if (side.nextAttackAt !== undefined) side.nextAttackAt /= scale;
+    }
+    state.battles['battle:0']!.nextRoundAt = hour;
+    state.scheduled[0]!.at = hour;
+    state.fleets.a!.units[0]!.hp = 1;
+    state.fleets.d = { id: 'd', owner: 'd', location: 'P', movement: null,
+      units: [{ unit: 'ship', count: 1 }], traits: [], battleId: 'battle:0' };
+    state.battles['battle:0']!.sides.push({ ref: { kind: 'fleet', fleetId: 'd' },
+      owner: 'd', role: 'attacker', nextAttackAt: hour });
+    state.battles['battle:0']!.sides[2]!.nextAttackAt = offset * hour;
+    const fast = parseGameData({ ...data, units: {
+      ...data.units, ship: { ...data.units.ship!, stats: { ...data.units.ship!.stats, attack: 300 } },
+    } });
+    const owners = ['a', 'b', 'c', 'd'];
+    const forecast = previewSides(state.battles['battle:0']!.sides.map(side => ({
+      units: state.fleets[side.owner!]!.units, owner: side.owner, role: side.role,
+      key: side.owner!, nextAttackAt: side.nextAttackAt,
+    })), fast, undefined, { now: 0, intervalMs: hour });
+    const result = kernel.advanceTo(state, { now: 240 * hour, data: fast, config: { timeScale: scale } });
+    if (!result.ok) throw Error(result.code);
+    expect(result.failures).toEqual([]);
+    expect(forecast.roundsEst).toBe(result.events.filter(e => e.type === 'combat.round').length);
+    for (const [i, owner] of owners.entries()) {
+      const live = result.state.fleets[owner]?.units ?? [];
+      expect(forecast.sides[i]!.survivors.map(({ unit, count, hp }) => ({ unit, count, hp })))
+        .toEqual(live.map(({ unit, count, hp }) => ({ unit, count, hp })));
+    }
+  });
+
   it('joining an already scheduled battle after a casualty cannot fire before reload', () => {
     const state = world();
     state.fleets.c!.units[0]!.hp = 1;

@@ -26,7 +26,7 @@ export function retainBattleAfterRetreat(
     if (side.role === role) continue;
     const stance = attacks(side) ? 'attack' : 'defense';
     side.role = role;
-    side.stance = stance;
+    side.roleStance = stance;
   }
   battle.sides = left;
   for (const side of left) {
@@ -96,6 +96,7 @@ export function restoreBattleClocks(h: HandlerContext, previous: Battle): void {
       if (!old) continue;
       restored = true;
       // Explicit attack overrides outlive the link's default roles.
+      delete side.roleStance;
       if (old.stance === 'attack') side.stance = 'attack';
       else delete side.stance;
       if (attacks(side)) {
