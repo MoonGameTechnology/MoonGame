@@ -1,6 +1,6 @@
 name: Android APK (prototype)
 
-# Builds installable debug APKs of the prototype by wrapping the self-contained
+# Builds release APKs of the prototype by wrapping the self-contained
 # prototype HTML in a Capacitor WebView (branded icon/splash, rotates freely).
 # TWO APKs from one matrix (см. prototype/build.mjs — профили клиента):
 #   • dev    — the full dev client (test mode, single-player, time controls);
@@ -13,6 +13,11 @@ name: Android APK (prototype)
 # Runs on GitHub's ubuntu runner, which has the Android SDK preinstalled. On main it
 # also publishes each APK to its rolling prerelease for a stable download link;
 # every run still uploads the APKs as build artifacts too.
+#
+# Signing. The build job produces an UNSIGNED, non-debuggable release APK and never sees
+# a key. Only the protected main publication job signs it, with the private release
+# keystore from the `android-release` environment. The public debug keystore used before
+# made Play Protect flag every install as suspicious (a well-known key, debuggable build).
 # Actions are SHA-pinned (SD-6.1 / F-16); the trailing `# vN` comments track versions.
 
 on:
@@ -43,7 +48,7 @@ concurrency:
 
 jobs:
   build-apk:
-    name: Assemble debug APK (${{ matrix.profile }})
+    name: Assemble release APK (${{ matrix.profile }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -80,14 +85,19 @@ jobs:
       # playtest server. Its ALLOWED_ORIGINS must include the APK origin http://localhost.
       VOID_SERVER: https://77-221-140-87.sslip.io
     steps:
-      - name: Assert the release signing key is unavailable to branch builds
+      - name: Assert the release signing keys are unavailable to branch builds
         if: github.ref != 'refs/heads/main'
         env:
-          # Pass a boolean only: the key itself must never enter a build process.
+          # Pass booleans only: the keys themselves must never enter a build process.
           REPOSITORY_SIGNING_SECRET_PRESENT: ${{ secrets.APK_MANIFEST_SIGNING_KEY != '' }}
+          REPOSITORY_KEYSTORE_SECRET_PRESENT: ${{ secrets.APK_RELEASE_KEYSTORE_BASE64 != '' || secrets.APK_RELEASE_KEYSTORE_PASSWORD != '' }}
         run: |
           if [ "$REPOSITORY_SIGNING_SECRET_PRESENT" != "false" ]; then
             echo "::error::Move APK_MANIFEST_SIGNING_KEY to the main-only android-release environment and delete its repository-level copy."
+            exit 1
+          fi
+          if [ "$REPOSITORY_KEYSTORE_SECRET_PRESENT" != "false" ]; then
+            echo "::error::Move APK_RELEASE_KEYSTORE_* to the main-only android-release environment and delete their repository-level copies."
             exit 1
           fi
 
@@ -170,50 +180,28 @@ jobs:
           # versionCode/versionName (VOID_VC / VOID_VN from the env above).
           node patch-updater.mjs
 
-      # Sign with a COMMITTED debug keystore (standard android/android credentials —
-      # not a secret) so every build has the SAME signature. Without this, the Gradle
-      # debug keystore is regenerated per run, so installing an update over a previously
-      # sideloaded build fails with "conflicts with another package" (signature mismatch).
-      - name: Pin the debug signing key (stable signature across builds)
-        run: |
-          mkdir -p ~/.android
-          cp mobile/debug.keystore ~/.android/debug.keystore
-
-      - name: Assemble debug APK
+      # Release build type: not debuggable, no signing config, so Gradle leaves the APK
+      # unsigned (app-release-unsigned.apk). The key is applied in publish-apk only.
+      - name: Assemble release APK (unsigned)
         working-directory: mobile/android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      # The ONE invariant one-tap updates depend on: every build is signed by the
-      # COMMITTED mobile/debug.keystore. If the signature ever drifts (a runner default
-      # keystore leaking in, a toolchain change), installing an update over the previous
-      # build fails on phones ("conflicts with another package") until players UNINSTALL
-      # — so drift must fail the BUILD here, never reach a release. Compares the APK's
-      # signer cert digest (apksigner) with the committed keystore's cert digest (keytool).
-      - name: Assert the APK is signed by the committed keystore
+      # A debuggable APK is one of the things Play Protect flags, and it lets anyone attach
+      # a debugger to the installed game. Fail the build instead of shipping one.
+      - name: Assert the APK is a non-debuggable release build
         run: |
-          APK=mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          APK=mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
           BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
-          APK_CERT=$("$ANDROID_HOME/build-tools/$BT/apksigner" verify --print-certs "$APK" \
-            | grep -i 'certificate SHA-256 digest' | head -1 | awk '{print $NF}')
-          KS_CERT=$(keytool -exportcert -alias androiddebugkey -keystore mobile/debug.keystore \
-            -storepass android 2>/dev/null | sha256sum | awk '{print $1}')
-          echo "apk signer cert : $APK_CERT"
-          echo "committed cert  : $KS_CERT"
-          if [ -z "$APK_CERT" ] || [ "$APK_CERT" != "$KS_CERT" ]; then
-            echo "::error::APK signature does not match mobile/debug.keystore — updates would break (uninstall required on every phone). Refusing to ship."
+          if "$ANDROID_HOME/build-tools/$BT/aapt" dump badging "$APK" | grep -q '^application-debuggable'; then
+            echo "::error::The release APK is debuggable. Refusing to ship."
             exit 1
           fi
-          {
-            echo "VOID_SIGNER_CERT_SHA256=$KS_CERT"
-            echo "AAPT=$ANDROID_HOME/build-tools/$BT/aapt"
-            echo "APKSIGNER=$ANDROID_HOME/build-tools/$BT/apksigner"
-          } >> "$GITHUB_ENV"
 
       - name: Upload APK candidate
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.artifact }}
-          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          path: mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
 
   publish-apk:
@@ -294,32 +282,49 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ matrix.artifact }}
-          path: mobile/android/app/build/outputs/apk/debug
+          path: unsigned
 
-      # The ONE invariant one-tap updates depend on: every build is signed by the
-      # COMMITTED mobile/debug.keystore. If the signature ever drifts (a runner default
-      # keystore leaking in, a toolchain change), installing an update over the previous
-      # build fails on phones ("conflicts with another package") until players UNINSTALL
-      # — so drift must fail the BUILD here, never reach a release. Compares the APK's
-      # signer cert digest (apksigner) with the committed keystore's cert digest (keytool).
-      - name: Assert the APK is signed by the committed keystore
+      # The ONE invariant one-tap updates depend on: every build is signed by the SAME
+      # release certificate, the one pinned as `signerSha256` in mobile/distribution.json.
+      # If it drifted (a rotated or wrong keystore secret), installing an update over the
+      # previous build would fail on phones ("conflicts with another package") until
+      # players UNINSTALL, so a mismatch stops publication here. The keystore exists on
+      # disk only for this step and is removed on exit.
+      - name: Sign the APK with the release key and check its certificate
+        env:
+          KEYSTORE_BASE64: ${{ secrets.APK_RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.APK_RELEASE_KEYSTORE_PASSWORD }}
         run: |
-          APK=mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          set -euo pipefail
+          umask 077
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::APK_RELEASE_KEYSTORE_BASE64 / APK_RELEASE_KEYSTORE_PASSWORD are missing from the android-release environment."
+            exit 1
+          fi
+          KEYSTORE_FILE="$RUNNER_TEMP/apk-release.p12"
+          trap 'rm -f "$KEYSTORE_FILE"' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
           BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
-          APK_CERT=$("$ANDROID_HOME/build-tools/$BT/apksigner" verify --print-certs "$APK" \
+          APKSIGNER="$ANDROID_HOME/build-tools/$BT/apksigner"
+          mkdir -p release
+          "$ANDROID_HOME/build-tools/$BT/zipalign" -P 16 -f 4 unsigned/app-release-unsigned.apk "$RUNNER_TEMP/aligned.apk"
+          "$APKSIGNER" sign --ks "$KEYSTORE_FILE" --ks-key-alias void-release \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
+            --out release/app-release.apk "$RUNNER_TEMP/aligned.apk"
+          rm -f "$RUNNER_TEMP/aligned.apk"
+          APK_CERT=$("$APKSIGNER" verify --print-certs release/app-release.apk \
             | grep -i 'certificate SHA-256 digest' | head -1 | awk '{print $NF}')
-          KS_CERT=$(keytool -exportcert -alias androiddebugkey -keystore mobile/debug.keystore \
-            -storepass android 2>/dev/null | sha256sum | awk '{print $1}')
+          PINNED_CERT=$(node -p "require('./mobile/distribution.json').signerSha256")
           echo "apk signer cert : $APK_CERT"
-          echo "committed cert  : $KS_CERT"
-          if [ -z "$APK_CERT" ] || [ "$APK_CERT" != "$KS_CERT" ]; then
-            echo "::error::APK signature does not match mobile/debug.keystore — updates would break (uninstall required on every phone). Refusing to ship."
+          echo "pinned cert     : $PINNED_CERT"
+          if [ -z "$APK_CERT" ] || [ "$APK_CERT" != "$PINNED_CERT" ]; then
+            echo "::error::APK certificate does not match signerSha256 in mobile/distribution.json — updates would break (uninstall required on every phone). Refusing to ship."
             exit 1
           fi
           {
-            echo "VOID_SIGNER_CERT_SHA256=$KS_CERT"
+            echo "VOID_SIGNER_CERT_SHA256=$APK_CERT"
             echo "AAPT=$ANDROID_HOME/build-tools/$BT/aapt"
-            echo "APKSIGNER=$ANDROID_HOME/build-tools/$BT/apksigner"
+            echo "APKSIGNER=$APKSIGNER"
           } >> "$GITHUB_ENV"
 
       # The signed manifest is the trust root of the site updater: installed APKs accept
@@ -330,13 +335,13 @@ jobs:
         env:
           APK_MANIFEST_SIGNING_KEY: ${{ secrets.APK_MANIFEST_SIGNING_KEY }}
         run: |
-          node mobile/apk-manifest.mjs mobile/android/app/build/outputs/apk/debug/app-debug.apk version.json
+          node mobile/apk-manifest.mjs release/app-release.apk version.json
 
       # SLSA-style build provenance (SEC-7): a keyless cosign signature over the exact
       # APK bytes, tying them to this workflow run + commit (Fulcio cert) with a public
       # Rekor transparency-log entry. Verify with:
-      #   cosign verify-blob app-debug.apk --signature app-debug.apk.sig \
-      #     --certificate app-debug.apk.cert \
+      #   cosign verify-blob app-release.apk --signature app-release.apk.sig \
+      #     --certificate app-release.apk.cert \
       #     --certificate-identity-regexp 'https://github.com/MoonGameTechnology/MoonGame/.*' \
       #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
       # cosign runs as a pinned container (same pattern as the scanners in
@@ -350,7 +355,7 @@ jobs:
         env:
           COSIGN_EXPERIMENTAL: '1'
         run: |
-          APK=mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          APK=release/app-release.apk
           docker run --rm \
             -e COSIGN_EXPERIMENTAL \
             -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
@@ -366,9 +371,9 @@ jobs:
         with:
           name: ${{ matrix.artifact }}-release
           path: |
-            mobile/android/app/build/outputs/apk/debug/app-debug.apk
-            mobile/android/app/build/outputs/apk/debug/app-debug.apk.sig
-            mobile/android/app/build/outputs/apk/debug/app-debug.apk.cert
+            release/app-release.apk
+            release/app-release.apk.sig
+            release/app-release.apk.cert
             version.json
           if-no-files-found: error
 
@@ -381,13 +386,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk "$ASSET"
+          cp release/app-release.apk "$ASSET"
           # Provenance sig/cert are best-effort (SEC-7 cosign step above) — attach
           # them to the release when present, skip quietly when the sign step failed.
           RELEASE_ASSETS=("$ASSET" "version.json")
-          if [ -f mobile/android/app/build/outputs/apk/debug/app-debug.apk.sig ]; then
-            cp mobile/android/app/build/outputs/apk/debug/app-debug.apk.sig "$ASSET.sig"
-            cp mobile/android/app/build/outputs/apk/debug/app-debug.apk.cert "$ASSET.cert"
+          if [ -f release/app-release.apk.sig ]; then
+            cp release/app-release.apk.sig "$ASSET.sig"
+            cp release/app-release.apk.cert "$ASSET.cert"
             RELEASE_ASSETS+=("$ASSET.sig" "$ASSET.cert")
           fi
           {
@@ -413,7 +418,7 @@ jobs:
             fi
             echo "New APKs check https://77-221-140-87.sslip.io/downloads/android/$RELEASE_TAG/latest.json; legacy APKs use this release for the migration update."
             echo
-            echo "Debug-signed (testing only, not Play-Store ready). For multiplayer, point the"
+            echo "Release-signed sideload build (not from a store). For multiplayer, point the"
             echo "connect screen at a host running pnpm dev:proto-server (see docs/multiplayer.md)."
             if [ -f "$ASSET.sig" ] && [ -f "$ASSET.cert" ]; then
               echo

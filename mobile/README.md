@@ -56,24 +56,28 @@ On the phone: open the direct link → download → open the APK → allow "inst
 unknown sources" if prompted → launch. In the **dev** APK single-player runs fully
 offline; rotate freely on a phone or tablet.
 
-It is a **debug** APK, signed with a **committed debug keystore** (`mobile/debug.keystore`,
-standard `android`/`android` credentials — not a secret) so every build shares one
-signature and updates install over the previous build. A Play-Store release/AAB still
-needs a real (secret) keystore — a later step.
+It is a non-debuggable **release** APK. CI builds it unsigned and only the protected
+main publication job signs it with the private release keystore (Environment secrets
+`APK_RELEASE_KEYSTORE_BASE64` / `APK_RELEASE_KEYSTORE_PASSWORD` in `android-release`,
+alias `void-release`), so every build shares one signature and updates install over the
+previous build. Its certificate SHA-256 is pinned as `signerSha256` in
+`mobile/distribution.json`; publication stops on a mismatch. Local `npm run apk` still
+makes a debug build signed with `mobile/debug.keystore`, for development only.
 
 ### If the install fails
 
 - **"App not installed — it conflicts with another package"** — you have an older build
-  installed that was signed with a *different* key (older builds regenerated the debug
-  key each time). **Uninstall Void Dominion once**, then install this build; from now on
-  the signature is stable, so future updates install straight over the top. CI now
-  **asserts** every APK is signed by the committed `debug.keystore` (the build fails on
-  drift), so a signature mismatch can never silently ship again. Note the two lanes are
+  installed that was signed with a *different* key: every build before the switch to the
+  release key was debug-signed. **Uninstall Void Dominion once**, then install this
+  build; from now on the signature is stable, so future updates install straight over the
+  top. CI **asserts** the certificate against `signerSha256` before publishing, so a
+  signature mismatch can never silently ship. Note the two lanes are
   two separate apps (`…prototype` dev / `…player`) — an update of one never conflicts
   with the other.
-- **Google Play Protect "blocked for your protection"** — expected for a sideloaded
-  debug APK from an unverified developer. Tap **Подробнее → Установить всё равно**
-  (More details → Install anyway). It's the same code you build here.
+- **Google Play Protect warning** — the debug builds triggered it (public debug key,
+  debuggable). A release-signed sideload APK can still get a milder "unknown app" prompt
+  from a developer Google has not verified; tap **Подробнее → Установить всё равно**
+  (More details → Install anyway). Only a store or Google developer verification removes it.
 
 ## In-app auto-update
 
@@ -94,12 +98,13 @@ notes are plain text and the action is **«Скачать обновление»
 (`VoidNative.installVerified`, written by `patch-updater.mjs`) downloads the APK into
 the app's private cache, compares its SHA-256 with the signed one and its package
 name, and only then opens the system installer. A mismatch deletes the file. This
-check, not the APK signature, is what stops a swapped file: the debug key is public.
+check, not the APK signature, is what stops a swapped file even if the download host is
+compromised.
 Android installation always requires the user's approval; the first time it also asks
 to allow installs from this app. A WebView without Ed25519 (Chromium older than 137)
 shows that instead of offering the update.
-Application IDs, WebView origin and `mobile/debug.keystore` are unchanged, so a
-compatible update installs over the existing app and retains its local data.
+Application IDs and the WebView origin are unchanged, so an update signed by the same
+release key installs over the existing app and retains its local data.
 
 Checks run at launch, foreground return (15min throttle), every4h, and manually.
 Timeout5s/body32KiB, malformed JSON, a bad signature, unavailable site and older/equal versions never

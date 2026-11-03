@@ -4,7 +4,7 @@ import { openSync, closeSync, writeSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateManifest, openSignedManifest, LANES, apkName, distribution } from '../../mobile/apk-manifest.mjs';
+import { validateManifest, openSignedManifest, LANES, apkName, distribution, CURRENT_SIGNERS } from '../../mobile/apk-manifest.mjs';
 import { verifyApk } from '../../mobile/apk-verify.mjs';
 const { AbortController } = globalThis;
 const REPO = 'https://api.github.com/repos/MoonGameTechnology/MoonGame';
@@ -44,10 +44,12 @@ export async function download(url, limit, { fetchImpl = fetch, destination } = 
   } finally { clearTimeout(timer); if(descriptor!==undefined)closeSync(descriptor); }
 }
 
-/** Host-owned current file: signed envelope, or a legacy plain manifest imported by hand. */
+/** Host-owned current file: signed envelope, or a legacy plain manifest imported by hand.
+ *  It may still name the previous APK certificate: that build was published before the
+ *  certificate changed, and only its versionCode matters here. */
 function currentManifest(text,lane,publicKey) {
   const value=JSON.parse(text);
-  return typeof value?.payload==='string' ? openSignedManifest(value,lane,publicKey).manifest : validateManifest(value,lane);
+  return typeof value?.payload==='string' ? openSignedManifest(value,lane,publicKey,CURRENT_SIGNERS).manifest : validateManifest(value,lane,CURRENT_SIGNERS);
 }
 /** Commit immutable files first, then switch ONE pointer shared by JSON and APK. */
 export async function installRelease({ root, lane, signed, acquire, verify=verifyApk, checkSpace=true, publicKey=distribution.manifestPublicKey }) {
