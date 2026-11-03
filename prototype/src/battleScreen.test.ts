@@ -290,6 +290,7 @@ describe('прогноз и правила в окне боя (UIX-6.2)', () => 
         role: 'attacker',
         owner: 'p1',
         key: 'p1-1',
+        nextAttackAt: 9000,
         units: [{ unit: 'cruiser', count: 3, hp: 50 }],
       },
       {

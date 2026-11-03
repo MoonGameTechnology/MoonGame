@@ -287,6 +287,7 @@ export {
   type BattlePreviewSide,
   type MultiBattlePreview,
   type PreviewSideInput,
+  type PreviewClock,
 } from './state/previewBattle';
 export {
   COMBAT_WIDTH as GROUND_COMBAT_WIDTH,

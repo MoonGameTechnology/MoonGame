@@ -786,6 +786,8 @@ export interface BattleSideView {
    *  `defense`. Роль принадлежит СТОРОНЕ (MSB-1), поэтому её нельзя вывести из места в
    *  списке: атакующих может быть сразу несколько. */
   role: 'attacker' | 'defender';
+  /** Explicit attack order survives the next battle link. */
+  attackOrdered?: boolean;
   /** PERK-3.3: во сколько раз эта сторона бьёт сильнее за пережитые бои (PERK-3.1).
    *  Отсутствует, когда надбавки нет — у необстрелянных сил или когда механика выключена
    *  данными. Панель тогда не рисует строки вовсе: «×1.00» это шум, а не сведения.
@@ -867,6 +869,7 @@ function sideView(
       : getStance(state, viewerId, owner) === 'war' ? 'enemy' : 'neutral',
     stacks: stacks.map((s) => ({ ...s, ...(s.modules ? { modules: [...s.modules] } : {}) })),
     role: attacks(side) ? 'attacker' : 'defender',
+    ...(side.stance === 'attack' ? { attackOrdered: true } : {}),
     ...(attacks(side) && (side.nextAttackAt ?? battle.nextRoundAt) !== undefined
       ? { attackStartedAt: side.attackStartedAt, nextAttackAt: side.nextAttackAt ?? battle.nextRoundAt } : {}),
   };

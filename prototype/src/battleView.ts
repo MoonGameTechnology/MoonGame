@@ -12,7 +12,7 @@
  * прицел «Отступить всем» и нажатия по плиткам окна. Мир, своё место, имена мест и сторон
  * модуль получает хуками.
  */
-import type { GameState } from '../../packages/shared-core/src/index';
+import { hoursToMs, type GameState } from '../../packages/shared-core/src/index';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
 import { createBattleModel } from '../../packages/client/src/index';
 import { attackBattle } from '../../decisions/actions';
@@ -126,7 +126,12 @@ export function initBattleView(host: BattleViewHost): void {
       autoRetreatAt,
       timeLeft,
       // UIX-6.2: прогноз по текущему составу сторон — новый раунд сам даёт новый прогноз.
-      forecast: (sides) => battleForecast(sides, data, battleHostility(game.world())),
+      forecast: (sides) => {
+        const s = game.world();
+        return battleForecast(sides, data, battleHostility(s), {
+          now: s.time, intervalMs: hoursToMs(ctx(s.time, s), 1),
+        });
+      },
     },
   });
   root.addEventListener('click', (event) => {

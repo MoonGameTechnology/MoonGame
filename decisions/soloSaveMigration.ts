@@ -377,6 +377,17 @@ export const STAR_LADDER_SOLO_MIGRATION = {
   toDataHash: '1c1df8bf2931ed',
 } as const;
 
+/** Rules-only patch: combat 4.0.1 preserves continuing attackers' reload clocks and
+ * explicit attack overrides. Pending events and saved battles retain their exact state. */
+export const COMBAT_CONTINUITY_SOLO_MIGRATION = {
+  fromRules: STAR_LADDER_SOLO_MIGRATION.toRules,
+  fromData: STAR_LADDER_SOLO_MIGRATION.toData,
+  fromDataHash: STAR_LADDER_SOLO_MIGRATION.toDataHash,
+  toRules: '1fb69c7580fdd9',
+  toData: STAR_LADDER_SOLO_MIGRATION.toData,
+  toDataHash: STAR_LADDER_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -411,6 +422,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   INTERCEPT_TURRET_SOLO_MIGRATION,
   CLOAK_FIELD_SOLO_MIGRATION,
   STAR_LADDER_SOLO_MIGRATION,
+  COMBAT_CONTINUITY_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

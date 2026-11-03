@@ -6,6 +6,7 @@ import { splitDealt, targetedVolley } from '../util/groundTargets';
 import { combatSequence } from '../util/combatSequence';
 import { effectiveStats } from '../util/loadout';
 import { deepClone } from '../util/clone';
+import { MS_PER_HOUR } from '../util/time';
 import { divertFortressDamage } from '../util/fortressDamage';
 import type { Planet } from './gameState';
 import { refreshFortressBody } from './fortress';
@@ -96,9 +97,12 @@ export interface PreviewSideInput {
   units: readonly UnitStack[];
   /** Known internal systems of this fortress body, if the side is a fortress. */
   fortress?: Planet;
-  /** Роль в ИДУЩЕМ бою: атакующий бьёт `attack`, обороняющийся отвечает `defense`. В
-   *  следующих звеньях цепочки роли раздаёт правило пересцепки (см. {@link previewSides}). */
+  /** Текущий режим огня; обычные роли следующего звена назначаются заново. */
   role: 'attacker' | 'defender';
+  /** Explicit attack override that survives relinking; a captured garrison is new. */
+  attackOrdered?: boolean;
+  /** Known personal deadline, in the same milliseconds as PreviewClock.now. */
+  nextAttackAt?: number;
   /** Владелец — нужен только чтобы спросить вражду; для безымянной дуэли не нужен. */
   owner?: string | null;
   /** Порядок пересцепки после гибели: живой бой обходит выживших флоты по id. Ключи — у
@@ -116,9 +120,13 @@ export interface MultiBattlePreview {
   outcome: 'decided' | 'stalemate';
   /** Раундов во всех звеньях цепочки вместе. */
   roundsEst: number;
+  /** Remaining game hours, when the caller supplied the current match clock. */
+  hoursEst?: number;
   /** В ТОМ ЖЕ порядке, что и вход. */
   sides: BattlePreviewSide[];
 }
+
+export interface PreviewClock { now: number; intervalMs: number }
 
 type Role = PreviewSideInput['role'];
 
@@ -127,16 +135,18 @@ type Role = PreviewSideInput['role'];
  *
  * РАУНД — последовательные обмены: атака, потери, ответ выжившей обороны.
  * Каждый атакующий фиксирует залп по всем целям до ответов. При одинаковых часах
- * раньше действует раньше вступившая сторона. Разнесённые часы прогноз сводит в раунд.
+ * раньше действует раньше вступившая сторона. Перезарядка сохраняется между звеньями;
+ * новый атакующий начинает сразу, а продолжающий атаковать ждёт личного срока.
  *
  * ЦЕПОЧКА (§0.0 №5). Гибель любой стороны закрывает бой, но выжившие тут же сцепляются
  * заново, поэтому прогноз досчитывает все звенья до конца:
  *  · на орбите — как `finishBattle`→`engageFleets`: первый по ключу выживший, у которого
- *    есть враг, нападает; его первый по ключу враг обороняется; все, кто враждебен
- *    кому-нибудь в новом бою, вступают атакующими. Корабли уносят урон в новое звено;
+ *    есть враг, начинает звено со своим первым по ключу врагом; остальные втягиваются
+ *    по вражде. Корабли уносят урон и явно отданные приказы атаки в новое звено;
  *  · на земле (есть сторона `holds`) — как штурм после гибели: мир держит обороняющийся,
- *    враждебные ему берега атакуют. Пал гарнизон — мир берёт первый уцелевший берег этого
- *    звена и уже сам обороняется. Между звеньями наземные стороны сохраняют повреждения корпуса; щит сбрасывается.
+ *    враждебные ему берега продолжают бой. Пал гарнизон — мир берёт
+ *    первый уцелевший берег этого звена и уже сам обороняется. Между звеньями наземные
+ *    стороны сохраняют повреждения корпуса; щит сбрасывается.
  * Цепочку обрывает предохранитель `MAX_COMBAT_ROUNDS` в любом звене (после ничьей никто
  * не сцепляется, CMB-6) или бой, где стрелять некому.
  *
@@ -153,6 +163,7 @@ export function previewSides(
   input: readonly PreviewSideInput[],
   data: GameData,
   hostile?: (a: string | null | undefined, b: string | null | undefined) => boolean,
+  clock?: PreviewClock,
 ): MultiBattlePreview {
   // damageUnits мутирует то, что ему дали, — симуляция идёт по приватным копиям.
   const live = input.map((s) => deepClone(s.units as UnitStack[]).filter((x) => x.count > 0));
@@ -171,10 +182,16 @@ export function previewSides(
   }
   const ground = input.some((s) => s.holds);
   let holder = input.findIndex((s) => s.holds);
+  const ordered = input.map(side => side.attackOrdered === true);
+  const start = clock?.now ?? 0;
+  const interval = clock?.intervalMs ?? MS_PER_HOUR;
+  let now = start;
+  const deadlines = input.map(side => Math.max(now, side.nextAttackAt ?? now));
+  const counts = input.map(() => 0);
 
   /** Один раунд звена `link`. Ложь — стрелять некому (никто из атакующих не враг никому). */
-  const round = (link: readonly number[], roles: readonly Role[]): boolean => {
-    return combatSequence(link, link.filter(i => roles[i] === 'attacker'), up, foes,
+  const round = (link: readonly number[], roles: readonly Role[], due: readonly number[]): boolean => {
+    return combatSequence(link, due, up, foes,
       i => roles[i] === 'defender', (from, targets, role) => {
         const shots = targets.map(i => {
           const shot = targetedVolley(live[from]!, live[i]!, data, role);
@@ -197,13 +214,15 @@ export function previewSides(
   const relink = (last: readonly number[]): [number[], Role[]] | null => {
     const standing = order.filter(up);
     const rolesFor = (defender: number): Role[] =>
-      input.map((_, i) => (i === defender ? 'defender' : 'attacker'));
+      input.map((_, i) => ordered[i] || i !== defender ? 'attacker' : 'defender');
     if (ground) {
       // Мир взят — его держит первый уцелевший берег этого звена (MSB-4, §0.0 №4).
       if (!up(holder)) {
         const captor = standing.find((i) => last.includes(i));
         if (captor === undefined) return null;
         holder = captor;
+        // The captor becomes a new garrison, not the previous attacking beachhead.
+        ordered[holder] = false;
       }
       const attackers = standing.filter((i) => foes(i, holder));
       if (attackers.length === 0) return null;
@@ -228,22 +247,29 @@ export function previewSides(
 
   // Звено первое — бой как он есть: все стороны, роли со входа.
   let link = input.map((_, i) => i);
-  let roles: Role[] = input.map((s) => s.role);
+  let roles: Role[] = input.map((s, i) => ordered[i] ? 'attacker' : s.role);
   let rounds = 0;
   let stalemate = false;
   for (;;) {
-    let linkRounds = 0;
     while (link.every(up)) {
       rounds += 1;
-      linkRounds += 1;
+      const sources = link.filter(i => roles[i] === 'attacker');
+      if (!sources.some(i => link.some(j => foes(i, j)))) { stalemate = true; break; }
+      now = Math.max(now, Math.min(...sources.map(i => deadlines[i]!)));
+      const due = sources.filter(i => deadlines[i]! <= now)
+        .sort((a, b) => deadlines[a]! - deadlines[b]!);
+      for (const i of due) { counts[i]! += 1; deadlines[i] = now + interval; }
       // Как и у живого предохранителя: счётчик ПРЕВЫШАЕТ кап, сам раунд не считается.
       // Никто никому не враг — бой не идёт вовсе, и крутить его до предохранителя значило
       // бы обещать игроку 240 раундов там, где не будет ни одного (живой такт закрывает
       // такой бой перемирием, CMB-7).
-      if (linkRounds > MAX_COMBAT_ROUNDS || !round(link, roles)) {
+      if (due.some(i => counts[i]! > MAX_COMBAT_ROUNDS)) {
         stalemate = true;
         break;
       }
+      // A peaceful source may be due before hostile ones: its empty tick still
+      // advances its clock, without ending the other participants' battle.
+      round(link, roles, due);
     }
     if (stalemate) break;
     // Наземный бой отпускает выживших С РАНАМИ (`finishBattle`, combat 3.10.0): щит стеков
@@ -256,7 +282,12 @@ export function previewSides(
     }
     const next = relink(link);
     if (!next) break;
+    const priorRoles = roles;
     [link, roles] = next;
+    for (const i of link) {
+      counts[i] = 0; // a casualty is progress: reset the new link's stalemate window
+      if (roles[i] === 'attacker' && priorRoles[i] !== 'attacker') deadlines[i] = now;
+    }
   }
   const survivorCount = live.filter((u) => alive(u)).length;
   const sideOf = (before: readonly UnitStack[], after: UnitStack[]): BattlePreviewSide => {
@@ -267,6 +298,7 @@ export function previewSides(
   return {
     outcome: !stalemate && survivorCount === 1 ? 'decided' : 'stalemate',
     roundsEst: rounds,
+    ...(clock ? { hoursEst: (now - start) / interval } : {}),
     sides: input.map((s, i) => sideOf(s.units, live[i]!)),
   };
 }
