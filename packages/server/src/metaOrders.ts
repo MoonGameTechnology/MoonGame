@@ -292,6 +292,14 @@ const BEST_ORDER =
   ORDER_COLS +
   ' FROM meta_market_orders WHERE key=$1 AND price>=$2 AND account_id<>$3 ORDER BY price DESC,created_at,id LIMIT 1';
 
+/** Подходящий лот выставил продавец вне области транзакции: повторить с ним. */
+class ScopeGrew extends Error {
+  constructor(readonly sellers: string[]) {
+    super('E_ORDER_SCOPE');
+  }
+}
+const ORDER_GONE = Symbol('order-gone');
+
 /** Postgres: заказ, его исполнения и возвраты — в одной транзакции с кошельками. */
 export class PostgresMetaOrders extends PostgresMarketBase implements MetaOrders {
   async mine(accountId: string): Promise<BuyOrder[]> {
@@ -311,7 +319,40 @@ export class PostgresMetaOrders extends PostgresMarketBase implements MetaOrders
     if (bad) return { ok: false, code: bad };
     if (!validRequestId(requestId)) return { ok: false, code: 'E_BAD_REQUEST' };
     const seen = await this.pool.query<{ seller_id: string }>(OFFERS_FOR, [key, price, accountId]);
-    const sellers = seen.rows.map((r) => r.seller_id);
+    const scope = new Set(seen.rows.map((r) => r.seller_id));
+    // Продавец мог выставить подходящий лот между чтением и транзакцией: тогда область
+    // транзакции расширяется и она повторяется; на последней попытке такие лоты пропускаются
+    // (их подхватит `matchListing` при выставлении).
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.placeOnce(
+          accountId,
+          login,
+          key,
+          price,
+          quantity,
+          requestId,
+          scope,
+          attempt < 2,
+        );
+      } catch (e) {
+        if (!(e instanceof ScopeGrew) || attempt >= 2) throw e;
+        for (const seller of e.sellers) scope.add(seller);
+      }
+    }
+  }
+
+  private placeOnce(
+    accountId: string,
+    login: string,
+    key: string,
+    price: number,
+    quantity: number,
+    requestId: string,
+    scope: ReadonlySet<string>,
+    canGrow: boolean,
+  ): Promise<MetaMarketResult<OrderPlaced>> {
+    const sellers = [...scope];
     return this.transaction([accountId, ...sellers], async (c, tx) => {
       const fingerprint = JSON.stringify(['order', key, price, quantity]);
       await c.query("SELECT pg_advisory_xact_lock(hashtext('meta_market_receipt'), hashtext($1))", [
@@ -333,7 +374,8 @@ export class PostgresMetaOrders extends PostgresMarketBase implements MetaOrders
         'SELECT count(*) AS n FROM meta_market_orders WHERE account_id=$1',
         [accountId],
       );
-      if (Number(open.rows[0]!.n) >= MAX_BUY_ORDERS) return { ok: false, code: 'E_BUY_ORDER_LIMIT' };
+      if (Number(open.rows[0]!.n) >= MAX_BUY_ORDERS)
+        return { ok: false, code: 'E_BUY_ORDER_LIMIT' };
       const wallets = await this.lockWallets(c, [accountId, ...sellers]);
       const total = price * quantity;
       if (wallets.get(accountId)! < total) return { ok: false, code: 'E_INSUFFICIENT' };
@@ -355,7 +397,9 @@ export class PostgresMetaOrders extends PostgresMarketBase implements MetaOrders
       await this.move(c, accountId, -total, 'order-hold', order.id, at);
       const fills: OrderFill[] = [];
       const offers = await c.query<LotRow>(OFFERS_FOR, [key, price, accountId]);
-      for (const row of offers.rows) {
+      const outside = offers.rows.filter((r) => !scope.has(r.seller_id)).map((r) => r.seller_id);
+      if (outside.length && canGrow) throw new ScopeGrew(outside);
+      for (const row of offers.rows.filter((r) => scope.has(r.seller_id))) {
         if (order.filled >= quantity) break;
         const fill = await this.fill(c, tx, order, row);
         if (fill) fills.push(fill);
@@ -400,16 +444,30 @@ export class PostgresMetaOrders extends PostgresMarketBase implements MetaOrders
     );
     const found = lot.rows[0];
     if (!found) return null;
-    const best = await this.pool.query<OrderRow>(BEST_ORDER, [
-      found.key,
-      Number(found.price),
-      found.seller_id,
-    ]);
-    const candidate = best.rows[0];
-    if (!candidate) return null;
-    return this.transaction([found.seller_id, candidate.account_id], async (c, tx) => {
+    // Лучший заказ мог исполниться параллельным лотом между выбором и блокировкой —
+    // тогда выбираем следующий, а не оставляем лот и чужую заморозку висеть.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const best = await this.pool.query<OrderRow>(BEST_ORDER, [
+        found.key,
+        Number(found.price),
+        found.seller_id,
+      ]);
+      const candidate = best.rows[0];
+      if (!candidate) return null;
+      const result = await this.fillCandidate(listingId, found.seller_id, candidate);
+      if (result !== ORDER_GONE) return result;
+    }
+    return null;
+  }
+
+  private fillCandidate(
+    listingId: string,
+    sellerId: string,
+    candidate: OrderRow,
+  ): Promise<OrderFill | null | typeof ORDER_GONE> {
+    return this.transaction([sellerId, candidate.account_id], async (c, tx) => {
       const locked = await c.query<OrderRow>(ORDER_LOCK, [candidate.id]);
-      if (!locked.rows[0]) return null;
+      if (!locked.rows[0]) return ORDER_GONE;
       const order = fromOrderRow(locked.rows[0]);
       const offer = await c.query<LotRow>(OFFER_LOCK, [order.key, listingId]);
       const row = offer.rows[0];

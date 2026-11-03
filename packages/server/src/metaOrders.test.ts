@@ -174,6 +174,20 @@ function scenarios(make: () => Promise<Stand>): void {
 
 describe('buy orders — memory', () => {
   scenarios(async () => memoryStand());
+  it('rolls an order back with the rest of a failed economy transaction', async () => {
+    const s = memoryStand();
+    const market = s.market as MemoryMetaMarket;
+    await s.credit('buyer', 1000);
+    const before = market.snapshotState();
+    expect(await market.orderBook().place('buyer', 'Buyer', KEY, 200, 1, 'r1')).toMatchObject({
+      ok: true,
+      balance: 800,
+    });
+    // Откат транзакции экономики возвращает и кошелёк, и заказ: отмена не вернёт лишнего.
+    market.restoreState(before);
+    expect(await market.orderBook().mine('buyer')).toEqual([]);
+    expect(await market.ensureWallet('buyer')).toBe(1000);
+  });
 });
 
 const databaseUrl = process.env.DATABASE_URL;
