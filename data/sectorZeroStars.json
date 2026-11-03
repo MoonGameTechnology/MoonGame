@@ -1,14 +1,14 @@
 {
   "cap": 6,
-  "guaranteed": 3,
+  "guaranteed": 2,
   "capByRarity": { "simple": 3, "unique": 4, "mythic": 5, "legendary": 6 },
   "hulls": { "maxSlots": 6, "warrants": [90, 180, 360, 600, 900] },
   "steps": [
-    { "chance": 1, "warrants": 20, "bonus": 0.1, "pity": 0 },
-    { "chance": 1, "warrants": 45, "bonus": 0.1, "pity": 0 },
-    { "chance": 1, "warrants": 90, "bonus": 0.15, "pity": 0 },
-    { "chance": 0.55, "warrants": 180, "bonus": 0.25, "pity": 3 },
-    { "chance": 0.3, "warrants": 360, "bonus": 0.4, "pity": 5 },
-    { "chance": 0.2, "warrants": 600, "bonus": 0.5, "pity": 7 }
+    { "chance": 1, "warrants": 20, "bonus": 0.05, "pity": 0 },
+    { "chance": 1, "warrants": 45, "bonus": 0.05, "pity": 0 },
+    { "chance": 0.75, "warrants": 90, "bonus": 0.1, "pity": 2 },
+    { "chance": 0.55, "warrants": 180, "bonus": 0.1, "pity": 3 },
+    { "chance": 0.3, "warrants": 360, "bonus": 0.15, "pity": 5 },
+    { "chance": 0.2, "warrants": 600, "bonus": 0.15, "pity": 7 }
   ]
 }
