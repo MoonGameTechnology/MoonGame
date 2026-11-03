@@ -770,9 +770,8 @@ function releaseOrDestroyFleet(h: HandlerContext, ref: CombatantRef, battleId: s
 type BattleEnd = 'decided' | 'stalemate' | 'ceasefire';
 
 function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decided'): void {
-  // MSB-1: роли спрашиваются у СПИСКА сторон. Сегодня каждый бой ровно парный (кирпич
-  // меняет форму, не правила), поэтому обе роли на месте всегда; их отсутствие означало
-  // бы повреждённое состояние — fail-secure закрываем бой и уходим, не гадая.
+  // Report anchors come from the side list, including a retreat continuation where
+  // every survivor attacks. Fewer than two participants is invalid here.
   const attacker = attackerOf(battle);
   const defender = defenderOf(battle);
   if (!attacker || !defender) {

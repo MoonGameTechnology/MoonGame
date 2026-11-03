@@ -521,6 +521,17 @@ describe('createBattleModel', () => {
     expect(res.attacker.owner).toBe('p1');
   });
 
+  it('после отступления защиты окно сохраняет двух атакующих без выдуманного приказа', () => {
+    const s = threeSided();
+    s.battles.b1!.sides = s.battles.b1!.sides.filter(side => side.owner !== 'p2');
+    const res = createBattleModel(s, 'b1', 'p1', DATA);
+    if (!res.ok) throw new Error(res.code);
+    expect(res.sides.map(side => side.role)).toEqual(['attacker', 'attacker']);
+    expect(res.sides.every(side => side.attackOrdered === undefined)).toBe(true);
+    expect(res.attacker.owner).toBe('p1');
+    expect(res.defender.owner).toBe('p3');
+  });
+
   it('projects an orbital battle: both sides, forces, hull/shield, live round timer', () => {
     const res = createBattleModel(orbitalScene(), 'b1', 'p1', DATA);
     expect(res.ok).toBe(true);

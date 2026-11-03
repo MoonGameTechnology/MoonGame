@@ -26,7 +26,7 @@ export function sidesOf(battle: Battle): readonly BattleSide[] {
 
 /** Current fire order, with support for battles saved before personal clocks. */
 export function attacks(side: BattleSide): boolean {
-  return (side.stance ?? side.roleStance ?? (side.role === 'attacker' ? 'attack' : 'defense')) === 'attack';
+  return (side.stance ?? (side.role === 'attacker' ? 'attack' : 'defense')) === 'attack';
 }
 
 /** Stable identity even when participants leave or the list grows. */
@@ -36,13 +36,17 @@ export function combatantKey(ref: BattleSide['ref']): string {
     : ref.kind === 'beachhead' ? [ref.kind, ref.planetId, ref.owner] : [ref.kind, ref.planetId]);
 }
 
-/** Первая сторона с ролью `role`, или `undefined`. */
+/** Report anchor, without changing fire orders when a role's last fleet retreats. */
 function sideByRole(battle: Battle, role: BattleSide['role']): BattleSide | undefined {
-  return battle.sides.find((s) => s.role === role);
+  const anchored = battle.sides.find((s) => s.role === role);
+  if (anchored) return anchored;
+  const opposite = battle.sides.find((s) => s.role !== role);
+  return battle.sides.find((s) => s !== opposite);
 }
 
 /** Атакующая сторона дуэли. При N сторонах атакующих может быть несколько — тогда это
- *  ПЕРВАЯ из них, и звать её стоит только там, где бой заведомо парный. */
+ *  ПЕРВАЯ из них. Если роль ушла с отступившим, остаётся только опорой отчёта;
+ *  режим огня каждой стороны по-прежнему задаёт {@link attacks}. */
 export function attackerOf(battle: Battle): BattleSide | undefined {
   return sideByRole(battle, 'attacker');
 }

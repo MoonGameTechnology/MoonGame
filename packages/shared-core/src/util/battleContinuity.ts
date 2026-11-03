@@ -10,7 +10,7 @@ function enemies(h: HandlerContext, a: BattleSide, b: BattleSide): boolean {
 }
 
 /** Retreat removes only the leaving fleets. Surviving enemies keep their battle,
- * fire orders and clocks; role anchors still exist for reports and resolution. */
+ * original roles, fire orders and clocks until a casualty starts the next link. */
 export function retainBattleAfterRetreat(
   h: HandlerContext,
   battle: Battle,
@@ -19,15 +19,6 @@ export function retainBattleAfterRetreat(
   const left = battle.sides.filter(side =>
     !(side.ref.kind === 'fleet' && leaving.has(side.ref.fleetId)) && sideAlive(h.state, side.ref));
   if (!left.some((a, i) => left.some((b, j) => j > i && enemies(h, a, b)))) return false;
-  const attacker = left.find(side => side.role === 'attacker') ?? left[0]!;
-  const defender = left.find(side => side !== attacker && side.role === 'defender') ??
-    left.find(side => side !== attacker)!;
-  for (const [side, role] of [[attacker, 'attacker'], [defender, 'defender']] as const) {
-    if (side.role === role) continue;
-    const stance = attacks(side) ? 'attack' : 'defense';
-    side.role = role;
-    side.roleStance = stance;
-  }
   battle.sides = left;
   for (const side of left) {
     if (side.ref.kind !== 'fleet') continue;
@@ -96,7 +87,6 @@ export function restoreBattleClocks(h: HandlerContext, previous: Battle): void {
       if (!old) continue;
       restored = true;
       // Explicit attack overrides outlive the link's default roles.
-      delete side.roleStance;
       if (old.stance === 'attack') side.stance = 'attack';
       else delete side.stance;
       if (attacks(side)) {

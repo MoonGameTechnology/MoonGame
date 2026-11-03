@@ -97,6 +97,8 @@ describe('combat lifecycle preserves personal clocks', () => {
 
   it('retreating defender preserves both attackers’ stances and staggered clocks', () => {
     const result = retreat(world(), 'b');
+    expect(result.state.battles['battle:0']!.sides.map(side => side.role)).toEqual(['attacker', 'attacker']);
+    expect(result.state.battles['battle:0']!.sides.every(side => side.stance === undefined)).toBe(true);
     expect(survivor(result.state, 'a')?.nextAttackAt).toBe(HOUR);
     expect(survivor(result.state, 'c')?.nextAttackAt).toBe(1.5 * HOUR);
     const first = advance(result.state, HOUR);
