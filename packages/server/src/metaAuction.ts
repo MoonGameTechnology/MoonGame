@@ -377,6 +377,10 @@ type AuctionRow = {
 };
 const AUCTION_SELECT =
   'SELECT l.*,a.kind,a.form,a.def_id,a.grade,a.soulbound,a.durability,a.origin,a.acquired_at,a.progression FROM meta_market_listings l JOIN arsenal a ON a.item_id=l.item_id';
+// Готовые запросы: значения идут только параметрами $n.
+const AUCTION_LOTS = AUCTION_SELECT + ' WHERE l.ends_at IS NOT NULL ORDER BY l.ends_at,l.id';
+const AUCTION_BY_ID = AUCTION_SELECT + ' WHERE l.id=$1';
+const AUCTION_LOCK = AUCTION_SELECT + ' WHERE l.id=$1 AND l.ends_at IS NOT NULL FOR UPDATE OF l';
 
 const fromAuctionRow = (r: AuctionRow): AuctionListing => ({
   id: r.id,
@@ -490,9 +494,7 @@ export class PostgresMetaAuctions implements MetaAuctions {
   }
 
   async lots(): Promise<AuctionListing[]> {
-    const r = await this.pool.query<AuctionRow>(
-      `${AUCTION_SELECT} WHERE l.ends_at IS NOT NULL ORDER BY l.ends_at,l.id`,
-    );
+    const r = await this.pool.query<AuctionRow>(AUCTION_LOTS);
     return r.rows.map(fromAuctionRow);
   }
 
@@ -523,7 +525,7 @@ export class PostgresMetaAuctions implements MetaAuctions {
         [id, accountId, login, start, at, at + hours * HOUR_MS, buyout ?? null, itemId, limit],
       );
       if (!r.rows[0]) return { ok: false, code: 'E_NOT_TRADABLE' };
-      const row = await c.query<AuctionRow>(`${AUCTION_SELECT} WHERE l.id=$1`, [id]);
+      const row = await c.query<AuctionRow>(AUCTION_BY_ID, [id]);
       return { ok: true, listing: fromAuctionRow(row.rows[0]!) };
     });
   }
@@ -555,10 +557,7 @@ export class PostgresMetaAuctions implements MetaAuctions {
         return receipt.rows[0].fingerprint === fingerprint
           ? receipt.rows[0].result
           : { ok: false, code: 'E_IDEMPOTENCY_CONFLICT' };
-      const q = await c.query<AuctionRow>(
-        `${AUCTION_SELECT} WHERE l.id=$1 AND l.ends_at IS NOT NULL FOR UPDATE OF l`,
-        [listingId],
-      );
+      const q = await c.query<AuctionRow>(AUCTION_LOCK, [listingId]);
       if (!q.rows[0]) return { ok: false, code: 'E_NO_LISTING' };
       const lot = fromAuctionRow(q.rows[0]);
       const now = this.now();
@@ -632,10 +631,7 @@ export class PostgresMetaAuctions implements MetaAuctions {
     for (const found of due.rows) {
       const accounts = [found.seller_id, ...(found.bid_account ? [found.bid_account] : [])];
       const done = await this.transaction(accounts, async (c, tx) => {
-        const q = await c.query<AuctionRow>(
-          `${AUCTION_SELECT} WHERE l.id=$1 AND l.ends_at IS NOT NULL FOR UPDATE OF l`,
-          [found.id],
-        );
+        const q = await c.query<AuctionRow>(AUCTION_LOCK, [found.id]);
         if (!q.rows[0]) return null;
         const lot = fromAuctionRow(q.rows[0]);
         if (lot.auction.endsAt > this.now()) return null;
