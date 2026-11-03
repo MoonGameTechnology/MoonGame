@@ -928,6 +928,9 @@ console.log(
 // пробелов и кириллицы. Требование 1.21: всё вместе не больше 100 МБ в распакованном
 // виде. Сторож `prototype/buildTarget.test.mjs` проверяет это по готовым файлам.
 const platformFiles = await bundlePlatform();
+// Каталог — начисто: имена картинок несут хеш, и ассеты прошлых сборок иначе копились бы
+// рядом с новыми, раздувая архив, который уходит на площадку целиком.
+rmSync('prototype/dist/yandex', { recursive: true, force: true });
 mkdirSync('prototype/dist/yandex/assets', { recursive: true });
 let platformBytes = 0;
 for (const file of platformFiles) {
