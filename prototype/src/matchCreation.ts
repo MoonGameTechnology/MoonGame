@@ -9,8 +9,10 @@ let grant: Creator | null = null;
 let generation = 0;
 
 function current(): Creator | null {
-  const server = resolveServer();
-  return server ? { ...server, token: tokenFor(localStorage, server.base, server.nick) } : null;
+  try {
+    const server = resolveServer();
+    return server ? { ...server, token: tokenFor(localStorage, server.base, server.nick) } : null;
+  } catch { return null; }
 }
 function same(a: Creator | null, b: Creator | null): boolean {
   return a !== null && b !== null && a.base === b.base && a.nick === b.nick && a.token === b.token;
@@ -21,7 +23,8 @@ export function matchCreator(): Creator | null {
   return grant && same(grant, current()) ? grant : null;
 }
 export function isCurrentMatchCreator(creator: Creator): boolean {
-  return same(creator, matchCreator());
+  // A lost grant blocks new requests; it must not discard an already-created match.
+  return same(creator, current());
 }
 export function canCreateOnlineMatch(): boolean { return matchCreator() !== null; }
 

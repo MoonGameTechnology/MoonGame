@@ -85,6 +85,14 @@ describe('session creation controls', () => {
     server = { base: BASE, nick: 'Another' };
     expect(creation.canCreateOnlineMatch()).toBe(false);
   });
+  it('a failed background check prevents new creates but preserves an in-flight response for the same session', async () => {
+    await creation.refreshMatchCreation();
+    const creator = creation.matchCreator()!;
+    fetcher.mockRejectedValueOnce(new Error('background request failed'));
+    await creation.refreshMatchCreation();
+    hidden();
+    expect(creation.isCurrentMatchCreator(creator)).toBe(true);
+  });
   it.each(['account', 'server', 'logout'])('ignores an old grant after changing %s', async change => {
     let finish!: (value: ReturnType<typeof response>) => void;
     fetcher.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
@@ -113,5 +121,15 @@ describe('session creation controls', () => {
     await creation.refreshMatchCreation();
     expect(fetcher).not.toHaveBeenCalled();
     hidden();
+  });
+  it('denies creation without breaking the screen when session storage is blocked', async () => {
+    await creation.refreshMatchCreation();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true, get: () => { throw new Error('storage blocked'); },
+    });
+    expect(creation.canCreateOnlineMatch()).toBe(false);
+    await creation.refreshMatchCreation();
+    hidden();
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
