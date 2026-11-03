@@ -32,6 +32,7 @@ export const TAB_KEY = {
   buy: 'auction.tab.buy',
   bids: 'auction.tab.bids',
   sell: 'auction.tab.sell',
+  mine: 'auction.tab.mine',
 } as const;
 export const itemCat = (item: ArsenalItem): AuctionCategory =>
   itemCategory({ kind: item.kind, form: item.form, slot: data.modules[item.defId]?.slot });

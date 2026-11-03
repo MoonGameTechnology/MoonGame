@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import type { Pool, PoolClient } from 'pg';
+import type { PoolClient } from 'pg';
 import type { ArsenalItem } from '@void/shared-core';
 import type { ArsenalStore } from './store';
-import type { MetaEconomyStore, MetaEconomyTransaction } from './metaEconomyStore';
+import type { MetaEconomyTransaction } from './metaEconomyStore';
 import type { MetaMarketLedgerEntry, MetaMarketListing, MetaMarketResult } from './metaMarket';
+import { moveSource, PostgresMarketBase } from './marketTx';
 
 /**
  * Торги со ставками на аукционе хаба (макет владельца 2026-11-03, вкладка «Торги»).
@@ -162,17 +163,6 @@ export interface MemoryAuctionPort {
   run<T>(accounts: string[], work: (tx?: MetaEconomyTransaction) => Promise<T>): Promise<T>;
 }
 
-function moveSource(
-  tx: MetaEconomyTransaction | undefined,
-  itemId: string,
-  from: string,
-  to: string,
-): void {
-  if (!tx) return;
-  const source = tx.account(from).itemSources[itemId];
-  if (source) tx.account(to).itemSources[itemId] = source;
-  delete tx.account(from).itemSources[itemId];
-}
 
 export class MemoryMetaAuctions implements MetaAuctions {
   constructor(private readonly p: MemoryAuctionPort) {}
@@ -430,77 +420,7 @@ const fromAuctionRow = (r: AuctionRow): AuctionListing => ({
  * Лот запирается `FOR UPDATE`, кошельки — по возрастанию `account_id`, тот же порядок,
  * что у `PostgresMetaMarket.buy`, поэтому встречные сделки не ловят дедлок.
  */
-export class PostgresMetaAuctions implements MetaAuctions {
-  constructor(
-    private readonly pool: Pool,
-    private readonly economy: () => MetaEconomyStore | undefined,
-    private readonly now: () => number,
-    private readonly feeRate: number,
-    private readonly faucet: number,
-  ) {}
-
-  private transaction<T>(
-    accounts: string[],
-    work: (c: PoolClient, tx: MetaEconomyTransaction) => Promise<T>,
-  ): Promise<T> {
-    const economy = this.economy();
-    if (!economy) return Promise.reject(new Error('E_UNAVAILABLE'));
-    return economy.transaction(accounts, async (tx) => {
-      if (!tx.sql) throw new Error('E_STORAGE_MISMATCH');
-      return work(tx.sql, tx);
-    });
-  }
-
-  private async lockWallets(c: PoolClient, ids: string[]): Promise<Map<string, number>> {
-    const balances = new Map<string, number>();
-    for (const id of [...new Set(ids)].sort()) {
-      const inserted = await c.query(
-        'INSERT INTO meta_wallets(account_id, warrants) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING account_id',
-        [id, this.faucet],
-      );
-      if (inserted.rowCount === 1)
-        await c.query(
-          "INSERT INTO meta_market_ledger(id,account_id,delta,reason,at) VALUES($1,$2,$3,'seed',$4)",
-          [randomUUID(), id, this.faucet, this.now()],
-        );
-      const r = await c.query<{ warrants: string }>(
-        'SELECT warrants FROM meta_wallets WHERE account_id=$1 FOR UPDATE',
-        [id],
-      );
-      balances.set(id, Number(r.rows[0]!.warrants));
-    }
-    return balances;
-  }
-
-  private async move(
-    c: PoolClient,
-    accountId: string,
-    delta: number,
-    reason: string,
-    listingId: string,
-    at: number,
-  ): Promise<void> {
-    await c.query('UPDATE meta_wallets SET warrants=warrants+$1 WHERE account_id=$2', [
-      delta,
-      accountId,
-    ]);
-    await this.ledger(c, accountId, delta, reason, listingId, at);
-  }
-
-  private async ledger(
-    c: PoolClient,
-    accountId: string,
-    delta: number,
-    reason: string,
-    listingId: string,
-    at: number,
-  ): Promise<void> {
-    await c.query(
-      'INSERT INTO meta_market_ledger(id,account_id,delta,reason,listing_id,at) VALUES($1,$2,$3,$4,$5,$6)',
-      [randomUUID(), accountId, delta, reason, listingId, at],
-    );
-  }
-
+export class PostgresMetaAuctions extends PostgresMarketBase implements MetaAuctions {
   async lots(): Promise<AuctionListing[]> {
     const r = await this.pool.query<AuctionRow>(AUCTION_LOTS);
     return r.rows.map(fromAuctionRow);

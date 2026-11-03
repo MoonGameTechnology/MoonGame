@@ -447,6 +447,19 @@ const SCHEMA_SQL = `
     ALTER TABLE meta_market_listings ADD COLUMN IF NOT EXISTS bid_login text;
     ALTER TABLE meta_market_listings ADD COLUMN IF NOT EXISTS bid_amount bigint CHECK (bid_amount > 0);
     CREATE INDEX IF NOT EXISTS meta_market_auction_end_idx ON meta_market_listings(ends_at) WHERE ends_at IS NOT NULL;
+    -- Заказы на покупку (metaOrders.ts): price × (quantity − filled) уже списано с кошелька.
+    CREATE TABLE IF NOT EXISTS meta_market_orders (
+      id text PRIMARY KEY,
+      account_id text NOT NULL,
+      login text NOT NULL,
+      key text NOT NULL,
+      price bigint NOT NULL CHECK (price > 0),
+      quantity integer NOT NULL CHECK (quantity > 0),
+      filled integer NOT NULL DEFAULT 0 CHECK (filled >= 0 AND filled < quantity),
+      created_at bigint NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS meta_market_orders_key_idx ON meta_market_orders(key, price DESC, created_at);
+    CREATE INDEX IF NOT EXISTS meta_market_orders_account_idx ON meta_market_orders(account_id);
     CREATE TABLE IF NOT EXISTS meta_market_ledger (
       id text PRIMARY KEY,
       account_id text NOT NULL,

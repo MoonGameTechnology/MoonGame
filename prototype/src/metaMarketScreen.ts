@@ -33,6 +33,13 @@ import {
 } from './marketParts';
 import { detach } from './detach';
 import { auctionTermsHtml, bidsHtml, shelfAuctionTile, type AuctionLot } from './auctionBids';
+import {
+  myOrdersHtml,
+  newOrderHtml,
+  NEW_ORDER,
+  orderFormHtml,
+  type MyOrder,
+} from './auctionOrders';
 
 export interface Listing {
   id: string;
@@ -57,6 +64,9 @@ export interface MarketView {
   auctions?: AuctionLot[];
   /** Часы сервера в момент ответа: таймеры торгов считаются от них, а не от часов телефона. */
   serverNow?: number;
+  /** Свои заказы на покупку (`metaOrders.ts`) и их предел на игрока. */
+  orders?: MyOrder[];
+  orderLimit?: number;
 }
 export interface MetaMarketHost {
   root(): HTMLElement;
@@ -74,7 +84,7 @@ const materialLabel = (view: MarketView, id: string): string =>
 /** Что открыто на экране: вкладка, категория, поиск и раскрытая карточка
  *  (плитка «Купить» по ключу типа или предмет склада `item:`/`mat:`). */
 export interface MarketUi {
-  tab: 'buy' | 'bids' | 'sell';
+  tab: 'buy' | 'bids' | 'sell' | 'mine';
   cat: AuctionCategory;
   search: string;
   open: string | null;
@@ -153,9 +163,14 @@ function offerRowHtml(
 function buyHtml(view: MarketView, ui: MarketUi, disabled: string, tradeDisabled: string): string {
   const groups = groupOffers(buyOffers(view, ui), (o) => o.key);
   const any = view.listings.length + (view.materialListings?.length ?? 0) > 0;
-  const grid = groups.length
-    ? `<div class="mm-tiles">${groups.map((g) => tileHtml(view, g)).join('')}</div>`
-    : `<p class="hub-empty">${t(any ? 'auction.no-match' : 'auction.empty')}</p>`;
+  const grid =
+    (groups.length
+      ? `<div class="mm-tiles">${groups.map((g) => tileHtml(view, g)).join('')}</div>`
+      : `<p class="hub-empty">${t(any ? 'auction.no-match' : 'auction.empty')}</p>`) +
+    (ui.cat === 'material'
+      ? ''
+      : `<button type="button" class="mm-ghost" data-mm-open="${NEW_ORDER}">${t('auction.order.new')}</button>`);
+  if (ui.open === NEW_ORDER) return grid + newOrderHtml(tradeDisabled);
   const open = groups.find((g) => g.key === ui.open);
   if (!open) return grid;
   const first = open.offers[0]!;
@@ -164,7 +179,7 @@ function buyHtml(view: MarketView, ui: MarketUi, disabled: string, tradeDisabled
     sheet(
       offerName(view, first),
       first.kind === 'item' ? itemIcon(first.lot.item) : CAT_ICON.material,
-      `<p class="mm-fee">${t('auction.offers', { n: open.offers.length })}</p>${open.offers.map((o) => offerRowHtml(view, o, disabled, tradeDisabled)).join('')}`,
+      `<p class="mm-fee">${t('auction.offers', { n: open.offers.length })}</p>${open.offers.map((o) => offerRowHtml(view, o, disabled, tradeDisabled)).join('')}${first.kind === 'item' ? orderFormHtml(open.key, open.lowest - 1, tradeDisabled) : ''}`,
     )
   );
 }
@@ -268,7 +283,7 @@ export function metaMarketHtml(
 ): string {
   const disabled = busy ? ' disabled' : '';
   const tradeDisabled = busy || view.canTrade === false ? ' disabled' : '';
-  const tabs = (['buy', 'bids', 'sell'] as const)
+  const tabs = (['buy', 'bids', 'sell', 'mine'] as const)
     .map(
       (tab) =>
         `<button type="button" data-mm-tab="${tab}"${ui.tab === tab ? ' aria-current="page"' : ''}>${t(TAB_KEY[tab])}</button>`,
@@ -282,7 +297,7 @@ export function metaMarketHtml(
     view.canTrade === false
       ? `<p class="mm-fee">${view.minimumAccountXp === undefined ? t('err.level-required') : t('auction.level-required', { n: accountLevel(view.minimumAccountXp).level })}</p>`
       : '';
-  return `<header class="mm-head"><div><strong>${t('auction.title')}</strong><small>${t('auction.fee', { n: Math.round(view.feeRate * 100) })}</small></div><b>⌖ ${nfmt(view.balance)}</b></header>${gate}<nav class="mm-tabs">${tabs}</nav><div class="mm-tools"><input type="search" data-mm-filter="search" value="${esc(ui.search)}" placeholder="${esc(t('auction.search'))}" aria-label="${esc(t('auction.search'))}"></div><nav class="mm-cats" aria-label="${esc(t('auction.cats'))}">${cats}</nav>${ui.tab === 'buy' ? buyHtml(view, ui, disabled, tradeDisabled) : ui.tab === 'bids' ? bidsHtml(view.auctions ?? [], ui.cat, ui.search, ui.open, now, tradeDisabled) : sellHtml(view, mine, ui, disabled, tradeDisabled, now)}`;
+  return `<header class="mm-head"><div><strong>${t('auction.title')}</strong><small>${t('auction.fee', { n: Math.round(view.feeRate * 100) })}</small></div><b>⌖ ${nfmt(view.balance)}</b></header>${gate}<nav class="mm-tabs">${tabs}</nav><div class="mm-tools"><input type="search" data-mm-filter="search" value="${esc(ui.search)}" placeholder="${esc(t('auction.search'))}" aria-label="${esc(t('auction.search'))}"></div><nav class="mm-cats" aria-label="${esc(t('auction.cats'))}">${cats}</nav>${ui.tab === 'buy' ? buyHtml(view, ui, disabled, tradeDisabled) : ui.tab === 'bids' ? bidsHtml(view.auctions ?? [], ui.cat, ui.search, ui.open, now, tradeDisabled) : ui.tab === 'mine' ? myOrdersHtml(view.orders ?? [], view.orderLimit ?? 10, disabled) + (ui.open === NEW_ORDER ? newOrderHtml(tradeDisabled) : '') : sellHtml(view, mine, ui, disabled, tradeDisabled, now)}`;
 }
 
 export function initMetaMarket(host: MetaMarketHost): {
@@ -333,7 +348,7 @@ export function initMetaMarket(host: MetaMarketHost): {
     const root = host.root();
     root
       .querySelectorAll?.<HTMLInputElement>(
-        'input[data-mm-price],input[data-mm-material-price],input[data-mm-quantity],input[data-mm-buyout-price]',
+        'input[data-mm-price],input[data-mm-material-price],input[data-mm-quantity],input[data-mm-buyout-price],input[data-mm-order-price],input[data-mm-order-qty]',
       )
       .forEach((el) =>
         drafts.set(
@@ -347,7 +362,7 @@ export function initMetaMarket(host: MetaMarketHost): {
     root.innerHTML = metaMarketHtml(view, host.arsenal(), busy, ui, clientNow());
     root
       .querySelectorAll?.<HTMLInputElement>(
-        'input[data-mm-price],input[data-mm-material-price],input[data-mm-quantity],input[data-mm-buyout-price]',
+        'input[data-mm-price],input[data-mm-material-price],input[data-mm-quantity],input[data-mm-buyout-price],input[data-mm-order-price],input[data-mm-order-qty]',
       )
       .forEach((el) => {
         const v = drafts.get(
@@ -511,6 +526,24 @@ export function initMetaMarket(host: MetaMarketHost): {
       path = '/meta-market/auction/bid';
       body = { listingId, amount };
       idField = 'tradeId';
+    } else if (el.dataset.mmOrder) {
+      const slot = el.dataset.mmOrder;
+      const key =
+        slot === NEW_ORDER
+          ? (host.root().querySelector<HTMLSelectElement>('[data-mm-order-key]')?.value ?? '')
+          : slot;
+      const price = input('data-mm-order-price', slot);
+      const quantity = input('data-mm-order-qty', slot);
+      if (!key || !positive(price) || !positive(quantity)) {
+        host.note(t('auction.invalid-amount'));
+        return;
+      }
+      path = '/meta-market/order';
+      body = { key, price, quantity };
+      idField = 'requestId';
+    } else if (el.dataset.mmOrderCancel) {
+      path = '/meta-market/order/cancel';
+      body = { orderId: el.dataset.mmOrderCancel };
     } else if (el.dataset.mmMaterialBuy) {
       path = '/meta-market/material/buy';
       body = { listingId: el.dataset.mmMaterialBuy };
@@ -544,6 +577,8 @@ export function initMetaMarket(host: MetaMarketHost): {
           }
           await request(path, body);
           attempts.delete(key);
+          // Заказ оставлен — шторка закрыта, видно его во вкладке «Мои».
+          if (path === '/meta-market/order') ui = { ...ui, tab: 'mine', open: null };
           view = { ...empty, canTrade: false };
           await host.inventoryChanged?.();
           await load();

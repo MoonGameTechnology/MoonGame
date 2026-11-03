@@ -4,6 +4,8 @@ import { META_MARKET_FEE, type MetaMarket } from './metaMarket';
 import { slidingWindowIpLimiter } from './rateLimit';
 import type { ShelfView } from './auctionShelf';
 import { registerMetaAuctionRoutes } from './metaAuctionApi';
+import { registerMetaOrderRoutes } from './metaOrdersApi';
+import { MAX_BUY_ORDERS } from './metaOrders';
 
 /** Торговля — спам- и абьюз-поверхность (`economy-roadmap.md` EC-0.3: wash-trading
  *  сдерживается лимитом сделок в окне), поэтому ПИШУЩИЕ маршруты делят per-IP бюджет —
@@ -132,6 +134,13 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
     },
     deps.auctionSweepMs,
   );
+  const orders = registerMetaOrderRoutes(app, deps.market.orderBook(), {
+    guarded,
+    writeGate,
+    gateError,
+    changed: (identity, request) => changed(identity, request),
+    shelfLimit,
+  });
 
   app.get('/meta-market', async (request, reply) =>
     guarded(reply, async () => {
@@ -147,6 +156,7 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
         deps.shelf ? deps.shelf(identity.accountId) : Promise.resolve(undefined),
       ]);
       const auctionLots = await auctions.views(identity.accountId);
+      const myOrders = await orders.mine(identity.accountId);
       return {
         balance,
         feeRate: META_MARKET_FEE,
@@ -158,6 +168,8 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
         canTrade,
         ...(shelf ? { shelf } : {}),
         auctions: auctionLots,
+        orders: myOrders,
+        orderLimit: MAX_BUY_ORDERS,
         serverNow: (deps.now ?? Date.now)(),
         ...(deps.minimumAccountXp === undefined ? {} : { minimumAccountXp: deps.minimumAccountXp }),
         materialListings: materialListings.map((listing) => ({
@@ -186,6 +198,8 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
         body.price,
         await shelfLimit(identity.accountId),
       );
+      // Лот дешевле чужого заказа уходит по заказу сразу.
+      if (result.ok) await orders.afterList(result.listing.id, request);
       if (!result.ok) void reply.code(result.code === 'E_NOT_OWNER' ? 404 : 409);
       return result.ok ? result : { error: result.code };
     }),

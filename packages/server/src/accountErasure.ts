@@ -78,6 +78,8 @@ const PERSONAL_ROWS = [
   // остаётся на торгах без лидера.
   'UPDATE meta_market_listings SET bid_account=NULL,bid_login=NULL,bid_amount=NULL WHERE bid_account=$1',
   'DELETE FROM meta_material_listings WHERE seller_id=$1',
+  // Заказы стёртого: замороженные под них варранты уходят вместе с кошельком.
+  'DELETE FROM meta_market_orders WHERE account_id=$1',
   'DELETE FROM arsenal WHERE account_id=$1',
   'DELETE FROM meta_wallets WHERE account_id=$1',
   'DELETE FROM meta_market_ledger WHERE account_id=$1',

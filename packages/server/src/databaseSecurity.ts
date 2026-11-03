@@ -37,6 +37,7 @@ export const APP_TABLES = [
   'meta_economy_receipts',
   'meta_material_listings',
   'meta_market_receipts',
+  'meta_market_orders',
   'meta_entitlement_nonces',
   'drop_claims',
   'drop_meta',

@@ -273,10 +273,10 @@ describe('meta market screen', () => {
       ],
     };
     expect(metaMarketHtml(view, [], false, { ...defaultMarketUi, cat: 'defense' })).toContain(
-      'data-mm-open=',
+      'data-mm-open="module:',
     );
     expect(metaMarketHtml(view, [], false, { ...defaultMarketUi, cat: 'weapon' })).not.toContain(
-      'data-mm-open=',
+      'data-mm-open="module:',
     );
   });
 
@@ -366,5 +366,49 @@ describe('meta market screen', () => {
     expect(html).toContain('data-mm-cancel="m1"');
     expect(html).not.toContain('data-mm-open="item:on-auction"');
     expect(html).toContain(t('auction.shelf', { n: 1, max: 6 }));
+  });
+  it('offers a buy order in the tile sheet, orders unlisted items and lists own orders', () => {
+    const engine = {
+      itemId: 'e',
+      kind: 'module' as const,
+      form: 'instance' as const,
+      defId: 'ion_engine',
+      soulbound: false,
+      origin: 'drop' as const,
+      acquiredAt: 1,
+    };
+    const view = {
+      balance: 500,
+      feeRate: 0.08,
+      listings: [
+        { id: 'l', sellerId: 'o', sellerLogin: 'o', item: engine, price: 90, createdAt: 1 },
+      ],
+      orders: [
+        {
+          id: 'o1',
+          key: 'module:instance:ion_engine',
+          price: 40,
+          quantity: 3,
+          filled: 1,
+          createdAt: 2,
+        },
+      ],
+      orderLimit: 10,
+    };
+    const tile = metaMarketHtml(view, [], false, {
+      ...defaultMarketUi,
+      open: 'module:instance:ion_engine',
+    });
+    expect(tile).toContain('data-mm-order="module:instance:ion_engine"');
+    expect(tile).toContain(
+      'data-mm-order-price="module:instance:ion_engine" type="number" min="1" step="1" inputmode="numeric" value="89"',
+    );
+    const fresh = metaMarketHtml(view, [], false, { ...defaultMarketUi, open: 'order:new' });
+    expect(fresh).toContain('<select data-mm-order-key>');
+    expect(fresh).toContain('value="module:instance:ion_engine"');
+    const mine = metaMarketHtml(view, [], false, { ...defaultMarketUi, tab: 'mine' });
+    expect(mine).toContain(t('auction.orders', { n: 1, max: 10 }));
+    expect(mine).toContain(t('auction.order.frozen', { n: '80' }));
+    expect(mine).toContain('data-mm-order-cancel="o1"');
   });
 });

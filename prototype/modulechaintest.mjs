@@ -164,6 +164,18 @@ try {
       await page.locator('[data-mm-bid]').click();
       await page.locator('.mm-pill.lead').waitFor();
       await page.screenshot({ path: resolve(out, `auction-bids-${width}.png`) });
+      // Заказ: bob заказывает модуль, видит заморозку во вкладке «Мои» и отменяет заказ.
+      await page.locator('[data-mm-tab="mine"]').click();
+      await page.locator('[data-mm-open="order:new"]').click();
+      await page.locator('[data-mm-order-key]').selectOption('module:instance:cargo_bay');
+      await page.locator('[data-mm-order-price="order:new"]').fill('30');
+      await page.locator('[data-mm-order-qty="order:new"]').fill('2');
+      await page.screenshot({ path: resolve(out, `auction-order-${width}.png`) });
+      await page.locator('[data-mm-order="order:new"]').click();
+      await page.locator('[data-mm-order-cancel]').waitFor();
+      await page.screenshot({ path: resolve(out, `auction-mine-${width}.png`) });
+      await page.locator('[data-mm-order-cancel]').click();
+      await page.waitForFunction(() => !document.querySelector('[data-mm-order-cancel]'));
       const bought = await f.arsenal.get('target');
       assert.equal(bought.accountId, 'bob');
       assert.equal(bought.grade, 1);
