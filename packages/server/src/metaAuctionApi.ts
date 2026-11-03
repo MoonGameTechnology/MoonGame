@@ -120,7 +120,11 @@ export function registerMetaAuctionRoutes(
         body.amount,
         body.tradeId,
       );
-      if (result.ok && result.won) await kit.changed(identity, request);
+      if (result.ok && result.won) {
+        // Выкуп меняет арсенал обеих сторон: продавец в матче не должен строить проданным.
+        await kit.changed(identity, request);
+        if (result.seller) await kit.changed(result.seller, request);
+      }
       if (!result.ok)
         void reply.code(
           result.code === 'E_NO_LISTING'
@@ -129,7 +133,9 @@ export function registerMetaAuctionRoutes(
               ? 400
               : 409,
         );
-      return result.ok ? result : { error: result.code };
+      if (!result.ok) return { error: result.code };
+      const { seller: _seller, ...shown } = result;
+      return shown;
     }),
   );
 

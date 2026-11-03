@@ -71,7 +71,8 @@ const PERSONAL_ROWS = [
   'DELETE FROM corp_arsenal_rent WHERE account_id=$1',
   // Торги стёртого продавца: ставка лидера держится на его лоте — вернуть её до удаления.
   "INSERT INTO meta_market_ledger(id,account_id,delta,reason,listing_id,at) SELECT md5(id||':erasure-refund'),bid_account,bid_amount,'bid-refund',id,created_at FROM meta_market_listings WHERE seller_id=$1 AND bid_account IS NOT NULL",
-  'UPDATE meta_wallets w SET warrants=w.warrants+l.bid_amount FROM meta_market_listings l WHERE l.seller_id=$1 AND l.bid_account=w.account_id',
+  // Один лидер может вести несколько лотов: UPDATE … FROM обновил бы кошелёк один раз, поэтому сумма.
+  'UPDATE meta_wallets w SET warrants=w.warrants+r.total FROM (SELECT bid_account,SUM(bid_amount) AS total FROM meta_market_listings WHERE seller_id=$1 AND bid_account IS NOT NULL GROUP BY bid_account) r WHERE r.bid_account=w.account_id',
   'DELETE FROM meta_market_listings WHERE seller_id=$1',
   // Стёртый лидер чужих торгов: его списанная ставка уходит вместе с кошельком, лот
   // остаётся на торгах без лидера.

@@ -101,10 +101,15 @@ describe('meta market HTTP API', () => {
       acquiredAt: 1,
     });
     const market = new MemoryMetaMarket(arsenal, () => 1, 500);
+    const changed: string[] = [];
     const app = Fastify();
     registerMetaMarketApi(app, {
       market,
       auctionSweepMs: 0,
+      onChanged: (identity) => {
+        changed.push(identity.accountId);
+        return Promise.resolve();
+      },
       identify: (r: FastifyRequest) => {
         const login = r.headers['x-user'];
         return Promise.resolve(typeof login === 'string' ? { accountId: login, login } : null);
@@ -156,6 +161,12 @@ describe('meta market HTTP API', () => {
     expect(JSON.stringify(other.auctions)).not.toContain('bidder');
     expect(other.listings).toEqual([]);
     expect((await post('seller', '/meta-market/cancel', { listingId: id })).statusCode).toBe(409);
+    // Выкуп: арсенал меняется у обеих сторон, обе пересобираются; продавец наружу не уходит.
+    const won = (
+      await post('rival', '/meta-market/auction/bid', { listingId: id, amount: 400, tradeId: 'w' })
+    ).json();
+    expect(won).toEqual({ ok: true, balance: 100, tradeId: 'w', won: true });
+    expect(changed.slice(-2)).toEqual(['rival', 'seller']);
     await app.close();
   });
 

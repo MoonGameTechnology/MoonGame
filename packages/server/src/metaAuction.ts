@@ -71,6 +71,8 @@ export interface BidResult {
   tradeId: string;
   /** Ставка дошла до выкупа: предмет уже у покупателя. */
   won: boolean;
+  /** При выкупе — продавец, чей игровой арсенал надо пересобрать. Наружу не отдаётся. */
+  seller?: { accountId: string; login: string };
 }
 
 /** Минимальная следующая ставка (правило 2). */
@@ -281,7 +283,13 @@ export class MemoryMetaAuctions implements MetaAuctions {
           leader: { accountId, login, amount: pay },
           endsAt: extendedEnd(lot.auction.endsAt, now),
         };
-      const result = { ok: true as const, balance: balance - pay, tradeId, won: buyout };
+      const result = {
+        ok: true as const,
+        balance: balance - pay,
+        tradeId,
+        won: buyout,
+        ...(buyout ? { seller: { accountId: lot.sellerId, login: lot.sellerLogin } } : {}),
+      };
       this.p.receipts.set(key, { fingerprint, result });
       return structuredClone(result);
     });
@@ -586,7 +594,13 @@ export class PostgresMetaAuctions implements MetaAuctions {
           'UPDATE meta_market_listings SET bids=bids+1,bid_account=$2,bid_login=$3,bid_amount=$4,ends_at=$5 WHERE id=$1',
           [listingId, accountId, login, pay, extendedEnd(lot.auction.endsAt, now)],
         );
-      const result = { ok: true as const, balance: balance - pay, tradeId, won: buyout };
+      const result = {
+        ok: true as const,
+        balance: balance - pay,
+        tradeId,
+        won: buyout,
+        ...(buyout ? { seller: { accountId: lot.sellerId, login: lot.sellerLogin } } : {}),
+      };
       await c.query(
         'INSERT INTO meta_market_receipts(account_id,trade_id,fingerprint,result) VALUES($1,$2,$3,$4::jsonb)',
         [accountId, tradeId, fingerprint, JSON.stringify(result)],
