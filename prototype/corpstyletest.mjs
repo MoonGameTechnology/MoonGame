@@ -13,12 +13,14 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import { bundleNetserver } from './bundle-netserver.mjs';
 import { launchBrowser, waitForApp, withDiagnostics } from './harnessKit.mjs';
+
+const buildingCount = JSON.parse(readFileSync('data/corpBuildings.json', 'utf8')).buildings.length;
 
 const require = createRequire(new URL('../packages/server/package.json', import.meta.url));
 const { Pool } = require('pg');
@@ -93,9 +95,11 @@ async function account(name) {
   return { login, token: body.token, accountId: body.accountId };
 }
 
-/** The base's pictures on the panorama, in drawing order. */
+/** The base's pictures on the panorama, in drawing order: the file plus the atlas window
+ *  it is cut from, since one atlas holds every style of a building. */
 const panorama = (page) =>
-  page.$$eval('#hp-corp .cb-lot image', (images) => images.map((image) => image.getAttribute('href')));
+  page.$$eval('#hp-corp .cb-lot image', (images) =>
+    images.map((image) => `${image.getAttribute('href')}#${image.parentElement?.getAttribute('viewBox') ?? ''}`));
 
 const browser = await launchBrowser();
 mkdirSync('.playwright-mcp', { recursive: true });
@@ -155,7 +159,7 @@ try {
       await appearance.filter({ hasText: locale === 'ru' ? 'Стандарт' : 'Standard' }).waitFor();
       await baseTab();
       const standard = await panorama(page);
-      assert.equal(standard.length, 3);
+      assert.equal(standard.length, buildingCount);
 
       // Shop: all five tabs fit, the head buys Imperial Gothic in two taps and applies it.
       await page.evaluate(() => document.getElementById('hub-shop').click());
@@ -183,7 +187,7 @@ try {
       await appearance.filter({ hasText: locale === 'ru' ? 'Имперская готика' : 'Imperial Gothic' }).waitFor();
       await baseTab();
       const gothic = await panorama(page);
-      assert.equal(gothic.length, 3);
+      assert.equal(gothic.length, buildingCount);
       assert.ok(gothic.every((href, i) => href !== standard[i]), 'every building is drawn in the new style');
       await page.screenshot({ path: `.playwright-mcp/corp-style-${tag}-base.png` });
 

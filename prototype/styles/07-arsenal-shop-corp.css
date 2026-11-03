@@ -327,9 +327,11 @@ span.ar-fchip{cursor:default;}
   .sh-tab{flex-direction:column;gap:2px;min-height:52px;padding:6px 2px;font-size:var(--fs-caption);}
 }
 @container shop (max-width:320px){
-  /* the smallest phones (320 px): the five labels fit only without gaps */
-  .sh-tabs{gap:0;padding:2px;}
-  .sh-tab{padding:6px 0;}
+  /* the smallest phones (320 px): the five labels fit only without gaps; a wide fallback font
+     (DejaVu Sans, where neither Inter nor Roboto is installed) wraps the strip into two rows
+     instead of cutting a label */
+  .sh-tabs{display:flex;flex-wrap:wrap;gap:0;padding:2px;}
+  .sh-tab{flex:1 0 auto;padding:6px 0;}
 }
 @container shop (max-width:699px){
   .sh-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
