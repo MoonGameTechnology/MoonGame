@@ -532,7 +532,9 @@ export function initHubScreen(host: HubScreenHost): void {
     });
   if (shop && typeof ResizeObserver !== 'undefined')
     new ResizeObserver(() => shop?.relayout()).observe($('hp-shop'));
-  if (!__SECTOR_ZERO_ONLY__) news = createHubNews();
+  // Страница Sector Zero (`sector-zero.html`) собрана тем же клиентом, но двери новостей в её
+  // разметке нет (`build.mjs`): лента без кнопки не поднимается, иначе роняла бы запуск.
+  if (!__SECTOR_ZERO_ONLY__ && document.body.dataset.entry !== 'sector-zero') news = createHubNews();
   // Main-game supply has its own server-owned state; Sector Zero remains independent.
   if (!__SECTOR_ZERO_ONLY__)
     metaEconomy = initMetaEconomy({

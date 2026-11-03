@@ -15,6 +15,8 @@
 #connect .ctitle .dia{width:12px;height:12px;transform:rotate(45deg);background:var(--cyan);box-shadow:0 0 10px var(--cyan);}
 #connect .csub{margin:8px 0 18px;color:var(--dim);font-size:var(--fs-body);line-height:1.5;}
 #connect .cfield{display:block;margin:0 0 12px;color:var(--dim);font-size:var(--fs-caption);}
+/* Пояснение под полем — размером подписи: `<small>` сам ужимает его до 10 px. */
+#connect .cfield small{font-size:var(--fs-caption);}
 #setup .inp,#setup-bot-count{display:block;width:100%;margin:6px 0 10px;padding:10px 12px;
   color:var(--ink);background:#0a1b23;border:1px solid var(--line-hi);border-radius:6px;font:inherit;min-height:44px;}
 #setup .inp:focus-visible,#setup-bot-count:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}

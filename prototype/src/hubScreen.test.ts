@@ -9,6 +9,7 @@
  * а вход в хаб ставит одиночную партию на паузу. Экраны вкладок подменены:
  * тест подслушивает, что модуль у них спросил. Каждый тест — свежая загрузка модулей.
  */
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { HubScreenHost } from './hubScreen';
@@ -194,5 +195,16 @@ describe('REFM-220 · вход в хаб', () => {
     env.els.get('hub-solo')!.fire('click', {});
     expect(env.calls).toEqual(['leaveMatch', 'openSetup']);
     expect(env.els.get('hub')?.style.display).toBe('none');
+  });
+});
+
+describe('страница Sector Zero', () => {
+  // Её собирает тот же клиент, что и игру, а разметка своя: в ней нет двери новостей, и лента,
+  // поднятая без кнопки, роняла запуск страницы целиком (нашёл `smoke:sector-zero`).
+  it('ленту новостей не поднимает: двери новостей в её разметке нет', () => {
+    const build = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+    const hub = readFileSync(new URL('./hubScreen.ts', import.meta.url), 'utf8');
+    expect(build).toMatch(/entry === 'sector-zero' \? '' : `<button class="hub-news" id="hub-news"/);
+    expect(hub).toMatch(/document\.body\.dataset\.entry !== 'sector-zero'\) news = createHubNews\(\)/);
   });
 });

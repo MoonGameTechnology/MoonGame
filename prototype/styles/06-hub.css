@@ -52,11 +52,12 @@
    границы, что прежняя позиция фона 160% → −60% */
 @keyframes hub-apk-shine{0%{transform:translateX(-96%);}22%,100%{transform:translateX(36%);}}
 @keyframes hub-apk-nod{0%,24%,100%{transform:none;}8%{transform:translateY(3px);}16%{transform:translateY(-1px);}}
-/* Телефон: шапка — одна тонкая строка, кнопка ниже и плотнее. Совсем узкий экран оставляет
-   только стрелку: имя кнопки остаётся подсказкой и для экранного диктора (aria-label). */
+/* Телефон: шапка — одна тонкая строка, кнопка плотнее, но не ниже 44 px — цели под палец.
+   Совсем узкий экран оставляет только стрелку: имя кнопки остаётся подсказкой и для
+   экранного диктора (aria-label). */
 @media (max-width:719px), ((pointer:coarse) and (max-height:519px)){
   #hub .hub-apk{margin-left:2px;}
-  #hub .hub-apk-btn{height:30px;padding:0 11px;gap:5px;font-size:13px;}
+  #hub .hub-apk-btn{height:44px;padding:0 11px;gap:5px;font-size:13px;}
   #hub .hub-apk-ic{width:15px;height:15px;}
   #hub .hub-bt{white-space:nowrap;}
 }

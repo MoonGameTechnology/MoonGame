@@ -137,7 +137,10 @@ try {
 
     // 4. Клавиатура. Зажатая B открыла «Производство» с вводной, и повтор той же клавиши
     //    подсказку не гасит. Пробел — гасит и ставит паузу: подсказка клавиш не глушит.
+    // Щелчок по площади провинции выбирает её мир: его лист закрыть, фокус остаётся на карте.
     await pc.mouse.click(1200, 420);
+    await pc.keyboard.press('Escape');
+    assert.deepEqual(await layers(pc), [], 'щелчок по карте ничего не оставил');
     await pc.keyboard.down('KeyB');
     await pc.locator('#intro.show').waitFor();
     await pc.keyboard.down('KeyB');

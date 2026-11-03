@@ -174,6 +174,7 @@ import { isValidActionPayload } from '../packages/shared-core/src/actions/payloa
 import type { PlayerId } from '../packages/shared-core/src/index';
 import { MS_PER_DAY, SWARM_MEMORY_WINDOW } from '../packages/shared-core/src/index';
 import type { Identity } from '../packages/server/src/matchApi';
+import { registerMatchCapabilitiesApi } from '../packages/server/src/matchCapabilitiesApi';
 import { admitSeat, seatClaim } from '../packages/server/src/joinSeat';
 import { expiredSeatClaims } from '../packages/server/src/seatExpiry';
 import { bootRoster, MAX_HOSTED_MATCHES } from '../packages/server/src/matchRoster';
@@ -1883,6 +1884,10 @@ const server = createMultiplayerServer({
         }
         return { xp: await commanderStore.xpOf(live.accountId) };
       });
+    } else {
+      // Режим позывных: создавать партии здесь нельзя, а клиент спрашивает право всегда
+      // (`matchCreation.ts`). Тот же маршрут отвечает «нельзя» вместо 404 в консоли.
+      registerMatchCapabilitiesApi(app, {});
     }
   },
   // Остальные страницы хоста. Их отдаёт сервер, как и игру: с `no-store` и политикой по их

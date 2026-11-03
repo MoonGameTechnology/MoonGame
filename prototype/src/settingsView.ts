@@ -97,7 +97,7 @@ export let push: ReturnType<typeof initPush> | null = null;
  * upload. Attributes are requests, not proof of which raster backend WebView actually
  * selected.
  */
-function mapRenderingReport(): string {
+export function mapRenderingReport(): string {
   const { canvas, cx, vw, vh, dpr, frameErrors, fps } = game.probe();
   const rect = canvas.getBoundingClientRect();
   const active = canvasCompatibilityActive();
