@@ -8,6 +8,7 @@ import { coalitionOf } from '../state/coalition';
 import { buildingLevel, type GameData, type ResourceBag } from '../data/schemas';
 import type { AgentAway, GameState, IntelGrant, SpyOp } from '../state/gameState';
 import { recordValues } from '../util/records';
+import { planetDevelopment } from '../state/development';
 import { canAfford, payCost, refundCost } from '../util/treasury';
 
 /**
@@ -38,7 +39,9 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  *     treasury itself is untouched). A repeat extends the term, never deepens the cut.
  *   - `theft` (SPY-9) — a random resource the owner holds: 5–15% of the stock, at
  *     most `THEFT_CAP`, moves from the owner's treasury to the spy's (a world has no
- *     stockpile of its own; owner's resolution 2026-10-22).
+ *     stockpile of its own; owner's resolution 2026-10-22). SPY-21: the share and the cap
+ *     grow by the world's `developmentShare`, up to twice from its civilisation's most
+ *     developed world.
  *   - `research` (SPY-10) — a random technology the owner has finished and the spy
  *     has not, prerequisites ignored: first among those the spy has not started, then
  *     among those in its labs. The grant is the technology module's
@@ -184,6 +187,9 @@ const DISRUPT_FACTOR = 0.75;
 const THEFT_SHARE_MIN = 0.05;
 const THEFT_SHARE_MAX = 0.15;
 export const THEFT_CAP = 500;
+/** SPY-21: what the most developed world of its civilisation adds to the success of a theft
+ *  or a research theft; a less developed one adds its share of it. */
+export const DEVELOPMENT_CHANCE_BONUS = 0.2;
 /** A posted counter-intelligence agent's `until`: it is away until recalled or caught.
  *  JSON-safe (unlike `Infinity`), and no world clock reaches it. */
 export const COUNTER_POSTED = Number.MAX_SAFE_INTEGER;
@@ -217,6 +223,38 @@ export function counterIntelOf(
     }
   }
   return best;
+}
+
+/**
+ * SPY-21: how developed `planetId` is against the other worlds of its owner, in [0,1] — its
+ * development over the most developed one's (owner's resolution 2026-11-03). The scale is
+ * the civilisation's own: a lone capital, or two equal worlds, are 1 however little is
+ * built; a civilisation with nothing built at all counts every world as 1. A world without
+ * an owner is 0. Counter-intelligence buildings count like any other (owner's resolution
+ * 2026-11-03): a bureau protects the whole civilisation far more than it adds to a theft.
+ */
+export function developmentShare(data: GameData, state: GameState, planetId: string): number {
+  const planet = state.planets[planetId];
+  if (!planet || planet.owner === null) return 0;
+  let best = 0;
+  for (const p of recordValues(state.planets)) {
+    if (p.owner === planet.owner) best = Math.max(best, planetDevelopment(data, p));
+  }
+  return best > 0 ? planetDevelopment(data, planet) / best : 1;
+}
+
+/** The base odds of a resolving mission: SPY-17's wave bonus, and SPY-21's — a theft is
+ *  likelier from a world developed against its own civilisation. */
+function missionOdds(
+  h: HandlerContext,
+  op: SpyOp,
+  planetId: string,
+  crew: number,
+): { crewBonus: number; development: number; baseChance: number } {
+  const crewBonus = CREW_BONUS * (Math.min(MAX_AGENTS_PER_WORLD, crew) - 1);
+  const development =
+    op === 'theft' || op === 'research' ? developmentShare(h.ctx.data, h.state, planetId) : 0;
+  return { crewBonus, development, baseChance: BASE_CHANCE + crewBonus + DEVELOPMENT_CHANCE_BONUS * development };
 }
 
 /** SPY-18: how long a turned agent serves its catcher, game-hours. */
@@ -310,14 +348,23 @@ function disrupt(h: HandlerContext, planetId: string): number {
 }
 
 /** Theft: a random resource the victim holds at least one whole unit of, 5–15% of it
- *  (rounded down, at most `THEFT_CAP`), moved to the spy. `null` — nothing to take. */
-function theft(h: HandlerContext, spy: string, victim: string): { resource: string; amount: number } | null {
+ *  (rounded down, at most `THEFT_CAP`), moved to the spy. Both the share and the cap grow
+ *  by the world's `developmentShare` (SPY-21): up to twice from the civilisation's most
+ *  developed world. `null` — nothing to take. */
+function theft(
+  h: HandlerContext,
+  spy: string,
+  victim: string,
+  development: number,
+): { resource: string; amount: number } | null {
   const purse = h.state.players[victim]!.resources;
   const held = h.ctx.data.resources.filter((r) => (purse[r] ?? 0) >= 1);
   if (held.length === 0) return null;
   const resource = held[h.rng.nextInt(0, held.length)]!;
-  const share = THEFT_SHARE_MIN + h.rng.nextFloat() * (THEFT_SHARE_MAX - THEFT_SHARE_MIN);
-  const amount = Math.min(THEFT_CAP, Math.max(1, Math.floor(purse[resource]! * share)));
+  const scale = 1 + development;
+  const share = (THEFT_SHARE_MIN + h.rng.nextFloat() * (THEFT_SHARE_MAX - THEFT_SHARE_MIN)) * scale;
+  const cap = Math.floor(THEFT_CAP * scale);
+  const amount = Math.min(cap, purse[resource]!, Math.max(1, Math.floor(purse[resource]! * share)));
   payCost(purse, { [resource]: amount });
   refundCost(h.state.players[spy]!.resources, { [resource]: amount });
   return { resource, amount };
@@ -391,7 +438,8 @@ export const espionageModule: GameModule = {
   // 1.7.0: разведка копится слоями, агент стоит до отзыва (SPY-13).
   // 1.8.0: подрыв экономики (SPY-15). 1.9.0: раскрытие — новость для всех (SPY-16).
   // 1.10.0: до трёх агентов на мире, волна складывает шансы (SPY-17).
-  version: '1.12.0',
+  // 1.13.0: кража вернее и богаче с развитого мира своей цивилизации (SPY-21).
+  version: '1.13.0',
   setup(api) {
     // SPY-15: a disrupted world produces `DISRUPT_FACTOR` of its output. A span never
     // runs across the end (it is a scheduled event), so «until ≥ now» at the span's end
@@ -544,15 +592,15 @@ export const espionageModule: GameModule = {
       }
 
       // SPY-17: the wave this agent rode in — each crewmate past the first raises both odds.
-      const crewBonus = CREW_BONUS * (Math.min(MAX_AGENTS_PER_WORLD, crew) - 1);
-      const rawChance = h.hook<number>('espionage.chance', BASE_CHANCE + crewBonus, {
+      const { crewBonus, development, baseChance } = missionOdds(h, op, planetId, crew);
+      const rawChance = h.hook<number>('espionage.chance', baseChance, {
         playerId: spy,
         target: victim,
         kind: op,
       });
       const chance = Number.isFinite(rawChance)
         ? Math.min(CHANCE_MAX, Math.max(CHANCE_MIN, rawChance))
-        : BASE_CHANCE + crewBonus;
+        : baseChance;
       const succeeded = h.rng.nextFloat() < chance;
 
       // Counter-intelligence (SPY-2): the detect roll is drawn for EVERY resolved
@@ -630,7 +678,7 @@ export const espionageModule: GameModule = {
               : op === 'disrupt'
                 ? { disrupted: disrupt(h, planetId) }
                 : op === 'theft'
-                ? { loot: theft(h, spy, victim) }
+                ? { loot: theft(h, spy, victim, development) }
                 : { tech: stealResearch(h, spy, victim) };
         reassign(h, spy, mission, killed ? recruit : comeHome);
         h.emit('espionage.succeeded', {

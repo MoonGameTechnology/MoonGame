@@ -329,6 +329,18 @@ export const CAPITAL_VICTORY_SOLO_MIGRATION = {
   toDataHash: '10b0717c0fb8c5',
 } as const;
 
+/** Rules-only pair: espionage 1.13.0 makes a theft likelier and richer from a world developed
+ *  against its own civilisation (SPY-21). The odds are drawn at resolution from the world as
+ *  it stands, so a saved world, its agents and their pending missions read as is. */
+export const SPY_DEVELOPMENT_SOLO_MIGRATION = {
+  fromRules: CAPITAL_VICTORY_SOLO_MIGRATION.toRules,
+  fromData: CAPITAL_VICTORY_SOLO_MIGRATION.toData,
+  fromDataHash: CAPITAL_VICTORY_SOLO_MIGRATION.toDataHash,
+  toRules: '02b82a3f466aab',
+  toData: CAPITAL_VICTORY_SOLO_MIGRATION.toData,
+  toDataHash: CAPITAL_VICTORY_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -359,6 +371,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   MODULE_PROGRESSION_SOLO_MIGRATION,
   ARMY_SELECTION_SOLO_MIGRATION,
   CAPITAL_VICTORY_SOLO_MIGRATION,
+  SPY_DEVELOPMENT_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
