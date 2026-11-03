@@ -612,7 +612,6 @@ export const pl: Record<string, string> = {
   'auction.list': 'Wystaw',
   'auction.price': 'Cena',
   'auction.fee': 'Prowizja giełdowa w wysokości {n}% jest pobierana przy każdej transakcji.',
-  'auction.empty': 'Brak otwartych ofert.',
   'auction.no-items': 'Brak egzemplarzy zdatnych do handlu. Przypisanych przedmiotów i projektów nie można wystawiać.',
   'arsenal.origin.auction': 'aukcja',
   'arsenal.origin.craft': 'wytwarzanie',

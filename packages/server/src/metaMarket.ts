@@ -7,7 +7,8 @@ import type { MaterialLot, MetaMaterialListing, MetaMarketPurchase } from '@void
 export type { MetaMaterialListing, MetaMarketPurchase } from '@void/protocol';
 import type { MetaEconomyStore, MetaEconomyTransaction } from './metaEconomyStore';
 import { memoryEconomyLock } from './memoryEconomyLock';
-import { MemoryMetaAuctions, PostgresMetaAuctions, type AuctionState, type MetaAuctions } from './metaAuction';
+import { MemoryMetaAuctions, PostgresMetaAuctions, type AuctionState, type MemoryAuctionPort, type MetaAuctions } from './metaAuction';
+import { MemoryMetaOrders, PostgresMetaOrders, type BuyOrder, type MetaOrders } from './metaOrders';
 
 export const META_MARKET_FEE = 0.08;
 /**
@@ -111,6 +112,7 @@ export interface MetaMarket {
   cancelMaterial(accountId: string, listingId: string): Promise<MetaMarketResult>;
   /** Торги со ставками в той же книге лотов. */
   auctionHouse(): MetaAuctions;
+  orderBook(): MetaOrders;
 }
 
 /** Development adapter. Mutations share one promise tail, mirroring a DB transaction. */
@@ -120,6 +122,7 @@ export class MemoryMetaMarket implements MetaMarket {
   private readonly journal: MetaMarketLedgerEntry[] = [];
   private readonly receipts = new Map<string, MarketReceipt>();
   private readonly materialLots = new Map<string, ReservedMaterialListing>();
+  private readonly orders = new Map<string, BuyOrder>();
   private economy?: MetaEconomyStore;
 
   constructor(
@@ -451,7 +454,15 @@ export class MemoryMetaMarket implements MetaMarket {
   }
 
   auctionHouse(): MetaAuctions {
-    return new MemoryMetaAuctions({
+    return new MemoryMetaAuctions(this.port());
+  }
+
+  orderBook(): MetaOrders {
+    return new MemoryMetaOrders(this.port(), this.orders);
+  }
+
+  private port(): MemoryAuctionPort {
+    return {
       now: this.now,
       feeRate: META_MARKET_FEE,
       lots: this.lots,
@@ -463,7 +474,7 @@ export class MemoryMetaMarket implements MetaMarket {
       journal: (...entries) => void this.journal.push(...entries.map((e) => ({ id: randomUUID(), ...e }))),
       locked: (work) => this.locked(work),
       run: (accounts, work) => (this.economy ? this.economy.transaction(accounts, work) : this.locked(() => work())),
-    });
+    };
   }
 
   cancel(accountId: string, listingId: string): Promise<MetaMarketResult> {
@@ -970,5 +981,9 @@ export class PostgresMetaMarket implements MetaMarket {
 
   auctionHouse(): MetaAuctions {
     return new PostgresMetaAuctions(this.pool, () => this.economy, this.now, META_MARKET_FEE, this.faucet);
+  }
+
+  orderBook(): MetaOrders {
+    return new PostgresMetaOrders(this.pool, () => this.economy, this.now, META_MARKET_FEE, this.faucet);
   }
 }

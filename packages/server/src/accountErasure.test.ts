@@ -212,6 +212,10 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
         "INSERT INTO meta_market_listings(id,seller_id,seller_login,item_id,price,created_at,ends_at,bids,bid_account,bid_login,bid_amount) VALUES('erasure-lot',$1,'active','erasure-lot-item',5,1,99,1,'other','other',10)",
         [id],
       );
+      await pool.query(
+        "INSERT INTO meta_market_orders(id,account_id,login,key,price,quantity,created_at) VALUES('erasure-order',$1,'active','module:instance:ion_engine',5,1,1)",
+        [id],
+      );
       // Второй лот с тем же лидером: возвраты складываются, а не теряются.
       await pool.query(
         "INSERT INTO arsenal(item_id,account_id,kind,form,def_id,soulbound,origin,acquired_at,progression) VALUES('erasure-lot-item-2',$1,'module','instance','ion_engine',false,'drop',1,'{}')",
@@ -287,6 +291,9 @@ describe.skipIf(!base)('erasure across isolated real databases', () => {
         (await pool.query("SELECT warrants FROM meta_wallets WHERE account_id='other'")).rows[0]
           .warrants,
       ).toBe('90');
+      expect(
+        (await pool.query("SELECT id FROM meta_market_orders WHERE id='erasure-order'")).rowCount,
+      ).toBe(0);
       const match = (await pool.query('SELECT state,clock FROM matches')).rows[0];
       expect(JSON.stringify(match)).not.toContain(id);
       expect(match.state.players.p1.name).toBe('[deleted]');

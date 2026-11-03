@@ -611,7 +611,6 @@ export const de: Record<string, string> = {
   'auction.list': 'Einstellen',
   'auction.price': 'Preis',
   'auction.fee': 'Bei jedem Verkauf fällt eine Börsengebühr von {n}% an.',
-  'auction.empty': 'Es gibt keine offenen Angebote.',
   'auction.no-items': 'Keine handelbaren Exemplare. Seelengebundene Gegenstände und Baupläne können nicht angeboten werden.',
   'arsenal.origin.auction': 'Auktion',
   'arsenal.origin.craft': 'hergestellt',
