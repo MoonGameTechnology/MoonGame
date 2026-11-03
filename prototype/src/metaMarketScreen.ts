@@ -381,6 +381,90 @@ export function metaMarketHtml(
   return `<header class="mm-head"><h2><small>${t('auction.hub')}</small>${t('auction.title')}</h2><div class="mm-wallet"><b>⌖ ${nfmt(view.balance)}</b>${frozen ? `<small>${t('auction.order.frozen', { n: nfmt(frozen) })}</small>` : ''}</div></header>${gate}<div class="mm-body">${tools}${body}</div><div class="mm-dock"><nav class="mm-cats" aria-label="${esc(t('auction.cats'))}">${cats}</nav><nav class="mm-tabs">${tabs}</nav></div>`;
 }
 
+type LotAction =
+  | { path: string; body: Record<string, unknown>; idField: 'requestId' | 'tradeId' | null }
+  | { note: string };
+
+/** Кнопка лота → запрос к серверу, или текст, почему введённое не годится. */
+function lotAction(el: HTMLButtonElement, root: HTMLElement, hours: number): LotAction | null {
+  const input = (attribute: string, id: string) =>
+    Number(root.querySelector<HTMLInputElement>(`[${attribute}="${CSS.escape(id)}"]`)?.value);
+  const positive = (value: number) => Number.isSafeInteger(value) && value > 0;
+  let path: string;
+  let body: Record<string, unknown>;
+  let idField: 'requestId' | 'tradeId' | null = null;
+  if (el.dataset.mmBuy) {
+    path = '/meta-market/buy';
+    body = { listingId: el.dataset.mmBuy };
+    idField = 'tradeId';
+  } else if (el.dataset.mmCancel) {
+    path = '/meta-market/cancel';
+    body = { listingId: el.dataset.mmCancel };
+  } else if (el.dataset.mmList) {
+    const price = input('data-mm-price', el.dataset.mmList);
+    if (!positive(price)) {
+      return { note: t('auction.invalid-amount') };
+    }
+    path = '/meta-market/list';
+    body = { itemId: el.dataset.mmList, price };
+  } else if (el.dataset.mmAuctionOpen) {
+    const itemId = el.dataset.mmAuctionOpen;
+    const start = input('data-mm-price', itemId);
+    const buyoutText =
+      root
+        .querySelector<HTMLInputElement>(`[data-mm-buyout-price="${CSS.escape(itemId)}"]`)
+        ?.value.trim() ?? '';
+    const buyout = buyoutText ? Number(buyoutText) : undefined;
+    if (!positive(start) || (buyout !== undefined && !(positive(buyout) && buyout > start))) {
+      return { note: t('auction.invalid-buyout') };
+    }
+    path = '/meta-market/auction/open';
+    body = { itemId, start, hours: hours, ...(buyout === undefined ? {} : { buyout }) };
+  } else if (el.dataset.mmBid || el.dataset.mmBuyout) {
+    const listingId = (el.dataset.mmBid ?? el.dataset.mmBuyout)!;
+    const amount = el.dataset.mmBuyout
+      ? Number(el.dataset.mmBuyoutAmount)
+      : input('data-mm-bid-amount', listingId);
+    if (!positive(amount)) {
+      return { note: t('auction.invalid-amount') };
+    }
+    path = '/meta-market/auction/bid';
+    body = { listingId, amount };
+    idField = 'tradeId';
+  } else if (el.dataset.mmOrder) {
+    const key = el.dataset.mmOrder;
+    const price = input('data-mm-order-price', key);
+    const quantity = input('data-mm-order-qty', key);
+    if (!key || !positive(price) || !positive(quantity)) {
+      return { note: t('auction.invalid-amount') };
+    }
+    path = '/meta-market/order';
+    body = { key, price, quantity };
+    idField = 'requestId';
+  } else if (el.dataset.mmOrderCancel) {
+    path = '/meta-market/order/cancel';
+    body = { orderId: el.dataset.mmOrderCancel };
+  } else if (el.dataset.mmMaterialBuy) {
+    path = '/meta-market/material/buy';
+    body = { listingId: el.dataset.mmMaterialBuy };
+    idField = 'tradeId';
+  } else if (el.dataset.mmMaterialCancel) {
+    path = '/meta-market/material/cancel';
+    body = { listingId: el.dataset.mmMaterialCancel };
+  } else if (el.dataset.mmMaterialList) {
+    const materialId = el.dataset.mmMaterialList;
+    const quantity = input('data-mm-quantity', materialId);
+    const price = input('data-mm-material-price', materialId);
+    if (!positive(quantity) || !positive(price)) {
+      return { note: t('auction.invalid-amount') };
+    }
+    path = '/meta-market/material/list';
+    body = { materialId, quantity, price };
+    idField = 'requestId';
+  } else return null;
+  return { path, body, idField };
+}
+
 export function initMetaMarket(host: MetaMarketHost): {
   refresh(): Promise<void>;
   sync(): Promise<void>;
@@ -534,11 +618,6 @@ export function initMetaMarket(host: MetaMarketHost): {
       /* A guest or an unreachable server keeps the previous wallet. */
     }
   };
-  const input = (attribute: string, id: string) =>
-    Number(
-      host.root().querySelector<HTMLInputElement>(`[${attribute}="${CSS.escape(id)}"]`)?.value,
-    );
-  const positive = (value: number) => Number.isSafeInteger(value) && value > 0;
   host.root().addEventListener('input', (ev) => {
     const el = ev.target as HTMLInputElement;
     if (el.dataset.mmSort !== undefined) {
@@ -584,84 +663,13 @@ export function initMetaMarket(host: MetaMarketHost): {
       updateNet(field);
       return;
     }
-    let path: string;
-    let body: Record<string, unknown>;
-    let idField: 'requestId' | 'tradeId' | null = null;
-    if (el.dataset.mmBuy) {
-      path = '/meta-market/buy';
-      body = { listingId: el.dataset.mmBuy };
-      idField = 'tradeId';
-    } else if (el.dataset.mmCancel) {
-      path = '/meta-market/cancel';
-      body = { listingId: el.dataset.mmCancel };
-    } else if (el.dataset.mmList) {
-      const price = input('data-mm-price', el.dataset.mmList);
-      if (!positive(price)) {
-        host.note(t('auction.invalid-amount'));
-        return;
-      }
-      path = '/meta-market/list';
-      body = { itemId: el.dataset.mmList, price };
-    } else if (el.dataset.mmAuctionOpen) {
-      const itemId = el.dataset.mmAuctionOpen;
-      const start = input('data-mm-price', itemId);
-      const buyoutText =
-        host
-          .root()
-          .querySelector<HTMLInputElement>(`[data-mm-buyout-price="${CSS.escape(itemId)}"]`)
-          ?.value.trim() ?? '';
-      const buyout = buyoutText ? Number(buyoutText) : undefined;
-      if (!positive(start) || (buyout !== undefined && !(positive(buyout) && buyout > start))) {
-        host.note(t('auction.invalid-buyout'));
-        return;
-      }
-      path = '/meta-market/auction/open';
-      body = { itemId, start, hours: ui.hours, ...(buyout === undefined ? {} : { buyout }) };
-    } else if (el.dataset.mmBid || el.dataset.mmBuyout) {
-      const listingId = (el.dataset.mmBid ?? el.dataset.mmBuyout)!;
-      const amount = el.dataset.mmBuyout
-        ? Number(el.dataset.mmBuyoutAmount)
-        : input('data-mm-bid-amount', listingId);
-      if (!positive(amount)) {
-        host.note(t('auction.invalid-amount'));
-        return;
-      }
-      path = '/meta-market/auction/bid';
-      body = { listingId, amount };
-      idField = 'tradeId';
-    } else if (el.dataset.mmOrder) {
-      const key = el.dataset.mmOrder;
-      const price = input('data-mm-order-price', key);
-      const quantity = input('data-mm-order-qty', key);
-      if (!key || !positive(price) || !positive(quantity)) {
-        host.note(t('auction.invalid-amount'));
-        return;
-      }
-      path = '/meta-market/order';
-      body = { key, price, quantity };
-      idField = 'requestId';
-    } else if (el.dataset.mmOrderCancel) {
-      path = '/meta-market/order/cancel';
-      body = { orderId: el.dataset.mmOrderCancel };
-    } else if (el.dataset.mmMaterialBuy) {
-      path = '/meta-market/material/buy';
-      body = { listingId: el.dataset.mmMaterialBuy };
-      idField = 'tradeId';
-    } else if (el.dataset.mmMaterialCancel) {
-      path = '/meta-market/material/cancel';
-      body = { listingId: el.dataset.mmMaterialCancel };
-    } else if (el.dataset.mmMaterialList) {
-      const materialId = el.dataset.mmMaterialList;
-      const quantity = input('data-mm-quantity', materialId);
-      const price = input('data-mm-material-price', materialId);
-      if (!positive(quantity) || !positive(price)) {
-        host.note(t('auction.invalid-amount'));
-        return;
-      }
-      path = '/meta-market/material/list';
-      body = { materialId, quantity, price };
-      idField = 'requestId';
-    } else return;
+    const action = lotAction(el, host.root(), ui.hours);
+    if (!action) return;
+    if ('note' in action) {
+      host.note(action.note);
+      return;
+    }
+    const { path, body, idField } = action;
     busy = true;
     paint();
     detach(
