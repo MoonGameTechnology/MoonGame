@@ -159,6 +159,8 @@ export interface MetaCommandReceipt {
     reason: 'active' | 'eliminated' | 'inactive' | 'no-contribution';
     score: number;
     scoreDivisor: number;
+    /** Per-match Sovereign ceiling applied after the division. */
+    maxSovereigns: number;
     kills: number;
     killsPerWarrant: number;
     baseWarrants: number;

@@ -3,6 +3,7 @@
   "finalMatch": {
     "version": 1,
     "scoreDivisor": 2,
+    "maxSovereigns": 100,
     "baseWarrants": 5,
     "killsPerWarrant": 5,
     "veteranPointsPerMaterial": 10,

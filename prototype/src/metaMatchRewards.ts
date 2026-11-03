@@ -83,6 +83,7 @@ export function matchRewardsHtml(
           t('end.rewards.score-calculation', {
             score: nfmt(calculation.score),
             divisor: nfmt(calculation.scoreDivisor),
+            cap: nfmt(calculation.maxSovereigns),
           }),
           t('end.rewards.kill-calculation', {
             base: calculation.baseWarrants,

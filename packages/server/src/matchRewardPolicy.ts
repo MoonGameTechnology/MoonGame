@@ -10,6 +10,8 @@ export const matchRewardPolicySchema = z
   .object({
     version: z.literal(1),
     scoreDivisor: amount,
+    /** Hard per-match ceiling: colluding accounts can inflate peak score with legal wins. */
+    maxSovereigns: z.number().int().min(0).max(1_000_000),
     baseWarrants: amount,
     killsPerWarrant: amount,
     baseMaterialCount: z.number().int().min(1).max(100),

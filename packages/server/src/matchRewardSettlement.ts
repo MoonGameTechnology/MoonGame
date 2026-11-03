@@ -28,7 +28,9 @@ export async function settleFinalMatch(
   const eligible = reward.reason === 'active' || reward.reason === 'eliminated';
   const baseWarrants = eligible ? policy.baseWarrants : 0;
   const killWarrants = eligible ? Math.floor(reward.kills / policy.killsPerWarrant) : 0;
-  const sovereigns = eligible ? Math.floor(reward.score / policy.scoreDivisor) : 0;
+  const sovereigns = eligible
+    ? Math.min(policy.maxSovereigns, Math.floor(reward.score / policy.scoreDivisor))
+    : 0;
   const veteranMaterials = eligible
     ? Math.min(
         policy.veteranMaterialCap,
@@ -48,6 +50,7 @@ export async function settleFinalMatch(
     reason: reward.reason,
     score: reward.score,
     scoreDivisor: policy.scoreDivisor,
+    maxSovereigns: policy.maxSovereigns,
     kills: reward.kills,
     killsPerWarrant: policy.killsPerWarrant,
     baseWarrants,

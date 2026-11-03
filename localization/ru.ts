@@ -3074,7 +3074,7 @@ export const ru: Record<string, string> = {
   'end.rewards.reason.eliminated': 'Награда сохранена: активное участие до выбывания.',
   'end.rewards.reason.inactive': 'Награда не начислена: участие прекратилось задолго до окончания игры за свою сторону.',
   'end.rewards.reason.no-contribution': 'Награда не начислена: недостаточно собственных приказов или подтверждённого вклада.',
-  'end.rewards.score-calculation': 'Лучший личный счёт: {score} ÷ {divisor} ◆, с округлением вниз.',
+  'end.rewards.score-calculation': 'Лучший личный счёт: {score} ÷ {divisor} ◆, с округлением вниз, не больше {cap} ◆ за матч.',
   'end.rewards.kill-calculation': 'Варранты: {base} за участие + {bonus} за уничтожение {kills} боевых единиц (1 за {divisor}).',
   'end.rewards.material-calculation': 'Материалы: {base} за участие + {bonus} за сохранённых ветеранов ({points} баллов).',
   'end.rewards.module-chance': 'Шанс модуля: {chance}%. Одна попытка за матч, независимо от места.',

@@ -45,6 +45,7 @@ describe('final match rewards', () => {
     const f = fixture();
     const facts = f.facts();
     facts.finalReward!.policy.moduleChance = 0;
+    facts.finalReward!.policy.maxSovereigns = 1000;
     const result = await f.service.settle(facts);
     expect(result).toMatchObject({
       ok: true,
@@ -70,6 +71,23 @@ describe('final match rewards', () => {
         .reduce((sum, m) => sum + m.quantity, 0),
     ).toBe(3);
     expect((await f.service.matchRewards('alice', facts.matchId)).finalReady).toBe(true);
+  });
+
+  it.each([
+    [0, 0],
+    [199, 99],
+    [200, 100],
+    [601, 100],
+    [100_000, 100],
+  ])('caps score %i at the shipped per-match ceiling: %i Sovereigns', async (score, expected) => {
+    const f = fixture();
+    const facts = f.facts();
+    facts.finalReward!.score = score;
+    expect(await f.service.settle(facts)).toMatchObject({
+      ok: true,
+      receipt: { sovereignsGranted: expected, matchReward: { maxSovereigns: 100 } },
+    });
+    expect((await f.store.read('alice')).sovereigns ?? 0).toBe(expected);
   });
 
   it.each([
@@ -146,7 +164,7 @@ describe('final match rewards', () => {
     expect((await f.service.matchRewards('alice', facts.matchId)).finalReady).toBe(false);
     expect(await f.service.settle(facts)).toMatchObject({
       ok: true,
-      receipt: { sovereignsGranted: 300, warrants: 12 },
+      receipt: { sovereignsGranted: 100, warrants: 12 },
     });
     expect(await f.arsenal.listOf('alice')).toHaveLength(1);
   });
