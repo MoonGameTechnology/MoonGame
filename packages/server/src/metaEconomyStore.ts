@@ -175,8 +175,7 @@ export class MemoryMetaEconomyStore implements MetaEconomyStore {
           },
           warrants: async (id) => { accountFrom(staged, id); return this.market.balance(id); },
           spendWarrants: async (id, amount, source, at) => { accountFrom(staged, id); return this.market.spendWarrants(id, amount, source, at); },
-          isItemListed: async (itemId) =>
-            (await this.market.listings()).some((lot) => lot.item.itemId === itemId),
+          isItemListed: (itemId) => this.market.hasListedItem(itemId),
         });
         const output = structuredClone(result);
         for (const account of staged.values()) validAccount(account);

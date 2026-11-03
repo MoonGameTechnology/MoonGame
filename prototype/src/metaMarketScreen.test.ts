@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defaultMarketUi, initMetaMarket, metaMarketHtml } from './metaMarketScreen';
 import { t } from '../../localization/runtime';
+import { moduleItemEffects } from './moduleProgression';
+import { esc } from './format';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -58,6 +60,10 @@ describe('meta market screen', () => {
       { ...defaultMarketUi, open: 'module:instance:ion_engine' },
     );
     expect(opened).toContain('data-mm-buy="lot"');
+    // Покупатель видит фактические бонусы копии (с её звёздами) до покупки.
+    const effects = moduleItemEffects(tradable);
+    expect(effects.length).toBeGreaterThan(0);
+    expect(opened).toContain(`<small class="mm-eff">${esc(effects.join(' · '))}</small>`);
     const sell = metaMarketHtml(
       {
         balance: 420,
@@ -272,5 +278,93 @@ describe('meta market screen', () => {
     expect(metaMarketHtml(view, [], false, { ...defaultMarketUi, cat: 'weapon' })).not.toContain(
       'data-mm-open=',
     );
+  });
+
+  it('lists timed lots with the server clock and opens a bid sheet with the minimum', () => {
+    const item = {
+      itemId: 'x',
+      kind: 'module' as const,
+      form: 'instance' as const,
+      defId: 'ion_engine',
+      soulbound: false,
+      origin: 'drop' as const,
+      acquiredAt: 1,
+    };
+    const lot = {
+      id: 'a1',
+      sellerLogin: 'Vega',
+      item,
+      start: 100,
+      endsAt: 1_000 + 4_718_000,
+      bids: 2,
+      current: 120,
+      minimum: 126,
+      leading: false,
+      mine: false,
+      createdAt: 1,
+      buyout: 900,
+    };
+    const view = {
+      balance: 500,
+      feeRate: 0.08,
+      listings: [],
+      auctions: [lot, { ...lot, id: 'a2', leading: true }],
+      serverNow: 1_000,
+    };
+    const list = metaMarketHtml(view, [], false, { ...defaultMarketUi, tab: 'bids' });
+    expect(list).toContain('01:18:38');
+    expect(list).toContain('data-mm-open="bid:a1"');
+    expect(list).not.toContain('data-mm-open="bid:a2"');
+    expect(list).toContain(t('auction.bid.leading'));
+    const sheet = metaMarketHtml(view, [], false, {
+      ...defaultMarketUi,
+      tab: 'bids',
+      open: 'bid:a1',
+    });
+    expect(sheet).toContain('data-mm-bid-amount="a1" type="number" min="126"');
+    expect(sheet).toContain('data-mm-buyout="a1" data-mm-buyout-amount="900"');
+    expect(sheet).toContain('class="mi-effects"');
+  });
+
+  it('offers a timed sale in the sell sheet and shows own timed lots on the shelf', () => {
+    const copy = {
+      itemId: 'c',
+      kind: 'module' as const,
+      form: 'instance' as const,
+      defId: 'ion_engine',
+      soulbound: false,
+      origin: 'drop' as const,
+      acquiredAt: 1,
+    };
+    const own = {
+      id: 'm1',
+      sellerLogin: 'me',
+      item: { ...copy, itemId: 'on-auction' },
+      start: 50,
+      endsAt: 99_000,
+      bids: 0,
+      minimum: 50,
+      leading: false,
+      mine: true,
+      createdAt: 1,
+    };
+    const html = metaMarketHtml(
+      {
+        balance: 0,
+        feeRate: 0.08,
+        listings: [],
+        auctions: [own],
+        shelf: { open: 6, lockedXp: [] },
+        serverNow: 0,
+      },
+      [copy, own.item],
+      false,
+      { ...defaultMarketUi, tab: 'sell', open: 'item:c', mode: 'bid', hours: 48 },
+    );
+    expect(html).toContain('data-mm-auction-open="c"');
+    expect(html).toContain('data-mm-hours="48" aria-pressed="true"');
+    expect(html).toContain('data-mm-cancel="m1"');
+    expect(html).not.toContain('data-mm-open="item:on-auction"');
+    expect(html).toContain(t('auction.shelf', { n: 1, max: 6 }));
   });
 });

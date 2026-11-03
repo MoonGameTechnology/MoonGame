@@ -88,3 +88,13 @@ export function shelfSlots(used: number, open: number, lockedXp: readonly number
   for (const xp of lockedXp) slots.push({ state: 'locked', xp });
   return slots;
 }
+
+/** Остаток торгов «чч:мм:сс»; больше 99 часов не бывает (торги до 48 ч), меньше нуля — нули. */
+export function countdown(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const parts = [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60];
+  return parts.map((n) => String(n).padStart(2, '0')).join(':');
+}
+
+/** Меньше 10 минут — таймер подсвечивается: лот вот-вот уйдёт. */
+export const AUCTION_HOT_MS = 600_000;

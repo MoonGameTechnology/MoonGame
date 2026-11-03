@@ -438,6 +438,15 @@ const SCHEMA_SQL = `
       created_at bigint NOT NULL
     );
     CREATE INDEX IF NOT EXISTS meta_market_price_idx ON meta_market_listings(price, created_at);
+    -- Торги (metaAuction.ts): та же книга, ends_at IS NULL — продажа по цене. Лидирующая
+    -- ставка уже списана с кошелька лидера; bid_amount — сколько вернуть, если перебьют.
+    ALTER TABLE meta_market_listings ADD COLUMN IF NOT EXISTS ends_at bigint;
+    ALTER TABLE meta_market_listings ADD COLUMN IF NOT EXISTS buyout bigint CHECK (buyout > price);
+    ALTER TABLE meta_market_listings ADD COLUMN IF NOT EXISTS bids integer NOT NULL DEFAULT 0 CHECK (bids >= 0);
+    ALTER TABLE meta_market_listings ADD COLUMN IF NOT EXISTS bid_account text;
+    ALTER TABLE meta_market_listings ADD COLUMN IF NOT EXISTS bid_login text;
+    ALTER TABLE meta_market_listings ADD COLUMN IF NOT EXISTS bid_amount bigint CHECK (bid_amount > 0);
+    CREATE INDEX IF NOT EXISTS meta_market_auction_end_idx ON meta_market_listings(ends_at) WHERE ends_at IS NOT NULL;
     CREATE TABLE IF NOT EXISTS meta_market_ledger (
       id text PRIMARY KEY,
       account_id text NOT NULL,
