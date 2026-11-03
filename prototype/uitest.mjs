@@ -347,7 +347,7 @@ if (soloBootCheck) {
     assert.deepEqual(mod.exports.solo().save.ai, expected.ai);
     assert.deepEqual(mod.exports.solo().save.memory, expected.memory);
     assert.equal(mod.exports.solo().mode, expected.state.modeId, 'reload restores the resolved match mode');
-    if (expected.state.modeId === 'team_2v2')
+    if (['team_2v2', 'capital_2v2'].includes(expected.state.modeId))
       assert.equal(mod.exports.breakTeam(), 'E_FORBIDDEN', 'fixed sides remain enforced after Continue');
     assert.equal(mod.exports.solo().speed, 0, 'reload resumes paused');
     for (let i = 0; i < 5 && rafCbs.length; i++) await rafCbs.shift()(performance.now());
@@ -564,7 +564,7 @@ selectMap('team-2v2');
 await click('setupgo');
 await click('solo-replace-confirm');
 assert.equal(JSON.parse(mod.exports.state()).mapId, 'team-2v2');
-assert.equal(mod.exports.solo().mode, 'team_2v2');
+assert.equal(mod.exports.solo().mode, 'capital_2v2');
 for (let i = 0; i < 30 && rafCbs.length; i++) {
   await rafCbs.shift()(performance.now());
   frames++;

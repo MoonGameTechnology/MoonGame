@@ -61,7 +61,7 @@ it.each(MAP_IDS)('AC15: %s simulation is identical with environment preparation 
   expect(destination).not.toBe('');
   const resolved = resolveMatchConfig(data, {
     timeScale: 1, modeId: initial.modeId,
-    victory: { scoreLimit: mapPreset(mapId).scoreLimit, endsAt: 48 * HOUR },
+    victory: { capitalCapture: false, scoreLimit: mapPreset(mapId).scoreLimit, endsAt: 48 * HOUR },
   });
   if (!resolved.ok) throw new Error(resolved.code);
   // Build the action log once: both runs consume the exact same action ids/payloads.

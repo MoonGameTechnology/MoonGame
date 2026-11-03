@@ -13,7 +13,7 @@ import { en } from '../../localization/en';
 
 /** The authored team maps: same contracts, their own size and spacing. */
 const TEAM_MAPS = [
-  { title: 'Broken Reach — main-game 2v2', id: 'team-2v2', mode: 'team_2v2', provinces: 85, side: 2, allyHops: 4, enemyHops: 8 },
+  { title: 'Broken Reach — main-game 2v2', id: 'team-2v2', mode: 'capital_2v2', provinces: 85, side: 2, allyHops: 4, enemyHops: 8 },
   { title: 'Shattered Crown — main-game 3v3', id: 'team-3v3', mode: 'team_3v3', provinces: 121, side: 3, allyHops: 4, enemyHops: 8 },
 ] as const;
 
@@ -191,12 +191,14 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
     const [first, ...rest] = teamB;
     for (const planet of Object.values(s.planets))
       if (planet.owner === first) planet.owner = null;
+    if (mode === 'capital_2v2') s.planets[s.capital![first!]!]!.owner = teamA[0]!;
     expect(advance(s, HOUR).state.match.status).toBe('ongoing');
     for (const planet of Object.values(s.planets))
       if (rest.includes(planet.owner ?? '')) planet.owner = null;
+    if (mode === 'capital_2v2') s.planets[s.capital![rest[0]!]!]!.owner = teamA[1]!;
     // Ordinary FFA diplomacy keeps its existing score/domination conditions.
     setMatchMode('standard');
-    expect(advance(s, HOUR).state.match.status).toBe('ongoing');
+    expect(advance({ ...s, modeId: 'standard' }, HOUR).state.match.status).toBe('ongoing');
     setMatchMode(mode);
     const result = advance(s, HOUR);
     expect(result.error).toBeUndefined();

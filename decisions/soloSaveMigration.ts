@@ -318,6 +318,17 @@ export const ARMY_SELECTION_SOLO_MIGRATION = {
   toDataHash: MODULE_PROGRESSION_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Capital modes apply to new worlds only. Existing saves keep their mode and the
+ * absent building divisor (legacy 1); only the audited catalogue/rules pins change. */
+export const CAPITAL_VICTORY_SOLO_MIGRATION = {
+  fromRules: ARMY_SELECTION_SOLO_MIGRATION.toRules,
+  fromData: ARMY_SELECTION_SOLO_MIGRATION.toData,
+  fromDataHash: ARMY_SELECTION_SOLO_MIGRATION.toDataHash,
+  toRules: '179935bf1c1e95',
+  toData: '0.1.76',
+  toDataHash: '10b0717c0fb8c5',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -347,6 +358,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   ECHELONS_SOLO_MIGRATION,
   MODULE_PROGRESSION_SOLO_MIGRATION,
   ARMY_SELECTION_SOLO_MIGRATION,
+  CAPITAL_VICTORY_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
