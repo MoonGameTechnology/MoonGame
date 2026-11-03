@@ -341,6 +341,17 @@ export const SPY_DEVELOPMENT_SOLO_MIGRATION = {
   toDataHash: CAPITAL_VICTORY_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Catalogue pair: the intercept turret (SM-4.2) is a new weapon module for the interceptor.
+ *  No saved ship carries it, so a save of the previous release reads as is. */
+export const INTERCEPT_TURRET_SOLO_MIGRATION = {
+  fromRules: SPY_DEVELOPMENT_SOLO_MIGRATION.toRules,
+  fromData: SPY_DEVELOPMENT_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_DEVELOPMENT_SOLO_MIGRATION.toDataHash,
+  toRules: '0238007e6ef542',
+  toData: '0.1.77',
+  toDataHash: '032a24eea7e673',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -372,6 +383,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   ARMY_SELECTION_SOLO_MIGRATION,
   CAPITAL_VICTORY_SOLO_MIGRATION,
   SPY_DEVELOPMENT_SOLO_MIGRATION,
+  INTERCEPT_TURRET_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

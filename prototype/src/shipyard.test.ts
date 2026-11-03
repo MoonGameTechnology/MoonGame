@@ -1080,8 +1080,9 @@ describe('производство — модули открытого отсе�
     const open = pane({ slot: 1, unfit: true });
     expect(open).toContain(`aria-expanded="true">${t('yard.modules.unfit-hide')}<`);
     expect((open.match(/cn-mod locked/g) ?? []).length).toBe(5);
-    // Оружие крейсера: свёрнут один тяговый луч, он только для флагмана героя.
-    expect(pane({ slot: 0 })).toContain(`aria-expanded="false">${t('yard.modules.unfit', { n: 1 })}<`);
+    // Оружие крейсера: свёрнуты тяговый луч (только флагман героя) и перехватная турель
+    // (только перехватчик).
+    expect(pane({ slot: 0 })).toContain(`aria-expanded="false">${t('yard.modules.unfit', { n: 2 })}<`);
   });
 
   it('нет ни одного модуля для отсека — так и сказано, а не пустая колонка', () => {

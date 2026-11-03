@@ -7,6 +7,7 @@
   ],
   "pool": [
     { "kind": "module", "defId": "targeting_array", "weight": 3 },
+    { "kind": "module", "defId": "intercept_turret", "weight": 3 },
     { "kind": "module", "defId": "shield_booster", "weight": 3 },
     { "kind": "module", "defId": "siege_platform", "weight": 2 },
     { "kind": "module", "defId": "tractor_beam", "weight": 2 },

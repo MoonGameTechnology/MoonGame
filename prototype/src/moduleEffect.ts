@@ -19,6 +19,7 @@ export const STAT_KEY: Record<string, string> = {
   radarRange: 'stat.radar',
   pointDefense: 'stat.point-defense',
   siegeDamage: 'loadout.stat.siege',
+  shuttleDamage: 'loadout.stat.air-damage',
   // Доли за игровой час (`perHourShare.ts`): без подписи чип читался бы «+0.05 hullRepair».
   shieldRegen: 'loadout.stat.shield-regen',
   hullRepair: 'loadout.stat.hull-repair',

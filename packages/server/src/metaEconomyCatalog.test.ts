@@ -20,11 +20,11 @@ describe('main-game meta content', () => {
       expect(() => parseMetaEconomyCatalog(catalog, data), path).toThrow('E_META_MATERIAL_PURPOSE');
     }
   });
-  it('ships five equipment and three corporation materials, six modules and a complete seasonal track', () => {
+  it('ships five equipment and three corporation materials, seven modules and a complete seasonal track', () => {
     const catalog = loadMetaEconomyCatalog(data);
     expect(Object.values(catalog.materials).filter((m) => !m.purpose)).toHaveLength(5);
     expect(Object.values(catalog.materials).filter((m) => m.purpose === 'corporation')).toHaveLength(3);
-    expect(Object.keys(catalog.recipes)).toHaveLength(6);
+    expect(Object.keys(catalog.recipes)).toHaveLength(7);
     expect(catalog.seasons[0]).toMatchObject({ durationDays: 56, levels: 50 });
     expect(catalog.seasons[0]!.milestones.map((row) => row.level)).toEqual([1, 10, 20, 30, 40, 50]);
     expect(catalog.seasons[0]!.contracts).toHaveLength(8);
