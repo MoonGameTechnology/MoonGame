@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Identity } from './matchApi';
 import { META_MARKET_FEE, type MetaMarket } from './metaMarket';
 import { slidingWindowIpLimiter } from './rateLimit';
+import type { ShelfView } from './auctionShelf';
 
 /** Торговля — спам- и абьюз-поверхность (`economy-roadmap.md` EC-0.3: wash-trading
  *  сдерживается лимитом сделок в окне), поэтому ПИШУЩИЕ маршруты делят per-IP бюджет —
@@ -16,6 +17,9 @@ export interface MetaMarketApiDeps {
   canTrade?(accountId: string): Promise<boolean>;
   /** The account XP `canTrade` asks for, shown to a player who is not there yet. */
   minimumAccountXp?: number;
+  /** Полка продавца (`auctionShelf.ts`): мест открыто и пороги закрытых. Без неё —
+   *  прежний общий лимит `MAX_META_LISTINGS`. */
+  shelf?(accountId: string): Promise<ShelfView>;
   onChanged?(identity: Identity): Promise<void>;
   /** Инъекция часов и лимитов для детерминированных тестов (как в `corpApi`). */
   now?: () => number;
@@ -90,6 +94,9 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
           : 'E_AUTH',
   });
 
+  const shelfLimit = async (accountId: string): Promise<number | undefined> =>
+    deps.shelf ? (await deps.shelf(accountId)).open : undefined;
+
   const changed = async (identity: Identity, request: FastifyRequest): Promise<void> => {
     if (!deps.onChanged) return;
     try {
@@ -106,12 +113,13 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
     guarded(reply, async () => {
       const identity = await who(request, reply);
       if (!identity) return { error: 'E_AUTH' as const };
-      const [balance, listings, history, materialListings, canTrade] = await Promise.all([
+      const [balance, listings, history, materialListings, canTrade, shelf] = await Promise.all([
         deps.market.balance(identity.accountId),
         deps.market.listings(),
         deps.market.history(identity.accountId),
         deps.market.materialListings(),
         deps.canTrade ? deps.canTrade(identity.accountId) : Promise.resolve(true),
+        deps.shelf ? deps.shelf(identity.accountId) : Promise.resolve(undefined),
       ]);
       return {
         balance,
@@ -122,6 +130,7 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
         })),
         history,
         canTrade,
+        ...(shelf ? { shelf } : {}),
         ...(deps.minimumAccountXp === undefined ? {} : { minimumAccountXp: deps.minimumAccountXp }),
         materialListings: materialListings.map((listing) => ({
           ...listing,
@@ -147,6 +156,7 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
         identity.login,
         body.itemId,
         body.price,
+        await shelfLimit(identity.accountId),
       );
       if (!result.ok) void reply.code(result.code === 'E_NOT_OWNER' ? 404 : 409);
       return result.ok ? result : { error: result.code };
@@ -210,6 +220,7 @@ export function registerMetaMarketApi(app: FastifyInstance, deps: MetaMarketApiD
         body.quantity,
         body.price,
         body.requestId,
+        await shelfLimit(identity.accountId),
       );
       if (!result.ok)
         void reply.code(

@@ -8,6 +8,16 @@ import { refusalKeyOf } from '../../decisions/refusalText';
 import { canSell } from '../../decisions/arsenalView';
 import { accountLevel } from '../../decisions/playerCareer';
 import { esc, nfmt } from './format';
+import { moduleIcon } from './moduleIcons';
+import {
+  AUCTION_CATEGORIES,
+  groupOffers,
+  inCategory,
+  itemCategory,
+  shelfSlots,
+  type AuctionCategory,
+  type OfferGroup,
+} from '../../decisions/auctionHouse';
 import { arsenalItemName } from './arsenalScreen';
 import { detach } from './detach';
 
@@ -28,6 +38,8 @@ export interface MarketView {
   canTrade?: boolean;
   minimumAccountXp?: number;
   materials?: MetaMaterialView[];
+  /** Полка продавца от сервера; без неё (старый сервер) мест столько, сколько лотов. */
+  shelf?: { open: number; lockedXp: number[] };
 }
 export interface MetaMarketHost {
   root(): HTMLElement;
@@ -42,56 +54,228 @@ const empty: MarketView = { balance: 0, feeRate: 0.08, listings: [] };
 const materialLabel = (view: MarketView, id: string): string =>
   t(view.materials?.find((m) => m.id === id)?.nameKey ?? `meta.material.${id}`);
 
-export interface MarketFilter { search: string; rarity: string; stars: number; sort: 'price' | 'stars' | 'new' }
-const noFilter: MarketFilter = { search: '', rarity: '', stars: 0, sort: 'price' };
-export function filteredModuleListings(listings: readonly Listing[], filter: MarketFilter): Listing[] {
-  const query = filter.search.trim().toLocaleLowerCase();
-  return listings.filter((l) => (!query || arsenalItemName(l.item).toLocaleLowerCase().includes(query)) &&
-    (!filter.rarity || (l.item.rarity ?? data.modules[l.item.defId]?.rarity ?? 'simple') === filter.rarity) &&
-    (l.item.grade ?? 0) >= filter.stars).sort((a, b) =>
-      (filter.sort === 'stars' ? (b.item.grade ?? 0) - (a.item.grade ?? 0) : filter.sort === 'new' ? b.createdAt - a.createdAt : a.price - b.price) || a.id.localeCompare(b.id));
+/** Что открыто на экране: вкладка, категория, поиск и раскрытая карточка
+ *  (плитка «Купить» по ключу типа или предмет склада `item:`/`mat:`). */
+export interface MarketUi {
+  tab: 'buy' | 'sell';
+  cat: AuctionCategory;
+  search: string;
+  open: string | null;
 }
-function marketFiltersHtml(filter: MarketFilter, count: number): string {
-  const option = (value: string, label: string, current: string) => `<option value="${value}"${current === value ? ' selected' : ''}>${esc(label)}</option>`;
-  return `<div class="mm-tools"><label>${t('auction.search')}<input type="search" data-mm-filter="search" value="${esc(filter.search)}"></label><label>${t('auction.all-rarity')}<select data-mm-filter="rarity">${option('', t('auction.all-rarity'), filter.rarity)}${['simple', 'unique', 'mythic', 'legendary'].map((r) => option(r, t('rarity.' + r), filter.rarity)).join('')}</select></label><label>${t('auction.all-stars')}<select data-mm-filter="stars">${option('0', t('auction.all-stars'), String(filter.stars))}${[1, 2, 3, 4, 5, 6].map((n) => option(String(n), t('auction.star-min', { n }), String(filter.stars))).join('')}</select></label><label>${t('auction.browse')}<select data-mm-filter="sort">${['price', 'stars', 'new'].map((s) => option(s, t(({ price: 'auction.sort-price', stars: 'auction.sort-stars', new: 'auction.sort-new' } as Record<string, string>)[s]!), filter.sort)).join('')}</select></label><span role="status">${t('auction.results', { n: count })}</span></div>`;
+export const defaultMarketUi: MarketUi = { tab: 'buy', cat: 'all', search: '', open: null };
+
+const CAT_ICON: Record<AuctionCategory, string> = {
+  all: '▦',
+  weapon: '🎯',
+  defense: '🛡',
+  utility: '⊞',
+  hull: '🛰',
+  blueprint: '📜',
+  material: '◈',
+};
+const CAT_KEY: Record<AuctionCategory, string> = {
+  all: 'auction.cat.all',
+  weapon: 'auction.cat.weapon',
+  defense: 'auction.cat.defense',
+  utility: 'auction.cat.utility',
+  hull: 'auction.cat.hull',
+  blueprint: 'auction.cat.blueprint',
+  material: 'auction.cat.material',
+};
+const TAB_KEY = { buy: 'auction.tab.buy', sell: 'auction.tab.sell' } as const;
+const itemCat = (item: ArsenalItem): AuctionCategory =>
+  itemCategory({ kind: item.kind, form: item.form, slot: data.modules[item.defId]?.slot });
+const itemKey = (item: ArsenalItem): string => `${item.kind}:${item.form}:${item.defId}`;
+const itemIcon = (item: ArsenalItem): string =>
+  item.kind === 'hull' ? CAT_ICON.hull : moduleIcon(item.defId);
+const tierOf = (item: ArsenalItem): 'simple' | 'unique' | 'mythic' | 'legendary' =>
+  item.kind === 'module' ? (item.rarity ?? data.modules[item.defId]?.rarity ?? 'simple') : 'simple';
+const matches = (search: string, name: string): boolean =>
+  !search.trim() || name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
+
+type BuyOffer =
+  | { id: string; price: number; key: string; kind: 'item'; lot: Listing }
+  | {
+      id: string;
+      price: number;
+      key: string;
+      kind: 'material';
+      lot: MetaMaterialListing & { mine?: boolean };
+    };
+
+function buyOffers(view: MarketView, ui: MarketUi): BuyOffer[] {
+  const items: BuyOffer[] = view.listings
+    .filter(
+      (l) => inCategory(ui.cat, itemCat(l.item)) && matches(ui.search, arsenalItemName(l.item)),
+    )
+    .map((l) => ({ id: l.id, price: l.price, key: itemKey(l.item), kind: 'item', lot: l }));
+  const materials: BuyOffer[] = (view.materialListings ?? [])
+    .filter(
+      (l) =>
+        inCategory(ui.cat, 'material') && matches(ui.search, materialLabel(view, l.materialId)),
+    )
+    .map((l) => ({
+      id: l.id,
+      price: l.price,
+      key: `mat:${l.materialId}`,
+      kind: 'material',
+      lot: l,
+    }));
+  return [...items, ...materials];
+}
+
+const stars = (item: ArsenalItem): string =>
+  item.grade
+    ? `<span class="mm-stars" aria-label="${esc(t('module.stars', { n: item.grade, cap: data.sectorZeroStars.capByRarity?.[tierOf(item)] ?? 6 }))}">${'★'.repeat(item.grade)}</span>`
+    : '';
+
+function offerName(view: MarketView, offer: BuyOffer): string {
+  return offer.kind === 'item'
+    ? arsenalItemName(offer.lot.item)
+    : materialLabel(view, offer.lot.materialId);
+}
+
+function tileHtml(view: MarketView, group: OfferGroup<BuyOffer>): string {
+  const first = group.offers[0]!;
+  const icon = first.kind === 'item' ? itemIcon(first.lot.item) : CAT_ICON.material;
+  const tier = first.kind === 'item' ? tierOf(first.lot.item) : 'simple';
+  const blueprint = first.kind === 'item' && first.lot.item.form === 'blueprint';
+  return `<button type="button" class="mm-tile r-${esc(tier)}" data-mm-open="${esc(group.key)}"><span class="mm-ic" aria-hidden="true">${icon}<b class="mm-count">${group.offers.length}</b></span><span class="mm-nm">${esc(offerName(view, first))}</span>${blueprint ? `<small>${t('auction.blueprint')}</small>` : ''}<span class="mm-from">${t('auction.from', { n: nfmt(group.lowest) })}</span></button>`;
+}
+
+function offerRowHtml(
+  view: MarketView,
+  offer: BuyOffer,
+  disabled: string,
+  tradeDisabled: string,
+): string {
+  if (offer.kind === 'material') {
+    const l = offer.lot;
+    return `<div class="mm-offer"><span>${esc(l.sellerLogin)} · ×${nfmt(l.quantity)}</span><b>⌖ ${nfmt(l.price)}</b><button type="button" ${l.mine ? 'data-mm-material-cancel' : 'data-mm-material-buy'}="${esc(l.id)}"${l.mine ? disabled : tradeDisabled}>${l.mine ? t('auction.cancel') : t('auction.buy')}</button></div>`;
+  }
+  const l = offer.lot;
+  return `<div class="mm-offer r-${esc(tierOf(l.item))}"><span>${esc(l.sellerLogin)} · ${l.item.kind === 'module' && l.item.form === 'instance' ? esc(t('rarity.' + tierOf(l.item))) : ''} ${stars(l.item)}</span><b>⌖ ${nfmt(l.price)}</b><button type="button" ${l.mine ? 'data-mm-cancel' : 'data-mm-buy'}="${esc(l.id)}"${l.mine ? disabled : tradeDisabled}>${l.mine ? t('auction.cancel') : t('auction.buy')}</button></div>`;
+}
+
+const sheet = (title: string, icon: string, body: string): string =>
+  `<div class="mm-scrim" data-mm-close><section class="mm-sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><span class="mm-ic" aria-hidden="true">${icon}</span><b>${esc(title)}</b><button type="button" class="btn-x" data-mm-close aria-label="${esc(t('auction.close'))}">×</button></header>${body}</section></div>`;
+
+function buyHtml(view: MarketView, ui: MarketUi, disabled: string, tradeDisabled: string): string {
+  const groups = groupOffers(buyOffers(view, ui), (o) => o.key);
+  const any = view.listings.length + (view.materialListings?.length ?? 0) > 0;
+  const grid = groups.length
+    ? `<div class="mm-tiles">${groups.map((g) => tileHtml(view, g)).join('')}</div>`
+    : `<p class="hub-empty">${t(any ? 'auction.no-match' : 'auction.empty')}</p>`;
+  const open = groups.find((g) => g.key === ui.open);
+  if (!open) return grid;
+  const first = open.offers[0]!;
+  return (
+    grid +
+    sheet(
+      offerName(view, first),
+      first.kind === 'item' ? itemIcon(first.lot.item) : CAT_ICON.material,
+      `<p class="mm-fee">${t('auction.offers', { n: open.offers.length })}</p>${open.offers.map((o) => offerRowHtml(view, o, disabled, tradeDisabled)).join('')}`,
+    )
+  );
+}
+
+function sellHtml(
+  view: MarketView,
+  mine: readonly ArsenalItem[],
+  ui: MarketUi,
+  disabled: string,
+  tradeDisabled: string,
+): string {
+  const myItems = view.listings.filter((l) => l.mine);
+  const myMaterials = (view.materialListings ?? []).filter((l) => l.mine);
+  const used = myItems.length + myMaterials.length;
+  const open = view.shelf?.open ?? used;
+  const slots = shelfSlots(used, Math.max(open, used), view.shelf?.lockedXp ?? []);
+  const lotTile = (index: number): string => {
+    if (index < myItems.length) {
+      const l = myItems[index]!;
+      return `<div class="mm-slot used r-${esc(tierOf(l.item))}"><span class="mm-ic" aria-hidden="true">${itemIcon(l.item)}</span><span class="mm-nm">${esc(arsenalItemName(l.item))} ${stars(l.item)}</span><b>⌖ ${nfmt(l.price)}</b><button type="button" data-mm-cancel="${esc(l.id)}"${disabled}>${t('auction.cancel')}</button></div>`;
+    }
+    const l = myMaterials[index - myItems.length]!;
+    return `<div class="mm-slot used"><span class="mm-ic" aria-hidden="true">${CAT_ICON.material}</span><span class="mm-nm">${esc(materialLabel(view, l.materialId))} ×${nfmt(l.quantity)}</span><b>⌖ ${nfmt(l.price)}</b><button type="button" data-mm-material-cancel="${esc(l.id)}"${disabled}>${t('auction.cancel')}</button></div>`;
+  };
+  const shelfHtml = `<section class="mm-shelf"><h3>${t('auction.shelf', { n: used, max: Math.max(open, used) })}</h3><div class="mm-slots">${slots
+    .map((s) =>
+      s.state === 'used'
+        ? lotTile(s.index)
+        : s.state === 'free'
+          ? `<div class="mm-slot free">${t('auction.shelf.free')}</div>`
+          : `<div class="mm-slot locked"><span aria-hidden="true">🔒</span>${t('auction.shelf.locked', { n: accountLevel(s.xp).level })}</div>`,
+    )
+    .join('')}</div></section>`;
+  const full = view.shelf !== undefined && used >= view.shelf.open;
+  const items = mine.filter(
+    (i) =>
+      canSell(i) &&
+      !view.listings.some((l) => l.item.itemId === i.itemId) &&
+      inCategory(ui.cat, itemCat(i)) &&
+      matches(ui.search, arsenalItemName(i)),
+  );
+  const materials = (view.materials ?? []).filter(
+    (m) => m.tradable > 0 && inCategory(ui.cat, 'material') && matches(ui.search, t(m.nameKey)),
+  );
+  const stock = [
+    ...items.map(
+      (i) =>
+        `<button type="button" class="mm-orb r-${esc(tierOf(i))}" data-mm-open="item:${esc(i.itemId)}"><span class="mm-ic" aria-hidden="true">${itemIcon(i)}</span><span class="mm-nm">${esc(arsenalItemName(i))} ${stars(i)}</span>${i.form === 'blueprint' ? `<small>${t('auction.blueprint')}</small>` : ''}</button>`,
+    ),
+    ...materials.map(
+      (m) =>
+        `<button type="button" class="mm-orb" data-mm-open="mat:${esc(m.id)}"><span class="mm-ic" aria-hidden="true">${CAT_ICON.material}<b class="mm-count">${nfmt(m.tradable)}</b></span><span class="mm-nm">${esc(t(m.nameKey))}</span></button>`,
+    ),
+  ].join('');
+  const listDisabled = full ? ' disabled' : tradeDisabled;
+  let form = '';
+  const pick = ui.open?.startsWith('item:')
+    ? items.find((i) => i.itemId === ui.open!.slice(5))
+    : undefined;
+  const pickMat = ui.open?.startsWith('mat:')
+    ? materials.find((m) => m.id === ui.open!.slice(4))
+    : undefined;
+  const fullNote = full ? `<p class="mm-fee">${t('auction.shelf.full')}</p>` : '';
+  if (pick)
+    form = sheet(
+      arsenalItemName(pick),
+      itemIcon(pick),
+      `${moduleItemHtml(pick)}${pick.form === 'blueprint' ? `<span class="mm-fee">${t('auction.blueprint')}</span>` : ''}<label class="mm-field">${t('auction.price')} <input data-mm-price="${esc(pick.itemId)}" type="number" min="1" step="1" inputmode="numeric" value="100"></label><small data-mm-net="${esc(pick.itemId)}">${t('auction.net', { n: nfmt(100 - Math.ceil(100 * view.feeRate)) })}</small>${fullNote}<button type="button" class="mm-primary" data-mm-list="${esc(pick.itemId)}"${listDisabled}>${t('auction.list')}</button>`,
+    );
+  else if (pickMat)
+    form = sheet(
+      t(pickMat.nameKey),
+      CAT_ICON.material,
+      `<span class="mm-fee">${t('auction.available', { n: nfmt(pickMat.tradable) })}</span><label class="mm-field">${t('auction.quantity')} <input data-mm-quantity="${esc(pickMat.id)}" type="number" min="1" max="${pickMat.tradable}" step="1" inputmode="numeric" value="1"></label><label class="mm-field">${t('auction.price')} <input data-mm-material-price="${esc(pickMat.id)}" type="number" min="1" step="1" inputmode="numeric" value="100"></label>${fullNote}<button type="button" class="mm-primary" data-mm-material-list="${esc(pickMat.id)}"${listDisabled}>${t('auction.list')}</button>`,
+    );
+  return `${shelfHtml}<h3 class="mm-sec">${t('auction.stock')}</h3>${stock ? `<div class="mm-stock">${stock}</div>` : `<p class="hub-empty">${t('auction.no-items')}</p>`}${form}`;
 }
 
 export function metaMarketHtml(
   view: MarketView,
   mine: readonly ArsenalItem[],
   busy = false,
-  filter: MarketFilter = noFilter,
+  ui: MarketUi = defaultMarketUi,
 ): string {
   const disabled = busy ? ' disabled' : '';
   const tradeDisabled = busy || view.canTrade === false ? ' disabled' : '';
-  const shown = filteredModuleListings(view.listings, filter);
-  const lots = shown
+  const tabs = (['buy', 'sell'] as const)
     .map(
-      (l) =>
-        `<article class="mm-card"><b>${esc(arsenalItemName(l.item))}</b>${moduleItemHtml(l.item)}<span>${esc(l.sellerLogin)} · ${l.item.form === 'blueprint' ? `${t('auction.blueprint')} · ` : ''}${l.item.grade ? `+${l.item.grade} · ` : ''}⌖ ${nfmt(l.price)}</span><button type="button" ${l.mine ? 'data-mm-cancel' : 'data-mm-buy'}="${esc(l.id)}"${l.mine ? disabled : tradeDisabled}>${l.mine ? t('auction.cancel') : t('auction.buy')}</button></article>`,
+      (tab) =>
+        `<button type="button" data-mm-tab="${tab}"${ui.tab === tab ? ' aria-current="page"' : ''}>${t(TAB_KEY[tab])}</button>`,
     )
     .join('');
-  const sell = mine
-    .filter((i) => canSell(i) && !view.listings.some((l) => l.item.itemId === i.itemId))
-    .map(
-      (i) =>
-        `<article class="mm-card"><b>${esc(arsenalItemName(i))}</b>${moduleItemHtml(i)}${i.form === 'blueprint' ? `<span>${t('auction.blueprint')}</span>` : ''}<label>${t('auction.price')} <input data-mm-price="${esc(i.itemId)}" type="number" min="1" step="1" value="100"></label><small data-mm-net="${esc(i.itemId)}">${t('auction.net', { n: nfmt(100 - Math.ceil(100 * view.feeRate)) })}</small><button type="button" data-mm-list="${esc(i.itemId)}"${tradeDisabled}>${t('auction.list')}</button></article>`,
-    )
-    .join('');
-  const materialLots = (view.materialListings ?? [])
-    .map(
-      (l) =>
-        `<article class="mm-card"><b>${esc(materialLabel(view, l.materialId))} ×${nfmt(l.quantity)}</b><span>${esc(l.sellerLogin)} · ⌖ ${nfmt(l.price)}</span><button type="button" ${l.mine ? 'data-mm-material-cancel' : 'data-mm-material-buy'}="${esc(l.id)}"${l.mine ? disabled : tradeDisabled}>${l.mine ? t('auction.cancel') : t('auction.buy')}</button></article>`,
-    )
-    .join('');
-  const materialSell = (view.materials ?? [])
-    .filter((m) => m.tradable > 0)
-    .map(
-      (m) =>
-        `<article class="mm-card"><b>${esc(t(m.nameKey))}</b><span>${t('auction.available', { n: nfmt(m.tradable) })}</span><label>${t('auction.quantity')} <input data-mm-quantity="${esc(m.id)}" type="number" min="1" max="${m.tradable}" step="1" value="1"></label><label>${t('auction.price')} <input data-mm-material-price="${esc(m.id)}" type="number" min="1" step="1" value="100"></label><button type="button" data-mm-material-list="${esc(m.id)}"${tradeDisabled}>${t('auction.list')}</button></article>`,
-    )
-    .join('');
-  return `<header class="mm-head"><div><strong>${t('auction.title')}</strong><small>${t('auction.subtitle')}</small></div><b>⌖ ${nfmt(view.balance)}</b></header><p class="mm-fee">${t('auction.fee', { n: Math.round(view.feeRate * 100) })}</p>${view.canTrade === false ? `<p class="mm-fee">${view.minimumAccountXp === undefined ? t('err.level-required') : t('auction.level-required', { n: accountLevel(view.minimumAccountXp).level })}</p>` : ''}<h3>${t('auction.browse')}</h3>${marketFiltersHtml(filter, shown.length)}<div class="mm-grid">${lots || `<p class="hub-empty">${t(view.listings.length ? 'auction.no-match' : 'auction.empty')}</p>`}</div><h3>${t('auction.materials')}</h3><div class="mm-grid">${materialLots || `<p class="hub-empty">${t('auction.empty')}</p>`}</div><h3>${t('auction.sell')}</h3><div class="mm-grid">${sell || `<p class="hub-empty">${t('auction.no-items')}</p>`}${materialSell || `<p class="hub-empty">${t('auction.no-materials')}</p>`}</div>`;
+  const cats = AUCTION_CATEGORIES.map(
+    (c) =>
+      `<button type="button" data-mm-cat="${c}" aria-pressed="${ui.cat === c}"><span aria-hidden="true">${CAT_ICON[c]}</span>${t(CAT_KEY[c])}</button>`,
+  ).join('');
+  const gate =
+    view.canTrade === false
+      ? `<p class="mm-fee">${view.minimumAccountXp === undefined ? t('err.level-required') : t('auction.level-required', { n: accountLevel(view.minimumAccountXp).level })}</p>`
+      : '';
+  return `<header class="mm-head"><div><strong>${t('auction.title')}</strong><small>${t('auction.fee', { n: Math.round(view.feeRate * 100) })}</small></div><b>⌖ ${nfmt(view.balance)}</b></header>${gate}<nav class="mm-tabs">${tabs}</nav><div class="mm-tools"><input type="search" data-mm-filter="search" value="${esc(ui.search)}" placeholder="${esc(t('auction.search'))}" aria-label="${esc(t('auction.search'))}"></div><nav class="mm-cats" aria-label="${esc(t('auction.cats'))}">${cats}</nav>${ui.tab === 'buy' ? buyHtml(view, ui, disabled, tradeDisabled) : sellHtml(view, mine, ui, disabled, tradeDisabled)}`;
 }
 
 export function initMetaMarket(host: MetaMarketHost): {
@@ -104,20 +288,48 @@ export function initMetaMarket(host: MetaMarketHost): {
   let view = empty;
   let busy = false;
   let identity = '';
-  let filter = { ...noFilter };
+  let ui: MarketUi = { ...defaultMarketUi };
   const drafts = new Map<string, string>();
   let wantSell: string | null = null;
   const attempts = new Map<string, string>();
   const updateNet = (el: HTMLInputElement) => {
     if (!el.dataset.mmPrice) return;
     const output = host.root().querySelector(`[data-mm-net="${CSS.escape(el.dataset.mmPrice)}"]`);
-    if (output) output.textContent = t('auction.net', { n: nfmt(Math.max(0, Number(el.value) - Math.ceil(Number(el.value) * view.feeRate))) });
+    if (output)
+      output.textContent = t('auction.net', {
+        n: nfmt(Math.max(0, Number(el.value) - Math.ceil(Number(el.value) * view.feeRate))),
+      });
   };
   const paint = () => {
     const root = host.root();
-    root.querySelectorAll?.<HTMLInputElement>('input[data-mm-price],input[data-mm-material-price],input[data-mm-quantity]').forEach((el) => drafts.set([...el.attributes].filter((a) => a.name.startsWith('data-mm-')).map((a) => a.name + a.value).join(''), el.value));
-    root.innerHTML = metaMarketHtml(view, host.arsenal(), busy, filter);
-    root.querySelectorAll?.<HTMLInputElement>('input[data-mm-price],input[data-mm-material-price],input[data-mm-quantity]').forEach((el) => { const v = drafts.get([...el.attributes].filter((a) => a.name.startsWith('data-mm-')).map((a) => a.name + a.value).join('')); if (v !== undefined) el.value = v; updateNet(el); });
+    root
+      .querySelectorAll?.<HTMLInputElement>(
+        'input[data-mm-price],input[data-mm-material-price],input[data-mm-quantity]',
+      )
+      .forEach((el) =>
+        drafts.set(
+          [...el.attributes]
+            .filter((a) => a.name.startsWith('data-mm-'))
+            .map((a) => a.name + a.value)
+            .join(''),
+          el.value,
+        ),
+      );
+    root.innerHTML = metaMarketHtml(view, host.arsenal(), busy, ui);
+    root
+      .querySelectorAll?.<HTMLInputElement>(
+        'input[data-mm-price],input[data-mm-material-price],input[data-mm-quantity]',
+      )
+      .forEach((el) => {
+        const v = drafts.get(
+          [...el.attributes]
+            .filter((a) => a.name.startsWith('data-mm-'))
+            .map((a) => a.name + a.value)
+            .join(''),
+        );
+        if (v !== undefined) el.value = v;
+        updateNet(el);
+      });
   };
   const request = async (path: string, body?: object) => {
     const auth = await host.authorizedBase();
@@ -132,7 +344,7 @@ export function initMetaMarket(host: MetaMarketHost): {
       identity = currentIdentity;
       attempts.clear();
       drafts.clear();
-      filter = { ...noFilter };
+      ui = { ...defaultMarketUi };
     }
     const res = await fetch(auth.base + path, {
       method: body ? 'POST' : 'GET',
@@ -157,6 +369,8 @@ export function initMetaMarket(host: MetaMarketHost): {
     };
     paint();
     if (wantSell) {
+      ui = { ...ui, tab: 'sell', cat: 'all', search: '', open: `item:${wantSell}` };
+      paint();
       const price = host
         .root()
         .querySelector<HTMLInputElement>(`[data-mm-price="${CSS.escape(wantSell)}"]`);
@@ -194,21 +408,30 @@ export function initMetaMarket(host: MetaMarketHost): {
   const positive = (value: number) => Number.isSafeInteger(value) && value > 0;
   host.root().addEventListener('input', (ev) => {
     const el = ev.target as HTMLInputElement;
-    const name = el.dataset.mmFilter;
-    if (name) {
-      if (name === 'search') filter.search = el.value;
-      else if (name === 'rarity') filter.rarity = el.value;
-      else if (name === 'stars') filter.stars = Number(el.value);
-      else if (name === 'sort') filter.sort = el.value as MarketFilter['sort'];
-      const selection = name === 'search' ? el.selectionStart : null;
+    if (el.dataset.mmFilter === 'search') {
+      ui = { ...ui, search: el.value, open: null };
+      const selection = el.selectionStart;
       paint();
-      const next = host.root().querySelector<HTMLInputElement>(`[data-mm-filter="${name}"]`);
+      const next = host.root().querySelector<HTMLInputElement>('[data-mm-filter="search"]');
       next?.focus();
       if (selection !== null) next?.setSelectionRange?.(selection, selection);
     } else updateNet(el);
   });
   host.root().addEventListener('click', (ev) => {
-    const el = (ev.target as HTMLElement).closest<HTMLButtonElement>('button');
+    const target = ev.target as HTMLElement;
+    const nav = target.closest<HTMLElement>(
+      '[data-mm-tab],[data-mm-cat],[data-mm-open],[data-mm-close]',
+    );
+    if (nav && (nav.dataset.mmClose === undefined || nav === target || nav.tagName === 'BUTTON')) {
+      if (nav.dataset.mmTab) ui = { ...ui, tab: nav.dataset.mmTab as MarketUi['tab'], open: null };
+      else if (nav.dataset.mmCat)
+        ui = { ...ui, cat: nav.dataset.mmCat as AuctionCategory, open: null };
+      else if (nav.dataset.mmOpen) ui = { ...ui, open: nav.dataset.mmOpen };
+      else ui = { ...ui, open: null };
+      paint();
+      return;
+    }
+    const el = target.closest<HTMLButtonElement>('button');
     if (!el || el.disabled || busy) return;
     let path: string;
     let body: Record<string, unknown>;

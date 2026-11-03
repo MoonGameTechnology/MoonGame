@@ -80,6 +80,8 @@ export interface MetaMarket {
     login: string,
     itemId: string,
     price: number,
+    /** Мест на полке продавца (`decisions/auctionHouse.ts` `shelfSlots`); без него — `MAX_META_LISTINGS`. */
+    limit?: number,
   ): Promise<MetaMarketResult<{ listing: MetaMarketListing }>>;
   buy(
     accountId: string,
@@ -96,6 +98,7 @@ export interface MetaMarket {
     quantity: number,
     price: number,
     requestId: string,
+    limit?: number,
   ): Promise<MetaMarketResult<{ listing: MetaMaterialListing }>>;
   buyMaterial(
     accountId: string,
@@ -225,6 +228,7 @@ export class MemoryMetaMarket implements MetaMarket {
     login: string,
     itemId: string,
     price: number,
+    limit: number = MAX_META_LISTINGS,
   ): Promise<MetaMarketResult<{ listing: MetaMarketListing }>> {
     return this.locked(async () => {
       if (!Number.isSafeInteger(price) || price < 1) return { ok: false, code: 'E_BAD_PRICE' };
@@ -236,7 +240,7 @@ export class MemoryMetaMarket implements MetaMarket {
       if (
         [...this.lots.values(), ...this.materialLots.values()].filter(
           (x) => x.sellerId === accountId,
-        ).length >= MAX_META_LISTINGS
+        ).length >= limit
       )
         return { ok: false, code: 'E_ORDER_LIMIT' };
       const { accountId: _owner, preferred: _preference, ...asset } = item;
@@ -330,6 +334,7 @@ export class MemoryMetaMarket implements MetaMarket {
     quantity: number,
     price: number,
     requestId: string,
+    limit: number = MAX_META_LISTINGS,
   ): Promise<MetaMarketResult<{ listing: MetaMaterialListing }>> {
     if (!this.economy) return { ok: false, code: 'E_UNAVAILABLE' };
     if (
@@ -352,7 +357,7 @@ export class MemoryMetaMarket implements MetaMarket {
       if (
         [...this.lots.values(), ...this.materialLots.values()].filter(
           (lot) => lot.sellerId === accountId,
-        ).length >= MAX_META_LISTINGS
+        ).length >= limit
       )
         return { ok: false, code: 'E_ORDER_LIMIT' };
       const account = tx.account(accountId);
@@ -617,6 +622,7 @@ export class PostgresMetaMarket implements MetaMarket {
     login: string,
     itemId: string,
     price: number,
+    limit: number = MAX_META_LISTINGS,
   ): Promise<MetaMarketResult<{ listing: MetaMarketListing }>> {
     if (!Number.isSafeInteger(price) || price < 1) return { ok: false, code: 'E_BAD_PRICE' };
     const id = randomUUID(),
@@ -632,7 +638,7 @@ export class PostgresMetaMarket implements MetaMarket {
       await c.query('SELECT item_id FROM arsenal WHERE item_id=$1 FOR UPDATE', [itemId]);
       const r = await c.query<LotRow>(
         `INSERT INTO meta_market_listings(id,seller_id,seller_login,item_id,price,created_at) SELECT $1,$2,$3,a.item_id,$4,$5 FROM arsenal a WHERE a.item_id=$6 AND a.account_id=$2 AND NOT a.soulbound AND ((SELECT count(*) FROM meta_market_listings WHERE seller_id=$2)+(SELECT count(*) FROM meta_material_listings WHERE seller_id=$2))<$7 ON CONFLICT DO NOTHING RETURNING *, (SELECT kind FROM arsenal WHERE item_id=$6), (SELECT form FROM arsenal WHERE item_id=$6), (SELECT def_id FROM arsenal WHERE item_id=$6), (SELECT grade FROM arsenal WHERE item_id=$6), (SELECT soulbound FROM arsenal WHERE item_id=$6), (SELECT durability FROM arsenal WHERE item_id=$6), (SELECT origin FROM arsenal WHERE item_id=$6), (SELECT acquired_at FROM arsenal WHERE item_id=$6), (SELECT progression FROM arsenal WHERE item_id=$6)`,
-        [id, accountId, login, price, at, itemId, MAX_META_LISTINGS],
+        [id, accountId, login, price, at, itemId, limit],
       );
       if (!r.rows[0]) return { ok: false, code: 'E_NOT_TRADABLE' };
       return { ok: true, listing: fromRow(r.rows[0]) };
@@ -780,6 +786,7 @@ export class PostgresMetaMarket implements MetaMarket {
     quantity: number,
     price: number,
     requestId: string,
+    limit: number = MAX_META_LISTINGS,
   ): Promise<MetaMarketResult<{ listing: MetaMaterialListing }>> {
     if (!this.economy) return { ok: false, code: 'E_UNAVAILABLE' };
     if (
@@ -807,7 +814,7 @@ export class PostgresMetaMarket implements MetaMarket {
         'SELECT (SELECT count(*) FROM meta_market_listings WHERE seller_id=$1)+(SELECT count(*) FROM meta_material_listings WHERE seller_id=$1) AS total',
         [accountId],
       );
-      if (Number(count.rows[0]!.total) >= MAX_META_LISTINGS)
+      if (Number(count.rows[0]!.total) >= limit)
         return { ok: false, code: 'E_ORDER_LIMIT' };
       const account = tx.account(accountId);
       const id = randomUUID();

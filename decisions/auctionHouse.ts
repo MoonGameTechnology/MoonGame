@@ -1,0 +1,90 @@
+/**
+ * Аукцион хаба: как разложить лоты по категориям, плиткам и полке продавца.
+ *
+ * Устройство экрана — макет «Аукцион Void Dominion» (владелец 2026-11-03): вкладки
+ * «Купить» и «Продать», полоса категорий, плитка на ТИП предмета с числом предложений
+ * и самой низкой ценой, а у продавца — полка с открытыми и закрытыми местами.
+ * Здесь только решения; разметка у `prototype/src/metaMarketScreen.ts`, лимит полки
+ * применяет сервер (`packages/server/src/auctionShelf.ts`).
+ */
+
+export type AuctionCategory =
+  'all' | 'weapon' | 'defense' | 'utility' | 'hull' | 'blueprint' | 'material';
+
+/** Порядок кнопок на полосе категорий. */
+export const AUCTION_CATEGORIES: readonly AuctionCategory[] = [
+  'all',
+  'weapon',
+  'defense',
+  'utility',
+  'hull',
+  'blueprint',
+  'material',
+];
+
+export interface CategorizedItem {
+  kind: 'module' | 'hull';
+  form: 'instance' | 'blueprint';
+  /** Тип отсека модуля из игровых данных; у корпуса нет. */
+  slot?: string;
+}
+
+/** Категория предмета арсенала. Чертёж — своя категория, какой бы модуль он ни открывал:
+ *  покупатель чертежа ищет именно чертёж. Модуль без известного отсека — «Системы». */
+export function itemCategory(item: CategorizedItem): Exclude<AuctionCategory, 'all' | 'material'> {
+  if (item.form === 'blueprint') return 'blueprint';
+  if (item.kind === 'hull') return 'hull';
+  return item.slot === 'weapon' ? 'weapon' : item.slot === 'defense' ? 'defense' : 'utility';
+}
+
+export function inCategory(selected: AuctionCategory, category: AuctionCategory): boolean {
+  return selected === 'all' || selected === category;
+}
+
+export interface PricedOffer {
+  id: string;
+  price: number;
+}
+
+export interface OfferGroup<T extends PricedOffer> {
+  key: string;
+  /** Предложения от дешёвого к дорогому; при равной цене — по id, чтобы порядок не прыгал. */
+  offers: T[];
+  lowest: number;
+}
+
+/** Плитки «Купить»: одна на ключ типа (`keyOf`), сначала самые дешёвые. */
+export function groupOffers<T extends PricedOffer>(
+  offers: readonly T[],
+  keyOf: (offer: T) => string,
+): OfferGroup<T>[] {
+  const groups = new Map<string, T[]>();
+  for (const offer of offers) {
+    const key = keyOf(offer);
+    const list = groups.get(key);
+    if (list) list.push(offer);
+    else groups.set(key, [offer]);
+  }
+  return [...groups]
+    .map(([key, list]) => {
+      const sorted = [...list].sort((a, b) => a.price - b.price || a.id.localeCompare(b.id));
+      return { key, offers: sorted, lowest: sorted[0]!.price };
+    })
+    .sort((a, b) => a.lowest - b.lowest || a.key.localeCompare(b.key));
+}
+
+export type ShelfSlot =
+  { state: 'used'; index: number } | { state: 'free' } | { state: 'locked'; xp: number };
+
+/**
+ * Места полки по порядку: занятые (индекс в списке лотов), свободные, закрытые с порогом
+ * опыта. Лотов может быть больше открытых мест — их выставили до появления полки, они
+ * остаются видны и снимаются как обычно, а свободных мест тогда нет.
+ */
+export function shelfSlots(used: number, open: number, lockedXp: readonly number[]): ShelfSlot[] {
+  const slots: ShelfSlot[] = [];
+  for (let index = 0; index < used; index++) slots.push({ state: 'used', index });
+  for (let n = used; n < open; n++) slots.push({ state: 'free' });
+  for (const xp of lockedXp) slots.push({ state: 'locked', xp });
+  return slots;
+}
