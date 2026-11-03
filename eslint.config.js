@@ -81,6 +81,29 @@ export default tseslint.config(
     },
   },
   {
+    // Invariant 3 (CLAUDE.md): modules talk only through the bus. A module may borrow
+    // another module's TYPES (a capability or payload contract), never its values —
+    // shared pure helpers live in `state/` or `util/` (SLIM-7 moved the last one).
+    files: ['packages/shared-core/src/modules/**/*.ts'],
+    ignores: ['packages/shared-core/src/modules/**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              // A sibling module file (`./x`), not the module's own folder (`./x/part`).
+              regex: '^\\./[^/]+$',
+              allowTypeImports: true,
+              message:
+                'Modules talk only through the bus: import types only from a sibling module; put shared helpers in state/ or util/.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // «Как часы» с машинным сторожем (а не с обещанием быть внимательным).
     //
     // Node с 15-й версии УБИВАЕТ процесс на необработанном отклонении промиса. Значит в

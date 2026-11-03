@@ -1,5 +1,6 @@
 import type { GameData } from '../packages/shared-core/src/index';
-import { newSectorHero, type SectorZeroProgress } from './sectorZeroProgress';
+import { newSectorHero } from './sectorZeroRules';
+import type { SectorZeroProgress } from './sectorZeroProgress';
 
 /**
  * Откуда в Sector Zero берутся новые герои (решение владельца 2026-09-23).

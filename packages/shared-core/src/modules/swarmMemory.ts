@@ -13,7 +13,7 @@
  * (`AiProfile` в `prototype/src/ai.ts`) в состояние не попадает и попадать не должен —
  * это ровно та недетерминированная настройка, которую ADR 05 держит вне реплей-контракта.
  * Поэтому ядро копит наблюдения БЕЗ окна, а окно накладывает тот, кто принимает
- * решение, — чистой функцией {@link recalled}. Два матча с одинаковыми боями и разной
+ * решение, — чистой функцией `recalled` (`state/swarmRecall.ts`). Два матча с одинаковыми боями и разной
  * сложностью дают одинаковое состояние и разные выводы, и это правильно: разной должна
  * быть глубина взгляда, а не история.
  *
@@ -77,35 +77,6 @@ function observe(memory: SwarmMemory, kind: string, engagement: string): number 
   const ordinal = known?.ordinal ?? ++memory.engagements;
   memory.observations.push({ ordinal, kind, engagement } satisfies SwarmObservation);
   return ordinal;
-}
-
-/**
- * Что Рой ПОМНИТ о классе при заданной глубине взгляда — чистая функция, общая ядру и
- * драйверу.
- *
- * `window` в столкновениях; `null` — «весь забег» (профиль операции). Окно отсчитывается
- * от последнего зачтённого столкновения, а не от текущего времени: столкновений может
- * не быть часами, и привязка ко времени означала бы, что память тает сама собой, пока
- * игрок отстраивается.
- */
-export function recalled(
-  memory: SwarmMemory | undefined,
-  kind: string,
-  window: number | null,
-  known: ReadonlySet<number> | null = null,
-): number {
-  if (!memory) return 0;
-  if (known === null) {
-    const from = window === null ? 0 : memory.engagements - window;
-    return memory.observations.filter((o) => o.kind === kind && o.ordinal > from).length;
-  }
-  // Сеть Роя (`docs/swarm-behavior.md`): часть помнит только то, что до неё ДОШЛО, и
-  // окно считается по её собственным столкновениям — последние `window` из известных
-  // ей, а не из всего журнала забега.
-  const mine = [...known].sort((a, b) => a - b);
-  const from = window === null || mine.length <= window ? -Infinity : mine[mine.length - window - 1]!;
-  return memory.observations.filter((o) => o.kind === kind && known.has(o.ordinal) && o.ordinal > from)
-    .length;
 }
 
 export const swarmMemoryModule: GameModule = {

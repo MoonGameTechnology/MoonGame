@@ -1480,11 +1480,15 @@ Escape/Back (`BACK_LAYERS`, ≈130) остаётся в `main.ts`: он пере
 - **SLIM-6** ⏳ `[proto]` `[core]` **Длинные функции — по месту.** `initCorp`,
   `initSectorZeroPreparation`, `handleEvents`, `setup` крыла и стройки и прочие из бюджета
   SLIM-1 режутся, когда их трогает фича, в том же потоке, без отдельной кампании.
-- **SLIM-7** ⏳ `[proto]` `[core]` `[docs]` **Мелкая уборка.** Файлы, живущие только на
-  тестах (`prototype/src/seatPicker.ts`, `decisions/seatJoin.ts`, `decisions/terrainArt.ts`);
-  `recalled` из `modules/swarmMemory.ts` в `state/` (единственный импорт значения между
-  модулями ядра); круг импорта из четырёх файлов вокруг `decisions/sectorZeroProgress.ts`;
-  строка «вне типчека» о прототипе в `docs/cross-platform-roadmap.md`.
+- **SLIM-7** ✅ `[proto]` `[core]` `[docs]` **Мелкая уборка.** Сняты файлы, жившие только на
+  тестах: `prototype/src/seatPicker.ts`, `decisions/seatJoin.ts`, `decisions/terrainArt.ts`
+  (их заменили `entrySetup.ts` и `holographicTerrainArt.ts`) и четыре осиротевших ключа
+  `seatpick.bonus.*`. `recalled` переехал в `state/swarmRecall.ts`; импорт значения из
+  соседнего модуля ядра теперь ловит ESLint (`no-restricted-imports`, типы можно). Круг
+  `sectorZeroProgress` → витрина → жетоны → найм разорван листом `decisions/sectorZeroRules.ts`
+  (выдача героя, Варранты забега, легальность навыка); профиль реэкспортирует его имена,
+  сторож круга — `sectorZeroRules.test.ts`. Строки «вне типчека» в
+  `docs/cross-platform-roadmap.md` уже не было.
 
 ---
 

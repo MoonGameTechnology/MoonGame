@@ -9,6 +9,24 @@ import { dailyOffers } from './sectorZeroShop';
 import { addHeroTokens, heroStarCost, heroTokenUse, rollHeroTokens } from './heroTokens';
 import { emptySwarmCodex, learnSwarm, parseSwarmCodex, type SwarmCodex } from './swarmCodex';
 import {
+  lastRunWarrants,
+  newSectorHero,
+  own,
+  sectorSkillLegal,
+  sectorSkillOpenTo,
+  skillLearnable,
+  SHOP_AD_REFRESHES_PER_DAY,
+  WARRANTS_PER_REWARD,
+} from './sectorZeroRules';
+export {
+  lastRunWarrants,
+  newSectorHero,
+  sectorSkillLegal,
+  sectorSkillOpenTo,
+  SHOP_AD_REFRESHES_PER_DAY,
+  WARRANTS_PER_REWARD,
+};
+import {
   addLoot,
   moduleLadder,
   profileRarity,
@@ -248,11 +266,6 @@ export function forgeLadderOf(data: GameData): RarityLadder {
   return data.sectorZeroStars;
 }
 
-/** Множитель награды за забег, переведённый в Варранты (§2 роадмапа экономики: вторая
- *  половина награды). **v0**: забег с четырьмя волнами и победой даёт 40 ⌖, первая звезда
- *  стоит 20, полная лестница одного модуля — 695. Числа калибруются телеметрией. */
-export const WARRANTS_PER_REWARD = 5;
-
 /**
  * Данные за победу в забеге — сверх данных за волны. Было «1 за сам забег + 3 за победу»,
  * но единица за сам забег платила и экспедиции, сданной в первую секунду, и начать →
@@ -272,13 +285,6 @@ export const WARRANTS_PER_KILL = 1;
 function runKills(state: GameState, player: string): number {
   const destroyed = state.pve?.tally?.[player]?.destroyed;
   return typeof destroyed === 'number' && Number.isSafeInteger(destroyed) && destroyed > 0 ? destroyed : 0;
-}
-/** Варранты последнего засчитанного забега — вся сумма, с уничтоженными. Итог без разбивки
- *  (засчитан до неё) — по старому правилу, от данных. */
-export function lastRunWarrants(progress: SectorZeroProgress): number {
-  return progress.lastRun?.attempt === progress.settledThrough
-    ? progress.lastRun.warrants
-    : progress.lastReward * WARRANTS_PER_REWARD;
 }
 
 /**
@@ -348,19 +354,6 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     heroTokens: {},
     selectedHero: first,
     swarmCodex: emptySwarmCodex(),
-  };
-}
-
-/** Герой, только что пришедший в отряд: первая ступень, без навыков, с одной стартовой
- *  способностью (призывы — не в счёт). Один рецепт на все пути прихода: стартовый герой,
- *  покупка за данные и награда за главу (`heroRecruits.ts`). */
-export function newSectorHero(id: string, data: GameData): SectorHero {
-  return {
-    level: 1,
-    skills: [],
-    equipped: (data.heroes[id]?.startAbilities ?? [])
-      .filter((key) => !data.heroAbilities[key]?.type.startsWith('spawn_'))
-      .slice(0, 1),
   };
 }
 
@@ -471,17 +464,6 @@ export function sectorSkillCost(id: string, data: GameData): number {
   };
   return 2 * depth(id, new Set());
 }
-/** Может ли ВЫБРАННЫЙ герой изучить узел прямо сейчас: ветка его, узел не изучен,
- *  предпосылки взяты. Правила каталога, и деньги их не отменяют — поэтому проверка
- *  вынесена сюда, а не продублирована в магазине второй копией. */
-export function sectorSkillLegal(
-  progress: SectorZeroProgress,
-  id: string,
-  data: GameData,
-): boolean {
-  const hero = own(progress.heroes, progress.selectedHero);
-  return hero !== undefined && skillLearnable(progress.selectedHero, hero.skills, id, data);
-}
 
 /** Карточка узла в Академии: изучен ли (куплен или врождён, AUD-22) и каких предпосылок
  *  не хватает. Та же правда, что у покупки, — иначе экран повесил бы цену на узел, который
@@ -495,50 +477,6 @@ export function sectorSkillCard(
   const known = knownSkillNodes(hero.skills, heroId, data);
   const requires = data.heroSkillTrees[id]?.requires ?? [];
   return { owned: known.has(id), missing: requires.filter((r) => !known.has(r)) };
-}
-
-/**
- * Одно правило «можно изучить» для Академии, магазина и чтения профиля. Изученным
- * считается и купленный узел, и ВРОЖДЁННЫЙ — тот, чья награда у архетипа со старта
- * (AUD-22, решение владельца 2026-09-24): его не продают, а узлы за ним открыты. Набор
- * известных узлов считает ядро (`knownSkillNodes`), тот же, что в `hero.skill.unlock`.
- */
-function skillLearnable(
-  heroId: string,
-  skills: readonly string[],
-  id: string,
-  data: GameData,
-): boolean {
-  const node = own(data.heroSkillTrees, id);
-  if (!node || !sectorSkillOpenTo(node, heroId, data)) return false;
-  const known = knownSkillNodes(skills, heroId, data);
-  return !known.has(id) && node.requires.every((r) => known.has(r));
-}
-
-/**
- * Узел открыт герою? Правило ровно то же, что в ядре (`hero.skill.unlock`): узел БЕЗ
- * ветки — общий и доступен любому, узел с веткой — только своей.
- *
- * Здесь раньше стояло строгое равенство `node.branch === def.branch`, и оно тихо
- * расходилось с ядром: безветочный узел (`undefined !== 'transhuman'`) в подготовке
- * Sector Zero НЕ покупался, хотя на настоящей карте то же ядро его пускало. Восемь из
- * девятнадцати узлов каталога были общими — то есть треть дерева на экране подготовки
- * была недостижима, и выглядело это как «узла просто нет».
- *
- * Парковка веток (HERO-11) сделала дефект невидимым: сейчас обе стороны `undefined`, и
- * строгое равенство случайно даёт верный ответ. Именно поэтому правило приведено к
- * ядерному СЕЙЧАС, а не «когда понадобится»: иначе распарковка вернула бы вместе с
- * ветками и эту дыру, и искать её пришлось бы заново.
- */
-export function sectorSkillOpenTo(
-  node: { branch?: string },
-  archetype: string | undefined,
-  data: GameData,
-): boolean {
-  return (
-    node.branch === undefined ||
-    node.branch === (archetype !== undefined ? data.heroes[archetype]?.branch : undefined)
-  );
 }
 
 /**
@@ -563,10 +501,6 @@ export function sectorHullIds(data: GameData): string[] {
     );
   });
 }
-
-/** Сколько раз в сутки витрину можно обновить за ролик — резолюция владельца (§0.7
- *  роадмапа экономики): «1 раз в сутки + 1 раз за рекламу». */
-export const SHOP_AD_REFRESHES_PER_DAY = 1;
 
 /**
  * Модули, которые игрок забега может хоть куда-то ПОСТАВИТЬ (PVR-6.5). Список подготовки
@@ -926,20 +860,6 @@ export function changeSectorZeroProgress(
     }
   }
   return next;
-}
-
-/**
- * Запись таблицы по id — только СОБСТВЕННЫЙ ключ (AUD-30). `data.modules['constructor']`
- * находит не запись каталога, а наследство `Object.prototype`, и профиль из `localStorage`
- * или облака принимал такие «модули» и «героев»: «Новый забег» падал на
- * `selectedHero: "constructor"`, Мастерская — на модуле `constructor`, а действие с id
- * `__proto__` дописывало поле прямо в `Object.prototype` — все объекты игры получали
- * `level: NaN`. `hasOwnProperty.call`, а не `Object.hasOwn`: клиент идёт и в старые WebView.
- */
-function own<T>(table: Readonly<Record<string, T>>, id: unknown): T | undefined {
-  return typeof id === 'string' && Object.prototype.hasOwnProperty.call(table, id)
-    ? table[id]
-    : undefined;
 }
 
 /** Объект-словарь из хранилища или пустой: массив и примитив словарём не считаются. */
@@ -1400,7 +1320,6 @@ export function settleSectorZeroRun(
     },
   };
 }
-
 
 /** Флагман экспедиции со своим набором (PVR-6.24): звёзды и редкость модулей — тем же
  *  снимком, что у стартового флота. Пустой набор — поле стека не заводится вовсе. */

@@ -629,7 +629,8 @@ export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
 export { planetTypeModule } from './modules/planetType';
 export { pveModule } from './modules/pve';
-export { swarmMemoryModule, recalled, STRIKE_KIND } from './modules/swarmMemory';
+export { swarmMemoryModule, STRIKE_KIND } from './modules/swarmMemory';
+export { recalled } from './state/swarmRecall';
 export {
   swarmAdaptModule,
   swarmAdaptDue,

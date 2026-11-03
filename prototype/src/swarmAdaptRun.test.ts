@@ -17,7 +17,7 @@ import { RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 import type { RunDifficulty } from '../../decisions/runDifficulty';
 import { fleetHolder, knowledgeOf, swarmNet } from '../../packages/shared-core/src/util/swarmNet';
 import { fleetPointDefense } from '../../packages/shared-core/src/util/pointDefense';
-import { recalled } from '../../packages/shared-core/src/modules/swarmMemory';
+import { recalled } from '../../packages/shared-core/src/state/swarmRecall';
 
 /**
  * AUD-20 — сценарий MC-01 (`sector-zero-roadmap.md` §3.9) на шипнутой карте `pve-1`,
