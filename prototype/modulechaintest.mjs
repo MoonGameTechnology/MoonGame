@@ -80,7 +80,7 @@ const css =
     .sort()
     .map((f) => readFileSync('prototype/styles/' + f, 'utf8'))
     .join('\n');
-const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\nhtml,body{height:100%;overflow:auto}body{padding:20px;background:#06131d}#hp-arsenal,#hp-auction{display:block;max-width:1200px;margin:auto;height:calc(100vh - 40px)}[hidden]{display:none!important}#notice{position:fixed;bottom:0}</style></head><body><section id="hp-arsenal"></section><section id="hp-auction" hidden></section><div id="arsenal-sheet"></div><div id="notice" role="status"></div><script src="/test.js"></script></body></html>`;
+const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\nhtml,body{height:100%;overflow:auto}body{padding:20px;background:#06131d}#hp-arsenal,#hp-auction{display:flex;flex-direction:column;max-width:1200px;margin:auto;height:calc(100vh - 40px)}[hidden]{display:none!important}#notice{position:fixed;bottom:0}</style></head><body><section id="hp-arsenal"></section><section id="hp-auction" hidden></section><div id="arsenal-sheet"></div><div id="notice" role="status"></div><script src="/test.js"></script></body></html>`;
 const browser = await launchBrowser();
 const results = [];
 try {
@@ -166,12 +166,17 @@ try {
       await page.screenshot({ path: resolve(out, `auction-bids-${width}.png`) });
       // Заказ: bob заказывает модуль, видит заморозку во вкладке «Мои» и отменяет заказ.
       await page.locator('[data-mm-tab="mine"]').click();
-      await page.locator('[data-mm-open="order:new"]').click();
-      await page.locator('[data-mm-order-key]').selectOption('module:instance:cargo_bay');
-      await page.locator('[data-mm-order-price="order:new"]').fill('30');
-      await page.locator('[data-mm-order-qty="order:new"]').fill('2');
+      await page.locator('.mm-seg [aria-pressed="true"]').waitFor();
+      await page.screenshot({ path: resolve(out, `auction-mine-bids-${width}.png`) });
+      await page.locator('[data-mm-tab="buy"]').click();
+      await page.locator('[data-mm-cat="all"]').click();
+      await page.screenshot({ path: resolve(out, `auction-catalog-${width}.png`) });
+      await page.locator('[data-mm-open="module:instance:cargo_bay"]').click();
+      const key = 'module:instance:cargo_bay';
+      await page.locator(`[data-mm-order-price="${key}"]`).fill('30');
+      await page.locator(`[data-mm-order-qty="${key}"]`).fill('2');
       await page.screenshot({ path: resolve(out, `auction-order-${width}.png`) });
-      await page.locator('[data-mm-order="order:new"]').click();
+      await page.locator(`[data-mm-order="${key}"]`).click();
       await page.locator('[data-mm-order-cancel]').waitFor();
       await page.screenshot({ path: resolve(out, `auction-mine-${width}.png`) });
       await page.locator('[data-mm-order-cancel]').click();

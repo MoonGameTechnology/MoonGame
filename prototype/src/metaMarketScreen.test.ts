@@ -272,11 +272,13 @@ describe('meta market screen', () => {
         { id: 'l', sellerId: 'o', sellerLogin: 'o', item: shield, price: 9, createdAt: 1 },
       ],
     };
-    expect(metaMarketHtml(view, [], false, { ...defaultMarketUi, cat: 'defense' })).toContain(
-      'data-mm-open="module:',
-    );
+    const defense = metaMarketHtml(view, [], false, { ...defaultMarketUi, cat: 'defense' });
+    expect(defense).toContain('data-mm-open="module:instance:shield_booster"');
+    expect(defense).toContain(t('auction.from', { n: '9' }));
+    // Каталог показывает и то, чего никто не продаёт.
+    expect(defense).toContain(t('auction.none'));
     expect(metaMarketHtml(view, [], false, { ...defaultMarketUi, cat: 'weapon' })).not.toContain(
-      'data-mm-open="module:',
+      'data-mm-open="module:instance:shield_booster"',
     );
   });
 
@@ -324,6 +326,13 @@ describe('meta market screen', () => {
     expect(sheet).toContain('data-mm-bid-amount="a1" type="number" min="126"');
     expect(sheet).toContain('data-mm-buyout="a1" data-mm-buyout-amount="900"');
     expect(sheet).toContain('class="mi-effects"');
+    expect(sheet).toContain(t('auction.bid.place-do', { n: '126' }));
+    expect(sheet).toContain('data-mm-step="1"');
+    // «Мои → Ставки»: только лидирующий лот, его ставка заморожена в шапке.
+    const mine = metaMarketHtml(view, [], false, { ...defaultMarketUi, tab: 'mine' });
+    expect(mine).toContain(t('auction.bid.leader'));
+    expect(mine).not.toContain('data-mm-open="bid:a1"');
+    expect(mine).toContain(t('auction.order.frozen', { n: '120' }));
   });
 
   it('offers a timed sale in the sell sheet and shows own timed lots on the shelf', () => {
@@ -403,10 +412,19 @@ describe('meta market screen', () => {
     expect(tile).toContain(
       'data-mm-order-price="module:instance:ion_engine" type="number" min="1" step="1" inputmode="numeric" value="89"',
     );
-    const fresh = metaMarketHtml(view, [], false, { ...defaultMarketUi, open: 'order:new' });
-    expect(fresh).toContain('<select data-mm-order-key>');
-    expect(fresh).toContain('value="module:instance:ion_engine"');
-    const mine = metaMarketHtml(view, [], false, { ...defaultMarketUi, tab: 'mine' });
+    const fresh = metaMarketHtml(view, [], false, {
+      ...defaultMarketUi,
+      open: 'module:instance:cargo_bay',
+    });
+    expect(fresh).toContain(t('auction.none'));
+    expect(fresh).toContain('data-mm-order="module:instance:cargo_bay"');
+    // Заморожено в шапке: остаток заказа 2 × 40.
+    expect(fresh).toContain(t('auction.order.frozen', { n: '80' }));
+    const mine = metaMarketHtml(view, [], false, {
+      ...defaultMarketUi,
+      tab: 'mine',
+      mineSeg: 'orders',
+    });
     expect(mine).toContain(t('auction.orders', { n: 1, max: 10 }));
     expect(mine).toContain(t('auction.order.frozen', { n: '80' }));
     expect(mine).toContain('data-mm-order-cancel="o1"');

@@ -98,3 +98,38 @@ export function countdown(ms: number): string {
 
 /** Меньше 10 минут — таймер подсвечивается: лот вот-вот уйдёт. */
 export const AUCTION_HOT_MS = 600_000;
+
+/** Шаг кнопок «−/+» у ставки: 5% от суммы, не меньше 1. Тот же шаг держит сервер
+ *  (`BID_STEP_PERCENT` в `packages/server/src/metaAuction.ts`); здесь только подсказка. */
+export function bidStep(amount: number): number {
+  return Math.max(1, Math.ceil((Math.max(0, amount) * 5) / 100));
+}
+
+/** Сколько варрантов заморожено: лидирующие ставки и неисполненный остаток заказов. */
+export function frozenWarrants(
+  lots: readonly { leading: boolean; current?: number }[],
+  orders: readonly { price: number; quantity: number; filled: number }[],
+): number {
+  const bids = lots.reduce((sum, l) => sum + (l.leading ? (l.current ?? 0) : 0), 0);
+  return orders.reduce((sum, o) => sum + o.price * Math.max(0, o.quantity - o.filled), bids);
+}
+
+/**
+ * Плитки «Купить» по макету: весь каталог в его порядке, у каждой плитки — группа
+ * предложений или пусто («нет в продаже»). Предложение на тип вне каталога (чертёж,
+ * корпус) идёт после каталога, чтобы ни один лот не пропал с экрана.
+ */
+export function catalogTiles<G extends { key: string }>(
+  catalog: readonly string[],
+  groups: readonly G[],
+): Array<{ key: string; group?: G }> {
+  const byKey = new Map(groups.map((g) => [g.key, g]));
+  const known = new Set(catalog);
+  return [
+    ...catalog.map((key) => {
+      const group = byKey.get(key);
+      return group ? { key, group } : { key };
+    }),
+    ...groups.filter((g) => !known.has(g.key)).map((g) => ({ key: g.key, group: g })),
+  ];
+}
