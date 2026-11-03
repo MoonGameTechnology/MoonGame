@@ -47,6 +47,9 @@ export interface CastOption {
   id: string;
   /** Остаток кулдауна в часах; 0 — можно применять. */
   cdH: number;
+  /** Когда способность откроется (игровое время); 0 — открыта. Ряд приказов пишет в
+   *  разметку срок, а не остаток: остаток пересобирал бы ряд с часами. */
+  readyAt: number;
   ranged: boolean;
 }
 
@@ -107,6 +110,7 @@ export function castOptions(
     out.push({
       id: spec.id,
       cdH: cooldownLeftH(spec.readyAt, now, hourMs),
+      readyAt: spec.readyAt ?? 0,
       ranged: isRanged(spec.range),
     });
   }

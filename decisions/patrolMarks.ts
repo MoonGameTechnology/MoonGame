@@ -48,6 +48,9 @@ export interface PatrolMark {
   active: boolean;
   /** Сколько ещё висеть, мс; у летящего к точке — `null` (правило 2). */
   leftMs: number | null;
+  /** Когда висение кончится (мировые мс), тоже `null` у летящего. Окно мира пишет в разметку
+   *  этот срок, а не остаток: остаток пересобирал бы его с каждым шагом часов. */
+  until: number | null;
   /** «Держать патруль» (правило 6): вернувшись, эскадра встанет снова сама. */
   hold: boolean;
 }
@@ -72,6 +75,7 @@ export function patrolMarks(
       radius,
       active,
       leftMs: active ? Math.max(0, st.arrivesAt - opts.now) : null, // правило 3
+      until: active ? st.arrivesAt : null,
       hold: st.patrol?.hold === true, // правило 6
     });
   }

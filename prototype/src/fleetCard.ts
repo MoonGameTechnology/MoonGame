@@ -82,10 +82,10 @@ import {
   type VitalView,
 } from './fleetConsole';
 import { effectsShown, fleetEffects, pointDefenseTotal, type EffectTag } from './fleetEffects';
-import { fleetVolleyIn } from './bombardClock';
+import { fleetVolleyAt } from './bombardClock';
 import { fleetHoldsHtml } from './fleetHoldView';
 import { fleetSummary, hullPct, LIMP_PCT, stackPools } from './fleetSummary';
-import { countdownHMS, displayUnit, esc, kfmt, resLine } from './format';
+import { displayUnit, esc, kfmt, resLine } from './format';
 import {
   ctx,
   data,
@@ -107,6 +107,7 @@ import { heroDisplayName } from './heroStaff';
 import { holoIcon } from './holographicIcons';
 import { SOV_SVG, unitIcon, unitIconHtml } from './icons';
 import { troopsPlan } from './interaction';
+import { LIVE_SLOT, liveTimerHtml, liveTipAttrs } from './liveTimers';
 import type { SectorType } from './map';
 import { squadronRelocateSpots } from './mapAim';
 import { fleetKnown, fleetNode } from './mapFog';
@@ -144,8 +145,6 @@ export interface FleetCardHost {
   consoleFleet(): Fleet | null;
   /** Мины и ракеты, которые видит своё место. */
   mineView(): ReturnType<typeof visibleOrdnance>;
-  /** Время, по которому карта рисует движущееся. */
-  mapNow(): number;
   /** Имя флота: «Флот «ПОЗЫВНОЙ»», у крепости — «крепость». */
   fleetTitleOf(id: string): string;
   /** Тип сектора узла; `undefined` — узел не на карте. */
@@ -178,7 +177,6 @@ const sectorTypeOf = (id: string): SectorType | undefined => game.sectorType(id)
 const fleetTitleOf = (id: string): string => game.fleetTitleOf(id);
 const consoleFleet = (): Fleet | null => game.consoleFleet();
 const mineView = (): ReturnType<typeof visibleOrdnance> => game.mineView();
-const mapNow = (): number => game.mapNow();
 const strikeSquadron = (st: ShuttleStrike): Squadron => game.strikeSquadron(st);
 const strikeFrom = (st: ShuttleStrike): { planetId: string } | { fleetId: string } =>
   game.strikeFrom(st);
@@ -243,15 +241,13 @@ function rocketMineCardHtml(f: Fleet): string {
  *  ракеты нет, поэтому и кнопок нет: «невозможно контролировать» (решение владельца). */
 function missileCardHtml(f: Fleet): string {
   const ME = game.me();
-  const card = missileCard(f, mineView()?.warheads?.[f.id], ME, mapNow(), data);
+  const card = missileCard(f, mineView()?.warheads?.[f.id], ME, data);
   if (!card) return '';
   const pct = card.hull.max > 0 ? Math.round((100 * card.hull.cur) / card.hull.max) : 0;
+  // Срок полёта — живой узел (`liveTimers.ts`): цифры в подписи пересобирали бы лист.
+  const eta = t('missile.card.eta', { in: liveTimerHtml(card.arrivesAt, 'hms') });
   let html =
-    cardHeader(
-      ownerColor(f.owner),
-      t('data.missile'),
-      t('missile.card.eta', { in: countdownHMS(card.leftMs) }),
-    ) +
+    kitCardHeader(ownerColor(f.owner), t('data.missile'), '', { compact: pcUi(), subLive: eta }) +
     `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar"><i style="width:${pct}%"></i></span><b>${kfmt(card.hull.cur)}/${kfmt(card.hull.max)}</b></div>` +
     `<div class="row"><b>💥 ${esc(t('missile.card.blast', { r: card.blast }))}</b></div>`;
   if (card.damage !== null)
@@ -414,7 +410,7 @@ function fleetSummaryHtml(f: Fleet): string {
     `<div class="row">⚡ ${t('side.summary.speed')}: <b>${sm.speed > 0 ? Math.round(sm.speed) : '—'}</b>${mults.length ? ` <span class="dim">${mults.join(' · ')}</span>` : ''} <span class="dim">· ${t('side.summary.speed.note')}</span></div>`,
   );
   if (f.owner === ME)
-    rows.push(fleetHoldsHtml(fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data))));
+    rows.push(fleetHoldsHtml(fleetHolds(f, data, fleetAloftPlaces(s, f, data))));
   else if (sm.cargo)
     rows.push(
       `<div class="row">📦 ${t('side.summary.cargo')}: <b>${sm.cargo.used}/${sm.cargo.cap}</b></div>`,
@@ -515,7 +511,7 @@ export function fleetPanelHtml(f: Fleet): string {
       h += `<div class="row hullrow" data-desc="stat:shield"${tap('shield')}><span class="hico">◈</span><span class="hbar sh"><i style="width:${hullPct(sm.shield)}%"></i></span><b${tone(mods?.incoming.tone)}${key}>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b></div>`;
   }
   if (f.owner === ME)
-    h += fleetHoldsHtml(fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)));
+    h += fleetHoldsHtml(fleetHolds(f, data, fleetAloftPlaces(s, f, data)));
   h += fleetMinesRowHtml(f);
   // Aggregate combat weight — БОЕВОЙ вес, как его считает ядро: effectiveStats +
   // доля корпуса и эффективность состава. Скорость — базовая скорость флота (мин по
@@ -638,8 +634,7 @@ function fleetSubNotes(f: Fleet, nTr: number): string {
  *  пересобирался целиком, и кнопки «Бомбардировать» и «Штурм» под курсором мигали. */
 function fleetLandingNote(f: Fleet): string {
   if (!f.assaultLanding) return '';
-  const timer = `<span class="pn-timer" data-at="${f.assaultLanding.doneAt}">…</span>`;
-  return ' · ⤓ ' + t('side.fleet.landing', { t: timer });
+  return ' · ⤓ ' + t('side.fleet.landing', { t: liveTimerHtml(f.assaultLanding.doneAt) });
 }
 
 /** Кнопка ремонта у полосы корпуса. */
@@ -660,7 +655,7 @@ function fleetRepairChipsHtml(f: Fleet): string {
 }
 
 /** Строка минного заградителя. SM-3.5: заградитель ставит поле там, где стоит; правило
- *  и отказы — в ядре. */
+ *  и отказы — в ядре. Срок на кнопке — живой узел: с цифрами лист пересобирался бы. */
 function fleetMinesRowHtml(f: Fleet): string {
   const s = game.world();
   const ME = game.me();
@@ -670,9 +665,9 @@ function fleetMinesRowHtml(f: Fleet): string {
     mines.ready
       ? t('side.fleet.mines.lay')
       : mines.reason === 'installing'
-        ? t('side.fleet.mines.installing', { in: countdownHMS(mines.readyInMs) })
+        ? t('side.fleet.mines.installing', { in: liveTimerHtml(mines.readyAt, 'hms') })
         : mines.reason === 'cooldown'
-          ? t('side.fleet.mines.cooldown', { in: countdownHMS(mines.readyInMs) })
+          ? t('side.fleet.mines.cooldown', { in: liveTimerHtml(mines.readyAt, 'hms') })
           : t('side.fleet.mines.busy')
   }</button></div>`;
 }
@@ -708,15 +703,15 @@ function fleetEffectsHtml(f: Fleet, boosted: boolean, nTr: number): string {
     s.players[ME]?.arrears ?? [],
   );
   if (!effectsShown(tags)) return '';
-  // Метка обстрела несёт таймер: через сколько следующий залп этого флота
-  // (`decisions/bombardTimer.ts`). Слова — в подсказке, как и в шапке мира.
-  const volleyIn = fleetVolleyIn(s, f, ME);
+  // Метка обстрела несёт таймер: когда следующий залп этого флота
+  // (`decisions/bombardTimer.ts`). Слова — в подсказке, как и в шапке мира; отсчёт и
+  // подсказка — живые узлы (`liveTimers.ts`), иначе карточка пересобиралась бы с часами.
+  const volleyAt = fleetVolleyAt(s, f, ME);
   let h = `<div class="sec">${t('effect.title')}</div><div class="row effects">`;
   for (const tag of tags) {
-    if (tag.kind === 'bombarding' && volleyIn !== null) {
-      const left = countdownHMS(volleyIn);
-      const tip = esc(t('side.world.bombard-next', { t: left }));
-      h += `<span class="effect-tag" title="${tip}" aria-label="${tip}">${effectTagText(tag)} · ${left}</span>`;
+    if (tag.kind === 'bombarding' && volleyAt !== null) {
+      const tip = liveTipAttrs(volleyAt, 'hms', t('side.world.bombard-next', { t: LIVE_SLOT }));
+      h += `<span class="effect-tag pn-tip"${tip}>${effectTagText(tag)} · ${liveTimerHtml(volleyAt, 'hms')}</span>`;
     } else h += `<span class="effect-tag">${effectTagText(tag)}</span>`;
   }
   return h + `</div>`;
@@ -771,7 +766,7 @@ export function fleetLandShown(f: Fleet): boolean {
   const hold = f.owner === ME ? fleetHangar(f, data, s) : null;
   const wing = hasHangar(hold) ? fleetWingOffer(f, hold) : null;
   return landColumnShown({
-    holds: fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)),
+    holds: fleetHolds(f, data, fleetAloftPlaces(s, f, data)),
     wingTransfer: !!wing && (wing.load || wing.unload),
   });
 }
@@ -1015,7 +1010,7 @@ function fleetConsoleHtml(f: Fleet): string {
   );
   const troopsIn = troopsInputFor(f.id);
   let land =
-    fleetHoldsHtml(fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data))) +
+    fleetHoldsHtml(fleetHolds(f, data, fleetAloftPlaces(s, f, data))) +
     troopTableHtml(rows, ownWorld) +
     fleetHangarHtml(f, true) +
     (troopsIn
@@ -1111,7 +1106,7 @@ export function aloftPanelHtml(st: ShuttleStrike): string {
   // Отсчёт патчит `updatePanelLive` (`.pn-timer`): в разметке только срок, и панель не
   // перестраивается каждый кадр под пальцем. Поэтому внутри заглушка, а не сами цифры:
   // с цифрами разметка всё равно менялась бы вместе с ними.
-  const timer = `<span class="pn-timer" data-at="${card.until}">…</span>`;
+  const timer = liveTimerHtml(card.until);
   let h = cardHeader(ownerColor(ME), strikeTitle(st), notes.join(' · '));
   h += `<div class="row"><b>${esc(text.what)}</b></div>`;
   h += `<div class="row dim">${esc(text.until)} ${timer}</div>`;

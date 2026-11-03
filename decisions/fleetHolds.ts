@@ -22,12 +22,21 @@ export interface FleetHold {
   over: number;
   usedFraction: number;
   reservedFraction: number;
-  /** Volume-weighted progress of the active ground lifts, 0..1. */
-  loadingProgress: number;
+  /** The active ground lifts — progress at any moment is {@link holdProgress}. */
+  loadingWindows: readonly HoldWindow[];
   /** Volume already going ashore (`fleet.unloading`) — still aboard, so part of `used`. */
   unloading: number;
-  /** Volume-weighted progress of the active disembarkations, 0..1. */
-  unloadingProgress: number;
+  /** The active disembarkations — progress at any moment is {@link holdProgress}. */
+  unloadingWindows: readonly HoldWindow[];
+}
+
+/** One timed lift: its window and the volume it moves. The meter carries windows rather
+ *  than a progress figure, because a figure would change the card's markup with every
+ *  tick of the clock and rebuild the card under the cursor; the card patches it live. */
+export interface HoldWindow {
+  startAt: number;
+  doneAt: number;
+  volume: number;
 }
 
 const clamp = (n: number): number => Math.max(0, Math.min(1, n));
@@ -38,14 +47,25 @@ function windowProgress(claim: { startAt: number; doneAt: number }, now: number)
   return duration > 0 ? clamp((now - claim.startAt) / duration) : Number(now >= claim.doneAt);
 }
 
+/** Volume-weighted progress of the lifts at `now`, 0..1; no lifts → 0. */
+export function holdProgress(windows: readonly HoldWindow[], now: number): number {
+  let total = 0;
+  let done = 0;
+  for (const w of windows) {
+    total += w.volume;
+    done += w.volume * windowProgress(w, now);
+  }
+  return total > 0 ? done / total : 0;
+}
+
 function hold(
   kind: FleetHold['kind'],
   used: number,
   capacity: number,
   reserved = 0,
-  loadingProgress = 0,
+  loadingWindows: readonly HoldWindow[] = [],
   unloading = 0,
-  unloadingProgress = 0,
+  unloadingWindows: readonly HoldWindow[] = [],
 ): FleetHold {
   const usedFraction = capacity > 0 ? clamp(used / capacity) : used > 0 ? 1 : 0;
   return {
@@ -53,9 +73,9 @@ function hold(
     used,
     capacity,
     reserved,
-    loadingProgress,
+    loadingWindows,
     unloading,
-    unloadingProgress,
+    unloadingWindows,
     free: Math.max(0, capacity - used - reserved),
     over: Math.max(0, used + reserved - capacity),
     usedFraction,
@@ -73,26 +93,27 @@ export function fleetAloftPlaces(state: GameState, fleet: Fleet, data: GameData)
   );
 }
 
+/** A timed lift as the fleet stores it (`loading` and `unloading` claims). */
+type LiftClaim = { unit: string; count: number; startAt: number; doneAt: number };
+
 /** `aloft` — places of squadrons out on a sortie (`fleetAloftPlaces`): they count as
- * shuttle places, so the troops meter never offers space the core would refuse. */
-export function fleetHolds(fleet: Fleet, data: GameData, now: number, aloft = 0): FleetHold[] {
+ * shuttle places, so the troops meter never offers space the core would refuse. The meter
+ * does not read the clock: lifts come as windows, and their progress is
+ * {@link holdProgress} at the moment the reader shows it. */
+export function fleetHolds(fleet: Fleet, data: GameData, aloft = 0): FleetHold[] {
   const capacity = sumUnitStat(fleet.units, data, 'cargoCapacity');
   const used = sumUnitStat(fleet.landing ?? [], data, 'cargoSize');
-  let reserved = 0;
-  let progressed = 0;
-  for (const claim of fleet.loading ?? []) {
-    const volume = claim.count * (data.units[claim.unit]?.stats.cargoSize ?? 1);
-    reserved += volume;
-    progressed += volume * windowProgress(claim, now);
-  }
+  const windows = (claims: readonly LiftClaim[] | undefined): HoldWindow[] =>
+    (claims ?? []).map((c) => ({
+      startAt: c.startAt,
+      doneAt: c.doneAt,
+      volume: c.count * (data.units[c.unit]?.stats.cargoSize ?? 1),
+    }));
+  const loading = windows(fleet.loading);
+  const reserved = loading.reduce((n, w) => n + w.volume, 0);
   // Выгрузка идёт по таймеру, как погрузка (MSB-9): объём ещё на борту, прогресс — тот же.
-  let leaving = 0;
-  let landed = 0;
-  for (const claim of fleet.unloading ?? []) {
-    const volume = claim.count * (data.units[claim.unit]?.stats.cargoSize ?? 1);
-    leaving += volume;
-    landed += volume * windowProgress(claim, now);
-  }
+  const unloading = windows(fleet.unloading);
+  const leaving = unloading.reduce((n, w) => n + w.volume, 0);
   const machines = hangarSize(fleet, data) + aloft;
   const meters: FleetHold[] = [];
   if (capacity > 0 || used > 0 || reserved > 0)
@@ -102,9 +123,9 @@ export function fleetHolds(fleet: Fleet, data: GameData, now: number, aloft = 0)
         used,
         Math.max(0, capacity - machines),
         reserved,
-        reserved > 0 ? progressed / reserved : 0,
+        loading,
         leaving,
-        leaving > 0 ? landed / leaving : 0,
+        unloading,
       ),
     );
   if (machines > 0) meters.push(hold('hangar', machines, fleetShuttleBay(fleet, data)));

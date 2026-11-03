@@ -58,6 +58,7 @@ import {
 } from './game';
 import { grantLeftMs, myAgents, spyCostRange } from './intel';
 import { selPlanet } from './interaction';
+import { liveTimerHtml, patchLiveTimers, type LiveFormats } from './liveTimers';
 import { dispatchChat, markUnread, pushMsg, readMessages, sessionMessages } from './messageLog';
 import { offerAffordance, offerClass, offerDisabled, offerMark } from './offerAffordance';
 import { pingRoute } from './relayIntake';
@@ -606,9 +607,13 @@ export const conversations = initConversations({
   threadDiploHtml,
 });
 
+/** Таймеры «Шпионажа» — целые часы вверх, как и до живых узлов. */
+const INTEL_LIVE: LiveFormats = { hceil: (ms) => t('fmt.hours', { n: Math.ceil(ms / HOUR) }) };
+
 /** SPY-UX (плейтест, вариант 1): весь шпионаж в одном месте — сеть агентов, активные
  *  окна интела с таймерами и сессионный журнал попыток. Агента отправляют с карточки
- *  чужого мира (SPY-8: цель шпиона — мир), вкладка ведёт к ней подсказкой. */
+ *  чужого мира (SPY-8: цель шпиона — мир), вкладка ведёт к ней подсказкой. Таймеры — живые
+ *  узлы (`liveTimers.ts`): в разметке срок, и она не меняется с часами. */
 function intelTabHtml(): string {
   const s = game.state();
   const ME = game.me();
@@ -616,11 +621,10 @@ function intelTabHtml(): string {
     .myIntel()
     .sort((a, b) => a.until - b.until)
     .map((g) => {
-      const left = Math.max(0, Math.ceil((g.until - s.time) / HOUR));
       const label = t('log.spy.what.world', { at: game.placeName(g.target) });
       return (
         `<div class="in-row" data-iw="${esc(g.target)}"><span class="in-k">🗝</span><b>${esc(label)}</b>` +
-        `<span class="in-t">⏳ ${t('fmt.hours', { n: left })}</span><span class="in-go">↪</span></div>`
+        `<span class="in-t">⏳ ${liveTimerHtml(g.until, 'hceil')}</span><span class="in-go">↪</span></div>`
       );
     })
     .join('');
@@ -631,7 +635,7 @@ function intelTabHtml(): string {
     .map((a) => {
       // SPY-11: a counter-intelligence agent is away until recalled — no countdown.
       const guard = a.op === 'counter';
-      const left = guard ? '' : `⏳ ${t('fmt.hours', { n: Math.max(0, Math.ceil((a.until - s.time) / HOUR)) })}`;
+      const left = guard ? '' : `⏳ ${liveTimerHtml(a.until, 'hceil')}`;
       const what = a.lost
         ? t('spy.agent.lost')
         : a.planetId
@@ -661,6 +665,17 @@ function intelTabHtml(): string {
     `</div>`
   );
 }
+/** Нарисованная вкладка «Шпионаж»; пусто — открыта другая. */
+let intelHtml = '';
+/** Перерисовка «Шпионажа» по таймеру (`liveWindows.ts`): вкладка пересобирается, только когда
+ *  изменилась, а отсчёты ставит живой патч. Пересборка каждые пять секунд пересоздавала
+ *  строки миров и крестик под курсором: наведение мигало, а нажатие терялось. */
+export function refreshIntelTab(): void {
+  if (!diploOpen || diploTab !== 'intel') return;
+  if (!espionageShown(game.sectorZeroToolsHidden()) || intelTabHtml() !== intelHtml) return renderDiplo();
+  const el = document.getElementById('diplo');
+  if (el) patchLiveTimers(el, game.state().time, INTEL_LIVE);
+}
 export function renderDiplo(resetRosterScroll = false): void {
   const el = document.getElementById('diplo');
   if (!el) return;
@@ -676,6 +691,7 @@ export function renderDiplo(resetRosterScroll = false): void {
       : diploTab === 'intel'
         ? intelTabHtml()
         : `<div class="dp-convo">${conversations.listHtml()}${conversations.threadHtml()}</div>`;
+  intelHtml = diploTab === 'intel' ? body : '';
   el.innerHTML =
     `<div class="dpbox">` +
     `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}${spyTab ? tabBtn('intel', t('diplo.tab.espionage')) : ''}<button class="dp-close btn-x">✕</button></div>` +
@@ -683,6 +699,7 @@ export function renderDiplo(resetRosterScroll = false): void {
     `</div>`;
   restoreUi();
   if (diploTab === 'msgs') scrollFeedToEnd();
+  if (intelHtml) patchLiveTimers(el, game.state().time, INTEL_LIVE);
 }
 /** COAL-1: после дипломатического пакета — список чатов и карточки предложений в
  *  открытой личке, не трогая поле ввода (полу-набранная реплика переживает). */

@@ -28,6 +28,7 @@ describe('SHU-6.3 — метки патрулей', () => {
         radius: 60,
         active: true,
         leftMs: 3000,
+        until: 5000,
         hold: false,
       },
     ]);
@@ -37,6 +38,7 @@ describe('SHU-6.3 — метки патрулей', () => {
     const [m] = patrolMarks([patrol({ leg: 'out' })], { me: 'p1', now: 2000 });
     expect(m?.active).toBe(false);
     expect(m?.leftMs).toBeNull();
+    expect(m?.until).toBeNull();
   });
 
   it('ОБРАТНАЯ НОГА МЕТКИ НЕ ДАЁТ: круг обещал бы прикрытие, которого уже нет', () => {

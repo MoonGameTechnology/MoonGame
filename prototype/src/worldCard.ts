@@ -51,10 +51,10 @@ import { showsBlackout, showsStarving } from './arrearsWarnings';
 import type { BuildLane } from './buildQueue';
 import { shownProductionLanes } from '../../decisions/productionLanes';
 import type { UnitCatalogTab } from './buildScreen';
-import { bombardVolleyIn } from './bombardClock';
+import { bombardVolleyAt } from './bombardClock';
 import { builtTileHtml } from './catalogTile';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
-import { buildingName, cost, countdownHMS, displayUnit, esc, fmtEta, resLine } from './format';
+import { buildingName, cost, displayUnit, esc, resLine } from './format';
 import { data } from './gameData';
 import { canOrder, ctx } from './game';
 import { fortressStatusHtml, fortressServicesHtml } from './fortressView';
@@ -70,6 +70,7 @@ import {
 import { BUILD_ICON, KIND_ICON, unitIconHtml } from './icons';
 import { myAgents, SPY_COST } from './intel';
 import { squadMerge } from './interaction';
+import { LIVE_SLOT, liveTimerHtml, liveTipAttrs } from './liveTimers';
 import { SECTOR_TYPES, type SectorType } from './map';
 import { squadronRelocateSpots } from './mapAim';
 import { known, memory, myIntel, surveyed } from './mapFog';
@@ -84,7 +85,7 @@ import {
 import { worldName } from './planetName';
 import { isGroundUnit, planetSummary } from './planetSummary';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
-import { spyOffer, windowLeftH } from './spyOffer';
+import { spyOffer } from './spyOffer';
 import {
   mergeTargets,
   squadronCallsignOf,
@@ -249,15 +250,15 @@ function patrolRowsHtml(owner: string): string {
     : { kind: 'fleet', id: owner };
   return basePatrols(patrolMarks(s.strikes, { me: ME, now: s.time }), base)
     .map((m) => {
-      const name = squadronCallsignOf(m.squadronId);
+      const name = esc(squadronCallsignOf(m.squadronId));
       const text =
-        m.leftMs !== null
-          ? t('side.wing.patrol.on', { name, left: fmtEta(m.leftMs / HOUR) })
+        m.until !== null
+          ? t('side.wing.patrol.on', { name, left: liveTimerHtml(m.until) })
           : t('side.wing.patrol.out', { name });
       // «Держать патруль» стоит у САМОГО патруля, а не у базы: удержание принадлежит
       // вылету и уходит с ним, и с одной базы могут висеть два патруля в разных точках.
       const keep = m.hold ? t('side.wing.keep.off') : t('side.wing.keep');
-      return `<div class="row"><span class="dim">${esc(text)}</span> ${btn('wingkeep', m.id, keep, true)} ${btn('wingrecall', m.id, t('side.wing.recall'), true)}</div>`;
+      return `<div class="row"><span class="dim">${text}</span> ${btn('wingkeep', m.id, keep, true)} ${btn('wingrecall', m.id, t('side.wing.recall'), true)}</div>`;
     })
     .join('');
 }
@@ -493,10 +494,9 @@ function worldFactHtml(f: WorldFact): string {
       return `<span class="pfact bad">⚡ ${t('side.world.blackout')}</span>`;
     case 'bombard': {
       // Знак и время на фишке, слова — в подсказке: шапка узкая, а на телефоне фишка
-      // делит строку с действиями мира.
-      const left = countdownHMS(f.leftMs);
-      const tip = esc(t('side.world.bombard-next', { t: left }));
-      return `<span class="pfact bad" title="${tip}" aria-label="${tip}">⊗ ${left}</span>`;
+      // делит строку с действиями мира. Отсчёт — живой узел, как и время в подсказке.
+      const tip = liveTipAttrs(f.at, 'hms', t('side.world.bombard-next', { t: LIVE_SLOT }));
+      return `<span class="pfact bad pn-tip"${tip}>⊗ ${liveTimerHtml(f.at, 'hms')}</span>`;
     }
     case 'type': {
       const parts: string[] = [];
@@ -580,7 +580,7 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
     if (spy === 'window' && live && live.layer !== undefined) out.push(...intelRowsHtml(live));
     else if (spy === 'window' && live) {
       out.push(
-        `<span class="pfact cyan">${t('side.world.spy-window')} ${t('side.world.spy-window.left', { left: fmtEta(windowLeftH(live.until, s.time, HOUR)) })}</span>`,
+        `<span class="pfact cyan">${t('side.world.spy-window')} ${t('side.world.spy-window.left', { left: liveTimerHtml(live.until) })}</span>`,
       );
     } else if (spy !== 'none') {
       out.push(btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spy === 'buy'));
@@ -590,7 +590,7 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
       for (const op of HOSTILE_OPS) out.push(btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), ready(op)));
     // SPY-15: the owner sees its own world's economy sabotaged and for how long.
     if (mine && (p.disruptedUntil ?? 0) > s.time)
-      out.push(`<span class="pfact">${t('side.world.disrupted', { left: fmtEta(windowLeftH(p.disruptedUntil!, s.time, HOUR)) })}</span>`);
+      out.push(`<span class="pfact">${t('side.world.disrupted', { left: liveTimerHtml(p.disruptedUntil!) })}</span>`);
     // SPY-11: a guard for any owned world, your own too; posted or en route → «Отозвать».
     const guard = myAgents(s, ME).away.some((a) => a.op === 'counter' && a.planetId === p.id);
     if (p.owner && guard) out.push(btn('spyrecall', '', t('side.scan.recall'), true));
@@ -755,8 +755,8 @@ export function planetPanelHtml(p: Planet): string {
       Object.values(s.match.capitalObjectives ?? {}).some((target) => target.planetId === p.id),
     // ECON-2: блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
     blackout: showsBlackout(mine, s.players[ME]?.arrears),
-    // Таймер обстрела: через сколько следующий залп (`decisions/bombardTimer.ts`).
-    bombardIn: bombardVolleyIn(s, p.id, ME),
+    // Таймер обстрела: когда следующий залп (`decisions/bombardTimer.ts`).
+    bombardAt: bombardVolleyAt(s, p.id, ME),
     bonuses: sm.bonuses,
     mitigation: sm.mitigation,
     baseOutput: sm.baseOutput,

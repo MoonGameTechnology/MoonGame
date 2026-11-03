@@ -22,6 +22,7 @@ import { DAY, HOUR } from './time';
 import { runClockShown } from './format';
 import { runClockText } from '../../decisions/runClock';
 import { worldName } from './planetName';
+import { liveSinceHtml, liveTimerHtml, patchLiveTimers, type LiveFormats } from './liveTimers';
 
 /** Game-hours a single delegation can run — the three offered buttons. */
 const STEW_DURATIONS = [4, 8, 12];
@@ -56,6 +57,9 @@ export function stewFmtDur(ms: number): string {
   const m = t('fmt.minutes', { n: h > 0 ? mins % 60 : mins });
   return h > 0 ? `${t('fmt.hours', { n: h })} ${m}` : m;
 }
+
+/** Живые сроки окна (`liveTimers.ts`) — в словах вахты, {@link stewFmtDur}. */
+const STEW_LIVE: LiveFormats = { dur: stewFmtDur };
 
 /** Is the Steward unlocked? Researched in the «Командование» branch (day 15, scientist
  *  Куратор) — the side panel gates its hold-point control on the same answer. */
@@ -117,7 +121,7 @@ export function stewLogHtml(state: GameState, me: string): string {
     .slice(0, 12)
     .map(
       (e) =>
-        `<div class="st-log-line"><span class="st-log-when">${t('steward.log.ago', { dur: stewFmtDur(Math.max(0, state.time - (e.at ?? 0))) })}</span> ${stewLogLine(e, (id) => worldName(state, id))}</div>`,
+        `<div class="st-log-line"><span class="st-log-when">${t('steward.log.ago', { dur: liveSinceHtml(e.at ?? 0, 'dur') })}</span> ${stewLogLine(e, (id) => worldName(state, id))}</div>`,
     )
     .join('');
   return `<div class="st-h">${t('steward.log.title')}</div><div class="st-log">${lines}</div>`;
@@ -137,7 +141,7 @@ export function stewardBodyHtml(
   if (posture && cur) {
     html +=
       `<div class="st-status on">🤖 <b>${posture === 'active_defend' ? t('steward.on.active') : t('steward.on.defense')}</b><br>` +
-      t('steward.on.returns', { dur: stewFmtDur(cur.until - state.time) }) +
+      t('steward.on.returns', { dur: liveTimerHtml(cur.until, 'dur') }) +
       `<br>` +
       `${posture === 'active_defend' ? t('steward.on.active.note') : t('steward.on.defense.note')}</div>` +
       `<div class="st-row"><button class="st-btn warn" data-stew="recall">${t('steward.take-back')}</button></div>` +
@@ -206,8 +210,14 @@ export function initSteward(host: StewardHost): {
   let planned: StewardPosture = 'defend';
 
   const isOpen = (): boolean => host.root().classList.contains('show');
+  // Окно живёт кадром (полсекунды): разметку переприсваиваем, только когда она сменилась, а
+  // сроки вахты и журнала ставят живые узлы. Раньше тело пересобиралось каждый раз целиком, и
+  // кнопки под курсором мигали дважды в секунду.
+  let lastHtml = '';
   const repaint = (): void => {
-    host.body().innerHTML = stewardBodyHtml(host.state(), host.me(), planned);
+    const html = stewardBodyHtml(host.state(), host.me(), planned);
+    if (html !== lastHtml) host.body().innerHTML = lastHtml = html;
+    patchLiveTimers(host.body(), host.state().time, STEW_LIVE);
   };
 
   host.root().addEventListener('click', (e) => {

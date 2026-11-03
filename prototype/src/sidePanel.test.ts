@@ -632,7 +632,7 @@ describe('REFM-225 — лист, кэш и живые сроки', () => {
       `<div class="conv-fill" data-at="${now + 4 * game.HOUR}" data-dur="${4 * game.HOUR}"></div>` +
         `<span class="conv-time" data-at="${now + 4 * game.HOUR}"></span>` +
         `<span class="pn-eta" data-arrive="${now + 3 * game.HOUR}" data-rest="2"></span>` +
-        `<span class="pn-timer" data-at="900"></span>`,
+        `<span class="pn-timer" data-at="${now + 2 * game.HOUR}"></span>`,
     );
     const live = () => [
       node('.conv-fill').style.width,
@@ -644,7 +644,8 @@ describe('REFM-225 — лист, кэш и живые сроки', () => {
       `${barPct(now + 4 * game.HOUR, 4 * game.HOUR, time).toFixed(0)}%`,
       `T${now + 4 * game.HOUR}`,
       fmtEta(arrivalHours(now + 3 * game.HOUR, time, game.HOUR, 2)),
-      'T900',
+      // `.pn-timer` — общий живой отсчёт (`liveTimers.ts`), формат по умолчанию — `fmtEta`
+      fmtEta((now + 2 * game.HOUR - time) / game.HOUR),
     ];
     expect(live()).toEqual(at(now));
     env.world = { ...env.world, time: now + game.HOUR };

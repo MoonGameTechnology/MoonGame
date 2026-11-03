@@ -6,8 +6,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { FleetHold } from '../../decisions/fleetHolds';
+import { t } from '../../localization/runtime';
 import { FLEET_COUNT_FONT } from '../../packages/client/src/fleetCountBadge';
-import { drawFleetHoldBadge } from './fleetHoldView';
+import { drawFleetHoldBadge, fleetHoldsHtml } from './fleetHoldView';
+import { liveText, plainText } from './liveTimers.fixture';
 import { VETERAN_GOLD } from './veteranChevrons';
 
 interface Call {
@@ -58,9 +60,9 @@ const hold = (over: Partial<FleetHold> = {}): FleetHold => ({
   over: 0,
   usedFraction: 0.5,
   reservedFraction: 0,
-  loadingProgress: 0,
+  loadingWindows: [],
   unloading: 0,
-  unloadingProgress: 0,
+  unloadingWindows: [],
   ...over,
 });
 
@@ -90,5 +92,28 @@ describe('бейдж флота на карте', () => {
     const figure = calls.find((c) => c.name === 'fillText' && c.args[0] === '2/4')!;
     expect(figure.font).toBe('600 10px ui-monospace,Menlo,monospace');
     expect(props.font).toBe(FLEET_COUNT_FONT);
+  });
+});
+
+describe('шкала трюма в листе флота', () => {
+  it('доля погрузки и выгрузки — живой узел: в разметке окна подъёмов, проценты ставит патч', () => {
+    const html = fleetHoldsHtml([
+      hold({
+        reserved: 2,
+        loadingWindows: [
+          { startAt: 0, doneAt: 100, volume: 1 },
+          { startAt: 0, doneAt: 200, volume: 1 },
+        ],
+        unloading: 1,
+        unloadingWindows: [{ startAt: 100, doneAt: 300, volume: 1 }],
+      }),
+    ]);
+    // Цифр в разметке нет: лист сравнивает её строкой, и процент пересобирал бы его с кнопками.
+    const seen = (now: number): string => liveText(html, now);
+    expect(plainText(html)).toContain(t('cargo.meter.loading', { n: 2, p: '…' }));
+    expect(seen(100)).toContain(t('cargo.meter.loading', { n: 2, p: 75 }));
+    expect(seen(100)).toContain(t('cargo.meter.unloading', { n: 1, p: 0 }));
+    expect(seen(200)).toContain(t('cargo.meter.loading', { n: 2, p: 100 }));
+    expect(seen(200)).toContain(t('cargo.meter.unloading', { n: 1, p: 50 }));
   });
 });

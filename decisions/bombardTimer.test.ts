@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bombardTimerShown, nextVolleyIn } from './bombardTimer';
+import { bombardTimerShown, nextVolleyAt, nextVolleyIn } from './bombardTimer';
 
 const HOUR = 3_600_000;
 
@@ -14,6 +14,11 @@ describe('таймер бомбардировки — через сколько 
     expect(nextVolleyIn([undefined], 0)).toBeNull();
     expect(nextVolleyIn([], 0)).toBeNull();
     expect(nextVolleyIn([Number.NaN], 0)).toBeNull();
+  });
+
+  it('срок — ближайшие часы как есть: окно пишет его в разметку, и он не меняется с часами', () => {
+    expect(nextVolleyAt([3 * HOUR, undefined, 2 * HOUR + 5_000])).toBe(2 * HOUR + 5_000);
+    expect(nextVolleyAt([undefined, Number.NaN])).toBeNull();
   });
 
   it('отсчёт не уходит в минус', () => {
