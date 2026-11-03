@@ -1349,6 +1349,8 @@ export const pl: Record<string, string> = {
   'corp.combat.closed': 'Zamknięte',
   'corp.combat.corp-ready': 'Gotowość korporacji',
   'corp.combat.decline': 'Odrzuć',
+  'corp.combat.attention': 'Bitwa wymaga twojej uwagi',
+  'corp.combat.withdraw': 'Wycofaj',
   'corp.combat.declined': 'Odrzucono',
   'corp.combat.disabled': 'Bitwy korporacji są na tym serwerze na razie niedostępne.',
   'corp.combat.domination-goal': 'Do zwycięstwa terytorialnego potrzeba {n}% sektorów.',

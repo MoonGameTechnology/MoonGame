@@ -435,7 +435,7 @@ export interface AvaChallengeStore {
   challengesOf(corpId: string, limit?: number): Promise<AvaChallenge[]>;
   /** Atomic pending→terminal transition. False = the row was NOT pending (already
    *  closed, or missing) and NOTHING changed — the caller must not refund twice. */
-  closeChallenge(id: string, status: 'accepted' | 'declined' | 'expired'): Promise<boolean>;
+  closeChallenge(id: string, status: 'accepted' | 'declined' | 'expired' | 'cancelled'): Promise<boolean>;
   /** Pending challenges whose expiry is due at `now` (for the sweep). */
   duePending(now: number): Promise<AvaChallenge[]>;
   /** AVA-6: stamp the roster window deadline on an ACCEPTED matchup (right after the

@@ -35,6 +35,8 @@ export interface CorpBattlesPaint {
   busy: boolean;
   now: number;
   canPlay: boolean;
+  /** Red markers on the inner tabs (`battleAttention`). */
+  attention?: { now: number; challenges: number };
 }
 const TABS: Record<CorpBattleTab, string> = {
   now: 'corp.combat.tab.now',
@@ -183,6 +185,11 @@ function nowView(p: CorpBattlesPaint): string {
     })
     .join('');
 }
+/** The red marker of a tab that waits on this member, like the news button's. */
+function alertDot(p: CorpBattlesPaint, tab: CorpBattleTab): string {
+  const n = tab === 'now' || tab === 'challenges' ? (p.attention?.[tab] ?? 0) : 0;
+  return n ? `<i class="cb-alert" role="img" aria-label="${esc(t('corp.combat.attention'))}"></i>` : '';
+}
 function challengesView(p: CorpBattlesPaint): string {
   const groups = challengeGroups(p.view!.challenges, p.corp.corpId);
   const groupLabels = {
@@ -207,6 +214,9 @@ function challengesView(p: CorpBattlesPaint): string {
                     : `<p class="cb-battle-hint">${esc(t('corp.combat.expires', { date: date(c.expiresAt) }))}</p>`) +
                   (group === 'incoming' && p.me.role === 'head'
                     ? `<div class="cb-battle-actions">${button('ava-accept', c.id, t('corp.combat.accept'), p.busy || expired)}${button('ava-decline', c.id, t('corp.combat.decline'), p.busy || expired)}</div>`
+                    : '') +
+                  (group === 'outgoing' && p.me.role === 'head'
+                    ? `<div class="cb-battle-actions">${button('ava-withdraw', c.id, t('corp.combat.withdraw'), p.busy || expired)}</div>`
                     : '') +
                   (group === 'incoming' && p.me.role !== 'head'
                     ? hint('corp.combat.head-only')
@@ -354,7 +364,7 @@ export function corpBattlesViewHtml(p: CorpBattlesPaint): string {
     `<div class="cb-battle-tabs" role="tablist" aria-label="${esc(t('corp.combat.tabs'))}">` +
     CORP_BATTLE_TABS.map(
       (tab) =>
-        `<button type="button" role="tab" id="cb-battle-tab-${tab}" aria-controls="cb-battle-panel" tabindex="${tab === p.tab ? 0 : -1}" data-battletab="${tab}" aria-selected="${tab === p.tab}" class="${tab === p.tab ? 'on' : ''}">${esc(t(TABS[tab]))}${counts[tab] ? `<small>${counts[tab]}</small>` : ''}</button>`,
+        `<button type="button" role="tab" id="cb-battle-tab-${tab}" aria-controls="cb-battle-panel" tabindex="${tab === p.tab ? 0 : -1}" data-battletab="${tab}" aria-selected="${tab === p.tab}" class="${tab === p.tab ? 'on' : ''}">${esc(t(TABS[tab]))}${counts[tab] ? `<small>${counts[tab]}</small>` : ''}${alertDot(p, tab)}</button>`,
     ).join('') +
     `</div>`;
   const views: Record<CorpBattleTab, (p: CorpBattlesPaint) => string> = {

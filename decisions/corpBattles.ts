@@ -218,6 +218,35 @@ export function battlePhase(
   if (c.status === 'accepted') return 'roster';
   return war?.phase === 'ended' ? 'settling' : (war?.phase ?? 'preparing');
 }
+/** What in «Битвы» waits on this member — the red markers on the hub button, the
+ *  section tab and the inner tabs. `now`: a battle forming that I have not joined, or a
+ *  battle under way that I hold a seat in (or whose roster is not read yet). `challenges`:
+ *  incoming calls, which only the head answers. An expired call needs nobody. */
+export function battleAttention(p: {
+  challenges: readonly CorpBattleChallenge[];
+  corpId: string;
+  accountId: string;
+  head: boolean;
+  rosters: Readonly<Record<string, { mine: ReadonlyArray<{ accountId: string }> } | null>>;
+  now: number;
+}): { now: number; challenges: number } {
+  const seated = (id: string): boolean | null => {
+    const roster = p.rosters[id];
+    return roster ? roster.mine.some((s) => s.accountId === p.accountId) : null;
+  };
+  const now = p.challenges.filter((c) => {
+    if (c.challengerCorp !== p.corpId && c.targetCorp !== p.corpId) return false;
+    if (c.status === 'accepted')
+      return (c.pauseEndsAt ?? Infinity) > p.now && seated(c.id) !== true;
+    return c.status === 'locked' && seated(c.id) !== false;
+  }).length;
+  const challenges = p.head
+    ? p.challenges.filter(
+        (c) => c.status === 'pending' && c.targetCorp === p.corpId && c.expiresAt > p.now,
+      ).length
+    : 0;
+  return { now, challenges };
+}
 export function challengeGroups(
   rows: readonly CorpBattleChallenge[],
   corpId: string,
@@ -323,4 +352,14 @@ export function opponentOffer(p: {
   if (!f) return { kind: 'format' };
   if (p.influence < f.cost) return { kind: 'influence' };
   return { kind: 'challenge', format: f.format, cost: f.cost };
+}
+
+/** The server route of a body-less battle button (`data-corpact`), or null for any other
+ *  action: `ready-*` toggles the pools, the challenge verbs and `ava-join` act on the
+ *  challenge or matchup `arg`. */
+export function battlePostPath(act: string, arg: string): string | null {
+  if (/^ready-(corp|player)(-clear)?$/.test(act)) return `/ava/${act.replace(/-/g, '/')}`;
+  const verb = /^ava-(accept|decline|withdraw)$/.exec(act)?.[1];
+  if (verb) return `/ava/challenge/${encodeURIComponent(arg)}/${verb}`;
+  return act === 'ava-join' ? `/ava/matchup/${encodeURIComponent(arg)}/join` : null;
 }

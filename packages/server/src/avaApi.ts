@@ -18,6 +18,7 @@ import { slidingWindowIpLimiter } from './rateLimit';
  *   POST /ava/challenge     {target, format?}  challenge a ready corp (head; spends influence)
  *   POST /ava/challenge/:id/accept     accept → S2 matchup (target head)
  *   POST /ava/challenge/:id/decline    decline → refund (target head)
+ *   POST /ava/challenge/:id/withdraw   withdraw an unanswered challenge → refund (challenger head)
  *   GET  /ava/matchup/:id              my side's roster + both headcounts (AVA-6)
  *   POST /ava/matchup/:id/roster       {players[]} curate my side (head/officer)
  *   POST /ava/matchup/:id/join         self-enroll during the pause window (member)
@@ -189,6 +190,15 @@ export function registerAvaApi(app: FastifyInstance, deps: AvaApiDeps): void {
     if (!who) return { error: 'E_AUTH' as const };
     const { id } = request.params as { id: string };
     const result = await service.decline(who, id);
+    if (!result.ok) return failed(reply, result.code);
+    return result;
+  });
+
+  app.post('/ava/challenge/:id/withdraw', async (request, reply) => {
+    const who = await guardedWrite(request, reply);
+    if (!who) return { error: 'E_AUTH' as const };
+    const { id } = request.params as { id: string };
+    const result = await service.withdraw(who, id);
     if (!result.ok) return failed(reply, result.code);
     return result;
   });

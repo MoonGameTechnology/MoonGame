@@ -287,6 +287,28 @@ describe('AVA · readiness + challenge API', () => {
     await app.close();
   });
 
+  it('the challenger head withdraws an unanswered challenge over HTTP; the target cannot', async () => {
+    const { app, corpB } = await harness();
+    await app.inject({ method: 'POST', url: '/ava/ready/corp', headers: as('alice') });
+    await app.inject({ method: 'POST', url: '/ava/ready/corp', headers: as('bob') });
+    const challenge = await app.inject({
+      method: 'POST',
+      url: '/ava/challenge',
+      headers: as('alice'),
+      payload: { target: corpB },
+    });
+    const { id } = challenge.json() as { id: string };
+    const bob = await app.inject({ method: 'POST', url: `/ava/challenge/${id}/withdraw`, headers: as('bob') });
+    expect(bob.statusCode).toBe(403);
+    const alice = await app.inject({ method: 'POST', url: `/ava/challenge/${id}/withdraw`, headers: as('alice') });
+    expect(alice.statusCode).toBe(200);
+    const again = await app.inject({ method: 'POST', url: `/ava/challenge/${id}/withdraw`, headers: as('alice') });
+    expect(again.statusCode).toBe(409);
+    const tab = await app.inject({ method: 'GET', url: '/ava/battles', headers: as('alice') });
+    expect(tab.json()).toMatchObject({ challenges: [{ id, status: 'cancelled' }] });
+    await app.close();
+  });
+
   it('the battles tab over HTTP (CORP-9): a closed challenge stays listed, members only', async () => {
     const { app, corpB } = await harness();
     await app.inject({ method: 'POST', url: '/ava/ready/corp', headers: as('alice') });

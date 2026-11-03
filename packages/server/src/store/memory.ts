@@ -712,7 +712,7 @@ export class MemoryAvaChallengeStore implements AvaChallengeStore {
     return Promise.resolve(mine.slice(0, limit).map((r) => ({ ...r })));
   }
 
-  closeChallenge(id: string, status: 'accepted' | 'declined' | 'expired'): Promise<boolean> {
+  closeChallenge(id: string, status: 'accepted' | 'declined' | 'expired' | 'cancelled'): Promise<boolean> {
     const row = this.rows.get(id);
     if (!row || row.status !== 'pending') return Promise.resolve(false);
     row.status = status;

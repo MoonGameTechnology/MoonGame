@@ -333,6 +333,18 @@ export class AvaService {
     return { ok: true };
   }
 
+  /** withdraw — the challenger's head takes back a challenge the target has not answered
+   *  → cancelled and refunded in full. The pending→cancelled close is the same
+   *  exactly-once gate as decline: a withdraw racing an accept or an expiry loses cleanly. */
+  async withdraw(who: CorpActor, challengeId: string): Promise<{ ok: true } | AvaFail> {
+    const gate = await this.challengePartyGate(who, challengeId, 'challenger');
+    if (!gate.ok) return gate;
+    const closed = await this.challenges.closeChallenge(challengeId, 'cancelled');
+    if (!closed) return { ok: false, code: 'E_CHALLENGE_CLOSED' };
+    await this.refund(gate.challenge);
+    return { ok: true };
+  }
+
   /** Expiry sweep — closes+refunds every due pending challenge. No client needed. */
   async sweepExpired(now = this.now()): Promise<number> {
     const due = await this.challenges.duePending(now);

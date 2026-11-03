@@ -294,11 +294,16 @@ try {
       await page.locator('#medal-rewards[open]').waitFor();
       await page.click('#medal-rewards [data-mreward="ok"]');
       await page.locator('#medal-rewards').waitFor({ state: 'hidden' });
+      // Bravo holds a seat in a running battle: the red marker is on «Корпорация» before the
+      // tab is opened, then on «Битвы» and on «Текущие».
+      await page.locator('.hub-tab[data-hub="corp"].has-news').waitFor();
       await page.click('[data-hub="corp"]');
       if (await page.locator('#intro').isVisible()) await page.click('#intro .in-ok');
+      await page.locator('[data-corpsec="battles"] small').waitFor();
       await page.click('[data-corpsec="battles"]');
       if (await page.locator('#intro').isVisible()) await page.click('#intro .in-ok');
       await page.locator('[data-battletab="now"]').waitFor();
+      await page.locator('[data-battletab="now"] .cb-alert').waitFor();
       for (const width of [390, 1280]) {
         await page.setViewportSize({ width, height: 844 });
         for (const tab of ['challenges', 'opponents', 'history', 'ready', 'now']) {

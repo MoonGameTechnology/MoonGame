@@ -1464,6 +1464,8 @@ export const ru: Record<string, string> = {
   'corp.combat.closed': 'Закрытые',
   'corp.combat.corp-ready': 'Готовность корпорации',
   'corp.combat.decline': 'Отклонить',
+  'corp.combat.attention': 'Битва ждёт вашего внимания',
+  'corp.combat.withdraw': 'Отозвать',
   'corp.combat.declined': 'Отклонён',
   'corp.combat.disabled': 'Битвы корпораций на этом сервере пока недоступны.',
   'corp.combat.domination-goal': 'Для победы по территории нужно {n}% секторов.',

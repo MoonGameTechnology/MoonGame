@@ -1847,7 +1847,7 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
     return r.rows.map(challengeOf);
   }
 
-  async closeChallenge(id: string, status: 'accepted' | 'declined' | 'expired'): Promise<boolean> {
+  async closeChallenge(id: string, status: 'accepted' | 'declined' | 'expired' | 'cancelled'): Promise<boolean> {
     // Only a still-pending row transitions — so a lost double-accept race changes
     // nothing and the caller (which keys the refund off this) can't double-refund.
     const r = await this.pool.query(

@@ -1347,6 +1347,8 @@ export const de: Record<string, string> = {
   'corp.combat.closed': 'Geschlossen',
   'corp.combat.corp-ready': 'Korporationsbereitschaft',
   'corp.combat.decline': 'Ablehnen',
+  'corp.combat.attention': 'Eine Schlacht braucht deine Aufmerksamkeit',
+  'corp.combat.withdraw': 'Zurückziehen',
   'corp.combat.declined': 'Abgelehnt',
   'corp.combat.disabled': 'Korporationsschlachten sind auf diesem Server nicht verfügbar.',
   'corp.combat.domination-goal': 'Für einen territorialen Sieg sind {n}% der Sektoren erforderlich.',

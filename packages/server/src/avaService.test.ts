@@ -161,6 +161,37 @@ describe('AvaService — challenge S0→S2 (AVA-4)', () => {
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(500); // fully refunded
   });
 
+  it('the challenger head withdraws an unanswered challenge and gets the full refund', async () => {
+    const f = await fixture();
+    await ready(f);
+    const ch = await f.ava.challenge(A_HEAD, f.corpB);
+    if (!ch.ok) throw new Error('challenge failed');
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(400);
+    // Only the challenger's head: not the target, not a plain member.
+    expect(await f.ava.withdraw(B_HEAD, ch.id)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+    expect(await f.ava.withdraw(A_MEMBER, ch.id)).toEqual({ ok: false, code: 'E_FORBIDDEN' });
+    expect(await f.ava.withdraw(A_HEAD, ch.id)).toEqual({ ok: true });
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(500);
+    expect((await f.ava.challengesFor(A_HEAD))[0]).toMatchObject({ status: 'cancelled' });
+    // Closed once: a second withdraw, an accept or the expiry sweep refund nothing more.
+    expect(await f.ava.withdraw(A_HEAD, ch.id)).toEqual({ ok: false, code: 'E_CHALLENGE_CLOSED' });
+    expect(await f.ava.accept(B_HEAD, ch.id)).toEqual({ ok: false, code: 'E_CHALLENGE_CLOSED' });
+    expect(await f.ava.sweepExpired(1_000_000)).toBe(0);
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(500);
+    // The pair is free again.
+    expect(await f.ava.challenge(A_HEAD, f.corpB)).toMatchObject({ ok: true });
+  });
+
+  it('an accepted challenge can no longer be withdrawn', async () => {
+    const f = await fixture();
+    await ready(f);
+    const ch = await f.ava.challenge(A_HEAD, f.corpB);
+    if (!ch.ok) throw new Error('challenge failed');
+    expect(await f.ava.accept(B_HEAD, ch.id)).toEqual({ ok: true });
+    expect(await f.ava.withdraw(A_HEAD, ch.id)).toEqual({ ok: false, code: 'E_CHALLENGE_CLOSED' });
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(400);
+  });
+
   it.each([{ format: 2, days: 5, remaining: 20 }, { format: 3, days: 7, remaining: 18 }])(
     'settles building income before charging a base $format-on-$format challenge',
     async ({ format, days, remaining }) => {

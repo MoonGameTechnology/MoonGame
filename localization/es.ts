@@ -1349,6 +1349,8 @@ export const es: Record<string, string> = {
   'corp.combat.closed': 'Cerrados',
   'corp.combat.corp-ready': 'Preparación corporativa',
   'corp.combat.decline': 'Rechazar',
+  'corp.combat.attention': 'Una batalla requiere tu atención',
+  'corp.combat.withdraw': 'Retirar',
   'corp.combat.declined': 'Rechazado',
   'corp.combat.disabled': 'Las batallas corporativas no están disponibles en este servidor por ahora.',
   'corp.combat.domination-goal': 'Para la victoria territorial se requiere el {n}% de los sectores.',

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  battlePostPath,
+  battleAttention,
   battlePhase,
   battleStats,
   challengeGroups,
@@ -177,5 +179,51 @@ describe('corporation battle decisions', () => {
     ]);
     expect(parseCorpWar({ ...war, scoreGoal: 0 }, 'm')).toBeNull();
     expect(parseCorpWar(war, 'different')).toBeNull();
+  });
+
+  it('marks what waits on the member: a forming battle to join, a seat in a running one, a call to answer', () => {
+    const base = { corpId: 'a', accountId: 'me', head: false, now: 10 };
+    const forming = { ...challenge, id: 'f' };
+    const running = { ...challenge, id: 'r', status: 'locked' as const };
+    const call = {
+      ...challenge,
+      id: 'c',
+      status: 'pending' as const,
+      challengerCorp: 'z',
+      targetCorp: 'a',
+    };
+    const rows = [forming, running, call];
+    // Rosters not read yet: both battles count, the call only for the head.
+    expect(battleAttention({ ...base, challenges: rows, rosters: {} })).toEqual({
+      now: 2,
+      challenges: 0,
+    });
+    expect(battleAttention({ ...base, head: true, challenges: rows, rosters: {} })).toEqual({
+      now: 2,
+      challenges: 1,
+    });
+    // Joined the forming one, no seat in the running one: nothing left to do.
+    const joined = { f: { mine: [{ accountId: 'me' }] }, r: { mine: [{ accountId: 'x' }] } };
+    expect(battleAttention({ ...base, challenges: rows, rosters: joined })).toEqual({
+      now: 0,
+      challenges: 0,
+    });
+    // A closed roster window and an expired call need nobody.
+    expect(
+      battleAttention({ ...base, head: true, now: 60, challenges: [forming, call], rosters: {} }),
+    ).toEqual({ now: 0, challenges: 0 });
+  });
+});
+
+describe('battlePostPath — маршрут кнопки битвы без тела', () => {
+  it('готовность, ответ на вызов и вход в состав', () => {
+    expect(battlePostPath('ready-corp', '')).toBe('/ava/ready/corp');
+    expect(battlePostPath('ready-player-clear', '')).toBe('/ava/ready/player/clear');
+    expect(battlePostPath('ava-withdraw', 'c/1')).toBe('/ava/challenge/c%2F1/withdraw');
+    expect(battlePostPath('ava-join', 'm1')).toBe('/ava/matchup/m1/join');
+  });
+  it('прочие действия — не его', () => {
+    expect(battlePostPath('ava-challenge', 'x')).toBeNull();
+    expect(battlePostPath('ready-x', '')).toBeNull();
   });
 });
