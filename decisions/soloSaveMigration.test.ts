@@ -29,6 +29,7 @@ import {
   MODULE_PROGRESSION_SOLO_MIGRATION as moduleProgression,
   ARMY_SELECTION_SOLO_MIGRATION as armySelection,
   CAPITAL_VICTORY_SOLO_MIGRATION as capitalVictory,
+  SPY_DEVELOPMENT_SOLO_MIGRATION as spyDevelopment,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -174,7 +175,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -543,4 +544,13 @@ it('preserves the released echelon save through module snapshots and exact army 
   const raw = serializeSoloSave(before, echelons.toRules);
   expect(parseCompatibleSoloSave(raw, armySelection.toRules)).toEqual(before);
   expect(parseSoloSave(raw, echelons.toRules)).toEqual(before);
+});
+
+describe('the rules-only theft by development pair (0.1.76 → 0.1.76)', () => {
+  it('reads a save of the capital victory release under the new rules unchanged', () => {
+    const before = oldSave();
+    before.state.version = { data: spyDevelopment.fromData, dataHash: spyDevelopment.fromDataHash, manifest: '1' };
+    const raw = serializeSoloSave(before, spyDevelopment.fromRules);
+    expect(parseCompatibleSoloSave(raw, spyDevelopment.toRules)).toEqual(before);
+  });
 });

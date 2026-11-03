@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
-import { espionageModule, MISSION_HOURS, SPY_OP_COST, THEFT_CAP } from './espionage';
+import {
+  BASE_CHANCE,
+  DEVELOPMENT_CHANCE_BONUS,
+  developmentShare,
+  espionageModule,
+  MISSION_HOURS,
+  SPY_OP_COST,
+  THEFT_CAP,
+} from './espionage';
 import { constructionModule } from './construction';
 import { technologyModule } from './technology';
 import { economyModule } from './economy';
@@ -23,6 +31,9 @@ const data: GameData = parseGameData({
     mine: { name: 'Mine', cost: {}, hp: 100, produces: { metal: 10 } },
     farm: { name: 'Farm', cost: {}, hp: 200 },
     beacon: { name: 'Beacon', cost: {} }, // no modelled HP — sabotage can't touch it
+    // SPY-21: development points come from price and build time — 200/20 + 10 = 20 a level.
+    citadel: { name: 'Citadel', cost: { metal: 200 }, buildTimeHours: 10 },
+    bureau: { name: 'Bureau', cost: { metal: 200 }, buildTimeHours: 10, spyDetectBonus: 0.1 },
   },
   events: {},
   technologies: {
@@ -308,9 +319,17 @@ describe('SPY-15 — economic sabotage', () => {
   });
 });
 
+/** The victim also owns a built-up world elsewhere, so B — with nothing of worth on it —
+ *  is its least developed one and the theft gets no development bonus (SPY-21). */
+function outskirts(): GameState {
+  const s = baseState();
+  s.planets.C = planet('C', 'p2', [{ uid: 'c1', type: 'citadel', level: 1, hp: 0 }], 10_000);
+  return s;
+}
+
 describe('SPY-9 — resource theft', () => {
   it('moves 5–15% of one held resource from the owner to the spy', () => {
-    const { state, events } = run('theft', [sure, unseen, spared]);
+    const { state, events } = run('theft', [sure, unseen, spared], outskirts());
     const loot = (ofType(events, 'espionage.succeeded')[0]!.payload as {
       loot: { resource: string; amount: number };
     }).loot;
@@ -324,7 +343,7 @@ describe('SPY-9 — resource theft', () => {
   });
 
   it('one theft carries at most 500', () => {
-    const rich = baseState();
+    const rich = outskirts();
     rich.players.p2!.resources = { credits: 1_000_000 };
     const { events } = run('theft', [sure, unseen, spared], rich);
     const loot = (ofType(events, 'espionage.succeeded')[0]!.payload as { loot: { amount: number } }).loot;
@@ -424,7 +443,7 @@ describe('SPY-17 — up to three agents on one world', () => {
   });
 
   it('two agents: +0.1 to success and to detection for each', () => {
-    const { seen, sent } = wave(['sabotage', 'theft']);
+    const { seen, sent } = wave(['sabotage', 'disrupt']);
     expect(sent.scheduled.map((e) => (e.payload as { crew?: number }).crew)).toEqual([2, 2]);
     for (const c of seen.chance) expect(c).toBeCloseTo(0.7, 9);
     // detection base after a success (0.25) or a failure (0.5), plus the crew bonus
@@ -432,7 +451,7 @@ describe('SPY-17 — up to three agents on one world', () => {
   });
 
   it('three agents: +0.2 to both', () => {
-    const { seen } = wave(['sabotage', 'theft', 'delay']);
+    const { seen } = wave(['sabotage', 'disrupt', 'delay']);
     expect(seen.chance).toHaveLength(3);
     for (const c of seen.chance) expect(c).toBeCloseTo(0.8, 9);
     for (const d of seen.detect) expect([0.45, 0.7].some((x) => Math.abs(x - d) < 1e-9)).toBe(true);
@@ -458,5 +477,73 @@ describe('SPY-17 — up to three agents on one world', () => {
     const r = k4.applyAction(s, spy('research'), ctx(0));
     expect(r.ok ? null : r.code).toBe('E_BAD_TARGET');
     expect(k.applyAction(s, spy('research'), ctx(0)).ok).toBe(false);
+  });
+});
+
+describe('SPY-21 — theft odds and loot follow the world development', () => {
+  const lvl = (type: string, level: number, uid: string) => ({ uid, type, level, hp: 0 });
+  /** p2 owns B (one citadel, 20 points) and C (`cCitadels` citadels, 20 each). */
+  function civ(cCitadels: number): GameState {
+    const s = baseState();
+    s.planets.B = planet('B', 'p2', [lvl('citadel', 1, 'b1')]);
+    s.planets.C = planet(
+      'C',
+      'p2',
+      Array.from({ length: cCitadels }, (_, i) => lvl('citadel', 1, `c${i}`)),
+      10_000,
+    );
+    return s;
+  }
+  function chanceSeen(op: string, s: GameState): number[] {
+    const seen: number[] = [];
+    const probe: GameModule = {
+      id: 'probe',
+      version: '1.0.0',
+      setup(api) {
+        api.hook<number>('espionage.chance', (cur) => (seen.push(cur), cur));
+      },
+    };
+    run(op, [probe, unseen, spared], s);
+    return seen;
+  }
+
+  it('the share is against the most developed world of the civilisation', () => {
+    expect(developmentShare(data, civ(4), 'B')).toBeCloseTo(0.25, 9);
+    expect(developmentShare(data, civ(4), 'C')).toBe(1);
+    // Two equal worlds — each is the most developed, whatever is built.
+    expect(developmentShare(data, civ(1), 'B')).toBe(1);
+    // A lone world with nothing of worth on it is still its civilisation's best.
+    expect(developmentShare(data, baseState(), 'B')).toBe(1);
+    expect(developmentShare(data, baseState(), 'missing')).toBe(0);
+  });
+
+  it('a counter-intelligence building adds no development', () => {
+    const s = civ(1);
+    s.planets.B!.buildings.push(lvl('bureau', 1, 'b2'), lvl('bureau', 1, 'b3'));
+    expect(developmentShare(data, s, 'B')).toBe(1);
+    expect(developmentShare(data, s, 'C')).toBe(1);
+  });
+
+  it('theft and research theft gain up to +0.2 success, other operations do not', () => {
+    expect(chanceSeen('theft', civ(4))).toEqual([BASE_CHANCE + DEVELOPMENT_CHANCE_BONUS * 0.25]);
+    expect(chanceSeen('research', civ(1))).toEqual([BASE_CHANCE + DEVELOPMENT_CHANCE_BONUS]);
+    expect(chanceSeen('sabotage', civ(1))).toEqual([BASE_CHANCE]);
+    expect(chanceSeen('disrupt', civ(1))).toEqual([BASE_CHANCE]);
+  });
+
+  it('the most developed world yields twice the share, up to twice the cap', () => {
+    const top = civ(1);
+    top.players.p2!.resources = { metal: 1000 };
+    const { events } = run('theft', [sure, unseen, spared], top);
+    const loot = (ofType(events, 'espionage.succeeded')[0]!.payload as { loot: { amount: number } }).loot;
+    expect(loot.amount).toBeGreaterThanOrEqual(100); // 10% of 1000
+    expect(loot.amount).toBeLessThanOrEqual(300); // 30% of 1000
+
+    const rich = civ(1);
+    rich.players.p2!.resources = { credits: 1_000_000 };
+    const big = run('theft', [sure, unseen, spared], rich).events;
+    expect((ofType(big, 'espionage.succeeded')[0]!.payload as { loot: { amount: number } }).loot.amount).toBe(
+      THEFT_CAP * 2,
+    );
   });
 });

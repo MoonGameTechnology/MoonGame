@@ -88,6 +88,7 @@
 | SPY-18 | ✅ | core data | `docs/backlog.md` | Перевербовка. |
 | SPY-19 | ✅ | proto | `docs/backlog.md` | Шанс на кнопке операции. |
 | SPY-20 | ✅ | proto | `docs/backlog.md` | Архив докладов. |
+| SPY-21 | ✅ | core | `docs/backlog.md` | Кража по развитости мира. |
 | BLD-2.1 | ✅ | core | `docs/backlog.md` | Полоса юнита — его производственная постройка. |
 | BLD-2.2 | ✅ | proto | `docs/backlog.md` | Конвейер на каждую полосу. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
