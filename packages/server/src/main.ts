@@ -67,6 +67,7 @@ import { registerMedalApi } from './medalApi';
 import { MedalService } from './medalService';
 import { registerArsenalApi } from './arsenalApi';
 import { registerMetaMarketApi } from './metaMarketApi';
+import { shelfByXp } from './auctionShelf';
 import { CorpArsenalService } from './corpArsenalService';
 import { registerCorpArsenalApi } from './corpArsenalApi';
 import { registerAvaWarApi } from './avaWarApi';
@@ -735,7 +736,7 @@ const server = createMultiplayerServer({
           registerMetaMarketApi(scope, { market: stores.metaMarket, identify,
             onChanged: refreshAccountArsenal,
             canTrade: async (accountId) => (await stores.commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp,
-            minimumAccountXp: metaCatalog.market.minimumAccountXp });
+            minimumAccountXp: metaCatalog.market.minimumAccountXp, ...shelfByXp(metaCatalog.market.shelf, (accountId) => stores.commanderStore.xpOf(accountId)) });
           // Corp-arsenal rentals (ARS-6) — head/officer hands out a corp item.
           registerCorpArsenalApi(scope, { service: corpArsenalService, identify });
           // CORP-9 — the war of one side for the hub's «Битвы»: served here, where the

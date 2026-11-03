@@ -57,6 +57,37 @@ describe('meta market HTTP API', () => {
     ]);
     await app.close();
   });
+  it('держит полку продавца: лишний лот отбит, открытые и закрытые места видны в обзоре', async () => {
+    const arsenal = new MemoryArsenalStore();
+    for (const itemId of ['a', 'b'])
+      await arsenal.grant({
+        itemId,
+        accountId: 'seller',
+        kind: 'module',
+        form: 'instance',
+        defId: 'ion_engine',
+        soulbound: false,
+        origin: 'drop',
+        acquiredAt: 1,
+      });
+    const app = Fastify();
+    registerMetaMarketApi(app, {
+      market: new MemoryMetaMarket(arsenal, () => 1, 0),
+      identify: () => Promise.resolve({ accountId: 'seller', login: 'seller' }),
+      shelf: () => Promise.resolve({ open: 1, lockedXp: [3850] }),
+    });
+    const list = (itemId: string): Promise<{ statusCode: number; json(): unknown }> =>
+      app.inject({ method: 'POST', url: '/meta-market/list', payload: { itemId, price: 10 } });
+    expect((await list('a')).statusCode).toBe(200);
+    const full = await list('b');
+    expect(full.statusCode).toBe(409);
+    expect(full.json()).toEqual({ error: 'E_ORDER_LIMIT' });
+    expect((await app.inject({ url: '/meta-market' })).json()).toMatchObject({
+      shelf: { open: 1, lockedXp: [3850] },
+    });
+    await app.close();
+  });
+
   it('пишущие маршруты под per-IP лимитом (EC-0.3 wash-trading), чтение свободно', async () => {
     const market = new MemoryMetaMarket(new MemoryArsenalStore(), () => 1, 500);
     const app = Fastify();

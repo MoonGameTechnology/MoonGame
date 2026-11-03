@@ -32,7 +32,7 @@ export async function stand() {
  for(const id of ['alice','bob']) await store.transaction([id],async tx=>{await tx.creditWarrants(id,1000,'fixture','fixture',0);tx.account(id).moduleBlueprints={unique:1};});
  for(let n=0;n<10;n++) await arsenal.grant({accountId:'alice',itemId:n?'copy'+n:'target',kind:'module',form:'instance',defId:'cargo_bay',origin:'craft',soulbound:false,acquiredAt:0});
  const app=Fastify();const identify=async r=>['alice','bob'].includes(r.headers.authorization?.slice(7))?{accountId:r.headers.authorization.slice(7),login:r.headers.authorization.slice(7)}:null;
- registerMetaEconomyApi(app,{economy,identify,rateMax:100});registerMetaMarketApi(app,{market,identify,rateMax:100});
+ registerMetaEconomyApi(app,{economy,identify,rateMax:100});registerMetaMarketApi(app,{market,identify,rateMax:100,shelf:async()=>({open:6,lockedXp:[3850,6750]})});
  app.get('/commerce/offers',async()=>({offers:[]}));
  return {app,arsenal,market,economy};
 }`,
@@ -132,17 +132,15 @@ try {
       await page.locator('[data-module-reward="next"]').click();
       await page.locator('[data-ar-sell="target"]').click();
       await page.locator('[data-mm-price="target"]').fill('180');
-      await page.locator('[data-mm-filter="sort"]').selectOption('stars');
-      if (
-        (await page.locator('[data-mm-price="target"]').inputValue()) !== '180' ||
-        !(await page.locator('[data-mm-net="target"]').textContent()).includes('165')
-      )
-        throw new Error('sale quote lost after filter repaint');
+      if (!(await page.locator('[data-mm-net="target"]').textContent()).includes('165'))
+        throw new Error('sale quote does not follow the price');
+      await page.screenshot({ path: resolve(out, `auction-sell-${width}.png`) });
       await page.locator('[data-mm-list="target"]').click();
       await page.locator('[data-mm-cancel]').waitFor();
       await page.evaluate(() => window.moduleChain.actor('bob'));
-      await page.locator('[data-mm-filter="rarity"]').selectOption('unique');
-      await page.locator('[data-mm-filter="stars"]').selectOption('1');
+      await page.locator('[data-mm-cat="utility"]').click();
+      await page.screenshot({ path: resolve(out, `auction-buy-${width}.png`) });
+      await page.locator('[data-mm-open="module:instance:cargo_bay"]').click();
       assert.equal(await page.locator('[data-mm-buy]').count(), 1);
       await page.screenshot({ path: resolve(out, `auction-${width}.png`), fullPage: true });
       await page.locator('[data-mm-buy]').click();

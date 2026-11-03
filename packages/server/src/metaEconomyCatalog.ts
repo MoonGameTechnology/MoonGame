@@ -88,7 +88,21 @@ const schema = z
           .strict(),
       })
       .strict(),
-    market: z.object({ minimumAccountXp: z.number().int().nonnegative() }).strict(),
+    market: z
+      .object({
+        minimumAccountXp: z.number().int().nonnegative(),
+        /** Полка продавца: мест сразу и опыт аккаунта, с которым открывается ещё по месту.
+         *  Порог — опыт, а не уровень: формула уровня живёт у клиента
+         *  (`decisions/playerCareer.ts`), сервер сравнивает с тем же `xpOf`, что и `minimumAccountXp`. */
+        shelf: z
+          .object({
+            base: z.number().int().min(1).max(50),
+            unlockXp: z.array(z.number().int().nonnegative()).max(20),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict(),
     /** Profile medal rewards by degree (3 = class III, the first goal). */
     medals: z
       .object({

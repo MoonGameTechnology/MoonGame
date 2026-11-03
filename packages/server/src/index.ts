@@ -116,6 +116,7 @@ export {
   type MetaMarket,
 } from './metaMarket';
 export { registerMetaMarketApi, type MetaMarketApiDeps } from './metaMarketApi';
+export { shelfByXp } from './auctionShelf';
 // FRIENDS-1 — roster API + rules, exported so the playtest host mounts the SAME slice
 // as production (one implementation of the social graph, not two).
 export {

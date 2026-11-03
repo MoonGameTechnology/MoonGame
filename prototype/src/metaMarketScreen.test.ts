@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { initMetaMarket, metaMarketHtml } from './metaMarketScreen';
+import { defaultMarketUi, initMetaMarket, metaMarketHtml } from './metaMarketScreen';
 import { t } from '../../localization/runtime';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -35,9 +35,50 @@ describe('meta market screen', () => {
       [tradable, bound],
     );
     expect(html).toContain('⌖ 420');
-    expect(html).toContain('data-mm-buy="lot"');
-    expect(html).not.toContain('data-mm-list="trade"'); // already listed: cannot offer twice
-    expect(html).not.toContain('data-mm-list="bound"');
+    // «Купить»: одна плитка на тип, продавцы — после нажатия на неё.
+    expect(html).toContain('data-mm-open="module:instance:ion_engine"');
+    expect(html).not.toContain('data-mm-buy="lot"');
+    const opened = metaMarketHtml(
+      {
+        balance: 420,
+        feeRate: 0.08,
+        listings: [
+          {
+            id: 'lot',
+            sellerId: 'other',
+            sellerLogin: 'Rival',
+            item: tradable,
+            price: 75,
+            createdAt: 1,
+          },
+        ],
+      },
+      [],
+      false,
+      { ...defaultMarketUi, open: 'module:instance:ion_engine' },
+    );
+    expect(opened).toContain('data-mm-buy="lot"');
+    const sell = metaMarketHtml(
+      {
+        balance: 420,
+        feeRate: 0.08,
+        listings: [
+          {
+            id: 'lot',
+            sellerId: 'other',
+            sellerLogin: 'Rival',
+            item: tradable,
+            price: 75,
+            createdAt: 1,
+          },
+        ],
+      },
+      [tradable, bound],
+      false,
+      { ...defaultMarketUi, tab: 'sell' },
+    );
+    expect(sell).not.toContain('data-mm-open="item:trade"'); // already listed: cannot offer twice
+    expect(sell).not.toContain('data-mm-open="item:bound"');
   });
 
   it('offers earned blueprints and only the tradable material balance for sale', () => {
@@ -62,11 +103,27 @@ describe('meta market screen', () => {
         ],
       },
       [blueprint, { ...blueprint, itemId: 'paid', soulbound: true }],
+      false,
+      { ...defaultMarketUi, tab: 'sell' },
     );
-    expect(html).toContain('data-mm-list="bp"');
-    expect(html).not.toContain('data-mm-list="paid"');
-    expect(html).toContain('data-mm-quantity="ferroalloys" type="number" min="1" max="4"');
-    expect(html).not.toContain('data-mm-material-list="energy_cells"');
+    expect(html).toContain('data-mm-open="item:bp"');
+    expect(html).not.toContain('data-mm-open="item:paid"');
+    expect(html).toContain('data-mm-open="mat:ferroalloys"');
+    expect(html).not.toContain('data-mm-open="mat:energy_cells"');
+    const material = metaMarketHtml(
+      {
+        balance: 0,
+        feeRate: 0.08,
+        listings: [],
+        materials: [
+          { id: 'ferroalloys', nameKey: 'meta.material.ferroalloys', tradable: 4, soulbound: 99 },
+        ],
+      },
+      [],
+      false,
+      { ...defaultMarketUi, tab: 'sell', open: 'mat:ferroalloys' },
+    );
+    expect(material).toContain('data-mm-quantity="ferroalloys" type="number" min="1" max="4"');
   });
 
   it('blocks purchases below the trading gate but still allows cancellation', () => {
@@ -88,6 +145,8 @@ describe('meta market screen', () => {
         materialListings: [lot, { ...lot, id: 'mine', mine: true }],
       },
       [],
+      false,
+      { ...defaultMarketUi, open: 'mat:ferroalloys' },
     );
     expect(html).toContain('data-mm-material-buy="buy" disabled');
     expect(html).toContain('data-mm-material-cancel="mine">');
@@ -143,9 +202,75 @@ describe('meta market screen', () => {
     await market.refresh();
     expect(root.innerHTML).toContain('data-mm-price="drop-b"');
     expect(scrolled).toEqual(['[data-mm-price="drop-b"]']);
+    expect(root.innerHTML).toContain('aria-current="page">' + t('auction.tab.sell'));
     expect(focused).toEqual([]);
     await market.refresh();
     expect(scrolled).toHaveLength(1);
     expect(focused).toEqual([]);
+  });
+
+  it('draws the seller shelf with used, free and level-locked places and blocks listing when full', () => {
+    const copy = {
+      itemId: 'c',
+      kind: 'module' as const,
+      form: 'instance' as const,
+      defId: 'ion_engine',
+      soulbound: false,
+      origin: 'drop' as const,
+      acquiredAt: 1,
+    };
+    const lot = {
+      id: 'mine',
+      sellerId: 'me',
+      sellerLogin: 'me',
+      item: { ...copy, itemId: 'x' },
+      price: 50,
+      createdAt: 1,
+      mine: true,
+    };
+    const html = metaMarketHtml(
+      { balance: 0, feeRate: 0.08, listings: [lot], shelf: { open: 2, lockedXp: [3850] } },
+      [copy],
+      false,
+      { ...defaultMarketUi, tab: 'sell', open: 'item:c' },
+    );
+    expect(html).toContain(t('auction.shelf', { n: 1, max: 2 }));
+    expect(html).toContain('data-mm-cancel="mine"');
+    expect(html).toContain(t('auction.shelf.free'));
+    expect(html).toContain(t('auction.shelf.locked', { n: 12 }));
+    expect(html).toContain('data-mm-list="c">');
+    const full = metaMarketHtml(
+      { balance: 0, feeRate: 0.08, listings: [lot], shelf: { open: 1, lockedXp: [] } },
+      [copy],
+      false,
+      { ...defaultMarketUi, tab: 'sell', open: 'item:c' },
+    );
+    expect(full).toContain('data-mm-list="c" disabled');
+    expect(full).toContain(t('auction.shelf.full'));
+  });
+
+  it('filters tiles by category', () => {
+    const shield = {
+      itemId: 's',
+      kind: 'module' as const,
+      form: 'instance' as const,
+      defId: 'shield_booster',
+      soulbound: false,
+      origin: 'drop' as const,
+      acquiredAt: 1,
+    };
+    const view = {
+      balance: 0,
+      feeRate: 0.08,
+      listings: [
+        { id: 'l', sellerId: 'o', sellerLogin: 'o', item: shield, price: 9, createdAt: 1 },
+      ],
+    };
+    expect(metaMarketHtml(view, [], false, { ...defaultMarketUi, cat: 'defense' })).toContain(
+      'data-mm-open=',
+    );
+    expect(metaMarketHtml(view, [], false, { ...defaultMarketUi, cat: 'weapon' })).not.toContain(
+      'data-mm-open=',
+    );
   });
 });

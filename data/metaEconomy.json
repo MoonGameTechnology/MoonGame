@@ -79,7 +79,7 @@
       "finalPresence": 0.25
     }
   },
-  "market": { "minimumAccountXp": 700 },
+  "market": { "minimumAccountXp": 700, "shelf": { "base": 6, "unlockXp": [3850, 6750] } },
   "medals": {
     "grades": {
       "3": { "sovereigns": 10, "warrants": 20, "xp": 50 },
