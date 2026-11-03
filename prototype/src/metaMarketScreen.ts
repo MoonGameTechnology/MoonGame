@@ -145,12 +145,6 @@ function buyOffers(view: MarketView, ui: MarketUi): BuyOffer[] {
   return [...items, ...materials];
 }
 
-function offerName(view: MarketView, offer: BuyOffer): string {
-  return offer.kind === 'item'
-    ? arsenalItemName(offer.lot.item)
-    : materialLabel(view, offer.lot.materialId);
-}
-
 /** Плитка каталога: число предложений и самая низкая цена, или «нет в продаже». */
 function tileHtml(view: MarketView, key: string, group?: OfferGroup<BuyOffer>): string {
   const sample = key.startsWith('mat:') ? null : orderSample(key);
