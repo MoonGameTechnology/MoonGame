@@ -658,7 +658,6 @@ export interface ArsenalHost {
   signIn(): void;
   openAuction(): void;
   openHeroMatch?(): void;
-  openHeroSector?(hero: string): void;
   /** The auction's sell form for this copy. */
   sell(itemId: string): void;
   /** «Снабжение» on its season (rewards are claimed there). */
@@ -842,7 +841,6 @@ export function initArsenal(host: ArsenalHost): {
     }
     if (d.arHero) { hero = d.arHero; return paint(); }
     if (d.arHeroMatch !== undefined) return host.openHeroMatch?.();
-    if (d.arHeroSector) return host.openHeroSector?.(d.arHeroSector);
     if (d.arModule) return open('modules', d.arModule, byAttr('data-ar-module', d.arModule));
     if (d.arHull) return open('hulls', d.arHull, byAttr('data-ar-hull', d.arHull));
     if (d.arPick !== undefined) {

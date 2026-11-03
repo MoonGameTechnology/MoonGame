@@ -39,10 +39,10 @@ it('закрытый герой и босс не получают доступ �
   );
   expect(closed).not.toContain('SHIP-SHOULD-NOT-RENDER');
 });
-it('каталог хаба различает прогрессию партии и коллекцию экспедиций', () => {
+it('каталог хаба основной игры говорит о партии и не ведёт в Sector Zero', () => {
   const result = arsenalHeroesHtml('commander');
   expect(result).toContain('конкретной партии');
-  expect(result).toContain('data-ar-hero-sector="commander"');
+  expect(result).not.toContain('data-ar-hero-sector');
   expect(result).toContain('class="ar-hero-skills"');
   expect(result).not.toContain('undefined');
 });
