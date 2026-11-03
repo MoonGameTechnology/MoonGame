@@ -68,22 +68,34 @@ try {
       page.evaluate(() =>
         [...document.querySelectorAll('#speedbar .spd-mult-pc .spdmini')].map((c) => (c.classList.contains('on') ? 1 : 0)).join(''),
       );
-    /** Убрать открытое и вернуть фокус карте — как игрок, щелчком по пустому месту. */
+    /** Убрать открытое и вернуть фокус карте — как игрок, щелчком по карте. Щелчок по площади
+     *  провинции выбирает её мир, и лист мира под мышью съел бы протяжку: его тоже закрыть. */
     const clear = async () => {
-      for (let i = 0; i < 6 && (await t('layers')).length; i++) await page.keyboard.press('Escape');
+      const close = async () => {
+        for (let i = 0; i < 6 && (await t('layers')).length; i++) await page.keyboard.press('Escape');
+      };
+      await close();
       await page.mouse.click(1200, 420);
+      await close();
     };
-    /** Увести камеру прочь перетаскиванием карты. */
-    const dragAway = async () => {
-      await page.mouse.move(900, 500);
-      await page.mouse.down();
-      await page.mouse.move(300, 200, { steps: 6 });
-      await page.mouse.up();
-    };
+
     /** Точка в середине поля карты (с допуском в четверть экрана)? */
     const centred = async (p) => {
       const mid = await t('middle');
       return !!p && Math.abs(p.x - mid.x) < VIEW.width / 4 && Math.abs(p.y - mid.y) < VIEW.height / 4;
+    };
+    /** Увести камеру прочь перетаскиванием карты, пока ни одна из точек не в середине. Под
+     *  нагрузкой одна протяжка может не дойти: камера ещё доезжает переход входа в партию. */
+    const dragAway = async (...at) => {
+      for (let i = 0; i < 3; i++) {
+        await page.mouse.move(900, 500);
+        await page.mouse.down();
+        await page.mouse.move(300, 200, { steps: 6 });
+        await page.mouse.up();
+        let away = true;
+        for (const p of at) if (await centred(await p())) away = false;
+        if (away) return;
+      }
     };
 
     await page.goto(site.url);
@@ -160,14 +172,14 @@ try {
     //    уведена прочь: в середину их приводит сама клавиша.
     const mine = await t('mine');
     assert(mine.length, 'у игрока есть флот');
-    await dragAway();
+    await dragAway(...mine.map((id) => () => t('fleetAt', id)));
     for (const id of mine) assert.equal(await centred(await t('fleetAt', id)), false, 'до Tab флоты не в середине');
     await page.keyboard.press('Tab');
     const picked = await t('selected');
     assert(mine.includes(picked), 'Tab выбирает свой флот');
     assert(await centred(await t('fleetAt', picked)), 'Tab показывает флот');
     await clear();
-    await dragAway();
+    await dragAway(() => t('capitalAt'));
     assert.equal(await centred(await t('capitalAt')), false, 'до H столица не в середине');
     await page.keyboard.press('KeyH');
     assert(await centred(await t('capitalAt')), 'H ведёт к столице');

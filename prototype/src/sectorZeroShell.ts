@@ -475,12 +475,15 @@ export function openSectorZero(preparation: boolean | { hero: string } = false, 
     'Sector Zero menu',
     sectorZeroMenu.open().then(() => {
       if (preparation && sectorZeroMenu.isOpen()) sectorPreparation.open(typeof preparation === 'object' ? preparation : undefined);
-      heroReceipts?.resume();
+      // Повтор главы проходит меню насквозь: награды героя ждут возвращения в меню, иначе
+      // их модальное окно осталось бы поверх новой попытки и забрало бы карту.
       if (replay && sectorZeroMenu.isOpen()) {
         chooseMission(chapter);
         sectorZeroMenu.hide();
         launchSectorRun();
+        return;
       }
+      heroReceipts?.resume();
     }),
   );
 }

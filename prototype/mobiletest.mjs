@@ -411,8 +411,15 @@ try {
   const mine = (await desktop.evaluate(() => window.__mobileTest.fleets())).find(
     (x) => x.owner === 'p1',
   );
-  await desktop.mouse.click(mine.p.x, mine.p.y);
-  await desktop.locator('#cmdbar [data-cmd="move"]').click();
+  // Флот кружит по орбите: под нагрузкой точка, прочитанная до щелчка, успевает уплыть, и
+  // щелчок выбирает мир под ней. Тогда — перечитать точку и щёлкнуть снова.
+  const move = desktop.locator('#cmdbar [data-cmd="move"]');
+  for (let i = 0; i < 3 && !(await move.isVisible()); i++) {
+    const at = (await desktop.evaluate(() => window.__mobileTest.fleets())).find((x) => x.id === mine.id).p;
+    await desktop.mouse.click(at.x, at.y);
+    await move.waitFor({ timeout: 2000 }).catch(() => {});
+  }
+  await move.click();
   const target = await desktop.evaluate(
     (id) =>
       window.__mobileTest

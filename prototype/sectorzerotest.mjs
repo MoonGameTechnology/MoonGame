@@ -251,7 +251,7 @@ async function check(label, run) {
   );
   // Очки победы (заказ владельца 2026-10-14): в забеге ни метки «✦ 50» у имени мира, ни
   // статьи о них в Справочнике; в схватке — и то и другое.
-  assert.equal(await page.locator('#side .phead .pbadge').count(), run ? 0 : 1, `${label}: очки мира`);
+  assert.equal(await page.locator('#side .phead .pbadge[data-desc="fact:vp"]').count(), run ? 0 : 1, `${label}: очки мира`);
   await page.evaluate(() => document.getElementById('rail-help').click());
   await page.locator('#codexhub [data-codex]').first().waitFor();
   assert.equal(await page.locator('#codexhub [data-codex="m:score"]').count(), run ? 0 : 1, `${label}: статья об очках`);
@@ -343,6 +343,29 @@ async function check(label, run) {
   assert.deepEqual(misfit, [], `${label}: подписи колонки — в своих кнопках`);
   assert.equal(await page.locator('#rail-abandon .rlbl').isVisible(), run, `${label}: «Завершить экспедицию» в колонке`);
   await page.mouse.move(1000, 300);
+}
+
+/** Страница героя вкладками (PVR-6.25). Первой открыт «Корабль» героя, навыки в слотах — на
+ *  «В бой». Дерево навыков — список узлов (арсенал героев, 2026-11-02): состояние узла видно
+ *  по классу, карточка закрытого узла называет, чего не хватает. Уходит страница с «В бой». */
+async function heroPage() {
+  assert.equal(await page.locator('[data-prep="hero-tab"]').count(), 4, 'четыре вкладки героя');
+  assert.equal(
+    await page.locator('[data-prep="hero-tab"][aria-pressed="true"]').getAttribute('data-id'),
+    'ship',
+    'первая вкладка — корабль героя',
+  );
+  await page.locator('[data-prep="hero-tab"][data-id="battle"]').click();
+  assert.ok((await page.locator('#sz-workshop [data-prep="ability"]').count()) > 0, '«В бой» — навыки в слотах');
+  await page.locator('[data-prep="hero-tab"][data-id="tree"]').click();
+  for (const state of ['owned', 'open', 'locked'])
+    assert.ok((await page.locator(`.ha-skill.${state}`).count()) > 0, `в дереве есть узел «${state}»`);
+  await page.locator('.ha-skill.locked').first().click();
+  assert.equal(await page.locator('.sz-tree-card .sz-prereq').count(), 1, 'карточка закрытого узла называет предпосылку');
+  await page.locator('[data-prep="hero-tab"][data-id="stars"]').click();
+  assert.equal(await page.locator('.sz-star-ladder li').count(), 3, 'лестница звёзд');
+  assert.equal(await page.locator('#sz-workshop [data-prep="upgrade-hero"]').count(), 1, 'звезда покупается на своей вкладке');
+  await page.locator('[data-prep="hero-tab"][data-id="battle"]').click();
 }
 
 /** Выход в меню путём игрока на десктопе: «Выход» в колонке инструментов. */
@@ -516,20 +539,7 @@ try {
     );
     assert.deepEqual(broken, [], 'портреты героев в Академии загрузились');
     assert.ok((await page.locator(faces).count()) >= 5, 'пять героев в ростере');
-    // Страница героя вкладками, навыки деревом (PVR-6.25): связи — линиями, состояние узла
-    // видно по классу, карточка закрытого узла называет, чего не хватает.
-    assert.equal(await page.locator('[data-prep="hero-tab"]').count(), 3, 'три вкладки героя');
-    assert.ok((await page.locator('#sz-workshop [data-prep="ability"]').count()) > 0, '«В бой» — навыки в слотах');
-    await page.locator('[data-prep="hero-tab"][data-id="tree"]').click();
-    assert.ok((await page.locator('.sz-tree line').count()) > 0, 'связи дерева — линиями');
-    for (const state of ['owned', 'open', 'locked'])
-      assert.ok((await page.locator(`.sz-tree-node.${state}`).count()) > 0, `в дереве есть узел «${state}»`);
-    await page.locator('.sz-tree-node.locked').first().click();
-    assert.equal(await page.locator('.sz-tree-card .sz-prereq').count(), 1, 'карточка закрытого узла называет предпосылку');
-    await page.locator('[data-prep="hero-tab"][data-id="stars"]').click();
-    assert.equal(await page.locator('.sz-star-ladder li').count(), 3, 'лестница звёзд');
-    assert.equal(await page.locator('#sz-workshop [data-prep="upgrade-hero"]').count(), 1, 'звезда покупается на своей вкладке');
-    await page.locator('[data-prep="hero-tab"][data-id="battle"]').click();
+    await heroPage();
     await page.locator('[data-prep="back"]').click();
     await page.locator('#sz-mission-0').click();
     // Комикс главы (решение владельца 2026-09-24): перед первым забегом главы, один раз.
@@ -792,6 +802,10 @@ try {
     await page.locator('#holo-back').click();
     await page.locator('#abandon-menu').click();
     await page.waitForFunction(() => !document.getElementById('sz-continue').disabled);
+    // Награды героя, отложенные повтором главы, ждали меню — и встречают в нём.
+    await page.locator('#hero-reward[open]').waitFor();
+    await page.locator('#hero-reward [data-hero-reward="dismiss"]').click();
+    await page.locator('#hero-reward').waitFor({ state: 'hidden' });
     await page.locator('#sz-continue').click();
     await page.waitForFunction(() => window.__szTest.run() === true);
     await page.locator('#maploading').waitFor({ state: 'hidden' });

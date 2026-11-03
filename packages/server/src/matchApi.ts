@@ -3,6 +3,7 @@ import type { MatchRegistry } from './matchRegistry';
 import { slidingWindowIpLimiter } from './rateLimit';
 import { validSeatName } from '@void/protocol';
 import { matchCreationPermitted, registerMatchCapabilitiesApi } from './matchCapabilitiesApi';
+export { registerMatchCapabilitiesApi };
 
 /**
  * SV-2.4 — the minimal match create/join HTTP API, so players can actually enter a match

@@ -121,7 +121,14 @@ try {
     await page.locator('#hub-solo').waitFor({ state: 'visible' });
     await page.locator('#hub-solo').tap();
     await page.locator('#setupgo').waitFor({ state: 'visible' });
-    await sample('transparent setup', true);
+    // Окно настройки во весь экран закрывает карту, и та под ним не рисуется (`mapCovered()`
+    // в main.ts); окно меньше экрана оставляет её видимой — тогда она обязана рисоваться.
+    const setupCovers = await page.evaluate(() => {
+      const setup = document.getElementById('setup');
+      const box = setup.firstElementChild;
+      return box.offsetWidth >= setup.offsetWidth && box.offsetHeight >= setup.offsetHeight;
+    });
+    await sample(setupCovers ? 'full-screen setup' : 'transparent setup', !setupCovers);
     await page.locator('#setupgo').tap();
     await sample('match', true);
     const resize = await page.evaluate(() => {
