@@ -40,25 +40,28 @@ export const LIVE_FORMATS: LiveFormats = {
 export const LIVE_SLOT = '{t}';
 
 const fmtAttr = (fmt: string): string => (fmt === 'eta' ? '' : ` data-fmt="${esc(fmt)}"`);
+/** Момент в атрибут — тоже через `esc`: число он только по типу, а приходит из состояния
+ *  (сеть, сейв), и строка в нём закрыла бы атрибут. */
+const num = (v: number): string => esc(String(v));
 
 /** Отсчёт до `at` (правило 1). */
 export function liveTimerHtml(at: number, fmt = 'eta'): string {
-  return `<span class="pn-timer" data-at="${at}"${fmtAttr(fmt)}>…</span>`;
+  return `<span class="pn-timer" data-at="${num(at)}"${fmtAttr(fmt)}>…</span>`;
 }
 
 /** Сколько прошло с `since` — «столько-то назад» (правило 1). */
 export function liveSinceHtml(since: number, fmt = 'eta'): string {
-  return `<span class="pn-timer" data-since="${since}"${fmtAttr(fmt)}>…</span>`;
+  return `<span class="pn-timer" data-since="${num(since)}"${fmtAttr(fmt)}>…</span>`;
 }
 
 /** Атрибуты узла `pn-tip`: подсказка `tip` с {@link LIVE_SLOT}, где встанет отсчёт до `at`. */
 export function liveTipAttrs(at: number, fmt: string, tip: string): string {
-  return ` data-at="${at}"${fmtAttr(fmt)} data-tip="${esc(tip)}"`;
+  return ` data-at="${num(at)}"${fmtAttr(fmt)} data-tip="${esc(tip)}"`;
 }
 
 /** Полоса от `since` до `at`: ширина — пройденная доля (правило 4). */
 export function liveBarHtml(since: number, at: number): string {
-  return `<i class="pn-bar" data-since="${since}" data-at="${at}"></i>`;
+  return `<i class="pn-bar" data-since="${num(since)}" data-at="${num(at)}"></i>`;
 }
 
 /** Доля погрузки по окнам трюма, целые проценты (правило 4). */
