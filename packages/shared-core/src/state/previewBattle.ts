@@ -254,7 +254,7 @@ export function previewSides(
     while (link.every(up)) {
       rounds += 1;
       const sources = link.filter(i => roles[i] === 'attacker');
-      if (!sources.length) { stalemate = true; break; }
+      if (!sources.some(i => link.some(j => foes(i, j)))) { stalemate = true; break; }
       now = Math.max(now, Math.min(...sources.map(i => deadlines[i]!)));
       const due = sources.filter(i => deadlines[i]! <= now)
         .sort((a, b) => deadlines[a]! - deadlines[b]!);
@@ -263,10 +263,13 @@ export function previewSides(
       // Никто никому не враг — бой не идёт вовсе, и крутить его до предохранителя значило
       // бы обещать игроку 240 раундов там, где не будет ни одного (живой такт закрывает
       // такой бой перемирием, CMB-7).
-      if (due.some(i => counts[i]! > MAX_COMBAT_ROUNDS) || !round(link, roles, due)) {
+      if (due.some(i => counts[i]! > MAX_COMBAT_ROUNDS)) {
         stalemate = true;
         break;
       }
+      // A peaceful source may be due before hostile ones: its empty tick still
+      // advances its clock, without ending the other participants' battle.
+      round(link, roles, due);
     }
     if (stalemate) break;
     // Наземный бой отпускает выживших С РАНАМИ (`finishBattle`, combat 3.10.0): щит стеков

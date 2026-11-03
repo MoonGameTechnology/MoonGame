@@ -5,7 +5,7 @@ import { createInitialState, type BattleSide, type GameState } from '../state/ga
 import { hashState } from '../state/hash';
 import { attacks } from '../state/battle';
 import { previewSides } from '../state/previewBattle';
-import { setStance } from '../state/diplomacy';
+import { getStance, setStance } from '../state/diplomacy';
 import { parseGameData } from '../data/schemas';
 import { combatModule } from './combat';
 
@@ -274,6 +274,28 @@ describe('combat lifecycle preserves personal clocks', () => {
     expect(survivor(result.state, 'a')?.nextAttackAt).toBe(1.5 * HOUR);
     expect(survivor(result.state, 'a')?.attackCount).toBe(0);
     expect(result.state.planets.P!.beachheads![0]!.units[0]!.hp).toBeUndefined();
+  });
+
+  it('a peaceful source’s empty tick cannot end the forecast of the remaining enemies', () => {
+    const state = world();
+    state.fleets.b!.units[0]!.hp = 1;
+    setStance(state, 'a', 'b', 'peace');
+    setStance(state, 'a', 'c', 'peace');
+    setStance(state, 'b', 'c', 'war');
+    const changed = kernel.applyAction(state, { id: 'peace', type: 'test.diplomacy', playerId: 'a',
+      issuedAt: 0, payload: {} }, ctx(0));
+    if (!changed.ok) throw Error(changed.code);
+    expect(Object.keys(changed.state.battles)).toHaveLength(1);
+    const forecast = previewSides(changed.state.battles['battle:0']!.sides.map(side => ({
+      units: changed.state.fleets[side.owner!]!.units, owner: side.owner, role: side.role,
+      key: side.owner!, nextAttackAt: side.nextAttackAt,
+    })), data, (a, b) => a !== b && a != null && b != null && getStance(changed.state, a, b) === 'war');
+    const result = advance(changed.state, 2 * HOUR);
+    expect(result.state.fleets.b).toBeUndefined();
+    for (const [i, owner] of ['a', 'b', 'c'].entries()) {
+      expect(forecast.sides[i]!.survivors.map(({ unit, count, hp }) => ({ unit, count, hp })))
+        .toEqual((result.state.fleets[owner]?.units ?? []).map(({ unit, count, hp }) => ({ unit, count, hp })));
+    }
   });
 
   it('a captured garrison cannot inherit its previous owner’s attack clock', () => {
