@@ -59,9 +59,9 @@ function world(team = false): GameState {
   if (team) s.modeId = 'team_2v2';
   return s;
 }
-function tick(s: GameState): GameState {
+function tick(s: GameState, now = 2): GameState {
   const r = kernel.advanceTo(s, {
-    now: 2,
+    now,
     data,
     config: { ...config, ...(s.modeId ? { modeId: s.modeId } : {}) },
   });
@@ -70,6 +70,22 @@ function tick(s: GameState): GameState {
 }
 
 describe('capital-only victory', () => {
+  it('finishes after a neutralized capital is captured even if its original owner was already eliminated', () => {
+    const s = world();
+    s.planets.spare = { ...s.planets.home2!, id: 'spare' };
+    s.planets.home2!.owner = null;
+    const first = tick(s);
+    expect(first.match.capitalObjectives?.p2?.owner).toBeNull();
+    first.planets.spare!.owner = 'p1';
+    const eliminated = tick(first, 3);
+    expect(eliminated.players.p2!.status).toBe('defeated');
+    expect(eliminated.match.status).toBe('ongoing');
+    eliminated.planets.home2!.owner = 'p1';
+    expect(tick(eliminated, 4).match).toMatchObject({
+      status: 'ended', winner: 'p1', reason: 'capital-capture',
+      capitalObjectives: { p2: { planetId: 'home2', owner: 'p1' } },
+    });
+  });
   it('judges the capture event on the same action, without waiting for a later heartbeat', () => {
     const capture: GameModule = {
       id: 'capture-fixture',

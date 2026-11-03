@@ -482,6 +482,17 @@ function evaluateVictory(h: HandlerContext): void {
     }
   }
 
+  // Capitals remain objectives after their original owner loses all territory.
+  // The one-active-seat shortcut belongs to the legacy races below.
+  if (!h.state.pve && h.ctx.config?.victory?.capitalCapture) {
+    eliminateLandless(h, scores, activeBefore);
+    const result = capitalVictoryStatus(h.state, h.ctx.config.modeId);
+    h.state.match.capitalObjectives = result.objectives;
+    if (result.winner)
+      endMatch(h, highestScore(scores, result.winner) ?? result.winner[0]!, 'capital-capture', result.winner);
+    return;
+  }
+
   if (activeBefore.length < 2 && fixedVictoryUnits(h, activeBefore) === undefined) {
     // A solo exploration map can still have hostile inhabitants. They never
     // receive a PvP victory, but taking the lone commander's last world is a loss.
@@ -499,14 +510,6 @@ function evaluateVictory(h: HandlerContext): void {
   }
 
   eliminateLandless(h, scores, activeBefore);
-
-  if (!h.state.pve && h.ctx.config?.victory?.capitalCapture) {
-    const result = capitalVictoryStatus(h.state, h.ctx.config.modeId);
-    h.state.match.capitalObjectives = result.objectives;
-    if (result.winner)
-      endMatch(h, highestScore(scores, result.winner) ?? result.winner[0]!, 'capital-capture', result.winner);
-    return;
-  }
 
   const active = playerIds.filter((playerId) => h.state.players[playerId]?.status === 'active');
 
