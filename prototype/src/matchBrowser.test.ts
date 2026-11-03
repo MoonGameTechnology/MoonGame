@@ -264,7 +264,8 @@ beforeEach(() => {
   detached = [];
   vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => void detached.push(args));
   // Хост без аккаунтов: проба режима отвечает «не знаю такого адреса».
-  server = (url) => (url.endsWith('/auth/status') ? reply(404) : reply(200, lists));
+  server = (url) => url.endsWith('/auth/status') ? reply(404)
+    : url.endsWith('/matches/capabilities') ? reply(200, { canCreate: true }) : reply(200, lists);
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
   vi.stubGlobal('localStorage', {
     getItem: (k: string) => cell.get(k) ?? null,
@@ -360,6 +361,7 @@ describe('REFM-217 — лента обозревателя', () => {
     const mb = await boot();
     await mb.refreshMatches();
     expect(fetched).toEqual([
+      { url: `${HTTP}/matches/capabilities`, method: 'GET', auth: undefined },
       { url: `${HTTP}/auth/status`, method: 'GET', auth: undefined },
       { url: `${HTTP}/matches?nick=Orion`, method: 'GET', auth: undefined },
     ]);
@@ -601,6 +603,16 @@ describe('REFM-217 — лента обозревателя', () => {
     expect($('match-create').style.display).toBe('');
     tab('active').click();
     expect($('match-create').style.display).toBe('none');
+  });
+
+  it('не предлагает создание аккаунту без серверного разрешения, но оставляет вход в партии', async () => {
+    server = (url) => url.endsWith('/matches/capabilities')
+      ? reply(200, { canCreate: false })
+      : url.endsWith('/auth/status') ? reply(200, { enabled: true }) : reply(200, lists);
+    await browsing();
+    expect($('match-create').style.display).toBe('none');
+    expect(ids()).toEqual(['a1', 'a2', 'a3']);
+    expect(rows()[0]!.buttons.length).toBeGreaterThan(0);
   });
 
   it('строка статуса говорит «сервер недоступен» — новую партию не предлагает и над старой лентой', async () => {

@@ -45,7 +45,7 @@ function mockOwners(): void {
     openSectorZero: log('openSectorZero'),
     openAbandon: (reason: string) => env.calls.push(`openAbandon:${reason}`),
   }));
-  vi.doMock('./setupScreen', () => ({ openSetup: log('openSetup') }));
+  vi.doMock('./setupScreen', () => ({ openSetup: log('openSetup'), netSetup: null, setupMapId: 'duel-1' }));
   // Соседи, которые трогают канвас и DOM при импорте; выходам они не нужны.
   for (const m of [
     './chainComposer',
@@ -105,6 +105,14 @@ afterEach(() => {
 });
 
 describe('REFM-219 · дверь выхода', () => {
+  it('a forced creation handler without a confirmed permission sends no request', async () => {
+    const life = await load();
+    const fetcher = vi.fn();
+    vi.stubGlobal('fetch', fetcher);
+    life.createOnlineMatch('duel-1');
+    env.listeners.get('setup-network-create')?.({});
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it('сохраняет забег, останавливает мир и сеть, гасит ники мест, первые цели, тур и «Вернуть обучение»', async () => {
     const life = await load();
     life.leaveMatch();

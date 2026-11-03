@@ -91,6 +91,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `bundle-netserver.mjs` | ОДНА конфигурация сборки бандла на дев и прод — чтобы они не разъехались |
 | `src/main.ts` | клиент целиком: карта, HUD, панели, ввод. Большой (см. блок `REFM` в бэклоге) |
 | `src/setupScreen.ts` · `src/matchJoin.ts` · `src/accountSession.ts` | выбор домов и мест из предложения сетевой сессии, опрос списка, вход и разбор отказов; поздний ответ сохраняет новый аккаунт |
+| `src/matchCreation.ts` · `decisions/matchCreation.ts` | подтверждение права создания сессий; обе кнопки скрыты до серверного разрешения, привязанного к аккаунту и серверу |
 | `src/protoKernel.ts` | сборка ядра прототипа на общем `GAME_MODULES` + `canOrder`/`canOrderAll` — проба правил с памятью ответов |
 | `src/rocketMinesUi.ts` · `minestest.mjs` | карточка ракетной мины и браузерный smoke; `packages/client/src/ordnanceView.ts` рисует отфильтрованные мины и ракеты |
 | `src/diploWindow.ts` · `src/diploRosterView.ts` · `diplomacytest.mjs` | окно дипломатии, поиск и список участников; сортировка/фильтры — `decisions/diploRoster.ts`, браузерная проверка — `pnpm smoke:diplomacy` |
@@ -490,6 +491,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `matchApi.ts` | `GET /matches` | match-browser read-model |
 | `matchFactory.ts` | `createMatch` | фабрика матчей |
 | `matchCreationAccess.ts` | `matchCreationAccess` | production allowlist UUID для создания сессий |
+| `matchCapabilitiesApi.ts` | `GET /matches/capabilities` | право создания без списка UUID; единая политика с `POST /matches` |
 | `operatorMatchApi.ts` | `POST /metrics/matches` | создание сессии с картой и скоростью; полный операторский ключ |
 | `sessionSpeed.ts` | `sessionSpeed` | скорость из сохранённых часов либо настройка новой сессии |
 | `clockDriver.ts` | `clockDriver` | v1 offline scheduler (`msUntilNextEvent` → tick) |

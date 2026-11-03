@@ -10,10 +10,10 @@
  */
 import { linkedAlly } from '../../decisions/allyPanel';
 import { httpBase } from '../../decisions/matchQuery';
+import { canCreateOnlineMatch, forgetMatchCreation, isCurrentMatchCreator, matchCreator, refreshMatchCreation } from './matchCreation';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
 import { prepareSectorZeroRun } from '../../decisions/sectorZeroProgress';
-import { tokenFor } from '../../decisions/sessionStore';
 import { startFleetMerges } from '../../decisions/startFleets';
 import { trainingFlagshipMerge } from '../../decisions/trainingGuide';
 import { t } from '../../localization/runtime';
@@ -415,7 +415,7 @@ export function startProvingGround(): void {
 
 let creatingMatch = false;
 export function createOnlineMatch(mapId: MapId): void {
-  if (creatingMatch) return;
+  if (creatingMatch || !canCreateOnlineMatch()) return;
   const srv = game.resolveServer();
   if (!srv) {
     note(t('acc.server-down'));
@@ -436,21 +436,26 @@ export function createOnlineMatch(mapId: MapId): void {
     'create match',
     (async () => {
       try {
-        const pass = tokenFor(localStorage, srv.base, srv.nick);
-        const res = await fetch(`${httpBase(srv.base)}/matches`, {
+        await refreshMatchCreation();
+        const creator = matchCreator();
+        if (!creator) return;
+        for (const { button } of buttons) button.disabled = true;
+        const res = await fetch(`${httpBase(creator.base)}/matches`, {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
-            ...(pass ? { authorization: `Bearer ${pass}` } : {}),
+            ...(creator.token ? { authorization: `Bearer ${creator.token}` } : {}),
           },
           body: JSON.stringify({ mapId }),
         });
+        if (!isCurrentMatchCreator(creator)) return;
         if (!res.ok) {
+          if (res.status === 401 || res.status === 403) forgetMatchCreation();
           const refusal = (await res.json().catch(() => null)) as { error?: string } | null;
           throw new Error(refusal?.error ?? 'E_CREATE_MATCH');
         }
         const body = (await res.json()) as { matchId: string };
-        await openSeatPicker(body.matchId);
+        if (isCurrentMatchCreator(creator)) await openSeatPicker(body.matchId);
       } catch (err) {
         note(
           t(
@@ -462,7 +467,7 @@ export function createOnlineMatch(mapId: MapId): void {
       } finally {
         creatingMatch = false;
         for (const { button, label } of buttons) {
-          button.disabled = false;
+          button.disabled = !canCreateOnlineMatch();
           button.textContent = label;
         }
       }

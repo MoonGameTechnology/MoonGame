@@ -85,6 +85,7 @@ import {
   stopNetSetupPoll,
 } from './matchJoin';
 import { initMatchBrowser } from './matchBrowser';
+import { forgetMatchCreation } from './matchCreation';
 import { NATIVE_BACK_LAYERS } from './nativeBackLayers';
 import { isAvaMap, isFrontier, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 /**
@@ -2697,6 +2698,7 @@ initSettingsView({
 // загрузочного блока: его ветка по ссылке может попросить войти.
 initAccountSession({
   sessionChanged: () => {
+    forgetMatchCreation();
     refreshActivity();
     arsenal?.forget();
   },

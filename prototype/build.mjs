@@ -496,7 +496,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <option value="ffa-20" data-i18n="setup.map.ffa-20"></option>
             <option value="ffa-50" data-i18n="setup.map.ffa-50"></option>
           </select>
-          <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="browser.create.go"></button>
+          <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="browser.create.go" disabled></button>
         </div>
       </div>
       <div id="cstatus" class="cstat" role="status" aria-live="polite" aria-atomic="true"></div>
@@ -761,7 +761,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <button class="spdchip" type="button" data-spd="100">×100</button>
           </div>
         </div>
-        <button id="setup-network-create" class="snetnew btn-second solo-only" type="button" data-i18n="setup.network.create"></button>
+        <button id="setup-network-create" class="snetnew btn-second solo-only" type="button" data-i18n="setup.network.create" style="display:none" disabled></button>
       </div>
       <div class="scol sside">
         <div id="setupfactions" class="sfactions"></div>

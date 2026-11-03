@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { MatchRegistry } from './matchRegistry';
 import { slidingWindowIpLimiter } from './rateLimit';
 import { validSeatName } from '@void/protocol';
+import { matchCreationPermitted, registerMatchCapabilitiesApi } from './matchCapabilitiesApi';
 
 /**
  * SV-2.4 — the minimal match create/join HTTP API, so players can actually enter a match
@@ -165,6 +166,7 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
   // Only mounted when the host seeds matches through the API. A host that seeds out of
   // band (netserver) omits `createMatch` and gets the join route alone.
   const createMatch = deps.createMatch;
+  registerMatchCapabilitiesApi(app, deps);
   if (createMatch) {
     const createQuota = deps.createQuota ?? CREATE_QUOTA;
     /** Account → the matches it created here, each with the order it was recorded in
@@ -185,7 +187,7 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
         void reply.code(401);
         return { error: 'E_AUTH' as const };
       }
-      if (deps.canCreate && (!who || !(await deps.canCreate(who)))) {
+      if (!(await matchCreationPermitted(who, deps.canCreate))) {
         return reply.code(403).send({ error: 'E_FORBIDDEN' });
       }
       const body = request.body;
