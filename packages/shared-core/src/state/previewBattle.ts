@@ -96,9 +96,10 @@ export interface PreviewSideInput {
   units: readonly UnitStack[];
   /** Known internal systems of this fortress body, if the side is a fortress. */
   fortress?: Planet;
-  /** Роль в ИДУЩЕМ бою: атакующий бьёт `attack`, обороняющийся отвечает `defense`. В
-   *  следующих звеньях цепочки роли раздаёт правило пересцепки (см. {@link previewSides}). */
+  /** Текущий режим огня; обычные роли следующего звена назначаются заново. */
   role: 'attacker' | 'defender';
+  /** Explicit attack override that survives relinking; a captured garrison is new. */
+  attackOrdered?: boolean;
   /** Владелец — нужен только чтобы спросить вражду; для безымянной дуэли не нужен. */
   owner?: string | null;
   /** Порядок пересцепки после гибели: живой бой обходит выживших флоты по id. Ключи — у
@@ -132,11 +133,12 @@ type Role = PreviewSideInput['role'];
  * ЦЕПОЧКА (§0.0 №5). Гибель любой стороны закрывает бой, но выжившие тут же сцепляются
  * заново, поэтому прогноз досчитывает все звенья до конца:
  *  · на орбите — как `finishBattle`→`engageFleets`: первый по ключу выживший, у которого
- *    есть враг, нападает; его первый по ключу враг обороняется; все, кто враждебен
- *    кому-нибудь в новом бою, вступают атакующими. Корабли уносят урон в новое звено;
+ *    есть враг, начинает звено со своим первым по ключу врагом; остальные втягиваются
+ *    по вражде. Корабли уносят урон и явно отданные приказы атаки в новое звено;
  *  · на земле (есть сторона `holds`) — как штурм после гибели: мир держит обороняющийся,
- *    враждебные ему берега атакуют. Пал гарнизон — мир берёт первый уцелевший берег этого
- *    звена и уже сам обороняется. Между звеньями наземные стороны сохраняют повреждения корпуса; щит сбрасывается.
+ *    враждебные ему берега продолжают бой. Пал гарнизон — мир берёт
+ *    первый уцелевший берег этого звена и уже сам обороняется. Между звеньями наземные
+ *    стороны сохраняют повреждения корпуса; щит сбрасывается.
  * Цепочку обрывает предохранитель `MAX_COMBAT_ROUNDS` в любом звене (после ничьей никто
  * не сцепляется, CMB-6) или бой, где стрелять некому.
  *
@@ -171,6 +173,7 @@ export function previewSides(
   }
   const ground = input.some((s) => s.holds);
   let holder = input.findIndex((s) => s.holds);
+  const ordered = input.map(side => side.attackOrdered === true);
 
   /** Один раунд звена `link`. Ложь — стрелять некому (никто из атакующих не враг никому). */
   const round = (link: readonly number[], roles: readonly Role[]): boolean => {
@@ -197,13 +200,15 @@ export function previewSides(
   const relink = (last: readonly number[]): [number[], Role[]] | null => {
     const standing = order.filter(up);
     const rolesFor = (defender: number): Role[] =>
-      input.map((_, i) => (i === defender ? 'defender' : 'attacker'));
+      input.map((_, i) => ordered[i] || i !== defender ? 'attacker' : 'defender');
     if (ground) {
       // Мир взят — его держит первый уцелевший берег этого звена (MSB-4, §0.0 №4).
       if (!up(holder)) {
         const captor = standing.find((i) => last.includes(i));
         if (captor === undefined) return null;
         holder = captor;
+        // The captor becomes a new garrison, not the previous attacking beachhead.
+        ordered[holder] = false;
       }
       const attackers = standing.filter((i) => foes(i, holder));
       if (attackers.length === 0) return null;
@@ -228,7 +233,7 @@ export function previewSides(
 
   // Звено первое — бой как он есть: все стороны, роли со входа.
   let link = input.map((_, i) => i);
-  let roles: Role[] = input.map((s) => s.role);
+  let roles: Role[] = input.map((s, i) => ordered[i] ? 'attacker' : s.role);
   let rounds = 0;
   let stalemate = false;
   for (;;) {

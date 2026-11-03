@@ -32,6 +32,7 @@ import {
   SPY_DEVELOPMENT_SOLO_MIGRATION as spyDevelopment,
   INTERCEPT_TURRET_SOLO_MIGRATION as interceptTurret,
   CLOAK_FIELD_SOLO_MIGRATION as cloakField,
+  COMBAT_CONTINUITY_SOLO_MIGRATION as combatContinuity,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -177,7 +178,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, combatContinuity]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -583,4 +584,22 @@ describe('the cloak field catalogue and rules pair (0.1.77 → 0.1.78)', () => {
       } },
     });
   });
+});
+
+it('the combat patch reads pending personal clocks without resetting the saved battle', () => {
+  const before = oldSave();
+  before.state.version = { data: combatContinuity.fromData,
+    dataHash: combatContinuity.fromDataHash, manifest: '1' };
+  before.state.battles['battle:0'] = { id: 'battle:0', phase: 'orbital', location: 'A',
+    round: 23, nextRoundAt: 3_600_000, sides: [
+      { ref: { kind: 'fleet', fleetId: 'f1' }, owner: 'p1', role: 'attacker',
+        attackStartedAt: 0, nextAttackAt: 3_600_000, attackCount: 23 },
+      { ref: { kind: 'fleet', fleetId: 'f2' }, owner: 'p2', role: 'defender', stance: 'attack',
+        attackStartedAt: 300_000, nextAttackAt: 3_900_000, attackCount: 19 },
+    ] };
+  before.state.scheduled = [{ id: 'evt:7', seq: 7, type: 'combat.tick', at: 3_600_000,
+    payload: { battleId: 'battle:0' } }];
+  before.state.scheduleSeq = 8;
+  const raw = serializeSoloSave(before, combatContinuity.fromRules);
+  expect(parseCompatibleSoloSave(raw, combatContinuity.toRules)).toEqual(before);
 });

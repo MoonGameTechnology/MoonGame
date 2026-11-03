@@ -45,6 +45,8 @@ export interface ForecastSide {
   /** Союзник — сторона в моей колонке окна: его победа — моя победа (правило 1). */
   ally?: boolean;
   role: 'attacker' | 'defender';
+  /** Explicit attack override, independently of the initial role. */
+  attackOrdered?: boolean;
   /** Текущий состав: стеки вместе с остатком корпуса (`hp`). */
   units: readonly UnitStack[];
   /** Владелец: по нему спрашивается вражда сторон. */

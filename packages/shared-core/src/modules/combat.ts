@@ -8,15 +8,17 @@ import type {
   UnitStack,
 } from '../state/gameState';
 import type { GameData } from '../data/schemas';
-import { hoursToMs, type Context } from '../action/types';
+import { hoursToMs } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 import { requireOwnedIdleFleet } from '../util/fleet';
 import { effectiveStats } from '../util/loadout';
 import { peekValues } from '../util/draft';
 import { isCapturable } from '../state/sectorKind';
-import { attacks, combatantKey, attackerOf, defenderOf, landingBattleOf, shipsEngaged } from '../state/battle';
+import { attacks, attackerOf, defenderOf, landingBattleOf, shipsEngaged } from '../state/battle';
 import type { FleetCourse } from './movement';
 import { battleExchanges } from '../util/battleExchanges';
+import { orderBattleAttack, roundIntervalMs, scheduleTick } from '../util/battleClocks';
+import { queueBattleClockRestore, restoreBattleClocks, retainBattleAfterRetreat, roadBattleSides } from '../util/battleContinuity';
 import {
   INTERCEPT_TOL,
   isAllied,
@@ -43,8 +45,6 @@ import { STAND_UP_EVENTS, standingFleet, standsAt, type BattleStandUp } from '..
 /** Keep a pinned crossing point off the lane's endpoints (avoids a degenerate
  *  node-equivalent edge); mirrors movement's own EPS. */
 const EDGE_EPS = 1e-4;
-
-const roundIntervalMs = (ctx: Context): number => hoursToMs(ctx, 1);
 
 /**
  * Сколько идёт высадка штурмом на чужой мир (решение владельца 2026-09-26: «высадка
@@ -102,28 +102,6 @@ function applyRetreatToll(fleet: Fleet, data: GameData, toll = RETREAT_TOLL): vo
 
 // --- battle lifecycle --------------------------------------------------------
 
-/** Schedule only the earliest personal clock. A stale event is harmless: the
- * handler fires only participants whose clock is due. Equal instants share one
- * pre-damage snapshot, independent of the order in which they were scheduled. */
-function scheduleTick(h: HandlerContext, battleId: string, immediate = false): void {
-  const battle = h.state.battles[battleId];
-  if (!battle) return;
-  for (const side of battle.sides) {
-    if (!attacks(side)) continue;
-    if (side.nextAttackAt === undefined) {
-      const at = battle.nextRoundAt ?? (immediate ? h.ctx.now : h.ctx.now + roundIntervalMs(h.ctx));
-      side.attackStartedAt = Math.min(h.ctx.now, at);
-      side.nextAttackAt = at;
-    }
-  }
-  const times = battle.sides.flatMap((s) => attacks(s) && s.nextAttackAt !== undefined ? [s.nextAttackAt] : []);
-  if (!times.length) { delete battle.nextRoundAt; return; }
-  const at = Math.min(...times);
-  if (battle.nextRoundAt === at) return;
-  battle.nextRoundAt = at;
-  h.schedule(at, 'combat.tick', { battleId });
-}
-
 /** Lowest-id hostile, alive, unengaged fleet sitting at node `at`.
  *
  *  `except` — тот, с кем сцепляться НЕЛЬЗЯ (CMB-6): им называют напарника по только что
@@ -171,7 +149,8 @@ function ceasefired(h: HandlerContext, battle: Battle): boolean {
     for (let j = i + 1; j < sides.length; j++) {
       const a = sides[i]!.owner;
       const b = sides[j]!.owner;
-      if (a === null || b === null) continue; // стойки нет — спрашивать не у кого
+      // A neutral garrison cannot agree to peace with allied attackers.
+      if (a === null || b === null) { if (a !== b) return false; continue; }
       comparable += 1;
       if (isHostile(h, a, b)) return false;
     }
@@ -809,6 +788,7 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // Правило то же самое, произнесённое без двойки: победитель есть, только когда выжил
   // РОВНО ОДИН. На двух сторонах это дословно прежняя таблица.
   const aliveSides = battle.sides.filter((side) => sideAlive(h.state, side.ref));
+  if (!stalemate && battle.phase === 'ground') queueBattleClockRestore(h, battle);
   const winner = stalemate || aliveSides.length !== 1 ? null : (aliveSides[0]?.owner ?? null);
 
   // ПЕРЕЖИТОЕ СРАЖЕНИЕ (VET-2) — по ЖИВЫМ сторонам, и ровно раз на бой. Не «победитель»:
@@ -1033,6 +1013,13 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
     }
   }
 
+  if (end === 'decided' && battle.phase === 'orbital') {
+    for (const sides of roadBattleSides(h, battle)) startBattle(h, {
+      id: `battle:${h.state.battleSeq++}`, location: battle.location, phase: 'orbital', sides, round: 0,
+    });
+    restoreBattleClocks(h, battle);
+  }
+
   // ROADS-8: whoever a road battle pulled off its march carries on — after a decided
   // fight and after a ceasefire alike. Not after a STALEMATE: both sides are alive on
   // the same point of the road, and marching on would re-meet them at once, restarting
@@ -1081,7 +1068,7 @@ export const combatModule: GameModule = {
   // 3.10.0: наземные выжившие уходят из боя с ранами; лечит их госпиталь, а не сам бой.
   // 3.11.0: флот, вставший у мира не прилётом (верфь, взлёт, раскол, герой), сходится с врагом.
   // 3.12.0: separate fortress hull/internal-system damage routing.
-  version: '4.0.0',
+  version: '4.0.1',
   setup(api) {
     api.provideCapability<BattlePullIn>('battle.pullIn', (at, h) => pullInBystanders(h, at));
     // Встал у мира без прилёта — бой, как у прибывшего (`util/standUp.ts`, баг 2026-11-02).
@@ -1440,7 +1427,7 @@ export const combatModule: GameModule = {
         if (side.ref.kind !== 'fleet' || !leavingIds.has(side.ref.fleetId))
           releaseOrDestroyFleet(h, side.ref, battleId);
       }
-      delete h.state.battles[battleId];
+      if (!retainBattleAfterRetreat(h, battle, leavingIds)) delete h.state.battles[battleId];
       for (const side of battle.sides) {
         if (side.ref.kind === 'fleet' && !leavingIds.has(side.ref.fleetId))
           settleMarch(h, side.ref.fleetId, true);
@@ -1464,22 +1451,10 @@ export const combatModule: GameModule = {
     api.onAction('battle.retreat', retreat);
 
     // Missing/foreign participant has one opaque refusal; allies cannot be ordered.
-    api.onAction('battle.attack', (action, h) => {
-      const p = action.payload as { battleId?: unknown; side?: unknown } | null;
-      if (!p || typeof p.battleId !== 'string' || (p.side !== undefined && typeof p.side !== 'string'))
-        return h.reject('E_BAD_PAYLOAD');
-      const battle = Object.hasOwn(h.state.battles, p.battleId) ? h.state.battles[p.battleId] : undefined;
-      const own = battle?.sides.filter((s) => s.owner === action.playerId && sideAlive(h.state, s.ref)
-        && (p.side === undefined || combatantKey(s.ref) === p.side)) ?? [];
-      if (!battle || !own.length) return h.reject('E_NO_BATTLE');
-      for (const side of own) {
-        if (attacks(side)) continue; // repeated/bulk orders never restart an attacker's clock
-        side.stance = 'attack';
-        side.attackCount = 0;
-        side.attackStartedAt = h.ctx.now;
-        side.nextAttackAt = h.ctx.now + roundIntervalMs(h.ctx);
-      }
-      scheduleTick(h, battle.id);
+    api.onAction('battle.attack', orderBattleAttack);
+
+    api.on('combat.clocks.restore', (event, h) => {
+      restoreBattleClocks(h, (event.payload as { previous: Battle }).previous);
     });
 
     api.on('combat.tick', (event, h) => {

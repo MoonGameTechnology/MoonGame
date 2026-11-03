@@ -135,7 +135,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 9 | `hero` | `hero.ts` | `hero.ability`, `hero.spawn`, `hero.skill.unlock`, `hero.equip`, `hero.unequip`, `hero.install`, `hero.uninstall` | `fleet.arrived`, `fleet.departed`, `fleet.bombard`, `battle.started`, `planet.captured`, `hero.siege.due`, `hero.path.expire`, `unit.died`, `fleet.destroyed`, `fleet.transit`, `fleet.fork`, `hero.respawn`, `hero.mobilization.complete` | `fleet.speed`, `combat.damage`, `salvage.share` | — | `hero.spawned`, `hero.recruited`, `hero.died`, `hero.siege.broken`, `hero.path.created`, `hero.path.expired`, `planet.destroyed`, `hero.siege.started`, `hero.siege.done`, `hero.ability.used`, `hero.respawned`, `hero.skill.unlocked`, `hero.equipped`, `hero.unequipped`, `hero.installed`, `hero.uninstalled`, `hero.mobilization.started`, `hero.mobilization.cancelled` · sched: `hero.mobilization.complete`, `hero.respawn`, `hero.path.expire`, `hero.siege.due` |
 | 10 | `heroEffects` | `heroEffects.ts` | — | — | `combat.damage.parallel`, `combat.damage` | `hero.effect.recall`, `hero.effect.aura`, `hero.effect.reveal`, `hero.effect.jump`, `hero.effect.decoy` | `hero.recalled`, `hero.jumped`, `hero.decoyed`, `hero.aura`, `hero.revealed` |
 | 11 | `orbital` | `orbital.ts` | `fleet.orbit`, `fleet.bombard` | `fleet.arrived`, `time.advanced` | — | — | `aa.fired`, `planet.bombarded`, `fleet.orbit`, `fleet.bombard` |
-| 12 | `combat` | `combat.ts` | `fleet.assault`, `fleet.retreat`, `battle.retreat`, `battle.attack` | `fleet.arrived`, `fleet.transit`, `diplomacy.changed`, `fleet.intercept`, `fleet.meet`, `player.eliminated`, `assault.landed`, `fleet.departed`, `beachhead.landed`, `combat.tick` | `fleet.speed` | `battle.pullIn` | `battle.started`, `battle.joined`, `assault.landing`, `assault.interrupted`, `assault.cancelled`, `assault.ashore`, `beachhead.landed`, `planet.captured`, `fleet.destroyed`, `battle.resolved`, `fleet.retreated`, `combat.round` · sched: `combat.tick`, `assault.landed` |
+| 12 | `combat` | `combat.ts` | `fleet.assault`, `fleet.retreat`, `battle.retreat`, `battle.attack` | `fleet.arrived`, `fleet.transit`, `diplomacy.changed`, `fleet.intercept`, `fleet.meet`, `player.eliminated`, `assault.landed`, `fleet.departed`, `beachhead.landed`, `combat.clocks.restore`, `combat.tick` | `fleet.speed` | `battle.pullIn` | `battle.started`, `battle.joined`, `assault.landing`, `assault.interrupted`, `assault.cancelled`, `assault.ashore`, `beachhead.landed`, `planet.captured`, `fleet.destroyed`, `battle.resolved`, `fleet.retreated`, `combat.round` · sched: `combat.tick`, `combat.clocks.restore`, `assault.landed` |
 | 13 | `veteran` | `veteran.ts` | — | — | `combat.damage`, `combat.mitigation` | — | — |
 | 14 | `intercept` | `intercept.ts` | — | `fleet.leg`, `fleet.parked`, `battle.started` | — | — | sched: `fleet.intercept`, `fleet.meet` |
 | 15 | `capture-on-arrival` | `captureOnArrival.ts` | — | `fleet.arrived`, `fleet.transit` | — | — | `planet.captured` |
@@ -449,6 +449,8 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `util/time.ts` | `MS_PER_DAY`, `MS_PER_HOUR` | константы времени |
 | `state/battleReadout.ts` | `inspectBattle` | урон и бафы/дебафы участников через `traceHooks` |
 | `util/combat.ts` | `isHostile`, `posAt`, `laneOccupancy` | утилиты боя |
+| `util/battleClocks.ts` | `orderBattleAttack`, `scheduleTick` | личные часы и повторные приказы атаки |
+| `util/battleContinuity.ts` | `retainBattleAfterRetreat`, `restoreBattleClocks`, `roadBattleSides` | продолжение боя без лишних залпов и разрыва сцепки |
 
 ---
 
