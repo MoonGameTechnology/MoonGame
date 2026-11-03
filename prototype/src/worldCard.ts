@@ -56,7 +56,7 @@ import { builtTileHtml } from './catalogTile';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { buildingName, cost, countdownHMS, displayUnit, esc, fmtEta, resLine } from './format';
 import { data } from './gameData';
-import { canOrder } from './game';
+import { canOrder, ctx } from './game';
 import { fortressStatusHtml, fortressServicesHtml } from './fortressView';
 import { pcUi } from './graphicsPrefs';
 import {
@@ -530,7 +530,8 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   const ME = game.me();
   const out: string[] = [];
   // Столица — здесь возрождаются герои и меняют модули (Phase C).
-  if (capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(data, p)) === 'designate')
+  if (capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(data, p),
+    !!ctx(s.time, s).config?.victory?.capitalCapture) === 'designate')
     out.push(btn('capital', '', t('side.world.make-capital'), true));
   // Hold point (ST-2.1): a standing order for the Steward — the anchor is never
   // auto-evacuated and gets reinforced under threat. Same tech gate as delegation.
@@ -750,7 +751,8 @@ export function planetPanelHtml(p: Planet): string {
   // Числа состава живут только на вкладках: прежний ряд фишек дублировал их другим счётом.
   const facts = worldFacts({
     mine,
-    capital: capitalOf(s, ME) === p.id,
+    capital: capitalOf(s, ME) === p.id ||
+      Object.values(s.match.capitalObjectives ?? {}).some((target) => target.planetId === p.id),
     // ECON-2: блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
     blackout: showsBlackout(mine, s.players[ME]?.arrears),
     // Таймер обстрела: через сколько следующий залп (`decisions/bombardTimer.ts`).

@@ -23,7 +23,7 @@ export interface CorpBattleSeat {
   out: boolean;
 }
 export interface CorpBattleReport {
-  reason: 'domination' | 'elimination' | 'score' | 'timeout' | null;
+  reason: 'domination' | 'elimination' | 'score' | 'timeout' | 'capital-capture' | null;
   warAt?: number;
   provinces: number;
   sides: Record<CorpBattleSide, { score: number; provinces: number }>;
@@ -55,6 +55,9 @@ export interface CorpBattlesView {
   names: Record<string, string>;
 }
 export interface CorpWarView {
+  capitalCapture?: true;
+  capitalsCaptured?: number;
+  capitalsRequired?: number;
   matchupId: string;
   side: CorpBattleSide;
   phase: 'peace' | 'war' | 'ended';

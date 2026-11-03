@@ -489,6 +489,19 @@ describe('строка статуса', () => {
 });
 
 describe('ряд 1 шапки', () => {
+  it('показывает захват столицы и обновляет его при неизменном счёте', async () => {
+    const { m, env, el } = await boot();
+    env.s.modeId = 'capital_duel';
+    env.s.match.capitalObjectives = {
+      p1: { planetId: 'own', owner: 'p1' }, p2: { planetId: 'enemy', owner: 'p2' },
+    };
+    m.renderTopBar([]);
+    expect(el('tbscore').textContent).toBe(t('hud.capital.progress', { n: 0, total: 1 }));
+    env.s.match.capitalObjectives.p2!.owner = 'p1';
+    m.renderTopBar([]);
+    expect(el('tbscore').textContent).toBe(t('hud.capital.progress', { n: 1, total: 1 }));
+    expect(el('tbscore').classList.contains('win')).toBe(true);
+  });
   it('позывной, живое место, ✦-чип очков и день с отсчётом — цифрами', async () => {
     const { m, el } = await boot({ nick: '  Капитан ' });
     m.renderTopBar([]);

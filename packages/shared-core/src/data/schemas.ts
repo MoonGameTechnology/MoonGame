@@ -1,3 +1,5 @@
+import { ModeVictorySchema, ScoringRulesSchema } from './victorySchema';
+export { ModeVictorySchema } from './victorySchema';
 import { z } from 'zod';
 
 /**
@@ -1352,25 +1354,6 @@ export const TEAM_FORMATS = [
 export const TeamFormatSchema = z.enum(TEAM_FORMATS);
 
 /**
- * The victory rules a mode pins — `VictoryConfig` MINUS `endsAt`. `endsAt` is an
- * absolute match timestamp, so it belongs to the match, never to shipped content;
- * `.strict()` turns writing it here into a loud validation error instead of a field
- * zod would silently drop, which would leave a mode that reads as configured and
- * isn't (A08 — validate before use, fail-closed). Every field is optional: an
- * omitted one falls back to the victory module's base rule, which is how a preset
- * says "standard rules here".
- */
-export const ModeVictorySchema = z
-  .object({
-    dominationPercent: z.number().gt(0).max(1).optional(),
-    scoreLimit: z.number().positive().optional(),
-    coalitionFactor: z.number().positive().optional(),
-    /** `VictoryConfig.scripted`: the scenario, not a race, ends the match. */
-    scripted: z.literal(true).optional(),
-  })
-  .strict();
-
-/**
  * The PvE section of a mode: one common NPC enemy attacking in scheduled waves
  * (docs/game-modes-roadmap.md GM-4.6). Present ⇒ the mode is PvE. The numbers are
  * the balance knobs — waves and their spacing are tuned in content, never in code.
@@ -1629,6 +1612,8 @@ export const GameDataSchema = z.object({
   units: z.record(z.string(), UnitDefSchema),
   factions: z.record(z.string(), FactionDefSchema),
   buildings: z.record(z.string(), BuildingDefSchema),
+  /** Integer scoring weights; legacy/custom bundles keep their authored worth. */
+  scoring: ScoringRulesSchema.prefault({}),
   events: z.record(z.string(), EffectRuleSchema),
   sectors: z.record(z.string(), SectorTypeDefSchema).default({}),
   sectorKinds: z.record(z.string(), SectorKindDefSchema).default({}),

@@ -33,9 +33,11 @@ export function capitalOf(state: GameState, playerId: string): string | undefine
  *  one is lost. Heroes respawn here (`heroModule`'s `[home, location]` fallback). */
 export const capitalModule: GameModule = {
   id: 'capital',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     api.onAction('capital.designate', (action, h) => {
+      if (h.ctx.config?.victory?.capitalCapture && !h.ctx.config.victory.scripted && !h.state.pve)
+        return h.reject('E_CAPITAL_LOCKED');
       const p = action.payload as { planetId?: string };
       if (typeof p?.planetId !== 'string') return h.reject('E_BAD_PAYLOAD');
       const planet = h.state.planets[p.planetId];

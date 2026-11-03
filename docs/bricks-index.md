@@ -1018,9 +1018,9 @@
 | GM-0.3 | ⏳ | srv | `docs/game-modes-roadmap.md` | Выбор режима в лобби [client] |
 | GM-1.1 | ✅ | data | `docs/game-modes-roadmap.md` | Пресет standard (score/domination/timeout) |
 | GM-1.2 | ✅ | core | `docs/game-modes-roadmap.md` | Коалиционный порог очков (SES-1: реализовано и покрыто тестами) |
-| GM-2.1 | ⏳ | core data | `docs/game-modes-roadmap.md` | Сущность столицы |
-| GM-2.2 | 🔒 | core | `docs/game-modes-roadmap.md` | capitalModule: поражение по потере штаба |
-| GM-2.3 | 🔒 |  | `docs/game-modes-roadmap.md` | UX столицы [client] |
+| GM-2.1 | ✅ | core data | `docs/game-modes-roadmap.md` | Сущность столицы |
+| GM-2.2 | ✅ | core | `docs/game-modes-roadmap.md` | Победа захватом столиц |
+| GM-2.3 | 🔶 |  | `docs/game-modes-roadmap.md` | UX столицы [client] |
 | GM-3.1 | ⏳ | core data | `docs/game-modes-roadmap.md` | Контрольные точки в данных |
 | GM-3.2 | 🔒 | core | `docs/game-modes-roadmap.md` | holdPointsModule: таймеры удержания |
 | GM-3.3 | 🔒 |  | `docs/game-modes-roadmap.md` | UX точек и прогресса [client] |

@@ -61,6 +61,16 @@
     "name": "Team 2v2",
     "teamFormat": "2v2"
   },
+  "capital_duel": {
+    "name": "Capital Duel",
+    "teamFormat": "1v1",
+    "victory": { "capitalCapture": true }
+  },
+  "capital_2v2": {
+    "name": "Capital 2v2",
+    "teamFormat": "2v2",
+    "victory": { "capitalCapture": true }
+  },
   "team_3v3": {
     "name": "Team 3v3",
     "teamFormat": "3v3"

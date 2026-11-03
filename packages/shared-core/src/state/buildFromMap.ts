@@ -653,6 +653,11 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     version: { data: data.version, manifest: options.manifest ?? '1', dataHash: hashGameDataBundle(data) },
     time: options.time ?? map.time,
   });
+  base.match.buildingScoreDivisor = data.scoring.buildingDivisor;
+  if (map.mode) {
+    if (!data.modes[map.mode]) throw new Error('E_UNKNOWN_MODE');
+    base.modeId = map.mode;
+  }
 
   if (map.techRules) {
     base.techRules = { ...map.techRules, exclude: [...map.techRules.exclude],
@@ -862,6 +867,11 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     .find((id) => map.sectors[id]!.vault !== undefined);
   const vault = vaultId === undefined ? undefined : map.sectors[vaultId]!.vault!;
   // Пленный главы V (PVR-9.5): карта объявила убежище — в матче есть пленный.
+  const capital: Record<string, string> = {};
+  for (const slotId of Object.keys(slotAssign).sort()) {
+    const home = Object.keys(map.sectors).sort().find((id) => map.sectors[id]!.owner === slotId);
+    if (map.slots[slotId] && home !== undefined) capital[slotAssign[slotId]!.playerId] = home;
+  }
   const hideoutId = Object.keys(map.sectors)
     .sort()
     .find((id) => map.sectors[id]!.captive !== undefined);
@@ -869,6 +879,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
   return {
     ...base,
     players,
+    capital,
     // The road network never changes for the match: shared, not copied, by every kernel
     // step's clone (ROADS-7, `shareRoadNetwork`).
     planets: shareRoadNetwork(planets),

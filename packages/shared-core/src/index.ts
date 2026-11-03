@@ -156,6 +156,7 @@ export {
 export {
   sectorKindDef,
   provinceScore,
+  provinceBuildingScore,
   isCapturable,
   isStationable,
   isBuildable,
@@ -722,6 +723,7 @@ export { rallyPointOf } from './state/rallyPoint';
 export { autoMergeModule } from './modules/autoMerge';
 export { shuttleModule } from './modules/shuttle';
 export { capitalModule, capitalsOf, capitalOf } from './modules/capital';
+export { capitalVictoryStatus, type CapitalObjectives } from './state/capitalVictory';
 export { standingOrdersModule } from './modules/standingOrders';
 export {
   instantRepairCost,

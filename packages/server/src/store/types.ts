@@ -491,7 +491,7 @@ export interface AvaSeatReport {
  *  that ran it: how it ended, both sides' score and provinces, every seat's score. */
 export interface AvaBattleReport {
   /** The match's end reason; null when the state names none of the four. */
-  reason: 'domination' | 'elimination' | 'score' | 'timeout' | null;
+  reason: 'domination' | 'elimination' | 'score' | 'timeout' | 'capital-capture' | null;
   /** When the war opened (wall clock); absent when the battle ended before it. */
   warAt?: number;
   /** Capturable provinces of the map: the share a domination win counts against. */

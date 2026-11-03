@@ -15,6 +15,7 @@
 import type { GameState } from '../../packages/shared-core/src/index';
 import { identifiedNodes, scanNodeThreats } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
+import { capitalProgress } from '../../decisions/capitalProgress';
 import { allyPanelView } from '../../decisions/allyPanel';
 import { devourSieges } from '../../decisions/devourSiege';
 import type { MissionRow } from '../../decisions/missionView';
@@ -410,6 +411,8 @@ export function renderTopBar(missions: MissionRow[]): void {
   // with a countdown to the next game day. Fixed nodes are patched by textContent
   // (no innerHTML rebuild — the crest/who/dstat click targets stay put).
   const SCORE_LIMIT = game.scoreLimit();
+  const capitalCapture = !!ctx(s.time, s).config?.victory?.capitalCapture;
+  const capitals = capitalProgress(s, ME);
   const d = Math.floor(s.time / DAY) + 1;
   // Живое положение в таблице — `standingLine.ts` (REFM-191): место берётся ТОЙ ЖЕ
   // формулой, что и на итоговом экране (`placementOf`), иначе две рукописные копии
@@ -427,12 +430,16 @@ export function renderTopBar(missions: MissionRow[]): void {
   // Шапка забега (решение владельца 2026-09-24): вместо эмблемы, очков и дня — кошелёк
   // профиля, живой: награда или ролик посреди забега видны сразу.
   runWallet.render();
-  const topText = topSignature(nick, myPlace, seats, score, d, eta);
+  const topText = topSignature(nick, myPlace, seats, score, d, eta) +
+    `|${capitalCapture}|${capitals.captured}/${capitals.total}`;
   if (topText !== lastTopText) {
     patchText(tbName, nick);
     patchText(tbPlace, standingShown(myPlace) ? t('hud.place', { p: myPlace, n: seats }) : '');
-    patchText(tbScore, `✦ ${score}/${SCORE_LIMIT}`);
-    tbScore.classList.toggle('win', atLimit(need));
+    patchText(tbScore, capitalCapture
+      ? t('hud.capital.progress', { n: capitals.captured, total: capitals.total })
+      : `✦ ${score}/${SCORE_LIMIT}`);
+    tbScore.classList.toggle('win', capitalCapture
+      ? capitals.total > 0 && capitals.captured === capitals.total : atLimit(need));
     patchText(tbDay, t('browser.day', { n: d }));
     // digits only: the «до след. дня» caption is a static sibling node (#tbetacap),
     // so a narrow phone can drop the caption and keep the countdown.
@@ -748,6 +755,11 @@ export function initTopBar(host: TopBarHost): void {
     if (!(ev.target as Element).closest('.dstat')) return;
     const s = game.world();
     const ME = game.me();
+    if (ctx(s.time, s).config?.victory?.capitalCapture) {
+      const capitals = capitalProgress(s, ME);
+      note(t('hud.capital.tip', { n: capitals.captured, total: capitals.total }));
+      return;
+    }
     const mine = Object.values(s.planets).filter((p) => p.owner === ME);
     const worlds = mine.filter((p) => (p.kind ?? 'planet') === 'planet').length;
     const score = Math.round(s.match?.scores?.[ME]?.total ?? 0);

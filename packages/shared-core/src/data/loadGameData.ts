@@ -26,6 +26,7 @@ export function composeGameDataBundle(readJson: JsonReader): Record<string, unkn
     units: readJson('units.json'),
     factions: readJson('factions.json'),
     buildings: readJson('buildings.json'),
+    scoring: readJson('scoring.json'),
     events: readJson('events.json'),
     sectors: readJson('sectors.json'),
     sectorKinds: readJson('sectorKinds.json'),

@@ -27,6 +27,8 @@ export interface Action {
 
 /** Victory rules pinned with the match; absent fields fall back to base rules. */
 export interface VictoryConfig {
+  /** Capture every enemy capital; score, domination and the session cap do not end this mode. */
+  capitalCapture?: boolean;
   /** Owned planet share required to end by domination. Default: 0.6 (60%). */
   dominationPercent?: number;
   /** Aggregate scoreboard points required to end by score. */

@@ -1218,7 +1218,7 @@ const archiveViews = new ArchiveRoomCache({
 const registry = new MatchRegistry(accountStore, data, Date.now, {
   rooms: archiveViews,
   catalog: pool ? new PostgresArchiveCatalog(pool) : new StoreArchiveCatalog(matchStore, accountStore),
-  rules: (meta) => ({ timeScale: meta.timeScale, victory: victoryFor({ mapId: meta.mapId }) }),
+  rules: (meta) => ({ timeScale: meta.timeScale, victory: victoryFor({ mapId: meta.mapId, modeId: meta.modeId }) }),
 });
 
 let retiring: Promise<void> | null = null;

@@ -17,6 +17,8 @@
  *    исчерпавший лимит, запрётся: ни поставить новую, ни убрать старую.
  */
 
+import { isInhabited, type GameData, type GameState, type Planet } from '../packages/shared-core/src/index';
+
 /** Что показать про столицу. */
 export type CapitalOffer =
   /** Это и есть столица — метка. */
@@ -38,10 +40,18 @@ export type HoldOffer =
   | 'set-disabled';
 
 /** Предложение про столицу (правила 1–3). */
-export function capitalOffer(mine: boolean, isCapital: boolean, inhabited: boolean): CapitalOffer {
+export function capitalOffer(mine: boolean, isCapital: boolean, inhabited: boolean, locked = false): CapitalOffer {
   if (!mine) return 'none';
   if (isCapital) return 'marked';
-  return inhabited ? 'designate' : 'none';
+  return inhabited && !locked ? 'designate' : 'none';
+}
+
+/** Both clients use the authoritative habitation rule and the published mode lock. */
+export function worldCapitalOffer(state: GameState, viewer: string, planet: Planet, data?: GameData): CapitalOffer {
+  const locked = !!state.match.capitalObjectives ||
+    !!(state.modeId && data?.modes[state.modeId]?.victory.capitalCapture);
+  return capitalOffer(planet.owner === viewer, state.capital?.[viewer] === planet.id,
+    !!data && isInhabited(data, planet), locked);
 }
 
 /** Предложение про точку удержания (правила 1, 4–6). `settable` — можно ли этот узел

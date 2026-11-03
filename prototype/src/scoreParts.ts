@@ -22,6 +22,7 @@
 import {
   isForkSite,
   provinceScore,
+  provinceBuildingScore,
   type GameData,
   type GameState,
   type PlayerId,
@@ -67,10 +68,7 @@ export function scoreParts(state: GameState, data: GameData): Record<PlayerId, S
     if (!parts) continue;
     parts.planets += 1;
     parts.territory += provinceScore(data, planet);
-    for (const building of planet.buildings) {
-      const def = data.buildings[building.type];
-      if (def) parts.buildings += def.scoreValue * building.level;
-    }
+    parts.buildings += provinceBuildingScore(data, planet, state.match.buildingScoreDivisor ?? 1);
     for (const stack of planet.garrison) parts.units += stack.count;
   }
 

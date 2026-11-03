@@ -60,6 +60,7 @@ const REASONS = {
   domination: 'corp.combat.reason.domination',
   elimination: 'corp.combat.reason.elimination',
   score: 'corp.combat.reason.score',
+  'capital-capture': 'corp.combat.reason.capital-capture',
   timeout: 'corp.combat.reason.timeout',
 };
 const OFFER = {
@@ -163,8 +164,11 @@ function nowView(p: CorpBattlesPaint): string {
           ? `<p class="cb-battle-hint">${esc(t(war.phase === 'peace' ? 'corp.combat.war-at' : 'corp.combat.war-since', { date: date(war.warAt) }))}</p>`
           : '') +
         (war
-          ? `<div class="cb-battle-stats">${stat('corp.combat.score', `${nfmt(war.score)} / ${nfmt(war.scoreGoal)}`)}${stat('corp.combat.land', `${war.provinces} / ${war.capturable}`)}</div>` +
-            `<p class="cb-battle-hint">${esc(t('corp.combat.domination-goal', { n: Math.ceil(war.dominationPercent * 100) }))}</p>`
+          ? `<div class="cb-battle-stats">${war.capitalCapture
+            ? stat('corp.combat.capitals', `${war.capitalsCaptured ?? 0} / ${war.capitalsRequired ?? war.rivals.count}`)
+            : stat('corp.combat.score', `${nfmt(war.score)} / ${nfmt(war.scoreGoal)}`)}${stat('corp.combat.land', `${war.provinces} / ${war.capturable}`)}</div>` +
+            `<p class="cb-battle-hint">${esc(war.capitalCapture ? t('browser.description.capitals')
+              : t('corp.combat.domination-goal', { n: Math.ceil(war.dominationPercent * 100) }))}</p>`
           : '') +
         roster(p, c) +
         (war?.phase === 'war' && war.rivals.seats

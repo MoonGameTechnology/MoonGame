@@ -639,7 +639,7 @@ describe('AvaOrchestrator × the shipped pool (CORP-8) — a map for every forma
       if (!res.ok) throw new Error(res.code);
       expect(res.mapId).toBe(n === 2 ? 'team-2v2' : n === 3 ? 'team-3v3' : 'ffa-20');
       const state = h.built.at(-1)!.state;
-      expect(state.modeId).toBe(`team_${n}v${n}`);
+      expect(state.modeId).toBe(n === 2 ? 'capital_2v2' : `team_${n}v${n}`);
       const seats = Object.values(state.players).filter((p) => !p.npc);
       expect(seats.filter((p) => p.team === 'A')).toHaveLength(n);
       expect(seats.filter((p) => p.team === 'B')).toHaveLength(n);

@@ -1,5 +1,6 @@
 {
   "id": "team-2v2",
+  "mode": "capital_2v2",
   "seed": "broken-reach-20261014",
   "sectors": {
     "home_1": {

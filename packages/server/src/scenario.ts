@@ -646,6 +646,7 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
   });
   const state: GameState = options.initialState ?? {
     ...base,
+    match: { ...base.match, buildingScoreDivisor: data.scoring.buildingDivisor },
     ...(options.mapId !== undefined ? { mapId: options.mapId } : {}),
     players,
     planets,

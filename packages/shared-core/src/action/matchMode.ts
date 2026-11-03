@@ -54,6 +54,7 @@ export function resolveMatchConfig(data: GameData, config: MatchConfig): ModeRes
  *  N-on-N format from 2 to 10: the authored team maps seat 2v2 and 3v3, a corporations
  *  battle any of them (CORP-8). */
 export const FIXED_SIDE_MODES: readonly string[] = [
+  'capital_2v2',
   'team_2v2',
   'team_3v3',
   'team_4v4',

@@ -213,6 +213,41 @@ export function drawSweepAfterglow(lod: MapLod): void {
  * делало их все разом (`holoDraw.ts`, `prepareSphere`). Цвет сферы — цвет стороны владельца,
  * поэтому атласы — по цвету каждой стороны на карте, ничьей и своей.
  */
+function drawOwnWorldNames(lod: MapLod): void {
+  const s = game.world(), cx = game.ctx(), ME = game.me(), MAP = game.nodes();
+  if (lod.art < 1) {
+    // The rings themselves are in the map layer (`paintMapLayer`); my worlds' names stay live.
+    cx.save();
+    cx.globalAlpha *= 1 - lod.art;
+    for (const n of MAP) {
+      const p = s.planets[n.id];
+      if (!p || p.owner !== ME || !known(n.id) || n.sector !== 'planet') continue;
+      const c = world(n);
+      if (!visible(c, 10)) continue;
+      cx.fillStyle = ownerColor(ME);
+      cx.font = '700 12px ui-monospace,Menlo,monospace';
+      cx.fillText(placeName(n.id), c.x + lod.markerRadius + 6, c.y - 1);
+    }
+    cx.restore();
+  }
+}
+
+function drawCapitalObjectives(): void {
+  const s = game.world(), cx = game.ctx();
+  cx.save();
+  cx.font = '700 16px ui-sans-serif, system-ui, sans-serif';
+  cx.textAlign = 'center';
+  for (const objective of Object.values(s.match.capitalObjectives ?? {})) {
+    const position = s.planets[objective.planetId]?.position;
+    if (!position) continue;
+    const c = world(position);
+    if (!visible(c, 40)) continue;
+    cx.fillStyle = ownerColor(objective.owner);
+    cx.fillText('♜', c.x, c.y - 28);
+  }
+  cx.restore();
+}
+
 export function prepareWorldArt(): void {
   const colors = new Set([ownerColor(null), ownerColor(game.me())]);
   for (const p of Object.values(game.world().planets)) colors.add(ownerColor(p.owner));
@@ -236,21 +271,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
   cx.textAlign = 'left';
   const ns = artScale(detail); // node scale: schematic → detail (тот же закон, что у залпа)
   const R = 13 * ns;
-  if (lod.art < 1) {
-    // The rings themselves are in the map layer (`paintMapLayer`); my worlds' names stay live.
-    cx.save();
-    cx.globalAlpha *= 1 - lod.art;
-    for (const n of MAP) {
-      const p = s.planets[n.id];
-      if (!p || p.owner !== ME || !known(n.id) || n.sector !== 'planet') continue;
-      const c = world(n);
-      if (!visible(c, 10)) continue;
-      cx.fillStyle = ownerColor(ME);
-      cx.font = '700 12px ui-monospace,Menlo,monospace';
-      cx.fillText(placeName(n.id), c.x + lod.markerRadius + 6, c.y - 1);
-    }
-    cx.restore();
-  }
+  drawOwnWorldNames(lod);
   drawRegionLabels(lod);
   /**
    * Силуэт КРЕПОСТИ: прозрачный орбитальный каркас и — у крепости с ядром — корпус и
@@ -796,4 +817,5 @@ export function drawWorlds(now: number, lod: MapLod): void {
   }
 
   cx.restore();
+  drawCapitalObjectives();
 }

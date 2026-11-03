@@ -20,6 +20,15 @@ const match: MatchRow = {
 };
 
 describe('match description', () => {
+  it('describes capital capture without score, domination or a score-based deadline', () => {
+    const html = matchDescriptionHtml({ ...match, modeId: 'capital_2v2', rules: {
+      victory: { ...match.rules.victory, capitalCapture: true, endsAt: 1000 },
+    } }, 'Team map');
+    expect(html).toContain(t('browser.description.capitals'));
+    expect(html).toContain(t('browser.description.no-deadline'));
+    expect(html).not.toContain(t('browser.description.score', { n: 2200 }));
+    expect(html).not.toContain(t('browser.description.domination', { p: 60 }));
+  });
   it('shows pinned base rules and coalition scaling, rather than promising a solo threshold to a team', () => {
     const html = matchDescriptionHtml(match, 'Team map');
     expect(html).toContain(t('browser.description.score', { n: 2200 }));

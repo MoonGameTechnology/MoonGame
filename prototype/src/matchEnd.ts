@@ -41,6 +41,8 @@ function operationEndText(op: OperationState | undefined): string {
  *  контракт главы, если он есть: текст победы по нему называет только объявленное. */
 export function endReasonText(reason: string | undefined, operation?: OperationState): string {
   switch (reason) {
+    case 'capital-capture':
+      return t('ai.end.capital-capture');
     case 'domination':
       return t('ai.end.domination');
     case 'elimination':

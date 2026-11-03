@@ -21,12 +21,15 @@ export function matchDescriptionHtml(match: MatchRow, mapName: string): string {
           : unknown;
   const goals: string[] = [];
   const endsAt = match.rules.victory?.endsAt;
+  const capitalCapture = !!match.rules.victory?.capitalCapture;
   // The server's deadline is absolute GAME time, never a wall-clock timestamp or
   // a remaining duration. Use the same day numbering as the in-match clock/log.
-  const deadline = endsAt !== undefined && Number.isFinite(endsAt) && endsAt >= 0
+  const deadline = capitalCapture ? t('browser.description.no-deadline') :
+    endsAt !== undefined && Number.isFinite(endsAt) && endsAt >= 0
     ? t('browser.description.timeout', { at: gameStamp(endsAt) })
     : unknown;
   if (match.kind === 'pve') goals.push(t('browser.description.pve'));
+  else if (capitalCapture) goals.push(t('browser.description.capitals'));
   else {
     if (match.rules.victory?.scoreLimit)
       goals.push(t('browser.description.score', { n: match.rules.victory.scoreLimit }));

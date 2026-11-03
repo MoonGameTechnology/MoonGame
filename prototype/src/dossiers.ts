@@ -462,6 +462,9 @@ export function abilityDossier(id: string): Dossier | null {
 
 /** Wire the live-state renderers to the match screen. The pure exports above need no
  *  host and are imported directly. */
+const buildingScorePerLevel = (value: number, divisor: number): number =>
+  Math.round((value / divisor) * 100) / 100;
+
 export function createDossiers(host: DossierHost): {
   constructionDossier: (key: string) => Dossier | null;
   objDossier: (key: string) => Dossier | null;
@@ -672,7 +675,7 @@ export function createDossiers(host: DossierHost): {
       }
       if ((def.scoreValue ?? 0) > 0 && host.victoryPoints())
         rows.push(
-          cxRow(t('codex.row.score'), t('codex.value.per-level', { n: def.scoreValue ?? 0 })),
+          cxRow(t('codex.row.score'), t('codex.value.per-level', { n: buildingScorePerLevel(def.scoreValue ?? 0, host.state().match.buildingScoreDivisor ?? 1) })),
         );
       rows.push(
         cxRow(
