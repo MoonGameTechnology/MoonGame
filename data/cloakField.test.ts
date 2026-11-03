@@ -18,11 +18,11 @@ describe('маскировочное поле', () => {
     expect(data.modules.cloak_field).toMatchObject({ slot: 'utility', rarity: 'legendary' });
   });
 
-  it('−20% без звёзд, −50% на ★6', () => {
+  it('−20% без звёзд, −32% на ★6', () => {
     const fleet = (stars: number) => ({
       units: [{ unit: 'hero', count: 1, modules: ['cloak_field'], moduleStars: { cloak_field: stars } }],
     });
     expect(fleetCloakRating(fleet(0), data)).toBeCloseTo(0.2, 9);
-    expect(fleetCloakRating(fleet(6), data)).toBeCloseTo(0.5, 9);
+    expect(fleetCloakRating(fleet(6), data)).toBeCloseTo(0.32, 9);
   });
 });

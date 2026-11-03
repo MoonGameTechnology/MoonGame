@@ -1268,8 +1268,8 @@ describe('производство — редкость и уровень про
     expect(html).toContain('<span class="cn-tst" aria-hidden="true">★2</span>');
     expect(html).toContain(`(${t('rarity.unique')}, ${t('shipcard.stars', { n: 2 })})"`);
     expect(html).toContain(moduleGradeHtml('unique', 2));
-    // ★2 = ×1.2 на вклад модуля и на параметр уникальной ступени: +1.2 скорости, +0.6 защиты.
-    expect(html).toContain(`+1.2 ${t(STAT_KEY.speed!)}`);
+    // ★2 = ×1.1 на вклад модуля и на параметр уникальной ступени: +1.1 скорости, +0.6 защиты.
+    expect(html).toContain(`+1.1 ${t(STAT_KEY.speed!)}`);
     expect(html).toContain(`+0.6 ${t(STAT_KEY.defense!)}`);
   });
 
@@ -1280,6 +1280,6 @@ describe('производство — редкость и уровень про
     const c = card(html, 'cargo_bay');
     expect(c).toContain('★</span>');
     const cargo = data.modules.cargo_bay!.effects.stats.cargoCapacity!;
-    expect(c).toContain(`+${Math.round(cargo * 1.1 * 10) / 10} `);
+    expect(c).toContain(`+${Math.round(cargo * 1.05 * 10) / 10} `);
   });
 });

@@ -1503,6 +1503,7 @@
 | SM-4.1 | ✅ | data | `docs/ship-modules-roadmap.md` | Боевые и защитные модули вдвое, эффекты флота — флагману героя |
 | SM-4.2 | ✅ | data | `docs/ship-modules-roadmap.md` | Перехватная турель |
 | SM-4.3 | ✅ | core | `docs/ship-modules-roadmap.md` | Маскировочное поле |
+| SM-4.4 | ✅ | data | `docs/ship-modules-roadmap.md` | Пологая лестница звёзд |
 | SHU-0.1 | ✅ | core data proto | `docs/shuttles-roadmap.md` | Переименование: эскадрильи → челноки |
 | SHU-1.1 | ✅ | core data | `docs/shuttles-roadmap.md` | Ангар космопорта |
 | SHU-1.2 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар и возврат |

@@ -365,6 +365,18 @@ export const CLOAK_FIELD_SOLO_MIGRATION = {
   toDataHash: '0f9abfa796f0e3',
 } as const;
 
+/** Catalogue pair: a gentler star ladder (SM-4.4) — two sure stars instead of three, and a
+ *  star multiplies a module's contribution by ×1.05…×1.6 instead of ×1.1…×2.5. A saved ship
+ *  keeps its stars; only what they are worth is read from the new catalogue. */
+export const STAR_LADDER_SOLO_MIGRATION = {
+  fromRules: CLOAK_FIELD_SOLO_MIGRATION.toRules,
+  fromData: CLOAK_FIELD_SOLO_MIGRATION.toData,
+  fromDataHash: CLOAK_FIELD_SOLO_MIGRATION.toDataHash,
+  toRules: '173486d5cc6c30',
+  toData: '0.1.79',
+  toDataHash: '1c1df8bf2931ed',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -398,6 +410,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_DEVELOPMENT_SOLO_MIGRATION,
   INTERCEPT_TURRET_SOLO_MIGRATION,
   CLOAK_FIELD_SOLO_MIGRATION,
+  STAR_LADDER_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

@@ -38,12 +38,12 @@ describe('перехватная турель', () => {
     expect(armed).toBeGreaterThan(plain);
   });
 
-  it('легендарная ★6 упирается в +16,25: звезда множит и базу, и строку редкости', () => {
+  it('легендарная ★6 упирается в +10,4: звезда множит и базу, и строку редкости', () => {
     const top = effectiveStats(
       interceptor,
       { modules: ['intercept_turret'], moduleStars: { intercept_turret: 6 }, moduleRarity: { intercept_turret: 'legendary' } },
       data,
     );
-    expect(top.shuttleDamage! - interceptor.stats.shuttleDamage!).toBeCloseTo(16.25, 6);
+    expect(top.shuttleDamage! - interceptor.stats.shuttleDamage!).toBeCloseTo(10.4, 6);
   });
 });
