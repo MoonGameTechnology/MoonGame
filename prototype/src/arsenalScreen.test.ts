@@ -459,7 +459,10 @@ function hostOf(over: Partial<ArsenalHost> = {}): FakeHost {
 }
 
 /** The server: the economy view, the store, and a craft endpoint the test can script. */
-function server(craft?: (body: Record<string, unknown>) => unknown) {
+function server(
+  craft?: (body: Record<string, unknown>) => unknown,
+  over: Partial<MetaEconomyView> = {},
+) {
   const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
   const fetcher = vi.fn(async (url: string, init?: { body?: string }) => {
     const path = url.replace('https://srv', '');
@@ -470,7 +473,7 @@ function server(craft?: (body: Record<string, unknown>) => unknown) {
       if (out instanceof Error) throw out;
       return response(out ?? { ok: true, receipt: { id: 'r' } });
     }
-    return response(path === '/commerce/offers' ? { offers: [] } : view());
+    return response(path === '/commerce/offers' ? { offers: [] } : view(over));
   });
   vi.stubGlobal('fetch', fetcher);
   return { posts, fetcher };
@@ -661,6 +664,21 @@ describe('арсенал — вкладка', () => {
     expect(host.sheet().classList.contains('open')).toBe(false);
     expect(arsenal.isOpen()).toBe(false);
     expect(host.sheet().innerHTML).toBe('');
+  });
+
+  it('телефон: «Собрать» в цели мастерской открывает шторку с подтверждением', async () => {
+    const { posts } = server(undefined, { supplyGoal: 'siege' });
+    const host = hostOf({ narrow: () => true });
+    const arsenal = initArsenal(host);
+    await arsenal.refresh();
+    // The goal's module is the default selection, and the sheet is still closed.
+    expect(host.root().innerHTML).toContain('data-ar-craft="siege"');
+    host.root().fire({ arCraft: 'siege' });
+    expect(arsenal.isOpen()).toBe(true);
+    expect(host.sheet().innerHTML).toContain('data-ar-craft-do="siege"');
+    host.sheet().fire({ arCraftDo: 'siege' });
+    await vi.waitFor(() => expect(host.sheet().innerHTML).toContain('Модуль собран.'));
+    expect(posts.map((p) => p.path)).toEqual(['/meta-economy/craft']);
   });
 
   it('уход с вкладки и расширение экрана закрывают шторку', async () => {

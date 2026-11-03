@@ -20,7 +20,7 @@ export function arsenalHeroesHtml(selected: string | undefined): string {
       const def = data.heroAbilities[key] ?? data.heroPassives[key];
       return def
         ? [
-            `<article class="ar-hero-skill"><i aria-hidden="true">✦</i><h4>${esc(tData(def.name))}</h4><p>${esc(t(def.description ?? ''))}</p></article>`,
+            `<article class="ar-hero-skill"><h4>${esc(tData(def.name))}</h4><p>${esc(t(def.description ?? ''))}</p></article>`,
           ]
         : [];
     })
@@ -28,7 +28,6 @@ export function arsenalHeroesHtml(selected: string | undefined): string {
   return `<section class="ar-heroes"><div class="ar-hero-roster">${cards}</div>
     <article class="ar-hero-detail"><h3>${esc(tData(hero.name))}</h3><p>${esc(t(hero.description ?? ''))}</p>
       <h4>${t('arsenal.heroes.skills')}</h4><div class="ar-hero-skills">${skills}</div>
-      <div class="ar-hero-destinations"><section><h4>${t('arsenal.heroes.galactic-war')}</h4><p>${t('arsenal.heroes.match')}</p><button type="button" data-ar-hero-match>${t('arsenal.heroes.open-match')}</button></section>
-      <section><h4>${t('sector-zero.enter')}</h4><p>${t('arsenal.heroes.sector')}</p><button type="button" data-ar-hero-sector="${esc(id)}">${t('arsenal.heroes.open-sector')}</button></section></div>
+      <div class="ar-hero-match"><p>${t('arsenal.heroes.match')}</p><button type="button" data-ar-hero-match>${t('arsenal.heroes.open-match')}</button></div>
     </article></section>`;
 }

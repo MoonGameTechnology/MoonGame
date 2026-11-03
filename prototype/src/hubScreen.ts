@@ -475,7 +475,6 @@ export function initHubScreen(host: HubScreenHost): void {
       },
       openAuction: () => hubTab('auction'),
       openHeroMatch: () => hubTab('games'),
-      openHeroSector: (hero) => openSectorZero({ hero }),
       sell: (itemId) => {
         metaMarket?.focusSell(itemId);
         hubTab('auction');

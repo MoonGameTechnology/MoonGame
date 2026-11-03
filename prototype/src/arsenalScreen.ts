@@ -658,7 +658,6 @@ export interface ArsenalHost {
   signIn(): void;
   openAuction(): void;
   openHeroMatch?(): void;
-  openHeroSector?(hero: string): void;
   /** The auction's sell form for this copy. */
   sell(itemId: string): void;
   /** «Снабжение» on its season (rewards are claimed there). */
@@ -842,7 +841,6 @@ export function initArsenal(host: ArsenalHost): {
     }
     if (d.arHero) { hero = d.arHero; return paint(); }
     if (d.arHeroMatch !== undefined) return host.openHeroMatch?.();
-    if (d.arHeroSector) return host.openHeroSector?.(d.arHeroSector);
     if (d.arModule) return open('modules', d.arModule, byAttr('data-ar-module', d.arModule));
     if (d.arHull) return open('hulls', d.arHull, byAttr('data-ar-hull', d.arHull));
     if (d.arPick !== undefined) {
@@ -885,7 +883,9 @@ export function initArsenal(host: ArsenalHost): {
     if (d.arCraft) {
       const recipe = view.recipes.find((r) => r.id === d.arCraft);
       if (!recipe?.canCraft) return;
-      if (tab !== 'modules' || module !== recipe.defId)
+      // The confirmation is drawn in the detail. On a phone that is the sheet, still closed
+      // when the goal card asks, even if the goal's module is already the selected one.
+      if (tab !== 'modules' || module !== recipe.defId || (!wide && !sheetOpen))
         open('modules', recipe.defId, byAttr('data-ar-craft', recipe.id));
       return ask({ kind: 'craft', recipeId: recipe.id });
     }

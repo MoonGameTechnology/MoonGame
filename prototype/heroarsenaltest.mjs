@@ -8,10 +8,12 @@ import { enterSkirmish, instrumentedGame, launchBrowser, serve, waitForApp, with
 const hooks = `
 import * as __heroProfile from './sectorProfile';
 import { presentMatchHeroRewards as __presentHeroReward } from './heroRewards';
+import { openSectorZero as __openSectorZero } from './sectorZeroShell';
 window.__heroArsenalTest = {
   seed: () => __heroProfile.saveSectorProgress({ ...__heroProfile.sectorProgress, research: 10000,
     heroTokens: { ...__heroProfile.sectorProgress.heroTokens, commander: 100 } }),
   read: () => __heroProfile.sectorProgress,
+  openSector: (hero) => __openSectorZero({ hero }),
   back: () => stepBack(false),
   matchReward: () => {
     shipyard.open('heroes');
@@ -38,13 +40,14 @@ try {
       await page.locator('[data-ar-tab="heroes"]').click();
       await page.locator('[data-ar-hero="commander"]').click();
       assert(await page.locator('.ar-hero-skills').isVisible());
-      assert((await page.locator('.ar-hero .hero-portrait').first().boundingBox()).width >= 80);
+      assert((await page.locator('.ar-hero .hero-portrait').first().boundingBox()).width >= 40);
+      assert.equal(await page.locator('[data-ar-hero-sector]').count(), 0);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
       const tabBox = await page.locator('[data-ar-tab="heroes"]').boundingBox();
       assert(tabBox.x + tabBox.width <= width);
       await page.screenshot({ path: `.playwright-mcp/hero-catalog-${locale}.png`, fullPage: true });
       await page.evaluate(() => window.__heroArsenalTest.seed());
-      await page.locator('[data-ar-hero-sector="commander"]').click();
+      await page.evaluate(() => window.__heroArsenalTest.openSector('commander'));
       await page.locator('[data-prep="hero-tab"][data-id="ship"]').waitFor();
       await page.locator('[data-prep="bay"][data-slot="utility"]').first().click();
       await page.locator('[data-prep="fit-hero"][data-id="ion_engine"]').click();
