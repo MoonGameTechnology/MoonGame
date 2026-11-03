@@ -55,6 +55,7 @@ import {
   type MatchTab,
 } from './matchRow';
 import { openSetup } from './setupScreen';
+import { canCreateOnlineMatch, forgetMatchCreation, initMatchCreation, refreshMatchCreation } from './matchCreation';
 
 /** Что обозревателю нужно от игры. Живёт в `main.ts`. */
 export interface MatchBrowserHost {
@@ -119,7 +120,8 @@ let pollStarted = false;
 export async function refreshMatches(quiet = false): Promise<void> {
   startPoll();
   const srv = game.resolveServer();
-  if (!srv) return;
+  if (!srv) { forgetMatchCreation(); return; }
+  const permission = refreshMatchCreation();
   // Что переопрос пишет в строку статуса — `matchPoll.ts` (REFM-153): тихий фоновый
   // не мигает «загрузкой» над уже показанным списком, но о беде молчать не имеет
   // права — эту строку читает `renderMatches` как признак «сервер не ответил».
@@ -130,6 +132,7 @@ export async function refreshMatches(quiet = false): Promise<void> {
   };
   line('start');
   line((await loadMatchLists(srv)) ? 'loaded' : 'failed');
+  await permission;
   if (!isMatchDescriptionOpen()) renderMatches();
 }
 
@@ -431,7 +434,7 @@ function renderMatches(): void {
   const down = showServerRow({ loaded, failed });
   $('msrv').style.display = down ? '' : 'none';
   if (down && game.statusText() === t('acc.server-down')) game.status('');
-  $('match-create').style.display = loaded && !failed && activeTab === 'available' ? '' : 'none';
+  $('match-create').style.display = loaded && !failed && activeTab === 'available' && canCreateOnlineMatch() ? '' : 'none';
   // Вход по номеру — там же, где новая партия: только когда сервер ответил.
   $('mnum').style.display = loaded && !failed ? '' : 'none';
   // Панель нужна только там, где есть что фильтровать: без загруженной ленты она
@@ -577,6 +580,7 @@ export function showLists(lists: Record<MatchTab, MatchRow[]>): void {
  *  блока `main.ts`: тот открывает хаб, а заход домой переспрашивает «Мои партии». */
 export function initMatchBrowser(host: MatchBrowserHost): void {
   game = host;
+  initMatchCreation(() => game.resolveServer());
   srvInput = $('csrv') as HTMLInputElement;
   // Контролы фильтра (BRW-3). Обработчики вешаются ОДИН раз: живой пересчёт — это
   // перерисовка уже лежащей в памяти ленты, без похода на сервер.

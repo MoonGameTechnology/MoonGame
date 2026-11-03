@@ -21,6 +21,13 @@ describe('account-scoped session creation', () => {
       join: async () => ({ error: 'E_NO_MATCH' }),
     });
     try {
+      expect((await app.inject({ method: 'GET', url: '/matches/capabilities' })).statusCode).toBe(401);
+      const deniedCapability = await app.inject({ method: 'GET', url: '/matches/capabilities?accountId=owner&nick=Owner', headers: { authorization: 'other' } });
+      expect(deniedCapability.json()).toEqual({ canCreate: false });
+      expect(deniedCapability.headers['cache-control']).toBe('no-store');
+      const grantedCapability = await app.inject({ method: 'GET', url: '/matches/capabilities', headers: { authorization: 'creator' } });
+      expect(grantedCapability.json()).toEqual({ canCreate: true });
+      expect(created).toBe(0);
       expect((await app.inject({ method: 'POST', url: '/matches' })).statusCode).toBe(401);
       const denied = await app.inject({ method: 'POST', url: '/matches', headers: { authorization: 'other' }, payload: { accountId: 'owner' } });
       expect(denied.statusCode).toBe(403);
@@ -33,7 +40,30 @@ describe('account-scoped session creation', () => {
   it('a restricted host cannot accidentally authorize an unidentified dev caller', async () => {
     const app = Fastify();
     registerMatchApi(app, { canCreate: () => true, createMatch: async () => { throw new Error('must not create'); }, join: async () => ({ error: 'E_NO_MATCH' }) });
-    try { expect((await app.inject({ method: 'POST', url: '/matches' })).statusCode).toBe(403); }
+    try {
+      expect((await app.inject({ method: 'GET', url: '/matches/capabilities' })).json()).toEqual({ canCreate: false });
+      expect((await app.inject({ method: 'POST', url: '/matches' })).statusCode).toBe(403);
+    }
     finally { await app.close(); }
+  });
+  it('does not advertise creation when the host has no create route', async () => {
+    const app = Fastify();
+    registerMatchApi(app, { join: async () => ({ error: 'E_NO_MATCH' }) });
+    try { expect((await app.inject('/matches/capabilities')).json()).toEqual({ canCreate: false }); }
+    finally { await app.close(); }
+  });
+  it('capability checks fail closed without leaking a failed policy', async () => {
+    const app = Fastify();
+    registerMatchApi(app, {
+      identify: async () => ({ accountId: 'owner', login: 'Owner' }),
+      canCreate: () => { throw new Error('private policy detail'); },
+      createMatch: async () => ({ matchId: 'test', seats: ['p1'] }),
+      join: async () => ({ error: 'E_NO_MATCH' }),
+    });
+    try {
+      const response = await app.inject('/matches/capabilities');
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: 'E_UNAVAILABLE' });
+    } finally { await app.close(); }
   });
 });

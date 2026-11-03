@@ -38,6 +38,8 @@ import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
 import { DEFAULT_MAP_ID, fixedSideMode, isCurrentMap, isFrontier, mapPreset, seatsByCount, teamForStart, MAP_IDS, type MapId } from './mapCatalog';
 import { mapWorldName } from './planetName';
 import { resetSandboxConfig } from './sandbox';
+import { refreshMatchCreation } from './matchCreation';
+import { detach } from './detach';
 import { initSciPick, sciCouncilRowHtml } from './sciPick';
 import { SNAP_REACH, drawOrder, lanes, mapViewBox, viewBoxPoint } from './setupMap';
 import { setupRivalsHtml } from './setupRivals';
@@ -460,6 +462,7 @@ let sciPick: ReturnType<typeof initSciPick>;
 const openSciPick = (): void => sciPick.open();
 
 export function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
+  detach('match creation access', refreshMatchCreation());
   saveSolo();
   if (!game.net()) game.halt();
   setupReturn = from;
