@@ -142,7 +142,7 @@ try {
       }
       await page.click('#hp-corp [data-corpsec="base"]');
       assert.equal(await page.locator('#hp-corp .cb-bc').count(), buildingCount);
-      assert.equal(await page.locator('#hp-corp .cb-lot').count(), 3);
+      assert.equal(await page.locator('#hp-corp .cb-lot').count(), buildingCount);
       await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-base.png` });
       // A locked building's sheet explains the lock instead of offering an order.
       await page.click('#hp-corp .cb-bc[data-corpbld="supply_center"]');

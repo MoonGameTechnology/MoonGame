@@ -182,6 +182,28 @@ jobs:
       - name: Corporation identity smoke
         run: node prototype/corptest.mjs --identity-only
 
+      # The rest of the corporation flows: the base, corporation battles, the style and
+      # backdrop shop, building materials and the news window. Outside CI two of these
+      # rotted unnoticed when the base grew from 3 to 7 buildings, so they run on every
+      # push now. Non-blocking like the browser smoke above: a failure surfaces as an
+      # error annotation per smoke without reddening main. Each DB smoke makes and drops
+      # its own `*_test` database next to the service one.
+      - name: Corporation flows smoke (non-blocking)
+        env:
+          AVA_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/void_test
+          CORP_STYLE_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/void_test
+          CORP_MATERIALS_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/void_test
+        run: |
+          failed=0
+          for smoke in corptest avatest corpstyletest corpmaterialstest newstest; do
+            if ! node "prototype/$smoke.mjs"; then
+              echo "::error title=Corporation flows smoke::$smoke упал — смотри лог шага"
+              failed=1
+            fi
+          done
+          exit "$failed"
+        continue-on-error: true
+
       # YAG-1.1c: робот играет в СОБРАННЫЙ архив площадки (`prototype/dist/yandex/`) —
       # запуск, забег, «Продолжить», ролик за награду, закрытые двери по ссылке. Архив
       # собран с `__SECTOR_ZERO_ONLY__`, и его кода не повторяет ни одна другая сборка:
