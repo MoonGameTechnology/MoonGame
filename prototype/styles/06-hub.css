@@ -318,6 +318,7 @@
 .cb-settings-icon{font-size:22px;line-height:1;}
 .cb-tab small{min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:grid;place-items:center;
   font-size:var(--fs-caption);font-weight:700;background:var(--amber);color:#1c1200;}
+.cb-tab[data-corpsec="battles"] small{background:#ff5f65;color:#1a0505;}
 .cb-tab[aria-selected="true"]{background:var(--sf-sel);color:var(--sf-hi);box-shadow:inset 0 -2px 0 var(--sf-accent);}
 :is(.cb-tab,.cb-lvl,.cb-lot,.cb-bc):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
 /* База: сцена — фон окружения и здания на палубе (corpSprites.ts). На ПК мир 1200×630, на узкой

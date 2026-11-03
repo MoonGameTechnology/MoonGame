@@ -25,6 +25,7 @@ import {
   type AvaFormat,
   type AvaFormatCatalog,
 } from './avaFormats';
+import { influenceDetail, liveShare, settleBattle } from './avaEconomy';
 import { corpMedalNews } from './corpNews';
 import type { MedalCatalog } from './medalCatalog';
 
@@ -94,6 +95,11 @@ export type { CorpBattleSeat as AvaBattleSeat, CorpBattleResult as AvaBattleResu
 /** Default challenge expiry (tunable via deps). Price, roster bounds and the win reward
  *  come from the challenge's format (CORP-7). */
 const DEFAULT_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24h real-time
+/** CORP-19: the daily bonus cap's window. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** CORP-19: recent results the repeat and cap checks read — a week of battles of one corp
+ *  stays far below it (each battle takes a day of roster window). */
+const RECENT_RESULTS = 500;
 /** Roster window (AVA-6, corporation-wars.md §2: пауза 1–2 дня). */
 const DEFAULT_PAUSE_MS = 24 * 60 * 60 * 1000; // 24h real-time
 
@@ -266,7 +272,7 @@ export class AvaService {
       at,
       actor: who.accountId,
       action: 'influence',
-      detail: `-${cost}: вызов ${targetCorpId}`,
+      detail: influenceDetail(-cost, 'challenge', targetCorpId),
     });
     return { ok: true, id: challenge.id };
   }
@@ -307,7 +313,11 @@ export class AvaService {
     if (!gate.ok) return gate;
     const closed = await this.challenges.closeChallenge(challengeId, 'accepted');
     if (!closed) return { ok: false, code: 'E_CHALLENGE_CLOSED' }; // lost the double-accept race
-    await this.challenges.openRosterWindow(challengeId, this.now() + this.pauseMs);
+    // CORP-19: the ratings the win bonus is reckoned from are fixed now, not at the end.
+    await this.challenges.openRosterWindow(challengeId, this.now() + this.pauseMs, {
+      challenger: await this.ratingOf(gate.challenge.challengerCorp),
+      target: await this.ratingOf(gate.challenge.targetCorp),
+    });
     await this.corps.appendAudit({
       corpId: gate.challenge.targetCorp,
       at: this.now(),
@@ -329,6 +339,18 @@ export class AvaService {
     if (!closed) return { ok: false, code: 'E_CHALLENGE_CLOSED' };
     // Refund ONLY after we won the close race — closeChallenge returning true is the
     // exactly-once guarantee, so the challenger can't be refunded twice.
+    await this.refund(gate.challenge);
+    return { ok: true };
+  }
+
+  /** withdraw — the challenger's head takes back a challenge the target has not answered
+   *  → cancelled and refunded in full. The pending→cancelled close is the same
+   *  exactly-once gate as decline: a withdraw racing an accept or an expiry loses cleanly. */
+  async withdraw(who: CorpActor, challengeId: string): Promise<{ ok: true } | AvaFail> {
+    const gate = await this.challengePartyGate(who, challengeId, 'challenger');
+    if (!gate.ok) return gate;
+    const closed = await this.challenges.closeChallenge(challengeId, 'cancelled');
+    if (!closed) return { ok: false, code: 'E_CHALLENGE_CLOSED' };
     await this.refund(gate.challenge);
     return { ok: true };
   }
@@ -471,11 +493,12 @@ export class AvaService {
   // ---- AVA-8 · settlement (S7) --------------------------------------------
 
   /** settleMatch — the orchestrator calls this once a LOCKED matchup's war has ended:
-   *  archive it (locked→ended), record the outcome (MM-3.1 history), and award influence
-   *  to the winning corp (AVA-2) by the matchup's format (CORP-7). The atomic locked→ended
+   *  archive it (locked→ended), record the outcome (MM-3.1 history), move both battle
+   *  ratings and pay out influence by the economy (CORP-19, `avaEconomy.ts`): the stake
+   *  back and a bonus for a winning challenger, a share of the bonus for a winning target,
+   *  part of the stake back on a draw (`winnerSide` null). The atomic locked→ended
    *  transition is the exactly-once gate — a replayed `match.ended` loses the race and
-   *  no-ops, so influence is never awarded twice. `winnerSide` is null for a draw (result
-   *  recorded, no influence); a format the catalog no longer knows awards none either.
+   *  no-ops, so influence is never paid out twice.
    *  The result carries the matchup's format and, when the host sends one, the battle's
    *  breakdown (CORP-9, `avaBattleReport`). Server-driven (past the action gate) like the
    *  expiry/roster sweeps — no client. */
@@ -500,6 +523,19 @@ export class AvaService {
     const at = this.now();
     // CORP-9: the breakdown the host sent, if it holds up; a bad one never blocks the result.
     const breakdown = parseAvaBattleReport(report);
+    const economy = this.formats.economy;
+    const payout = settleBattle(economy, {
+      cost: matchup.cost,
+      winner: winnerSide,
+      ratings: matchup.ratings ?? {
+        challenger: await this.ratingOf(matchup.challengerCorp),
+        target: await this.ratingOf(matchup.targetCorp),
+      },
+      pairBattles: await this.pairBattles(matchup, at),
+      bonusToday: winnerCorp === null ? 0 : await this.bonusSince(winnerCorp, at - DAY_MS),
+      liveShare:
+        winnerSide === null ? 1 : liveShare(breakdown, winnerSide === 'challenger' ? 'target' : 'challenger'),
+    });
     await this.results.record({
       matchupId,
       challengerCorp: matchup.challengerCorp,
@@ -508,17 +544,17 @@ export class AvaService {
       at,
       format: matchup.format,
       ...(breakdown ? { report: breakdown } : {}),
+      bonus: payout.bonus,
     });
-    const reward = avaFormat(this.formats, matchup.format)?.reward;
-    if (winnerCorp !== null && reward !== undefined) {
-      await this.corps.addInfluence(winnerCorp, reward);
-      await this.corps.appendAudit({
-        corpId: winnerCorp,
-        at,
-        actor: 'system',
-        action: 'influence',
-        detail: `+${reward}: победа ${matchupId}`,
-      });
+    await this.corps.adjustRating(matchup.challengerCorp, payout.rating.challenger, economy.ratingStart);
+    await this.corps.adjustRating(matchup.targetCorp, payout.rating.target, economy.ratingStart);
+    if (payout.refund > 0) {
+      await this.corps.addInfluence(matchup.challengerCorp, payout.refund);
+      await this.audit(matchup.challengerCorp, at, influenceDetail(payout.refund, 'refund'));
+    }
+    if (winnerCorp !== null && payout.bonus > 0) {
+      await this.corps.addInfluence(winnerCorp, payout.bonus);
+      await this.audit(winnerCorp, at, influenceDetail(payout.bonus, 'win'));
     }
     // AVA-9: the public feed row goes LAST and best-effort — the settlement already
     // committed (endMatchup is the exactly-once gate); a feed hiccup must not fail it.
@@ -621,6 +657,32 @@ export class AvaService {
     });
   }
 
+  /** CORP-19: a corp's battle rating; the catalog's start before its first battle. */
+  private async ratingOf(corpId: string): Promise<number> {
+    return (await this.corps.getCorp(corpId))?.rating ?? this.formats.economy.ratingStart;
+  }
+
+  /** CORP-19: battles this pair fought inside the repeat window before `at`. */
+  private async pairBattles(matchup: AvaChallenge, at: number): Promise<number> {
+    const since = at - this.formats.economy.pairWindowMs;
+    const other = (r: AvaResult): string =>
+      r.challengerCorp === matchup.challengerCorp ? r.targetCorp : r.challengerCorp;
+    return (await this.results.resultsOf(matchup.challengerCorp, RECENT_RESULTS)).filter(
+      (r) => r.at > since && r.matchupId !== matchup.id && other(r) === matchup.targetCorp,
+    ).length;
+  }
+
+  /** CORP-19: bonus influence the corp has won in battles since `since`. */
+  private async bonusSince(corpId: string, since: number): Promise<number> {
+    return (await this.results.resultsOf(corpId, RECENT_RESULTS))
+      .filter((r) => r.at > since && r.winnerCorp === corpId)
+      .reduce((sum, r) => sum + (r.bonus ?? 0), 0);
+  }
+
+  private async audit(corpId: string, at: number, detail: string): Promise<void> {
+    await this.corps.appendAudit({ corpId, at, actor: 'system', action: 'influence', detail });
+  }
+
   private async refund(challenge: AvaChallenge): Promise<void> {
     await this.corps.addInfluence(challenge.challengerCorp, challenge.cost);
     await this.corps.appendAudit({
@@ -628,7 +690,7 @@ export class AvaService {
       at: this.now(),
       actor: 'system',
       action: 'influence',
-      detail: `+${challenge.cost}: возврат`,
+      detail: influenceDetail(challenge.cost, 'refund'),
     });
   }
 

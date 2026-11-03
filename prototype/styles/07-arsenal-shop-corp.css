@@ -348,6 +348,8 @@ span.ar-fchip{cursor:default;}
 #hub .hub-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px 8px;cursor:pointer;
   background:transparent;border:0;color:var(--sf-head);font:var(--fs-body) var(--sf-font);}
 #hub .hub-tab .hn-ic{font-size:20px;line-height:1;}
+#hub .hub-tab{position:relative;}
+#hub .hub-tab .news-dot{top:6px;right:calc(50% - 20px);}
 #hub .hub-tab.active{color:var(--cyan);}
 #hub .hub-tab.active .hn-ic{text-shadow:0 0 8px rgba(53,214,230,.6);}
 

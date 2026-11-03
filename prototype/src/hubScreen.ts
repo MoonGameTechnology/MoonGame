@@ -23,6 +23,7 @@ import { authMode, probeAuthMode, sessionToken, signOutEverywhere } from './acco
 import { initArsenal } from './arsenalScreen';
 import { syncCommanderXp } from './commanderSync';
 import { initCorp } from './corpScreen';
+import { corpAttentionMarker } from './corpAttention';
 import { detach } from './detach';
 import { initFriends } from './friendsScreen';
 import { maybeIntro, openCodex } from './helpCenter';
@@ -104,6 +105,7 @@ export function showHub(show: boolean): void {
   if (!show) arsenal?.close();
   if (!show) shop?.close();
   if (!show) corp?.hideHub();
+  pollCorpAttention(show);
   // Карточка справочника, открытая в партии (её кнопки строят на выбранном мире), в хаб не переходит.
   if (show) document.getElementById('codex')?.classList.remove('show');
   news?.setActive(show);
@@ -111,6 +113,20 @@ export function showHub(show: boolean): void {
   // Справочник, открытый из хаба (карточка арсенала, плитка «Справка»), встаёт ПОВЕРХ хаба:
   // в партии его слой ниже, а у хаба выше, и раньше он открывался за ним (`prototype/styles/`).
   document.body.classList.toggle('hub-open', show);
+}
+
+/** The red marker on «Корпорация» stays true while the hub is up on any tab: a light read
+ *  every minute (the open corporation tab refreshes itself and skips it). */
+let corpAttentionTimer: ReturnType<typeof setInterval> | undefined;
+function pollCorpAttention(on: boolean): void {
+  if (corpAttentionTimer !== undefined) clearInterval(corpAttentionTimer);
+  corpAttentionTimer = undefined;
+  if (!on || !corp) return;
+  const poll = (): void => {
+    if (document.visibilityState !== 'hidden') detach('хаб: внимание корпорации', corp!.pollAttention());
+  };
+  poll();
+  corpAttentionTimer = setInterval(poll, 60_000);
 }
 
 const HUB_PANELS: Record<string, string> = {
@@ -624,9 +640,7 @@ export function initHubScreen(host: HubScreenHost): void {
       hub: {
         root: () => $('hp-corp'),
         sheet: () => $('corp-sheet'),
-        note: (text) => {
-          hubNote.textContent = text;
-        },
+        note: (text) => void (hubNote.textContent = text),
         canSignIn: () => !!game.resolveServer() && authMode === 'accounts',
         signIn: () => {
           showHub(false);
@@ -641,6 +655,7 @@ export function initHubScreen(host: HubScreenHost): void {
         },
         openMarket: () => hubTab('auction'),
         openBattle: (matchupId) => connectToMatch(avaMatchId(matchupId)),
+        alert: corpAttentionMarker,
       },
     });
   // hub interactions

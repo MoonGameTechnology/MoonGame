@@ -2,11 +2,12 @@ import { canFundCorpBuilding, corpMaterialsHtml, parseCorpMaterials } from './co
 import type { CorpMaterialsView } from '../../packages/protocol/src/corpInfrastructure';
 import { corpShowcaseHtml, parseWarehouse, warehouseHtml, type WarehouseView } from './corpFacilitiesView';
 import { corpHubBadges, corpHubState } from '../../decisions/corpHub';
-import { BATTLE_FORMATS, CORP_BATTLE_TABS, formatLimit, parseCorpBattles, parseCorpWar, type CorpBattleTab } from '../../decisions/corpBattles';
+import { BATTLE_FORMATS, CORP_BATTLE_TABS, battlePostPath, formatLimit, parseCorpBattles, parseCorpWar, type CorpBattleTab } from '../../decisions/corpBattles';
 import type { CorpBattlesView, CorpWarView } from '../../packages/protocol/src/corpBattles';
 import { corpBattleReportHtml, corpBattlesViewHtml } from './corpBattlesView';
 import { parseCorpInfrastructure } from '../../decisions/corpInfrastructure';
 import { parseCorpStyle } from '../../decisions/corpStyle';
+import { INFLUENCE_AUDIT_KEY, influenceEntry } from '../../decisions/corpTreasury';
 import type { CorpInfrastructureView } from '../../packages/protocol/src/corpInfrastructure';
 import type { MetaCorpStyleView } from '../../packages/protocol/src/corpStyle';
 import { corpBuildingsHtml, updateCorpConstructionCountdown } from './corpBuildingsView';
@@ -42,6 +43,7 @@ import { t } from '../../localization/runtime';
 import { corpEmblemId, isCorpEmblemId, type CorpEmblemId } from '../../packages/protocol/src/corpIdentity';
 import { CORP_EMBLEM_LABEL, corpEmblem, corpEmblemPicker } from './corpEmblems';
 import { esc, nfmt } from './format';
+import { attentionTotal, corpAttention, pollCorpAttention } from './corpAttention';
 import { detach } from './detach';
 import {
   canManage,
@@ -221,6 +223,8 @@ export interface CorpHost {
     openShop?(style: string): void;
     openMarket?(): void;
     openBattle?(matchupId: string): void;
+    /** A battle or a call waits on this member: light the red marker on the hub button. */
+    alert?(on: boolean): void;
   };
 }
 
@@ -242,6 +246,8 @@ export function initCorp(host: CorpHost): {
   /** Back ladder: the sheet over the hub. */
   hubSheetOpen: () => boolean;
   closeHubSheet: () => void;
+  /** The hub is up on another tab: a light read of `/ava/battles` keeps the marker true. */
+  pollAttention: () => Promise<void>;
 } {
   let infrastructure: CorpInfrastructureView | null = null;
   let corpMaterials: CorpMaterialsView | null = null;
@@ -388,6 +394,13 @@ export function initCorp(host: CorpHost): {
       corpFetchBusy = false;
     }
     paint();
+    host.hub.alert?.(attentionTotal(attention()) > 0);
+  }
+
+  const attention = () => corpAttention(corpMine.membership, battleView?.challenges ?? [], battleRosters, avaAvailable);
+  async function pollAttention(): Promise<void> {
+    if (hubShown || refreshing || !host.hub.alert) return; // the open tab refreshes itself
+    await pollCorpAttention((await host.authorizedBase()) !== null, corpFetch, host.hub.alert, battleRosters);
   }
 
   async function loadCorp(): Promise<void> {
@@ -555,6 +568,8 @@ export function initCorp(host: CorpHost): {
     if (entry.action === 'showcase') return t('corp.audit.showcase');
     if (entry.action === 'emblem') return t('corp.audit.emblem') +
       (isCorpEmblemId(entry.detail) ? ` · ${t(CORP_EMBLEM_LABEL[entry.detail])}` : '');
+    const moved = entry.action === 'influence' ? influenceEntry(entry.detail) : null;
+    if (moved?.kind) return t(INFLUENCE_AUDIT_KEY[moved.kind], { n: `${moved.n > 0 ? '+' : ''}${moved.n}`, corp: moved.ref ? corpNameOf(moved.ref) : '' });
     if (entry.action === 'building_income') return t('corp.buildings.income-earned', { n: entry.detail ?? '0' });
     const name = infrastructure?.buildings.find((b) => b.id === entry.target)?.nameKey;
     if (name && entry.action === 'building_complete') return t('corp.buildings.completed', { name: t(name), n: entry.detail ?? '' });
@@ -949,6 +964,8 @@ export function initCorp(host: CorpHost): {
     const arg = btn.dataset.corparg ?? '';
     const corpId = corpMine.membership?.corpId ?? '';
     const account = btn.dataset.corpaccount ?? '';
+    const post = battlePostPath(act, arg);
+    if (post) return corpSend(act, post);
     switch (act) {
       case 'ava-ready-save': {
         if (!battleView || corpMine.membership?.role !== 'head' || !battleDraft?.length) break;
@@ -1041,29 +1058,8 @@ export function initCorp(host: CorpHost): {
       case 'disband':
         corpSend(act, `/corps/${encodeURIComponent(corpId)}/disband`);
         break;
-      case 'ready-corp':
-        corpSend(act, '/ava/ready/corp');
-        break;
-      case 'ready-corp-clear':
-        corpSend(act, '/ava/ready/corp/clear');
-        break;
-      case 'ready-player':
-        corpSend(act, '/ava/ready/player');
-        break;
-      case 'ready-player-clear':
-        corpSend(act, '/ava/ready/player/clear');
-        break;
       case 'ava-challenge':
         corpSend(act, '/ava/challenge', { target: arg, ...(btn.dataset.corpformat ? { format: Number(btn.dataset.corpformat) } : {}) });
-        break;
-      case 'ava-accept':
-        corpSend(act, `/ava/challenge/${encodeURIComponent(arg)}/accept`);
-        break;
-      case 'ava-decline':
-        corpSend(act, `/ava/challenge/${encodeURIComponent(arg)}/decline`);
-        break;
-      case 'ava-join':
-        corpSend(act, `/ava/matchup/${encodeURIComponent(arg)}/join`);
         break;
       case 'ava-roster-toggle': {
         // arg = matchupId, account = the toggled accountId. Server is wholesale
@@ -1107,12 +1103,12 @@ export function initCorp(host: CorpHost): {
       busy: intentBusy,
       draftEmblem,
       armed: hubArmed,
-      badges: corpHubBadges(me, members, avaChallenges),
+      badges: { ...corpHubBadges(me, members, avaChallenges), battles: attentionTotal(attention()) },
       battles: hubSection === 'battles' && corpMine.corp && me ? corpBattlesViewHtml({
         view: battleView, available: avaAvailable, corp: corpMine.corp, me, members, pool: battlePool,
         rosters: battleRosters, wars: battleWars, tab: battleTab, format: battleFormat,
         maxFormat: formatLimit(infrastructure), draftFormats: battleDraft ?? [], busy: intentBusy,
-        now: Date.now(), canPlay: !!host.hub.openBattle,
+        now: Date.now(), canPlay: !!host.hub.openBattle, attention: attention(),
       }) : '',
       battleReport: hubSheet?.kind === 'report' ? battleReport(hubSheet.matchupId) : '',
       facilities: {
@@ -1387,5 +1383,6 @@ export function initCorp(host: CorpHost): {
     },
     hubSheetOpen: () => hubSheet !== null,
     closeHubSheet,
+    pollAttention,
   };
 }

@@ -159,8 +159,8 @@ const SDK_LOADER = `<!-- Yandex Games SDK -->
 const matchTabs = () => `<div class="mtabs">
           <button class="mtab active" type="button" data-tab="available"><span data-i18n="welcome.browse.tab.available"></span><i class="mcount"></i></button>
           <button class="mtab" type="button" data-tab="active"><span data-i18n="welcome.browse.tab.active"></span><i class="mcount"></i></button>
-          <button class="mtab" type="button" data-tab="archived"><span data-i18n="welcome.browse.tab.archived"></span><i class="mcount"></i></button>
           <button class="mtab" type="button" data-tab="corporate"><span data-i18n="welcome.browse.tab.corporate"></span><i class="mcount"></i></button>
+          <button class="mtab" type="button" data-tab="archived"><span data-i18n="welcome.browse.tab.archived"></span><i class="mcount"></i></button>
         </div>`;
 
 const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
@@ -711,7 +711,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button class="hub-tab active" data-hub="home" type="button"><span class="hn-ic">⌂</span><span data-i18n="hub.nav.home"></span></button>
     <button class="hub-tab" data-hub="games" type="button"><span class="hn-ic">▶</span><span data-i18n="hub.nav.games"></span></button>
     <button class="hub-tab" data-hub="arsenal" type="button"><span class="hn-ic">⚔</span><span data-i18n="hub.nav.arsenal"></span></button>
-    <button class="hub-tab" data-hub="corp" type="button"><span class="hn-ic">⬢</span><span data-i18n="hub.nav.corp"></span></button>
+    <button class="hub-tab" data-hub="corp" type="button"><span class="hn-ic">⬢</span><span data-i18n="hub.nav.corp"></span><i class="news-dot" aria-hidden="true"></i></button>
     <button class="hub-tab" data-hub="more" type="button"><span class="hn-ic">≡</span><span data-i18n="hub.nav.more"></span></button>
   </nav>
   <!-- Шторки арсенала, магазина, ленты новостей и корпорации: вне тела хаба, чтобы его стекло не держало fixed-потомка -->

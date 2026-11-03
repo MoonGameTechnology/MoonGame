@@ -599,6 +599,12 @@ export class MemoryCorpStore implements CorpStore {
     return Promise.resolve();
   }
 
+  adjustRating(corpId: string, delta: number, start: number): Promise<void> {
+    const corp = this.corps.get(corpId);
+    if (corp) corp.rating = (corp.rating ?? start) + delta;
+    return Promise.resolve();
+  }
+
   addInfluence(corpId: string, delta: number): Promise<void> {
     const corp = this.corps.get(corpId);
     if (corp && delta > 0) corp.influence += delta;
@@ -712,7 +718,7 @@ export class MemoryAvaChallengeStore implements AvaChallengeStore {
     return Promise.resolve(mine.slice(0, limit).map((r) => ({ ...r })));
   }
 
-  closeChallenge(id: string, status: 'accepted' | 'declined' | 'expired'): Promise<boolean> {
+  closeChallenge(id: string, status: 'accepted' | 'declined' | 'expired' | 'cancelled'): Promise<boolean> {
     const row = this.rows.get(id);
     if (!row || row.status !== 'pending') return Promise.resolve(false);
     row.status = status;
@@ -728,9 +734,16 @@ export class MemoryAvaChallengeStore implements AvaChallengeStore {
     );
   }
 
-  openRosterWindow(id: string, pauseEndsAt: number): Promise<void> {
+  openRosterWindow(
+    id: string,
+    pauseEndsAt: number,
+    ratings?: Record<AvaSide, number>,
+  ): Promise<void> {
     const row = this.rows.get(id);
-    if (row && row.status === 'accepted') row.pauseEndsAt = pauseEndsAt;
+    if (row && row.status === 'accepted') {
+      row.pauseEndsAt = pauseEndsAt;
+      if (ratings) row.ratings = { ...ratings };
+    }
     return Promise.resolve();
   }
 

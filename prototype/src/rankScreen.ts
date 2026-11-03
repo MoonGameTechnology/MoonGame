@@ -56,7 +56,7 @@ function rowHtml(r: BoardRow, kind: BoardKind, pinned = false): string {
     (kind === 'players'
       ? `<button type="button" class="rk-txt pf-player-link" data-profile="${esc(r.name)}"><b>${esc(r.name)}</b></button>`
       : `<span class="rk-txt"><b>${esc(r.name)}</b>${sub ? `<span>${sub}</span>` : ''}</span>`) +
-    `<span class="rk-sc">${r.score}<i>${t(kind === 'corps' ? 'rank.unit.influence' : 'rank.unit.xp')}</i></span>` +
+    `<span class="rk-sc">${r.score}<i>${t(kind === 'corps' ? 'rank.unit.rating' : 'rank.unit.xp')}</i></span>` +
     `</div>`
   );
 }

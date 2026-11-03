@@ -3,19 +3,18 @@ import { AVA_FORMATS, avaFormat, avaModeId, corpMaxFormat, parseAvaFormats } fro
 import { CORP_BUILDINGS } from './corpConstruction';
 
 describe('AvA battle formats (CORP-7)', () => {
-  it('the catalog: 2 на 2 to 10 на 10 at 50 ⟡ a seat, 75 ⟡ a seat to the winner, N − ⌊N/4⌋ players', () => {
+  it('the catalog: 2 на 2 to 10 на 10 at 50 ⟡ a seat, N − ⌊N/4⌋ players', () => {
     expect(AVA_FORMATS.baseMaxFormat).toBe(3);
     expect(AVA_FORMATS.formats.map((f) => f.format)).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10]);
     for (const f of AVA_FORMATS.formats) {
       expect(f).toEqual({
         format: f.format,
         cost: 50 * f.format,
-        reward: 75 * f.format,
         minPlayers: f.format - Math.floor(f.format / 4),
         maps: f.maps,
       });
     }
-    expect(avaFormat(AVA_FORMATS, 2)).toMatchObject({ cost: 100, reward: 150, minPlayers: 2 });
+    expect(avaFormat(AVA_FORMATS, 2)).toMatchObject({ cost: 100, minPlayers: 2 });
     expect(avaFormat(AVA_FORMATS, 1)).toBeUndefined();
     expect(avaFormat(AVA_FORMATS, 11)).toBeUndefined();
   });
@@ -32,7 +31,8 @@ describe('AvA battle formats (CORP-7)', () => {
   });
 
   it('rejects a broken catalog before it reaches a challenge', () => {
-    const row = { format: 2, cost: 100, reward: 150, minPlayers: 2, maps: [{ id: 'm' }] };
+    const row = { format: 2, cost: 100, minPlayers: 2, maps: [{ id: 'm' }] };
+    const economy = AVA_FORMATS.economy;
     for (const raw of [
       null,
       {},
@@ -41,25 +41,48 @@ describe('AvA battle formats (CORP-7)', () => {
       { baseMaxFormat: 2, formats: [{ ...row, format: 1, minPlayers: 1 }] }, // a side of one
       { baseMaxFormat: 2, formats: [row, row] }, // not ascending
       { baseMaxFormat: 2, formats: [{ ...row, cost: 0 }] },
-      { baseMaxFormat: 2, formats: [{ ...row, reward: 1.5 }] },
+      { baseMaxFormat: 3, economy, formats: [{ ...row, cost: 1.5 }] },
       { baseMaxFormat: 2, formats: [{ ...row, minPlayers: 3 }] }, // more than the side holds
       { baseMaxFormat: 4, formats: [row] }, // the base is not a format
     ]) {
       expect(() => parseAvaFormats(raw)).toThrow('E_AVA_FORMATS');
     }
     // Every format a building opens must be one a battle can be played in.
-    const known = { baseMaxFormat: 2, formats: [row] };
+    const known = { baseMaxFormat: 2, economy, formats: [row] };
     expect(() => parseAvaFormats(known)).toThrow('E_AVA_FORMATS'); // the operations center opens 5
+  });
+
+  it('carries the battle economy (CORP-19) and rejects a broken one', () => {
+    expect(AVA_FORMATS.economy).toMatchObject({
+      startInfluence: 100,
+      ratingStart: 1000,
+      ratingK: 32,
+      ratingSpread: 400,
+      pairBonus: [1, 0.5, 0],
+      dailyBonusCap: 2000,
+    });
+    const raw = JSON.parse(JSON.stringify(AVA_FORMATS)) as Record<string, unknown>;
+    for (const broken of [
+      undefined,
+      { ...AVA_FORMATS.economy, ratingK: 0 },
+      { ...AVA_FORMATS.economy, bonusMin: 0 },
+      { ...AVA_FORMATS.economy, bonusMax: 0.25 }, // below the minimum
+      { ...AVA_FORMATS.economy, targetShare: 1.5 },
+      { ...AVA_FORMATS.economy, pairBonus: [] },
+      { ...AVA_FORMATS.economy, startInfluence: -1 },
+    ]) {
+      expect(() => parseAvaFormats({ ...raw, economy: broken })).toThrow('E_AVA_FORMATS');
+    }
   });
 
   it('rejects a format whose maps cannot seat it (CORP-8)', () => {
     // Every format the operations center opens is present, so only the maps can fail.
     const catalog = (maps: unknown) => ({
       baseMaxFormat: 2,
+      economy: AVA_FORMATS.economy,
       formats: [2, 5, 7, 10].map((format) => ({
         format,
         cost: 50 * format,
-        reward: 75 * format,
         minPlayers: format - Math.floor(format / 4),
         maps: format === 2 ? maps : [{ id: 'm' }],
       })),

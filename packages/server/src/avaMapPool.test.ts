@@ -11,7 +11,7 @@ import {
   parseMatchMap,
   type MatchMap,
 } from '@void/shared-core';
-import type { AvaFormat, AvaFormatMap } from './avaFormats';
+import { AVA_FORMATS, type AvaFormat, type AvaFormatMap } from './avaFormats';
 import { avaMapView, buildAvaMapPool, pickAvaMap } from './avaMapPool';
 import { loadAvaMaps, loadShippedData } from './scenario';
 
@@ -103,12 +103,11 @@ describe('buildAvaMapPool (CORP-8) — the formats catalog against the map files
   const row = (format: number, ...maps: AvaFormatMap[]): AvaFormat => ({
     format,
     cost: 1,
-    reward: 1,
     minPlayers: 1,
     maps,
   });
   const build = (...formats: AvaFormat[]): MatchMap[] =>
-    buildAvaMapPool({ baseMaxFormat: 2, formats }, files, data);
+    buildAvaMapPool({ ...AVA_FORMATS, baseMaxFormat: 2, formats }, files, data);
   const top = [
     ['slot_15', 'slot_19'],
     ['slot_16', 'slot_18'],

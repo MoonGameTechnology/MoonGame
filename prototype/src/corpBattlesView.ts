@@ -1,11 +1,14 @@
 import {
   BATTLE_FORMATS,
+  battleRating,
   CORP_BATTLE_TABS,
   battlePhase,
   battleStats,
   challengeGroups,
   opponentOffer,
   topCorpFighters,
+  pairRepeats,
+  winBonus,
   type CorpBattleTab,
 } from '../../decisions/corpBattles';
 import type {
@@ -35,6 +38,8 @@ export interface CorpBattlesPaint {
   busy: boolean;
   now: number;
   canPlay: boolean;
+  /** Red markers on the inner tabs (`battleAttention`). */
+  attention?: { now: number; challenges: number };
 }
 const TABS: Record<CorpBattleTab, string> = {
   now: 'corp.combat.tab.now',
@@ -183,6 +188,11 @@ function nowView(p: CorpBattlesPaint): string {
     })
     .join('');
 }
+/** The red marker of a tab that waits on this member, like the news button's. */
+function alertDot(p: CorpBattlesPaint, tab: CorpBattleTab): string {
+  const n = tab === 'now' || tab === 'challenges' ? (p.attention?.[tab] ?? 0) : 0;
+  return n ? `<i class="cb-alert" role="img" aria-label="${esc(t('corp.combat.attention'))}"></i>` : '';
+}
 function challengesView(p: CorpBattlesPaint): string {
   const groups = challengeGroups(p.view!.challenges, p.corp.corpId);
   const groupLabels = {
@@ -207,6 +217,9 @@ function challengesView(p: CorpBattlesPaint): string {
                     : `<p class="cb-battle-hint">${esc(t('corp.combat.expires', { date: date(c.expiresAt) }))}</p>`) +
                   (group === 'incoming' && p.me.role === 'head'
                     ? `<div class="cb-battle-actions">${button('ava-accept', c.id, t('corp.combat.accept'), p.busy || expired)}${button('ava-decline', c.id, t('corp.combat.decline'), p.busy || expired)}</div>`
+                    : '') +
+                  (group === 'outgoing' && p.me.role === 'head'
+                    ? `<div class="cb-battle-actions">${button('ava-withdraw', c.id, t('corp.combat.withdraw'), p.busy || expired)}</div>`
                     : '') +
                   (group === 'incoming' && p.me.role !== 'head'
                     ? hint('corp.combat.head-only')
@@ -259,12 +272,12 @@ function opponentsView(p: CorpBattlesPaint): string {
                   p.busy,
                   ` data-corpformat="${offer.format}"`,
                 ) +
-                `<small>${fmt(offer.format)} · ${esc(t('corp.combat.price', { n: offer.cost }))}</small>`;
+                `<small>${fmt(offer.format)} · ${esc(t('corp.combat.price', { n: offer.cost }))} · ${esc(t('corp.combat.reward', { n: winBonus(offer.cost, p.corp.rating, r.rating, pairRepeats(p.view?.results ?? [], p.corp.corpId, r.corpId, p.now)) }))}</small>`;
             else if (offer.kind === 'answer' || offer.kind === 'active')
               action = `<button type="button" class="btn-second" data-battletab="${offer.kind === 'answer' ? 'challenges' : 'now'}">${esc(t(offer.kind === 'answer' ? 'corp.combat.answer' : 'corp.combat.to-current'))}</button>`;
             else action = hint(OFFER[offer.kind]);
             return (
-              `<article class="cb-card cb-battle-card${r.monument ? ' corp-monument' : ''}"><header><div class="cb-battle-identity">${corpEmblem(r.corpId, r.emblemId, 40)}<h3>${esc(r.name)}</h3></div><b>${nfmt(r.influence)} ⟡</b></header>` +
+              `<article class="cb-card cb-battle-card${r.monument ? ' corp-monument' : ''}"><header><div class="cb-battle-identity">${corpEmblem(r.corpId, r.emblemId, 40)}<h3>${esc(r.name)}</h3></div><b>${esc(t('corp.combat.rating', { n: battleRating(r.rating) }))}</b></header>` +
               `<p class="cb-battle-hint">${esc(t('corp.members.count', { n: r.members }))} · ${r.formats.map(fmt).join(' · ')}</p>` +
               (rematch
                 ? `<p class="cb-battle-hint">${esc(t('corp.combat.encounters', { wins: record.wins, losses: record.losses, draws: record.draws }))}</p>`
@@ -315,7 +328,7 @@ function readyView(p: CorpBattlesPaint): string {
       const locked = f.format > p.maxFormat;
       return (
         `<button type="button" data-battle-ready-format="${f.format}" aria-pressed="${p.draftFormats.includes(f.format)}"${!head || p.busy || locked ? ' disabled' : ''}>` +
-        `<b>${fmt(f.format)}</b><span>${esc(t('corp.combat.price', { n: f.cost }))}</span><span>${esc(t('corp.combat.reward', { n: f.reward }))}</span><small>${esc(t(locked ? 'corp.combat.format-locked' : 'corp.combat.minimum', { n: f.minPlayers }))}</small></button>`
+        `<b>${fmt(f.format)}</b><span>${esc(t('corp.combat.price', { n: f.cost }))}</span><span>${esc(t('corp.combat.reward-even', { n: winBonus(f.cost) }))}</span><small>${esc(t(locked ? 'corp.combat.format-locked' : 'corp.combat.minimum', { n: f.minPlayers }))}</small></button>`
       );
     }).join('') +
     `</div>` +
@@ -354,7 +367,7 @@ export function corpBattlesViewHtml(p: CorpBattlesPaint): string {
     `<div class="cb-battle-tabs" role="tablist" aria-label="${esc(t('corp.combat.tabs'))}">` +
     CORP_BATTLE_TABS.map(
       (tab) =>
-        `<button type="button" role="tab" id="cb-battle-tab-${tab}" aria-controls="cb-battle-panel" tabindex="${tab === p.tab ? 0 : -1}" data-battletab="${tab}" aria-selected="${tab === p.tab}" class="${tab === p.tab ? 'on' : ''}">${esc(t(TABS[tab]))}${counts[tab] ? `<small>${counts[tab]}</small>` : ''}</button>`,
+        `<button type="button" role="tab" id="cb-battle-tab-${tab}" aria-controls="cb-battle-panel" tabindex="${tab === p.tab ? 0 : -1}" data-battletab="${tab}" aria-selected="${tab === p.tab}" class="${tab === p.tab ? 'on' : ''}">${esc(t(TABS[tab]))}${counts[tab] ? `<small>${counts[tab]}</small>` : ''}${alertDot(p, tab)}</button>`,
     ).join('') +
     `</div>`;
   const views: Record<CorpBattleTab, (p: CorpBattlesPaint) => string> = {

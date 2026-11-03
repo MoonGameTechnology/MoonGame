@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  battlePostPath,
+  pairRepeats,
+  battleRating,
+  winBonus,
+  battleAttention,
   battlePhase,
   battleStats,
   challengeGroups,
@@ -177,5 +182,74 @@ describe('corporation battle decisions', () => {
     ]);
     expect(parseCorpWar({ ...war, scoreGoal: 0 }, 'm')).toBeNull();
     expect(parseCorpWar(war, 'different')).toBeNull();
+  });
+
+  it('marks what waits on the member: a forming battle to join, a seat in a running one, a call to answer', () => {
+    const base = { corpId: 'a', accountId: 'me', head: false, now: 10 };
+    const forming = { ...challenge, id: 'f' };
+    const running = { ...challenge, id: 'r', status: 'locked' as const };
+    const call = {
+      ...challenge,
+      id: 'c',
+      status: 'pending' as const,
+      challengerCorp: 'z',
+      targetCorp: 'a',
+    };
+    const rows = [forming, running, call];
+    // Rosters not read yet: both battles count, the call only for the head.
+    expect(battleAttention({ ...base, challenges: rows, rosters: {} })).toEqual({
+      now: 2,
+      challenges: 0,
+    });
+    expect(battleAttention({ ...base, head: true, challenges: rows, rosters: {} })).toEqual({
+      now: 2,
+      challenges: 1,
+    });
+    // Joined the forming one, no seat in the running one: nothing left to do.
+    const joined = { f: { mine: [{ accountId: 'me' }] }, r: { mine: [{ accountId: 'x' }] } };
+    expect(battleAttention({ ...base, challenges: rows, rosters: joined })).toEqual({
+      now: 0,
+      challenges: 0,
+    });
+    // A closed roster window and an expired call need nobody.
+    expect(
+      battleAttention({ ...base, head: true, now: 60, challenges: [forming, call], rosters: {} }),
+    ).toEqual({ now: 0, challenges: 0 });
+  });
+});
+
+describe('battlePostPath — маршрут кнопки битвы без тела', () => {
+  it('готовность, ответ на вызов и вход в состав', () => {
+    expect(battlePostPath('ready-corp', '')).toBe('/ava/ready/corp');
+    expect(battlePostPath('ready-player-clear', '')).toBe('/ava/ready/player/clear');
+    expect(battlePostPath('ava-withdraw', 'c/1')).toBe('/ava/challenge/c%2F1/withdraw');
+    expect(battlePostPath('ava-join', 'm1')).toBe('/ava/matchup/m1/join');
+  });
+  it('прочие действия — не его', () => {
+    expect(battlePostPath('ava-challenge', 'x')).toBeNull();
+    expect(battlePostPath('ready-x', '')).toBeNull();
+  });
+});
+
+describe('the win bonus a challenge promises (CORP-19)', () => {
+  it('is the stake against an equal, more against a stronger corp, less against a weaker', () => {
+    expect(winBonus(100)).toBe(100);
+    expect(winBonus(100, 1000, 1200)).toBe(150);
+    expect(winBonus(100, 1000, 1800)).toBe(200); // at most double
+    expect(winBonus(100, 1600, 1000)).toBe(50); // at least half
+    expect(battleRating(undefined)).toBe(1000);
+  });
+  it('a rematch inside the week promises half, the third one nothing', () => {
+    const week = 7 * 24 * 3600 * 1000;
+    const fought = [
+      { challengerCorp: 'a', targetCorp: 'b', at: 100 },
+      { challengerCorp: 'b', targetCorp: 'a', at: 200 },
+      { challengerCorp: 'a', targetCorp: 'c', at: 300 },
+    ];
+    expect(pairRepeats(fought, 'a', 'b', 1000)).toBe(2);
+    expect(pairRepeats(fought.slice(0, 1), 'a', 'b', 1000)).toBe(1);
+    expect(pairRepeats(fought, 'a', 'b', 200 + week)).toBe(0);
+    expect(winBonus(100, 1000, 1000, 1)).toBe(50);
+    expect(winBonus(100, 1000, 1000, 2)).toBe(0);
   });
 });

@@ -1,10 +1,22 @@
 {
   "baseMaxFormat": 3,
+  "economy": {
+    "startInfluence": 100,
+    "ratingStart": 1000,
+    "ratingK": 32,
+    "ratingSpread": 400,
+    "bonusMin": 0.5,
+    "bonusMax": 2,
+    "targetShare": 0.5,
+    "drawRefund": 0.5,
+    "pairWindowMs": 604800000,
+    "pairBonus": [1, 0.5, 0],
+    "dailyBonusCap": 2000
+  },
   "formats": [
     {
       "format": 2,
       "cost": 100,
-      "reward": 150,
       "minPlayers": 2,
       "maps": [
         {
@@ -15,7 +27,6 @@
     {
       "format": 3,
       "cost": 150,
-      "reward": 225,
       "minPlayers": 3,
       "maps": [
         {
@@ -26,7 +37,6 @@
     {
       "format": 4,
       "cost": 200,
-      "reward": 300,
       "minPlayers": 3,
       "maps": [
         {
@@ -43,7 +53,6 @@
     {
       "format": 5,
       "cost": 250,
-      "reward": 375,
       "minPlayers": 4,
       "maps": [
         {
@@ -61,7 +70,6 @@
     {
       "format": 6,
       "cost": 300,
-      "reward": 450,
       "minPlayers": 5,
       "maps": [
         {
@@ -80,7 +88,6 @@
     {
       "format": 7,
       "cost": 350,
-      "reward": 525,
       "minPlayers": 6,
       "maps": [
         {
@@ -100,7 +107,6 @@
     {
       "format": 8,
       "cost": 400,
-      "reward": 600,
       "minPlayers": 6,
       "maps": [
         {
@@ -121,7 +127,6 @@
     {
       "format": 9,
       "cost": 450,
-      "reward": 675,
       "minPlayers": 7,
       "maps": [
         {
@@ -143,7 +148,6 @@
     {
       "format": 10,
       "cost": 500,
-      "reward": 750,
       "minPlayers": 8,
       "maps": [
         {

@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { AVA_FORMATS } from './avaFormats';
 import type { Identity } from './matchApi';
 import type { CommanderStore, CorpStore, CorpSummary, UserStore } from './store';
 
@@ -33,7 +34,7 @@ export interface BoardRow {
   rank: number;
   /** Display name: a player's callsign or a corp's name. */
   name: string;
-  /** The ranked number itself — lifetime XP for players, influence for corps. */
+  /** The ranked number itself — lifetime XP for players, the battle rating for corps. */
   score: number;
   /** Extra number the corp board prints (headcount); absent on the player board. */
   members?: number;
@@ -49,7 +50,7 @@ export interface BoardView {
   total: number;
 }
 
-/** Rank corps by influence — the pure half, so the rule is testable without a
+/** Rank corps by battle rating (CORP-19) — the pure half, so the rule is testable without a
  *  server. Ties share a rank (see rule 1); the tiebreaker for ORDER is the name,
  *  which keeps equal rows from shuffling between refreshes. */
 export function rankCorps(
@@ -57,23 +58,21 @@ export function rankCorps(
   myCorpId: string | null,
   limit: number = BOARD_PAGE,
 ): BoardView {
-  const sorted = [...corps].sort(
-    (a, b) => b.influence - a.influence || a.name.localeCompare(b.name),
-  );
-  const rankOf = (influence: number): number =>
-    sorted.filter((c) => c.influence > influence).length + 1;
+  const score = (c: CorpSummary): number => c.rating ?? AVA_FORMATS.economy.ratingStart;
+  const sorted = [...corps].sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
+  const rankOf = (rating: number): number => sorted.filter((c) => score(c) > rating).length + 1;
   const mine = myCorpId ? (sorted.find((c) => c.corpId === myCorpId) ?? null) : null;
   return {
     rows: sorted.slice(0, Math.max(0, limit)).map((c) => ({
-      rank: rankOf(c.influence),
+      rank: rankOf(score(c)),
       name: c.name,
-      score: c.influence,
+      score: score(c),
       members: c.members,
       ...(c.corpId === myCorpId ? { me: true } : {}),
     })),
     me: {
-      rank: mine ? rankOf(mine.influence) : null,
-      score: mine?.influence ?? 0,
+      rank: mine ? rankOf(score(mine)) : null,
+      score: mine ? score(mine) : 0,
       name: mine?.name ?? null,
     },
     total: sorted.length,
