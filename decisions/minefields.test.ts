@@ -32,7 +32,7 @@ describe('SM-3.5 — кнопка «Поставить мины» и свои п
   });
 
   it('свой стоящий флот с заградителем — можно ставить', () => {
-    expect(minelayerOffer(fleet(), state(), data, 'p1')).toEqual({ ready: true, readyInMs: 0 });
+    expect(minelayerOffer(fleet(), state(), data, 'p1')).toEqual({ ready: true, readyAt: 0 });
   });
 
   it('без заградителя и на чужом флоте кнопки нет', () => {
@@ -45,12 +45,12 @@ describe('SM-3.5 — кнопка «Поставить мины» и свои п
     expect(minelayerOffer(fleet({ battleId: 'b' }), state(), data, 'p1')?.reason).toBe('busy');
   });
 
-  it('перезарядка: нельзя и видно, сколько ждать', () => {
+  it('перезарядка: нельзя и видно, до какого момента ждать', () => {
     const s = state({ minefields: { readyAt: { F: 4000 } } });
     expect(minelayerOffer(fleet(), s, data, 'p1')).toEqual({
       ready: false,
       reason: 'cooldown',
-      readyInMs: 3000,
+      readyAt: 4000,
     });
   });
 

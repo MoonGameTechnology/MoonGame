@@ -4,6 +4,7 @@ import { setRunClock } from './format';
 import { runClockText } from '../../decisions/runClock';
 import { newGame, HOUR, DAY } from './game';
 import { worldName } from './planetName';
+import { liveRender } from './liveTimers.fixture';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import {
   stewMetrics,
@@ -52,7 +53,7 @@ function fakeWin(): HTMLElement & {
 }
 
 function fakeBody(): HTMLElement & { html: () => string } {
-  const el = { innerHTML: '', html: () => el.innerHTML };
+  const el = { innerHTML: '', querySelectorAll: () => [], html: () => el.innerHTML };
   return el as unknown as HTMLElement & { html: () => string };
 }
 
@@ -203,7 +204,10 @@ describe('хранитель — три состояния окна', () => {
     s.players.p1!.steward = { until: s.time + 90 * 60_000, posture: 'defend' } as never;
     const html = stewardBodyHtml(s, 'p1', 'defend');
     expect(html).toContain('st-status on');
-    expect(html).toContain('1ч 30м');
+    // Срок — живой узел: игрок видит «1ч 30м», а разметка с часами не меняется.
+    expect(liveRender(html, s.time, { dur: stewFmtDur })).toContain('1ч 30м');
+    s.time += 30 * 60_000;
+    expect(stewardBodyHtml(s, 'p1', 'defend')).toBe(html);
     expect(html).toContain('data-stew="recall"');
     expect(html).not.toContain('data-stew="go"');
   });

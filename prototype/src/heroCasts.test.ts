@@ -97,7 +97,7 @@ describe('каст героя — кулдаун и прицел', () => {
 
   it('пункт меню несёт и кулдаун, и признак прицела', () => {
     const [opt] = castOptions([умение({ range: 90, readyAt: 8 * ЧАС })], КАСТУЕМЫЕ, 2 * ЧАС, ЧАС);
-    expect(opt).toEqual({ id: 'a1', cdH: 6, ranged: true });
+    expect(opt).toEqual({ id: 'a1', cdH: 6, readyAt: 8 * ЧАС, ranged: true });
   });
 });
 

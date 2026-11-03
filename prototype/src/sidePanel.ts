@@ -116,6 +116,7 @@ import {
   squadMerge,
   strikeAim,
 } from './interaction';
+import { patchLiveTimers } from './liveTimers';
 import { clampCam, focusWorld, panBy, world } from './mapCamera';
 import { seesDetails } from './mapFog';
 import { forgetAimPointer, pointers } from './mapInput';
@@ -430,9 +431,7 @@ function updatePanelLive(): void {
     const totalH = arrivalHours(Number(el.dataset.arrive), s.time, HOUR, Number(el.dataset.rest));
     el.textContent = fmtEta(totalH);
   }
-  for (const el of Array.from(root.querySelectorAll('.pn-timer')) as HTMLElement[]) {
-    el.textContent = timeLeft(Number(el.dataset.at));
-  }
+  patchLiveTimers(root, s.time); // `.pn-timer` и прочие живые узлы (`liveTimers.ts`)
 }
 
 /** Split-dialog rows of a fleet: one per STACK (unit + loadout), ships first, then

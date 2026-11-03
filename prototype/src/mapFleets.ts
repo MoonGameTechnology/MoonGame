@@ -407,7 +407,7 @@ export function drawFleets(now: number, lod: MapLod): void {
     const dock = !f.movement && f.location ? s.planets[f.location] : null;
     if (!emplacement) drawFleetHoldBadge(
       cx, A, heroesByFleet.has(f.id) ? null : dock ? world(dock.position) : null, ships,
-      f.owner === ME ? fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)) : [],
+      f.owner === ME ? fleetHolds(f, data, fleetAloftPlaces(s, f, data)) : [],
       selFleet === f.id || selFleets.has(f.id) || lod.scale >= 1.9,
       col,
       fleetVeteranGrade(f.units, data),

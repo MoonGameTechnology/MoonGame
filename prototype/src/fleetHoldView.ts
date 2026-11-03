@@ -2,6 +2,7 @@
 import { holdBadgePosition, type FleetHold } from '../../decisions/fleetHolds';
 import { t } from '../../localization/runtime';
 import { esc } from './format';
+import { livePctHtml } from './liveTimers';
 import {
   FLEET_COUNT_FONT,
   countTextWidth,
@@ -26,25 +27,21 @@ export function fleetHoldsHtml(meters: readonly FleetHold[]): string {
         m.over > 0
           ? t('cargo.meter.over', { n: number(m.over) })
           : t('cargo.meter.free', { n: number(m.free) });
+      // Доля — живой узел (`liveTimers.ts`): с цифрой в разметке карточка флота
+      // пересобиралась бы с каждым процентом вместе с кнопками приказов.
       const loading =
         m.reserved > 0
-          ? t('cargo.meter.loading', {
-              n: number(m.reserved),
-              p: Math.floor(m.loadingProgress * 100),
-            })
+          ? t('cargo.meter.loading', { n: number(m.reserved), p: livePctHtml(m.loadingWindows) })
           : '';
       // Выгрузка по таймеру (MSB-9): войска ещё в трюме, строка говорит, что они сходят.
       const unloading =
         m.unloading > 0
-          ? t('cargo.meter.unloading', {
-              n: number(m.unloading),
-              p: Math.floor(m.unloadingProgress * 100),
-            })
+          ? t('cargo.meter.unloading', { n: number(m.unloading), p: livePctHtml(m.unloadingWindows) })
           : '';
       return `<div class="holdmeter${m.over > 0 ? ' over' : ''}" style="--hold-color:${color(m)}">
       <div class="holdmeter-head"><span>${icon(m)} ${esc(label(m))}</span><b>${number(m.used)} / ${number(m.capacity)}</b></div>
       <div class="holdmeter-track" aria-hidden="true"><i style="width:${m.usedFraction * 100}%"></i><i class="reserved" style="width:${m.reservedFraction * 100}%"></i></div>
-      <div class="holdmeter-note"><span>${esc(status)}</span>${loading ? `<span class="holdmeter-loading">${esc(loading)}</span>` : ''}${unloading ? `<span class="holdmeter-loading">${esc(unloading)}</span>` : ''}</div>
+      <div class="holdmeter-note"><span>${esc(status)}</span>${loading ? `<span class="holdmeter-loading">${loading}</span>` : ''}${unloading ? `<span class="holdmeter-loading">${unloading}</span>` : ''}</div>
     </div>`;
     })
     .join('')}</div>`;

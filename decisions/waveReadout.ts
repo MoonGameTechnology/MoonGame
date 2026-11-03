@@ -35,12 +35,14 @@ import type { PveState } from '../packages/shared-core/src/index';
 export type WaveReadout =
   /** Не PvE-матч — строки волн нет вовсе (правило 1). */
   | { kind: 'none' }
-  /** Штурм идёт: `wave` уже пришло из `total`, следующая через `nextInMs` (правила 2–3). */
-  | { kind: 'waves'; wave: number; total: number; nextInMs: number }
+  /** Штурм идёт: `wave` уже пришло из `total`, следующая через `nextInMs` (правила 2–3),
+   *  в момент `nextAt`. Срок нужен окну, которое сравнивает разметку: остаток менял бы её
+   *  с часами, и полоса статуса пересобиралась бы вместе с кнопками. */
+  | { kind: 'waves'; wave: number; total: number; nextInMs: number; nextAt: number }
   /** Волны кончились — новых не будет (правила 4–5). */
   | { kind: 'cleared'; total: number }
-  /** Волны кончились, до победы — удержание ещё `holdInMs` (правило 6). */
-  | { kind: 'hold'; total: number; holdInMs: number };
+  /** Волны кончились, до победы — удержание ещё `holdInMs`, до `holdUntil` (правило 6). */
+  | { kind: 'hold'; total: number; holdInMs: number; holdUntil: number };
 
 /** `pve` — секция состояния матча (её нет в обычной партии), `now` — время МИРА. */
 export function waveReadout(pve: PveState | undefined, now: number): WaveReadout {
@@ -48,12 +50,18 @@ export function waveReadout(pve: PveState | undefined, now: number): WaveReadout
   if (pve.nextWaveAt === undefined) {
     return pve.holdUntil === undefined
       ? { kind: 'cleared', total: pve.totalWaves }
-      : { kind: 'hold', total: pve.totalWaves, holdInMs: Math.max(0, pve.holdUntil - now) };
+      : {
+          kind: 'hold',
+          total: pve.totalWaves,
+          holdInMs: Math.max(0, pve.holdUntil - now),
+          holdUntil: pve.holdUntil,
+        };
   }
   return {
     kind: 'waves',
     wave: pve.waveNumber,
     total: pve.totalWaves,
     nextInMs: Math.max(0, pve.nextWaveAt - now),
+    nextAt: pve.nextWaveAt,
   };
 }

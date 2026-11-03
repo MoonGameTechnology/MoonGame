@@ -15,6 +15,7 @@ import { t } from '../../localization/runtime';
 import type { Action, DiplomaticStance, GameState } from '../../packages/shared-core/src/index';
 import { COALITION } from './conversations';
 import { declareWar, newGame, shareMap, START_CANDIDATES } from './game';
+import { liveRender } from './liveTimers.fixture';
 
 interface El {
   id: string;
@@ -29,6 +30,7 @@ interface El {
   fire(type: string, ev?: unknown): void;
   click(): void;
   focus(): void;
+  querySelectorAll(sel: string): unknown[];
 }
 
 let page: Map<string, El>;
@@ -54,6 +56,8 @@ function stub(id: string): El {
     },
     click: () => el.fire('click', { target: { id: '', closest: () => null } }),
     focus: () => {},
+    // Живой патч (`liveTimers.ts`) ищет свои узлы; разметку заглушка не разбирает.
+    querySelectorAll: () => [],
   };
   return el;
 }
@@ -131,6 +135,7 @@ async function boot() {
     sent: [] as Array<[string, string, string?]>,
     nicks: {} as Record<string, string>,
     nickPulls: 0,
+    intel: [] as Array<{ kind: 'planet'; target: string; until: number }>,
   };
   log.initMessageLog({
     now: () => env.s.time,
@@ -153,7 +158,7 @@ async function boot() {
     killStats: () => ({ destroyed: 3, lost: 1 }),
     ownerColor: () => '#fff',
     stanceCol: () => '#888',
-    myIntel: () => [],
+    myIntel: () => [...env.intel],
     placeName: (id) => `«${id}»`,
     note: (text) => void env.notes.push(text),
     playerOrder: (a) => (env.orders.push(a), true),
@@ -429,6 +434,36 @@ describe('REFM-214 — журнал разведки', () => {
     win.restoreSpyArchive(saved);
     win.openDiplo('intel');
     expect(el('diplo').innerHTML).toContain('кража');
+  });
+});
+
+// Перерисовка «Шпионажа» по таймеру пересобирала вкладку каждые пять секунд: строки миров и
+// крестик под курсором пересоздавались (как «Штурм» на высадке, #1801).
+describe('живые таймеры «Шпионажа»', () => {
+  it('таймер перерисовки не пересобирает вкладку, пока в ней ничего не изменилось', async () => {
+    const { win, env } = await boot();
+    const until = env.s.time + 3 * 3_600_000;
+    env.intel = [{ kind: 'planet', target: 'n7', until }];
+    win.openDiplo('intel');
+    const html = el('diplo').innerHTML;
+    expect(html).toContain(`⏳ <span class="pn-timer" data-at="${until}" data-fmt="hceil">…</span>`);
+    expect(liveRender(html, env.s.time, { hceil: (ms) => String(Math.ceil(ms / 3_600_000)) })).toContain('>3<');
+    el('diplo').innerHTML = 'нарисовано';
+    env.s = { ...env.s, time: env.s.time + 3_600_000 };
+    win.refreshIntelTab();
+    expect(el('diplo').innerHTML).toBe('нарисовано');
+    // Окно закрылось — вкладка изменилась, и перерисовка её пересобирает.
+    env.intel = [];
+    win.refreshIntelTab();
+    expect(el('diplo').innerHTML).toContain(t('spy.windows.empty'));
+  });
+
+  it('на другой вкладке таймер «Шпионажа» окно не трогает', async () => {
+    const { win } = await boot();
+    win.openDiplo('diplo');
+    el('diplo').innerHTML = 'ростер';
+    win.refreshIntelTab();
+    expect(el('diplo').innerHTML).toBe('ростер');
   });
 });
 

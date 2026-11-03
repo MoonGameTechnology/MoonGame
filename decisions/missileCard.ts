@@ -2,7 +2,7 @@
  * Карточка летящей ракеты (SM-3.7b, решение владельца 2026-09-30: «Ракета тоже является
  * отрядом. Только его невозможно контролировать»). Ракету выделяют общим путём, приказов у
  * неё нет, поэтому в карточке только то, что о ней можно прочесть: прочность (её сбивают
- * ПРО и челноки), сколько ей лететь до точки цели, радиус взрыва и — только хозяину —
+ * ПРО и челноки), когда она будет в точке цели, радиус взрыва и — только хозяину —
  * боевая часть.
  *
  * Боевая часть живёт в `ordnance.warheads`, и проекция отдаёт её одному хозяину: чужой
@@ -22,15 +22,15 @@ export interface MissileCard {
   blast: number;
   /** Прочность ракеты: текущая и полная. */
   hull: { cur: number; max: number };
-  /** Сколько ещё лететь до точки цели, мс; 0 — уже у цели. */
-  leftMs: number;
+  /** Когда ракета будет в точке цели (мировые мс). Срок, а не остаток: остаток менялся бы
+   *  с часами, и карточка, сравнивающая разметку, пересобиралась бы каждый кадр. */
+  arrivesAt: number;
 }
 
 export function missileCard(
   fleet: Pick<Fleet, 'owner' | 'units' | 'flight'>,
   warhead: number | undefined,
   viewer: string,
-  now: number,
   data: GameData,
 ): MissileCard | null {
   const launcher = missileModule(fleet, data);
@@ -50,6 +50,6 @@ export function missileCard(
     damage: own ? (warhead ?? null) : null,
     blast: launcher.def.blastRadius,
     hull: { cur: Math.round(cur), max: Math.round(max) },
-    leftMs: Math.max(0, fleet.flight.arrivesAt - now),
+    arrivesAt: fleet.flight.arrivesAt,
   };
 }

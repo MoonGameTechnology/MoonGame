@@ -1,12 +1,13 @@
 /**
- * Таймер бомбардировки для карты, окна мира и метки флота: через сколько ударит следующий
- * залп обстрела. Правила — в `decisions/bombardTimer.ts`; здесь только выбор флотов.
+ * Таймер бомбардировки для карты, окна мира и метки флота: когда ударит следующий залп
+ * обстрела. Карта рисует остаток (`…In`), окна — срок (`…At`): цифры в их разметке ставит
+ * живой узел (`liveTimers.ts`). Правила — в `decisions/bombardTimer.ts`; здесь только выбор флотов.
  *
  * Залп бьёт по часам флота (`Fleet.bombardNextAt`, модуль `orbital`), поэтому отсчёт —
  * простое чтение мира: ни прогноза урона, ни кэша.
  */
 import { bombardersOf, type Fleet, type GameState } from '../../packages/shared-core/src/index';
-import { bombardTimerShown, nextVolleyIn } from '../../decisions/bombardTimer';
+import { bombardTimerShown, nextVolleyAt, nextVolleyIn } from '../../decisions/bombardTimer';
 import { data } from './gameData';
 
 /** Флоты, которые сейчас обстреливают мир, если смотрящий — сторона обстрела. */
@@ -35,11 +36,17 @@ export function bombardVolleyIn(s: GameState, planetId: string, me: string): num
     : null;
 }
 
-/** Мс мира до следующего залпа этого флота — только пока он и правда обстреливает мир. */
-export function fleetVolleyIn(s: GameState, f: Fleet, me: string): number | null {
+/** Срок ближайшего залпа по миру `planetId`, или `null`, если таймера нет. */
+export function bombardVolleyAt(s: GameState, planetId: string, me: string): number | null {
+  const fleets = shownBombarders(s, planetId, me);
+  return fleets ? nextVolleyAt(fleets.map((f) => f.bombardNextAt)) : null;
+}
+
+/** Срок следующего залпа этого флота — только пока он и правда обстреливает мир. */
+export function fleetVolleyAt(s: GameState, f: Fleet, me: string): number | null {
   if (!f.bombarding || !f.location) return null;
   const fleets = shownBombarders(s, f.location, me);
-  return fleets?.some((g) => g.id === f.id) ? nextVolleyIn([f.bombardNextAt], s.time) : null;
+  return fleets?.some((g) => g.id === f.id) ? nextVolleyAt([f.bombardNextAt]) : null;
 }
 
 /** Миры с таймером для карты: где обстреливает мой флот или обстреливают мой мир. */

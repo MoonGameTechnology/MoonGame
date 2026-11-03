@@ -46,6 +46,7 @@ import {
   openDiplo,
   openPlayerCard,
   openSeatCard,
+  refreshIntelTab,
   renderDiplo,
   renderDiploFeed,
   restoreSpyArchive,
@@ -1649,8 +1650,8 @@ initWorldCard({
 
 // Карточка флота, группы, мин и ракеты, плитки юнитов — у владельца, `fleetCard.ts` (REFM-224).
 // Карточка эскадры в воздухе и всплывашка надбавок — там же. Отсюда — то, что принадлежит
-// игре: мир, место, имена, открытая сводка армии, окно консоли, видимые мины, часы карты,
-// имя флота, тип сектора, эскадра вылета и её база, флот листа и досье параметра.
+// игре: мир, место, имена, открытая сводка армии, окно консоли, видимые мины, имя флота,
+// тип сектора, эскадра вылета и её база, флот листа и досье параметра.
 initFleetCard({
   world: () => s,
   me: () => ME,
@@ -1658,7 +1659,6 @@ initFleetCard({
   fleetInfoFor: () => fleetInfoFor,
   consoleFleet,
   mineView,
-  mapNow,
   fleetTitleOf,
   sectorType: sectorTypeOf,
   strikeSquadron,
@@ -3824,7 +3824,7 @@ function frame(nowReal: number, nativeGap: number) {
   }
   if (repaintDue(intelVisible(diploOpen, diploTab), nowReal, lastIntelAt, INTEL_MS)) {
     lastIntelAt = nowReal;
-    renderDiplo();
+    refreshIntelTab();
   }
 }
 

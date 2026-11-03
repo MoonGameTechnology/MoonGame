@@ -46,6 +46,7 @@ import { canBuildHere } from '../../decisions/buildGate';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
 import { worldName } from './planetName';
 import { buildingRepairHtml } from './fortressView';
+import { patchLiveTimers } from './liveTimers';
 
 type BuildingDef = (typeof data.buildings)[string];
 
@@ -490,14 +491,17 @@ export function initBuildScreen(host: BuildHost): {
           (id, level) => host.dossierBody(id, level),
           activeCat,
         );
-    if (html === lastHtml) return;
     const body = host.body();
-    const before = body.querySelector('.bw-scroll');
-    const sy = before?.scrollTop ?? 0;
-    body.innerHTML = html;
-    lastHtml = html;
-    const after = body.querySelector('.bw-scroll');
-    if (after) after.scrollTop = sy;
+    if (html !== lastHtml) {
+      const before = body.querySelector('.bw-scroll');
+      const sy = before?.scrollTop ?? 0;
+      body.innerHTML = html;
+      lastHtml = html;
+      const after = body.querySelector('.bw-scroll');
+      if (after) after.scrollTop = sy;
+    }
+    // Сроки ремонта — живые узлы: цифры ставятся на месте, окно не пересобирается.
+    patchLiveTimers(body, host.state().time);
   }
 
   host.root().addEventListener('click', (e) => {

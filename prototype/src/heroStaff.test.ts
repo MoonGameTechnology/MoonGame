@@ -7,6 +7,9 @@ import { data } from './gameData';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { HERO_GRADE_COLORS } from '../../decisions/heroIdentity';
+import { countdownHMS, fmtHrs } from './format';
+import { liveRender } from './liveTimers.fixture';
+import { HOUR } from './time';
 import {
   HERO_TABS,
   ownHeroes,
@@ -715,5 +718,29 @@ describe('штаб героев — Учёный', () => {
     });
     expect(name).toBe(tData(data.heroes.scientist!.name));
     expect(name).not.toContain('hero.person');
+  });
+});
+
+// Цифры отсчёта в разметке меняли её с каждым шагом часов: окно «Производство → Герои»
+// пересобиралось, и кнопки под курсором мигали (как «Штурм» на высадке, #1801).
+describe('штаб героев — живые сроки', () => {
+  const seen = (html: string, now: number): string => liveRender(html, now).replace(/<[^>]+>/g, '');
+
+  it('кулдаун способности и мобилизация — сроком в разметке, цифры ставит живой патч', () => {
+    const s = staffed();
+    const staff = initHeroStaff(hostOf({ state: () => s }));
+    staff.focus('hero:p1:2');
+    const ab = /data-hcast="hero:p1:2" data-ab="([^"]+)"/.exec(staff.paneHtml())![1]!;
+    const hero = s.heroes!['hero:p1:2']!;
+    hero.cooldowns = { ...hero.cooldowns, [heroCdKey(data.heroAbilities[ab]!.type)]: s.time + 5 * HOUR };
+    s.heroes!['hero:p1:1']!.mobilization = { target: 'x', startedAt: s.time, readyAt: s.time + 2 * HOUR };
+    const html = staff.paneHtml();
+    const t0 = s.time;
+    expect(seen(html, t0)).toContain(t('hero.abil.cooldown', { h: fmtHrs(5) }));
+    expect(seen(html, t0)).toContain(t('hero.hq.mobilizing', { time: countdownHMS(2 * HOUR) }));
+    s.time = t0 + HOUR;
+    expect(staff.paneHtml()).toBe(html);
+    expect(seen(html, s.time)).toContain(t('hero.abil.cooldown', { h: fmtHrs(4) }));
+    expect(seen(html, s.time)).toContain(t('hero.hq.mobilizing', { time: countdownHMS(HOUR) }));
   });
 });

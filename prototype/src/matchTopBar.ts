@@ -35,6 +35,7 @@ import { note, toast } from './eventFeed';
 import { clockHM, countdownHMS, esc, flowPer, flowRate, kfmt } from './format';
 import { data } from './gameData';
 import { motionOn, pcUi } from './graphicsPrefs';
+import { LIVE_SLOT, liveTimerHtml, liveTipAttrs, patchLiveTimers } from './liveTimers';
 import { RES_SVG, SOV_SVG } from './icons';
 import { jumpToPing } from './mapCamera';
 import { fleetSeen, known, vision } from './mapFog';
@@ -318,7 +319,9 @@ export function renderTopBar(missions: MissionRow[]): void {
   // (row 1 of the bar, below). (World/fleet counts stay on the player card.)
   // PVR-1.2: строка волн стоит рядом с часами, потому что это то же самое измерение —
   // сколько осталось до следующего события мира. В обычной партии `waveReadout` отвечает
-  // «нечего», и полоса выглядит ровно как до этого кирпича.
+  // «нечего», и полоса выглядит ровно как до этого кирпича. Отсчёты — живые узлы
+  // (`liveTimers.ts`): с цифрами в разметке полоса пересобиралась бы каждую игровую секунду
+  // вместе с кнопками «Сохранить», «Снабжение» и задачами под курсором.
   const wave = waveReadout(s.pve, s.time);
   const waveHtml =
     wave.kind === 'none'
@@ -333,11 +336,11 @@ export function renderTopBar(missions: MissionRow[]): void {
                 // кончились, исход решает накопитель или операция.
                 s.extraction || s.operation
                 ? t('hud.wave.done')
-                : t('hud.wave.hold', { in: countdownHMS(wave.holdInMs) })
+                : t('hud.wave.hold', { in: liveTimerHtml(wave.holdUntil, 'hms') })
               : // На телефоне строка статуса уже экрана: слова «следующая через» уходят, остаётся
                 // отсчёт (прогон кнопок на телефоне, 2026-09-25 — хвост обрезался маской).
-                `<span class="dl-full">${t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })}</span>` +
-                `<span class="dl-short">${countdownHMS(wave.nextInMs)}</span>`
+                `<span class="dl-full">${t('hud.wave.next', { in: liveTimerHtml(wave.nextAt, 'hms') })}</span>` +
+                `<span class="dl-short">${liveTimerHtml(wave.nextAt, 'hms')}</span>`
         }</span>`;
   // ЗАДАЧИ ЗАБЕГА (решение владельца 2026-09-22). Прогресс считается ЧИСТЫМ предикатом по
   // текущему состоянию, поэтому живая строка не стоит ни нового поля в состоянии, ни
@@ -350,11 +353,10 @@ export function renderTopBar(missions: MissionRow[]): void {
   const siegeHtml = devourSieges(s, ME)
     .map((m) => {
       const place = game.placeName(m.target);
-      const left = countdownHMS(m.leftMs);
       const tip = m.archetype
-        ? ` title="${esc(t(`boss.${m.archetype}.siege`, { world: place, in: left }))}"`
+        ? liveTipAttrs(m.until, 'hms', t(`boss.${m.archetype}.siege`, { world: place, in: LIVE_SLOT }))
         : '';
-      return `<span class="dl-siege"${tip}>☠ <span>${esc(place)} </span>${left}</span>`;
+      return `<span class="dl-siege${tip ? ' pn-tip' : ''}"${tip}>☠ <span>${esc(place)} </span>${liveTimerHtml(m.until, 'hms')}</span>`;
     })
     .join('');
   const missionsDone = missions.filter((m) => m.complete).length;
@@ -399,6 +401,7 @@ export function renderTopBar(missions: MissionRow[]): void {
     devlineTail.innerHTML = statusHtml;
     lastClockText = statusHtml;
   }
+  patchLiveTimers(devlineTail, s.time);
   // Входы в досье Роя — пока оно не приколото справа (ПК держит его открытым всегда).
   // Язычок прячется и под открытой панелью: ручка того, что уже выдвинуто, не нужна.
   const dossierEntry = Boolean(s.pve) && !swarmDossierPinned;

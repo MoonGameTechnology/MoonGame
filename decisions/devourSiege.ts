@@ -24,6 +24,8 @@ export interface DevourSiegeMark {
   archetype: string | undefined;
   /** Сколько мира осталось до гибели, мс времени мира (правило 3). */
   leftMs: number;
+  /** Срок гибели (мс мира): полоса статуса пишет в разметку его, а не остаток. */
+  until: number;
   /** Доля осады, которую уже выдержали, 0..1 (правило 3). */
   progress: number;
 }
@@ -39,6 +41,7 @@ export function devourSieges(state: GameState, viewer: PlayerId): DevourSiegeMar
       target: siege.target,
       archetype: hero.archetype,
       leftMs,
+      until: siege.until,
       progress: span > 0 ? Math.min(1, Math.max(0, 1 - leftMs / span)) : 1,
     });
   }

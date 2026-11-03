@@ -332,7 +332,7 @@ describe('REFM-235 — флоты на карте', () => {
     const [badge] = badges(frame.calls);
     const [bx, by, w, h] = badge!;
     expect([bx, by]).toEqual([A.x - w! / 2, A.y + 18]);
-    const holds = fleetHolds(f, game.data, env.world.time, fleetAloftPlaces(env.world, f, game.data));
+    const holds = fleetHolds(f, game.data, fleetAloftPlaces(env.world, f, game.data));
     expect(h).toBe(Math.max(26, holds.length * 12 + 4));
     const count = call(frame.calls, 'fillText', String(ships(f)), bx! + 20, by! + h! / 2)!;
     expect([count.fill, count.font, count.alpha]).toEqual(['#f4f8fc', `700 16px ${MONO}`, 1]);
@@ -344,7 +344,7 @@ describe('REFM-235 — флоты на карте', () => {
     const { fleets, frame, geo, game, env, interaction, home, at, fleet, patchFleet } = await boot();
     env.world = { ...env.world, heroes: {} };
     const f = fleet('p1-1');
-    const holds = fleetHolds(f, game.data, env.world.time, fleetAloftPlaces(env.world, f, game.data));
+    const holds = fleetHolds(f, game.data, fleetAloftPlaces(env.world, f, game.data));
     expect(holds.length).toBeGreaterThan(0);
     fleets.drawFleets(0, LOD());
     const A = geo.fleetAnchor(f)!;

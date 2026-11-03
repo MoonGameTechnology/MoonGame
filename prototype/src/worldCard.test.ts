@@ -23,9 +23,10 @@ import {
   type ShuttleStrike,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
-import { buildingName, resLine } from './format';
+import { buildingName, fmtEta, resLine } from './format';
 import { data } from './gameData';
 import { fleetHangar, planetHangar } from './hangarPanel';
+import { liveRender } from './liveTimers.fixture';
 import type { SectorType } from './map';
 import { worldName } from './planetName';
 import type { Snapshot } from './scanMemory';
@@ -196,6 +197,8 @@ const sub = (html: string): string =>
   /<div class="ptitle"><b>[^<]*<\/b><span>([^<]*)<\/span>/.exec(html)![1]!;
 /** Кнопка действия панели по `data-act` и `data-arg`. */
 const act = (name: string, arg: string): string => `data-act="${name}" data-arg="${arg}"`;
+/** Что увидит игрок после живого патча к моменту `now` (`liveTimers.ts`): текст без тегов. */
+const seen = (html: string, now: number): string => liveRender(html, now).replace(/<[^>]+>/g, '');
 
 // Первая загрузка карточки тянет ядро, данные и решения — секунды под нагрузкой полного гейта.
 // Граф греется один раз; тесты после `vi.resetModules()` берут его из кеша трансформаций.
@@ -303,6 +306,65 @@ describe('действия мира', () => {
     const html = card('N');
     expect(html).not.toContain('data-act="ping"');
     expect(html).not.toContain('data-act="spyplanet"');
+  });
+});
+
+// Цифры отсчёта в разметке меняли её с каждым шагом часов, и лист пересобирался вместе с
+// кнопками под курсором (как «Штурм» на высадке, #1801). В разметке — срок, цифры ставит патч.
+describe('живые сроки не пересобирают лист', () => {
+  it('окно разведки и саботаж своего мира: разметка та же, отсчёт идёт', async () => {
+    const { env, card } = await boot();
+    const t0 = env.s.time;
+    env.intel = [{ kind: 'planet', target: 'N', until: t0 + 3 * HOUR }];
+    env.s.planets.A!.disruptedUntil = t0 + 2 * HOUR;
+    const spy = card('N');
+    const own = card('A');
+    expect(seen(spy, t0)).toContain(t('side.world.spy-window.left', { left: fmtEta(3) }));
+    expect(seen(own, t0)).toContain(t('side.world.disrupted', { left: fmtEta(2) }));
+    env.s.time = t0 + HOUR;
+    expect(card('N')).toBe(spy);
+    expect(card('A')).toBe(own);
+    expect(seen(spy, env.s.time)).toContain(t('side.world.spy-window.left', { left: fmtEta(2) }));
+    expect(seen(own, env.s.time)).toContain(t('side.world.disrupted', { left: fmtEta(1) }));
+  });
+
+  it('обстрел своего мира: фишка и подсказка со сроком залпа', async () => {
+    const { env, card } = await boot();
+    const t0 = env.s.time;
+    env.s.diplomacy = { 'p1|p2': 'war' } as unknown as GameState['diplomacy'];
+    Object.assign(env.s.fleets.F2!, { orbit: 'near', bombarding: true, bombardNextAt: t0 + HOUR });
+    const html = card('A');
+    expect(liveRender(html, t0)).toContain(`title="${t('side.world.bombard-next', { t: '1:00:00' })}"`);
+    expect(seen(html, t0)).toContain('⊗ 1:00:00');
+    env.s.time = t0 + 0.75 * HOUR;
+    expect(card('A')).toBe(html);
+    expect(seen(html, env.s.time)).toContain('⊗ 0:15:00');
+  });
+
+  it('патруль над ангаром: срок висения живой, кнопки «Держать» и «Вернуть» стоят', async () => {
+    const { env, m } = await boot();
+    const t0 = env.s.time;
+    env.s.strikes = [
+      {
+        id: 'st:1',
+        owner: 'p1',
+        base: { kind: 'planet', id: 'A' },
+        squadronId: 'sq:7',
+        units: [{ unit: 'interceptor', count: 1 }],
+        target: { kind: 'point' },
+        to: { x: 0, y: 0 },
+        leg: 'patrol',
+        departedAt: 0,
+        arrivesAt: t0 + 2 * HOUR,
+        patrol: { radius: 50 },
+      } as unknown as ShuttleStrike,
+    ];
+    const port = planetHangar(env.s.planets.A!, data)!;
+    const html = m.hangarSectionHtml(port, 'A', true);
+    expect(seen(html, t0)).toContain(fmtEta(2));
+    env.s.time = t0 + HOUR;
+    expect(m.hangarSectionHtml(port, 'A', true)).toBe(html);
+    expect(seen(html, env.s.time)).toContain(fmtEta(1));
   });
 });
 

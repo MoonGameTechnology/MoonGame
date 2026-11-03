@@ -23,8 +23,9 @@ export interface MinelayerOffer {
   ready: boolean;
   /** Почему нельзя: флот идёт или в бою (`busy`), идёт перезарядка (`cooldown`). */
   reason?: 'busy' | 'cooldown' | 'installing';
-  /** Сколько мировых мс до конца перезарядки (0 — готов). */
-  readyInMs: number;
+  /** Когда кончится постановка или перезарядка (мировые мс; 0 — готов). Срок, а не
+   *  остаток: остаток менялся бы с часами и пересобирал карточку флота каждый кадр. */
+  readyAt: number;
 }
 
 /** Кнопка для флота `fleet`; `null` — не показывать (чужой флот или нет заградителя). */
@@ -38,12 +39,12 @@ export function minelayerOffer(
   if (!(bestFleetStat(fleet.units, MINE_CHARGE_STAT, data) >= 1)) return null;
   if (!(bestFleetStat(fleet.units, MINE_HIT_STAT, data) > 0)) return null;
   const job = state.minefields?.installations?.[fleet.id];
-  if (job) return { ready: false, reason: 'installing', readyInMs: Math.max(0, job.readyAt - state.time) };
-  const readyInMs = Math.max(0, Math.max(state.minefields?.readyAt[fleet.id] ?? 0, state.minefields?.ownerReadyAt?.[me] ?? 0) - state.time);
+  if (job) return { ready: false, reason: 'installing', readyAt: job.readyAt };
+  const readyAt = Math.max(state.minefields?.readyAt[fleet.id] ?? 0, state.minefields?.ownerReadyAt?.[me] ?? 0);
   if ((fleet.location === null && !fleet.edge) || fleet.movement || fleet.battleId)
-    return { ready: false, reason: 'busy', readyInMs };
-  if (readyInMs > 0) return { ready: false, reason: 'cooldown', readyInMs };
-  return { ready: true, readyInMs: 0 };
+    return { ready: false, reason: 'busy', readyAt };
+  if (readyAt > state.time) return { ready: false, reason: 'cooldown', readyAt };
+  return { ready: true, readyAt: 0 };
 }
 
 /** Свои мины (SM-3.6 — отряды во `fleets`): отряд и остаток зарядов, в порядке id. */
