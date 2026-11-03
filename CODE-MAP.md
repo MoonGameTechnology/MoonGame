@@ -511,6 +511,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `dropRoller.ts` | `DropTables`, `validateDropTables` | ARS-4 salvage/shards |
 | `metaEconomy.ts` / `metaEconomyCatalog.ts` | `MetaEconomy`, строгий каталог v0 | награды, крафт, разбор, сезон, entitlements вне ядра |
 | `metaEconomyStore.ts` / `memoryEconomyLock.ts` | общий transaction boundary | inventory/drop/wallet/materials/receipt: Memory + PostgreSQL |
+| `matchRewardProgress.ts` / `matchRewardFacts.ts` / `matchRewardSettlement.ts` | новые итоговые награды | сохранённый личный максимум, потери врага, активность до выбывания, закреплённые правила и атомарная выдача |
 | `metaEconomyDelivery.ts` / `metaEconomyObservation.ts` / `metaEconomyActivity.ts` | durable факты и доставка | baseline + события сохраняются со snapshot; повтор/рестарт без новой выдачи |
 | `metaEconomyApi.ts` / `metaCommerce.ts` | session API / внутренний signed API | supply goal, craft, season, read-only receipts; Commerce grant отдельно от клиента |
 | `metaMarket.ts` / `metaMarketApi.ts` | Auction внутри Meta/Economy | предметы и material escrow, кошельки/комиссия/receipt одной транзакцией |

@@ -25,6 +25,7 @@ export interface EconomyObservation {
 }
 
 export interface MatchSnapshot {
+  matchRewardProgress?: import('../matchRewardProgress').MatchRewardProgress;
   career?: import('../playerCareer').CareerLedger;
   matchId: string;
   dataVersion: string;

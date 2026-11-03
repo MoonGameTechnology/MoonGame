@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { matchRewardPolicySchema } from './matchRewardPolicy';
 import { z } from 'zod';
 import type { GameData } from '@void/shared-core';
 import { CORP_BACKDROP_STANDARD, CORP_STYLE_STANDARD, PROFILE_MEDALS } from '@void/protocol';
@@ -51,6 +52,7 @@ const medalPay = z
 const schema = z
   .object({
     version: z.string().min(1),
+    finalMatch: matchRewardPolicySchema.optional(),
     materials: z.record(id, z.object({ nameKey: z.string().min(1), purpose: z.literal('corporation').optional() }).strict()),
     recipes: z.record(
       id,
@@ -202,6 +204,12 @@ export function parseMetaEconomyCatalog(
   }
   if (equipmentIds.some((key) => (uses[key] ?? 0) < 2)) throw new Error('E_META_UNUSED_MATERIAL');
   checkMaterials(catalog.rewards.materials);
+  if (catalog.finalMatch) {
+    if (catalog.finalMatch.materialPool.some((entry) => !Object.hasOwn(catalog.materials, entry.materialId)))
+      throw new Error('E_META_MATCH_MATERIAL');
+    if (catalog.finalMatch.modulePool.some((entry) => !Object.hasOwn(data.modules, entry.defId)))
+      throw new Error('E_META_MATCH_MODULE');
+  }
   checkMaterials(catalog.rewards.corporationMaterials, true);
   if (corporationIds.some((key) => !catalog.rewards.corporationMaterials[key])) {
     throw new Error('E_META_UNUSED_MATERIAL');
@@ -331,5 +339,6 @@ export function loadMetaEconomyCatalog(
 
 /** Retain issued payment editions when the current match reward catalog advances. */
 export function loadMetaEconomyCatalogHistory(data: Pick<GameData, 'modules'>): MetaEconomyCatalog[] {
-  return [loadMetaEconomyCatalog(data, 'data/metaEconomy-history/meta-v0.1.json')];
+  return ['meta-v0.1', 'meta-v0.2'].map((version) =>
+    loadMetaEconomyCatalog(data, `data/metaEconomy-history/${version}.json`));
 }

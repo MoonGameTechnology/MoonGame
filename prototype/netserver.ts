@@ -849,6 +849,9 @@ async function createHostedMatch(
       victory: victoryFor(initialState),
     },
     initialCareer: restoredSnap?.career,
+    initialMatchRewardProgress: restoredSnap?.matchRewardProgress,
+    initialEconomyActivity: restoredSnap?.economyActivity,
+    ...(!ava ? { matchRewardPolicy: metaCatalog.finalMatch } : {}),
     careerAccounts: AUTH ? await nickSeatAccounts(accountStore, userStore, id)() : {},
     initialSeq: restoredSnap?.seq, // resume the action counter — else the optimistic-by-seq
     // store drops post-restart saves until seq climbs back past the stored value
@@ -911,6 +914,7 @@ async function createHostedMatch(
         clock: room.clockSnapshot,
         economyActivity: room.economyActivitySnapshot,
         career: room.careerSnapshot,
+        matchRewardProgress: room.matchRewardSnapshot,
       };
       await matchStore.save(snapshot);
       if (snapshot.status === 'ended') await profileStore.creditCareer?.(snapshot);

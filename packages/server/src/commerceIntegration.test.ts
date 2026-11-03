@@ -84,16 +84,16 @@ async function setup() {
 }
 
 describe('Commerce to real Meta/Economy over signed HTTP', () => {
-  it('delivers an already issued old-catalog order after the catalog update, once', async () => {
+  it.each(['meta-v0.1', 'meta-v0.2'])('delivers an already issued %s order after the catalog update, once', async (catalogVersion) => {
     const f = await setup();
     const orderId = 'paid-before-catalog-update';
     await f.orders.create({
       orderId, accountId: 'alice', requestId: 'legacy-checkout', provider: 'test-only',
       offer: { ...commerceOffers().find((offer) => offer.productId === 'supply_personal')!,
-        catalogVersion: 'meta-v0.1', available: true, price: { amountMinor: 100, currency: 'USD' } },
+        catalogVersion, available: true, price: { amountMinor: 100, currency: 'USD' } },
       state: 'pending', createdAt: f.now - 1,
     });
-    await f.send({ ...f.proof(orderId), catalogVersion: 'meta-v0.1' });
+    await f.send({ ...f.proof(orderId), catalogVersion });
     await f.commerce.deliver();
     expect((await f.commerce.order('alice', orderId))?.state).toBe('fulfilled');
     expect(await f.commerce.deliver()).toBe(0);

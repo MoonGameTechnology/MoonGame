@@ -90,6 +90,7 @@ const SCHEMA_SQL = `
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_observations jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS economy_activity jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS career jsonb;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS match_reward_progress jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS ended_at timestamptz;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS archive_meta jsonb;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS archive_state_bytes integer;
@@ -680,6 +681,7 @@ interface MatchRow {
   economy_observations: MatchSnapshot['economyObservations'] | null;
   economy_activity: MatchSnapshot['economyActivity'] | null;
   career: MatchSnapshot['career'] | null;
+  match_reward_progress: MatchSnapshot['matchRewardProgress'] | null;
   created_at: Date;
   ended_at: Date | null;
 }
@@ -710,7 +712,7 @@ export class PostgresMatchStore implements MatchStore {
 
   async load(matchId: string): Promise<MatchSnapshot | null> {
     const r = await this.pool.query<MatchRow>(
-      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, created_at, ended_at FROM matches WHERE id = $1`,
+      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, match_reward_progress, created_at, ended_at FROM matches WHERE id = $1`,
       [matchId],
     );
     const row = r.rows[0];
@@ -719,7 +721,7 @@ export class PostgresMatchStore implements MatchStore {
 
   async loadArchive(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null> {
     const r = await this.pool.query<MatchRow>(
-      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, created_at, ended_at
+      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, match_reward_progress, created_at, ended_at
        FROM matches WHERE id=$1 AND status='ended' AND ended_at>$2 AND archive_state_bytes<=$3`,
       [matchId, new Date(since), maxBytes],
     );
@@ -740,6 +742,7 @@ export class PostgresMatchStore implements MatchStore {
       ...(row.created_at ? { createdAt: row.created_at.getTime() } : {}),
       ...(row.ended_at ? { endedAt: row.ended_at.getTime() } : {}),
       ...(row.career ? { career: row.career } : {}),
+      ...(row.match_reward_progress ? { matchRewardProgress: row.match_reward_progress } : {}),
       state: row.state, // pg parses jsonb → JS object
       ...(row.clock ? { clock: row.clock } : {}),
       ...(row.economy_observations ? { economyObservations: row.economy_observations } : {}),
@@ -777,8 +780,8 @@ export class PostgresMatchStore implements MatchStore {
     // Optimistic by seq: only overwrite when our snapshot is at least as new as the
     // stored one (the WHERE on the upsert path drops a stale late write).
     const result = await query.query(
-      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, ended_at, created_at, archive_meta, archive_state_bytes, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $10::jsonb, $11, COALESCE($12, now()), $13::jsonb, $14, now())
+      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, ended_at, created_at, archive_meta, archive_state_bytes, match_reward_progress, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $10::jsonb, $11, COALESCE($12, now()), $13::jsonb, $14, $15::jsonb, now())
        ON CONFLICT (id) DO UPDATE SET
          data_version = EXCLUDED.data_version,
          seq          = EXCLUDED.seq,
@@ -786,6 +789,7 @@ export class PostgresMatchStore implements MatchStore {
          state        = EXCLUDED.state,
          clock        = EXCLUDED.clock,
          career       = EXCLUDED.career,
+         match_reward_progress = COALESCE(EXCLUDED.match_reward_progress, matches.match_reward_progress),
          ended_at     = COALESCE(matches.ended_at, EXCLUDED.ended_at),
          archive_meta = EXCLUDED.archive_meta,
          archive_state_bytes = EXCLUDED.archive_state_bytes,
@@ -840,6 +844,7 @@ export class PostgresMatchStore implements MatchStore {
         snapshot.createdAt !== undefined ? new Date(snapshot.createdAt) : null,
         snapshot.status === 'ended' ? JSON.stringify(archiveMetadataOf(snapshot)) : null,
         snapshot.status === 'ended' ? archiveStateBytes(snapshot.state) : null,
+        snapshot.matchRewardProgress ? JSON.stringify(snapshot.matchRewardProgress) : null,
       ],
     );
     return result.rowCount === 1;

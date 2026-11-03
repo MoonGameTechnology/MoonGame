@@ -363,11 +363,10 @@ describe('MetaEconomy manufacturing', () => {
   it('discloses the drop tables it rolls and the module a season level grants outright', async () => {
     const f = setup();
     const view = await f.service.readModel('alice');
-    const tables = loadDropTables(data);
     expect(view.drops).toEqual({
-      pityAfter: tables.pityAfter,
-      byPlace: [...tables.byPlace].sort((a, b) => a.maxPlace - b.maxPlace),
-      pool: tables.pool,
+      pityAfter: 0,
+      byPlace: [{ maxPlace: 999, chance: f.catalog.finalMatch!.moduleChance }],
+      pool: f.catalog.finalMatch!.modulePool.map((entry) => ({ kind: 'module', ...entry })),
     });
     const season = f.catalog.seasons[0]!;
     for (const [i, milestone] of season.milestones.entries()) {

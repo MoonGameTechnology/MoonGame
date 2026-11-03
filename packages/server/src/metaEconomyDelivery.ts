@@ -12,6 +12,8 @@ import type { MatchSnapshot, MatchStore } from './store';
 import { commitMatch } from './matchCommit';
 import type { SeatAccounts } from './commanderCredit';
 import type { MetaEconomyCatalog } from './metaEconomyCatalog';
+import { finalRewardFacts } from './matchRewardFacts';
+import { rewardPlayerKey } from './matchRewardProgress';
 
 type Metrics = Record<'recon' | 'logistics' | 'defense' | 'objectives', number>;
 type Participation = MetaEconomyCatalog['rewards']['participation'];
@@ -125,6 +127,26 @@ export function createMetaRewardDelivery(deps: MetaRewardDeliveryDeps): {
           Math.floor(progress.logistics / thresholds.logisticsPerPoint) +
           Math.floor(progress.defense / thresholds.defensePerPoint) +
           Math.floor(progress.objectives / thresholds.objectivesPerPoint);
+        // New matches settle exactly once after the whole match ends. A player who
+        // fought until elimination retains the same entitlement while waiting offline.
+        if (snapshot.matchRewardProgress) {
+          const reward = state.match.rewards?.[player];
+          if (state.match.status !== 'ended' || !reward) return output;
+          const key = `reward-facts:${rewardScope}:final`;
+          const existing = await tx.receipt(key);
+          if (existing) return [existing.response as MatchRewardFacts];
+          const ledger = snapshot.matchRewardProgress;
+          const row = ledger.players[rewardPlayerKey(player, seat.claimedAt ?? 0)];
+          const owned = row?.accountId === accountId ? row : undefined;
+          const contribution = Math.max(points(), owned?.battles.length ?? 0, (owned?.kills ?? 0) > 0 ? 1 : 0);
+          const finalReward = finalRewardFacts(ledger, owned, contribution,
+            snapshot.clock?.timeScale ?? 1, state.match.endedAt ?? state.time);
+          const final: MatchRewardFacts = { matchId, accountId, kind: 'final', place: reward.place,
+            participation: finalReward.reason === 'active' || finalReward.reason === 'eliminated',
+            seasonFacts: { ...progress }, finalReward, occurredAt: snapshot.endedAt ?? snapshot.clock?.wallTime ?? now() };
+          await tx.saveReceipt(key, fingerprint(final), final);
+          return [final];
+        }
         // A role may qualify on its own. Natural async pauses and the Steward do
         // not erase a verified accomplishment; previous stage facts retain it.
         // Each stage also needs that many distinct days of the player's own orders,

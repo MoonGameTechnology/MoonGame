@@ -1,5 +1,84 @@
 {
-  "version": "meta-v0.2",
+  "version": "meta-v0.3",
+  "finalMatch": {
+    "version": 1,
+    "scoreDivisor": 2,
+    "baseWarrants": 5,
+    "killsPerWarrant": 5,
+    "veteranPointsPerMaterial": 10,
+    "veteranMaterialCap": 3,
+    "moduleChance": 0.05,
+    "modulePool": [
+      {
+        "defId": "targeting_array",
+        "weight": 3
+      },
+      {
+        "defId": "shield_booster",
+        "weight": 3
+      },
+      {
+        "defId": "siege_platform",
+        "weight": 2
+      },
+      {
+        "defId": "tractor_beam",
+        "weight": 2
+      },
+      {
+        "defId": "repair_tender",
+        "weight": 2
+      },
+      {
+        "defId": "mine_layer",
+        "weight": 2
+      },
+      {
+        "defId": "rocket_mine_layer",
+        "weight": 1
+      }
+    ],
+    "minimumOrders": 2,
+    "minimumContribution": 1,
+    "finalPresence": 0.25,
+    "presenceGraceMs": 1800000,
+    "maxAbsenceMs": 172800000,
+    "baseMaterialCount": 3,
+    "materialPool": [
+      {
+        "materialId": "ferroalloys",
+        "weight": 30
+      },
+      {
+        "materialId": "technical_composites",
+        "weight": 20
+      },
+      {
+        "materialId": "control_circuits",
+        "weight": 20
+      },
+      {
+        "materialId": "energy_cells",
+        "weight": 15
+      },
+      {
+        "materialId": "construction_blocks",
+        "weight": 10
+      },
+      {
+        "materialId": "engineering_kits",
+        "weight": 3
+      },
+      {
+        "materialId": "technology_archives",
+        "weight": 1
+      },
+      {
+        "materialId": "command_cores",
+        "weight": 1
+      }
+    ]
+  },
   "materials": {
     "ferroalloys": { "nameKey": "meta.material.ferroalloys" },
     "technical_composites": { "nameKey": "meta.material.technical_composites" },

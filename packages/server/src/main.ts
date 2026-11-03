@@ -294,7 +294,7 @@ const loadMatch = createMatchLoader({
 // Seed the `dev` match into the store on boot if absent, so the registry can load it on the
 // first connection (dev continuity — a real match is created via the SV-2.4 /matches API).
 if (!(await stores.store.load('dev'))) {
-  const seed = createDevMatch(data, { id: 'dev', time: bootTime });
+  const seed = createDevMatch(data, { id: 'dev', time: bootTime, matchRewardPolicy: metaCatalog.finalMatch });
   const snapshot = snapshotOf(seed);
   if (auth) snapshot.state = initializeOrdinaryArsenal(snapshot.state, data);
   await stores.store.save(snapshot);
@@ -398,7 +398,7 @@ const identify: MatchApiDeps['identify'] = verifySession
 const createMatch = async (): Promise<CreatedMatch> => {
   if (matchCount >= MAX_MATCHES) throw new Error('match capacity reached'); // → 500, bounded
   const matchId = await freeMatchId(async (id) => (await stores.store.load(id)) !== null);
-  const seed = createDevMatch(data, { id: matchId, time: Date.now() });
+  const seed = createDevMatch(data, { id: matchId, time: Date.now(), matchRewardPolicy: metaCatalog.finalMatch });
   const snapshot = snapshotOf(seed);
   if (auth) snapshot.state = initializeOrdinaryArsenal(snapshot.state, data);
   await stores.store.save(snapshot);
