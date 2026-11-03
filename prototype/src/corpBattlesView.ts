@@ -1,11 +1,13 @@
 import {
   BATTLE_FORMATS,
+  battleRating,
   CORP_BATTLE_TABS,
   battlePhase,
   battleStats,
   challengeGroups,
   opponentOffer,
   topCorpFighters,
+  winBonus,
   type CorpBattleTab,
 } from '../../decisions/corpBattles';
 import type {
@@ -269,12 +271,12 @@ function opponentsView(p: CorpBattlesPaint): string {
                   p.busy,
                   ` data-corpformat="${offer.format}"`,
                 ) +
-                `<small>${fmt(offer.format)} · ${esc(t('corp.combat.price', { n: offer.cost }))}</small>`;
+                `<small>${fmt(offer.format)} · ${esc(t('corp.combat.price', { n: offer.cost }))} · ${esc(t('corp.combat.reward', { n: winBonus(offer.cost, p.corp.rating, r.rating) }))}</small>`;
             else if (offer.kind === 'answer' || offer.kind === 'active')
               action = `<button type="button" class="btn-second" data-battletab="${offer.kind === 'answer' ? 'challenges' : 'now'}">${esc(t(offer.kind === 'answer' ? 'corp.combat.answer' : 'corp.combat.to-current'))}</button>`;
             else action = hint(OFFER[offer.kind]);
             return (
-              `<article class="cb-card cb-battle-card${r.monument ? ' corp-monument' : ''}"><header><div class="cb-battle-identity">${corpEmblem(r.corpId, r.emblemId, 40)}<h3>${esc(r.name)}</h3></div><b>${nfmt(r.influence)} ⟡</b></header>` +
+              `<article class="cb-card cb-battle-card${r.monument ? ' corp-monument' : ''}"><header><div class="cb-battle-identity">${corpEmblem(r.corpId, r.emblemId, 40)}<h3>${esc(r.name)}</h3></div><b>${esc(t('corp.combat.rating', { n: battleRating(r.rating) }))}</b></header>` +
               `<p class="cb-battle-hint">${esc(t('corp.members.count', { n: r.members }))} · ${r.formats.map(fmt).join(' · ')}</p>` +
               (rematch
                 ? `<p class="cb-battle-hint">${esc(t('corp.combat.encounters', { wins: record.wins, losses: record.losses, draws: record.draws }))}</p>`
@@ -325,7 +327,7 @@ function readyView(p: CorpBattlesPaint): string {
       const locked = f.format > p.maxFormat;
       return (
         `<button type="button" data-battle-ready-format="${f.format}" aria-pressed="${p.draftFormats.includes(f.format)}"${!head || p.busy || locked ? ' disabled' : ''}>` +
-        `<b>${fmt(f.format)}</b><span>${esc(t('corp.combat.price', { n: f.cost }))}</span><span>${esc(t('corp.combat.reward', { n: f.reward }))}</span><small>${esc(t(locked ? 'corp.combat.format-locked' : 'corp.combat.minimum', { n: f.minPlayers }))}</small></button>`
+        `<b>${fmt(f.format)}</b><span>${esc(t('corp.combat.price', { n: f.cost }))}</span><span>${esc(t('corp.combat.reward-even', { n: winBonus(f.cost) }))}</span><small>${esc(t(locked ? 'corp.combat.format-locked' : 'corp.combat.minimum', { n: f.minPlayers }))}</small></button>`
       );
     }).join('') +
     `</div>` +

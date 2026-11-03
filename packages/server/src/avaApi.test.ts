@@ -38,7 +38,7 @@ async function harness(influenceA = 500): Promise<Harness> {
   let t = 0;
   const now = (): number => ++t;
   let catalogueIndex = 0;
-  const corp = new CorpService({ store, now, nameIndex: () => catalogueIndex++ });
+  const corp = new CorpService({ store, now, nameIndex: () => catalogueIndex++ , startInfluence: 0 });
   const service = new AvaService({
     corpStore: store,
     challengeStore: challenges,

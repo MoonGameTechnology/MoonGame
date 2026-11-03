@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   battlePostPath,
+  battleRating,
+  winBonus,
   battleAttention,
   battlePhase,
   battleStats,
@@ -225,5 +227,15 @@ describe('battlePostPath — маршрут кнопки битвы без те�
   it('прочие действия — не его', () => {
     expect(battlePostPath('ava-challenge', 'x')).toBeNull();
     expect(battlePostPath('ready-x', '')).toBeNull();
+  });
+});
+
+describe('the win bonus a challenge promises (CORP-19)', () => {
+  it('is the stake against an equal, more against a stronger corp, less against a weaker', () => {
+    expect(winBonus(100)).toBe(100);
+    expect(winBonus(100, 1000, 1200)).toBe(150);
+    expect(winBonus(100, 1000, 1800)).toBe(200); // at most double
+    expect(winBonus(100, 1600, 1000)).toBe(50); // at least half
+    expect(battleRating(undefined)).toBe(1000);
   });
 });

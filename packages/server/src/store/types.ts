@@ -233,6 +233,9 @@ export interface CorpRecord extends CorpPublicFacilities {
   /** AvA influence points (AVA-2) — the corp's inter-match currency: spent on a
    *  challenge, earned by a war victory. Never negative (spend is atomic+guarded). */
   influence: number;
+  /** CORP-19: battle rating (Elo). Absent until the corp's first battle: it reads as the
+   *  catalog's `ratingStart`. */
+  rating?: number;
 }
 
 /** One membership row. An account belongs to AT MOST one corporation (recruit rows
@@ -350,6 +353,8 @@ export interface CorpStore {
   /** Credit influence (AVA-2). `delta` must be positive — earning only; spending
    *  goes through the guarded `spendInfluence`. */
   addInfluence(corpId: string, delta: number): Promise<void>;
+  /** CORP-19: move the battle rating by `delta`, from `start` when the corp has none yet. */
+  adjustRating(corpId: string, delta: number, start: number): Promise<void>;
   /** Debit influence atomically (AVA-2): the check and the subtraction are one
    *  storage-level operation, so two racing spends can't overdraw the balance. */
   spendInfluence(
@@ -405,6 +410,9 @@ export interface AvaChallenge {
    *  sides gather their roster until this instant, then the sweep locks or cancels.
    *  Absent on rows accepted before AVA-6 — treated as a closed window (fail-secure). */
   pauseEndsAt?: number;
+  /** CORP-19: both sides' battle ratings, stamped on accept — the settlement reckons the
+   *  win bonus from them. Absent on matchups accepted before it: the current ratings. */
+  ratings?: Record<AvaSide, number>;
 }
 
 /** Which party of a matchup an account fights for (AVA-6). */
@@ -440,7 +448,7 @@ export interface AvaChallengeStore {
   duePending(now: number): Promise<AvaChallenge[]>;
   /** AVA-6: stamp the roster window deadline on an ACCEPTED matchup (right after the
    *  accept wins its close race — S3 opens at S2). No-op on any other status. */
-  openRosterWindow(id: string, pauseEndsAt: number): Promise<void>;
+  openRosterWindow(id: string, pauseEndsAt: number, ratings?: Record<AvaSide, number>): Promise<void>;
   /** AVA-6: atomic accepted→terminal transition of the roster phase (`locked` /
    *  `cancelled`). False = the row was NOT accepted and NOTHING changed — the same
    *  exactly-once contract as `closeChallenge` (the caller must not refund twice). */
@@ -471,6 +479,8 @@ export interface AvaResult {
   format?: number;
   /** CORP-9: how the battle went; absent on results recorded before it. */
   report?: AvaBattleReport;
+  /** CORP-19: influence minted for the winner; absent on results recorded before it. */
+  bonus?: number;
 }
 
 /** CORP-9: one seat of a corporations battle in its breakdown. The login is taken at the

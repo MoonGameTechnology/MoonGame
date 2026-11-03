@@ -63,10 +63,10 @@ describe('рейтинги — разметка доски', () => {
       rows: [{ rank: 1, name: 'Флот', score: 50, members: 7 }],
     }));
     expect(corps).toContain('7');
-    expect(corps).toContain('вл'); // влияние, а не опыт
+    expect(corps).toContain('<i>рейт</i>'); // рейтинг битв, а не опыт
     const players = boardHtml('players', view());
     expect(players).toContain('оп');
-    expect(players).not.toContain('вл');
+    expect(players).not.toContain('<i>рейт</i>');
   });
 
   it('гость видит ПРИЧИНУ, а не пустую доску: место живёт на аккаунте', () => {

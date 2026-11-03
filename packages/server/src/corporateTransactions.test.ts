@@ -179,7 +179,7 @@ describe.skipIf(!url)('corporate settlement recovery', () => {
       if (!a.ok || !b.ok) throw Error('fixture');
       await pool.query('UPDATE corps SET influence=500 WHERE id=$1', [a.corpId]);
       await pool.query(
-        "INSERT INTO ava_challenges(id,challenger_corp,target_corp,cost,status,created_at,expires_at) VALUES($1,$2,$3,0,'locked',0,0)",
+        "INSERT INTO ava_challenges(id,challenger_corp,target_corp,cost,status,created_at,expires_at) VALUES($1,$2,$3,100,'locked',0,0)",
         [id, a.corpId, b.corpId],
       );
       await pool.query(
@@ -216,7 +216,7 @@ describe.skipIf(!url)('corporate settlement recovery', () => {
           (await pool.query('SELECT influence FROM corps WHERE id=$1', [a.corpId])).rows[0]
             .influence,
         ),
-      ).toBe(650);
+      ).toBe(700); // CORP-19: the 100 stake back + a 100 bonus over an equal
     } finally {
       await pool.end();
     }

@@ -4,8 +4,9 @@ import { rankCorps, registerLeaderboardApi, type BoardView } from './leaderboard
 import { MemoryCommanderStore, MemoryCorpStore, MemoryUserStore } from './store';
 import type { CorpSummary } from './store';
 
-function corp(corpId: string, name: string, influence: number, members = 1): CorpSummary {
-  return { corpId, name, influence, members };
+/** CORP-19: the corp board ranks the battle rating, not the influence balance. */
+function corp(corpId: string, name: string, rating: number, members = 1): CorpSummary {
+  return { corpId, name, influence: 0, rating, members };
 }
 
 describe('RANK-1 — правило места', () => {
@@ -30,6 +31,16 @@ describe('RANK-1 — правило места', () => {
     expect(view.rows.some((r) => r.me)).toBe(false); // в странице меня нет — и не выдумываем
     expect(view.me.rank).toBe(12); // но место известно: считается по ВСЕМ
     expect(view.total).toBe(12);
+  });
+
+  it('считает рейтинг битв, а не баланс влияния; без боёв — стартовый рейтинг', () => {
+    const rich: CorpSummary = { corpId: 'r', name: 'Богач', influence: 9000, members: 1 };
+    const view = rankCorps([rich, corp('w', 'Боец', 1016)], 'r');
+    expect(view.rows.map((r) => [r.name, r.score])).toEqual([
+      ['Боец', 1016],
+      ['Богач', 1000],
+    ]);
+    expect(view.me).toEqual({ rank: 2, score: 1000, name: 'Богач' });
   });
 
   it('без корпорации место пустое — это не «последнее место»', () => {

@@ -46,7 +46,7 @@ describe('AvA battle end to end (CORP-4)', () => {
     let wall = Date.UTC(2026, 9, 22);
     const now = (): number => wall;
     const stores = await createStores({});
-    const corp = new CorpService({ store: stores.corpStore, now });
+    const corp = new CorpService({ store: stores.corpStore, now , startInfluence: 0 });
     const ava = new AvaService({
       corpStore: stores.corpStore,
       challengeStore: stores.challengeStore,
@@ -181,8 +181,9 @@ describe('AvA battle end to end (CORP-4)', () => {
     expect(pending).toEqual([{ matchId, matchupId: ch.id, winner: 'slot_a1' }]);
     for (const result of pending) await orch.onMatchEnded(result.matchId, result.winner);
     expect((await stores.resultStore.get(ch.id))?.winnerCorp).toBe(a.corpId);
-    // 500 − 100 for the challenge + 150 for the win
-    expect((await stores.corpStore.getCorp(a.corpId))?.influence).toBe(550);
+    // 500 − 100 for the challenge, then the stake back + 100 for a win over an equal
+    // (CORP-19)
+    expect((await stores.corpStore.getCorp(a.corpId))?.influence).toBe(600);
   });
 });
 

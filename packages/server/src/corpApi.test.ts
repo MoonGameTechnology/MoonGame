@@ -96,12 +96,12 @@ describe('CORP-0 · corp API', () => {
 
     const list = await app.inject({ method: 'GET', url: '/corps', headers: as('bob') });
     expect(list.json()).toEqual({
-      corps: [{ corpId, name: generatedCorpName(0), members: 1, influence: 0, emblemId: expect.any(String) }],
+      corps: [{ corpId, name: generatedCorpName(0), members: 1, influence: 100, emblemId: expect.any(String) }],
     });
 
     const detail = await app.inject({ method: 'GET', url: `/corps/${corpId}`, headers: as('bob') });
     expect(detail.json()).toEqual({
-      corp: { corpId, name: generatedCorpName(0), influence: 0, emblemId: expect.any(String) },
+      corp: { corpId, name: generatedCorpName(0), influence: 100, emblemId: expect.any(String) },
       members: [{ corpId, accountId: 'acc-alice', login: 'alice', role: 'head' }],
     });
 
@@ -238,7 +238,7 @@ describe('CORP-0 · corp API', () => {
     });
     expect(res.statusCode).toBe(200);
     const { audit } = res.json() as { audit: Array<{ action: string; actor: string }> };
-    expect(audit.map((e) => e.action)).toEqual(['decline', 'create']); // newest first
+    expect(audit.map((e) => e.action)).toEqual(['decline', 'influence', 'create']); // newest first
     expect(audit[0]).toMatchObject({ actor: 'acc-alice' });
     await app.close();
   });

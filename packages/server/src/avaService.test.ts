@@ -55,7 +55,7 @@ async function fixture(
   let t = 0;
   const now = (): number => ++t;
   let catalogueIndex = 0;
-  const corp = new CorpService({ store, now, nameIndex: () => catalogueIndex++ });
+  const corp = new CorpService({ store, now, nameIndex: () => catalogueIndex++ , startInfluence: 0 });
   const ava = new AvaService({
     corpStore: store,
     challengeStore: challenges,
@@ -404,13 +404,14 @@ describe('AvaService — roster window S3 (AVA-6)', () => {
 });
 
 describe('AvaService — settlement (AVA-8, S7)', () => {
-  it('archives the matchup, records the outcome, awards influence to the winner', async () => {
+  it('archives the matchup, records the outcome, pays the winning challenger', async () => {
     const f = await fixture();
     const id = await lockedMatchup(f);
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(400); // cost spent, not refunded
     expect(await f.ava.settleMatch(id, 'challenger')).toEqual({ ok: true, winnerCorp: f.corpA });
     expect((await f.ava.challengesFor(A_HEAD))[0]?.status).toBe('ended'); // S7 archive
-    expect((await f.store.getCorp(f.corpA))?.influence).toBe(550); // +150 win reward
+    // CORP-19: the stake back + a bonus of the stake, the sides being equal
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(600);
     const history = await f.ava.matchHistory();
     expect(history).toHaveLength(1);
     expect(history[0]).toMatchObject({
@@ -425,17 +426,17 @@ describe('AvaService — settlement (AVA-8, S7)', () => {
     const f = await fixture();
     const id = await lockedMatchup(f);
     expect(await f.ava.settleMatch(id, 'target')).toEqual({ ok: true, winnerCorp: f.corpB });
-    expect((await f.store.getCorp(f.corpB))?.influence).toBe(650); // 500 + 150
+    expect((await f.store.getCorp(f.corpB))?.influence).toBe(550); // 500 + half the bonus
     expect(await f.ava.settleMatch(id, 'target')).toEqual({ ok: false, code: 'E_MATCHUP_CLOSED' });
-    expect((await f.store.getCorp(f.corpB))?.influence).toBe(650); // not awarded twice
+    expect((await f.store.getCorp(f.corpB))?.influence).toBe(550); // not awarded twice
     expect(await f.ava.matchHistory()).toHaveLength(1);
   });
 
-  it('a draw records the result but awards no influence', async () => {
+  it('a draw records the result and returns half the stake, no bonus', async () => {
     const f = await fixture();
     const id = await lockedMatchup(f);
     expect(await f.ava.settleMatch(id, null)).toEqual({ ok: true, winnerCorp: null });
-    expect((await f.store.getCorp(f.corpA))?.influence).toBe(400);
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(450);
     expect((await f.store.getCorp(f.corpB))?.influence).toBe(500);
     expect((await f.ava.matchHistory())[0]).toMatchObject({ matchupId: id, winnerCorp: null });
   });
@@ -456,6 +457,39 @@ describe('AvaService — settlement (AVA-8, S7)', () => {
       code: 'E_NO_CHALLENGE',
     });
     expect(await f.ava.matchHistory()).toHaveLength(0);
+  });
+});
+
+describe('AvaService — the battle economy (CORP-19)', () => {
+  it('moves both battle ratings by Elo and records the bonus with the result', async () => {
+    const f = await fixture();
+    const id = await lockedMatchup(f);
+    await f.ava.settleMatch(id, 'challenger');
+    expect((await f.store.getCorp(f.corpA))?.rating).toBe(1016);
+    expect((await f.store.getCorp(f.corpB))?.rating).toBe(984);
+    expect((await f.ava.matchHistory())[0]?.bonus).toBe(100);
+  });
+
+  it('reckons the bonus from the ratings stamped at accept, not the ones at the end', async () => {
+    const f = await fixture();
+    const id = await lockedMatchup(f); // accepted at 1000 against 1000
+    await f.store.adjustRating(f.corpA, -400, 1000); // A looks weak only after the accept
+    await f.ava.settleMatch(id, 'challenger');
+    expect((await f.ava.matchHistory())[0]?.bonus).toBe(100); // k = 1, not 2
+  });
+
+  it('a pair that keeps fighting earns 100 %, then 50 %, then nothing', async () => {
+    const f = await fixture();
+    const bonuses: Array<number | undefined> = [];
+    for (let i = 0; i < 3; i++) {
+      const id = await lockedMatchup(f);
+      await f.ava.settleMatch(id, 'challenger');
+      bonuses.push((await f.ava.matchHistory())[0]?.bonus);
+    }
+    // the 2nd: half of 100 × k, k = 1 + (984 − 1016) / 400 = 0.92 after the 1st battle
+    expect(bonuses).toEqual([100, 46, 0]);
+    // 500 − 3 × 100 stakes + 3 × 100 back + 146 bonus
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(646);
   });
 });
 
@@ -667,7 +701,7 @@ describe('AvaService — battle formats (CORP-7)', () => {
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(before - 200);
   });
 
-  it('a 3-on-3 needs three a side and pays the winner 75 ⟡ a seat', async () => {
+  it('a 3-on-3 needs three a side and reckons the win from its 150 ⟡ stake', async () => {
     const f = await fixture();
     await f.ava.setCorpReady(A_HEAD);
     await f.ava.setCorpReady(B_HEAD, [3]);
@@ -684,11 +718,11 @@ describe('AvaService — battle formats (CORP-7)', () => {
     await play([B_HEAD, B_MEMBER]);
     expect(await f.ava.sweepRosters(f.clock() + 1_000_000)).toEqual({ locked: 0, cancelled: 1 });
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(500);
-    // Three a side lock; the winner gets 225.
+    // Three a side lock; the winning target gets half the bonus: 75.
     const id = await play([B_HEAD, B_MEMBER, B_THIRD]);
     expect(await f.ava.sweepRosters(f.clock() + 1_000_000)).toEqual({ locked: 1, cancelled: 0 });
     expect(await f.ava.settleMatch(id, 'target')).toEqual({ ok: true, winnerCorp: f.corpB });
-    expect((await f.store.getCorp(f.corpB))?.influence).toBe(725);
+    expect((await f.store.getCorp(f.corpB))?.influence).toBe(575);
     expect((await f.store.getCorp(f.corpA))?.influence).toBe(350);
   });
 });
@@ -724,7 +758,7 @@ describe('AvaService — the «Битвы» tab (CORP-9)', () => {
     const [result] = await f.ava.matchHistory();
     expect(result).toMatchObject({ matchupId: id, format: 2 });
     expect(result).not.toHaveProperty('report');
-    expect((await f.store.getCorp(f.corpA))?.influence).toBe(550); // the win still paid
+    expect((await f.store.getCorp(f.corpA))?.influence).toBe(600); // the win still paid
   });
 
   it('shows a member the readiness, every challenge, the battles and the record', async () => {

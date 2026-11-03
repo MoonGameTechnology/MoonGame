@@ -25,6 +25,8 @@ export interface CorpRecord extends CorpPublicFacilities {
   corpId: string;
   name: string;
   influence: number;
+  /** CORP-19: battle rating; absent until the corp's first battle. */
+  rating?: number;
   emblemId?: CorpEmblemId;
 }
 export interface CorpSummary extends CorpRecord {
@@ -118,7 +120,7 @@ export function parseCorpFacilities(raw: Record<string, unknown>): CorpPublicFac
 }
 export function parseCorpRecord(raw: unknown): CorpRecord | null {
   if (!isObj(raw) || !isStr(raw.corpId) || !isStr(raw.name) || !isNum(raw.influence)) return null;
-  return { ...parseCorpFacilities(raw), corpId: raw.corpId, name: raw.name, influence: raw.influence,
+  return { ...parseCorpFacilities(raw), corpId: raw.corpId, name: raw.name, influence: raw.influence, ...(isNum(raw.rating) ? { rating: raw.rating } : {}),
     ...(isCorpEmblemId(raw.emblemId) ? { emblemId: raw.emblemId } : {}) };
 }
 
@@ -127,7 +129,7 @@ export function parseCorpSummaries(raw: unknown): CorpSummary[] {
   const out: CorpSummary[] = [];
   for (const r of raw) {
     if (isObj(r) && isStr(r.corpId) && isStr(r.name) && isNum(r.influence) && isNum(r.members)) {
-      out.push({ ...parseCorpFacilities(r), corpId: r.corpId, name: r.name, influence: r.influence, members: r.members,
+      out.push({ ...parseCorpFacilities(r), corpId: r.corpId, name: r.name, influence: r.influence, ...(isNum(r.rating) ? { rating: r.rating } : {}), members: r.members,
         ...(isCorpEmblemId(r.emblemId) ? { emblemId: r.emblemId } : {}) });
     }
   }
@@ -212,7 +214,7 @@ export function parseReadyPool(raw: unknown): Array<CorpSummary & { readySince: 
       isNum(r.members) &&
       isNum(r.readySince)
     ) {
-      out.push({ ...parseCorpFacilities(r), corpId: r.corpId, name: r.name, influence: r.influence, members: r.members, readySince: r.readySince,
+      out.push({ ...parseCorpFacilities(r), corpId: r.corpId, name: r.name, influence: r.influence, ...(isNum(r.rating) ? { rating: r.rating } : {}), members: r.members, readySince: r.readySince,
         ...(isCorpEmblemId(r.emblemId) ? { emblemId: r.emblemId } : {}) });
     }
   }

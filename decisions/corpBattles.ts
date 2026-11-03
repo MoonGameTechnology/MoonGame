@@ -12,12 +12,25 @@ import type {
 
 export const CORP_BATTLE_TABS = ['now', 'challenges', 'opponents', 'history', 'ready'] as const;
 export type CorpBattleTab = (typeof CORP_BATTLE_TABS)[number];
-export const BATTLE_FORMATS = catalog.formats.map(({ format, cost, reward, minPlayers }) => ({
+export const BATTLE_FORMATS = catalog.formats.map(({ format, cost, minPlayers }) => ({
   format,
   cost,
-  reward,
   minPlayers,
 }));
+const ECONOMY = catalog.economy;
+
+/** CORP-19: a corporation's battle rating; the start value before its first battle. */
+export function battleRating(rating: number | undefined): number {
+  return rating ?? ECONOMY.ratingStart;
+}
+
+/** CORP-19: the bonus a challenger rated `mine` wins over a target rated `theirs` at
+ *  `cost` — the server's rule for a first battle of the pair with no bots, before the
+ *  daily cap (`packages/server/src/avaEconomy.ts`). The stake comes back on top of it. */
+export function winBonus(cost: number, mine?: number, theirs?: number): number {
+  const k = 1 + (battleRating(theirs) - battleRating(mine)) / ECONOMY.ratingSpread;
+  return Math.round(cost * Math.min(ECONOMY.bonusMax, Math.max(ECONOMY.bonusMin, k)));
+}
 const object = (x: unknown): x is Record<string, unknown> =>
   !!x && typeof x === 'object' && !Array.isArray(x);
 const text = (x: unknown): x is string => typeof x === 'string' && x.length > 0 && x.length <= 256;

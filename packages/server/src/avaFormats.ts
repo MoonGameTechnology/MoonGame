@@ -4,7 +4,7 @@ import { CORP_BUILDINGS } from './corpConstruction';
 
 /**
  * CORP-7 — AvA battle formats (`data/avaFormats.json`). A battle is played N on N; the
- * format sets the challenge price, the winner's influence and the fewest players a side
+ * format sets the challenge price and the fewest players a side
  * must gather by the roster lock (bots take the rest of the seats, never more than a
  * quarter of a side). Every corporation plays up to `baseMaxFormat`; a larger format is
  * opened by a building level's `maxFormat` (the operations center). Meta-only data like the
@@ -28,19 +28,45 @@ export interface AvaFormatMap {
 export interface AvaFormat {
   /** Players per side. */
   format: number;
-  /** Influence the challenger pays; refunded on decline, expiry or cancellation. */
+  /** Influence the challenger pays; refunded on decline, expiry or cancellation. The win
+   *  bonus is reckoned from it (CORP-19, `avaEconomy.ts`). */
   cost: number;
-  /** Influence the winning corporation receives. */
-  reward: number;
   /** Fewest players per side at the roster lock: a shorter side cancels the battle. */
   minPlayers: number;
   /** The maps a battle of this format is played on; the orchestrator draws one. */
   maps: AvaFormatMap[];
 }
 
+/** CORP-19 — the influence economy of battles: the battle rating (Elo) and how a
+ *  settlement pays out. Reckoned by `avaEconomy.ts`. */
+export interface AvaEconomy {
+  /** Influence a new corporation starts with: enough for the first 2 на 2 challenge. */
+  startInfluence: number;
+  /** Battle rating of a corporation that has not fought yet. */
+  ratingStart: number;
+  /** Elo step: the most rating one battle moves. */
+  ratingK: number;
+  /** Rating gap that doubles (or halves) the win bonus, and Elo's spread. */
+  ratingSpread: number;
+  /** Bounds of the strength factor k. */
+  bonusMin: number;
+  bonusMax: number;
+  /** Share of the bonus a winning target receives: it risks only its rating. */
+  targetShare: number;
+  /** Share of the stake a draw returns to the challenger. */
+  drawRefund: number;
+  /** Window in which repeated battles of one pair pay less. */
+  pairWindowMs: number;
+  /** Bonus share of the 1st, 2nd, … battle of a pair in the window; the last one repeats. */
+  pairBonus: number[];
+  /** Most bonus influence a corporation receives from battles in a day (refunds aside). */
+  dailyBonusCap: number;
+}
+
 export interface AvaFormatCatalog {
   /** The largest format a corporation plays without any building. */
   baseMaxFormat: number;
+  economy: AvaEconomy;
   /** Ascending by `format`. */
   formats: AvaFormat[];
 }
@@ -76,7 +102,6 @@ export function parseAvaFormats(raw: unknown): AvaFormatCatalog {
       !positive(row.format) ||
       row.format <= previous ||
       !positive(row.cost) ||
-      !positive(row.reward) ||
       !positive(row.minPlayers) ||
       row.minPlayers > row.format ||
       !validMaps(row.maps, row.format)
@@ -94,7 +119,34 @@ export function parseAvaFormats(raw: unknown): AvaFormatCatalog {
     )
   )
     throw new Error('E_AVA_FORMATS');
-  return { baseMaxFormat: catalog!.baseMaxFormat as number, formats };
+  return {
+    baseMaxFormat: catalog!.baseMaxFormat as number,
+    economy: parseEconomy(catalog!.economy),
+    formats,
+  };
+}
+
+const share = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
+
+function parseEconomy(raw: unknown): AvaEconomy {
+  const e = raw as Partial<AvaEconomy> | null;
+  if (
+    !e ||
+    !(Number.isSafeInteger(e.startInfluence) && (e.startInfluence as number) >= 0) ||
+    !positive(e.ratingStart) ||
+    !positive(e.ratingK) ||
+    !positive(e.ratingSpread) ||
+    !(typeof e.bonusMin === 'number' && e.bonusMin > 0) ||
+    !(typeof e.bonusMax === 'number' && Number.isFinite(e.bonusMax) && e.bonusMax >= e.bonusMin) ||
+    !share(e.targetShare) ||
+    !share(e.drawRefund) ||
+    !positive(e.pairWindowMs) ||
+    !(Array.isArray(e.pairBonus) && e.pairBonus.length > 0 && e.pairBonus.every(share)) ||
+    !positive(e.dailyBonusCap)
+  )
+    throw new Error('E_AVA_FORMATS');
+  return structuredClone(e as AvaEconomy);
 }
 
 export const AVA_FORMATS = parseAvaFormats(rawFormats);

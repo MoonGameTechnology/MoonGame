@@ -262,7 +262,8 @@ describe('CORP-0 · read models and audit', () => {
     expect(await service.transfer(HEAD, corpId, OFFICER.accountId)).toEqual({ ok: true });
     const log = await service.auditLog(OFFICER, corpId);
     if (!log.ok) throw new Error('expected ok');
-    // newest first: transfer, kick, the fixture's role×2 + accept×3, create
+    // newest first: transfer, kick, the fixture's role×2 + accept×3, the start influence
+    // (CORP-19), create
     expect(log.audit.map((e) => e.action)).toEqual([
       'transfer',
       'kick',
@@ -271,6 +272,7 @@ describe('CORP-0 · read models and audit', () => {
       'accept',
       'accept',
       'accept',
+      'influence',
       'create',
     ]);
     expect(log.audit[0]).toMatchObject({ actor: HEAD.accountId, target: OFFICER.accountId });

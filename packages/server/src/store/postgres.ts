@@ -1,5 +1,6 @@
 export { PostgresArsenalStore } from './postgresArsenal';
 import { scopedPool } from '../corporateScopedPool';
+import { challengeOf, resultOf, type ChallengeRow, type ResultRow } from './avaRows';
 import { reservedBotLogin } from '../botNicknames';
 import { archiveMetadataOf, archiveStateBytes, type ArchiveSummaryMetadata } from '../matchArchiveMetadata';
 import { readArchiveMetadata } from '../matchArchiveCatalog';
@@ -22,9 +23,7 @@ import type { PlayerId } from '@void/shared-core';
 import type {
   AccountStore,
   AnnouncementStore,
-  AvaBattleReport,
   AvaChallenge,
-  AvaChallengeStatus,
   AvaChallengeStore,
   AvaFeedStore,
   AvaResult,
@@ -208,6 +207,8 @@ const SCHEMA_SQL = `
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS infrastructure jsonb;
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS emblem_id text;
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS showcase jsonb NOT NULL DEFAULT '[]'::jsonb;
+    -- CORP-19: battle rating (Elo); NULL = has not fought, reads as the catalog's start.
+    ALTER TABLE corps ADD COLUMN IF NOT EXISTS rating integer;
 
     -- account_id as the PRIMARY KEY is the one-corp-per-account invariant: a member
     -- (recruit rows included — a recruit row IS the pending application) can't join
@@ -284,6 +285,9 @@ const SCHEMA_SQL = `
     ALTER TABLE ava_challenges ADD COLUMN IF NOT EXISTS pause_ends_at bigint;
     -- CORP-7: players per side; challenges written before the formats were 2 на 2.
     ALTER TABLE ava_challenges ADD COLUMN IF NOT EXISTS format integer NOT NULL DEFAULT 2;
+    -- CORP-19: both sides' battle ratings, stamped on accept; NULL on earlier matchups.
+    ALTER TABLE ava_challenges ADD COLUMN IF NOT EXISTS challenger_rating integer;
+    ALTER TABLE ava_challenges ADD COLUMN IF NOT EXISTS target_rating integer;
 
     -- AvA rosters (AVA-6): one row per (matchup, account) — the PK is the
     -- one-entry-per-account invariant; the per-side cap is guarded inside the
@@ -316,6 +320,8 @@ const SCHEMA_SQL = `
     UPDATE ava_results r SET format = c.format FROM ava_challenges c
       WHERE r.format IS NULL AND c.id = r.matchup_id;
     ALTER TABLE ava_results ADD COLUMN IF NOT EXISTS report jsonb;
+    -- CORP-19: influence minted for the winner (the daily cap sums it); NULL before it.
+    ALTER TABLE ava_results ADD COLUMN IF NOT EXISTS bonus bigint;
     CREATE INDEX IF NOT EXISTS ava_results_challenger_idx ON ava_results (challenger_corp);
     CREATE INDEX IF NOT EXISTS ava_results_target_idx ON ava_results (target_corp);
 
@@ -1397,12 +1403,13 @@ export class PostgresCorpStore implements CorpStore {
   }
 
   async getCorp(corpId: string): Promise<CorpRecord | null> {
-    const r = await this.pool.query<CorpFacilityRow & { id: string; name: string; influence: string; emblem_id: string | null }>(
-      `SELECT id, name, influence, emblem_id, infrastructure, showcase FROM corps WHERE id = $1`,
+    const r = await this.pool.query<CorpFacilityRow & { id: string; name: string; influence: string; emblem_id: string | null; rating: number | null }>(
+      `SELECT id, name, influence, emblem_id, infrastructure, showcase, rating FROM corps WHERE id = $1`,
       [corpId],
     );
     const row = r.rows[0];
     return row ? { corpId: row.id, name: row.name, influence: Number(row.influence),
+      ...(row.rating === null ? {} : { rating: Number(row.rating) }),
       ...publicCorpFacilities(row.infrastructure, Date.now(), row.showcase),
       ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}) } : null;
   }
@@ -1438,8 +1445,9 @@ export class PostgresCorpStore implements CorpStore {
       influence: string;
       members: string;
       emblem_id: string | null;
+      rating: number | null;
     }>(
-      `SELECT c.id, c.name, c.influence, c.emblem_id, c.infrastructure, c.showcase,
+      `SELECT c.id, c.name, c.influence, c.emblem_id, c.infrastructure, c.showcase, c.rating,
               count(m.account_id) FILTER (WHERE m.role <> 'recruit') AS members
        FROM corps c
        LEFT JOIN corp_members m ON m.corp_id = c.id
@@ -1450,6 +1458,7 @@ export class PostgresCorpStore implements CorpStore {
       corpId: row.id,
       name: row.name,
       influence: Number(row.influence),
+      ...(row.rating === null ? {} : { rating: Number(row.rating) }),
       members: Number(row.members),
       ...publicCorpFacilities(row.infrastructure, Date.now(), row.showcase),
       ...(isCorpEmblemId(row.emblem_id) ? { emblemId: row.emblem_id } : {}),
@@ -1588,6 +1597,10 @@ export class PostgresCorpStore implements CorpStore {
     }
   }
 
+  async adjustRating(corpId: string, delta: number, start: number): Promise<void> {
+    await this.pool.query(`UPDATE corps SET rating = COALESCE(rating, $3) + $2 WHERE id = $1`, [corpId, delta, start]);
+  }
+
   async addInfluence(corpId: string, delta: number): Promise<void> {
     if (delta <= 0) return;
     await this.pool.query(`UPDATE corps SET influence = influence + $2 WHERE id = $1`, [
@@ -1633,8 +1646,9 @@ export class PostgresCorpStore implements CorpStore {
       since: string;
       formats: number[];
       emblem_id: string | null;
+      rating: number | null;
     }>(
-      `SELECT c.id, c.name, c.influence, c.emblem_id, c.infrastructure, c.showcase, r.since, r.formats,
+      `SELECT c.id, c.name, c.influence, c.emblem_id, c.infrastructure, c.showcase, c.rating, r.since, r.formats,
               count(m.account_id) FILTER (WHERE m.role <> 'recruit') AS members
        FROM corp_ready r
        JOIN corps c ON c.id = r.corp_id
@@ -1646,6 +1660,7 @@ export class PostgresCorpStore implements CorpStore {
       corpId: row.id,
       name: row.name,
       influence: Number(row.influence),
+      ...(row.rating === null ? {} : { rating: Number(row.rating) }),
       members: Number(row.members),
       readySince: Number(row.since),
       formats: row.formats.map(Number),
@@ -1775,32 +1790,6 @@ export class PostgresReceiptStore implements ReceiptStore {
   }
 }
 
-interface ChallengeRow {
-  id: string;
-  challenger_corp: string;
-  target_corp: string;
-  format: number;
-  cost: string;
-  status: string;
-  created_at: string;
-  expires_at: string;
-  pause_ends_at: string | null;
-}
-
-function challengeOf(row: ChallengeRow): AvaChallenge {
-  return {
-    id: row.id,
-    challengerCorp: row.challenger_corp,
-    targetCorp: row.target_corp,
-    format: Number(row.format),
-    cost: Number(row.cost),
-    status: row.status as AvaChallengeStatus,
-    createdAt: Number(row.created_at),
-    expiresAt: Number(row.expires_at),
-    ...(row.pause_ends_at === null ? {} : { pauseEndsAt: Number(row.pause_ends_at) }),
-  };
-}
-
 /** Postgres AvA challenge store (AVA-4). The partial unique index enforces one pending
  *  per pair; the conditional UPDATE makes pending→terminal an exactly-once transition. */
 export class PostgresAvaChallengeStore implements AvaChallengeStore {
@@ -1829,7 +1818,8 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
 
   async getChallenge(id: string): Promise<AvaChallenge | null> {
     const r = await this.pool.query<ChallengeRow>(
-      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at
+      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at,
+              challenger_rating, target_rating
        FROM ava_challenges WHERE id = $1`,
       [id],
     );
@@ -1838,7 +1828,8 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
 
   async challengesOf(corpId: string, limit = DEFAULT_CHALLENGES_LIMIT): Promise<AvaChallenge[]> {
     const r = await this.pool.query<ChallengeRow>(
-      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at
+      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at,
+              challenger_rating, target_rating
        FROM ava_challenges
        WHERE challenger_corp = $1 OR target_corp = $1
        ORDER BY created_at DESC, id LIMIT $2`,
@@ -1859,7 +1850,8 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
 
   async duePending(now: number): Promise<AvaChallenge[]> {
     const r = await this.pool.query<ChallengeRow>(
-      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at
+      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at,
+              challenger_rating, target_rating
        FROM ava_challenges
        WHERE status = 'pending' AND expires_at <= $1
        ORDER BY expires_at, id`,
@@ -1868,10 +1860,15 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
     return r.rows.map(challengeOf);
   }
 
-  async openRosterWindow(id: string, pauseEndsAt: number): Promise<void> {
+  async openRosterWindow(
+    id: string,
+    pauseEndsAt: number,
+    ratings?: Record<AvaSide, number>,
+  ): Promise<void> {
     await this.pool.query(
-      `UPDATE ava_challenges SET pause_ends_at = $2 WHERE id = $1 AND status = 'accepted'`,
-      [id, pauseEndsAt],
+      `UPDATE ava_challenges SET pause_ends_at = $2, challenger_rating = $3, target_rating = $4
+       WHERE id = $1 AND status = 'accepted'`,
+      [id, pauseEndsAt, ratings?.challenger ?? null, ratings?.target ?? null],
     );
   }
 
@@ -1887,7 +1884,8 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
 
   async dueRosters(now: number): Promise<AvaChallenge[]> {
     const r = await this.pool.query<ChallengeRow>(
-      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at
+      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at,
+              challenger_rating, target_rating
        FROM ava_challenges
        WHERE status = 'accepted' AND pause_ends_at IS NOT NULL AND pause_ends_at <= $1
        ORDER BY pause_ends_at, id`,
@@ -1898,7 +1896,8 @@ export class PostgresAvaChallengeStore implements AvaChallengeStore {
 
   async lockedMatchups(limit = DEFAULT_LOCKED_MATCHUPS_LIMIT): Promise<AvaChallenge[]> {
     const r = await this.pool.query<ChallengeRow>(
-      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at
+      `SELECT id, challenger_corp, target_corp, format, cost, status, created_at, expires_at, pause_ends_at,
+              challenger_rating, target_rating
        FROM ava_challenges
        WHERE status = 'locked'
        ORDER BY created_at DESC, id LIMIT $1`,
@@ -2022,28 +2021,6 @@ export class PostgresAvaRosterStore implements AvaRosterStore {
   }
 }
 
-interface ResultRow {
-  matchup_id: string;
-  challenger_corp: string;
-  target_corp: string;
-  winner_corp: string | null;
-  at: string;
-  format: number | null;
-  report: AvaBattleReport | null;
-}
-
-function resultOf(row: ResultRow): AvaResult {
-  return {
-    matchupId: row.matchup_id,
-    challengerCorp: row.challenger_corp,
-    targetCorp: row.target_corp,
-    winnerCorp: row.winner_corp,
-    at: Number(row.at),
-    ...(row.format === null ? {} : { format: Number(row.format) }),
-    ...(row.report === null ? {} : { report: row.report }),
-  };
-}
-
 /** Postgres AvA result store (AVA-8). `record` is idempotent via the matchup_id PK
  *  (ON CONFLICT DO NOTHING) — belt-and-braces behind the locked→ended gate. */
 export class PostgresAvaResultStore implements AvaResultStore {
@@ -2052,8 +2029,8 @@ export class PostgresAvaResultStore implements AvaResultStore {
   async record(result: AvaResult): Promise<void> {
     await this.pool.query(
       `INSERT INTO ava_results
-         (matchup_id, challenger_corp, target_corp, winner_corp, at, format, report)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (matchup_id, challenger_corp, target_corp, winner_corp, at, format, report, bonus)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (matchup_id) DO NOTHING`,
       [
         result.matchupId,
@@ -2063,13 +2040,14 @@ export class PostgresAvaResultStore implements AvaResultStore {
         result.at,
         result.format ?? null,
         result.report ? JSON.stringify(result.report) : null,
+        result.bonus ?? null,
       ],
     );
   }
 
   async get(matchupId: string): Promise<AvaResult | null> {
     const r = await this.pool.query<ResultRow>(
-      `SELECT matchup_id, challenger_corp, target_corp, winner_corp, at, format, report
+      `SELECT matchup_id, challenger_corp, target_corp, winner_corp, at, format, report, bonus
        FROM ava_results WHERE matchup_id = $1`,
       [matchupId],
     );
@@ -2078,7 +2056,7 @@ export class PostgresAvaResultStore implements AvaResultStore {
 
   async recent(limit = DEFAULT_RESULTS_LIMIT): Promise<AvaResult[]> {
     const r = await this.pool.query<ResultRow>(
-      `SELECT matchup_id, challenger_corp, target_corp, winner_corp, at, format, report
+      `SELECT matchup_id, challenger_corp, target_corp, winner_corp, at, format, report, bonus
        FROM ava_results ORDER BY at DESC, matchup_id LIMIT $1`,
       [limit],
     );
@@ -2090,7 +2068,7 @@ export class PostgresAvaResultStore implements AvaResultStore {
     limit = DEFAULT_RESULTS_LIMIT,
   ): Promise<Array<AvaResult & { format: number }>> {
     const r = await this.pool.query<ResultRow>(
-      `SELECT matchup_id, challenger_corp, target_corp, winner_corp, at, format, report
+      `SELECT matchup_id, challenger_corp, target_corp, winner_corp, at, format, report, bonus
        FROM ava_results WHERE challenger_corp = $1 OR target_corp = $1
        ORDER BY at DESC, matchup_id LIMIT $2`,
       [corpId, limit],

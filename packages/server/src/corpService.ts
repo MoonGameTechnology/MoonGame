@@ -1,3 +1,4 @@
+import { AVA_FORMATS } from './avaFormats';
 import { CORP_BUILDINGS } from './corpConstruction';
 import { CORP_EMBLEMS, isCorpEmblemId, blockedPublicName, type CorpBuildOrder, type CorpInfrastructureResult } from '@void/protocol';
 import { randomInt } from 'node:crypto';
@@ -55,17 +56,21 @@ export interface CorpServiceDeps {
   now?: () => number;
   /** Uniform starting point in the curated name catalogue; injectable for collision tests. */
   nameIndex?: () => number;
+  /** CORP-19: influence a new corporation starts with; absent ⇒ the battle economy's. */
+  startInfluence?: number;
 }
 
 export class CorpService {
   private readonly store: CorpStore;
   private readonly now: () => number;
   private readonly nameIndex: () => number;
+  private readonly startInfluence: number;
 
   constructor(deps: CorpServiceDeps) {
     this.store = deps.store;
     this.now = deps.now ?? ((): number => Date.now());
     this.nameIndex = deps.nameIndex ?? (() => randomInt(CORP_NAME_COUNT));
+    this.startInfluence = deps.startInfluence ?? AVA_FORMATS.economy.startInfluence;
   }
 
   infrastructure(who: CorpActor, corpId: string, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
@@ -93,6 +98,18 @@ export class CorpService {
         return created;
       }
       await this.audit(created.corpId, who, 'create', undefined, name);
+      // CORP-19: a new corporation can make its first 2 на 2 challenge right away.
+      const influence = this.startInfluence;
+      if (influence > 0) {
+        await this.store.addInfluence(created.corpId, influence);
+        await this.store.appendAudit({
+          corpId: created.corpId,
+          at: this.now(),
+          actor: 'system',
+          action: 'influence',
+          detail: `+${influence}`,
+        });
+      }
       return created;
     }
     return { ok: false, code: 'E_NAME_TAKEN' };

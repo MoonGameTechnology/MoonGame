@@ -80,7 +80,7 @@
 | CORP-16 | ✅ | data srv proto | `docs/backlog.md` | Материалы для зданий корпораций. |
 | CORP-17 | ✅ | proto | `docs/backlog.md` | Сцена базы в хабе. |
 | CORP-18 | ✅ | srv proto | `docs/backlog.md` | Отзыв вызова и маркер битвы. |
-| CORP-19 | ⏳ | srv data | `docs/backlog.md` | Экономика влияния в битвах. |
+| CORP-19 | ✅ | srv data proto | `docs/backlog.md` | Экономика влияния в битвах. |
 | CORP-20 | ⏳ | core srv proto | `docs/backlog.md` | Битва четырёх корпораций. |
 | CORP-21 | ⏳ | data | `docs/backlog.md` | Карта для битвы четырёх корпораций. |
 | SPY-12 | ✅ | core proto | `docs/backlog.md` | Разная цена операций. |
