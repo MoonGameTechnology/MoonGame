@@ -170,6 +170,70 @@ describe('meta market HTTP API', () => {
     await app.close();
   });
 
+  it('places a buy order that a later cheaper listing fills, syncing both sides', async () => {
+    const arsenal = new MemoryArsenalStore();
+    await arsenal.grant({
+      itemId: 'wanted',
+      accountId: 'seller',
+      kind: 'module',
+      form: 'instance',
+      defId: 'ion_engine',
+      soulbound: false,
+      origin: 'drop',
+      acquiredAt: 1,
+    });
+    const market = new MemoryMetaMarket(arsenal, () => 1, 500);
+    const changed: string[] = [];
+    const app = Fastify();
+    registerMetaMarketApi(app, {
+      market,
+      auctionSweepMs: 0,
+      onChanged: (identity) => {
+        changed.push(identity.accountId);
+        return Promise.resolve();
+      },
+      identify: (r: FastifyRequest) => {
+        const login = r.headers['x-user'];
+        return Promise.resolve(typeof login === 'string' ? { accountId: login, login } : null);
+      },
+    });
+    const post = (user: string, url: string, payload: object) =>
+      app.inject({ method: 'POST', url, headers: { 'x-user': user }, payload });
+    const bad = await post('buyer', '/meta-market/order', {
+      key: 'module:instance:ion_engine',
+      price: 100,
+      quantity: 99,
+      requestId: 'x',
+    });
+    expect(bad.statusCode).toBe(400);
+    const placed = await post('buyer', '/meta-market/order', {
+      key: 'module:instance:ion_engine',
+      price: 100,
+      quantity: 2,
+      requestId: 'o',
+    });
+    expect(placed.json()).toMatchObject({ ok: true, balance: 300, filled: 0 });
+    const view = (
+      await app.inject({ url: '/meta-market', headers: { 'x-user': 'buyer' } })
+    ).json() as { orders: Array<Record<string, unknown>> };
+    expect(view.orders).toMatchObject([{ key: 'module:instance:ion_engine', quantity: 2 }]);
+    expect(view.orders[0]).not.toHaveProperty('accountId');
+    expect(
+      (await post('seller', '/meta-market/list', { itemId: 'wanted', price: 80 })).statusCode,
+    ).toBe(200);
+    expect((await arsenal.get('wanted'))?.accountId).toBe('buyer');
+    expect(changed).toEqual(['buyer', 'seller']);
+    const id = view.orders[0]!.id as string;
+    expect((await post('seller', '/meta-market/order/cancel', { orderId: id })).statusCode).toBe(
+      403,
+    );
+    expect((await post('buyer', '/meta-market/order/cancel', { orderId: id })).json()).toEqual({
+      ok: true,
+      balance: 500 - 80,
+    });
+    await app.close();
+  });
+
   it('пишущие маршруты под per-IP лимитом (EC-0.3 wash-trading), чтение свободно', async () => {
     const market = new MemoryMetaMarket(new MemoryArsenalStore(), () => 1, 500);
     const app = Fastify();

@@ -612,7 +612,6 @@ export const es: Record<string, string> = {
   'auction.list': 'Poner en venta',
   'auction.price': 'Precio',
   'auction.fee': 'Se deduce una tasa de intercambio del {n}% en cada transacción.',
-  'auction.empty': 'No hay lotes abiertos por ahora.',
   'auction.no-items': 'No hay artículos comerciables. Los objetos vinculados y los planos no se pueden poner en venta.',
   'arsenal.origin.auction': 'subasta',
   'arsenal.origin.craft': 'fabricación',

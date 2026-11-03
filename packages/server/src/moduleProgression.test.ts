@@ -125,7 +125,7 @@ for (const backend of ['memory', 'postgres'] as const)
             .cargoCapacity,
         ).toBe(
           Math.round(
-            hull.stats.cargoCapacity! + data.modules.cargo_bay!.effects.stats.cargoCapacity! * 1.1,
+            hull.stats.cargoCapacity! + data.modules.cargo_bay!.effects.stats.cargoCapacity! * 1.05,
           ),
         );
         await f.economy.selectModule(f.accountId, { requestId: 'select', itemId: item.itemId });

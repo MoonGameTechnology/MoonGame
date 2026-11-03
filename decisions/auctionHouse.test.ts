@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { countdown, groupOffers, inCategory, itemCategory, shelfSlots } from './auctionHouse';
+import {
+  bidStep,
+  catalogTiles,
+  countdown,
+  frozenWarrants,
+  groupOffers,
+  inCategory,
+  itemCategory,
+  shelfSlots,
+} from './auctionHouse';
 
 describe('auction house decisions', () => {
   it('puts blueprints and hulls in their own categories and modules by slot', () => {
@@ -44,5 +53,29 @@ describe('auction house decisions', () => {
     expect(countdown(4_718_000)).toBe('01:18:38');
     expect(countdown(-5)).toBe('00:00:00');
     expect(countdown(48 * 3_600_000)).toBe('48:00:00');
+  });
+
+  it('steps a bid by 5% and never by less than one warrant', () => {
+    expect(bidStep(4100)).toBe(205);
+    expect(bidStep(10)).toBe(1);
+    expect(bidStep(0)).toBe(1);
+  });
+
+  it('sums frozen warrants of leading bids and open order remainders', () => {
+    expect(
+      frozenWarrants(
+        [{ leading: true, current: 760 }, { leading: false, current: 900 }, { leading: true }],
+        [{ price: 30, quantity: 3, filled: 1 }],
+      ),
+    ).toBe(820);
+  });
+
+  it('keeps the catalogue order and appends offers outside it', () => {
+    const tiles = catalogTiles(['a', 'b'], [{ key: 'bp' }, { key: 'b' }]);
+    expect(tiles).toEqual([
+      { key: 'a' },
+      { key: 'b', group: { key: 'b' } },
+      { key: 'bp', group: { key: 'bp' } },
+    ]);
   });
 });
