@@ -179,6 +179,35 @@
       "domain": "space"
     }
   },
+  "intercept_turret": {
+    "name": "Intercept Turret",
+    "rarity": "unique",
+    "rarityBonus": {
+      "mythic": {
+        "hp": 2
+      },
+      "legendary": {
+        "shuttleDamage": 1.5
+      }
+    },
+    "slot": "weapon",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "shuttleDamage": 5
+      }
+    },
+    "cost": {
+      "metal": 40,
+      "microelectronics": 4
+    },
+    "allowed": {
+      "domain": "space",
+      "units": [
+        "interceptor"
+      ]
+    }
+  },
   "ablative_plating": {
     "name": "Ablative Plating",
     "rarity": "simple",

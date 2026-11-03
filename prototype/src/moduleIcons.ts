@@ -18,6 +18,7 @@ export const SLOT_ICON: Record<string, string> = { weapon: '🎯', defense: '�
 /** Значок модуля. Нет своего — нейтральный квадрат, а не пустота. */
 export const MODULE_ICON: Record<string, string> = {
   targeting_array: '🎯',
+  intercept_turret: '⌖',
   shield_booster: '🛡',
   ablative_plating: '🧱',
   point_defense_array: '✴',

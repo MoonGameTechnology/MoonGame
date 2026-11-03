@@ -21,6 +21,11 @@
       "ingredients": { "ferroalloys": 10, "control_circuits": 25, "energy_cells": 4 },
       "salvage": { "ferroalloys": 2, "control_circuits": 6, "energy_cells": 1 }
     },
+    "intercept_turret": {
+      "defId": "intercept_turret",
+      "ingredients": { "ferroalloys": 10, "control_circuits": 25, "energy_cells": 4 },
+      "salvage": { "ferroalloys": 2, "control_circuits": 6, "energy_cells": 1 }
+    },
     "shield_booster": {
       "defId": "shield_booster",
       "ingredients": { "technical_composites": 15, "control_circuits": 20, "energy_cells": 12 },
@@ -183,6 +188,7 @@
   "store": {
     "modulePrices": {
       "targeting_array": 180,
+      "intercept_turret": 180,
       "shield_booster": 180,
       "repair_tender": 180,
       "mine_layer": 200,
@@ -228,6 +234,7 @@
         "discountPercent": 25
       },
       "module_targeting_array": { "category": "modules", "modules": ["targeting_array"] },
+      "module_intercept_turret": { "category": "modules", "modules": ["intercept_turret"] },
       "module_shield_booster": { "category": "modules", "modules": ["shield_booster"] },
       "module_repair_tender": { "category": "modules", "modules": ["repair_tender"] },
       "module_mine_layer": { "category": "modules", "modules": ["mine_layer"] },
