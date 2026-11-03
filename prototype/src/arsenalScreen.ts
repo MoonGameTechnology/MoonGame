@@ -883,7 +883,9 @@ export function initArsenal(host: ArsenalHost): {
     if (d.arCraft) {
       const recipe = view.recipes.find((r) => r.id === d.arCraft);
       if (!recipe?.canCraft) return;
-      if (tab !== 'modules' || module !== recipe.defId)
+      // The confirmation is drawn in the detail. On a phone that is the sheet, still closed
+      // when the goal card asks, even if the goal's module is already the selected one.
+      if (tab !== 'modules' || module !== recipe.defId || (!wide && !sheetOpen))
         open('modules', recipe.defId, byAttr('data-ar-craft', recipe.id));
       return ask({ kind: 'craft', recipeId: recipe.id });
     }
