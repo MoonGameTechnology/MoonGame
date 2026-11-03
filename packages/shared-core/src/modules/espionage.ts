@@ -8,7 +8,7 @@ import { coalitionOf } from '../state/coalition';
 import { buildingLevel, type GameData, type ResourceBag } from '../data/schemas';
 import type { AgentAway, GameState, IntelGrant, SpyOp } from '../state/gameState';
 import { recordValues } from '../util/records';
-import { buildingDevelopment } from '../state/development';
+import { planetDevelopment } from '../state/development';
 import { canAfford, payCost, refundCost } from '../util/treasury';
 
 /**
@@ -225,35 +225,22 @@ export function counterIntelOf(
   return best;
 }
 
-/** A world's development for spying (SPY-21): `planetDevelopment` without the
- *  counter-intelligence buildings — guarding a world must not make it a richer target. */
-function spyDevelopment(data: GameData, buildings: GameState['planets'][string]['buildings']): number {
-  let total = 0;
-  for (const b of buildings) {
-    const def = data.buildings[b.type];
-    if (!def) continue;
-    const lv = buildingLevel(def, b.level);
-    if (lv.spyDetectBonus > 0 || lv.spyKillBonus > 0 || lv.spyTurnChance > 0) continue;
-    total += buildingDevelopment(def, b.level);
-  }
-  return total;
-}
-
 /**
  * SPY-21: how developed `planetId` is against the other worlds of its owner, in [0,1] — its
  * development over the most developed one's (owner's resolution 2026-11-03). The scale is
  * the civilisation's own: a lone capital, or two equal worlds, are 1 however little is
  * built; a civilisation with nothing built at all counts every world as 1. A world without
- * an owner is 0.
+ * an owner is 0. Counter-intelligence buildings count like any other (owner's resolution
+ * 2026-11-03): a bureau protects the whole civilisation far more than it adds to a theft.
  */
 export function developmentShare(data: GameData, state: GameState, planetId: string): number {
   const planet = state.planets[planetId];
   if (!planet || planet.owner === null) return 0;
   let best = 0;
   for (const p of recordValues(state.planets)) {
-    if (p.owner === planet.owner) best = Math.max(best, spyDevelopment(data, p.buildings));
+    if (p.owner === planet.owner) best = Math.max(best, planetDevelopment(data, p));
   }
-  return best > 0 ? spyDevelopment(data, planet.buildings) / best : 1;
+  return best > 0 ? planetDevelopment(data, planet) / best : 1;
 }
 
 /** The base odds of a resolving mission: SPY-17's wave bonus, and SPY-21's — a theft is

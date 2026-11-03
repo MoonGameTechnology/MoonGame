@@ -517,11 +517,11 @@ describe('SPY-21 — theft odds and loot follow the world development', () => {
     expect(developmentShare(data, baseState(), 'missing')).toBe(0);
   });
 
-  it('a counter-intelligence building adds no development', () => {
+  it('a counter-intelligence building counts like any other', () => {
     const s = civ(1);
-    s.planets.B!.buildings.push(lvl('bureau', 1, 'b2'), lvl('bureau', 1, 'b3'));
+    s.planets.B!.buildings.push(lvl('bureau', 1, 'b2'));
     expect(developmentShare(data, s, 'B')).toBe(1);
-    expect(developmentShare(data, s, 'C')).toBe(1);
+    expect(developmentShare(data, s, 'C')).toBeCloseTo(0.5, 9);
   });
 
   it('theft and research theft gain up to +0.2 success, other operations do not', () => {
