@@ -135,7 +135,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 100: порядок тот же; control 1.1.0, construction 1.14.0 — стройка юнита за лимитом на паузе;
 // hero 4.11.0 — ребро закрытого коридора переходит к коридору поверх него.
 // 101: членство — `integration` (освоение взятой планеты) сразу за `control`; economy 1.2.0.
-const PINNED_FOR_VERSION = '101';
+// 102: порядок тот же; economy 1.3.0 — стройка за порогом считается по правилу Симпсона.
+const PINNED_FOR_VERSION = '102';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

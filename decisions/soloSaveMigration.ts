@@ -441,6 +441,18 @@ export const INTEGRATION_SOLO_MIGRATION = {
   toDataHash: CONTROL_RECHECK_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: `economy` 1.3.0 settles a construction past its 50% mark by Simpson's
+ *  rule, so a share that changes with time (integration, BAL-19) multiplies it exactly. Nothing
+ *  new is stored, and the catalogue is unchanged, so a saved world reads as is. */
+export const RAMP_SETTLEMENT_SOLO_MIGRATION = {
+  fromRules: INTEGRATION_SOLO_MIGRATION.toRules,
+  fromData: INTEGRATION_SOLO_MIGRATION.toData,
+  fromDataHash: INTEGRATION_SOLO_MIGRATION.toDataHash,
+  toRules: '1d3e18bfd60ee1',
+  toData: INTEGRATION_SOLO_MIGRATION.toData,
+  toDataHash: INTEGRATION_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -480,6 +492,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   CONTROL_LIMIT_SOLO_MIGRATION,
   CONTROL_RECHECK_SOLO_MIGRATION,
   INTEGRATION_SOLO_MIGRATION,
+  RAMP_SETTLEMENT_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

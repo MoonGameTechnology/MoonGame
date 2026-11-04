@@ -29,6 +29,7 @@ const data: GameData = parseGameData({
   factions: {},
   buildings: {
     mine: { name: 'Mine', produces: { metal: 10 }, cost: { metal: 1 }, buildTimeHours: 1 },
+    foundry: { name: 'Foundry', produces: { metal: 10 }, cost: { metal: 1 }, buildTimeHours: 72 },
     shipyard: { name: 'Shipyard', hp: 20, enablesShipConstruction: true },
   },
   sectorKinds: {
@@ -164,6 +165,28 @@ describe('integration module', () => {
     for (const at of [1, 7, 7.5, 30, 36, 71, 72, 77].map((x) => x * HOUR))
       step = okAdvance(kernel.advanceTo(step, ctx(at))).state;
     expect(metal(step, 'p1')).toBeCloseTo(metal(whole, 'p1'), 9);
+  });
+
+  it('a building rising on an integrating planet pays the same however the time is cut', () => {
+    const s = okApply(kernel.applyAction(world(), take('p1', 'n'), ctx(0))).state;
+    const foundry: Action = {
+      id: 's:p1:foundry',
+      type: 'building.construct',
+      playerId: 'p1',
+      payload: { planetId: 'n', building: 'foundry' },
+      issuedAt: 0,
+    };
+    const built = okApply(kernel.applyAction(s, foundry, ctx(0))).state;
+    const whole = okAdvance(kernel.advanceTo(built, ctx(DONE))).state;
+    let step = built;
+    for (let at = HOUR; at <= DONE; at += HOUR)
+      step = okAdvance(kernel.advanceTo(step, ctx(at))).state;
+    // The foundry yields 10 × progress from its halfway mark, times the integration share:
+    // 720 × ∫ u(0.25 + 0.75u) du over u ∈ [0.5, 1] = 225.
+    const ramp = (10 * INTEGRATION_HOURS * (INTEGRATION_START_OUTPUT + 1)) / 2;
+    const expected = metal(built, 'p1') + 10 * INTEGRATION_HOURS + ramp + 225;
+    expect(metal(whole, 'p1')).toBeCloseTo(expected, 6);
+    expect(metal(step, 'p1')).toBeCloseTo(expected, 6);
   });
 
   it('builds no units while integrating, buildings are allowed', () => {

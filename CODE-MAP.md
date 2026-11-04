@@ -192,7 +192,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `combat.retreatToll` | `loadoutEffects` | `modules/combat.ts` |
 | `construction.requirement` | `faction` → `control` → `integration` → `technology` | `modules/construction.ts`, `modules/hero.ts`, `modules/station.ts` |
 | `control.limit` | — (шов для технологий и учёного, никто не регистрирует) | `modules/control.ts` |
-| `economy.production` | `sector` → `planet-type` → `tax` → `faction` → `control` → `integration` → `technology` | `modules/economy.ts` (аргументы `planetId`, `from`, `to`) |
+| `economy.production` | `sector` → `planet-type` → `tax` → `faction` → `control` → `integration` → `technology` | `modules/economy.ts` (аргументы `planetId`, `from`, `to`; у мира со стройкой за порогом — мгновение, `from === to`) |
 | `espionage.agents` | — (шов, никто не регистрирует) | `modules/espionage.ts` |
 | `espionage.chance` | — (шов, никто не регистрирует) | `modules/espionage.ts` |
 | `espionage.cost` | — (шов, никто не регистрирует) | `modules/espionage.ts` |
