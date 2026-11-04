@@ -10,6 +10,7 @@
  */
 import { linkedAlly } from '../../decisions/allyPanel';
 import { httpBase } from '../../decisions/matchQuery';
+import { openMatchCreateDialog } from './matchCreateDialog';
 import { canCreateOnlineMatch, forgetMatchCreation, isCurrentMatchCreator, matchCreator, refreshMatchCreation } from './matchCreation';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
@@ -47,7 +48,7 @@ import { activeTour, forgetLesson, stopFirstGoals } from './guideFlow';
 import { forgetAway } from './helpCenter';
 import { disarm } from './interaction';
 import { defaultView } from './mapCamera';
-import { type MapId, mapPreset } from './mapCatalog';
+import { type MapId } from './mapCatalog';
 import { clearFlak } from './mapEffects';
 import { refreshVision, resetFogMemory } from './mapFog';
 import { forgetAdditive } from './mapInput';
@@ -504,7 +505,8 @@ export function initMatchLifecycle(host: MatchLifecycleHost): void {
   $('setup-network-create').addEventListener('click', () => {
     if (!netSetup) createOnlineMatch(setupMapId);
   });
+  // «Создать» открывает настройки матча; партию создаёт подтверждение в окне.
   $('match-create-go').addEventListener('click', () => {
-    createOnlineMatch(mapPreset(($('match-create-map') as HTMLSelectElement).value).id);
+    if (canCreateOnlineMatch()) openMatchCreateDialog(createOnlineMatch);
   });
 }
