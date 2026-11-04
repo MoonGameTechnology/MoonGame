@@ -222,6 +222,8 @@ async function boot(
     dev: false,
     soloSave: false,
     allyStep: null as string | null,
+    sovereigns: null as number | null,
+    shop: false,
     seen: true,
     engaged: new Set<string>(),
     ...over,
@@ -242,6 +244,7 @@ async function boot(
     jumps: [] as string[],
     saves: [] as unknown[],
     wallet: 0,
+    shops: 0,
     storage: { ...(opts.folded ? { 'vd.swarmDossier.folded': '1' } : {}) } as Record<
       string,
       string
@@ -282,6 +285,15 @@ async function boot(
     },
     get sectorRunActive() {
       return env.run;
+    },
+  }));
+  // Хаб тянет все свои экраны; полосе нужны только баланс Суверенов и дверь в магазин.
+  vi.doMock('./hubScreen', () => ({
+    matchSovereigns: () => env.sovereigns,
+    leaveToShop: () => {
+      if (!env.shop) return false;
+      rec.shops++;
+      return true;
     },
   }));
   vi.doMock('./sectorProfile', () => ({ sectorProgress: { chaptersWon: [] } }));
@@ -440,17 +452,20 @@ describe('строка статуса', () => {
     expect(tail).toContain(`<b>${t('ally.step.advance')}</b>`);
   });
 
-  it('Суверены в строке статуса — без числа, в забеге их нет; кошелёк забега рисуется каждый кадр', async () => {
+  it('Суверены в строке статуса — число, когда баланс известен; в забеге их нет; кошелёк забега рисуется каждый кадр', async () => {
     const { m, el, env, rec } = await boot();
     m.renderTopBar([]);
     const status = el('devline-status').innerHTML;
     expect(status).toContain('class="dl-donate" data-donate="1"');
     expect(status).toContain(`aria-label="${t('donate.open')}"`);
     expect(status).not.toMatch(/dl-donate[^]*<b>/);
+    env.sovereigns = 1250;
+    m.renderTopBar([]);
+    expect(el('devline-status').innerHTML).toContain('<b>1.3k</b>');
     env.toolsHidden = true;
     m.renderTopBar([]);
     expect(el('devline-status').innerHTML).not.toContain('data-donate');
-    expect(rec.wallet).toBe(2);
+    expect(rec.wallet).toBe(3);
   });
 
   it('сохранение одиночной партии: «сохранить» всегда, «продолжить» — только на паузе', async () => {
@@ -491,6 +506,12 @@ describe('строка статуса', () => {
     expect(rec.missionToggles).toBe(1);
     expect(rec.allyOpens).toBe(1);
     expect(rec.toasts).toEqual([t('donate.where')]);
+    expect(rec.shops).toBe(0);
+    // Магазин есть — нажатие уводит в него, без тоста.
+    env.shop = true;
+    line.click(hit('[data-donate]'));
+    expect(rec.shops).toBe(1);
+    expect(rec.toasts).toHaveLength(1);
     expect(rec.saves).toEqual([true]);
     // «Продолжить» — темп кнопки ▶ и без нагона: время паузы мир не отыгрывает.
     expect(rec.speeds).toEqual([PLAY * 10]);

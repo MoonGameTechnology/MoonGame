@@ -36,7 +36,9 @@ import { clockHM, countdownHMS, esc, flowPer, flowRate, kfmt } from './format';
 import { data } from './gameData';
 import { motionOn, pcUi } from './graphicsPrefs';
 import { LIVE_SLOT, liveTimerHtml, liveTipAttrs, patchLiveTimers } from './liveTimers';
-import { RES_SVG, SOV_SVG } from './icons';
+import { RES_SVG } from './icons';
+import { leaveToShop, matchSovereigns } from './hubScreen';
+import { sovereignChipHtml } from './hubWallet';
 import { jumpToPing } from './mapCamera';
 import { fleetSeen, known, vision } from './mapFog';
 import { displayOf, speedbarRestartShown, speedbarShown, timeControlsShown } from './matchExits';
@@ -390,13 +392,10 @@ export function renderTopBar(missions: MissionRow[]): void {
     (soloSaveActive && !NET
       ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>`
       : '') +
-    // Суверены — приманка (заказ владельца 2026-09-23): золото, блик и «+». Магазин живёт в
-    // «Снабжении» главного экрана (решение 2026-10-15: «магазин не скрывай»), и нажатие
-    // говорит, где он, не выводя из партии. Числа нет, пока у основной игры нет
-    // авторитетного кошелька; в забеге Sector Zero Суверены — в шапке забега (`runWallet`).
-    (game.toolsHidden()
-      ? ''
-      : `<button type="button" class="dl-donate" data-donate="1" title="${t('hub.sovereigns')}" aria-label="${t('donate.open')}"><i>${SOV_SVG}</i><em aria-hidden="true">+</em><span class="dl-glint" aria-hidden="true"></span></button>`);
+    // Суверены — приманка (заказ владельца 2026-09-23): золото, блик и «+». Баланс — тот же,
+    // что на плашке главного экрана, и нажатие уводит в магазин (заказ 2026-11-04); пока
+    // баланс неизвестен, числа нет. В забеге Sector Zero Суверены — в шапке забега (`runWallet`).
+    (game.toolsHidden() ? '' : sovereignChipHtml(matchSovereigns(), 'data-donate="1"'));
   if (statusHtml !== lastClockText) {
     devlineTail.innerHTML = statusHtml;
     lastClockText = statusHtml;
@@ -724,7 +723,7 @@ export function initTopBar(host: TopBarHost): void {
       return;
     }
     if ((event.target as Element).closest('[data-donate]')) {
-      toast(t('donate.where'));
+      if (!leaveToShop()) toast(t('donate.where'));
       return;
     }
     if ((event.target as Element).closest('[data-missions]')) {

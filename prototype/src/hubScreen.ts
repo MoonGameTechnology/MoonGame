@@ -30,7 +30,7 @@ import { maybeIntro, openCodex } from './helpCenter';
 import { initHubWallet } from './hubWallet';
 import { inviteTargets, joinByNumber, refreshMyMatches } from './matchBrowser';
 import { avaMatchId } from '../../packages/protocol/src/ava';
-import { leaveMatch, startProvingGround } from './matchLifecycle';
+import { leavesToSectorZero, leaveMatch, startProvingGround } from './matchLifecycle';
 import { type MetaState, parseMetaState } from './meta';
 import { initMetaEconomy } from './metaEconomyScreen';
 import { initMetaMarket } from './metaMarketScreen';
@@ -235,6 +235,30 @@ const SHOP_WIDE_MIN = 700;
 const premiumKey = (): string => 'vd.premium.' + (game.nick().trim() || 'guest');
 
 export let shop: ReturnType<typeof initShop> | null = null;
+
+/** Суверены для золотой плашки в строке статуса партии (заказ владельца 2026-11-04: «внутри
+ *  сессии тоже должно показывать золото»). Баланс сверяет главный экран; кто вошёл в партию
+ *  по ссылке, хаба не видел — тогда сверяем один раз сами. `null` — баланс неизвестен. */
+let matchWalletAsked = false;
+export function matchSovereigns(): number | null {
+  const n = shop?.sovereigns() ?? null;
+  if (n === null && shop && !matchWalletAsked) {
+    matchWalletAsked = true;
+    detach('партия: кошелёк Суверенов', shop.sync());
+  }
+  return n;
+}
+
+/** Нажатие на золото в партии ведёт в магазин (заказ владельца 2026-11-04) — тем же выходом,
+ *  что ⌂: сетевой мир идёт без нас, одиночная партия сохраняется. `false` — магазина нет
+ *  (страница Sector Zero) или выход ведёт в меню Sector Zero, а не в хаб. */
+export function leaveToShop(): boolean {
+  if (!shop || leavesToSectorZero()) return false;
+  $('tomenu').click();
+  shop.show('sovereigns');
+  hubTab('shop');
+  return true;
+}
 
 export let news: ReturnType<typeof initNews> | null = null;
 
