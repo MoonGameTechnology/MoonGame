@@ -3676,7 +3676,6 @@ export const pl: Record<string, string> = {
   'log.spy.counter.caught.killed': '🛡 Kontrwywiad na {at} schwytał agenta {who} i zlikwidował go',
   'log.spy.counter.lost': '🛡 Nasz agent kontrwywiadu na {at} został zdemaskowany i wydalony, powróci za 6h',
   'log.spy.counter.lost.killed': '🛡 Nasz agent kontrwywiadu na {at} został zdemaskowany i zabity. Znalezienie nowego szpiega potrwa 24h',
-  'log.spy.war': '⚔ Zdemaskowano szpiega: pomiędzy {a} i {b} wybuchła wojna',
   'log.spy.exposed': '🕵 {a} schwytał szpiega {b} na {at}',
   'log.spy.success': '🕵 Agent na posterunku: {what}. Nowa warstwa wywiadowcza co 12h',
   'log.spy.success.lost': '🕵 Agent zdobył dane wywiadowcze: {what} — okno 24h. Agent został zabity, znalezienie nowego szpiega potrwa 24h',

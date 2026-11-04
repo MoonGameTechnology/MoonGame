@@ -34,6 +34,7 @@ import {
   CLOAK_FIELD_SOLO_MIGRATION as cloakField,
   STAR_LADDER_SOLO_MIGRATION as starLadder,
   COMBAT_CONTINUITY_SOLO_MIGRATION as combatContinuity,
+  SPY_NO_WAR_SOLO_MIGRATION as spyNoWar,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -179,7 +180,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -617,4 +618,13 @@ it('the combat patch reads pending personal clocks without resetting the saved b
   before.state.scheduleSeq = 8;
   const raw = serializeSoloSave(before, combatContinuity.fromRules);
   expect(parseCompatibleSoloSave(raw, combatContinuity.toRules)).toEqual(before);
+});
+
+describe('the rules-only exposure without war pair', () => {
+  it('reads a save of the combat continuity release under the new rules unchanged', () => {
+    const before = oldSave();
+    before.state.version = { data: spyNoWar.fromData, dataHash: spyNoWar.fromDataHash, manifest: '1' };
+    const raw = serializeSoloSave(before, spyNoWar.fromRules);
+    expect(parseCompatibleSoloSave(raw, spyNoWar.toRules)).toEqual(before);
+  });
 });
