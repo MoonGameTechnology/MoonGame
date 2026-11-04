@@ -274,20 +274,21 @@ export function openTurn(
   // цепочка строилась не дома, а на призовом мире, и флот переставал пополняться вовсе.
   // Обе прежние ветки оставлены запасными: у мира без верфи якорь тот же, что и был.
   //
-  // Верфь — ПОД УПРАВЛЕНИЕМ (BAL-19): на планете за лимитом юниты не строятся, и якорь на
-  // захваченной верфи вдали от столицы снова отбивал бы каждый заказ корабля.
+  // Якорь — ПОД УПРАВЛЕНИЕМ во всех трёх ветках (BAL-19): на планете за лимитом юниты не
+  // строятся, и якорь на захваченной верфи вдали от столицы снова отбивал бы каждый заказ
+  // корабля. Свой мир под управлением есть всегда: за лимит выходят только планеты сверх него.
   const outside = uncontrolledPlanets(state, data, ai, state.modeId);
+  const ruled = (p: Planet): boolean => p.owner === ai && !outside.has(p.id);
   const base =
     Object.values(state.planets).find(
       (p) =>
-        p.owner === ai &&
-        !outside.has(p.id) &&
+        ruled(p) &&
         p.buildings.some(
           (b) => b.hp > 0 && data.buildings[b.type]?.enablesShipConstruction === true,
         ),
     ) ??
-    Object.values(state.planets).find((p) => p.owner === ai && p.buildings.length > 0) ??
-    Object.values(state.planets).find((p) => p.owner === ai);
+    Object.values(state.planets).find((p) => ruled(p) && p.buildings.length > 0) ??
+    Object.values(state.planets).find(ruled);
   const shipCount = (f: Fleet): number =>
     f.units.reduce((n, s) => n + (isShipUnit(s.unit) ? s.count : 0), 0);
   // Флот из одних разведчиков без десанта ничего не берёт: пустой мир ядро ему не отдаёт

@@ -1616,8 +1616,8 @@ export interface TempLane {
   speedBonus: number;
   /** Simulation time (ms) the lane closes. */
   expiresAt: number;
-  /** Whether the lane ADDED the `links` edge (vs the nodes were already linked) — so
-   *  expiry only removes a link the lane itself created. */
+  /** Whether the lane holds a `links` edge a corridor ADDED (its own, or handed over by a closed
+   *  lane on the same pair) vs the nodes were already linked — expiry removes only such a link. */
   addedLink: boolean;
   /** HERO-CORRIDOR — ступень способности, она же ПРАВО ПРОХОДА:
    *  · `1` — одноразовый: идёт только стак с этим героем, коридор закрывается, как

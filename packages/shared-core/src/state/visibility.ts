@@ -972,11 +972,16 @@ function hideRivalCorridors(state: GameState, view: VisibleState, viewerId: Play
   const shown = lanes.filter(
     (l) => l.owner === viewerId || laneIsPublic(l) || l.heroId === undefined,
   );
+  // Видимый коридор поверх ребра, добавленного скрытым: для зрителя ребро добавил он, иначе
+  // `isCorridorEdge` у клиента счёл бы ребро дорогой, а у сервера — коридором (BAL-19).
+  const riders = new Set<TempLane>();
   for (const lane of lanes) {
     if (shown.includes(lane) || !lane.addedLink) continue;
     const join = (l: TempLane): boolean =>
       (l.from === lane.from && l.to === lane.to) || (l.from === lane.to && l.to === lane.from);
-    if (shown.some(join)) continue; // то же ребро держит видимый коридор
+    const over = shown.filter(join);
+    for (const l of over) riders.add(l);
+    if (over.length > 0) continue; // то же ребро держит видимый коридор
     for (const [a, b] of [[lane.from, lane.to], [lane.to, lane.from]] as const) {
       const planet = view.planets[a];
       if (planet?.links) planet.links = planet.links.filter((id) => id !== b);
@@ -987,7 +992,7 @@ function hideRivalCorridors(state: GameState, view: VisibleState, viewerId: Play
     delete view.topology;
     return;
   }
-  view.tempLanes = shown.map((l) => ({ ...l }));
+  view.tempLanes = shown.map((l) => (riders.has(l) ? { ...l, addedLink: true } : { ...l }));
   const ids = shown.map((l) => l.id).sort();
   let fp = 0x811c9dc5; // FNV-1a по id видимых коридоров
   for (const ch of ids.join('\0')) {

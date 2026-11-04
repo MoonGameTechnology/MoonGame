@@ -414,6 +414,20 @@ export const CONTROL_LIMIT_SOLO_MIGRATION = {
   toDataHash: SPY_NO_WAR_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: `control` 1.1.0 announces `control.changed` when a new capital or a
+ *  captured planet moves control, `construction` 1.14.0 parks a running unit whose world left
+ *  control and re-asks the requirement on resume, and `hero` 4.11.0 hands a closing corridor's
+ *  edge to a corridor still on it (BAL-19). Nothing new is stored, and the catalogue is
+ *  unchanged, so a saved world reads as is. */
+export const CONTROL_RECHECK_SOLO_MIGRATION = {
+  fromRules: CONTROL_LIMIT_SOLO_MIGRATION.toRules,
+  fromData: CONTROL_LIMIT_SOLO_MIGRATION.toData,
+  fromDataHash: CONTROL_LIMIT_SOLO_MIGRATION.toDataHash,
+  toRules: '1973d52fbb435c',
+  toData: CONTROL_LIMIT_SOLO_MIGRATION.toData,
+  toDataHash: CONTROL_LIMIT_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -451,6 +465,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   COMBAT_CONTINUITY_SOLO_MIGRATION,
   SPY_NO_WAR_SOLO_MIGRATION,
   CONTROL_LIMIT_SOLO_MIGRATION,
+  CONTROL_RECHECK_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

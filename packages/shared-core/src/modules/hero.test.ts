@@ -18,6 +18,7 @@ import { deepFreeze } from '../util/clone';
 import { setStance } from '../state/diplomacy';
 import { sumUnitStat } from '../util/stacks';
 import { visibleState } from '../state/visibility';
+import { isCorridorEdge } from '../state/corridor';
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -274,6 +275,20 @@ describe('HERO-CORRIDOR — чужой личный коридор в туман
     expect(rival.tempLanes).toHaveLength(1);
     expect(rival.planets.C?.links).toContain('A');
   });
+
+  it('свой коридор поверх ребра скрытого чужого: ребро остаётся коридорным, как у сервера', () => {
+    // BAL-19: клиент считает лимит управления и запрет стоянки по проекции. Ребро A–C добавил
+    // скрытый коридор p1, поэтому коридор p2 по тому же ребру ребра не добавлял.
+    const s = okApply(kernel.applyAction(corridorWorld(), corridor('C'), ctx(0))).state;
+    const mine = s.tempLanes![0]!;
+    s.tempLanes!.push({ ...mine, id: 'lane:p2', owner: 'p2', heroId: 'hero:p2', from: 'C', to: 'A', addedLink: false });
+    const rival = visibleState(s, 'p2', data);
+    expect(rival.planets.A?.links).toContain('C');
+    expect(rival.tempLanes).toEqual([expect.objectContaining({ id: 'lane:p2', addedLink: true })]);
+    expect(isCorridorEdge(s, 'A', 'C')).toBe(true);
+    expect(isCorridorEdge(rival, 'A', 'C')).toBe(true);
+    expect(s.tempLanes![1]!.addedLink).toBe(false); // мир проекция не трогает
+  });
 });
 
 describe('AUD-18 — наследных действий героя больше нет', () => {
@@ -353,6 +368,31 @@ describe('hero — temp public lane (path.create / expire)', () => {
     expect(expired.state.planets.C?.links).not.toContain('A');
     expect(expired.state.topology).toBe(2); // create (1) + expire (2)
     expect(expired.events.map((e) => e.type)).toContain('hero.path.expired');
+  });
+
+  it('the link leaves with the last lane on it, even when the lane that added it closes first', () => {
+    const base = corridorWorld();
+    base.heroes!['hero:p2'] = {
+      id: 'hero:p2',
+      owner: 'p2',
+      location: 'A',
+      cooldowns: {},
+      alive: true,
+      abilities: ['corridor'],
+    };
+    const first = okApply(kernel.applyAction(base, corridor('C'), ctx(0))).state;
+    const over = act('hero.ability', 'p2', { heroId: 'hero:p2', abilityId: 'corridor', target: 'C' }, 2);
+    const both = okApply(kernel.applyAction(first, over, ctx(HOUR))).state;
+    const [added, later] = both.tempLanes!;
+    expect([added!.addedLink, later!.addedLink]).toEqual([true, false]);
+    // p1's lane closes first: p2's still runs over the edge and now holds it.
+    const one = okAdvance(kernel.advanceTo(both, ctx(added!.expiresAt))).state;
+    expect(one.tempLanes).toEqual([expect.objectContaining({ id: later!.id, addedLink: true })]);
+    expect(one.planets.A?.links).toContain('C');
+    const none = okAdvance(kernel.advanceTo(one, ctx(later!.expiresAt))).state;
+    expect(none.tempLanes).toHaveLength(0);
+    expect(none.planets.A?.links).not.toContain('C');
+    expect(none.planets.C?.links).not.toContain('A');
   });
 
   it('on a pre-existing lane the link survives expiry (only owner-added links are withdrawn)', () => {
