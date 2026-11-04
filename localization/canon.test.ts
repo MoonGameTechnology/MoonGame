@@ -43,6 +43,9 @@ function effectToken(value: number): string {
   return Math.abs(value) < 5 ? `${Math.round(Math.abs(value) * 100)}%` : String(value);
 }
 
+/** Эффекты-штуки, а не доли: слоты героев, планеты под управлением. */
+const COUNT_EFFECTS = new Set(['heroSlots', 'controlLimit']);
+
 /** Узлы с числовым эффектом, чей текст не называет величину. */
 export function missingEffectNumbers(messages: Messages, techs: Record<string, TechDef>): string[] {
   const out: string[] = [];
@@ -50,7 +53,7 @@ export function missingEffectNumbers(messages: Messages, techs: Record<string, T
     if (!def.description || !def.effects) continue;
     const text = messages[def.description] ?? '';
     for (const [effect, value] of Object.entries(def.effects)) {
-      const token = effect === 'heroSlots' ? String(value) : effectToken(value);
+      const token = COUNT_EFFECTS.has(effect) ? String(value) : effectToken(value);
       if (!text.includes(token)) out.push(`${id}.${effect}: ${token}`);
     }
   }

@@ -453,6 +453,19 @@ export const RAMP_SETTLEMENT_SOLO_MIGRATION = {
   toDataHash: INTEGRATION_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Catalogue + rules pair: three command nodes of the main game (BAL-19) raise the control limit
+ *  5 → 6 → 8 → 10, and `technology` 1.6.0 adds their `controlLimit` through the `control.limit`
+ *  hook. No saved player has researched them, and nothing new is stored, so a save of the
+ *  previous release reads as is. */
+export const CONTROL_TECH_SOLO_MIGRATION = {
+  fromRules: RAMP_SETTLEMENT_SOLO_MIGRATION.toRules,
+  fromData: RAMP_SETTLEMENT_SOLO_MIGRATION.toData,
+  fromDataHash: RAMP_SETTLEMENT_SOLO_MIGRATION.toDataHash,
+  toRules: '1cbc175afb6980',
+  toData: '0.1.80',
+  toDataHash: '075726b65dbf6c',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -493,6 +506,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   CONTROL_RECHECK_SOLO_MIGRATION,
   INTEGRATION_SOLO_MIGRATION,
   RAMP_SETTLEMENT_SOLO_MIGRATION,
+  CONTROL_TECH_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

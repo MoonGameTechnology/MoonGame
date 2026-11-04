@@ -24,6 +24,7 @@ import { garrisonNeed } from '../../../decisions/garrisonPolicy';
 import { canTraverse } from '../../../decisions/actions';
 import { isPirateClan, pirateRaidZone } from '../../../decisions/pirateReach';
 import { seatDoctrine } from '../botDoctrine';
+import { controlLimitOf } from '../economy';
 import { data } from '../gameData';
 import { SECTOR_TYPES } from '../map';
 import { stewardGuardOrders } from '../stewardGuard';
@@ -150,6 +151,8 @@ export interface AiTurn {
   readonly warFooting: boolean;
   /** Свои планеты за лимитом управления и в освоении (BAL-19): юниты на них не заказываются. */
   readonly outside: ReadonlySet<string>;
+  /** Есть свои планеты за лимитом управления (BAL-19): узел, поднимающий лимит, идёт вперёд. */
+  readonly beyondLimit: boolean;
   readonly base: Planet | undefined;
   readonly shipCount: (f: Fleet) => number;
   readonly reconBare: (f: Fleet) => boolean;
@@ -280,7 +283,8 @@ export function openTurn(
   // корабля. Свой мир под управлением есть всегда: за лимит выходят только планеты сверх него.
   // Взятая у другой стороны планета, пока осваивается, юнитов тоже не строит; держава из одних
   // таких планет остаётся без якоря, пока первая не освоится.
-  const outside = uncontrolledPlanets(state, data, ai, state.modeId);
+  const outside = uncontrolledPlanets(state, data, ai, state.modeId, controlLimitOf(state, ai));
+  const beyondLimit = outside.size > 0;
   for (const p of Object.values(state.planets))
     if (p.owner === ai && isIntegrating(p, state.time)) outside.add(p.id);
   const ruled = (p: Planet): boolean => p.owner === ai && !outside.has(p.id);
@@ -360,6 +364,7 @@ export function openTurn(
     d,
     warFooting,
     outside,
+    beyondLimit,
     base,
     shipCount,
     reconBare,

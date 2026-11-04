@@ -16,7 +16,7 @@ import {
 import { t } from '../../localization/runtime';
 import { data } from './gameData';
 import { esc, flowPer, flowRate, resLine } from './format';
-import { incomeBreakdown } from './economy';
+import { controlLimitOf, incomeBreakdown } from './economy';
 
 /** Resources that can be traded on the in-game market (credits are the currency). */
 const TRADEABLE = new Set(['metal', 'food', 'energy', 'microelectronics']);
@@ -134,7 +134,7 @@ export function resourceCardHtml(
   // BAL-19: половина выхода планет вне лимита управления уже вычтена из «Производства
   // миров»; строка объясняет, почему доход ниже, и показывается только тому, у кого такие
   // планеты есть.
-  const outside = uncontrolledPlanets(state, data, me, state.modeId).size;
+  const outside = uncontrolledPlanets(state, data, me, state.modeId, controlLimitOf(state, me)).size;
   const controlNote =
     outside > 0
       ? `<div class="rc-note">${esc(t('rescard.control', { n: outside, p: Math.round(UNCONTROLLED_OUTPUT * 100) }))}</div>`

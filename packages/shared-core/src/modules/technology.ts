@@ -104,7 +104,7 @@ function hasCompleted(player: Player | undefined, technology: string): boolean {
 function effectsSum(
   player: Player | undefined,
   data: GameData,
-  key: 'productionBonus' | 'fleetSpeedBonus',
+  key: 'productionBonus' | 'fleetSpeedBonus' | 'controlLimit',
 ): number {
   // Summed inline (no intermediate def array) — this runs from the fleet.speed /
   // economy.production hooks, i.e. per movement leg and production span.
@@ -114,6 +114,14 @@ function effectsSum(
     if (def) bonus += def.effects[key] ?? 0;
   }
   return bonus;
+}
+
+/** Planets the player's research adds to the control limit (BAL-19, `effects.controlLimit`):
+ *  the module adds them through the `control.limit` hook. Exported for the hosts, which read
+ *  the limit off a settled state as `CONTROL_LIMIT + controlLimitBonus(player, data)` (the hook
+ *  is not asked outside the kernel), the way the research screen sums its slots. */
+export function controlLimitBonus(player: Player | undefined, data: GameData): number {
+  return effectsSum(player, data, 'controlLimit');
 }
 
 /** Технологии, любая из которых открывает юнита или здание (пусто — не заперто). Тот же
@@ -805,7 +813,8 @@ export const technologyModule: GameModule = {
   // 1.2.0: площадка крепости на развилке не считается сектором (замечание Codex на #1410).
   // 1.4.0: возможность `technology.grant` — технология мимо лаборатории (SPY-10).
   // 1.5.0: очередь исследований (RQ-1) — `technology.queue` / `.dequeue` / `.queue.move`.
-  version: '1.5.0',
+  // 1.6.0: `effects.controlLimit` поднимает лимит управления (хук `control.limit`, BAL-19).
+  version: '1.6.0',
   setup(api) {
     api.provideCapability<TechnologyGrant>('technology.grant', grantTechnology);
     api.onAction('technology.research', startResearch);
@@ -887,6 +896,13 @@ export const technologyModule: GameModule = {
         out[res] = (bag[res] ?? 0) * (1 + bonus);
       }
       return out;
+    });
+
+    // BAL-19: planets research adds to the control limit (args `{ playerId }`).
+    api.hook<number>('control.limit', (limit, args, h) => {
+      const playerId = (args as { playerId?: string }).playerId;
+      if (typeof playerId !== 'string') return limit;
+      return limit + controlLimitBonus(h.state.players[playerId], h.ctx.data);
     });
 
     api.hook<number>('fleet.speed', (speed, args, h) => {

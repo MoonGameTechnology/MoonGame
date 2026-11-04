@@ -19,7 +19,6 @@
  */
 import {
   BASE_BUILDING_DEFENSE,
-  CONTROL_LIMIT,
   DEVELOPMENT_COST_PER_POINT,
   INTEGRATION_HOURS,
   INTEGRATION_START_OUTPUT,
@@ -39,6 +38,7 @@ import {
 // Straight from the source modules, not through the `game.ts` barrel — same as
 // `game.ts` itself sources them, and it keeps this module off the façade.
 import { data } from './gameData';
+import { controlLimitOf } from './economy';
 import { HOUR } from './time';
 import { t, tData } from '../../localization/runtime';
 import { GLOSSARY } from './codexIndex';
@@ -465,8 +465,9 @@ export function abilityDossier(id: string): Dossier | null {
 }
 
 /** Досье фишки шапки мира по её виду (`decisions/worldFacts.ts`); пустое тело — у фишки
- *  нет своего правила сверх подписи. */
-function factDossier(kind: string): Dossier | null {
+ *  нет своего правила сверх подписи. `controlLimit` — лимит управления смотрящего, с его
+ *  технологиями. */
+function factDossier(kind: string, controlLimit: number): Dossier | null {
   const FACT_DOSSIER: Record<string, [string, string]> = {
     capital: [t('side.world.capital'), t('side.world.capital.note')],
     vp: [t('side.world.vp'), ''],
@@ -474,7 +475,7 @@ function factDossier(kind: string): Dossier | null {
     uncontrolled: [
       t('side.world.uncontrolled'),
       t('side.world.uncontrolled.note', {
-        n: CONTROL_LIMIT,
+        n: controlLimit,
         p: Math.round(UNCONTROLLED_OUTPUT * 100),
       }),
     ],
@@ -603,7 +604,7 @@ export function createDossiers(host: DossierHost): {
       // только иконку, и когда топаешь на него, выводит более подробную информацию»), а её
       // правило — то же досье, что у характеристики `stat:mitigation`.
       if (key === 'fact:cover') return objDossier('stat:mitigation');
-      return factDossier(key.slice(5));
+      return factDossier(key.slice(5), controlLimitOf(host.state(), host.me()));
     }
     if (key.startsWith('stat:')) {
       // TXT-3: тело есть только у характеристики, которая несёт СВОЁ правило (атака и

@@ -271,7 +271,7 @@ describe('construction module — buildings paid from the treasury', () => {
     const ordered = okApply(kernel.applyAction(st, construct('mine'), ctx(0)));
     // While building (0→4h) the mine isn't in `planet.buildings` yet, but it DOES
     // ramp in partial output from the 50% mark (2h) onward — see economy.ts
-    // `pendingProduction` — so this single 0→4h advance (nothing else scheduled, so
+    // `rampsOn` — so this single 0→4h advance (nothing else scheduled, so
     // it's ONE time.advanced span) integrates 0 for 0-2h then a 0.5→1.0 ramp for
     // 2-4h: avg ramp 0.75 × 10/h × 2h = 15 metal on top of the 50 paid up-front.
     const built = okAdvance(kernel.advanceTo(ordered.state, ctx(4 * HOUR)));

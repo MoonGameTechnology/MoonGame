@@ -32,6 +32,7 @@ import {
   controlledPlanets,
   CONTROL_LIMIT,
   UNCONTROLLED_OUTPUT,
+  controlLimitBonus,
   integrationShare,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
@@ -86,6 +87,13 @@ export function economySnapshot(state: GameState): {
   return { kind: 'economy', atTime: state.time, players };
 }
 
+/** BAL-19: лимит управления места, каким его видит ядро: база `CONTROL_LIMIT` и планеты,
+ *  которые добавили его технологии (хук `control.limit` модуля технологий снаружи ядра не
+ *  спрашивается). Один на HUD, карточки, досье и бота. */
+export function controlLimitOf(state: GameState, playerId: string): number {
+  return CONTROL_LIMIT + controlLimitBonus(state.players[playerId], data);
+}
+
 /** BAL-19: доля выхода мира по лимиту управления (`controlModule`) — 1 под управлением,
  *  `UNCONTROLLED_OUTPUT` за лимитом, — и по освоению взятой планеты (`integrationModule`) в
  *  миг состояния. `inhabited` — число планет игрока: в пределах лимита под управлением всё,
@@ -95,9 +103,10 @@ function heldShare(
   playerId: string,
   inhabited: number,
 ): (p: Planet) => number {
+  const limit = controlLimitOf(state, playerId);
   const controlled =
-    inhabited > CONTROL_LIMIT && controlApplies(state, data, state.modeId)
-      ? controlledPlanets(state, data, playerId, CONTROL_LIMIT)
+    inhabited > limit && controlApplies(state, data, state.modeId)
+      ? controlledPlanets(state, data, playerId, limit)
       : null;
   const integrated = (p: Planet): number =>
     p.integration ? integrationShare(p.integration, state.time) : 1;
@@ -204,7 +213,7 @@ export function netIncome(
         out[res] = (out[res] ?? 0) - (level.upkeep[res] ?? 0) / 24;
     }
     // Constructions in progress (≥50% built) chip in a partial/delta share too —
-    // mirrors economy.ts's `pendingProduction` ramp rule. Point-evaluated (not
+    // mirrors economy.ts's ramp rule (`rampsOn`). Point-evaluated (not
     // integrated) since this is a live HUD rate, not an accrual over a span; no
     // upkeep is charged on an unfinished building either, so no brownout applies here.
     for (const event of sites.get(p.id) ?? []) {

@@ -689,6 +689,7 @@ export {
   BASE_RESEARCH_SLOTS,
   MAX_RESEARCH_SLOTS,
   clampResearchSlots,
+  controlLimitBonus,
 } from './modules/technology';
 export { constructionModule, hasShipyard, unitBuildSiteBlocker } from './modules/construction';
 export { coverPoints, worldDamageReduction } from './util/worldCover';

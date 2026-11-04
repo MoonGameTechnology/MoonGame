@@ -968,5 +968,65 @@
     "effects": {
       "heroSlots": 1
     }
+  },
+  "provincial_administration": {
+    "name": "Provincial Administration",
+    "description": "tech.node.provincial-administration.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 2,
+    "cost": {
+      "credits": 200,
+      "metal": 150
+    },
+    "researchTimeHours": 8,
+    "prerequisites": [
+      "signal_corps"
+    ],
+    "dayGate": 3,
+    "effects": {
+      "controlLimit": 1
+    }
+  },
+  "colonial_governance": {
+    "name": "Colonial Governance",
+    "description": "tech.node.colonial-governance.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 3,
+    "cost": {
+      "credits": 320,
+      "metal": 240,
+      "microelectronics": 30
+    },
+    "researchTimeHours": 12,
+    "prerequisites": [
+      "provincial_administration"
+    ],
+    "dayGate": 7,
+    "effects": {
+      "controlLimit": 2
+    }
+  },
+  "imperial_chancery": {
+    "name": "Imperial Chancery",
+    "description": "tech.node.imperial-chancery.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 4,
+    "cost": {
+      "credits": 450,
+      "metal": 340,
+      "microelectronics": 50
+    },
+    "researchTimeHours": 16,
+    "prerequisites": [
+      "colonial_governance",
+      "logistics_command"
+    ],
+    "dayGate": 12,
+    "effects": {
+      "controlLimit": 2
+    }
   }
 }
