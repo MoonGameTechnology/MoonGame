@@ -880,8 +880,8 @@ const sectorZeroHtml = stripDevMarkup(page(playerJs, 'sector-zero'));
 writeFileSync('prototype/dist/void-dominion.html', devHtml);
 writeFileSync('prototype/dist/void-dominion-player.html', playerHtml);
 writeFileSync('prototype/dist/sector-zero.html', sectorZeroHtml);
-// Файл потока — рядом с однофайловыми страницами: его забирают сайт (`stage-site.mjs`),
-// GitHub Pages и APK. Поток прошлой сборки удаляется: страница его уже не позовёт.
+// Файл потока — рядом с однофайловыми страницами: его забирают GitHub Pages и APK (сайт
+// Cloudflare берёт свою копию из `served/assets`). Поток прошлой сборки удаляется: страница его уже не позовёт.
 for (const name of readdirSync('prototype/dist')) {
   if (/^sim-worker-[0-9a-f]+\.js$/.test(name)) rmSync(`prototype/dist/${name}`);
 }
@@ -916,6 +916,12 @@ writeFileSync(`prototype/dist/served/assets/${simWorkerFile}`, simWorkerSource);
 const servedPlayerHtml = stripDevMarkup(page(servedPlayer.js));
 writeFileSync('prototype/dist/served/dev.html', page(servedDev.js));
 writeFileSync('prototype/dist/served/player.html', servedPlayerHtml);
+// Sector Zero для сайта Cloudflare (`stage-site.mjs`): однофайловая страница переросла его
+// лимит в 25 МиБ на файл, поэтому сайт берёт её отсюда, с картинками в `assets/`.
+writeFileSync(
+  'prototype/dist/served/sector-zero.html',
+  stripDevMarkup(page(servedPlayer.js, 'sector-zero')),
+);
 console.log(
   'wrote prototype/dist/served/ (player.html ' +
     (servedPlayerHtml.length / 1024).toFixed(0) +
