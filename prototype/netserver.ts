@@ -185,6 +185,7 @@ import { detach } from '../packages/server/src/detach';
 import { createSnapshotWriter } from '../packages/server/src/snapshotWriter';
 import { commitMatch } from '../packages/server/src/matchCommit';
 import type { StewardPosture } from './src/stewardScreen';
+import { publicSeatNicks } from '../packages/server/src/publicSeatNicks';
 import { installFatalHandlers } from '../packages/server/src/fatal';
 import { buildVersion } from '../packages/server/src/buildVersion';
 import { isMetricsReaderRequest, isOperatorRequest, metricsReaderTokenFromEnv, operatorTokenFromEnv } from '../packages/server/src/operatorAccess';
@@ -1589,9 +1590,7 @@ const server = createMultiplayerServer({
         // Кресло → ник: занятость и ник из одного ответа хранилища. Ник нужен клиенту в
         // дипломатии (строка игрока ведёт в его профиль); показывать его можно тем же,
         // кому этот расклад отдают вообще (ADDR-6, `registerSeatsApi`).
-        const nickOf = new Map(
-          (await accountStore.seatedNicks(id)).map((s) => [s.playerId, s.nick] as const),
-        );
+        const nickOf = await publicSeatNicks(accountStore, AUTH ? userStore : undefined, id);
         // The homeworld from the match's setup, never from live ownership (which would
         // retell every capture and loss to whoever reads the layout).
         const starts = networkStartsOf(room.state, NETWORK_MODE);
@@ -1600,7 +1599,7 @@ const server = createMultiplayerServer({
           ended: room.state.match.status === 'ended',
           seats: Object.values(room.state.players).filter((p) => !p.npc).map((p) => ({
             playerId: p.id,
-            name: p.name,
+            name: nickOf.get(p.id) === null ? p.faction : p.name,
             faction: p.faction,
             start: starts[p.id] ?? null,
             taken: nickOf.has(p.id),

@@ -62,6 +62,18 @@ function gatedRoom(now: () => number = () => 1000, extra: Record<string, unknown
 }
 
 describe('MatchRoom · action-layer gate (SV-1.1)', () => {
+  it('keeps the player action budget across reconnects with a fresh sessionId', async () => {
+    const room = gatedRoom(() => 1000, { actionRateMax: 1, actionRateWindowMs: 60_000 });
+    const first = new MemoryPeer();
+    room.addPeer('green', first, SESSION.sessionId);
+    await room.receive('green', first, wire(orbitEnvelope(1)), SESSION.sessionId);
+    room.removePeer('green', first);
+    const again = new MemoryPeer();
+    room.addPeer('green', again, 'new-session');
+    await room.receive('green', again, wire({ ...orbitEnvelope(1), sessionId: 'new-session' }), 'new-session');
+    expect(again.last()).toMatchObject({ type: 'rejection', code: 'E_RATE_LIMIT' });
+    expect(room.sequence).toBe(1);
+  });
   it('admits a valid gated action through the reducer', async () => {
     const room = gatedRoom();
     const peer = new MemoryPeer();

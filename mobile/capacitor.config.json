@@ -3,7 +3,7 @@
   "appName": "Void Dominion",
   "webDir": "www",
   "server": {
-    "androidScheme": "http",
-    "cleartext": true
+    "androidScheme": "https",
+    "cleartext": false
   }
 }

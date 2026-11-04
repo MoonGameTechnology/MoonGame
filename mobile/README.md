@@ -13,6 +13,13 @@ now ships **net mode**: its connect overlay can join a live session served by
 `pnpm dev:proto-server`. See `docs/multiplayer.md` → "Two phones, one session" for
 the friend-test runbook (server + `wss://` tunnel → sideload → both connect).
 
+The alpha/player WebView serves its bundled assets at `https://localhost` and refuses
+cleartext network traffic. Multiplayer endpoints must use HTTPS/WSS. Upgrade the game
+server before distributing this APK: configure `ALLOWED_ORIGINS` with the exact native
+origin `https://localhost`. For existing installations, `configFromEnv` also enables
+this TLS origin when `http://localhost` was explicitly allowed, keeping older clients
+usable during the transition. Website-only allowlists gain no native origin.
+
 ## Sector Zero on RuStore — release plan
 
 The [RuStore research and release roadmap](rustore-sector-zero-release-roadmap.md)

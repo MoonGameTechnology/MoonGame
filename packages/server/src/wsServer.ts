@@ -1,5 +1,6 @@
 import { validSeatName } from '@void/protocol';
 import { boundedReadiness } from './readiness';
+import { registerSafeNotFound } from './httpNotFound';
 import type { SecurityAudit } from './securityAudit';
 import { playablePlayerIds } from '@void/shared-core';
 import { seatConfirmAction } from './joinSeat';
@@ -425,9 +426,8 @@ export function createMultiplayerServer(
   app.addHook('onListen', async () => { options.securityAudit?.start(); });
   app.addHook('onClose', async () => { await options.securityAudit?.close(); });
 
-  // Fail-secure (invariant #4): a route handler that throws/rejects (e.g. a store fault in
-  // the match API) must return a stable code with NO internal detail — Fastify's default
-  // handler would echo err.message on the wire. The detail stays in the logs.
+  registerSafeNotFound(app);
+  // Stable codes only: Fastify defaults reflect exception messages and missing URLs.
   app.setErrorHandler((error, request, reply) => {
     const status = (error as { statusCode?: number }).statusCode;
     // Parser/size/rate failures are client errors, not outages. Keep details private.

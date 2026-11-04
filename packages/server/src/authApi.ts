@@ -4,7 +4,7 @@ import type { SessionClaim, SessionTokenResult } from './auth';
 import { hashPassword, verifyPassword, decoyHash, passwordNeedsRehash, PasswordWorkBusy, type ScryptParams } from './password';
 import type { UserRecord, UserStore } from './store';
 import { slidingWindowIpLimiter } from './rateLimit';
-import { validLogin, validLoginPassword, passwordIssue, blockedPublicName, parseRecoveryEmail, closedInput } from '@void/protocol';
+import { validLogin, validLoginPassword, passwordIssue, blockedPublicName, reservedStaffName, parseRecoveryEmail, closedInput } from '@void/protocol';
 
 /**
  * SE-1.x — login+password authentication over HTTP: `POST /auth/register` and
@@ -246,7 +246,7 @@ export function registerAuthApi(app: FastifyInstance, deps: AuthApiDeps): void {
     if (await deps.users.findUser(creds.login)) {
       return reply.code(409).send({ error: 'E_LOGIN_TAKEN' as const });
     }
-    if (blockedPublicName(creds.login)) return reply.code(400).send({ error: 'E_NICKNAME_BLOCKED' });
+    if (blockedPublicName(creds.login) || reservedStaffName(creds.login)) return reply.code(400).send({ error: 'E_NICKNAME_BLOCKED' });
     if (passwordIssue(creds.password)) return reply.code(400).send({ error: 'E_PASSWORD_POLICY' });
     const passHash = await hashPassword(creds.password, deps.scryptParams);
     let created = await deps.users.createUser(creds.login, passHash, email);
