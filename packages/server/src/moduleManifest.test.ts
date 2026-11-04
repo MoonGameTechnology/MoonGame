@@ -132,7 +132,9 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 97 combines echelons, paid module snapshots and exact army groups. Order is unchanged.
 // 98: ЧЛЕНСТВО — `cloak-field` 1.0.0 перед `auto-merge`, срыв маскировочного поля (SM-4.3).
 // 99: ЧЛЕНСТВО — снят `sprawl`, на его месте `control` 1.0.0, лимит управления (BAL-19).
-const PINNED_FOR_VERSION = '99';
+// 100: порядок тот же; control 1.1.0, construction 1.14.0 — стройка юнита за лимитом на паузе;
+// hero 4.11.0 — ребро закрытого коридора переходит к коридору поверх него.
+const PINNED_FOR_VERSION = '100';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

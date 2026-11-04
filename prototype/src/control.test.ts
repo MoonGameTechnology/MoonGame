@@ -3,6 +3,7 @@ import { setLocale } from '../../localization/runtime';
 import { newGame, netIncome, advance, HOUR } from './game';
 import { resourceCardHtml } from './resourceCard';
 import { data } from './gameData';
+import { openTurn } from './aiTurn/turn';
 import {
   CONTROL_LIMIT,
   isInhabited,
@@ -52,5 +53,22 @@ describe('лимит управления в прототипе (BAL-19)', () =>
     );
     const small = empireOf(CONTROL_LIMIT);
     expect(resourceCardHtml(small, 'p1', 'metal', {}, false)).not.toContain('Вне управления');
+  });
+
+  it('бот держит базу под управлением, даже когда верфь осталась только за лимитом', () => {
+    const s = empireOf(CONTROL_LIMIT + 1);
+    const outside = uncontrolledPlanets(s, data, 'p1', s.modeId);
+    expect(outside.size).toBe(1);
+    const far = [...outside][0]!;
+    const yard = (type: string): boolean => data.buildings[type]?.enablesShipConstruction === true;
+    for (const p of Object.values(s.planets))
+      if (p.owner === 'p1') p.buildings = p.buildings.filter((b) => !yard(b.type));
+    const shipyard = Object.keys(data.buildings).find(yard)!;
+    s.planets[far]!.buildings.push({ type: shipyard, level: 1, hp: 50 });
+    // Дальняя планета — первой на карте: запасная ветка брала первый свой застроенный мир.
+    s.planets = { [far]: s.planets[far]!, ...s.planets };
+    const base = openTurn(s, 'p1', 'expand', 'strong', new Set())?.base;
+    expect(base?.owner).toBe('p1');
+    expect(outside.has(base!.id)).toBe(false);
   });
 });

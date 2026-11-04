@@ -100,7 +100,12 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '99'; // BAL-19: ЧЛЕНСТВО — снят `sprawl` (налог на
+export const MODULE_MANIFEST_VERSION = '100'; // BAL-19: порядок тот же; `control` 1.1.0 и
+// `construction` 1.14.0 — стройка юнита встаёт на паузу, когда её мир уходит из-под управления
+// (новая столица, захват планеты ближе к ней), и возобновляется только под управлением;
+// `hero` 4.11.0 — закрытый коридор передаёт добавленное им ребро коридору поверх него. Партия
+// на 99 достраивала бы юниты за лимитом и оставляла бы такое ребро на карте навсегда.
+// export const MODULE_MANIFEST_VERSION = '99'; // BAL-19: ЧЛЕНСТВО — снят `sprawl` (налог на
 // рост с 35 провинций), на его месте `control` 1.0.0: 5 планет у столицы работают полностью,
 // остальные дают половину выхода и не строят юниты; `construction` 1.13.0 называет хуку
 // `construction.requirement` мир заказа. Партия на 98 платила бы налог на рост и строила бы

@@ -2,6 +2,7 @@ import type { BuildUnitPayload, CompletePayload } from '../state/construction';
 import { constructionModuleSnapshot, completionModuleSnapshot } from '../util/arsenalLoadout';
 import type { StructureDamage } from '../util/structureDamage';
 import { registerConstructionMaintenance } from './construction/maintenance';
+import { registerControlRecheck } from './construction/controlRecheck';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type {
   BuildingInstance,
@@ -11,6 +12,7 @@ import type {
   PausedConstructionSite,
   Player,
   QueuedConstruction,
+  ScheduledEvent,
   UnitStack,
 } from '../state/gameState';
 import type { BuildingDef, GameData, ResourceBag, UnitDef } from '../data/schemas';
@@ -807,6 +809,50 @@ const delayFirstOrder: ConstructionDelay = (h, planetId, hours) => {
 };
 
 /**
+ * Park a running build: refund the unbuilt share of its cost and keep its progress as a
+ * resumable paused site, then let the lane's next order start. One body for a player's
+ * cancel and for a unit whose world has left control (BAL-19). False for an order this
+ * module cannot price, before anything changed.
+ */
+function parkActive(h: HandlerContext, planet: Planet, event: ScheduledEvent): boolean {
+  const p = event.payload as CompletePayload;
+  const playerId = p.playerId;
+  const player = playerId === undefined ? undefined : h.state.players[playerId];
+  const spec = orderSpec(h.state, h.ctx.data, p);
+  if (playerId === undefined || !player || !spec) return false;
+  const totalDurationMs = hoursToMs(h.ctx, spec.hours);
+  const fortressWork = p.kind === 'upgrade' && p.building === FORTRESS_CORE ? planet.fortress?.assembly : undefined;
+  const progress = fortressWork && p.level !== undefined
+    ? Math.max(0, Math.min(1, fortressAssemblyScale(planet, h.ctx.now) - (p.level - 1)))
+    : buildProgress(h.ctx.now, event.at, totalDurationMs);
+  const refund = scaleCost(spec.cost, 1 - progress); // linear, NOT the 50% output threshold
+  refundCost(player.resources, refund);
+  h.state.scheduled = h.state.scheduled.filter((e) => e.seq !== event.seq);
+  const site: PausedConstructionSite = {
+    id: event.seq,
+    kind: p.kind === 'unit' || p.kind === 'upgrade' ? p.kind : 'building',
+    playerId,
+    building: p.building,
+    level: p.level,
+    unit: p.unit,
+    count: p.count,
+    modules: p.modules,
+    moduleSnapshot: p.moduleSnapshot,
+    troop: p.troop,
+    progress,
+    remainingHours: fortressWork ? Math.max(0, fortressWork.doneAt - h.ctx.now) / hoursToMs(h.ctx, 1)
+      : spec.hours * (1 - progress),
+    remainingCost: refund,
+  };
+  planet.pausedConstruction = [...(planet.pausedConstruction ?? []), site];
+  h.emit('construction.cancelled', { planetId: planet.id, seq: event.seq, kind: site.kind, progress, playerId });
+  // Полоса освободилась — её занимает следующий по очереди (BLD-1). Ровно это и
+  // делает отмену осмысленной кнопкой: «убрать текущее» = «пустить следующее».
+  startNextAfter(h, planet, orderLane(h.ctx.data, p));
+  return true;
+}
+
+/**
  * Buildings — a base module (docs/modulesystem.md). It owns everything about
  * planet structures:
  *
@@ -837,7 +883,8 @@ export const constructionModule: GameModule = {
   // 1.9.0: своя полоса у каждой производственной постройки — верфь, порт, казармы, завод (BLD-2.1).
   // 1.12.0 combines paid module snapshots with immediate structure casualties.
   // 1.13.0: the requirement hook names the order's world; queued units re-ask it (BAL-19).
-  version: '1.13.0',
+  // 1.14.0: a running unit build is parked when its world leaves control; resume re-asks (BAL-19).
+  version: '1.14.0',
   setup(api) {
     api.provideCapability<StructureDamage>('construction.impact', (h, id, amount, owner, covered) => {
       const planet = h.state.planets[id];
@@ -1231,7 +1278,7 @@ export const constructionModule: GameModule = {
       if (typeof payload?.planetId !== 'string' || typeof payload?.seq !== 'number') {
         return h.reject('E_BAD_PAYLOAD');
       }
-      const { planet, player } = ownedPlanet(h, action, payload.planetId);
+      const { planet } = ownedPlanet(h, action, payload.planetId);
       // BLD-1. Один номер — один заказ, независимо от того, СТРОИТСЯ он или ЖДЁТ:
       // `id` ждущего берётся из того же счётчика, что и `seq` запланированного, так
       // что перепутать их нельзя. Игроку это одна кнопка «отменить», а не две.
@@ -1264,45 +1311,9 @@ export const constructionModule: GameModule = {
       if (p.planetId !== planet.id || p.playerId !== action.playerId) {
         return h.reject('E_FORBIDDEN'); // that seq belongs to someone else's order
       }
-      const spec = orderSpec(h.state, h.ctx.data, p);
-      if (!spec) {
+      if (!parkActive(h, planet, event)) {
         return h.reject('E_UNKNOWN_BUILDING');
       }
-      const totalDurationMs = hoursToMs(h.ctx, spec.hours);
-      const fortressWork = p.kind === 'upgrade' && p.building === FORTRESS_CORE ? planet.fortress?.assembly : undefined;
-      const progress = fortressWork && p.level !== undefined
-        ? Math.max(0, Math.min(1, fortressAssemblyScale(planet, h.ctx.now) - (p.level - 1)))
-        : buildProgress(h.ctx.now, event.at, totalDurationMs);
-      const refund = scaleCost(spec.cost, 1 - progress); // linear, NOT the 50% output threshold
-      refundCost(player.resources, refund);
-      h.state.scheduled = h.state.scheduled.filter((e) => e.seq !== payload.seq);
-      const site: PausedConstructionSite = {
-        id: payload.seq,
-        kind: p.kind === 'unit' || p.kind === 'upgrade' ? p.kind : 'building',
-        playerId: action.playerId,
-        building: p.building,
-        level: p.level,
-        unit: p.unit,
-        count: p.count,
-        modules: p.modules,
-        moduleSnapshot: p.moduleSnapshot,
-        troop: p.troop,
-        progress,
-        remainingHours: fortressWork ? Math.max(0, fortressWork.doneAt - h.ctx.now) / hoursToMs(h.ctx, 1)
-          : spec.hours * (1 - progress),
-        remainingCost: refund,
-      };
-      planet.pausedConstruction = [...(planet.pausedConstruction ?? []), site];
-      h.emit('construction.cancelled', {
-        planetId: planet.id,
-        seq: payload.seq,
-        kind: site.kind,
-        progress,
-        playerId: action.playerId,
-      });
-      // Полоса освободилась — её занимает следующий по очереди (BLD-1). Ровно это и
-      // делает отмену осмысленной кнопкой: «убрать текущее» = «пустить следующее».
-      startNextAfter(h, planet, orderLane(h.ctx.data, p));
     });
 
     // Resume a paused site: pays exactly what was refunded, re-schedules exactly the
@@ -1344,6 +1355,9 @@ export const constructionModule: GameModule = {
         if (isQueued(h, 'upgrade', planet.id, site.building)) {
           return h.reject('E_ALREADY_QUEUED');
         }
+      } else if (site.kind === 'unit' && typeof site.unit === 'string') {
+        // Resuming starts the build again, so it passes the order's gate (BAL-19).
+        requireUnlocked(h, action.playerId, 'unit', site.unit, planet.id);
       }
       // BLD-1: возобновление — это СТАРТ, а полоса одна. В очередь его не ставим:
       // приостановленная стройка уже хранит свой прогресс и остаток цены отдельно
@@ -1460,6 +1474,8 @@ export const constructionModule: GameModule = {
           (e.payload as CompletePayload | undefined)?.planetId !== planet.id,
       );
     });
+
+    registerControlRecheck(api, parkActive);
 
     // Захват стирает очередь прежнего хозяина (правило 6). Терять нечего — ждущие
     // заказы не оплачены; а оставить их значило бы показать новому владельцу планы

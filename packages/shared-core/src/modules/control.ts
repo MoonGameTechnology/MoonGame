@@ -20,7 +20,8 @@ import { recordValues } from '../util/records';
  *   - yields UNCONTROLLED_OUTPUT of its production (`economy.production`), the civic tax
  *     included, so the module sits AFTER `tax`, where `sprawl` was;
  *   - builds no units (`construction.requirement` → `E_NOT_CONTROLLED`); buildings are
- *     still allowed.
+ *     still allowed. A unit already building there when control moves away is parked
+ *     (`control.changed`) and resumes only under control again.
  * The limit is CONTROL_LIMIT run through the `control.limit` hook (args `{ playerId }`), the
  * seam technologies raise it through. Designating another capital moves control with it.
  *
@@ -188,8 +189,22 @@ function controlledOf(h: HandlerContext, owner: string): ReadonlySet<PlanetId> |
 
 export const controlModule: GameModule = {
   id: 'control',
-  version: '1.0.0',
+  // 1.1.0: a new capital or a captured planet announces `control.changed` to running builds.
+  version: '1.1.0',
   setup(api) {
+    // Control follows the capital and the owner's planets. When either moves, the owner's
+    // running builds re-ask `construction.requirement`, so a unit started under control
+    // does not finish on a world that has left it. Losing a planet only brings others in.
+    for (const type of ['capital.designated', 'planet.captured']) {
+      api.on(type, (event, h) => {
+        const { owner, planetId } = (event.payload ?? {}) as { owner?: unknown; planetId?: unknown };
+        const planet = typeof planetId === 'string' ? h.state.planets[planetId] : undefined;
+        if (typeof owner !== 'string' || !planet || !isPlanet(h.ctx.data, planet)) return;
+        if (controlApplies(h.state, h.ctx.data, h.ctx.config?.modeId))
+          h.emit('control.changed', { owner });
+      });
+    }
+
     api.hook<ResourceBag>('economy.production', (bag, args, h) => {
       const planetId = (args as { planetId?: string }).planetId;
       const planet = planetId ? h.state.planets[planetId] : undefined;

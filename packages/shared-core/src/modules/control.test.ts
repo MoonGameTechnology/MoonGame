@@ -3,6 +3,7 @@ import { createKernel } from '../kernel/kernel';
 import type { GameModule } from '../kernel/module';
 import { economyModule } from './economy';
 import { constructionModule } from './construction';
+import { capitalModule } from './capital';
 import {
   controlModule,
   controlledPlanets,
@@ -329,6 +330,80 @@ describe('control module', () => {
     expect(r.events.map((e) => e.type)).toContain('construction.queue.dropped');
     expect(r.state.planets.a4!.buildQueue).toBeUndefined();
     expect(r.state.players.p1!.resources.metal).toBe(99); // only the first cruiser was paid
+  });
+
+  it('parks a running unit when the capital moves away, and resumes it only under control', () => {
+    const kernel = createKernel([constructionModule, capitalModule, controlModule]);
+    let s = okApply(kernel.applyAction(chain(), unitOrder('a1'), ctx(0))).state;
+    s = okApply(kernel.applyAction(s, unitOrder('a4'), ctx(0))).state;
+    const capital = (planetId: string): Action => ({
+      id: `s:p1:capital:${planetId}`,
+      type: 'capital.designate',
+      playerId: 'p1',
+      payload: { planetId },
+      issuedAt: 0,
+    });
+    const moved = okApply(kernel.applyAction(s, capital('a6'), ctx(HOUR / 2)));
+    // From a6, C and a1 are beyond the limit: a1's cruiser stops halfway, a4's goes on.
+    const running = moved.state.scheduled.filter((e) => e.type === 'construction.complete');
+    expect(running.map((e) => (e.payload as { planetId: string }).planetId)).toEqual(['a4']);
+    const site = moved.state.planets.a1!.pausedConstruction?.[0];
+    expect(site).toMatchObject({ kind: 'unit', unit: 'cruiser', progress: 0.5, remainingCost: { metal: 0.5 } });
+    expect(moved.state.players.p1!.resources.metal).toBe(98.5);
+    expect(moved.events.map((e) => e.type)).toContain('control.changed');
+
+    const resume: Action = {
+      id: 's:p1:resume',
+      type: 'construction.resume',
+      playerId: 'p1',
+      payload: { planetId: 'a1', id: site!.id },
+      issuedAt: 0,
+    };
+    expect(kernel.applyAction(moved.state, resume, ctx(HOUR / 2))).toMatchObject({
+      ok: false,
+      code: 'E_NOT_CONTROLLED',
+    });
+    const back = okApply(kernel.applyAction(moved.state, capital('C'), ctx(HOUR / 2))).state;
+    const resumed = okApply(kernel.applyAction(back, resume, ctx(HOUR / 2))).state;
+    expect(resumed.planets.a1!.pausedConstruction ?? []).toEqual([]);
+    const done = okAdvance(kernel.advanceTo(resumed, ctx(HOUR)));
+    expect(done.state.planets.a1!.garrison).toEqual([expect.objectContaining({ unit: 'cruiser', count: 1 })]);
+    expect(done.state.players.p1!.resources.metal).toBe(98);
+  });
+
+  it('parks a running unit when a planet taken nearer the capital pushes its world out', () => {
+    // A stand-in for any capture: the core's capture paths all announce `planet.captured`.
+    const capture: GameModule = {
+      id: 'test-capture',
+      version: '1.0.0',
+      setup(api) {
+        api.onAction('test.capture', (action, h) => {
+          const { planetId } = action.payload as { planetId: string };
+          h.state.planets[planetId]!.owner = action.playerId;
+          h.emit('planet.captured', { planetId, owner: action.playerId });
+        });
+      },
+    };
+    const kernel = createKernel([constructionModule, controlModule, capture]);
+    const s = chain([{ id: 'n', at: [0, 10], owner: 'p2' }], [['C', 'n']]);
+    delete s.planets.a6;
+    s.planets.a5!.links = ['a4'];
+    const st = okApply(kernel.applyAction(s, unitOrder('a4'), ctx(0))).state;
+    expect(st.scheduled.some((e) => e.type === 'construction.complete')).toBe(true);
+    const take: Action = { id: 's:p1:take', type: 'test.capture', playerId: 'p1', payload: { planetId: 'n' }, issuedAt: 0 };
+    const r = okApply(kernel.applyAction(st, take, ctx(HOUR / 4)));
+    // n sits one jump from the capital: C, a1, n, a2, a3 are controlled now, a4 is not.
+    expect(r.state.scheduled.some((e) => e.type === 'construction.complete')).toBe(false);
+    expect(r.state.planets.a4!.pausedConstruction).toHaveLength(1);
+  });
+
+  it('a capital move parks nothing in a PvE mode', () => {
+    const kernel = createKernel([constructionModule, capitalModule, controlModule]);
+    const s = okApply(kernel.applyAction(chain(), unitOrder('a1'), ctx(0, 'waves'))).state;
+    const move: Action = { id: 's:p1:capital', type: 'capital.designate', playerId: 'p1', payload: { planetId: 'a6' }, issuedAt: 0 };
+    const r = okApply(kernel.applyAction(s, move, ctx(HOUR / 2, 'waves')));
+    expect(r.events.map((e) => e.type)).not.toContain('control.changed');
+    expect(r.state.planets.a1!.pausedConstruction ?? []).toEqual([]);
   });
 
   it('takes its limit from the `control.limit` hook', () => {
