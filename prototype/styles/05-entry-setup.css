@@ -228,6 +228,13 @@
   padding:9px 0;border-bottom:1px solid var(--sf-edge);}
 #match-create-dialog dt{color:var(--sf-dim);}
 #match-create-dialog dd{margin:0;}
+#match-create-dialog .mcd-field{margin:4px 0 12px;}
+#match-create-dialog .mcd-label{display:block;margin-bottom:8px;color:var(--sf-dim);}
+#match-create-dialog .mcd-segs{display:flex;flex-wrap:wrap;gap:8px;}
+#match-create-dialog .mcd-segs .mcd-chip{flex:1 1 0;min-width:56px;}
+#match-create-dialog .mcd-speed{display:grid;grid-template-columns:repeat(auto-fit,minmax(44px,1fr));}
+#match-create-dialog .mcd-speed .mcd-chip{min-width:0;padding:6px 4px;}
+#match-create-dialog .mcd-hint{margin:-4px 0 12px;color:var(--sf-dim);font-size:14px;}
 #match-create-dialog .mcd-actions{display:flex;gap:10px;}
 #match-create-dialog .mcd-actions .mbtn{flex:1 1 0;min-height:48px;border-radius:12px;font:inherit;}
 /* «Новый матч» — у нижнего края, только над загруженными «Доступными». */

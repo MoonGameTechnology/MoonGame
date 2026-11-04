@@ -11,7 +11,7 @@ export async function matchCreationPermitted(
 
 export function registerMatchCapabilitiesApi(
   app: FastifyInstance,
-  deps: Pick<MatchApiDeps, 'identify' | 'canCreate' | 'createMatch'>,
+  deps: Pick<MatchApiDeps, 'identify' | 'canCreate' | 'createMatch' | 'settings'>,
 ): void {
   app.get('/matches/capabilities', async (request, reply) => {
     reply.header('cache-control', 'no-store');
@@ -19,7 +19,9 @@ export function registerMatchCapabilitiesApi(
       const identity = deps.identify ? await deps.identify(request) : null;
       if (deps.identify && !identity)
         return reply.code(401).send({ error: 'E_AUTH' });
-      return { canCreate: !!deps.createMatch && await matchCreationPermitted(identity, deps.canCreate) };
+      const canCreate = !!deps.createMatch && await matchCreationPermitted(identity, deps.canCreate);
+      // Что хост позволит настроить — только тому, кто может создавать.
+      return canCreate && deps.settings ? { canCreate, settings: deps.settings } : { canCreate };
     } catch {
       return reply.code(503).send({ error: 'E_UNAVAILABLE' });
     }

@@ -122,6 +122,45 @@ describe('SV-2.4 · match API', () => {
     await app.close();
   });
 
+  it('скорость и действия за золото принимаются только у хоста, который их объявил', async () => {
+    const seen: unknown[] = [];
+    const app = appWith({
+      mapIds: ['nexus'],
+      settings: { speeds: [1, 4, 24], defaultSpeed: 24, goldActions: true },
+      createMatch: (req) => { seen.push(req); return Promise.resolve({ matchId: 'm', seats: [] }); },
+      join: denyJoin,
+    });
+    const ok = await app.inject({
+      method: 'POST', url: '/matches', payload: { mapId: 'nexus', timeScale: 4, goldActions: false },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(seen).toEqual([{ mapId: 'nexus', timeScale: 4, goldActions: false }]);
+    for (const timeScale of [3, 0, -1, 1e9, '4', null, 4.5]) {
+      const bad = await app.inject({ method: 'POST', url: '/matches', payload: { timeScale } });
+      expect(bad.statusCode).toBe(400);
+      expect(bad.json()).toEqual({ error: 'E_BAD_SPEED' });
+    }
+    for (const goldActions of ['true', 1, null]) {
+      const bad = await app.inject({ method: 'POST', url: '/matches', payload: { goldActions } });
+      expect(bad.statusCode).toBe(400);
+      expect(bad.json()).toEqual({ error: 'E_BAD_SETTINGS' });
+    }
+    const caps = await app.inject({ method: 'GET', url: '/matches/capabilities' });
+    expect(caps.json()).toEqual({
+      canCreate: true,
+      settings: { speeds: [1, 4, 24], defaultSpeed: 24, goldActions: true },
+    });
+    expect(seen).toHaveLength(1);
+    await app.close();
+
+    // Хост без настроек: поля в теле — отказ, а в возможностях их нет.
+    const plain = appWith({ createMatch: () => Promise.resolve({ matchId: 'm', seats: [] }), join: denyJoin });
+    expect((await plain.inject({ method: 'POST', url: '/matches', payload: { timeScale: 4 } })).statusCode).toBe(400);
+    expect((await plain.inject({ method: 'POST', url: '/matches', payload: { goldActions: true } })).statusCode).toBe(400);
+    expect((await plain.inject({ method: 'GET', url: '/matches/capabilities' })).json()).toEqual({ canCreate: true });
+    await plain.close();
+  });
+
   it('GET /matches/:id/join returns a seat + token for a nick', async () => {
     const app = appWith({
       createMatch: () => Promise.resolve({ matchId: 'm-1', seats: [] }),

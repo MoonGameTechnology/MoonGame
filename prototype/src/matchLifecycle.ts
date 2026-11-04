@@ -11,7 +11,7 @@
 import { linkedAlly } from '../../decisions/allyPanel';
 import { httpBase } from '../../decisions/matchQuery';
 import { openMatchCreateDialog } from './matchCreateDialog';
-import { canCreateOnlineMatch, forgetMatchCreation, isCurrentMatchCreator, matchCreator, refreshMatchCreation } from './matchCreation';
+import { canCreateOnlineMatch, forgetMatchCreation, matchCreationOptions, isCurrentMatchCreator, matchCreator, refreshMatchCreation } from './matchCreation';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
 import { prepareSectorZeroRun } from '../../decisions/sectorZeroProgress';
@@ -415,7 +415,7 @@ export function startProvingGround(): void {
 }
 
 let creatingMatch = false;
-export function createOnlineMatch(mapId: MapId): void {
+export function createOnlineMatch(mapId: MapId, options: { timeScale?: number; goldActions?: boolean } = {}): void {
   if (creatingMatch || !canCreateOnlineMatch()) return;
   const srv = game.resolveServer();
   if (!srv) {
@@ -447,7 +447,7 @@ export function createOnlineMatch(mapId: MapId): void {
             'content-type': 'application/json',
             ...(creator.token ? { authorization: `Bearer ${creator.token}` } : {}),
           },
-          body: JSON.stringify({ mapId }),
+          body: JSON.stringify({ mapId, ...options }),
         });
         if (!isCurrentMatchCreator(creator)) return;
         if (!res.ok) {
@@ -507,6 +507,6 @@ export function initMatchLifecycle(host: MatchLifecycleHost): void {
   });
   // «Создать» открывает настройки матча; партию создаёт подтверждение в окне.
   $('match-create-go').addEventListener('click', () => {
-    if (canCreateOnlineMatch()) openMatchCreateDialog(createOnlineMatch);
+    if (canCreateOnlineMatch()) openMatchCreateDialog(matchCreationOptions(), createOnlineMatch);
   });
 }
