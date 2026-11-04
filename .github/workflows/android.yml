@@ -17,6 +17,10 @@ name: Android APK (prototype)
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/android.yml'
   push:
     # Branch candidates compile with the real SDK but cannot sign site manifests.
     # Only the protected main publication job receives the release key.

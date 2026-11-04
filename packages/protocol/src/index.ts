@@ -546,3 +546,4 @@ export {
   LOGIN_RE, NEW_PASSWORD_MIN, PASSWORD_MAX, validLogin, validSeatName, validLoginPassword,
   passwordIssue, blockedPublicName, parseRecoveryEmail, closedInput, sanitizeChatText,
 } from './inputPolicy';
+export { loginSkeleton, loginSkeletons, reservedStaffName } from './loginIdentity';

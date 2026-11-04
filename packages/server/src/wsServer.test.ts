@@ -70,6 +70,18 @@ function nextMessage(ws: WebSocket): Promise<ServerMessage> {
 }
 
 describe('createMultiplayerServer', () => {
+  it('does not reflect URL bearer queries in unknown route responses', async () => {
+    const server = createMultiplayerServer({ room: makeRoom() });
+    const origin = new URL(await server.listen());
+    origin.protocol = 'http:';
+    try {
+      for (const path of ['/matches/unknown?token=AUDIT_SECRET', '/unknown?ticket=AUDIT_SECRET', '/unknown?password=AUDIT_SECRET']) {
+        const response = await fetch(new URL(path, origin));
+        expect(response.status).toBe(404);
+        expect(await response.json()).toEqual({ error: 'E_NOT_FOUND' });
+      }
+    } finally { await server.close(); }
+  });
   it('closes a joined but unconfirmed seat after a permanent confirmation refusal', async () => {
     const room = createDevMatch(loadShippedData(), { now: () => 1000, time: 1000 });
     await room.submitServerAction('green', seatClaimAction(room.id, 'green', 1000, {}));

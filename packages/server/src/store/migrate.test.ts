@@ -15,6 +15,7 @@ function fakePool(errors: Array<{ code?: string; message: string }>) {
     query: async (sql: string) => {
       if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') log.push(sql);
       else if (sql.startsWith('SELECT pg_advisory_xact_lock')) log.push('lock');
+      else if (sql.startsWith('SELECT id,login FROM users')) return { rows: [] };
       else {
         log.push('schema');
         const error = errors[attempt++];

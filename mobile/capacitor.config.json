@@ -4,6 +4,6 @@
   "webDir": "www",
   "server": {
     "androidScheme": "http",
-    "cleartext": true
+    "cleartext": false
   }
 }

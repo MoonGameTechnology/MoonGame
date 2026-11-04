@@ -22,6 +22,7 @@
 //      VOID_VC / VOID_VN) so Android treats each rolling build as a strictly newer update.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { localOnlyCleartext, NETWORK_SECURITY_XML } from './network-security.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const read = (p) => readFileSync(p, 'utf8');
@@ -216,7 +217,9 @@ public class MainActivity extends BridgeActivity {
 
 // --- 1b. AndroidManifest.xml + file_paths.xml (installer permission, cache provider) ---
 {
-  let xml = read(manifestPath);
+  let xml = localOnlyCleartext(read(manifestPath));
+  writeFileSync(manifestPath, xml);
+  writeFileSync(here('./android/app/src/main/res/xml/void_network_security.xml'), NETWORK_SECURITY_XML);
   const permission = '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />';
   if (!xml.includes('android.permission.REQUEST_INSTALL_PACKAGES')) {
     if (!xml.includes('</manifest>')) throw new Error('patch-updater: AndroidManifest has no </manifest>');

@@ -64,6 +64,23 @@ const post = (
   server.inject({ method: 'POST', url, payload: body as object });
 
 describe('SE-1.x · /auth/register + /auth/login', () => {
+  it.each(['moderator', 'administrator', 'op-admin', 'аdmin123', 'поддержка', 'МODERATOR', 'МОДЕРАТОР', 'OFFIϹIAL', 'MODERAT0R', 'ADMⅠN', 'opߺadmin'])('refuses new staff-like callsign %s', async (login) => {
+    const server = authApp();
+    const response = await post(server, '/auth/register', { login, password: 'a quiet audit orbit 2026' });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'E_NICKNAME_BLOCKED' });
+  });
+
+  it('keeps legacy staff-like logins usable but rejects a new visually colliding account', async () => {
+    const users = new MemoryUserStore();
+    const password = 'a quiet audit orbit 2026';
+    await users.createUser('moderator', await hashPassword(password, FAST));
+    await users.createUser('att_probe', await hashPassword(password, FAST));
+    const server = authApp({ users });
+    expect((await post(server, '/auth/login', { login:'moderator', password })).statusCode).toBe(200);
+    expect((await post(server, '/auth/register', { login:'аtt_probe', password })).statusCode).toBe(409);
+    expect(await users.findUser('аtt_probe')).toBeNull();
+  });
   it('gradually rehashes a verified legacy password and issues a session for the committed hash', async () => {
     const users = new MemoryUserStore();
     const before = await hashPassword('legacy orbit signal', FAST);

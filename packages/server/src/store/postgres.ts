@@ -1,7 +1,7 @@
 export { PostgresArsenalStore } from './postgresArsenal';
 import { scopedPool } from '../corporateScopedPool';
 import { challengeOf, resultOf, type ChallengeRow, type ResultRow } from './avaRows';
-import { reservedBotLogin } from '../botNicknames';
+import { backfillLoginSkeletons, createIdentity } from './loginIdentity';
 import { archiveMetadataOf, archiveStateBytes, type ArchiveSummaryMetadata } from '../matchArchiveMetadata';
 import { readArchiveMetadata } from '../matchArchiveCatalog';
 import { isCorpEmblemId, type CorpEmblemId } from '@void/protocol';
@@ -152,6 +152,8 @@ const SCHEMA_SQL = `
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email text;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS session_nonce text NOT NULL DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_requested_at timestamptz;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS login_skeletons text[];
+    CREATE INDEX IF NOT EXISTS users_login_skeletons_idx ON users USING gin(login_skeletons);
     CREATE TABLE IF NOT EXISTS player_activity_channels (
       account_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       channel text NOT NULL CHECK(channel ~ '^[a-f0-9]{32}$'),
@@ -675,6 +677,7 @@ export async function migrate(pool: Pool | PoolClient): Promise<void> {
   // Boot/admin callers already own their client's transaction and migration lock.
   if ('release' in pool) {
     await pool.query(SCHEMA_SQL);
+    await backfillLoginSkeletons(pool);
     return;
   }
   // The advisory lock serializes migrations, not the schema's DDL against other sessions'
@@ -687,6 +690,7 @@ export async function migrate(pool: Pool | PoolClient): Promise<void> {
       await client.query('BEGIN');
       await client.query('SELECT pg_advisory_xact_lock(144731, 31)');
       await client.query(SCHEMA_SQL);
+      await backfillLoginSkeletons(client);
       await client.query('COMMIT');
       return;
     } catch (error) {
@@ -1127,33 +1131,7 @@ export class PostgresUserStore implements UserStore {
   ): Promise<
     { ok: true; userId: string } | { ok: false; code: 'E_LOGIN_TAKEN' | 'E_EMAIL_TAKEN' }
   > {
-    if (reservedBotLogin(login)) return { ok: false, code: 'E_LOGIN_TAKEN' };
-    const userId = randomUUID();
-    try {
-      // Historical snapshots can carry a callsign without an account ID. Reserve
-      // it through the deletion-ledger/backup lifetime so replay cannot touch a
-      // new person who reuses that name. The digest is still protected PDn.
-      const reserved = await this.pool.query(
-        "SELECT 1 FROM account_deletions WHERE login_hash=encode(sha256(convert_to(lower($1::text),'UTF8')),'hex') LIMIT 1",
-        [login],
-      );
-      if (reserved.rowCount) return { ok: false, code: 'E_LOGIN_TAKEN' };
-      await this.pool.query(
-        `INSERT INTO users (id, login, pass_hash, email, registration_reward) VALUES ($1, $2, $3, $4, true)`,
-        [userId, login, passHash, email?.toLowerCase() ?? null],
-      );
-      return { ok: true, userId };
-    } catch (e) {
-      // A unique-index violation makes the INSERT the atomic claim. Which one tells the
-      // caller apart: login already taken vs. that recovery email already on another
-      // account (the constraint name is on the pg error). Any other cause is treated as a
-      // taken login too — fail-secure, no account is overwritten.
-      const constraint = (e as { constraint?: string }).constraint;
-      return {
-        ok: false,
-        code: constraint === 'users_email_idx' ? 'E_EMAIL_TAKEN' : 'E_LOGIN_TAKEN',
-      };
-    }
+    return createIdentity(this.pool, login, passHash, email);
   }
 
   // Each lookup is a FULLY-LITERAL query (no string interpolation into SQL — the WHERE

@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     // Локали подключаются один раз на файл тестов: клиентские модули берут рантайм
     // из `core.ts` (пустого до регистрации — LOC-6), а тест ждёт от `t()` текст.
-    setupFiles: ['./localization/vitest.setup.ts'],
+    setupFiles: ['./localization/vitest.setup.ts', './packages/server/src/testDatabase.setup.ts'],
     include: [
       'packages/**/src/**/*.test.ts',
       'prototype/src/**/*.test.ts',
