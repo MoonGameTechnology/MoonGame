@@ -12,7 +12,7 @@
     "packages/shared-core/src/data/schemas.ts": 1727,
     "prototype/src/mapLayer.ts": 1615,
     "decisions/sectorZeroProgress.ts": 1524,
-    "packages/shared-core/src/state/visibility.ts": 1514,
+    "packages/shared-core/src/state/visibility.ts": 1516,
     "prototype/src/corpScreen.ts": 1391,
     "packages/server/src/metaEconomy.ts": 1379,
     "packages/server/src/store/memory.ts": 1316,

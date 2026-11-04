@@ -155,7 +155,7 @@ JSONL. Root guard контролирует свободный диск, inode и
 packages/
   shared-core/src/     ядро: детерминированная симуляция без сети и БД
     kernel/            kernel.ts: createKernel, applyAction, advanceTo, canApply; module.ts
-    modules/           56 модулей механик; порядок ядра — GAME_MODULES в gameModules.ts
+    modules/           57 модулей механик; порядок ядра — GAME_MODULES в gameModules.ts
     state/             gameState.ts (GameState), visibility.ts (туман), buildFromMap.ts (посев)
     action/, actions/  types.ts (Action, Context, MatchConfig), matchMode.ts; payloadSchemas.ts
     data/              schemas.ts (zod-схемы GameData), mapSchema.ts, loadGameData.ts
@@ -235,7 +235,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 
 ## 5. Модули ядра
 
-56 модулей в `packages/shared-core/src/modules`, по файлу на механику; порядок исполнения —
+57 модулей в `packages/shared-core/src/modules`, по файлу на механику; порядок исполнения —
 `GAME_MODULES` (`packages/shared-core/src/gameModules.ts`), один на оба хоста, счётчик — §9.
 Модули не импортируют друг друга: события, хуки и возможности, а без модуля работает базовый дефолт
 ([modulesystem.md](modulesystem.md)). Значение из соседнего модуля запрещает ESLint, тип — можно
@@ -251,12 +251,18 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `combat.mitigation`, `construction.requirement`, `research.slots`, `salvage.share` и другие.
 
 **Экономика и торговля.**
-- `economy` — доход миров и содержание войск по формуле за отрезок `time.advanced`.
+- `economy` — доход миров и содержание войск по формуле за отрезок `time.advanced`; хук
+  `economy.production` получает этот отрезок (`from`, `to`).
 - `tax` — налог с обитаемых миров, убывающий с ростом державы; `control` — лимит управления
   (BAL-19): 5 планет, ближайших к столице по прыжкам, работают полностью, остальные дают
   половину выхода и не строят юниты. Стройка юнита на мире, ушедшем из-под управления (новая
   столица, захват планеты ближе к ней), встаёт на паузу и возобновляется только под
   управлением. Предел идёт через хук `control.limit`; в PvE правило не действует.
+  `integration` — освоение (BAL-19): планета, взятая у другой стороны, 3 игровых дня выходит
+  с 25% выхода на полный и не строит юниты. Тот, у кого её взяли, отбив её до конца освоения,
+  сразу получает её целиком; третья сторона начинает освоение заново, право остаётся за ним.
+  Ничья планета своя сразу. С лимитом доли перемножаются; освоение видят только взявший и
+  потерявший, в PvE правило не действует.
 - `salvage` — победителям боя доля стоимости погибших обеих сторон; `effects` — правила
   `data/events.json` (§2).
 - `market` — книга заявок партии с эскроу (`market.list/take/cancel`); `trader` — торговец
@@ -1017,13 +1023,13 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 Готовность по этапам и продуктам — [readiness.md](readiness.md), путь к выпуску —
 [release-path.md](release-path.md). Здесь — состав ядра и технические долги.
 
-**56 модулей** на микроядре: столько файлов в `packages/shared-core/src/modules` (без тестов).
+**57 модулей** на микроядре: столько файлов в `packages/shared-core/src/modules` (без тестов).
 Оба хоста собирают весь каталог одним списком (SLIM-4): `MODULES` прототипа и `DEV_MODULES`
 канонического сервера — это `GAME_MODULES` из ядра.
 
 | Сборка | Модулей | Состав |
 | --- | --: | --- |
-| `GAME_MODULES` (оба хоста, `gameModules.ts`) | **56** | весь каталог ядра |
+| `GAME_MODULES` (оба хоста, `gameModules.ts`) | **57** | весь каталог ядра |
 
 §9 — единственный дом этих чисел: `scripts/docs-check.mjs` сверяет их с кодом (файлы каталога и
 закреплённый список `moduleManifest.test.ts`), другие доки ссылаются сюда. Состав и порядок —

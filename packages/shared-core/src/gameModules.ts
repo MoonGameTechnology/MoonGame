@@ -4,6 +4,7 @@ import { planetTypeModule } from './modules/planetType';
 import { taxModule } from './modules/tax';
 import { factionModule } from './modules/faction';
 import { controlModule } from './modules/control';
+import { integrationModule } from './modules/integration';
 import { hungerModule } from './modules/hunger';
 import { economyModule } from './modules/economy';
 import { movementModule } from './modules/movement';
@@ -82,6 +83,9 @@ export const GAME_MODULES: GameModule[] = [
   // кладёт в `economy.production`; с остальными вкладами (чистые множители) порядок на
   // число не влияет.
   controlModule,
+  // BAL-19: освоение взятой у другой стороны планеты — 3 дня с 25% выхода до полного, без
+  // юнитов. Чистый множитель выхода, как и лимит: с ним доли перемножаются.
+  integrationModule,
   hungerModule, // ECON-1: food в arrears → наземный урон ×0.75 (корабли едят кредиты)
   economyModule,
   movementModule,

@@ -34,6 +34,8 @@ import {
   planetDevelopment,
   rallyPointOf,
   uncontrolledPlanets,
+  integrationShare,
+  isIntegrating,
 } from '../../packages/shared-core/src/index';
 import { isMineFleet } from '../../packages/shared-core/src/state/minefields';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
@@ -722,6 +724,15 @@ export function planetPanelHtml(p: Planet): string {
     blackout: showsBlackout(mine, s.players[ME]?.arrears),
     // BAL-19: своя планета за лимитом управления — половина дохода, юниты не строятся.
     uncontrolled: mine && uncontrolledPlanets(s, data, ME, s.modeId).has(p.id),
+    // BAL-19: освоение взятой планеты — у взявшего доля выхода, у потерявшего право отбить.
+    integration:
+      p.integration && isIntegrating(p, s.time)
+        ? {
+            share: integrationShare(p.integration, s.time),
+            until: p.integration.until,
+            claimMine: p.integration.claim === ME,
+          }
+        : null,
     // Таймер обстрела: когда следующий залп (`decisions/bombardTimer.ts`).
     bombardAt: bombardVolleyAt(s, p.id, ME),
     bonuses: sm.bonuses,

@@ -561,6 +561,11 @@ export interface Planet {
    *  (`espionageModule`, хук `economy.production`). Повторный подрыв продлевает срок.
    *  Видит только владелец мира. Нет подрыва — поля нет. */
   disruptedUntil?: number;
+  /** Integration of a planet taken from another side (BAL-19, `integrationModule`): from the
+   *  capture (`since`) to `until`, ms of world time, its output ramps up to full and it builds
+   *  no units. `claim` — the side it was taken from: retaking it before `until` ends
+   *  integration at once. Seen by the holder and that side. No integration — no field. */
+  integration?: { claim: PlayerId; since: number; until: number };
   /** ПЛОЩАДКА КРЕПОСТИ НА РАЗВИЛКЕ (FORT-6.1): развилка какой тропы какой провинции.
    *  Узел с этим полем — не провинция, а место, где стоит (или стояла) космическая
    *  крепость: у него нет ни лейнов, ни клетки на карте, его не захватывают и не

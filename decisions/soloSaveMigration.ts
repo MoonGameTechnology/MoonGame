@@ -428,6 +428,19 @@ export const CONTROL_RECHECK_SOLO_MIGRATION = {
   toDataHash: CONTROL_LIMIT_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: the new `integration` module (BAL-19) makes a planet taken from another
+ *  side integrate for 3 game days, and `economy` 1.2.0 names the span it settles to its
+ *  production hook. A saved world has no integrating planet, and the catalogue is unchanged,
+ *  so it reads as is. */
+export const INTEGRATION_SOLO_MIGRATION = {
+  fromRules: CONTROL_RECHECK_SOLO_MIGRATION.toRules,
+  fromData: CONTROL_RECHECK_SOLO_MIGRATION.toData,
+  fromDataHash: CONTROL_RECHECK_SOLO_MIGRATION.toDataHash,
+  toRules: '04f2a4ed5816e2',
+  toData: CONTROL_RECHECK_SOLO_MIGRATION.toData,
+  toDataHash: CONTROL_RECHECK_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -466,6 +479,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_NO_WAR_SOLO_MIGRATION,
   CONTROL_LIMIT_SOLO_MIGRATION,
   CONTROL_RECHECK_SOLO_MIGRATION,
+  INTEGRATION_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

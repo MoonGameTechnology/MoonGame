@@ -428,6 +428,8 @@ describe('локализация — ключи', () => {
     codes.add('E_TECH_LOCKED');
     // Тот же хук у лимита управления (`control.ts`, BAL-19): юниты на планете вне лимита.
     codes.add('E_NOT_CONTROLLED');
+    // И у освоения (`integration.ts`, BAL-19): юниты на взятой планете, пока она осваивается.
+    codes.add('E_INTEGRATING');
     const missing = [...codes]
       .map((code) => [code, refusalKeyOf(code)] as const)
       .filter(([, key]) => !(key in ru) || !(key in en))

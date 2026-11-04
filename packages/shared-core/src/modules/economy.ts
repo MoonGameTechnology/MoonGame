@@ -274,7 +274,8 @@ function upkeepByOwner(
 export const economyModule: GameModule = {
   id: 'economy',
   // 1.1.0: содержание войск на плацдармах (замечание Codex на #1392).
-  version: '1.1.0',
+  // 1.2.0: `economy.production` names the span it settles (`from`, `to`), BAL-19.
+  version: '1.2.0',
   setup(api) {
     api.on('time.advanced', (event, h) => {
       const { from, to } = event.payload as { from: number; to: number };
@@ -330,7 +331,8 @@ export const economyModule: GameModule = {
             ),
             pausedProduction(planet, data),
           ),
-          { planetId },
+          // The span rides along for a share that changes with time (`integration`).
+          { planetId, from, to },
         );
         for (const res of Object.keys(rate)) {
           const perHour = rate[res] ?? 0;

@@ -47,6 +47,21 @@ describe('шапка мира — какие факты и в каком пор�
     ]);
   });
 
+  it('освоение: своя планета — доля выхода, взятая у смотрящего — право отбить (BAL-19)', () => {
+    const integration = { share: 0.4, until: 90_000, claimMine: false };
+    expect(worldFacts({ ...base, uncontrolled: true, integration, bombardAt: 1 })).toEqual([
+      { kind: 'uncontrolled' },
+      { kind: 'integrating', share: 0.4 },
+      { kind: 'bombard', at: 1 },
+    ]);
+    expect(kinds({ mine: false, integration })).toEqual([]);
+    const lost = { ...integration, claimMine: true };
+    expect(worldFacts({ ...base, mine: false, integration: lost })).toEqual([{ kind: 'reclaim', until: 90_000 }]);
+    // Туман помнит мир своим, но его уже взяли: право отбить, а не доля выхода.
+    expect(kinds({ integration: lost })).toEqual(['reclaim']);
+    expect(kinds({ integration: null })).toEqual([]);
+  });
+
   it('бонус типа несёт только ненулевые доли', () => {
     expect(worldFacts({ ...base, bonuses: { production: 0.45, defense: -0.25 } })).toEqual([
       { kind: 'type', production: 0.45, defense: -0.25 },

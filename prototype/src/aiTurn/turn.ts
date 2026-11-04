@@ -12,6 +12,7 @@ import {
   technologiesUnlocking,
   scientistsOf,
   uncontrolledPlanets,
+  isIntegrating,
   type Action,
   type Fleet,
   type GameState,
@@ -147,7 +148,7 @@ export interface AiTurn {
   readonly neediestWorld: (from: { x: number; y: number }) => Planet | undefined;
   readonly d: (a: { x: number; y: number }, b: { x: number; y: number }) => number;
   readonly warFooting: boolean;
-  /** Свои планеты за лимитом управления (BAL-19): юниты на них не заказываются. */
+  /** Свои планеты за лимитом управления и в освоении (BAL-19): юниты на них не заказываются. */
   readonly outside: ReadonlySet<string>;
   readonly base: Planet | undefined;
   readonly shipCount: (f: Fleet) => number;
@@ -277,7 +278,11 @@ export function openTurn(
   // Якорь — ПОД УПРАВЛЕНИЕМ во всех трёх ветках (BAL-19): на планете за лимитом юниты не
   // строятся, и якорь на захваченной верфи вдали от столицы снова отбивал бы каждый заказ
   // корабля. Свой мир под управлением есть всегда: за лимит выходят только планеты сверх него.
+  // Взятая у другой стороны планета, пока осваивается, юнитов тоже не строит; держава из одних
+  // таких планет остаётся без якоря, пока первая не освоится.
   const outside = uncontrolledPlanets(state, data, ai, state.modeId);
+  for (const p of Object.values(state.planets))
+    if (p.owner === ai && isIntegrating(p, state.time)) outside.add(p.id);
   const ruled = (p: Planet): boolean => p.owner === ai && !outside.has(p.id);
   const base =
     Object.values(state.planets).find(
