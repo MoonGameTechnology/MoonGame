@@ -134,7 +134,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 99: ЧЛЕНСТВО — снят `sprawl`, на его месте `control` 1.0.0, лимит управления (BAL-19).
 // 100: порядок тот же; control 1.1.0, construction 1.14.0 — стройка юнита за лимитом на паузе;
 // hero 4.11.0 — ребро закрытого коридора переходит к коридору поверх него.
-const PINNED_FOR_VERSION = '100';
+// 101: членство — `integration` (освоение взятой планеты) сразу за `control`; economy 1.2.0.
+const PINNED_FOR_VERSION = '101';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -144,6 +145,7 @@ const PINNED_MODULE_IDS = [
   'tax',
   'faction',
   'control', // BAL-19: после `tax` — половина выхода задевает и гражданский налог
+  'integration', // BAL-19: освоение взятой планеты, множитель выхода рядом с лимитом
   'hunger', // ECON-1: еда в долгах — наземный урон ×0.75
   'economy',
   'movement',

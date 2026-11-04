@@ -267,6 +267,21 @@ describe('шапка известного мира', () => {
     expect(card('A')).toContain('data-desc="fact:uncontrolled"');
     expect(card('C')).not.toContain('data-desc="fact:uncontrolled"');
   });
+
+  it('освоение: у взявшего — доля выхода, у потерявшего — право отбить с отсчётом (BAL-19)', async () => {
+    const { env, card } = await boot();
+    const since = env.s.time - 36 * HOUR; // середина трёх дней: (25% + 100%) / 2
+    env.s.planets.A!.integration = { claim: 'p2', since, until: since + 72 * HOUR };
+    expect(card('A')).toContain('data-desc="fact:integrating"');
+    expect(seen(card('A'), env.s.time)).toContain('Освоение 63%');
+    expect(card('A')).not.toContain('data-desc="fact:reclaim"');
+    env.s.planets.N!.integration = { claim: 'p1', since, until: since + 72 * HOUR };
+    expect(card('N')).toContain('data-desc="fact:reclaim"');
+    expect(seen(card('N'), env.s.time)).toMatch(/Можно отбить 36(\.0)?ч/);
+    // Освоение кончилось, а событие конца ещё не пришло: фишек нет.
+    env.s.planets.A!.integration = { claim: 'p2', since: 0, until: env.s.time };
+    expect(card('A')).not.toContain('data-desc="fact:integrating"');
+  });
 });
 
 describe('действия мира', () => {

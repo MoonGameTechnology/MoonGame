@@ -10,6 +10,8 @@ import {
   type GameState,
   uncontrolledPlanets,
   UNCONTROLLED_OUTPUT,
+  isIntegrating,
+  INTEGRATION_START_OUTPUT,
 } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { data } from './gameData';
@@ -137,6 +139,15 @@ export function resourceCardHtml(
     outside > 0
       ? `<div class="rc-note">${esc(t('rescard.control', { n: outside, p: Math.round(UNCONTROLLED_OUTPUT * 100) }))}</div>`
       : '';
+  // То же про освоение взятых планет: их доход ещё растёт до полного. Взятую у меня планету
+  // туман может помнить моей, но она не моя.
+  const integrating = Object.values(state.planets).filter(
+    (p) => p.owner === me && isIntegrating(p, state.time) && p.integration?.claim !== me,
+  ).length;
+  const integrationNote =
+    integrating > 0
+      ? `<div class="rc-note">${esc(t('rescard.integration', { n: integrating, p: Math.round(INTEGRATION_START_OUTPUT * 100) }))}</div>`
+      : '';
 
   return `<div class="rc-box">
     <div class="rc-head">
@@ -148,6 +159,7 @@ export function resourceCardHtml(
     <div class="rc-sec">${esc(t('rescard.income'))}</div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.production'))}</span><span class="rc-v pos">+${fmt(bd.production)}</span></div>
     ${controlNote}
+    ${integrationNote}
     <div class="rc-sec">${esc(t('rescard.expense'))}</div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.upkeep'))}</span><span class="rc-v neg">−${fmt(bd.buildingUpkeep)}</span></div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.army'))}</span><span class="rc-v neg">−${fmt(bd.unitUpkeep)}</span></div>

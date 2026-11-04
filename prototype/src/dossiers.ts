@@ -21,6 +21,8 @@ import {
   BASE_BUILDING_DEFENSE,
   CONTROL_LIMIT,
   DEVELOPMENT_COST_PER_POINT,
+  INTEGRATION_HOURS,
+  INTEGRATION_START_OUTPUT,
   MITIGATION_CAP,
   buildingLevel,
   buildingMaxLevel,
@@ -476,6 +478,14 @@ function factDossier(kind: string): Dossier | null {
         p: Math.round(UNCONTROLLED_OUTPUT * 100),
       }),
     ],
+    integrating: [
+      t('side.world.integrating.name'),
+      t('side.world.integrating.note', {
+        n: INTEGRATION_HOURS / 24,
+        p: Math.round(INTEGRATION_START_OUTPUT * 100),
+      }),
+    ],
+    reclaim: [t('side.world.reclaim'), t('side.world.reclaim.note')],
     output: [t('side.world.output'), ''],
   };
   const d = FACT_DOSSIER[kind];

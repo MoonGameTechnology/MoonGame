@@ -720,6 +720,13 @@ export {
   CONTROL_LIMIT,
   UNCONTROLLED_OUTPUT,
 } from './modules/control';
+export {
+  integrationModule,
+  integrationShare,
+  isIntegrating,
+  INTEGRATION_HOURS,
+  INTEGRATION_START_OUTPUT,
+} from './modules/integration';
 export { veteranModule } from './modules/veteran';
 export { promotionModule } from './modules/promotion';
 export { armyModule, type LoadFirst } from './modules/army';

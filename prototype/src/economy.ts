@@ -32,6 +32,7 @@ import {
   controlledPlanets,
   CONTROL_LIMIT,
   UNCONTROLLED_OUTPUT,
+  integrationShare,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
 import { feedsOnBiomass, isInfected } from '../../packages/shared-core/src/util/infestation';
@@ -86,9 +87,10 @@ export function economySnapshot(state: GameState): {
 }
 
 /** BAL-19: доля выхода мира по лимиту управления (`controlModule`) — 1 под управлением,
- *  `UNCONTROLLED_OUTPUT` за лимитом. `inhabited` — число планет игрока: в пределах лимита
- *  под управлением всё, и обход карты от столицы не нужен. */
-function beyondControl(
+ *  `UNCONTROLLED_OUTPUT` за лимитом, — и по освоению взятой планеты (`integrationModule`) в
+ *  миг состояния. `inhabited` — число планет игрока: в пределах лимита под управлением всё,
+ *  и обход карты от столицы не нужен. */
+function heldShare(
   state: GameState,
   playerId: string,
   inhabited: number,
@@ -97,8 +99,11 @@ function beyondControl(
     inhabited > CONTROL_LIMIT && controlApplies(state, data, state.modeId)
       ? controlledPlanets(state, data, playerId, CONTROL_LIMIT)
       : null;
-  if (controlled === null) return () => 1;
-  return (p) => (isInhabited(data, p) && !controlled.has(p.id) ? UNCONTROLLED_OUTPUT : 1);
+  const integrated = (p: Planet): number =>
+    p.integration ? integrationShare(p.integration, state.time) : 1;
+  if (controlled === null) return integrated;
+  return (p) =>
+    (isInhabited(data, p) && !controlled.has(p.id) ? UNCONTROLLED_OUTPUT : 1) * integrated(p);
 }
 
 /** Net per-hour income for a player: production from owned, un-bombarded worlds
@@ -144,7 +149,7 @@ export function netIncome(
   for (const id of me?.technologies?.completed ?? [])
     techBonus += data.technologies[id]?.effects?.productionBonus ?? 0;
   const bonusMult = (1 + factionBonus) * (1 + techBonus);
-  const outside = beyondControl(state, playerId, inhabited);
+  const held = heldShare(state, playerId, inhabited);
   const bombarded = owned.length > 0 ? bombardedPlanets(state, data) : new Set<string>();
   // Constructions in progress by world, in schedule order — what the per-world scan of
   // `state.scheduled` used to pick out.
@@ -160,8 +165,8 @@ export function netIncome(
     }
   for (const p of owned) {
     if (bombarded.has(p.id)) continue;
-    // BAL-19: планета вне лимита управления (`controlModule`) — половина всего выхода мира.
-    const control = outside(p);
+    // BAL-19: лимит управления и освоение — доля всего выхода мира.
+    const control = held(p);
     const mult =
       (1 + (p.planetType ? (data.planetTypes[p.planetType]?.productionBonus ?? 0) : 0)) *
       bonusMult *
@@ -328,11 +333,11 @@ export function incomeBreakdown(
   for (const id of me?.technologies?.completed ?? [])
     techBonus += data.technologies[id]?.effects?.productionBonus ?? 0;
   const bonusMult = (1 + factionBonus) * (1 + techBonus);
-  const outside = beyondControl(state, playerId, inhabited);
+  const held = heldShare(state, playerId, inhabited);
 
   for (const p of Object.values(state.planets)) {
     if (p.owner !== playerId || isBombarded(state, p.id, data)) continue;
-    const control = outside(p);
+    const control = held(p);
     const mult =
       (1 + (p.planetType ? (data.planetTypes[p.planetType]?.productionBonus ?? 0) : 0)) *
       bonusMult *

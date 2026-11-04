@@ -16,6 +16,11 @@ export function worldFactHtml(f: WorldFact): string {
     case 'uncontrolled':
       // Слово на фишке, правило — в досье по тапу/наведению, как у столицы.
       return `<span class="pfact bad" data-desc="fact:uncontrolled">⊘ ${t('side.world.uncontrolled')}</span>`;
+    case 'integrating':
+      return `<span class="pfact bad" data-desc="fact:integrating">⟳ ${t('side.world.integrating', { p: Math.round(f.share * 100) })}</span>`;
+    case 'reclaim':
+      // Срок в разметке, цифры ставит живой узел (`liveTimers.ts`).
+      return `<span class="pfact good" data-desc="fact:reclaim">↺ ${t('side.world.reclaim')} ${liveTimerHtml(f.until)}</span>`;
     case 'bombard': {
       // Знак и время на фишке, слова — в подсказке: шапка узкая, а на телефоне фишка
       // делит строку с действиями мира. Отсчёт — живой узел, как и время в подсказке.

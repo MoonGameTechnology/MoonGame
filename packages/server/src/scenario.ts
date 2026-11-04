@@ -100,7 +100,12 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '100'; // BAL-19: порядок тот же; `control` 1.1.0 и
+export const MODULE_MANIFEST_VERSION = '101'; // BAL-19: ЧЛЕНСТВО — `integration` 1.0.0 сразу за
+// `control`: взятая у другой стороны планета 3 игровых дня выходит с 25% выхода на полный и не
+// строит юниты, прежний хозяин отбивает её сразу на 100%; `economy` 1.2.0 называет хуку
+// `economy.production` отрезок, который он начисляет. Партия на 100 отдавала бы захваченную
+// планету захватчику сразу целиком.
+// export const MODULE_MANIFEST_VERSION = '100'; // BAL-19: порядок тот же; `control` 1.1.0 и
 // `construction` 1.14.0 — стройка юнита встаёт на паузу, когда её мир уходит из-под управления
 // (новая столица, захват планеты ближе к ней), и возобновляется только под управлением;
 // `hero` 4.11.0 — закрытый коридор передаёт добавленное им ребро коридору поверх него. Партия

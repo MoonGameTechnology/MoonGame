@@ -37,6 +37,7 @@ import {
   SPY_NO_WAR_SOLO_MIGRATION as spyNoWar,
   CONTROL_LIMIT_SOLO_MIGRATION as controlLimit,
   CONTROL_RECHECK_SOLO_MIGRATION as controlRecheck,
+  INTEGRATION_SOLO_MIGRATION as integration,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -182,7 +183,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -646,5 +647,14 @@ describe('the rules-only control recheck pair', () => {
     before.state.version = { data: controlRecheck.fromData, dataHash: controlRecheck.fromDataHash, manifest: '1' };
     const raw = serializeSoloSave(before, controlRecheck.fromRules);
     expect(parseCompatibleSoloSave(raw, controlRecheck.toRules)).toEqual(before);
+  });
+});
+
+describe('the rules-only integration pair', () => {
+  it('reads a save of the control recheck release under the new rules unchanged', () => {
+    const before = oldSave();
+    before.state.version = { data: integration.fromData, dataHash: integration.fromDataHash, manifest: '1' };
+    const raw = serializeSoloSave(before, integration.fromRules);
+    expect(parseCompatibleSoloSave(raw, integration.toRules)).toEqual(before);
   });
 });
