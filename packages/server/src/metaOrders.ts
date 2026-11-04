@@ -321,25 +321,18 @@ export class PostgresMetaOrders extends PostgresMarketBase implements MetaOrders
     const seen = await this.pool.query<{ seller_id: string }>(OFFERS_FOR, [key, price, accountId]);
     const scope = new Set(seen.rows.map((r) => r.seller_id));
     // Продавец мог выставить подходящий лот между чтением и транзакцией: тогда область
-    // транзакции расширяется и она повторяется; на последней попытке такие лоты пропускаются
-    // (их подхватит `matchListing` при выставлении).
-    for (let attempt = 0; ; attempt++) {
+    // транзакции расширяется и она повторяется. Лот не пропускается: его `matchListing`
+    // мог уже отработать, не увидев незакоммиченный заказ. Не сошлось за 5 попыток —
+    // отказ, транзакция откачена, ничего не заморожено.
+    for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        return await this.placeOnce(
-          accountId,
-          login,
-          key,
-          price,
-          quantity,
-          requestId,
-          scope,
-          attempt < 2,
-        );
+        return await this.placeOnce(accountId, login, key, price, quantity, requestId, scope);
       } catch (e) {
-        if (!(e instanceof ScopeGrew) || attempt >= 2) throw e;
+        if (!(e instanceof ScopeGrew)) throw e;
         for (const seller of e.sellers) scope.add(seller);
       }
     }
+    return { ok: false, code: 'E_UNAVAILABLE' };
   }
 
   private placeOnce(
@@ -350,7 +343,6 @@ export class PostgresMetaOrders extends PostgresMarketBase implements MetaOrders
     quantity: number,
     requestId: string,
     scope: ReadonlySet<string>,
-    canGrow: boolean,
   ): Promise<MetaMarketResult<OrderPlaced>> {
     const sellers = [...scope];
     return this.transaction([accountId, ...sellers], async (c, tx) => {
@@ -398,8 +390,8 @@ export class PostgresMetaOrders extends PostgresMarketBase implements MetaOrders
       const fills: OrderFill[] = [];
       const offers = await c.query<LotRow>(OFFERS_FOR, [key, price, accountId]);
       const outside = offers.rows.filter((r) => !scope.has(r.seller_id)).map((r) => r.seller_id);
-      if (outside.length && canGrow) throw new ScopeGrew(outside);
-      for (const row of offers.rows.filter((r) => scope.has(r.seller_id))) {
+      if (outside.length) throw new ScopeGrew(outside);
+      for (const row of offers.rows) {
         if (order.filled >= quantity) break;
         const fill = await this.fill(c, tx, order, row);
         if (fill) fills.push(fill);
