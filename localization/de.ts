@@ -3661,7 +3661,6 @@ export const de: Record<string, string> = {
   'log.spy.counter.caught.killed': '🛡 Spionageabwehr auf {at} fing Agenten von {who} ab und eliminierte ihn',
   'log.spy.counter.lost': '🛡 Unser Abwehroffizier auf {at} wurde enttarnt und ausgewiesen, Rückkehr in 6h',
   'log.spy.counter.lost.killed': '🛡 Unser Abwehroffizier auf {at} wurde enttarnt und getötet. Neuer Spion in 24h',
-  'log.spy.war': '⚔ Spion enttarnt: Krieg zwischen {a} und {b}',
   'log.spy.success': '🕵 Agent beschaffte Informationen: {what} — 24h Zeitfenster',
   'log.spy.success.lost': '🕵 Agent beschaffte Informationen: {what} — 24h Zeitfenster. Agent getötet, neuer Spion in 24h',
   'log.spy.success.lost.short': '🗝 Erfolg: {what}. Agent getötet',

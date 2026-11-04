@@ -14,6 +14,12 @@ it('rejects concurrent confusable memory registrations without changing authenti
   expect(await users.findUser('att_probe')).toMatchObject({ login: 'att_probe' });
 });
 
+it('recognizes lunate sigma before compatibility folding can destroy its C shape', async () => {
+  const users = new MemoryUserStore();
+  expect((await users.createUser('foco', 'hash')).ok).toBe(true);
+  expect(await users.createUser('foϲo', 'hash')).toEqual({ ok: false, code: 'E_LOGIN_TAKEN' });
+});
+
 describe.skipIf(!process.env.DATABASE_URL)('durable registration collision protection', () => {
   const pools = [
     new Pool({ connectionString: process.env.DATABASE_URL }),

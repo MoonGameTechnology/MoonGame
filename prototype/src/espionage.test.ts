@@ -84,10 +84,10 @@ describe('espionage in the prototype kernel (SPY-8 playable)', () => {
       if (caught) {
         expect((caught.payload as { owner: string }).owner).toBe('p2'); // addressed to the victim
         // Favour heals a little over the 12h mission, so the hit shows as a drop below
-        // where it started. SPY-11: the exposure also declares war, so the war hit may
-        // stack on top — the drop is at least most of the spy hit.
+        // where it started — the drop is at least most of the spy hit.
         expect(botFavour(st, 'p2', 'p1')).toBeLessThan(before - FAVOUR_SPY_CAUGHT_HIT / 2);
-        expect(getStance(st, 'p1', 'p2')).toBe('war');
+        // SPY-22: the exposure declares no war (owner's resolution 2026-11-04).
+        expect(getStance(st, 'p1', 'p2')).toBe('peace');
         return;
       }
     }
