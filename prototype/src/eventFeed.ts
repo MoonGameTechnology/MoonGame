@@ -740,8 +740,6 @@ export function handleEvents(events: DomainEvent[]) {
           // «Экспедиция начата — Рой уже идёт» служебной строкой с именем фракции игрока.
           // Реплика в треде дипломатии выше остаётся.
           if (!sectorRunActive) note(`${na} → ${nb}: ${stanceRu(st)}`);
-          // SPY-11: войну объявило раскрытие шпиона, а не игрок — это стоит назвать.
-          if (p.cause === 'espionage') note(t('log.spy.war', { a: na, b: nb }));
         }
         if (diploOpen && diploTab === 'diplo') renderDiplo();
         break;

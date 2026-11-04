@@ -388,6 +388,18 @@ export const COMBAT_CONTINUITY_SOLO_MIGRATION = {
   toDataHash: STAR_LADDER_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: espionage 1.14.0 no longer declares war when a spy is exposed (owner's
+ *  resolution 2026-11-04). A war an exposure already declared stays a war like any other,
+ *  so a saved world reads as is. */
+export const SPY_NO_WAR_SOLO_MIGRATION = {
+  fromRules: COMBAT_CONTINUITY_SOLO_MIGRATION.toRules,
+  fromData: COMBAT_CONTINUITY_SOLO_MIGRATION.toData,
+  fromDataHash: COMBAT_CONTINUITY_SOLO_MIGRATION.toDataHash,
+  toRules: '193ffd52a9ecab',
+  toData: COMBAT_CONTINUITY_SOLO_MIGRATION.toData,
+  toDataHash: COMBAT_CONTINUITY_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -423,6 +435,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   CLOAK_FIELD_SOLO_MIGRATION,
   STAR_LADDER_SOLO_MIGRATION,
   COMBAT_CONTINUITY_SOLO_MIGRATION,
+  SPY_NO_WAR_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

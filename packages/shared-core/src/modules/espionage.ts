@@ -3,7 +3,7 @@ import { FORTRESS_CORE } from '../state/fortress';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { BuildingDamage, BuildingHit, ConstructionDelay, DelayedOrder } from './construction';
 import type { TechnologyGrant } from './technology';
-import { getStance, type DiplomacyCapability } from '../state/diplomacy';
+import { getStance } from '../state/diplomacy';
 import { coalitionOf } from '../state/coalition';
 import { buildingLevel, type GameData, type ResourceBag } from '../data/schemas';
 import type { AgentAway, GameState, IntelGrant, SpyOp } from '../state/gameState';
@@ -26,7 +26,7 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  *     owner's treasury, 3 — the world's build queue and the owner's research, 4 — the
  *     owner's pending diplomatic offers; `intel.deepened`), and every such step
  *     re-rolls detection and death as on arrival. A detected agent is out (`intel.lost`,
- *     war on exposure as below) and every layer closes with it. A killed agent's
+ *     public exposure as below) and every layer closes with it. A killed agent's
  *     success leaves a plain 24h window of the first layer (`espionage.duration`).
  *   - `sabotage` (SPY-9) — 3–5 random buildings of the world lose 10–20% of their
  *     max HP each; one already worn down can be destroyed. The damage itself is the
@@ -57,12 +57,10 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
  *     counter-intelligence agents posted there by civilisations at WAR with its owner
  *     — on an enemy world that includes the enemy's own guard.
  *
- * War on exposure (SPY-11, owner's resolution 2026-10-22): an aggressive mission that
- * is DETECTED (a killed agent is always detected) declares war between the world's
- * owner and the spy's owner — through the `diplomacy` capability's `declareWar`, so an
- * alliance or a pact breaks too. A caught counter-intelligence agent declares nothing:
- * both sides are at war already, and a third party's world is not party to it.
- * The exposure is also public news (SPY-16): `espionage.exposed` names the world's owner
+ * No war on exposure (owner's resolution 2026-11-04): SPY-11 made a detected aggressive
+ * mission declare war between the world's owner and the spy's owner; that is gone, a
+ * caught spy changes no stance. The victim learns of it (`espionage.detected`), and
+ * the exposure is public news (SPY-16): `espionage.exposed` names the world's owner
  * (`a`), the spy's owner (`b`) and the world, never the operation.
  * Agents in numbers (SPY-17): a player may hold at most `MAX_AGENTS_PER_WORLD` agents on
  * one world. Aggressive agents sent there while others are still on their way ride one
@@ -439,7 +437,8 @@ export const espionageModule: GameModule = {
   // 1.8.0: подрыв экономики (SPY-15). 1.9.0: раскрытие — новость для всех (SPY-16).
   // 1.10.0: до трёх агентов на мире, волна складывает шансы (SPY-17).
   // 1.13.0: кража вернее и богаче с развитого мира своей цивилизации (SPY-21).
-  version: '1.13.0',
+  // 1.14.0: раскрытие шпиона больше не объявляет войну.
+  version: '1.14.0',
   setup(api) {
     // SPY-15: a disrupted world produces `DISRUPT_FACTOR` of its output. A span never
     // runs across the end (it is a scheduled event), so «until ≥ now» at the span's end
@@ -639,11 +638,8 @@ export const espionageModule: GameModule = {
       const lostTags = killed ? { agentLost: true, ...(turned ? { agentTurned: true } : {}) } : {};
       const caughtTags = killed ? { killed: true, ...(turned ? { turned: true, spy } : {}) } : {};
       const recruit: AgentAway = { until: now + hoursToMs(h.ctx, AGENT_RECRUIT_HOURS), lost: true };
-      // War on exposure (SPY-11): even an ally or a pact partner caught spying is an enemy now.
-      if (detected) {
-        h.capability<DiplomacyCapability>('diplomacy')?.declareWar?.(h, victim, spy, 'espionage');
-        exposed(h, victim, spy, planetId);
-      }
+      // Exposure is news, not war (owner's resolution 2026-11-04): stances stay as they are.
+      if (detected) exposed(h, victim, spy, planetId);
 
       if (!succeeded) {
         reassign(h, spy, mission, killed ? recruit : comeHome);
@@ -798,7 +794,6 @@ export const espionageModule: GameModule = {
       const killed = h.rng.nextFloat() < Math.min(1, Math.max(0, finiteOr(rawKill, baseKill))) && detected;
       const turned = killed && turnAgent(h, victim, spy, 'recon');
       if (detected) {
-        h.capability<DiplomacyCapability>('diplomacy')?.declareWar?.(h, victim, spy, 'espionage');
         exposed(h, victim, spy, planetId);
         closeIntel(h, spy, mission);
         reassign(

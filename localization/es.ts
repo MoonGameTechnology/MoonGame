@@ -3671,7 +3671,6 @@ export const es: Record<string, string> = {
   'log.spy.counter.caught.killed': '🛡 La contrainteligencia en {at} capturó al agente de {who} y lo eliminó',
   'log.spy.counter.lost': '🛡 Nuestro agente de contrainteligencia en {at} fue descubierto y expulsado; regresará en 6 h',
   'log.spy.counter.lost.killed': '🛡 Nuestro agente de contrainteligencia en {at} fue descubierto y eliminado. Encontrar un nuevo espía tomará 24 h',
-  'log.spy.war': '⚔ Espía descubierto: estalló la guerra entre {a} y {b}',
   'log.spy.exposed': '🕵 {a} capturó a un espía de {b} en {at}',
   'log.spy.success': '🕵 Agente apostado: {what}. Nuevo nivel de inteligencia cada 12 h',
   'log.spy.success.lost': '🕵 Inteligencia obtenida: {what} — ventana de 24 h. El agente fue eliminado, buscar un nuevo espía tomará 24 h',

@@ -151,21 +151,25 @@ describe('SPY-11 — the guard against aggressive missions', () => {
   });
 });
 
-describe('SPY-11 — war on exposure', () => {
+describe('exposure declares no war (owner 2026-11-04, was SPY-11)', () => {
   const caught = [pin('miss', 'espionage.chance', 0), pin('seen', 'espionage.detect', 1), pin('live', 'espionage.kill', 0)];
 
-  it('a detected spy declares war between the world owner and its owner — an alliance breaks', () => {
+  it('a detected spy keeps the stance — an alliance holds, the exposure is still news', () => {
     const s = baseState();
     setStance(s, 'p1', 'p2', 'alliance');
     const { state, events } = play(kernel(caught), s, [spy('p1', 'B', 'sabotage')], 0, END);
-    expect(getStance(state, 'p1', 'p2')).toBe('war');
-    expect(ofType(events, 'diplomacy.changed').map((e) => e.payload)).toContainEqual({
-      a: 'p2',
-      b: 'p1',
-      stance: 'war',
-      from: 'alliance',
-      cause: 'espionage',
-    });
+    expect(getStance(state, 'p1', 'p2')).toBe('alliance');
+    expect(ofType(events, 'diplomacy.changed')).toEqual([]);
+    expect(ofType(events, 'espionage.exposed')).toHaveLength(1);
+  });
+
+  it('a recon agent caught on arrival keeps the stance too', () => {
+    const s = baseState();
+    setStance(s, 'p1', 'p2', 'pact');
+    const posted = [pin('hit', 'espionage.chance', 1), pin('seen', 'espionage.detect', 1), pin('live', 'espionage.kill', 0)];
+    const { state, events } = play(kernel(posted), s, [spy('p1', 'B', 'recon')], 0, END);
+    expect(getStance(state, 'p1', 'p2')).toBe('pact');
+    expect(ofType(events, 'espionage.exposed')).toHaveLength(1);
   });
 
   it('an unnoticed spy changes nothing', () => {
