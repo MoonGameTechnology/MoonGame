@@ -170,11 +170,6 @@ try {
       }
       const facts = await page.evaluate(() => window.__trainingTest.facts());
       assert.equal(facts.state.match.winner, 'p1');
-      const observed = await page.evaluate(() => window.__tutorialEvents);
-      const tutorial = observed.filter((event) => event.guide === 'sector-zero');
-      for (const action of ['started', 'step', 'completed', 'skipped'])
-        assert.ok(tutorial.some((event) => event.action === action), 'observed tutorial ' + action);
-      assert.ok(tutorial.every((event) => /^[a-f0-9]{32}$/.test(event.attempt)), 'attempt IDs present');
       assert.deepEqual(errors, []);
       await page.screenshot({ path: `/tmp/sz-training/${mode}-complete.png` });
       // Первая победа на полигоне платит стартовый пакет (§14.7) и больше ничего: ни забега,
@@ -213,6 +208,11 @@ try {
           value,
           `preserve ${key}`,
         );
+      const observed = await page.evaluate(() => window.__tutorialEvents);
+      const tutorial = observed.filter((event) => event.guide === 'sector-zero');
+      for (const action of ['started', 'step', 'completed', 'skipped'])
+        assert.ok(tutorial.some((event) => event.action === action), 'observed tutorial ' + action);
+      assert.ok(tutorial.every((event) => /^[a-f0-9]{32}$/.test(event.attempt)), 'attempt IDs present');
       assert.deepEqual(errors, []);
       console.log(mode, 'all twelve stages, pause/fold, replay/skip/resume, starter pack and save isolation');
     } catch (e) {
