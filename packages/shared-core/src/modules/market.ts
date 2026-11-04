@@ -106,6 +106,8 @@ export const marketModule: GameModule = {
       }
       if (typeof p.price !== 'number') return h.reject('E_BAD_PAYLOAD');
       const amount = Math.floor(p.amount);
+      // Finite first: Infinity passes `>= 1` and does not survive the JSON state (it becomes null).
+      if (!Number.isFinite(amount) || !Number.isFinite(p.price)) return h.reject('E_BAD_PAYLOAD');
       if (!(amount > 0) || !(p.price >= 1)) return h.reject('E_BAD_PAYLOAD'); // rule 3
       if (!isTradable(h.ctx.data, p.resource)) return h.reject('E_UNKNOWN_RESOURCE'); // rule 2
 
