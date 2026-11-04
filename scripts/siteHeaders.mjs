@@ -8,8 +8,8 @@
  * here is the server's one with a single difference: `connect-src` also allows `https:`. On
  * Cloudflare the game server is another origin, and the client calls its HTTP API by the
  * address the player chose, so `'self'` alone would cut it off. Like a server that ships the
- * solo sim worker, the site allows its own worker: `stage-site.mjs` puts `sim-worker-<hash>.js`
- * next to the pages. `siteHeaders.test.ts` keeps the two policies in step.
+ * solo sim worker, the site allows its own worker: `stage-site.mjs` puts
+ * `assets/sim-worker-<hash>.js` on the site, next to the art. `siteHeaders.test.ts` keeps the two policies in step.
  *
  * Hashes come from the staged text itself, so a rebuilt page gets a matching policy.
  */

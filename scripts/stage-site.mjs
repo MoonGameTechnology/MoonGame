@@ -6,21 +6,34 @@
  * (`void-dominion-admin.html`), the platform archive (`yandex/`, it expects the Yandex SDK
  * at `/sdk.js`) and the screenshots the browser harnesses leave behind.
  *
- * The main page is the same file GitHub Pages publishes (`.github/workflows/pages.yml`),
- * so both web addresses show one game.
+ * The pages come from the server build (`dist/served/`): the same game GitHub Pages
+ * publishes (`.github/workflows/pages.yml`), but with the art as files in `assets/`. The
+ * single-file pages carry it as base64 and outgrew Cloudflare's 25 MiB limit per file;
+ * `MAX_FILE_BYTES` below stops the build before the upload would fail.
  */
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { headersFile } from './siteHeaders.mjs';
 import { bakeServer, parseServer } from './siteServer.mjs';
 
-const dist = 'prototype/dist';
-const site = `${dist}/site`;
+const served = 'prototype/dist/served';
+const site = 'prototype/dist/site';
 
-/** Published path → built file. */
+/** Cloudflare refuses the whole upload if any one asset is larger than this. */
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
+
+/** Published path → built file in `served`. */
 const PAGES = {
-  'index.html': 'void-dominion.html',
+  'index.html': 'dev.html',
   'sector-zero.html': 'sector-zero.html',
-  'player.html': 'void-dominion-player.html',
+  'player.html': 'player.html',
 };
 
 // A fresh folder each time: a page dropped from the list must not linger on the site.
@@ -31,15 +44,20 @@ const server = parseServer(process.env.GAME_SERVER);
 mkdirSync(site, { recursive: true });
 const staged = {};
 for (const [published, built] of Object.entries(PAGES)) {
-  staged[published] = bakeServer(readFileSync(`${dist}/${built}`, 'utf8'), server);
+  staged[published] = bakeServer(readFileSync(`${served}/${built}`, 'utf8'), server);
   writeFileSync(`${site}/${published}`, staged[published]);
   console.log(`staged ${site}/${published} ← ${built}`);
 }
-// The solo sim worker the pages start (`build.mjs`): the page policy lets in only a worker
-// from this site (`worker-src 'self'`), so it is a file here, not a string in the page.
-for (const name of readdirSync(dist).filter((n) => /^sim-worker-[0-9a-f]+\.js$/.test(n))) {
-  copyFileSync(`${dist}/${name}`, `${site}/${name}`);
-  console.log(`staged ${site}/${name}`);
+// Art and the solo sim worker: the pages ask for them by absolute `/assets/<name>-<hash>`,
+// and the page policy lets in only images and a worker from this site (`'self'`).
+cpSync(`${served}/assets`, `${site}/assets`, { recursive: true });
+console.log(`staged ${site}/assets/ (${readdirSync(`${site}/assets`).length} files)`);
+const tooBig = [...Object.keys(PAGES), ...readdirSync(`${site}/assets`).map((n) => `assets/${n}`)]
+  .map((rel) => ({ rel, bytes: statSync(`${site}/${rel}`).size }))
+  .filter((f) => f.bytes > MAX_FILE_BYTES);
+if (tooBig.length > 0) {
+  for (const f of tooBig) console.error(`${f.rel}: ${f.bytes} bytes > ${MAX_FILE_BYTES}`);
+  throw new Error('a staged file is over the Cloudflare limit of 25 MiB per asset');
 }
 // Cloudflare reads `_headers` from the assets folder and does not serve it (siteHeaders.mjs).
 writeFileSync(`${site}/_headers`, headersFile(staged));
