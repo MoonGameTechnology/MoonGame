@@ -100,7 +100,12 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '98'; // SM-4.3: ЧЛЕНСТВО — `cloak-field` 1.0.0 перед
+export const MODULE_MANIFEST_VERSION = '99'; // BAL-19: ЧЛЕНСТВО — снят `sprawl` (налог на
+// рост с 35 провинций), на его месте `control` 1.0.0: 5 планет у столицы работают полностью,
+// остальные дают половину выхода и не строят юниты; `construction` 1.13.0 называет хуку
+// `construction.requirement` мир заказа. Партия на 98 платила бы налог на рост и строила бы
+// войска на любой своей планете.
+// export const MODULE_MANIFEST_VERSION = '98'; // SM-4.3: ЧЛЕНСТВО — `cloak-field` 1.0.0 перед
 // `auto-merge`, срыв маскировочного поля; новое поле флота `cloakBrokenUntil`.
 // export const MODULE_MANIFEST_VERSION = '97'; // Эшелоны, снимки модулей и точные группы войск.
 // Членство и порядок прежние; объединённые правила требуют отдельной версии.

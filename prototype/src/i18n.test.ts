@@ -426,6 +426,8 @@ describe('локализация — ключи', () => {
     // (`technology.ts`) запирает постройку до исследования — им заперты и форт, и
     // орбитальное ПКО (ORB-1). Хук отдаёт код значением, поэтому разбор его не видит.
     codes.add('E_TECH_LOCKED');
+    // Тот же хук у лимита управления (`control.ts`, BAL-19): юниты на планете вне лимита.
+    codes.add('E_NOT_CONTROLLED');
     const missing = [...codes]
       .map((code) => [code, refusalKeyOf(code)] as const)
       .filter(([, key]) => !(key in ru) || !(key in en))

@@ -209,6 +209,7 @@ describe('UI-RES2 — сторож: ресурс не печатается сл�
     'buildScreen.ts',
     'main.ts',
     'worldCard.ts',
+    'worldFactView.ts',
     'eventFeed.ts',
     'diploWindow.ts',
     'techTree.ts',
@@ -249,11 +250,11 @@ describe('UI-RES2 — сторож: ресурс не печатается сл�
 
   it('базовый выход мира идёт чипом БЕЗ отката на слово', () => {
     // Прежняя форма «TECH_CUR[r] ? curIc(r) : tData(r)» падала на слово ровно там,
-    // где у игрока нет опоры — у ресурса без глифа. Фишку выхода рисует карточка мира
-    // (`worldCard.ts`, REFM-223).
+    // где у игрока нет опоры — у ресурса без глифа. Фишку выхода рисует шапка карточки
+    // мира (`worldFactView.ts`, вынесена из `worldCard.ts`, REFM-223).
     expect(read('main.ts')).not.toMatch(/TECH_CUR\[r\] \? curIc\(r\)/);
     expect(read('worldCard.ts')).not.toMatch(/TECH_CUR\[r\] \? curIc\(r\)/);
-    expect(read('worldCard.ts')).toContain("resLine({ ...f.perHour }, { per: 'h' })");
+    expect(read('worldFactView.ts')).toContain("resLine({ ...f.perHour }, { per: 'h' })");
   });
 });
 

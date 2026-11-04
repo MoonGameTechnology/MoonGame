@@ -337,7 +337,13 @@ function queuedStillValid(h: HandlerContext, planet: Planet, q: QueuedConstructi
       : planet.buildings.find((b) => b.type === q.building);
     return !!instance && instance.level === q.level - 1;
   }
-  return q.kind === 'unit' && typeof q.unit === 'string' && typeof q.count === 'number';
+  if (q.kind !== 'unit' || typeof q.unit !== 'string' || typeof q.count !== 'number') return false;
+  // The planet may have fallen beyond the control limit while the order waited (BAL-19).
+  return h.hook<ConstructionRequirement>(
+    'construction.requirement',
+    { allowed: true },
+    { playerId: q.playerId, kind: 'unit', id: q.unit, planetId: planet.id },
+  ).allowed;
 }
 
 /** Назначить повтор попытки старта (правило 4), не плодя дублей. */
@@ -551,11 +557,12 @@ function requireUnlocked(
   playerId: string,
   kind: 'unit' | 'building',
   id: string,
+  planetId: string,
 ): void {
   const requirement = h.hook<ConstructionRequirement>(
     'construction.requirement',
     { allowed: true },
-    { playerId, kind, id },
+    { playerId, kind, id, planetId },
   );
   if (!requirement.allowed) {
     return h.reject(requirement.code ?? 'E_LOCKED');
@@ -829,7 +836,8 @@ export const constructionModule: GameModule = {
   // переживают бой, `combat` 3.10.0).
   // 1.9.0: своя полоса у каждой производственной постройки — верфь, порт, казармы, завод (BLD-2.1).
   // 1.12.0 combines paid module snapshots with immediate structure casualties.
-  version: '1.12.0',
+  // 1.13.0: the requirement hook names the order's world; queued units re-ask it (BAL-19).
+  version: '1.13.0',
   setup(api) {
     api.provideCapability<StructureDamage>('construction.impact', (h, id, amount, owner, covered) => {
       const planet = h.state.planets[id];
@@ -943,7 +951,7 @@ export const constructionModule: GameModule = {
       if (slots && slots.used >= slots.capacity) {
         return h.reject('E_NO_BUILD_SLOTS');
       }
-      requireUnlocked(h, action.playerId, 'building', payload.building);
+      requireUnlocked(h, action.playerId, 'building', payload.building, planet.id);
       if (atInstanceCap(h, planet, payload.building)) {
         return h.reject('E_ALREADY_BUILT'); // лимит экземпляров исчерпан (maxPerPlanet)
       }
@@ -1088,7 +1096,7 @@ export const constructionModule: GameModule = {
       if (def.traits.includes('issued')) {
         return h.reject('E_NOT_BUILDABLE');
       }
-      requireUnlocked(h, action.playerId, 'unit', payload.unit);
+      requireUnlocked(h, action.playerId, 'unit', payload.unit, planet.id);
       // Челнок строится В КОСМОПОРТЕ и остаётся в нём. Порт — только ворота (SHU-1.1):
       // ноль вместимости читается как «порта нет», а предела нет вовсе — космопорт
       // держит сколько угодно машин (SHU-5.1, резолюция владельца 2026-09-26).
@@ -1134,7 +1142,7 @@ export const constructionModule: GameModule = {
         if (troopDef.traits.includes('issued') || troopDef.traits.includes('immobile')) {
           return h.reject('E_NOT_BUILDABLE');
         }
-        requireUnlocked(h, action.playerId, 'unit', troopId);
+        requireUnlocked(h, action.playerId, 'unit', troopId, planet.id);
         if (!hasGroundFacility(planet, h.ctx.data, troopDef.kind)) {
           return h.reject(GROUND_FACILITY[troopDef.kind].code);
         }

@@ -11,6 +11,7 @@ import {
   matchCost,
   technologiesUnlocking,
   scientistsOf,
+  uncontrolledPlanets,
   type Action,
   type Fleet,
   type GameState,
@@ -146,6 +147,8 @@ export interface AiTurn {
   readonly neediestWorld: (from: { x: number; y: number }) => Planet | undefined;
   readonly d: (a: { x: number; y: number }, b: { x: number; y: number }) => number;
   readonly warFooting: boolean;
+  /** Свои планеты за лимитом управления (BAL-19): юниты на них не заказываются. */
+  readonly outside: ReadonlySet<string>;
   readonly base: Planet | undefined;
   readonly shipCount: (f: Fleet) => number;
   readonly reconBare: (f: Fleet) => boolean;
@@ -270,10 +273,15 @@ export function openTurn(
   // отбивался `E_NO_SHIPYARD` (в пробном матче — 102 отказа за матч), экономическая
   // цепочка строилась не дома, а на призовом мире, и флот переставал пополняться вовсе.
   // Обе прежние ветки оставлены запасными: у мира без верфи якорь тот же, что и был.
+  //
+  // Верфь — ПОД УПРАВЛЕНИЕМ (BAL-19): на планете за лимитом юниты не строятся, и якорь на
+  // захваченной верфи вдали от столицы снова отбивал бы каждый заказ корабля.
+  const outside = uncontrolledPlanets(state, data, ai, state.modeId);
   const base =
     Object.values(state.planets).find(
       (p) =>
         p.owner === ai &&
+        !outside.has(p.id) &&
         p.buildings.some(
           (b) => b.hp > 0 && data.buildings[b.type]?.enablesShipConstruction === true,
         ),
@@ -345,6 +353,7 @@ export function openTurn(
     neediestWorld,
     d,
     warFooting,
+    outside,
     base,
     shipCount,
     reconBare,

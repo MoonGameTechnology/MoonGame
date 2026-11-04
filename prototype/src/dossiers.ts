@@ -19,6 +19,7 @@
  */
 import {
   BASE_BUILDING_DEFENSE,
+  CONTROL_LIMIT,
   DEVELOPMENT_COST_PER_POINT,
   MITIGATION_CAP,
   buildingLevel,
@@ -29,6 +30,7 @@ import {
   thresholdRamp,
   signatureSize,
   TURNED_HOURS,
+  UNCONTROLLED_OUTPUT,
   unitTier,
   type GameState,
 } from '../../packages/shared-core/src/index';
@@ -460,6 +462,26 @@ export function abilityDossier(id: string): Dossier | null {
   return { name: tData(def.name), body: `${desc}<div class="cx-stats">${rows.join('')}</div>` };
 }
 
+/** Досье фишки шапки мира по её виду (`decisions/worldFacts.ts`); пустое тело — у фишки
+ *  нет своего правила сверх подписи. */
+function factDossier(kind: string): Dossier | null {
+  const FACT_DOSSIER: Record<string, [string, string]> = {
+    capital: [t('side.world.capital'), t('side.world.capital.note')],
+    vp: [t('side.world.vp'), ''],
+    dev: [t('side.world.dev'), t('side.world.dev.desc', { n: DEVELOPMENT_COST_PER_POINT })],
+    uncontrolled: [
+      t('side.world.uncontrolled'),
+      t('side.world.uncontrolled.note', {
+        n: CONTROL_LIMIT,
+        p: Math.round(UNCONTROLLED_OUTPUT * 100),
+      }),
+    ],
+    output: [t('side.world.output'), ''],
+  };
+  const d = FACT_DOSSIER[kind];
+  return d ? { name: d[0], body: d[1] } : null;
+}
+
 /** Wire the live-state renderers to the match screen. The pure exports above need no
  *  host and are imported directly. */
 const buildingScorePerLevel = (value: number, divisor: number): number =>
@@ -571,14 +593,7 @@ export function createDossiers(host: DossierHost): {
       // только иконку, и когда топаешь на него, выводит более подробную информацию»), а её
       // правило — то же досье, что у характеристики `stat:mitigation`.
       if (key === 'fact:cover') return objDossier('stat:mitigation');
-      const FACT_DOSSIER: Record<string, [string, string]> = {
-        capital: [t('side.world.capital'), t('side.world.capital.note')],
-        vp: [t('side.world.vp'), ''],
-        dev: [t('side.world.dev'), t('side.world.dev.desc', { n: DEVELOPMENT_COST_PER_POINT })],
-        output: [t('side.world.output'), ''],
-      };
-      const d = FACT_DOSSIER[key.slice(5)];
-      return d ? { name: d[0], body: d[1] } : null;
+      return factDossier(key.slice(5));
     }
     if (key.startsWith('stat:')) {
       // TXT-3: тело есть только у характеристики, которая несёт СВОЁ правило (атака и

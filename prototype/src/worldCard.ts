@@ -33,6 +33,7 @@ import {
   MAX_STEWARD_HOLD_POINTS,
   planetDevelopment,
   rallyPointOf,
+  uncontrolledPlanets,
 } from '../../packages/shared-core/src/index';
 import { isMineFleet } from '../../packages/shared-core/src/state/minefields';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
@@ -43,7 +44,7 @@ import { basePatrols, patrolMarks } from '../../decisions/patrolMarks';
 import { rallyOffer, type RallyOffer } from '../../decisions/rallyPoint';
 import { espionageShown, toolShown, victoryPointsShown } from '../../decisions/sectorZeroTools';
 import { medalBadges } from '../../decisions/unitMedals';
-import { worldFacts, type WorldFact } from '../../decisions/worldFacts';
+import { worldFacts } from '../../decisions/worldFacts';
 import { intelLayers } from '../../decisions/intelLayers';
 import { knownBureau, oddsPct, spyOdds } from '../../decisions/spyOdds';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
@@ -70,7 +71,7 @@ import {
 import { BUILD_ICON, KIND_ICON, unitIconHtml } from './icons';
 import { myAgents, SPY_COST } from './intel';
 import { squadMerge } from './interaction';
-import { LIVE_SLOT, liveTimerHtml, liveTipAttrs } from './liveTimers';
+import { liveTimerHtml } from './liveTimers';
 import { SECTOR_TYPES, type SectorType } from './map';
 import { squadronRelocateSpots } from './mapAim';
 import { known, memory, myIntel, surveyed } from './mapFog';
@@ -104,6 +105,7 @@ import {
   coreQueue,
   myRes,
 } from './worldQueries';
+import { worldFactHtml } from './worldFactView';
 
 /** Вкладка карточки мира. */
 export type PlanetTab = 'ground' | 'ships' | 'shuttle' | 'buildings';
@@ -482,43 +484,6 @@ export function unknownPlanetHtml(p: Planet): string {
   );
 }
 
-/** Фишка шапки мира (`decisions/worldFacts.ts`). Слова — из локали, значки — те же, что в
- *  остальном интерфейсе: ★ столица, ✦ очки победы, значки ресурсов. */
-function worldFactHtml(f: WorldFact): string {
-  const pct = (n: number): string => (n >= 0 ? '+' : '') + Math.round(n * 100) + '%';
-  const tone = (n: number): string => (n >= 0 ? 'up' : 'dn');
-  switch (f.kind) {
-    case 'capital':
-      return `<span class="pfact good" data-desc="fact:capital">★ ${t('side.world.capital')}</span>`;
-    case 'blackout':
-      return `<span class="pfact bad">⚡ ${t('side.world.blackout')}</span>`;
-    case 'bombard': {
-      // Знак и время на фишке, слова — в подсказке: шапка узкая, а на телефоне фишка
-      // делит строку с действиями мира. Отсчёт — живой узел, как и время в подсказке.
-      const tip = liveTipAttrs(f.at, 'hms', t('side.world.bombard-next', { t: LIVE_SLOT }));
-      return `<span class="pfact bad pn-tip"${tip}>⊗ ${liveTimerHtml(f.at, 'hms')}</span>`;
-    }
-    case 'type': {
-      const parts: string[] = [];
-      if (f.production !== undefined)
-        parts.push(
-          `<i class="${tone(f.production)}">${t('side.world.production', { p: pct(f.production) })}</i>`,
-        );
-      if (f.defense !== undefined)
-        parts.push(
-          `<i class="${tone(f.defense)}">${t('side.world.defense', { p: pct(f.defense) })}</i>`,
-        );
-      return `<span class="pfact">${parts.join(' · ')}</span>`;
-    }
-    case 'cover':
-      // Иконка и число, правило — в досье по тапу/наведению (заказ владельца 2026-09-29).
-      // Число, а не один значок: защита падает с каждой снесённой постройкой (FORT-5.15).
-      return `<span class="pfact" data-desc="fact:cover" aria-label="${esc(t('side.world.mitigation', { n: Math.round(f.share * 100) }))}">🛡 −${Math.round(f.share * 100)}%</span>`;
-    case 'output':
-      return `<span class="pfact" data-desc="fact:output">${resLine({ ...f.perHour }, { per: 'h' })}</span>`;
-  }
-}
-
 /**
  * Действия с миром в его шапке: сделать столицей, точка удержания, «Пинг», разведка.
  * ЧТО предлагать, решают `worldOrders.ts` и `spyOffer.ts` (REFM-91/92), здесь только
@@ -755,6 +720,8 @@ export function planetPanelHtml(p: Planet): string {
       Object.values(s.match.capitalObjectives ?? {}).some((target) => target.planetId === p.id),
     // ECON-2: блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
     blackout: showsBlackout(mine, s.players[ME]?.arrears),
+    // BAL-19: своя планета за лимитом управления — половина дохода, юниты не строятся.
+    uncontrolled: mine && uncontrolledPlanets(s, data, ME, s.modeId).has(p.id),
     // Таймер обстрела: когда следующий залп (`decisions/bombardTimer.ts`).
     bombardAt: bombardVolleyAt(s, p.id, ME),
     bonuses: sm.bonuses,

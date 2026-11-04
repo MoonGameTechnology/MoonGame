@@ -19,6 +19,8 @@ export type WorldFact =
   | { kind: 'capital' }
   /** Неоплаченная энергия глушит радары и ПКО владельца (ECON-2). */
   | { kind: 'blackout' }
+  /** Своя планета вне лимита управления: половина дохода, юниты не строятся (BAL-19). */
+  | { kind: 'uncontrolled' }
   /** Мир под обстрелом: когда ударит следующий залп, срок в мс мира (`bombardTimer.ts`).
    *  Срок, а не остаток: шапка пишет его в разметку, а цифры ставит живой узел. Видят
    *  только стороны обстрела — это решает хост. */
@@ -31,10 +33,12 @@ export type WorldFact =
   | { kind: 'output'; perHour: Readonly<Record<string, number>> };
 
 export interface WorldFactsInput {
-  /** Мир принадлежит смотрящему. Столица и блэкаут — только о своём мире. */
+  /** Мир принадлежит смотрящему. Столица, блэкаут и лимит управления — только о своём мире. */
   mine: boolean;
   capital: boolean;
   blackout: boolean;
+  /** Мир вне лимита управления смотрящего (`uncontrolledPlanets`). */
+  uncontrolled?: boolean;
   /** Срок следующего залпа обстрела (`nextVolleyAt`) или `null`, если таймера нет. */
   bombardAt?: number | null;
   bonuses: { production?: number; defense?: number };
@@ -51,6 +55,7 @@ export function worldFacts(i: WorldFactsInput): WorldFact[] {
   const out: WorldFact[] = [];
   if (i.mine && i.capital) out.push({ kind: 'capital' });
   if (i.mine && i.blackout) out.push({ kind: 'blackout' });
+  if (i.mine && i.uncontrolled) out.push({ kind: 'uncontrolled' });
   if (i.bombardAt != null) out.push({ kind: 'bombard', at: i.bombardAt });
   const { production, defense } = i.bonuses;
   if ((production ?? 0) !== 0 || (defense ?? 0) !== 0) {

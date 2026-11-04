@@ -8,8 +8,7 @@ import { applyDamageToSide, hookedDamage, removeIfWiped } from '../util/combat';
 import { fortressFleetId, fortressRepairQuote, stationSiteId, buildingRepairQuote, serviceSitesForFleet, indexServiceSites } from '../state/fortress';
 import { divertFortressDamage } from '../util/fortressDamage';
 import { visibleState } from '../state/visibility';
-import { forkSiteId, forkSiteEdge } from '../state/forkSite';
-import { ownedProvinceCount } from './sprawl';
+import { forkSiteId, forkSiteEdge, isForkSite } from '../state/forkSite';
 import { instantRepairModule } from './instantRepair';
 import { previewSides } from '../state/previewBattle';
 import { movementModule } from './movement';
@@ -220,7 +219,8 @@ describe('separate fortress model', () => {
     const restored = JSON.parse(JSON.stringify(state)) as GameState;
     expect(ok(kernel.advanceTo(restored, context(6 * H / speed))).state)
       .toEqual(ok(kernel.advanceTo(state, context(6 * H / speed))).state);
-    expect(ownedProvinceCount(state, 'p1')).toBe(1);
+    // The fortress is not a province of its own: p1 still holds one.
+    expect(Object.values(state.planets).filter((p) => p.owner === 'p1' && !isForkSite(p))).toHaveLength(1);
   });
 
   it('enforces module ownership and stamps the same arsenal quality snapshot as ship construction', () => {

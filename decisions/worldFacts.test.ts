@@ -35,8 +35,16 @@ describe('шапка мира — какие факты и в каком пор�
     expect(kinds({ bombardAt: null })).toEqual([]);
   });
 
-  it('столица и блэкаут — только о своём мире', () => {
-    expect(kinds({ mine: false, capital: true, blackout: true })).toEqual([]);
+  it('столица, блэкаут и лимит управления — только о своём мире', () => {
+    expect(kinds({ mine: false, capital: true, blackout: true, uncontrolled: true })).toEqual([]);
+  });
+
+  it('планета вне лимита управления — состояние мира, сразу за блэкаутом (BAL-19)', () => {
+    expect(kinds({ blackout: true, uncontrolled: true, bombardAt: 90_000 })).toEqual([
+      'blackout',
+      'uncontrolled',
+      'bombard',
+    ]);
   });
 
   it('бонус типа несёт только ненулевые доли', () => {

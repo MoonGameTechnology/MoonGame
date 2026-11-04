@@ -400,6 +400,20 @@ export const SPY_NO_WAR_SOLO_MIGRATION = {
   toDataHash: COMBAT_CONTINUITY_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: `sprawl` leaves the module graph and `control` 1.0.0 takes its place
+ *  (BAL-19) — the five planets nearest the capital work in full, the rest yield half and
+ *  build no units; construction 1.13.0 names the order's world to its requirement hook. The
+ *  rule is computed from the world as it stands and keeps nothing in it, and the catalogue is
+ *  unchanged, so a saved world reads as is. */
+export const CONTROL_LIMIT_SOLO_MIGRATION = {
+  fromRules: SPY_NO_WAR_SOLO_MIGRATION.toRules,
+  fromData: SPY_NO_WAR_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_NO_WAR_SOLO_MIGRATION.toDataHash,
+  toRules: '1afd3d6ad0215b',
+  toData: SPY_NO_WAR_SOLO_MIGRATION.toData,
+  toDataHash: SPY_NO_WAR_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -436,6 +450,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   STAR_LADDER_SOLO_MIGRATION,
   COMBAT_CONTINUITY_SOLO_MIGRATION,
   SPY_NO_WAR_SOLO_MIGRATION,
+  CONTROL_LIMIT_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

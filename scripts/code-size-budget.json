@@ -7,7 +7,7 @@
     "packages/shared-core/src/modules/shuttle.ts": 2897,
     "prototype/netserver.ts": 2097,
     "packages/shared-core/src/state/gameState.ts": 1890,
-    "packages/shared-core/src/modules/construction.ts": 1642,
+    "packages/shared-core/src/modules/construction.ts": 1650,
     "packages/shared-core/src/modules/combat.ts": 1574,
     "packages/shared-core/src/data/schemas.ts": 1727,
     "prototype/src/mapLayer.ts": 1615,
@@ -62,7 +62,6 @@
     "packages/server/src/authApi.ts::registerAuthApi": 338,
     "prototype/src/techTree.ts::techTreeHtml": 335,
     "prototype/src/chatWindow.ts::initChat": 315,
-    "prototype/src/dossiers.ts::createDossiers": 302,
     "prototype/src/firstMatchOperation.ts::buildOperationSteps": 301
   }
 }
