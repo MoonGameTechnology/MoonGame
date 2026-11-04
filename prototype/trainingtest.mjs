@@ -5,6 +5,16 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { instrumentedGame, launchBrowser, serve, waitForApp } from './harnessKit.mjs';
 const host = await serve(
   await instrumentedGame(`
+import { getPlatform as __tutorialPlatform } from './platform/host';
+window.__tutorialEvents = [];
+window.__captureTutorial = () => {
+  const analytics = __tutorialPlatform().analytics;
+  const emit = analytics.emit.bind(analytics);
+  analytics.emit = (event, props) => {
+    if (event === 'onboarding_step') window.__tutorialEvents.push(props);
+    emit(event, props);
+  };
+};
 const trainingUiTest = () => trainingTourUi({world:()=>s,me:()=>ME,mobile:MOBILE,
   expanded:()=>mobileHud.expanded(selPlanet ? 'planet:'+selPlanet : 'fleet:'+selFleet),collapse:()=>mobileHud.collapse(),tab:()=>planetTab,ships:()=>{setPlanetTab('ships');},
   render:()=>{invalidatePanel();renderPanel();updateMobileHud();}});
@@ -40,6 +50,7 @@ try {
     try {
       await page.goto(host.url);
       await waitForApp(page, { timeout: 30000 });
+      await page.evaluate(() => window.__captureTutorial());
       await page.locator('#cnew').click();
       // Opening the campaign uses the same menu control as a player.
       await page.locator('#hub-sector-zero').click();
@@ -159,6 +170,11 @@ try {
       }
       const facts = await page.evaluate(() => window.__trainingTest.facts());
       assert.equal(facts.state.match.winner, 'p1');
+      const observed = await page.evaluate(() => window.__tutorialEvents);
+      const tutorial = observed.filter((event) => event.guide === 'sector-zero');
+      for (const action of ['started', 'step', 'completed', 'skipped'])
+        assert.ok(tutorial.some((event) => event.action === action), 'observed tutorial ' + action);
+      assert.ok(tutorial.every((event) => /^[a-f0-9]{32}$/.test(event.attempt)), 'attempt IDs present');
       assert.deepEqual(errors, []);
       await page.screenshot({ path: `/tmp/sz-training/${mode}-complete.png` });
       // Первая победа на полигоне платит стартовый пакет (§14.7) и больше ничего: ни забега,

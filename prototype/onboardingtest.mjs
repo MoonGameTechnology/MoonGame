@@ -7,6 +7,16 @@ import { instrumentedGame, launchBrowser, serve, waitForApp } from './harnessKit
 // Only the clock is accelerated. All orders and selections go through the visible UI.
 const host = await serve(
   await instrumentedGame(`
+import { getPlatform as __tutorialPlatform } from './platform/host';
+window.__tutorialEvents = [];
+window.__captureTutorial = () => {
+  const analytics = __tutorialPlatform().analytics;
+  const emit = analytics.emit.bind(analytics);
+  analytics.emit = (event, props) => {
+    if (event === 'onboarding_step') window.__tutorialEvents.push(props);
+    emit(event, props);
+  };
+};
 // Счётчики гида — у обучения (REFM-221); \`main.ts\` их больше не видит.
 import { guideFleet as __guideFleet, guideMineLevel as __guideMineLevel, guideShipCount as __guideShipCount, guideHeroFleet as __guideHeroFleet } from '../../decisions/firstMatchGuide';
 window.__trail = [];
@@ -141,6 +151,7 @@ try {
         );
       await page.goto(host.url);
       await waitForApp(page, { timeout: 30000 });
+      await page.evaluate(() => window.__captureTutorial());
       await page.locator('#cnew').click();
       const saved = await page.evaluate(() => {
         const value = JSON.stringify({ priorSave: 'must survive the lesson' });
@@ -266,6 +277,11 @@ try {
       assert.equal(skipped.onboard.skipped, true);
       assert.equal(skipped.xp, firstXp);
       assert.equal(await page.evaluate(() => localStorage.getItem('void.solo.v1')), saved);
+      const observed = await page.evaluate(() => window.__tutorialEvents);
+      const tutorial = observed.filter((event) => event.guide === 'main');
+      for (const action of ['started', 'step', 'completed', 'skipped'])
+        assert.ok(tutorial.some((event) => event.action === action), 'observed tutorial ' + action);
+      assert.ok(tutorial.every((event) => /^[a-f0-9]{32}$/.test(event.attempt)), 'attempt IDs present');
       assert.deepEqual(errors, []);
       console.log(
         `${mode}: complete, real research/build/movement/capture, market/hero/troops/aviation/assault and the medal; replay/chapter skip/skip/fold and existing save preserved`,

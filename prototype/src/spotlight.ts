@@ -116,6 +116,11 @@ export interface TourResult {
 
 export type TourEnd = (result: TourResult) => void;
 
+export interface TourObserver {
+  enter(step: SpotlightStep, index: number): void;
+  skipStage(): void;
+}
+
 /**
  * The step machine. Construct with a chain + a host; `start()` it, then feed it
  * `tap()`, `notifyAction(type)` and `refresh()` (the last one also polls `state`
@@ -133,6 +138,7 @@ export class SpotlightTour {
     private readonly steps: readonly SpotlightStep[],
     private readonly host: SpotlightHost,
     private readonly onEnd?: TourEnd,
+    private readonly observer?: TourObserver,
   ) {
     for (const step of steps) if (step.stage !== undefined && !this.stages.includes(step.stage)) this.stages.push(step.stage);
   }
@@ -177,6 +183,7 @@ export class SpotlightTour {
    *  как пройденного (игрок дошёл до конца цепочки). У шага без этапа — как «Далее». */
   skipStage(): void {
     if (!this.running) return;
+    try { this.observer?.skipStage(); } catch { /* Observation never blocks the guide. */ }
     const stage = this.current.stage;
     let j = this.i + 1;
     while (stage !== undefined && j < this.steps.length && this.steps[j]!.stage === stage) j++;
@@ -240,6 +247,7 @@ export class SpotlightTour {
     this.i = i;
     if (i > this.reached) this.reached = i;
     const step = this.current;
+    try { this.observer?.enter(step, i); } catch { /* Observation never blocks the guide. */ }
     // A step whose selector isn't in the DOM right now can't be highlighted. For a
     // `tap` step there's nothing to wait for BUT the (missing) target, so `optional`
     // slides past it and a required one safe-stops (never a hole over nothing, never
