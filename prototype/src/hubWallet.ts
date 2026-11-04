@@ -19,13 +19,20 @@ export interface HubWallet {
   warrants: number;
 }
 
+/** Золотая плашка Суверенов — одна на хаб и строку статуса партии; `attr` — её метка нажатия. */
+export function sovereignChipHtml(n: number | null, attr: string): string {
+  const sov = n === null ? null : kfmt(n);
+  return (
+    `<button type="button" class="dl-donate" ${attr} title="${t('hub.sovereigns')}" aria-label="${sov === null ? t('donate.open') : t('donate.aria', { n: sov })}">` +
+    `<i aria-hidden="true">${SOV_SVG}</i>${sov === null ? '' : `<b>${sov}</b>`}<em aria-hidden="true">+</em>` +
+    `<span class="dl-glint" aria-hidden="true"></span></button>`
+  );
+}
+
 export function hubWalletHtml(w: HubWallet): string {
-  const sov = w.sovereigns === null ? null : kfmt(w.sovereigns);
   const war = kfmt(w.warrants);
   return (
-    `<button type="button" class="dl-donate" data-hub-wallet="donate" title="${t('hub.sovereigns')}" aria-label="${sov === null ? t('donate.open') : t('donate.aria', { n: sov })}">` +
-    `<i aria-hidden="true">${SOV_SVG}</i>${sov === null ? '' : `<b>${sov}</b>`}<em aria-hidden="true">+</em>` +
-    `<span class="dl-glint" aria-hidden="true"></span></button>` +
+    sovereignChipHtml(w.sovereigns, 'data-hub-wallet="donate"') +
     `<button type="button" class="tw-cur tw-warrants" data-hub-wallet="auction" title="${t('hub.wallet.auction', { n: war })}" aria-label="${t('hub.wallet.auction', { n: war })}">` +
     `<i aria-hidden="true">⌖</i>${war}<span class="hw-go" aria-hidden="true">${t('hub.tile.auction')}</span></button>`
   );
