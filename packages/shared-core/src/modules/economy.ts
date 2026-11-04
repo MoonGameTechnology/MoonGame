@@ -1,4 +1,4 @@
-import type { GameModule } from '../kernel/module';
+import type { GameModule, HandlerContext } from '../kernel/module';
 import type { GameState, Planet, UnitStack } from '../state/gameState';
 import { matchHours } from '../util/pricing';
 import type { GameData, ResourceBag } from '../data/schemas';
@@ -63,7 +63,14 @@ function mergeBags(a: ResourceBag, b: ResourceBag): ResourceBag {
   return out;
 }
 
-/** Bonus production from constructions in progress on this planet, on top of
+/** A rate bag times `k` hours: the amounts it yields. */
+function scaleBag(bag: ResourceBag, k: number): ResourceBag {
+  const out: Record<string, number> = {};
+  for (const res of Object.keys(bag)) out[res] = (bag[res] ?? 0) * k;
+  return out;
+}
+
+/** A construction in progress on a planet, as the output it adds on top of
  *  `baseProduction`'s fully-built total:
  *   - a FRESH build (`kind: 'building'`, not yet in `planet.buildings` at all) ramps
  *     in at the 50%-progress threshold, 1:1 with progress up to its full level-1
@@ -76,51 +83,27 @@ function mergeBags(a: ResourceBag, b: ResourceBag): ResourceBag {
  *  it) — its frozen share is credited separately by `pausedProduction` below, since a
  *  paused site's progress no longer changes with `now` the way an active one's does.
  *
- *  Returned as a RATE (per `hoursOfSpan`), matching `baseProduction`'s shape, so it
- *  merges into the same `economy.production` hook + `rate × hours` settlement below —
- *  but a naive point-evaluation of the ramp at `ctx.now` would over/under-credit a span
- *  that jumps straight past the 50% mark in one `time.advanced` (a long-offline
- *  catch-up, or a backgrounded single-player tab at high speed: this game's real-time
- *  offline scheduler wakes only for DUE events, so a quiet build can go one whole
- *  `time.advanced` from 0% to 100% with nothing in between). Instead this integrates
- *  the ramp (linear ⇒ exact via the trapezoid rule) over exactly the overlap between
- *  [from, to] and the building's [50%-mark, completion] window, then re-expresses that
- *  exact amount as a rate over the FULL span so `rate × hours` reproduces it exactly. */
-function pendingProduction(
+ *  The ramp adds `full × progress` from its 50% instant (`from`) to completion (`to`):
+ *  linear in time, which is what lets `settleRamped` integrate it exactly however the
+ *  world's time is cut into spans. */
+interface Ramp {
+  full: ResourceBag;
+  from: number;
+  to: number;
+  durationMs: number;
+}
+
+/** Every construction ramp on `planet` (see `Ramp`), from its `scheduled` events. */
+function rampsOn(
   scheduled: GameState['scheduled'],
   pricing: Pick<GameState, 'pricing'>,
   planet: Planet,
   data: GameData,
   ctx: Context,
-  from: number,
-  to: number,
-  hoursOfSpan: number,
-): ResourceBag {
-  const out: Record<string, number> = {};
-  if (hoursOfSpan <= 0) {
-    return out;
-  }
-  const scale = timeScaleOf(ctx);
-  const addRamped = (full: ResourceBag, completesAt: number, totalDurationMs: number): void => {
-    const rampStart = completesAt - totalDurationMs * 0.5; // the 50%-progress instant
-    const overlapFrom = Math.max(from, rampStart);
-    const overlapTo = Math.min(to, completesAt);
-    if (overlapTo <= overlapFrom) {
-      return; // this span never touches the ramp window
-    }
-    // Trapezoid rule: exact for a linear ramp — the average of the endpoint ramps
-    // times the overlap's duration is the true integral, no matter how coarse the span.
-    const avgRamp =
-      (buildProgress(overlapFrom, completesAt, totalDurationMs) +
-        buildProgress(overlapTo, completesAt, totalDurationMs)) /
-      2;
-    const overlapHours = ((overlapTo - overlapFrom) / MS_PER_HOUR) * scale;
-    for (const res of Object.keys(full)) {
-      const amount = (full[res] ?? 0) * avgRamp * overlapHours;
-      if (amount !== 0) {
-        out[res] = (out[res] ?? 0) + amount / hoursOfSpan;
-      }
-    }
+): Ramp[] {
+  const out: Ramp[] = [];
+  const add = (full: ResourceBag, completesAt: number, durationMs: number): void => {
+    out.push({ full, from: completesAt - durationMs * 0.5, to: completesAt, durationMs });
   };
   for (const event of scheduled) {
     if (event.type !== 'construction.complete') {
@@ -134,7 +117,7 @@ function pendingProduction(
       const def = data.buildings[p.building];
       if (!def) continue;
       const level1 = buildingLevel(def, 1);
-      addRamped(level1.produces, event.at, hoursToMs(ctx, matchHours(pricing, level1.buildTimeHours)));
+      add(level1.produces, event.at, hoursToMs(ctx, matchHours(pricing, level1.buildTimeHours)));
     } else if (p.kind === 'upgrade' && typeof p.building === 'string' && typeof p.level === 'number') {
       const def = data.buildings[p.building];
       const instance = planet.buildings.find((b) => b.type === p.building);
@@ -146,7 +129,55 @@ function pendingProduction(
       for (const res of resources) {
         delta[res] = (target.produces[res] ?? 0) - (current.produces[res] ?? 0);
       }
-      addRamped(delta, event.at, hoursToMs(ctx, matchHours(pricing, target.buildTimeHours)));
+      add(delta, event.at, hoursToMs(ctx, matchHours(pricing, target.buildTimeHours)));
+    }
+  }
+  return out;
+}
+
+/** What a planet whose output grows inside [from, to] yields over it, as amounts (not a
+ *  rate). Output without a ramp is one hook call over the whole span (the caller): every
+ *  `economy.production` hook either scales it by a constant or, like `integration`, by a
+ *  share linear in time, whose mean over a span is the mean of its ends. A ramp past its
+ *  50% mark grows linearly too, and the product of two linear ramps is quadratic — the
+ *  mean of each, multiplied, is not the mean of the product, and a coarse span (a
+ *  long-offline catch-up, a backgrounded tab at high speed) would credit differently from
+ *  a fine one. So the span is cut at every ramp's start and end, and each piece is
+ *  integrated by Simpson's rule, exact for a quadratic, asking the hooks at an instant
+ *  (`from === to`). Without a share that varies in time this is the old trapezoid of the
+ *  ramp, the same amount however the span is cut. */
+function settleRamped(
+  h: HandlerContext,
+  planetId: string,
+  steady: ResourceBag,
+  ramps: readonly Ramp[],
+  from: number,
+  to: number,
+): ResourceBag {
+  const cuts = [from, to];
+  for (const r of ramps) for (const t of [r.from, r.to]) if (t > from && t < to) cuts.push(t);
+  cuts.sort((a, b) => a - b);
+  const scale = timeScaleOf(h.ctx);
+  const out: Record<string, number> = {};
+  for (let i = 1; i < cuts.length; i += 1) {
+    const a = cuts[i - 1]!;
+    const b = cuts[i]!;
+    if (b <= a) continue;
+    // Cut at every ramp's ends, a piece lies wholly inside or outside each ramp.
+    const live = ramps.filter((r) => r.from <= a && r.to >= b);
+    const at = (t: number): ResourceBag => {
+      const bag: Record<string, number> = { ...steady };
+      for (const r of live) {
+        const progress = buildProgress(t, r.to, r.durationMs);
+        for (const res of Object.keys(r.full)) bag[res] = (bag[res] ?? 0) + (r.full[res] ?? 0) * progress;
+      }
+      return h.hook<ResourceBag>('economy.production', bag, { planetId, from: t, to: t });
+    };
+    const samples = [at(a), at((a + b) / 2), at(b)];
+    const hours = ((b - a) / MS_PER_HOUR) * scale;
+    for (const [k, rate] of samples.entries()) {
+      const weight = (k === 1 ? 4 : 1) / 6;
+      for (const res of Object.keys(rate)) out[res] = (out[res] ?? 0) + (rate[res] ?? 0) * weight * hours;
     }
   }
   return out;
@@ -157,7 +188,7 @@ function pendingProduction(
  *  CONSTRUCTION, not the share of the building already standing — it keeps
  *  contributing whatever it had reached, same 50%-threshold rule as an active build,
  *  but FROZEN at `site.progress` rather than advancing (nothing is scheduled to tick
- *  it forward while paused). Unlike `pendingProduction`'s ramp, a paused site's rate
+ *  it forward while paused). Unlike an active site's `Ramp`, a paused site's rate
  *  never changes across a span, so this is already an exact constant rate — no
  *  span-integration needed. */
 function pausedProduction(planet: Planet, data: GameData): ResourceBag {
@@ -275,7 +306,9 @@ export const economyModule: GameModule = {
   id: 'economy',
   // 1.1.0: содержание войск на плацдармах (замечание Codex на #1392).
   // 1.2.0: `economy.production` names the span it settles (`from`, `to`), BAL-19.
-  version: '1.2.0',
+  // 1.3.0: a construction ramp is settled by Simpson's rule, exact under a share that
+  // changes with time (замечание Codex на #1996).
+  version: '1.3.0',
   setup(api) {
     api.on('time.advanced', (event, h) => {
       const { from, to } = event.payload as { from: number; to: number };
@@ -293,7 +326,7 @@ export const economyModule: GameModule = {
       // перебирать все бои и все флоты.
       const fighting = battleLocations(h.state);
       // Стройки по мирам — один проход по очереди событий, а не проход на каждый мир.
-      // `pendingProduction` берёт свой список в прежнем порядке очереди.
+      // `rampsOn` берёт свой список в прежнем порядке очереди.
       const builds = new Map<unknown, GameState['scheduled']>();
       for (const event of h.state.scheduled) {
         if (event.type !== 'construction.complete') continue;
@@ -318,26 +351,29 @@ export const economyModule: GameModule = {
         if (bombarded.has(planetId) || fighting.has(planetId)) {
           continue; // узел не работает: обстрел (GDD §7.4) либо бой прямо здесь
         }
-        const rate = h.hook<ResourceBag>(
-          'economy.production',
-          // Arrears from the LAST settlement dim this span's output (state-carried,
-          // so the formula stays continuous and deterministic across any span split).
-          // Constructions in progress (>= 50%) chip in a partial/delta share on top,
-          // and a PAUSED one keeps its frozen share (only further construction halts).
-          mergeBags(
-            mergeBags(
-              baseProduction(planet, data, player.arrears, feedsOnBiomass(h.state, planet.owner, data)),
-              pendingProduction(builds.get(planetId) ?? [], h.state, planet, data, h.ctx, from, to, hours),
-            ),
-            pausedProduction(planet, data),
-          ),
-          // The span rides along for a share that changes with time (`integration`).
-          { planetId, from, to },
+        // Arrears from the LAST settlement dim this span's output (state-carried, so the
+        // formula stays continuous and deterministic across any span split), and a PAUSED
+        // construction keeps its frozen share (only further construction halts).
+        const steady = mergeBags(
+          baseProduction(planet, data, player.arrears, feedsOnBiomass(h.state, planet.owner, data)),
+          pausedProduction(planet, data),
         );
-        for (const res of Object.keys(rate)) {
-          const perHour = rate[res] ?? 0;
-          if (perHour !== 0) {
-            player.resources[res] = (player.resources[res] ?? 0) + perHour * hours;
+        // Constructions past their 50% mark chip in a growing share on top.
+        const ramps = rampsOn(builds.get(planetId) ?? [], h.state, planet, data, h.ctx).filter(
+          (r) => r.from < to && r.to > from,
+        );
+        const gained =
+          ramps.length > 0
+            ? settleRamped(h, planetId, steady, ramps, from, to)
+            : scaleBag(
+                // The span rides along for a share that changes with time (`integration`).
+                h.hook<ResourceBag>('economy.production', steady, { planetId, from, to }),
+                hours,
+              );
+        for (const res of Object.keys(gained)) {
+          const amount = gained[res] ?? 0;
+          if (amount !== 0) {
+            player.resources[res] = (player.resources[res] ?? 0) + amount;
           }
         }
       }
