@@ -1,4 +1,4 @@
-import { matchCreationAllowed } from '../../decisions/matchCreation';
+import { matchCreationAllowed, matchCreationSettings, type MatchCreationSettings } from '../../decisions/matchCreation';
 import { httpBase } from '../../decisions/matchQuery';
 import { tokenFor } from '../../decisions/sessionStore';
 
@@ -6,6 +6,8 @@ type Server = { base: string; nick: string };
 interface Creator extends Server { readonly token: string | null }
 let resolveServer: () => Server | null = () => null;
 let grant: Creator | null = null;
+/** What the server lets the creator configure; travels with the grant. */
+let settings: MatchCreationSettings = matchCreationSettings(null);
 let generation = 0;
 
 function current(): Creator | null {
@@ -27,6 +29,7 @@ export function isCurrentMatchCreator(creator: Creator): boolean {
   return same(creator, current());
 }
 export function canCreateOnlineMatch(): boolean { return matchCreator() !== null; }
+export function matchCreationOptions(): MatchCreationSettings { return settings; }
 
 function renderControls(): void {
   const allowed = canCreateOnlineMatch();
@@ -63,6 +66,7 @@ export async function refreshMatchCreation(): Promise<void> {
     const body: unknown = await response.json().catch(() => null);
     if (request !== generation) return;
     grant = same(creator, current()) && matchCreationAllowed({ status: response.status, body }) ? creator : null;
+    settings = matchCreationSettings(grant ? body : null);
     renderControls();
   } catch {
     if (request === generation) { grant = null; renderControls(); }

@@ -18,6 +18,9 @@ export interface MatchState {
   scores: Record<PlayerId, MatchScore>;
   /** Pinned at creation. Absent in legacy snapshots means the original unscaled scoring. */
   buildingScoreDivisor?: number;
+  /** Pinned at creation: may players use actions paid in Sovereigns (account premium
+   *  currency) in this match. Absent = allowed, as before the setting existed. */
+  goldActions?: boolean;
   /** Public capture targets and holders; no intelligence about the garrison is included. */
   capitalObjectives?: Record<PlayerId, { planetId: PlanetId; owner: PlayerId | null }>;
   /** Battle points accrued so far (BAL-16): +20 per battle won against a player, −4 per

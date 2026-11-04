@@ -487,15 +487,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <div id="mlist" class="mlist"></div>
         </div>
         <div id="match-create" class="mcreate" style="display:none">
-          <label for="match-create-map" data-i18n="browser.create"></label>
-          <select id="match-create-map" class="inp">
-            <option value="duel-1" data-i18n="setup.map.duel-1"></option>
-            <option value="ffa-4" data-i18n="setup.map.ffa-4"></option>
-            <option value="team-2v2" data-i18n="setup.map.team-2v2"></option>
-            <option value="team-3v3" data-i18n="setup.map.team-3v3"></option>
-            <option value="ffa-20" data-i18n="setup.map.ffa-20"></option>
-            <option value="ffa-50" data-i18n="setup.map.ffa-50"></option>
-          </select>
+          <span class="mclabel" data-i18n="browser.create"></span>
           <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="browser.create.go" disabled></button>
         </div>
       </div>
