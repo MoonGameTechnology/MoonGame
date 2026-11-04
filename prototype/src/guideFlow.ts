@@ -67,6 +67,7 @@ import { refreshHubDoor } from './soloCheckpoint';
 import type { Rect, TourResult } from './spotlight';
 import { type RunningTour, startTour } from './spotlightDom';
 import { activeConstruction, coreQueue } from './worldQueries';
+import type { TutorialGuide } from '../../packages/client/src/tutorialAnalytics';
 
 declare const __PLAYER_BUILD__: boolean;
 
@@ -136,6 +137,7 @@ export function launchTour(
   steps = ORIENTATION_TOUR,
   onEnd?: (r: TourResult) => void,
   from = 0,
+  guide: TutorialGuide = 'hud',
 ): void {
   activeTour = startTour(
     steps,
@@ -145,6 +147,7 @@ export function launchTour(
     },
     { keepClear: keepMarkClear },
     from,
+    guide,
   );
 }
 
@@ -328,6 +331,8 @@ export function startGuidedMatch(): void {
         },
       }),
       onGuidedTourEnded,
+      0,
+      'main',
     );
   };
   game.showHub(false);

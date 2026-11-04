@@ -323,3 +323,47 @@ export function personSources(clientLines) {
   }
   return out;
 }
+
+/** Bounded client observations, not proof of completion or of a permanent exit.
+ * Missing terminal events become incomplete after five minutes without a tutorial
+ * checkpoint. A later visible/heartbeat event makes a suspended attempt live again.
+ * Sequence orders events within an attempt; server receipt time drives freshness. */
+export function tutorialAttempts(clientLines, now = Date.now()) {
+  const lines = uniqueEvents(clientLines);
+  const personOf = people(lines);
+  const attempts = new Map();
+  const actions = new Set(['started', 'step', 'stage_skipped', 'heartbeat', 'hidden', 'visible', 'pagehide',
+    'completed', 'skipped', 'stopped', 'exited', 'replaced', 'error']);
+  const terminal = new Set(['completed', 'skipped', 'stopped', 'exited', 'replaced', 'error']);
+  for (const line of lines) {
+    const p = line.p;
+    if (line.e !== 'onboarding_step' || !p || !['main', 'sector-zero', 'hud'].includes(p.guide) ||
+      typeof p.attempt !== 'string' || !/^[a-f0-9]{32}$/.test(p.attempt) ||
+      !actions.has(p.action) || !Number.isSafeInteger(p.sequence) || p.sequence < 0 ||
+      !Number.isSafeInteger(p.index) || p.index < 0 ||
+      !Number.isSafeInteger(p.total) || p.total < 0 ||
+      !Number.isFinite(line.t)) continue;
+    const person = personOf(line);
+    const key = JSON.stringify([person, line.install, line.session, p.guide, p.attempt]);
+    let row = attempts.get(key);
+    if (!row) {
+      row = { person, guide: p.guide, attempt: p.attempt, startedObserved: false,
+        sequence: -1, lastAt: 0, stages: new Set() };
+      attempts.set(key, row);
+    }
+    row.startedObserved ||= p.action === 'started';
+    row.lastAt = Math.max(row.lastAt, line.t);
+    if (typeof p.stage === 'string' && /^[a-zA-Z0-9_.-]{1,120}$/.test(p.stage)) row.stages.add(p.stage);
+    if (p.sequence <= row.sequence) continue;
+    Object.assign(row, { sequence: p.sequence, action: p.action, index: p.index, total: p.total,
+      step: typeof p.step === 'string' && /^[a-zA-Z0-9_.-]{0,120}$/.test(p.step) ? p.step : '',
+      stage: typeof p.stage === 'string' && /^[a-zA-Z0-9_.-]{0,120}$/.test(p.stage) ? p.stage : '',
+      elapsedMs: Number.isFinite(p.elapsedMs) && p.elapsedMs >= 0 ? p.elapsedMs : null,
+      skippedStages: Number.isSafeInteger(p.skippedStages) && p.skippedStages >= 0 ? p.skippedStages : 0 });
+  }
+  return [...attempts.values()].map((row) => ({ ...row, stages: [...row.stages],
+    status: terminal.has(row.action)
+      ? row.action === 'completed' && row.skippedStages > 0 ? 'completed_with_skips' : row.action
+      : now - row.lastAt >= 300000 ? 'incomplete' : 'pending',
+  }));
+}

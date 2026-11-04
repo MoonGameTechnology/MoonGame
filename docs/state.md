@@ -922,6 +922,11 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Пульт `src/admin.ts` — своя сборка на `/admin` (только с `ADMIN_LOGINS`): состав партии и «Снять».
 - События `TELEMETRY_EVENTS` (`packages/protocol/src/telemetry.ts`) уходят в `POST /telemetry`
   (`playtest-logs/client-*.jsonl`); сводка — `pnpm run analytics`.
+  Основной курс, полигон Sector Zero и HUD-тур отправляют `onboarding_step`: начало,
+  шаг/этап, пропуски, завершение, выход/замену/ошибку, видимость и checkpoint раз в 30с.
+  `analytics` показывает уникальных, попытки, исходы, охват этапов и последний шаг.
+  Тишина ≥5мин — `incomplete`, не доказательство окончательного ухода; завершение
+  с пропусками отмечается отдельно ([подробности](playtest-telemetry-roadmap.md#статистика-обучения-2026-11-04)).
 - Авторизованный foreground pulse и union интервалов дают уникальные аккаунты/время по
   суткам UTC; источник `/metrics/activity`, экран Grafana `/d/moongame-player-activity`.
   Переход в Sector Zero дополнительно сохраняет число входов, первое и последнее

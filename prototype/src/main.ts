@@ -2271,7 +2271,7 @@ initMatchLifecycle({
             if (r.skipped && isTraining() && s.match.status !== 'ended')
               trainingResume.offer(resumeStep(steps.map((step) => step.stage), r.reachedStep));
           },
-          from,
+          from, 'sector-zero',
         );
       trainingResumeRun = run;
       run(0);

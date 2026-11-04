@@ -24,6 +24,7 @@ import {
   survival,
   taskSuccess,
   uniqueEvents,
+  tutorialAttempts,
   utcDay,
 } from './analytics.mjs';
 
@@ -96,6 +97,31 @@ if (args.person) {
 }
 
 out.push(`Поведение игроков · ${utcDay(client[0].t)} … ${utcDay(lastT)} · людей ${people.size}`);
+const tutorials = tutorialAttempts(client);
+out.push('', 'Обучение (клиентские наблюдения; incomplete — нет сигнала ≥5 мин, причина ухода неизвестна):');
+for (const guide of ['main', 'sector-zero', 'hud']) {
+  const runs = tutorials.filter((row) => row.guide === guide);
+  if (!runs.length) continue;
+  out.push(`  ${guide}: уникальных ${new Set(runs.map((r) => r.person)).size}, попыток ${runs.length}, начало записано ${runs.filter((r) => r.startedObserved).length}`);
+  const statuses = new Map();
+  const checkpoints = new Map();
+  const stages = new Map();
+  for (const run of runs) {
+    statuses.set(run.status, (statuses.get(run.status) ?? 0) + 1);
+    for (const stage of run.stages) {
+      if (!stages.has(stage)) stages.set(stage, new Set());
+      stages.get(stage).add(run.person);
+    }
+    if (run.status !== 'completed' && run.status !== 'completed_with_skips') {
+      const key = `${run.status}: ${run.stage || '—'} / ${run.step || '—'} (${run.index + 1}/${run.total})`;
+      checkpoints.set(key, (checkpoints.get(key) ?? 0) + 1);
+    }
+  }
+  out.push(`    исходы: ${[...statuses].map(([k, v]) => `${k}=${v}`).join(', ')}`);
+  for (const [stage, visitors] of stages) out.push(`    этап ${stage}: ${visitors.size} уникальных`);
+  for (const [checkpoint, count] of checkpoints) out.push(`    последний подтверждённый шаг ${checkpoint}: ${count}`);
+}
+if (!tutorials.length) out.push('  Нет событий нового формата; старые посещения не восстанавливаются.');
 out.push('', 'Воронка (люди, медиана минут от открытия):');
 const f = funnel(people);
 const min1 = (x) => (x === null ? '—' : `${x.toFixed(1)} мин`);

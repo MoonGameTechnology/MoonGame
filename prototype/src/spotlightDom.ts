@@ -28,6 +28,8 @@ import {
 import { overlayMode, pressCue } from './tourGate';
 import { esc } from './format';
 import type { GestureAnim, MapGesture } from '../../decisions/mapGestures';
+import { tutorialAnalytics, type TutorialGuide, type TutorialOutcome } from '../../packages/client/src/tutorialAnalytics';
+import { getPlatform } from './platform/host';
 
 interface Overlay {
   root: HTMLElement;
@@ -324,6 +326,7 @@ export interface RunningTour {
 }
 
 let current: SpotlightTour | null = null;
+let closeCurrent: ((reason: TutorialOutcome) => void) | null = null;
 
 /** Is the target wholly on screen, inside the scrolling panel that holds it? */
 function onScreen(node: Element, r: DOMRect): boolean {
@@ -358,9 +361,36 @@ export function startTour(
   map?: TourMap,
   /** Step to begin at: a resumed guide picks up where it was closed. */
   from = 0,
+  guide: TutorialGuide = 'hud',
 ): RunningTour {
   const o = ensureOverlay();
-  current?.skip(); // one tour at a time
+  closeCurrent?.('replaced'); // one tour at a time
+
+  // Capture pagehide before the platform sink's bubbling beacon flush. Heartbeats
+  // leave a checkpoint even when the OS kills the page without a final event.
+  let telemetry: ReturnType<typeof tutorialAnalytics> | undefined;
+  try {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    telemetry = tutorialAnalytics({
+      guide, from, total: steps.length,
+      attempt: Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(''),
+      now: () => performance.now(),
+      emit: (props) => getPlatform().analytics.emit('onboarding_step', props),
+    });
+  } catch { /* Telemetry unavailable: the lesson still runs. */ }
+  const hidden = (): void => telemetry?.checkpoint(document.hidden ? 'hidden' : 'visible');
+  const pagehide = (): void => telemetry?.checkpoint('pagehide');
+  document.addEventListener('visibilitychange', hidden);
+  window.addEventListener('pagehide', pagehide, true);
+  const heartbeat = setInterval(() => {
+    if (!document.hidden) telemetry?.checkpoint('heartbeat');
+  }, 30000);
+  const finish = (outcome: TutorialOutcome): void => {
+    telemetry?.finish(outcome);
+    clearInterval(heartbeat);
+    document.removeEventListener('visibilitychange', hidden);
+    window.removeEventListener('pagehide', pagehide, true);
+  };
 
   // A highlighted target can sit inside a scrollable panel (the world/fleet sheet)
   // below the fold — the player would have to guess a scroll is needed to even SEE
@@ -410,11 +440,14 @@ export function startTour(
 
   let running = true;
   const tour = new SpotlightTour(steps, host, (result) => {
+    finish(result.completed ? 'completed' : result.skipped ? 'skipped' : 'stopped');
     running = false;
-    if (current === tour) current = null;
+    if (current === tour) { current = null; closeCurrent = null; }
     onEnd?.(result);
-  });
+  }, telemetry);
   current = tour;
+  const close = (reason: TutorialOutcome): void => { finish(reason); tour.skip(); };
+  closeCurrent = close;
 
   o.next.onclick = () => tour.tap();
   o.skip.onclick = () => tour.skip();
@@ -426,7 +459,7 @@ export function startTour(
   const abort = (err: unknown): void => {
     console.error('[spotlight] кадр подсветки упал — закрываю тур:', err);
     try {
-      tour.skip(); // штатный путь: позовёт `onEnd` и снимет `running`
+      close('error'); // штатный путь: позовёт `onEnd` и снимет `running`
     } catch (stubborn) {
       console.error('[spotlight] закрыть тур штатно тоже не вышло:', stubborn);
     } finally {
@@ -449,7 +482,7 @@ export function startTour(
 
   return {
     notifyAction: (type) => tour.notifyAction(type),
-    stop: () => tour.skip(),
+    stop: () => close('exited'),
     get active() {
       return running;
     },
