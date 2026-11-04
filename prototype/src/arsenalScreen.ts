@@ -23,7 +23,7 @@ import { moduleCopyControls, moduleUpgradeConfirm, moduleItemEffects, moduleUpgr
 import type { ModuleUpgradeQuote } from '../../packages/protocol/src/metaEconomyView';
 import type { ArsenalItem } from '../../packages/shared-core/src/index';
 import type { MetaEconomyView, MetaRecipeView } from '../../packages/protocol/src/metaEconomyView';
-import { LOCALE, t, tData } from '../../localization/runtime';
+import { t, tData } from '../../localization/runtime';
 import { moduleGroups } from '../../decisions/moduleGroups';
 import {
   arsenalCatalog,
@@ -71,19 +71,6 @@ const ORIGIN_KEY: Record<ArsenalItem['origin'], string> = {
   commerce: 'arsenal.origin.commerce',
   ad: 'arsenal.origin.ad',
   season: 'arsenal.origin.season',
-};
-
-/** Where a copy came from, in full: the copy rows of the detail. */
-const FROM_KEY: Record<ArsenalItem['origin'], string> = {
-  starter: 'arsenal.from.starter',
-  drop: 'arsenal.from.drop',
-  craft: 'arsenal.from.craft',
-  auction: 'arsenal.from.auction',
-  lootbox: 'arsenal.from.lootbox',
-  rent: 'arsenal.from.rent',
-  commerce: 'arsenal.from.commerce',
-  ad: 'arsenal.from.ad',
-  season: 'arsenal.from.season',
 };
 
 const RARITY_KEY: Record<string, string> = {
@@ -386,11 +373,8 @@ function copiesHtml(s: ArsenalState, id: string): string {
             : c.soulbound
               ? ['arsenal.copy.bound', ' bound']
               : ['arsenal.copy.no-sale', ''];
-      const when =
-        c.acquiredAt > 0
-          ? `, ${new Date(c.acquiredAt).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' })}`
-          : '';
-      // Copies differ by grade and wear, and selling or salvaging takes THIS one.
+      // Copies differ by grade and wear, and selling or salvaging takes THIS one. Where and
+      // when a copy was obtained is not shown: the owner ruled it noise for the player.
       const state = [
         c.grade ? t('arsenal.copy.grade', { n: c.grade }) : '',
         typeof c.durability === 'number' ? t('arsenal.copy.durability', { n: c.durability }) : '',
@@ -398,7 +382,7 @@ function copiesHtml(s: ArsenalState, id: string): string {
         .filter(Boolean)
         .join(', ');
       return (
-        `<div class="ar-copy"><div><b>${t(FROM_KEY[c.origin])}${esc(when)}${state ? esc(`, ${state}`) : ''}</b>` +
+        `<div class="ar-copy"><div>${state ? `<b>${esc(state)}</b>` : ''}` +
         `<span class="ar-copy-st${cls}">${t(statusKey)}</span></div><div class="ar-acts">` +
         (sell
           ? `<button type="button" class="btn-second" data-ar-sell="${esc(c.itemId)}"${off(s.busy)}>${t('arsenal.sell')}</button>`
