@@ -148,7 +148,7 @@ describe('арсенал — имена и источники', () => {
     expect(arsenalItemName({ ...dropA, defId: 'laser' })).toBe('laser');
   });
 
-  it('у всех источников есть подпись — ключ наружу не течёт', () => {
+  it('у всех источников есть подпись для верфи — ключ наружу не течёт', () => {
     for (const o of [
       'starter',
       'drop',
@@ -161,13 +161,6 @@ describe('арсенал — имена и источники', () => {
       'season',
     ] as const) {
       expect(originLabel(o), o).not.toContain('arsenal.origin');
-      const html = arsenalDetailHtml(
-        state({
-          items: [copy({ itemId: 'x', defId: 'targeting_array', origin: o })],
-          module: 'targeting_array',
-        }),
-      );
-      expect(html, o).not.toContain('arsenal.from');
     }
   });
 });
@@ -270,10 +263,13 @@ describe('арсенал — подробности модуля', () => {
     expect(html).not.toContain('data-ar-hull=');
   });
 
-  it('копии: откуда каждая, продать и разобрать; лишние — по правилу верфи', () => {
+  it('копии: продать и разобрать, без того, откуда и когда получены; лишние — по правилу верфи', () => {
     const html = arsenalDetailHtml(state({ module: 'targeting_array' }));
     expect(html).toContain('2 копии');
-    expect(html).toContain('Награда за партию, 16 окт.');
+    // Владелец 2026-11-04: «когда собран и как получен» игроку не нужны.
+    expect(html).not.toContain('Награда за партию');
+    expect(html).not.toContain('16 окт.');
+    expect(html).not.toContain('9 окт.');
     expect(html).toContain('data-ar-sell="drop-a"');
     expect(html).toContain('data-ar-salvage="drop-b"');
     expect(html).toContain('Верфи хватает одной копии.');
@@ -288,7 +284,7 @@ describe('арсенал — подробности модуля', () => {
       durability: 3,
     });
     const html = arsenalDetailHtml(state({ module: 'targeting_array', items: [dropA, graded] }));
-    expect(html).toContain('Награда за партию, 9 окт., заточка +2, прочность 3');
+    expect(html).toContain('<b>заточка +2, прочность 3</b>');
     expect(html).toContain('data-ar-sell="inst-1"');
   });
 
