@@ -254,6 +254,19 @@ describe('шапка известного мира', () => {
     expect(card('C')).toContain('data-desc="fact:capital"');
     expect(card('A')).not.toContain('data-desc="fact:capital"');
   });
+
+  it('факты мира: планета за лимитом управления отмечена, столица — нет (BAL-19)', async () => {
+    const { env, card } = await boot();
+    expect(card('A')).not.toContain('data-desc="fact:uncontrolled"');
+    // Пять соседей столицы в прыжке от неё: вместе со столицей это лимит, и мир A, до
+    // которого дорог нет, уходит за него.
+    for (const id of ['P1', 'P2', 'P3', 'P4', 'P5']) {
+      env.s.planets[id] = planet(id, 'p1', { links: ['C'] });
+      env.s.planets.C!.links!.push(id);
+    }
+    expect(card('A')).toContain('data-desc="fact:uncontrolled"');
+    expect(card('C')).not.toContain('data-desc="fact:uncontrolled"');
+  });
 });
 
 describe('действия мира', () => {

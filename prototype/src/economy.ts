@@ -14,7 +14,6 @@ import {
   type ScheduledEvent,
   isBombarded,
   bombardedPlanets,
-  isForkSite,
   buildingLevel,
   BROWNOUT,
   buildProgress,
@@ -29,8 +28,10 @@ import {
   isInhabited,
   civicTax,
   inhabitedWorldCount,
-  sprawlFactor,
-  ownedProvinceCount,
+  controlApplies,
+  controlledPlanets,
+  CONTROL_LIMIT,
+  UNCONTROLLED_OUTPUT,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
 import { feedsOnBiomass, isInfected } from '../../packages/shared-core/src/util/infestation';
@@ -84,6 +85,22 @@ export function economySnapshot(state: GameState): {
   return { kind: 'economy', atTime: state.time, players };
 }
 
+/** BAL-19: доля выхода мира по лимиту управления (`controlModule`) — 1 под управлением,
+ *  `UNCONTROLLED_OUTPUT` за лимитом. `inhabited` — число планет игрока: в пределах лимита
+ *  под управлением всё, и обход карты от столицы не нужен. */
+function beyondControl(
+  state: GameState,
+  playerId: string,
+  inhabited: number,
+): (p: Planet) => number {
+  const controlled =
+    inhabited > CONTROL_LIMIT && controlApplies(state, data, state.modeId)
+      ? controlledPlanets(state, data, playerId, CONTROL_LIMIT)
+      : null;
+  if (controlled === null) return () => 1;
+  return (p) => (isInhabited(data, p) && !controlled.has(p.id) ? UNCONTROLLED_OUTPUT : 1);
+}
+
 /** Net per-hour income for a player: production from owned, un-bombarded worlds
  *  (brownout-dimmed like the core) minus unit/garrison AND building upkeep
  *  (daily ÷ 24). Drives the HUD's `+/h` deltas.
@@ -102,16 +119,14 @@ export function netIncome(
 ): Record<string, number> {
   const out: Record<string, number> = {};
   const arrears = state.players[playerId]?.arrears ?? [];
-  // My worlds in map order, the two counts the bonuses need (`ownedProvinceCount`,
-  // `inhabitedWorldCount`) and the garrison/beachhead stacks in the order they are charged.
+  // My worlds in map order, the count the bonuses need (`inhabitedWorldCount`) and the
+  // garrison/beachhead stacks in the order they are charged.
   const owned: Planet[] = [];
   const stationed: Array<Array<{ unit: string; count: number }>> = [];
-  let provinces = 0;
   let inhabited = 0; // for the diminishing civic tax
   for (const p of planets) {
     if (p.owner === playerId) {
       owned.push(p);
-      if (!isForkSite(p)) provinces += 1;
       if (isInhabited(data, p)) inhabited += 1;
       stationed.push(p.garrison);
     }
@@ -128,8 +143,8 @@ export function netIncome(
   let techBonus = 0;
   for (const id of me?.technologies?.completed ?? [])
     techBonus += data.technologies[id]?.effects?.productionBonus ?? 0;
-  // BAL-10: налог на рост державы (sprawlModule) — тоже чистый множитель всего выхода мира.
-  const bonusMult = (1 + factionBonus) * (1 + techBonus) * sprawlFactor(provinces);
+  const bonusMult = (1 + factionBonus) * (1 + techBonus);
+  const outside = beyondControl(state, playerId, inhabited);
   const bombarded = owned.length > 0 ? bombardedPlanets(state, data) : new Set<string>();
   // Constructions in progress by world, in schedule order — what the per-world scan of
   // `state.scheduled` used to pick out.
@@ -145,8 +160,12 @@ export function netIncome(
     }
   for (const p of owned) {
     if (bombarded.has(p.id)) continue;
+    // BAL-19: планета вне лимита управления (`controlModule`) — половина всего выхода мира.
+    const control = outside(p);
     const mult =
-      (1 + (p.planetType ? (data.planetTypes[p.planetType]?.productionBonus ?? 0) : 0)) * bonusMult;
+      (1 + (p.planetType ? (data.planetTypes[p.planetType]?.productionBonus ?? 0) : 0)) *
+      bonusMult *
+      control;
     // Credits are settled per-planet so the civic tax + Tax Office boost mirror the
     // core's economy.production pipeline (taxModule); metal accrues straight to `out`.
     let credits = 0;
@@ -266,7 +285,7 @@ export function netIncome(
       }
     }
     if (isInhabited(data, p)) {
-      credits += civicTax(inhabited) * bonusMult; // civic tax is post-tax income → also boosted (BF-35)
+      credits += civicTax(inhabited) * bonusMult * control; // civic tax is post-tax income → also boosted (BF-35)
       const taxBonus = creditsBonusOf(data, p); // RULES-2: правило из данных здания
       if (taxBonus !== 0) credits *= 1 + taxBonus;
     }
@@ -308,14 +327,16 @@ export function incomeBreakdown(
   let techBonus = 0;
   for (const id of me?.technologies?.completed ?? [])
     techBonus += data.technologies[id]?.effects?.productionBonus ?? 0;
-  // BAL-10: налог на рост державы (sprawlModule) — тоже чистый множитель всего выхода мира.
-  const bonusMult =
-    (1 + factionBonus) * (1 + techBonus) * sprawlFactor(ownedProvinceCount(state, playerId));
+  const bonusMult = (1 + factionBonus) * (1 + techBonus);
+  const outside = beyondControl(state, playerId, inhabited);
 
   for (const p of Object.values(state.planets)) {
     if (p.owner !== playerId || isBombarded(state, p.id, data)) continue;
+    const control = outside(p);
     const mult =
-      (1 + (p.planetType ? (data.planetTypes[p.planetType]?.productionBonus ?? 0) : 0)) * bonusMult;
+      (1 + (p.planetType ? (data.planetTypes[p.planetType]?.productionBonus ?? 0) : 0)) *
+      bonusMult *
+      control;
     let credits = 0;
     const ptDef = p.planetType ? data.planetTypes[p.planetType] : undefined;
     const ptByRes = ptDef?.productionByResource ?? {};
@@ -346,7 +367,7 @@ export function incomeBreakdown(
       }
     }
     if (isInhabited(data, p)) {
-      credits += civicTax(inhabited) * bonusMult;
+      credits += civicTax(inhabited) * bonusMult * control;
       const taxBonus = creditsBonusOf(data, p); // RULES-2: правило из данных здания
       if (taxBonus !== 0) credits *= 1 + taxBonus;
     }

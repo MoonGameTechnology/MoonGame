@@ -256,7 +256,7 @@ describe('dossiers — маршрутизация objDossier', () => {
   it('фишки шапки мира открывают досье; защита построек — с правилом', () => {
     expect(objDossier('fact:cover')).toEqual(objDossier('stat:mitigation'));
     expect(objDossier('fact:cover')?.body).toBeTruthy();
-    for (const k of ['capital', 'vp', 'output']) expect(objDossier(`fact:${k}`)?.name, k).toBeTruthy();
+    for (const k of ['capital', 'vp', 'output', 'uncontrolled']) expect(objDossier(`fact:${k}`)?.name, k).toBeTruthy();
     expect(objDossier('fact:nope')).toBeNull();
   });
 

@@ -102,6 +102,7 @@ export function strongCampaign(bot: AiTurn, home: HomeTurn): void {
     groundRoster,
     groundDefenders,
     warFooting,
+    outside,
   } = bot;
   const { base, pl, pendingBuild, affordable, buildAllowed, shuttlesOwned } = home;
   const pendingUnit = (planetId: string, unit: string): boolean =>
@@ -180,6 +181,9 @@ export function strongCampaign(bot: AiTurn, home: HomeTurn): void {
   let garrisonOrders = 0;
   for (const p of worldsInOrder(state, ai, 'barracks', skilled)) {
     if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
+    // За лимитом управления войска не заказываются (BAL-19): ни казарма, ни заказ ополчения
+    // там не нужны, а отбитый заказ съел бы место в счёте заказов этого тика.
+    if (outside.has(p.id)) continue;
     if (!hasFacilityFor(p, militiaUnit)) {
       if (barracksOrdered || pendingBuild(p.id, 'barracks')) continue;
       if (!affordable('barracks')) continue;

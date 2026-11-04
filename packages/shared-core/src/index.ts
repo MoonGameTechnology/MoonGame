@@ -713,12 +713,13 @@ export type { ResearchQueueWait, ResearchQueueEntry } from './modules/technology
 export { scientistModule, scientistSlotBonus } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export {
-  sprawlModule,
-  sprawlFactor,
-  ownedProvinceCount,
-  SPRAWL_FREE,
-  SPRAWL_RATE,
-} from './modules/sprawl';
+  controlModule,
+  controlApplies,
+  controlledPlanets,
+  uncontrolledPlanets,
+  CONTROL_LIMIT,
+  UNCONTROLLED_OUTPUT,
+} from './modules/control';
 export { veteranModule } from './modules/veteran';
 export { promotionModule } from './modules/promotion';
 export { armyModule, type LoadFirst } from './modules/army';

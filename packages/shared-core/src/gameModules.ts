@@ -3,7 +3,7 @@ import { sectorModule } from './modules/sector';
 import { planetTypeModule } from './modules/planetType';
 import { taxModule } from './modules/tax';
 import { factionModule } from './modules/faction';
-import { sprawlModule } from './modules/sprawl';
+import { controlModule } from './modules/control';
 import { hungerModule } from './modules/hunger';
 import { economyModule } from './modules/economy';
 import { movementModule } from './modules/movement';
@@ -77,10 +77,11 @@ export const GAME_MODULES: GameModule[] = [
   planetTypeModule,
   taxModule, // FND-2: civic tax on inhabited worlds (hooks economy.production, after planetType)
   factionModule, // always-on faction passives (production / fleet.speed / combat.damage) via hooks
-  // BAL-10: налог на рост державы. После `tax` обязательно — множитель должен задеть и
-  // гражданский налог, который тот кладёт в `economy.production`; с остальными вкладами
-  // (чистые множители) порядок на число не влияет.
-  sprawlModule,
+  // BAL-19: лимит управления (вместо налога на рост `sprawl`). После `tax` обязательно —
+  // половина выхода планеты вне лимита должна задеть и гражданский налог, который тот
+  // кладёт в `economy.production`; с остальными вкладами (чистые множители) порядок на
+  // число не влияет.
+  controlModule,
   hungerModule, // ECON-1: food в arrears → наземный урон ×0.75 (корабли едят кредиты)
   economyModule,
   movementModule,

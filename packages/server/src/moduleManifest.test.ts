@@ -131,7 +131,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // за `auto-rally`, `pve` и семья Роя — сразу за `army`. Партии прод-хоста не тронуты.
 // 97 combines echelons, paid module snapshots and exact army groups. Order is unchanged.
 // 98: ЧЛЕНСТВО — `cloak-field` 1.0.0 перед `auto-merge`, срыв маскировочного поля (SM-4.3).
-const PINNED_FOR_VERSION = '98';
+// 99: ЧЛЕНСТВО — снят `sprawl`, на его месте `control` 1.0.0, лимит управления (BAL-19).
+const PINNED_FOR_VERSION = '99';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -140,7 +141,7 @@ const PINNED_MODULE_IDS = [
   'planet-type',
   'tax',
   'faction',
-  'sprawl', // BAL-10: после `tax` — множитель задевает и гражданский налог
+  'control', // BAL-19: после `tax` — половина выхода задевает и гражданский налог
   'hunger', // ECON-1: еда в долгах — наземный урон ×0.75
   'economy',
   'movement',

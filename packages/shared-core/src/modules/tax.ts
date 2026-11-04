@@ -62,7 +62,7 @@ export function inhabitedWorldCount(
  * {@link inhabitedWorldCount}, но одним проходом по карте. Хук спрашивают на каждый мир
  * начисления, и пересчёт всей карты на каждый мир стоил квадрат числа провинций. Хук зовёт
  * только цикл начисления экономики, внутри него хозяева миров не меняются, поэтому счёт
- * берётся раз на шаг: ключ — контекст шага `h` (как у `sprawl`).
+ * берётся раз на шаг: ключ — контекст шага `h` (как у `control`).
  */
 const countsOfStep = new WeakMap<object, Map<string, number>>();
 function inhabitedCounts(step: object, data: GameData, state: GameState): Map<string, number> {
