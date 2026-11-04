@@ -1,4 +1,4 @@
-import type { TelemetryProps } from '../packages/protocol/src/telemetry';
+import type { TelemetryProps } from '../../protocol/src/telemetry';
 
 export type TutorialGuide = 'main' | 'sector-zero' | 'hud';
 export type TutorialOutcome = 'completed' | 'skipped' | 'stopped' | 'exited' | 'replaced' | 'error';

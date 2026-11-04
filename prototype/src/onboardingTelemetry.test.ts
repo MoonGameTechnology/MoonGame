@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { tutorialAnalytics } from './onboardingAnalytics';
-import { parseTelemetryBatch, type TelemetryProps } from '../packages/protocol/src/telemetry';
-import { SpotlightTour, type SpotlightStep } from '../prototype/src/spotlight';
+import { tutorialAnalytics } from '../../packages/client/src/tutorialAnalytics';
+import { parseTelemetryBatch, type TelemetryProps } from '../../packages/protocol/src/telemetry';
+import { SpotlightTour, type SpotlightStep } from './spotlight';
 
 const attempt = 'a'.repeat(32);
 describe('tutorial observations', () => {

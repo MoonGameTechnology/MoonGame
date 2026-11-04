@@ -437,5 +437,5 @@ bfcache, а завершённая попытка не открывается п
 Ошибки транспорта и закрытие приложения могут терять события, клиентские наблюдения
 не являются доказательством выполнения курса и не начисляют награды.
 
-Проверки: `decisions/onboardingAnalytics.test.ts`, `prototype/tutorialAnalytics.test.mjs`,
+Проверки: `prototype/src/onboardingTelemetry.test.ts`, `prototype/tutorialAnalytics.test.mjs`,
 существующие `smoke:onboarding` и `smoke:training` проверяют эмиссию в настоящем браузере.

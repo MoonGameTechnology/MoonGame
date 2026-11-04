@@ -28,7 +28,7 @@ import {
 import { overlayMode, pressCue } from './tourGate';
 import { esc } from './format';
 import type { GestureAnim, MapGesture } from '../../decisions/mapGestures';
-import { tutorialAnalytics, type TutorialGuide, type TutorialOutcome } from '../../decisions/onboardingAnalytics';
+import { tutorialAnalytics, type TutorialGuide, type TutorialOutcome } from '../../packages/client/src/tutorialAnalytics';
 import { getPlatform } from './platform/host';
 
 interface Overlay {

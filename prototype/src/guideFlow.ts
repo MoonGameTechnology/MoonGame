@@ -67,7 +67,7 @@ import { refreshHubDoor } from './soloCheckpoint';
 import type { Rect, TourResult } from './spotlight';
 import { type RunningTour, startTour } from './spotlightDom';
 import { activeConstruction, coreQueue } from './worldQueries';
-import type { TutorialGuide } from '../../decisions/onboardingAnalytics';
+import type { TutorialGuide } from '../../packages/client/src/tutorialAnalytics';
 
 declare const __PLAYER_BUILD__: boolean;
 
