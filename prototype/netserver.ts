@@ -1,4 +1,5 @@
 import { matchCreationAccess } from '../packages/server/src/matchCreationAccess';
+import { hostMatchSettings, withGoldActions } from '../packages/server/src/matchSettings';
 import { CorpMaterials } from '../packages/server/src/corpMaterials';
 import { registerCorpMaterialsApi } from '../packages/server/src/corpMaterialsApi';
 import { jsonlTail, tailCount } from '../packages/server/src/jsonlTail';
@@ -656,7 +657,7 @@ async function createHostedMatch(
   id: string,
   mapId: MapId = DEFAULT_MAP_ID,
   modeId?: string,
-  requestedTimeScale?: number,
+  requestedTimeScale?: number, goldActions?: boolean,
 ): Promise<HostedMatch> {
   let connected = 0; // live players in THIS match (gates substitutes, not delegated Stewards)
   // CORP-5: битва корпораций. Её мир собирает оркестратор (`raiseAvaBattle`), а не `newGame`.
@@ -704,6 +705,7 @@ async function createHostedMatch(
       seats: networkSeatPlan(NETWORK_MODE, mapId),
     });
   if (AUTH && !restoredSnap) initialState = initializeOrdinaryArsenal(initialState, data);
+  if (!restoredSnap) initialState = withGoldActions(initialState, goldActions);
   // Режим берётся ИЗ СОСТОЯНИЯ, а не из аргумента: у восстановленной партии аргумента
   // нет (её поднимает `bootRoster` по списку из стора), и без этой строки рестарт
   // молча вернул бы PvE-сессию к базовым правилам — ровно та «подмена правил под
@@ -1300,7 +1302,7 @@ const restoredCount = hosted.filter((h) => h.restored).length;
  * хоста), а `hosted` пополняется, иначе её таймеры не остановит и состояние не сбросит на
  * диск выход по SIGINT (см. конец файла).
  */
-async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string, timeScale?: number): Promise<HostedMatch> {
+async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string, timeScale?: number, goldActions?: boolean): Promise<HostedMatch> {
   if (shuttingDown) throw new Error('E_SHUTTING_DOWN');
   await retireFinishedHosts();
   const release = archiveViews.reserveHostRoom();
@@ -1309,7 +1311,7 @@ async function hostNewMatch(mapId: MapId = DEFAULT_MAP_ID, modeId?: string, time
     const id = await freeMatchId(async (candidate) =>
       registry.has(candidate) || (await matchStore.load(candidate)) !== null,
     );
-    const h = await createHostedMatch(id, mapId, modeId, timeScale);
+    const h = await createHostedMatch(id, mapId, modeId, timeScale, goldActions);
     hosted.push(h);
     release();
     registry.register(h.room, browserMeta(h.room));
@@ -1791,8 +1793,8 @@ const server = createMultiplayerServer({
         // BRW-0: режимы берутся ИЗ КАТАЛОГА, а не списком здесь — иначе у хоста завёлся
         // бы второй перечень режимов, который молча разъедется с `data/modes.json`.
         modeIds: Object.keys(data.modes),
-        createMatch: async (request) => {
-          const h = await hostNewMatch(mapPreset(request?.mapId ?? DEFAULT_MAP_ID).id, request?.modeId);
+        settings: hostMatchSettings(TIME_SCALE), createMatch: async (request) => {
+          const h = await hostNewMatch(mapPreset(request?.mapId ?? DEFAULT_MAP_ID).id, request?.modeId, request?.timeScale, request?.goldActions);
           return { matchId: h.id, seats: playablePlayerIds(h.room.state) };
         },
         // Квота на учётку: не больше трёх ИДУЩИХ партий, созданных ею (`createQuota`).

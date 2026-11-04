@@ -208,13 +208,39 @@
 #match-description dt{color:var(--sf-dim);}
 #match-description dd{margin:0;}
 #match-description .mbtn{width:100%;min-height:44px;border-radius:12px;font:inherit;}
+/* «Настройки матча» (окно перед созданием сетевой партии) — в стиле окна описания. */
+#match-create-dialog{box-sizing:border-box;width:min(560px,calc(100% - 32px));max-width:none;max-height:calc(100dvh - 48px);
+  margin:auto;padding:22px;color:var(--sf-text);background:var(--sf-panel),#07121d;border:1px solid var(--sf-edge-hi);
+  border-radius:16px;font:16px/1.5 var(--sf-font);box-shadow:var(--sf-shadow);overflow-y:auto;overflow-wrap:anywhere;}
+#match-create-dialog::backdrop{background:rgba(2,8,14,.82);backdrop-filter:blur(3px);}
+#match-create-dialog h2{margin:0 0 14px;font-size:20px;color:var(--sf-hi);}
+#match-create-dialog .mcd-maps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+#match-create-dialog .mcd-chip{min-width:0;min-height:44px;padding:6px 12px;border-radius:12px;font:14px/1.3 var(--sf-font);
+  overflow-wrap:anywhere;}
+#match-create-dialog .mcd-map{width:100%;height:180px;display:block;margin-top:14px;border:1px solid var(--sf-edge);border-radius:12px;
+  background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--sf-accent) 8%,transparent),transparent 70%),var(--sf-inset);}
+#match-create-dialog .mcd-map .lane{stroke:#1d3640;stroke-width:3;}
+#match-create-dialog .mcd-map .node{fill:#2c5460;}
+#match-create-dialog .mcd-map .start{fill:color-mix(in srgb,var(--sf-accent) 30%,transparent);stroke:var(--sf-accent);stroke-width:4;}
+#match-create-dialog .mcd-info{margin:10px 0 0;color:var(--sf-dim);font-size:14px;}
+#match-create-dialog dl{margin:10px 0 18px;}
+#match-create-dialog dl > div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:12px;
+  padding:9px 0;border-bottom:1px solid var(--sf-edge);}
+#match-create-dialog dt{color:var(--sf-dim);}
+#match-create-dialog dd{margin:0;}
+#match-create-dialog .mcd-field{margin:4px 0 12px;}
+#match-create-dialog .mcd-label{display:block;margin-bottom:8px;color:var(--sf-dim);}
+#match-create-dialog .mcd-segs{display:flex;flex-wrap:wrap;gap:8px;}
+#match-create-dialog .mcd-segs .mcd-chip{flex:1 1 0;min-width:56px;}
+#match-create-dialog .mcd-speed{display:grid;grid-template-columns:repeat(auto-fit,minmax(44px,1fr));}
+#match-create-dialog .mcd-speed .mcd-chip{min-width:0;padding:6px 4px;}
+#match-create-dialog .mcd-hint{margin:-4px 0 12px;color:var(--sf-dim);font-size:14px;}
+#match-create-dialog .mcd-actions{display:flex;gap:10px;}
+#match-create-dialog .mcd-actions .mbtn{flex:1 1 0;min-height:48px;border-radius:12px;font:inherit;}
 /* «Новый матч» — у нижнего края, только над загруженными «Доступными». */
 #connect .mcreate{order:5;flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
   padding-top:12px;border-top:1px solid var(--sf-edge);}
-#connect .mcreate label{flex:1 0 100%;font-size:14px;font-weight:600;color:var(--sf-head);}
-#connect .mcreate .inp{flex:1 1 160px;min-width:0;min-height:48px;padding:0 14px;border:1px solid var(--sf-edge);border-radius:12px;
-  background:var(--sf-inset);color:var(--sf-text);font:16px var(--sf-font);}
-#connect .mcreate .inp:focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+#connect .mcreate .mclabel{flex:1 1 auto;font-size:14px;font-weight:600;color:var(--sf-head);}
 #connect .mcreate .mbtn{flex:0 0 auto;min-height:48px;padding:0 22px;font-size:16px;}
 /* Узкий телефон: три вкладки с числами должны встать в строку. */
 @media (max-width:360px){

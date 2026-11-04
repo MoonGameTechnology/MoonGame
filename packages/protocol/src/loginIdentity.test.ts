@@ -3,6 +3,9 @@ import { loginSkeleton, reservedStaffName } from './loginIdentity';
 
 describe('registration identity policy', () => {
   it.each([
+    ['MODERATOR', 'МODERATOR'],
+    ['MangoDrive', 'МangoDrive'],
+    ['vector', 'νector'],
     ['att_probe', 'аtt_prоbе'],
     ['coco', 'сосо'],
     ['pilot', 'ｐｉｌｏｔ'],

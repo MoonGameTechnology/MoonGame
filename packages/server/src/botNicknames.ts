@@ -1,4 +1,4 @@
-import { loginSkeleton } from '@void/protocol';
+import { loginSkeletons } from '@void/protocol';
 
 // Persistent gamer handles are proper names, shared by every viewer language.
 // Keep positions stable: the roster index fixes identity, appearance and personality.
@@ -105,9 +105,9 @@ export const SYSTEM_BOT_NICKNAMES: readonly string[] = Object.freeze([
   'OopsAllLasers',
 ]);
 
-const RESERVED = new Set(SYSTEM_BOT_NICKNAMES.map(loginSkeleton));
+const RESERVED = new Set(SYSTEM_BOT_NICKNAMES.flatMap(loginSkeletons));
 
 /** System identities never become password-bearing human accounts. */
 export function reservedBotLogin(login: string): boolean {
-  return RESERVED.has(loginSkeleton(login));
+  return loginSkeletons(login).some(key => RESERVED.has(key));
 }

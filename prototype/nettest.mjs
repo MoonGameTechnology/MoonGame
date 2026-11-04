@@ -341,9 +341,6 @@ try {
       (chips) => chips.map((chip) => chip.getAttribute('data-map')),
     ), ['duel-1', 'ffa-4', 'team-2v2', 'team-3v3', 'ffa-20', 'ffa-50']);
     await page.click('#setupcancel');
-    assert.deepEqual(await page.locator('#match-create-map option:not([hidden])').evaluateAll(
-      (options) => options.map((option) => option.value),
-    ), ['duel-1', 'ffa-4', 'team-2v2', 'team-3v3', 'ffa-20', 'ffa-50']);
     assert.equal(await page.locator('#hub-sector-zero').isVisible(), true);
     assert.equal(await page.locator('#hub-proving-ground').isVisible(), false);
     console.log('✓ карты: меню предлагает 1 на 1, FFA на 4, 20 и 50 игроков, 2 на 2 и 3 на 3');

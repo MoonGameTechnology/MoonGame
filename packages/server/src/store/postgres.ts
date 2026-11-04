@@ -152,8 +152,8 @@ const SCHEMA_SQL = `
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email text;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS session_nonce text NOT NULL DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_requested_at timestamptz;
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS login_skeleton text;
-    CREATE INDEX IF NOT EXISTS users_login_skeleton_idx ON users(login_skeleton);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS login_skeletons text[];
+    CREATE INDEX IF NOT EXISTS users_login_skeletons_idx ON users USING gin(login_skeletons);
     CREATE TABLE IF NOT EXISTS player_activity_channels (
       account_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       channel text NOT NULL CHECK(channel ~ '^[a-f0-9]{32}$'),

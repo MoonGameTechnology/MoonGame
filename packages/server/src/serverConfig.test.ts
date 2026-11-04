@@ -52,14 +52,6 @@ describe('configFromEnv', () => {
     const cfg = configFromEnv({ ALLOWED_ORIGINS: 'https://a.example, https://b.example ,' });
     expect(cfg.allowedOrigins).toEqual(['https://a.example', 'https://b.example']);
   });
-  it('accepts the TLS Capacitor origin only when its legacy native origin was enabled', () => {
-    expect(configFromEnv({ ALLOWED_ORIGINS: 'https://play.example,http://localhost' }).allowedOrigins)
-      .toEqual(['https://play.example', 'http://localhost', 'https://localhost']);
-    expect(configFromEnv({ ALLOWED_ORIGINS: 'https://localhost' }).allowedOrigins)
-      .toEqual(['https://localhost']);
-    expect(configFromEnv({ ALLOWED_ORIGINS: 'http://localhost.evil' }).allowedOrigins)
-      .toEqual(['http://localhost.evil']);
-  });
 
   it('GATE=1 yields a factory that builds a FRESH gate each call (per-match isolation)', () => {
     const cfg = configFromEnv({ GATE: '1' });

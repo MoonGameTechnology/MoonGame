@@ -64,7 +64,7 @@ const post = (
   server.inject({ method: 'POST', url, payload: body as object });
 
 describe('SE-1.x · /auth/register + /auth/login', () => {
-  it.each(['moderator', 'administrator', 'op-admin', 'аdmin123', 'поддержка'])('refuses new staff-like callsign %s', async (login) => {
+  it.each(['moderator', 'administrator', 'op-admin', 'аdmin123', 'поддержка', 'МODERATOR', 'МОДЕРАТОР'])('refuses new staff-like callsign %s', async (login) => {
     const server = authApp();
     const response = await post(server, '/auth/register', { login, password: 'a quiet audit orbit 2026' });
     expect(response.statusCode).toBe(400);

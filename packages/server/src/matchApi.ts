@@ -3,6 +3,7 @@ import type { MatchRegistry } from './matchRegistry';
 import { slidingWindowIpLimiter } from './rateLimit';
 import { validSeatName } from '@void/protocol';
 import { matchCreationPermitted, registerMatchCapabilitiesApi } from './matchCapabilitiesApi';
+import { parseMatchSettings, type MatchSettingsPolicy } from './matchSettings';
 export { registerMatchCapabilitiesApi };
 
 /**
@@ -88,7 +89,14 @@ export interface MatchApiDeps {
   /** Seed + persist a new match; returns its id and seat player ids. Optional: when absent
    *  the `POST /matches` route is not registered — a host that only seeds matches out of band
    *  (e.g. the playtest netserver) exposes join without a public create. */
-  createMatch?(request?: { mapId?: string; modeId?: string }): Promise<CreatedMatch>;
+  createMatch?(request?: {
+    mapId?: string;
+    modeId?: string;
+    timeScale?: number;
+    goldActions?: boolean;
+  }): Promise<CreatedMatch>;
+  /** Настройки, которые хост умеет применить к новой партии (`matchSettings.ts`). */
+  settings?: MatchSettingsPolicy;
   /** Optional host policy, evaluated only against a live authenticated identity. */
   canCreate?(identity: Identity): boolean | Promise<boolean>;
   /** Explicit allowlist for user-selected maps; absent = default only. */
@@ -206,13 +214,14 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
         void reply.code(400);
         return { error: 'E_UNKNOWN_MODE' as const };
       }
-      const choice =
-        mapId === undefined && modeId === undefined
-          ? undefined
-          : {
-              ...(mapId !== undefined ? { mapId } : {}),
-              ...(modeId !== undefined ? { modeId } : {}),
-            };
+      const parsed = parseMatchSettings(body as Record<string, unknown> | undefined, deps.settings ?? {});
+      if (!parsed.ok) return reply.code(400).send({ error: parsed.code });
+      const picked = {
+        ...(mapId !== undefined ? { mapId } : {}),
+        ...(modeId !== undefined ? { modeId } : {}),
+        ...parsed.settings,
+      };
+      const choice = Object.keys(picked).length ? picked : undefined;
       const listOngoing = deps.ongoingMatchIds;
       if (!who || !listOngoing) return choice ? createMatch(choice) : createMatch();
       const account = who.accountId;

@@ -149,11 +149,6 @@ export function configFromEnv(env: NodeJS.ProcessEnv): ServerConfig {
   const allowedOrigins = env.ALLOWED_ORIGINS
     ? env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
     : undefined;
-  // Preserve explicitly enabled Capacitor clients as their local asset origin moves
-  // to TLS. This adds no native origin on website-only deployments.
-  if (allowedOrigins?.includes('http://localhost') && !allowedOrigins.includes('https://localhost')) {
-    allowedOrigins.push('https://localhost');
-  }
 
   // A FACTORY, not one instance: each match needs its own gate (per-match sequence + receipts).
   const gateEnabled = env.GATE === '1' || env.GATE === 'true';

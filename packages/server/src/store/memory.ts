@@ -1,6 +1,6 @@
 export { MemoryArsenalStore } from './memoryArsenal';
 import { reservedBotLogin } from '../botNicknames';
-import { loginSkeleton } from '@void/protocol';
+import { loginSkeletons } from '@void/protocol';
 import { archiveMetadataOf, archiveStateBytes, type ArchiveSummaryMetadata } from '../matchArchiveMetadata';
 import { memoryEconomyLock, type MemoryEconomyLock } from '../memoryEconomyLock';
 import { MAX_META_ACTIVITY_FACTS_PER_ROLE } from '../metaEconomyActivity';
@@ -306,14 +306,14 @@ export class MemoryUserStore implements UserStore {
     { ok: true; userId: string } | { ok: false; code: 'E_LOGIN_TAKEN' | 'E_EMAIL_TAKEN' }
   > {
     const key = login.toLowerCase();
-    const skeleton = loginSkeleton(login);
-    if (reservedBotLogin(login) || this.byLogin.has(key) || this.skeletons.has(skeleton))
+    const skeletons = loginSkeletons(login);
+    if (reservedBotLogin(login) || this.byLogin.has(key) || skeletons.some(k => this.skeletons.has(k)))
       return Promise.resolve({ ok: false, code: 'E_LOGIN_TAKEN' });
     const mail = email?.toLowerCase();
     if (mail && this.byEmail(mail)) return Promise.resolve({ ok: false, code: 'E_EMAIL_TAKEN' });
     const userId = randomUUID();
     this.byLogin.set(key, { userId, login, passHash, registrationReward: true, ...(mail ? { email: mail } : {}) });
-    this.skeletons.add(skeleton);
+    for (const skeleton of skeletons) this.skeletons.add(skeleton);
     return Promise.resolve({ ok: true, userId });
   }
 

@@ -13,12 +13,14 @@ now ships **net mode**: its connect overlay can join a live session served by
 `pnpm dev:proto-server`. See `docs/multiplayer.md` → "Two phones, one session" for
 the friend-test runbook (server + `wss://` tunnel → sideload → both connect).
 
-The alpha/player WebView serves its bundled assets at `https://localhost` and refuses
-cleartext network traffic. Multiplayer endpoints must use HTTPS/WSS. Upgrade the game
-server before distributing this APK: configure `ALLOWED_ORIGINS` with the exact native
-origin `https://localhost`. For existing installations, `configFromEnv` also enables
-this TLS origin when `http://localhost` was explicitly allowed, keeping older clients
-usable during the transition. Website-only allowlists gain no native origin.
+The alpha/player WebView keeps `http://localhost`, preserving the existing origin-scoped
+saves and account sessions. `server.cleartext` is disabled and `patch-updater.mjs` wires
+`network-security.mjs` into the generated manifest: cleartext is denied by default, with
+an exception for the exact `localhost` asset host. External multiplayer endpoints must
+use HTTPS/WSS. The server's existing native Origin allowlist remains valid.
+See [Android Network Security Configuration](https://developer.android.com/privacy-and-security/security-config).
+Mobile changes also build read-only APK candidates on pull requests; release publication
+and its signing secret remain restricted to protected main.
 
 ## Sector Zero on RuStore — release plan
 

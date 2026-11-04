@@ -21,6 +21,10 @@ describe.skipIf(!process.env.DATABASE_URL)('durable registration collision prote
   ];
   beforeAll(() => migrate(pools[0]!));
   afterAll(() => Promise.all(pools.map((p) => p.end())));
+  it('runs against a disposable database rather than the shared test connection', async () => {
+    const { rows } = await pools[0]!.query<{ name: string }>('SELECT current_database() AS name');
+    expect(rows[0]!.name).toMatch(/^vd_vitest_[a-f0-9]{32}$/);
+  });
 
   it('serializes visually identical registrations across independent pools and keeps the key after adapter recreation', async () => {
     const suffix = randomUUID();
