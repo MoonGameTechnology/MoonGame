@@ -5,12 +5,14 @@ import { networkSeats } from './matchSetup';
 import { resourceCardHtml } from './resourceCard';
 import { data } from './gameData';
 import { openTurn } from './aiTurn/turn';
+import { investOrder } from './aiTurn/economy';
 import { controlLimitOf, incomeBreakdown } from './economy';
 import { createDossiers, type DossierHost } from './dossiers';
 import { traceHooks } from './protoKernel';
 import { DAY } from './time';
 import {
   CONTROL_LIMIT,
+  INTEGRATION_HOURS,
   isInhabited,
   uncontrolledPlanets,
   type GameState,
@@ -74,6 +76,58 @@ describe('лимит управления в прототипе (BAL-19)', () =>
     const base = openTurn(s, 'p1', 'expand', 'strong', new Set())?.base;
     expect(base?.owner).toBe('p1');
     expect(outside.has(base!.id)).toBe(false);
+  });
+
+  it('бот вкладывает хозяйство сперва под управлением, потом за лимитом, в освоение — нет', () => {
+    const s = empireOf(CONTROL_LIMIT + 2);
+    const [far, taken] = [...uncontrolledPlanets(s, data, 'p1', s.modeId)];
+    const ruled = Object.values(s.planets).find(
+      (p) =>
+        p.owner === 'p1' &&
+        isInhabited(data, p) &&
+        p.id !== s.capital?.p1 &&
+        p.id !== far &&
+        p.id !== taken,
+    )!;
+    s.planets[taken!]!.integration = {
+      claim: 'p2',
+      since: s.time,
+      until: s.time + INTEGRATION_HOURS * HOUR,
+    };
+    const bot = openTurn(s, 'p1', 'expand', 'strong', new Set())!;
+    const worlds = [s.planets[taken!]!, s.planets[far!]!, ruled];
+    expect(investOrder(bot, worlds).map((p) => p.id)).toEqual([ruled.id, far]);
+  });
+
+  it('бот не ставит шахту на планету, которую ещё осваивает', () => {
+    const s = empireOf(3);
+    s.players.p1!.resources = {
+      credits: 1e5,
+      metal: 1e5,
+      microelectronics: 1e4,
+      food: 1e4,
+      energy: 1e4,
+    };
+    const others = Object.values(s.planets).filter(
+      (p) => p.owner === 'p1' && isInhabited(data, p) && p.id !== s.capital?.p1,
+    );
+    for (const p of others) {
+      p.buildings = p.buildings.filter((b) => b.type !== 'mine');
+      p.integration = { claim: 'p2', since: s.time, until: s.time + INTEGRATION_HOURS * HOUR };
+    }
+    const mines = (st: GameState): string[] =>
+      aiOrders(st, 'p1', 'expand', 'strong')
+        .filter(
+          (a) =>
+            a.type === 'building.construct' &&
+            (a.payload as { building?: string }).building === 'mine',
+        )
+        .map((a) => (a.payload as { planetId: string }).planetId);
+    expect(mines(s)).toEqual([]);
+    // Освоение кончилось — планета своя целиком, и шахта идёт на неё.
+    const done = structuredClone(s);
+    for (const p of Object.values(done.planets)) delete p.integration;
+    expect(mines(done)).toHaveLength(1);
   });
 });
 

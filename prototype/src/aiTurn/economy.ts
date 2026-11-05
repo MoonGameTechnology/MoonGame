@@ -5,9 +5,11 @@
 import {
   buildingLevel,
   buildingMaxLevel,
+  isIntegrating,
   matchCost,
   matchUnitCost,
   type Action,
+  type Planet,
 } from '../../../packages/shared-core/src/index';
 import { buildBuilding, upgradeBuilding } from '../../../decisions/actions';
 import { data } from '../gameData';
@@ -20,6 +22,23 @@ import type { AiTurn } from './turn';
 const LEADER_METAL_SURPLUS = 600;
 /** Что ведущее место улучшает дома, по порядку: кредиты, налог, микроэлектроника. */
 const LEADER_UPGRADES = ['refinery', 'tax_office', 'fabricator'] as const;
+
+/**
+ * КУДА ВКЛАДЫВАТЬ ХОЗЯЙСТВО (BAL-19): сперва свои планеты под управлением, они дают выход
+ * целиком, потом планеты за лимитом с их половиной. Планету в освоении бот хозяйством не
+ * застраивает: она даёт от 25% выхода, а отбивший её прежний хозяин получит её вместе со
+ * зданиями. Внутри каждой группы порядок вызывающего (ротация `worldsInOrder`) сохраняется.
+ * Оборону осваиваемой планеты бот строит по-прежнему: она помогает её удержать.
+ */
+export function investOrder(bot: AiTurn, worlds: readonly Planet[]): Planet[] {
+  const ruled: Planet[] = [];
+  const beyond: Planet[] = [];
+  for (const p of worlds) {
+    if (p.owner !== bot.ai || isIntegrating(p, bot.state.time)) continue;
+    (bot.outside.has(p.id) ? beyond : ruled).push(p);
+  }
+  return ruled.concat(beyond);
+}
 
 /** Хозяйство дома за ход: четыре звена по порядку. */
 export function economyOrders(bot: AiTurn, home: HomeTurn): void {
@@ -116,7 +135,7 @@ function incomeOrders(bot: AiTurn, home: HomeTurn): void {
 function mineOrders(bot: AiTurn, home: HomeTurn): void {
   const { state, ai, out, pad, skilled, lineUnit } = bot;
   const { base, pl, pendingBuild, affordable } = home;
-  for (const p of worldsInOrder(state, ai, 'mine', skilled)) {
+  for (const p of investOrder(bot, worldsInOrder(state, ai, 'mine', skilled))) {
     if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
     if (p.buildings.some((x) => x.type === 'mine') || pendingBuild(p.id, 'mine')) continue;
     if (!affordable('mine')) break;
@@ -153,7 +172,9 @@ function mineOrders(bot: AiTurn, home: HomeTurn): void {
     const reserve = (r: string): number => (hull[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0);
     for (const p of [
       base,
-      ...worldsInOrder(state, ai, 'mine-upgrade', skilled).filter((p) => p.id !== base.id),
+      ...investOrder(bot, worldsInOrder(state, ai, 'mine-upgrade', skilled)).filter(
+        (p) => p.id !== base.id,
+      ),
     ]) {
       if (p.owner !== ai || p.kind !== 'planet') continue;
       const mine = p.buildings.find((b) => b.type === 'mine' && b.hp > 0);
@@ -236,7 +257,7 @@ function leaderInvest(bot: AiTurn, home: HomeTurn): void {
         if (canOrder(state, order) === null) return order;
       }
       if (!affordable('refinery')) return null;
-      for (const p of worldsInOrder(state, ai, 'refinery', skilled)) {
+      for (const p of investOrder(bot, worldsInOrder(state, ai, 'refinery', skilled))) {
         if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
         if (p.buildings.some((x) => x.type === 'refinery') || pendingBuild(p.id, 'refinery'))
           continue;

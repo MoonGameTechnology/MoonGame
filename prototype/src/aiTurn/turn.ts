@@ -153,6 +153,9 @@ export interface AiTurn {
   readonly outside: ReadonlySet<string>;
   /** Есть свои планеты за лимитом управления (BAL-19): узел, поднимающий лимит, идёт вперёд. */
   readonly beyondLimit: boolean;
+  /** Свои планеты, которые другая сторона ещё осваивает (BAL-19): флот места выбирает их
+   *  охотнее прочих целей (`retakeWeight`). */
+  readonly claims: ReadonlySet<string>;
   readonly base: Planet | undefined;
   readonly shipCount: (f: Fleet) => number;
   readonly reconBare: (f: Fleet) => boolean;
@@ -285,8 +288,14 @@ export function openTurn(
   // таких планет остаётся без якоря, пока первая не освоится.
   const outside = uncontrolledPlanets(state, data, ai, state.modeId, controlLimitOf(state, ai));
   const beyondLimit = outside.size > 0;
-  for (const p of Object.values(state.planets))
-    if (p.owner === ai && isIntegrating(p, state.time)) outside.add(p.id);
+  // Тот же проход собирает и обратную сторону освоения: свои планеты, которые другая сторона
+  // ещё осваивает. Отбитая до конца освоения планета сразу возвращается целиком (`fleets.ts`).
+  const claims = new Set<string>();
+  for (const p of Object.values(state.planets)) {
+    if (!isIntegrating(p, state.time)) continue;
+    if (p.owner === ai) outside.add(p.id);
+    else if (p.integration?.claim === ai) claims.add(p.id);
+  }
   const ruled = (p: Planet): boolean => p.owner === ai && !outside.has(p.id);
   const base =
     Object.values(state.planets).find(
@@ -365,6 +374,7 @@ export function openTurn(
     warFooting,
     outside,
     beyondLimit,
+    claims,
     base,
     shipCount,
     reconBare,
