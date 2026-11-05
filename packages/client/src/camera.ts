@@ -49,11 +49,15 @@ export const FIT_MARGIN = 0.94;
 export const MIN_SCALE = 1;
 /** Close enough to read one province + its neighbours on a phone. */
 export const MAX_SCALE = 6;
-/** Fraction of the play area you may pan past each content edge (easy edge navigation).
- *  The content edge is the outermost node, and the drawn frame sits further out: at 0.16
- *  the frame stayed under the HUD on PC (owner's ask 2026-10-24: let the camera fly a
- *  little further past the map edge). */
-export const PAN_SLACK = 0.3;
+/** Fraction of the play area the outermost node may be pulled in from its edge. At 0.5
+ *  any province, the edge ones too, can sit in the middle of the play area (owner's asks
+ *  2026-10-24 and 2026-11-05: the camera stopped too early at the map edge; at 0.3 an edge
+ *  province stayed near the screen border, on a phone under the thumb). */
+export const PAN_SLACK = 0.5;
+/** Zoom (over the whole-map fit) at which {@link PAN_SLACK} is fully open. From the fit,
+ *  where the whole map parks centred, the slack grows with the zoom, so it opens without
+ *  a jump. */
+export const SLACK_FULL_SCALE = 2;
 
 export const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
 /** Clamp a zoom factor into the allowed range. */
@@ -130,11 +134,12 @@ export function screenToWorld(
 }
 
 /** The pan range at `scale`: the camera rests with `x` in [minX, maxX], `y` in [minY, maxY].
- *  The map fills the play area with SLACK at the edges (an edge can sit a margin inside);
- *  at the whole-map floor a smaller-than-viewport axis parks centred. Optional `extra`
- *  (EdgeSlack) widens the range past a given edge — the "panel open" overshoot — including
- *  from the parked centre, so the map can be pulled out from under an overlay even at the
- *  min-zoom fit. */
+ *  Each content edge may come in from the play-area edge by the slack ({@link PAN_SLACK},
+ *  opening with the zoom up to {@link SLACK_FULL_SCALE}); an axis narrower than the play
+ *  area parks centred until the slack outgrows its letterbox, so at the whole-map fit the
+ *  map stays put. Optional `extra` (EdgeSlack) widens the range past a given edge — the
+ *  "panel open" overshoot — including from the parked centre, so the map can be pulled out
+ *  from under an overlay even at the min-zoom fit. */
 export function panRange(
   scale: number,
   vp: Viewport,
@@ -147,32 +152,20 @@ export function panRange(
   const pR = br.x * scale;
   const pT = tl.y * scale;
   const pB = br.y * scale;
-  // Open the edge slack continuously as the map grows past the fitted axis.
-  // Switching straight from a parked centre to full slack causes a visible jump.
-  const mx = Math.min(
-    (vp.right - vp.left) * PAN_SLACK,
-    Math.max(0, pR - pL - (vp.right - vp.left)) / 2,
-  );
-  const my = Math.min(
-    (vp.bottom - vp.top) * PAN_SLACK,
-    Math.max(0, pB - pT - (vp.bottom - vp.top)) / 2,
-  );
-  const eL = extra.left ?? 0;
-  const eR = extra.right ?? 0;
-  const eT = extra.top ?? 0;
-  const eB = extra.bottom ?? 0;
+  const aw = vp.right - vp.left;
+  const ah = vp.bottom - vp.top;
+  // How far in a content edge may come: the slack, or the letterbox of an axis that
+  // parks centred, whichever is wider. Both are continuous in the zoom, so the range
+  // never jumps — neither at the fit nor where the map outgrows the play area.
+  const open = clamp((scale - MIN_SCALE) / (SLACK_FULL_SCALE - MIN_SCALE), 0, 1);
+  const gx = Math.max(Math.max(0, aw - (pR - pL)) / 2, aw * PAN_SLACK * open);
+  const gy = Math.max(Math.max(0, ah - (pB - pT)) / 2, ah * PAN_SLACK * open);
   // A covered right edge lets you drag further LEFT (lower x bound); a covered bottom
   // edge further UP (lower y bound) — and symmetrically for left/top overlays.
-  const parkedX = (vp.left + vp.right - pL - pR) / 2;
-  const [minX, maxX] =
-    pR - pL >= vp.right - vp.left
-      ? [vp.right - pR - mx - eR, vp.left - pL + mx + eL]
-      : [parkedX - eR, parkedX + eL];
-  const parkedY = (vp.top + vp.bottom - pT - pB) / 2;
-  const [minY, maxY] =
-    pB - pT >= vp.bottom - vp.top
-      ? [vp.bottom - pB - my - eB, vp.top - pT + my + eT]
-      : [parkedY - eB, parkedY + eT];
+  const minX = vp.right - pR - gx - (extra.right ?? 0);
+  const maxX = vp.left - pL + gx + (extra.left ?? 0);
+  const minY = vp.bottom - pB - gy - (extra.bottom ?? 0);
+  const maxY = vp.top - pT + gy + (extra.top ?? 0);
   return { minX, maxX, minY, maxY };
 }
 

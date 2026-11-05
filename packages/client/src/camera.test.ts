@@ -21,6 +21,8 @@ import {
   dragCam,
   settleCam,
   ELASTIC_REACH,
+  PAN_SLACK,
+  SLACK_FULL_SCALE,
 } from './camera';
 
 // A portrait play area and a square map — the prototype's typical shape.
@@ -128,16 +130,47 @@ describe('camera — pan clamp & centring', () => {
     const b = worldToScreen(anchor, after, VP, B);
     expect(Math.abs(a.y - b.y)).toBeLessThan(0.02);
   });
-  it('zoomed in, the outermost node can be pulled 30% of the play area in from the edge', () => {
-    // Owner's ask 2026-10-24: let the camera fly a little further past the map edge.
+  it('zoomed in, the outermost node can be pulled in to the middle of the play area', () => {
+    // Owner's asks 2026-10-24 and 2026-11-05: the camera stopped too early at the map edge.
     const left = clampCam({ scale: 5, x: 10_000, y: 10_000 }, VP, B);
     const tl = worldToScreen({ x: 0, y: 0 }, left, VP, B);
-    expect(tl.x).toBeCloseTo(VP.left + 0.3 * 400, 6);
-    expect(tl.y).toBeCloseTo(VP.top + 0.3 * 800, 6);
+    expect(tl.x).toBeCloseTo(VP.left + PAN_SLACK * 400, 6);
+    expect(tl.y).toBeCloseTo(VP.top + PAN_SLACK * 800, 6);
     const right = clampCam({ scale: 5, x: -10_000, y: -10_000 }, VP, B);
     const br = worldToScreen({ x: 1000, y: 1000 }, right, VP, B);
-    expect(br.x).toBeCloseTo(VP.right - 0.3 * 400, 6);
-    expect(br.y).toBeCloseTo(VP.bottom - 0.3 * 800, 6);
+    expect(br.x).toBeCloseTo(VP.right - PAN_SLACK * 400, 6);
+    expect(br.y).toBeCloseTo(VP.bottom - PAN_SLACK * 800, 6);
+  });
+
+  it('from the slack-open zoom on, centerOn puts even a corner province in the middle', () => {
+    for (const corner of [
+      { x: 0, y: 0 },
+      { x: 1000, y: 0 },
+      { x: 0, y: 1000 },
+      { x: 1000, y: 1000 },
+    ]) {
+      const cam = centerOn({ scale: 1, x: 0, y: 0 }, corner, SLACK_FULL_SCALE, VP, B);
+      const at = worldToScreen(corner, cam, VP, B);
+      expect(at.x).toBeCloseTo(200, 6);
+      expect(at.y).toBeCloseTo(400, 6);
+    }
+  });
+
+  it('an axis narrower than the play area does not stay locked once zoomed in', () => {
+    // Scale 2: the square map is 752px tall in the 800px area — it used to park centred
+    // on Y, so a top-edge province could not be brought down at all.
+    const cam = clampCam({ scale: 2, x: 0, y: 10_000 }, VP, B);
+    expect(worldToScreen({ x: 500, y: 0 }, cam, VP, B).y).toBeCloseTo(400, 6);
+  });
+
+  it('the slack opens with the zoom: none at the whole-map fit, half way between', () => {
+    const reach = (scale: number) =>
+      worldToScreen({ x: 0, y: 0 }, clampCam({ scale, x: 10_000, y: 0 }, VP, B), VP, B).x;
+    const fit = reach(1);
+    expect(reach(1 + 1e-6) - fit).toBeLessThan(0.01); // no jump off the fit
+    // Half way to full zoom the left edge comes in half the full slack (letterbox is less).
+    expect(reach(1 + (SLACK_FULL_SCALE - 1) / 2)).toBeCloseTo(VP.left + (PAN_SLACK * 400) / 2, 6);
+    expect(reach(SLACK_FULL_SCALE)).toBeCloseTo(VP.left + PAN_SLACK * 400, 6);
   });
 
   it('parks a smaller-than-viewport axis centred at the min-zoom floor', () => {
@@ -188,8 +221,9 @@ describe('camera — edge slack (панель поверх карты)', () => {
   it('zoomAt and centerOn accept the slack (bounded wider, same anchor math)', () => {
     const viaZoom = zoomAt({ scale: 3, x: 0, y: -10_000 }, 200, 400, 1, VP, B, { bottom: 300 });
     expect(viaZoom.y).toBeCloseTo(clampCam({ scale: 3, x: 0, y: -10_000 }, VP, B).y - 300, 6);
-    const c = centerOn({ scale: 1, x: 0, y: 0 }, { x: 500, y: 1000 }, 3, VP, B, { bottom: 300 });
-    const noSlack = centerOn({ scale: 1, x: 0, y: 0 }, { x: 500, y: 1000 }, 3, VP, B);
+    // At the whole-map fit the bare range parks the map; only the panel slack frees it.
+    const c = centerOn({ scale: 1, x: 0, y: 0 }, { x: 500, y: 1000 }, 1, VP, B, { bottom: 300 });
+    const noSlack = centerOn({ scale: 1, x: 0, y: 0 }, { x: 500, y: 1000 }, 1, VP, B);
     expect(c.y).toBeLessThan(noSlack.y); // the bottom-edge target gets closer to centre
   });
 });
