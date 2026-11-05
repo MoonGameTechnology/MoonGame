@@ -3,8 +3,10 @@
  * каждого свободного флота — погрузка, гарнизон, штурм, осада, цель и подвоз.
  */
 import {
+  estimateTravelHours,
   fleetHoldFree,
   getStance,
+  INTEGRATION_HOURS,
   previewBattle,
   type Battle,
   type CombatantRef,
@@ -28,6 +30,7 @@ import {
 import { confidentGroundWin } from '../../../decisions/groundForecast';
 import { garrisonNeed, pickForGarrison, spareGround } from '../../../decisions/garrisonPolicy';
 import { data } from '../gameData';
+import { ctx } from '../protoKernel';
 import { decisionNoise } from './rules';
 import type { AiTurn } from './turn';
 
@@ -62,6 +65,27 @@ export function huntWeight(target: Planet, landing: readonly UnitStack[]): numbe
   const guarded = target.garrison.some((st) => st.count > 0);
   if (guarded && !confidentGroundWin(landing, target.garrison, data)) w /= 5;
   return w;
+}
+
+/** Во сколько раз своя планета в чужом освоении весит больше прочих целей (BAL-19). */
+export const RETAKE_WEIGHT = 3;
+
+/**
+ * ОТБИТЬ СВОЁ (BAL-19, освоение). Планету, взятую у места другой стороной, место до конца её
+ * освоения отбивает и сразу получает целиком, а взявший пока получает с неё от 25% выхода.
+ * Поэтому такая цель весит втрое больше прочих, если флот её возьмёт (пустую прилётом,
+ * гарнизон десантом наверняка) и успеет к ней до конца освоения. Опоздавшему она уже обычная
+ * чужая планета. Окно меряется долей освоения, а не миллисекундами: так сравнение с часами
+ * пути не зависит от темпа партии.
+ */
+export function retakeWeight(bot: AiTurn, f: Fleet, from: string, target: Planet): number {
+  const held = target.integration;
+  if (!bot.claims.has(target.id) || !held) return 1;
+  const guarded = target.garrison.some((st) => st.count > 0);
+  if (guarded && !confidentGroundWin(f.landing ?? [], target.garrison, data)) return 1;
+  const left = (INTEGRATION_HOURS * (held.until - bot.state.time)) / (held.until - held.since);
+  const eta = estimateTravelHours(bot.state, ctx(bot.state.time, bot.state), from, target.id, f);
+  return eta !== null && eta < left ? RETAKE_WEIGHT : 1;
 }
 
 // Consolidate BEFORE moving (self-play M4): two idle fleets sharing a location fuse
@@ -273,7 +297,9 @@ function fleetOrders(bot: AiTurn, f: Fleet): void {
     skilled ? decisionNoise(state, ai, `tie:${f.id}:${p.id}`) : 0;
   // Охота отстающего — у обоих профилей обычного места (игровой бот, 2026-09-28).
   const hunting = skilled && warFooting && trailing;
-  const weight = (p: Planet): number => (hunting ? huntWeight(p, f.landing ?? []) : 1);
+  const weight = (p: Planet): number =>
+    (hunting ? huntWeight(p, f.landing ?? []) : 1) *
+    (skilled ? retakeWeight(bot, f, here.id, p) : 1);
   for (const p of Object.values(state.planets)) {
     if (p.id === here.id || p.owner === ai || !capturable(p)) continue;
     if (!canTraverse(state, ai, p.owner)) continue; // a peace-locked target — leave it be
