@@ -47,6 +47,7 @@ import {
   takeJoinToken,
 } from './accountSession';
 import { detach } from './detach';
+import { resetFogMemory } from './mapFog';
 import { getPlatform } from './platform/host';
 import { admittedEvents, wsClosedProps } from '../../decisions/sessionAnalytics';
 import { dropPing, takeChat, takePing } from './messageLog';
@@ -314,6 +315,8 @@ function netClientFor(seat: string): MultiplayerClient {
           reconnecting = false; // a fresh welcome ends any reconnect cycle
           reconnectAttempts = 0;
           NET = true;
+          // Authored maps reuse node IDs; intel belongs to this match, not the previous one.
+          if (plan.fanfare) resetFogMemory();
           game.enter(snap.playerId, plan.fanfare);
           // Latency probe: ping every 2s with a client timestamp the pong echoes.
           if (pingTimer) clearInterval(pingTimer);
