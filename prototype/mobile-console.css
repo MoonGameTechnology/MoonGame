@@ -351,10 +351,8 @@ body.mobile-ui #top {
   background: linear-gradient(130deg, #0b2130ed, #06131ff2);
   box-shadow: 0 5px 24px #0005;
 }
-/* Same reasoning one level in: the ✦ chip and the day card were boxes inside a box —
-   each paying a border, a radius and its own padding for a separation a single hairline
-   already gives (the resource row below has always been divided that way, and the desktop
-   console de-boxes its day card too). Flat, they read as one continuous bar and hand the
+/* The ✦ chip and the day card form one continuous bar without inner dividers,
+   leaving more room for the crest and name. Flat, they hand the
    crest the pixels the boxes were holding. Both stay tappable: the chip still opens the
    victory breakdown through the .dstat handler on #top. */
 body.mobile-ui #tbscore {
@@ -373,7 +371,6 @@ body.mobile-ui #daycard {
   margin-left: 0;
   padding: 0 0 0 10px;
   border: 0;
-  border-left: 1px solid var(--line);
   border-radius: 0;
   background: none;
 }

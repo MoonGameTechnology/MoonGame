@@ -61,7 +61,7 @@ body.holo-ui .res b{font-size:15px;font-weight:500;font-variant-numeric:tabular-
 body.holo-ui .res em{font-size:var(--fs-caption);}
 body.holo-ui .res i svg{width:17px;height:17px;}
 body.holo-ui #tbscore{order:3;margin:0;padding:5px 8px;font-size:var(--fs-body);border-radius:5px;}
-body.holo-ui #daycard{order:4;margin:0;padding:0 0 0 10px;border:0;border-left:1px solid var(--line);border-radius:0;background:none;}
+body.holo-ui #daycard{order:4;margin:0;padding:0 0 0 10px;border:0;border-radius:0;background:none;}
 body.holo-ui #daycard b{font-size:var(--fs-body);}
 body.holo-ui #daycard span{font-size:var(--fs-caption);letter-spacing:0;}
 body.holo-ui .holo-back{position:fixed;display:grid;place-items:center;left:18px;top:16px;width:42px;height:44px;

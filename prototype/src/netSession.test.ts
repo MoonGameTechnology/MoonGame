@@ -302,6 +302,33 @@ describe('REFM-216 — впуск и снимки', () => {
     expect(net.NET).toBe(true);
   });
 
+  it('новый матч очищает разведку прежнего, обновления и переподключение её сохраняют', async () => {
+    const { net } = await boot();
+    const fog = await import('./mapFog');
+    const remembered = { owner: 'p9', garrison: 19, buildings: [{ type: 'radar', level: 2 }] };
+    fog.restoreFogMemory([['home_2', remembered]]);
+    net.connect();
+    lastWs().hear(welcome());
+    expect(fog.memory.dump()).toEqual([]);
+
+    // This match's intel survives both a resync and automatic reconnection.
+    fog.restoreFogMemory([['home_3', remembered]]);
+    lastWs().hear(resync(2));
+    expect(fog.memory.get('home_3')).toEqual(remembered);
+    lastWs().onclose?.();
+    vi.advanceTimersByTime(1_000);
+    lastWs().onopen?.();
+    lastWs().hear(welcome({ seq: 5 }));
+    expect(fog.memory.get('home_3')).toEqual(remembered);
+
+    // Authored maps reuse home IDs; an unrelated FFA must not inherit ownership.
+    net.leaveNetwork();
+    net.targetMatch('new-ffa-50');
+    net.connect();
+    lastWs().hear(welcome({ matchId: 'new-ffa-50', state: { ...world(0), mapId: 'ffa-50' } }));
+    expect(fog.memory.dump()).toEqual([]);
+  });
+
   it('билет места, выданный сервером, ложится под ключ этого места', async () => {
     const { net } = await boot();
     net.targetMatch('m1');

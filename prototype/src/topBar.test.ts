@@ -84,7 +84,7 @@ describe('телефонный бар — плоская полоса, а не �
     expect(css).toMatch(/border-bottom:\s*1px solid/);
   });
 
-  it('✦-чип и карточка дня плоские, разделены волосяной линией', () => {
+  it('✦-чип и карточка дня плоские, без вертикальной перегородки', () => {
     const score = mobileRule('body.mobile-ui #tbscore');
     expect(score).toMatch(/border:\s*0;/);
     expect(score).toMatch(/border-radius:\s*0;/);
@@ -92,6 +92,7 @@ describe('телефонный бар — плоская полоса, а не �
     const day = mobileRule('body.mobile-ui #daycard');
     expect(day).toMatch(/border-radius:\s*0;/);
     expect(day).toMatch(/background:\s*none;/);
-    expect(day).toMatch(/border-left:\s*1px solid/);
+    expect(day).toMatch(/border:\s*0;/);
+    expect(day).not.toMatch(/border-left:/);
   });
 });
