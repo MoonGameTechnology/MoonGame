@@ -4000,6 +4000,12 @@ export const en: Record<string, string> = {
   'rescard.trader': 'Trader',
   'rescard.close': 'Close',
   'rescard.no-trade': 'Credits are the currency — not tradeable on the market',
+  'hud.control.label': 'Planets',
+  'hud.control.title': 'Planets and control limit',
+  'hud.control.tip':
+    'Under control: {n} of {limit} {limit|planet|planets}. Planets past the limit yield {p}% of their resources and build no units. Command research raises the limit.',
+  'hud.control.tip.over':
+    'Under control: {n} of {limit} {limit|planet|planets}, {over} beyond control. Planets past the limit yield {p}% of their resources and build no units. Command research raises the limit.',
   'hud.capital.progress': '♜ {n}/{total}',
   'hud.capital.tip': 'Capture every enemy capital ({n}/{total}). Starting capitals are fixed.',
   'hud.score.tip':

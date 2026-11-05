@@ -369,6 +369,8 @@
   #devline .dl-siege span{display:none;}
   #devline .dl-missions{font-size:var(--fs-caption);padding:2px 8px;margin-left:8px;}
   #devline .dl-missions span{display:none;}
+  #devline .dl-control{font-size:var(--fs-caption);padding:2px 8px;margin-left:8px;}
+  #devline .dl-control span{display:none;}
   #devline .dl-ally{font-size:var(--fs-caption);padding:2px 8px;margin-left:8px;}
   #devline .dl-ally span{display:none;}
   #missionpanel{right:12px;left:12px;width:auto;}

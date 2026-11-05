@@ -300,6 +300,13 @@ body.app-startup-failed > :not(#startup-error):not(#dev-badge){display:none!impo
   font-variant-numeric:tabular-nums;background:rgba(143,245,200,.1);border:1px solid rgba(143,245,200,.5);}
 #devline .dl-missions[aria-expanded="true"]{background:rgba(143,245,200,.22);border-color:#8ff5c8;}
 #devline .dl-missions i{font-style:normal;}
+/* BAL-19: планеты места и лимит управления — циан шапки; сверх лимита красный, как фишка
+   «Вне управления» в окне мира. Стоит первым за часами: читается весь матч. */
+#devline .dl-control{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;margin-left:10px;padding:2px 10px;
+  border-radius:11px;cursor:pointer;color:var(--cyan);font:700 var(--fs-body)/1.4 inherit;white-space:nowrap;
+  font-variant-numeric:tabular-nums;background:rgba(53,214,230,.08);border:1px solid rgba(53,214,230,.45);}
+#devline .dl-control.over{color:var(--red);background:rgba(255,90,77,.1);border-color:rgba(255,90,77,.55);}
+#devline .dl-control i{font-style:normal;}
 #missionpanel{position:fixed;top:calc(var(--tbh) + 34px);right:18px;z-index:44;width:min(360px,calc(100vw - 24px));
   max-height:min(60vh,420px);overflow:auto;padding:10px 12px;border-radius:12px;color:var(--ink);
   background:rgba(4,16,18,.98);border:1px solid rgba(143,245,200,.55);box-shadow:0 8px 28px rgba(0,0,0,.55),0 0 16px rgba(143,245,200,.12);}
