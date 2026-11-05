@@ -52,10 +52,25 @@ describe('ранги узлов доктрины', () => {
       (id) => data.technologies[id]?.ruleset === undefined);
     expect(legacy.get('ai_stewardship')).toBe(0);
     expect(legacy.get('signal_corps')).toBe(1);
-    const main = doctrineRanks(data.technologies, 'command');
+    // Линия Наместника (BAL-19) — высший тир «Командования», но Куратору без Наместника
+    // она закрыта: бот не пускает её в доктрину (`aiTurn/research.ts`), и путь ведёт к
+    // высшему тиру, который совет откроет.
+    const viceroyLine = (id: string): boolean =>
+      (data.technologies[id]?.conditions ?? []).some(
+        (c) => c.type === 'has_scientist' && c.scientist === 'viceroy',
+      );
+    const main = doctrineRanks(data.technologies, 'command', (id) => !viceroyLine(id));
     expect(main.get('deep_range_network')).toBe(0);
     expect(main.get('picket_design')).toBe(0);
     expect(main.get('ai_stewardship')).toBe(1);
+    // С Наместником в совете путь ведёт к его линии через «Имперскую канцелярию».
+    const withViceroy = doctrineRanks(data.technologies, 'command');
+    expect(
+      ['imperial_protectorate', 'imperial_chancery', 'provincial_administration'].map((id) =>
+        withViceroy.get(id),
+      ),
+    ).toEqual([0, 0, 0]);
+    expect(withViceroy.get('deep_range_network')).toBe(1);
   });
 
   it('узел, убранный режимом из матча, в доктрину не попадает', () => {

@@ -45,6 +45,8 @@ export interface ScientistGateRow {
   id: string;
   /** Требуемая ветка учёного; `null` — годится любой. */
   branch: string | null;
+  /** Требуемый учёный по id (своя линия, BAL-19); `null` — годится любой ветки `branch`. */
+  scientist: string | null;
   minLevel: number;
   dayGate: number;
   /** Сколько раз узел исследован за прогон. */
@@ -73,14 +75,17 @@ export function scientistGatedNodes(
     for (const cond of def.conditions ?? []) {
       if (cond.type !== 'has_scientist') continue;
       const branch = cond.branch ?? null;
+      const scientist = cond.scientist ?? null;
       rows.push({
         id,
         branch,
+        scientist,
         minLevel: cond.minLevel,
         dayGate: def.dayGate,
         researched: researched.get(id) ?? 0,
-        hasLeader: Object.values(scientists).some(
-          (sci) => branch === null || sci.branch === branch,
+        hasLeader: Object.entries(scientists).some(
+          ([sid, sci]) =>
+            (scientist === null || sid === scientist) && (branch === null || sci.branch === branch),
         ),
         outsideWindow: def.dayGate > sessionDays,
       });

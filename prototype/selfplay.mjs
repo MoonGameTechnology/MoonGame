@@ -951,7 +951,7 @@ const sciRows = scientistGatedNodes(
 );
 const sciGateLine = sciRows
   .map((r) => {
-    const gate = `${r.branch ?? 'любая'}≥${r.minLevel}, с д${r.dayGate}`;
+    const gate = `${r.scientist ?? r.branch ?? 'любая'}≥${r.minLevel}, с д${r.dayGate}`;
     const verdict = !r.hasLeader
       ? 'НЕТ УЧЁНОГО ВЕТКИ — дыра ростера, не баланс'
       : r.outsideWindow

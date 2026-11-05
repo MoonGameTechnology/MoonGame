@@ -30,10 +30,10 @@ describe('main-game research progression', () => {
     expect(JSON.parse(JSON.stringify(s)).techRules).toEqual(s.techRules);
   });
 
-  it('has 53 nodes, six branches, valid unlock references and no prerequisite cycles', () => {
+  it('has 56 nodes, six branches, valid unlock references and no prerequisite cycles', () => {
     const s = fresh();
     const ids = Object.keys(data.technologies).filter((id) => !data.technologies[id]!.grantOnly && techInMatch(s, id, data));
-    expect(ids).toHaveLength(53); // BAL-19: три узла лимита управления в «Командовании»
+    expect(ids).toHaveLength(56); // BAL-19: три узла лимита в «Командовании» и три — линия Наместника
     expect(new Set(ids.map((id) => data.technologies[id]!.branch)).size).toBe(6);
     const visit = (id: string, chain: string[] = []) => {
       expect(chain, id).not.toContain(id);

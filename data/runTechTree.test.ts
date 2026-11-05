@@ -9,13 +9,16 @@
  */
 import { describe, expect, it } from 'vitest';
 import { pveModeId } from '../packages/client/src/gameData';
+import { techInMatch } from '../packages/shared-core/src/index';
 import { shippedGameData } from './bundle';
 
 const data = shippedGameData();
 const mode = data.modes[pveModeId() ?? ''];
 const rules = mode?.technology;
+// Дерево забега отбирает ядро (`techInMatch`): убранные режимом узлы и узлы другого набора
+// правил (дерево основной игры, `ruleset: main`) в него не входят.
 const tree = Object.entries(data.technologies).filter(
-  ([id, def]) => !def.grantOnly && !(rules?.exclude ?? []).includes(id),
+  ([id, def]) => !def.grantOnly && techInMatch({ techRules: rules }, id, data),
 );
 
 describe('PVR-6.17 — дерево технологий забега', () => {

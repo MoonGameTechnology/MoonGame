@@ -113,6 +113,21 @@ describe('совет учёных — влияние кандидата', () => 
     // на TT-4 у технологий завелись ключи `data.*`, и сырое имя перестало доезжать.
     expect(text).toContain(tData(mine[0]!.name));
   });
+
+  it('учёный своей линии (Наместник) называет её, а лидер ветки её не открывает (BAL-19)', () => {
+    const line = Object.values(data.technologies)
+      .filter((td) =>
+        (td.conditions ?? []).some((c) => c.type === 'has_scientist' && c.scientist === 'viceroy'),
+      )
+      .map((td) => tData(td.name));
+    expect(line).toHaveLength(3);
+    const own = sciInfluenceText('viceroy', data, branchLabel);
+    expect(own).toBe(t('scipick.opens-own', { list: line.join(', ') }));
+    const curator = sciInfluenceText('overseer', data, branchLabel);
+    for (const name of line) expect(curator).not.toContain(name);
+    // Генералист без своей линии остаётся генералистом.
+    expect(sciInfluenceText('polymath', data, branchLabel)).toBe(t('scipick.generalist'));
+  });
 });
 
 describe('совет учёных — разметка окна', () => {

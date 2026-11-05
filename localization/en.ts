@@ -111,6 +111,14 @@ export const en: Record<string, string> = {
   'data.provincial-administration': 'Provincial Administration',
   'data.colonial-governance': 'Colonial Governance',
   'data.imperial-chancery': 'Imperial Chancery',
+  'tech.node.viceroyalties.desc': '+2 planets under control, army upkeep +10%. Up to 12 planets.',
+  'tech.node.military-governorates.desc':
+    '+2 planets under control, army upkeep +10%. Up to 14 planets.',
+  'tech.node.imperial-protectorate.desc':
+    '+2 planets under control, army upkeep +10%. Up to 16 planets.',
+  'data.viceroyalties': 'Viceroyalties',
+  'data.military-governorates': 'Military Governorates',
+  'data.imperial-protectorate': 'Imperial Protectorate',
   "tech.node.field-medicine.desc": "Unlocks building: hospital.",
   "data.field-medicine": "Field Medicine",
   "tech.node.vehicle-works.desc": "Unlocks building: factory.",
@@ -2071,6 +2079,7 @@ export const en: Record<string, string> = {
   'data.vanguard-impulse': 'Vanguard Impulse',
   'data.vanguard': 'Vanguard',
   'data.violet-ascendancy': 'Violet Ascendancy',
+  'data.viceroy': 'Viceroy',
   'data.void-admiral': 'Void Admiral',
   'data.void-armadas': 'Void Armadas',
   'data.void-attunement': 'Void Attunement',
@@ -2994,6 +3003,8 @@ export const en: Record<string, string> = {
   'sci.void-admiral.desc': 'Leader of the space branch: shipyards, logistics, siege doctrines.',
   'sci.wing-commodore.desc':
     'Leader of the shuttle branch: flight decks, strike vectors, ace programs.',
+  'sci.viceroy.desc':
+    'A branchless administrator: three nodes after Imperial Chancery, each +2 planets under control and +10% army upkeep.',
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Candidates · tap to fill a slot',
@@ -3005,6 +3016,7 @@ export const en: Record<string, string> = {
   'scipick.note':
     '⚠ The council locks in for the whole match. A recommended pair is pre-selected — swap to taste.',
   'scipick.opens': 'Opens the {br} branch: {list}',
+  'scipick.opens-own': 'Opens a line of its own: {list}',
   'scipick.pick': 'Pick a scientist',
 
   // --- soon — Заглушки «скоро» для ещё не готовых экранов.
@@ -5129,6 +5141,7 @@ export const en: Record<string, string> = {
   'tech.fx.damage': 'damage',
   'tech.fx.hero-slots': '+{n} hero {n|slot|slots}',
   'tech.fx.control-limit': '+{n} {n|planet|planets} under control',
+  'tech.fx.army-upkeep': 'army upkeep',
   'tech.fx.damage-ground': 'ground combat damage',
   'tech.fx.damage-missile': 'missile damage',
   'tech.fx.damage-shuttle': 'shuttle damage',

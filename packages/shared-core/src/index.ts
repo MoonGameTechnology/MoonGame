@@ -690,6 +690,7 @@ export {
   MAX_RESEARCH_SLOTS,
   clampResearchSlots,
   controlLimitBonus,
+  armyUpkeepSurcharge,
 } from './modules/technology';
 export { constructionModule, hasShipyard, unitBuildSiteBlocker } from './modules/construction';
 export { coverPoints, worldDamageReduction } from './util/worldCover';

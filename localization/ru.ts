@@ -114,6 +114,14 @@ export const ru: Record<string, string> = {
   'data.provincial-administration': 'Провинциальная администрация',
   'data.colonial-governance': 'Колониальное управление',
   'data.imperial-chancery': 'Имперская канцелярия',
+  'tech.node.viceroyalties.desc': '+2 планеты под управлением, содержание армии +10%. До 12 планет.',
+  'tech.node.military-governorates.desc':
+    '+2 планеты под управлением, содержание армии +10%. До 14 планет.',
+  'tech.node.imperial-protectorate.desc':
+    '+2 планеты под управлением, содержание армии +10%. До 16 планет.',
+  'data.viceroyalties': 'Наместничества',
+  'data.military-governorates': 'Военные губернаторства',
+  'data.imperial-protectorate': 'Имперский протекторат',
   "tech.node.field-medicine.desc": "Открывает здание: полевой госпиталь.",
   "data.field-medicine": "Полевая медицина",
   "tech.node.vehicle-works.desc": "Открывает здание: завод техники.",
@@ -2079,6 +2087,7 @@ export const ru: Record<string, string> = {
   'data.vanguard-impulse': 'Импульс авангарда',
   'data.vanguard': 'Авангард',
   'data.violet-ascendancy': 'Пурпурное владычество',
+  'data.viceroy': 'Наместник',
   'data.void-admiral': 'Космоадмирал',
   'data.void-armadas': 'Армады Пустоты',
   'data.void-attunement': 'Сонастройка с Пустотой',
@@ -3001,6 +3010,8 @@ export const ru: Record<string, string> = {
   'sci.void-admiral.desc': 'Лидер космической ветки: верфи, логистика, осадные доктрины.',
   'sci.wing-commodore.desc':
     'Лидер ветки шаттлов: полётные палубы, векторы удара, программы асов.',
+  'sci.viceroy.desc':
+    'Администратор без ветки: три узла после «Имперской канцелярии», каждый +2 планеты под управлением и +10% к содержанию армии.',
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Кандидаты · нажмите, чтобы занять слот',
@@ -3012,6 +3023,7 @@ export const ru: Record<string, string> = {
   'scipick.note':
     '⚠ Совет закрепляется на весь матч. Рекомендованная пара уже выбрана — замените по вкусу.',
   'scipick.opens': 'Открывает ветку «{br}»: {list}',
+  'scipick.opens-own': 'Открывает свою линию: {list}',
   'scipick.pick': 'Выбрать учёного',
 
   // --- soon — Заглушки «скоро» для ещё не готовых экранов.
@@ -5134,6 +5146,7 @@ export const ru: Record<string, string> = {
   'tech.fx.damage': 'урон',
   'tech.fx.hero-slots': '+{n} {n|слот героя|слота героя|слотов героев}',
   'tech.fx.control-limit': '+{n} {n|планета|планеты|планет} под управлением',
+  'tech.fx.army-upkeep': 'содержание армии',
   'tech.fx.damage-ground': 'урон в наземном бою',
   'tech.fx.damage-missile': 'урон ракет',
   'tech.fx.damage-shuttle': 'урон шаттлов',

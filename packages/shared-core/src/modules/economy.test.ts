@@ -155,6 +155,31 @@ describe('economy module — daily upkeep', () => {
     expect(r.state.players.p1?.resources.credits).toBe(94); // 100 − 3 × 2/day
   });
 
+  it('scales an owner\'s unit upkeep through the economy.unitUpkeep hook (BAL-19)', () => {
+    const share = (value: (playerId: string) => number): GameModule => ({
+      id: 'garrison-duty',
+      version: '1.0.0',
+      setup(api) {
+        api.hook<number>('economy.unitUpkeep', (cur, args) =>
+          cur * value((args as { playerId: string }).playerId),
+        );
+      },
+    });
+    const st = stateWith({
+      players: [player('p1', { credits: 100 }), player('p2', { credits: 100 })],
+      planets: [planet('a', 'p1', [], [['scout', 3]])],
+      fleets: [fleet('f', 'p1', [['cruiser', 1]]), fleet('g', 'p2', [['cruiser', 1]])],
+    });
+    const after = (m: GameModule) =>
+      okAdvance(createKernel([economyModule, m]).advanceTo(st, ctx(DAY))).state.players;
+    const dearer = after(share((id) => (id === 'p1' ? 1.5 : 1)));
+    expect(dearer.p1?.resources.credits).toBe(100 - 14 * 1.5); // fleet and garrison alike
+    expect(dearer.p2?.resources.credits).toBe(92); // per owner
+    // A broken multiplier bills the base rate: it never pays the owner or poisons the treasury.
+    expect(after(share(() => -2)).p1?.resources.credits).toBe(86);
+    expect(after(share(() => Number.NaN)).p1?.resources.credits).toBe(86);
+  });
+
   it('clamps upkeep at zero (a deficit just empties the treasury)', () => {
     const kernel = createKernel([economyModule]);
     const st = stateWith({

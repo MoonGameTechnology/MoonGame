@@ -33,5 +33,9 @@
     "name": "Industrial Architect",
     "description": "sci.industrial-architect.desc",
     "branch": "industry"
+  },
+  "viceroy": {
+    "name": "Viceroy",
+    "description": "sci.viceroy.desc"
   }
 }

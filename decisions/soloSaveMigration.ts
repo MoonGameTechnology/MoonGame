@@ -466,6 +466,21 @@ export const CONTROL_TECH_SOLO_MIGRATION = {
   toDataHash: '075726b65dbf6c',
 } as const;
 
+/** Catalogue + rules pair: the viceroy (BAL-19), a branchless scientist whose own line of three
+ *  main-game nodes raises the control limit 10 → 12 → 14 → 16 at +10% army upkeep each.
+ *  `economy` 1.4.0 multiplies unit upkeep through the `economy.unitUpkeep` hook, `technology`
+ *  1.7.0 adds `armyUpkeep` to it and knows a scientist by id in `has_scientist`. No saved
+ *  council holds the viceroy, and nothing new is stored, so a save of the previous release
+ *  reads as is. */
+export const VICEROY_SOLO_MIGRATION = {
+  fromRules: CONTROL_TECH_SOLO_MIGRATION.toRules,
+  fromData: CONTROL_TECH_SOLO_MIGRATION.toData,
+  fromDataHash: CONTROL_TECH_SOLO_MIGRATION.toDataHash,
+  toRules: '0294e673859e48',
+  toData: '0.1.81',
+  toDataHash: '086a8a70acb1f4',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -507,6 +522,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   INTEGRATION_SOLO_MIGRATION,
   RAMP_SETTLEMENT_SOLO_MIGRATION,
   CONTROL_TECH_SOLO_MIGRATION,
+  VICEROY_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

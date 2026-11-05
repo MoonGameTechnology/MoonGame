@@ -223,14 +223,18 @@ function pausedProduction(planet: Planet, data: GameData): ResourceBag {
  *  landing troops and planet garrisons — aggregated in ONE pass over fleets and
  *  planets (O(world), not O(players × world)). An owner with no upkeep-bearing
  *  units has no entry. `planetIds` are the planet ids sorted, as the production pass
- *  already sorted them for the same span: nothing between the two adds a world. */
+ *  already sorted them for the same span: nothing between the two adds a world.
+ *  `unitShare` is the owner's multiplier on unit upkeep (the `economy.unitUpkeep` hook);
+ *  buildings are billed as listed. */
 function upkeepByOwner(
   state: GameState,
   data: GameData,
   planetIds: readonly string[],
+  unitShare: (owner: string) => number,
 ): Map<string, ResourceBag> {
   const out = new Map<string, ResourceBag>();
   const addStacks = (owner: string, stacks: UnitStack[]) => {
+    const share = unitShare(owner);
     for (const stack of stacks) {
       const def = data.units[stack.unit];
       if (!def) {
@@ -241,7 +245,7 @@ function upkeepByOwner(
         out.set(owner, (bag = {}));
       }
       for (const res of Object.keys(def.upkeep)) {
-        bag[res] = (bag[res] ?? 0) + (def.upkeep[res] ?? 0) * stack.count;
+        bag[res] = (bag[res] ?? 0) + (def.upkeep[res] ?? 0) * stack.count * share;
       }
     }
   };
@@ -298,7 +302,8 @@ function upkeepByOwner(
  *   - production: each owned planet feeds its owner's treasury
  *     (`Player.resources`), scaled by the `economy.production` hook;
  *   - upkeep: each player pays daily maintenance for their units, drained from
- *     the same treasury (clamped at zero — a deficit just leaves you at empty).
+ *     the same treasury (clamped at zero — a deficit just leaves you at empty). The
+ *     `economy.unitUpkeep` hook scales an owner's unit bill (base 1, args `{ playerId }`).
  *
  * Both scale with `timeScale`, like every other match timer (GDD §3.1).
  */
@@ -308,7 +313,8 @@ export const economyModule: GameModule = {
   // 1.2.0: `economy.production` names the span it settles (`from`, `to`), BAL-19.
   // 1.3.0: a construction ramp is settled by Simpson's rule, exact under a share that
   // changes with time (замечание Codex на #1996).
-  version: '1.3.0',
+  // 1.4.0: хук `economy.unitUpkeep` — множитель содержания войск владельца (BAL-19).
+  version: '1.4.0',
   setup(api) {
     api.on('time.advanced', (event, h) => {
       const { from, to } = event.payload as { from: number; to: number };
@@ -378,7 +384,19 @@ export const economyModule: GameModule = {
         }
       }
 
-      const upkeepPerOwner = upkeepByOwner(h.state, data, planetIds);
+      // Asked once per owner and span. A broken multiplier bills the base rate rather than
+      // paying the owner (negative) or poisoning the treasury (non-finite).
+      const shares = new Map<string, number>();
+      const unitShare = (owner: string): number => {
+        let share = shares.get(owner);
+        if (share === undefined) {
+          const raw = h.hook<number>('economy.unitUpkeep', 1, { playerId: owner });
+          share = Number.isFinite(raw) && raw >= 0 ? raw : 1;
+          shares.set(owner, share);
+        }
+        return share;
+      };
+      const upkeepPerOwner = upkeepByOwner(h.state, data, planetIds, unitShare);
       for (const playerId of Object.keys(h.state.players).sort()) {
         const player = h.state.players[playerId];
         if (!player) {
