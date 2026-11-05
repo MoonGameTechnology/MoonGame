@@ -16,11 +16,13 @@ import { readFileSync } from 'node:fs';
 import { setLocale, t } from '../../localization/runtime';
 import {
   createInitialState,
+  UNCONTROLLED_OUTPUT,
   type Fleet,
   type GameState,
   type Planet,
   type Player,
 } from '../../packages/shared-core/src/index';
+import type { ControlCounterView } from '../../decisions/controlCounter';
 import type { MissionRow } from '../../decisions/missionView';
 import { clockHM, countdownHMS } from './format';
 import { liveTimerHtml } from './liveTimers';
@@ -207,6 +209,7 @@ async function boot(
     scoreLimit: 1000,
     nick: '',
     income: { credits: 12, metal: -3 } as Record<string, number>,
+    control: null as ControlCounterView | null,
     mobile: false,
     aiSeats: 2,
     speedControl: true,
@@ -366,6 +369,7 @@ async function boot(
     scoreLimit: () => env.scoreLimit,
     nick: () => env.nick,
     income: () => env.income,
+    control: () => env.control,
     mobile: () => env.mobile,
     aiSeats: () => env.aiSeats,
     speedControl: () => env.speedControl,
@@ -419,6 +423,39 @@ describe('строка статуса', () => {
     env.missionsOpen = false;
     m.renderTopBar([]);
     expect(el('devline-status').innerHTML).not.toContain('data-missions');
+  });
+
+  it('чип управления — планеты и лимит первым за часами; сверх лимита красный; нет лимита — нет чипа', async () => {
+    const { m, el, env } = await boot({ control: { planets: 4, limit: 5, over: 0 } });
+    m.renderTopBar([mission(false)]);
+    const tail = el('devline-status').innerHTML;
+    expect(tail.startsWith('<button type="button" class="dl-control" data-control="1"')).toBe(true);
+    expect(tail).toContain(`title="${t('hud.control.title')}"`);
+    expect(tail).toContain(`<span>${t('hud.control.label')}</span><b>4/5</b>`);
+    expect(tail.indexOf('data-control')).toBeLessThan(tail.indexOf('data-missions'));
+    env.control = { planets: 7, limit: 5, over: 2 };
+    m.renderTopBar([]);
+    expect(el('devline-status').innerHTML).toContain('class="dl-control over" data-control="1"');
+    expect(el('devline-status').innerHTML).toContain('<b>7/5</b>');
+    env.control = null;
+    m.renderTopBar([]);
+    expect(el('devline-status').innerHTML).not.toContain('data-control');
+  });
+
+  it('нажатие на чип управления объясняет правило числами', async () => {
+    const { el, env, rec } = await boot({ control: { planets: 7, limit: 5, over: 2 } });
+    const p = Math.round(UNCONTROLLED_OUTPUT * 100);
+    el('devline').click(hit('[data-control]'));
+    expect(rec.notes).toEqual([
+      [t('hud.control.tip.over', { n: 5, limit: 5, over: 2, p }), undefined],
+    ]);
+    env.control = { planets: 3, limit: 10, over: 0 };
+    el('devline').click(hit('[data-control]'));
+    expect(rec.notes[1]![0]).toBe(t('hud.control.tip', { n: 3, limit: 10, over: 0, p }));
+    // Лимит перестал действовать между кадром и нажатием — молча.
+    env.control = null;
+    el('devline').click(hit('[data-control]'));
+    expect(rec.notes).toHaveLength(2);
   });
 
   it('волна стоит у часов: номер, всего и отсчёт до следующей', async () => {
@@ -934,6 +971,11 @@ describe('стык с main.ts', () => {
     expect(MAIN).toMatch(/renderEndScreen\(\);\s*renderSpeedbar\(\);/);
     expect(MAIN).toContain('updateThreatAlerts(); // «враг у ваших рубежей»');
     expect(MAIN).toContain('onToggle: forgetStatusLine,');
+    // Счётчик управления — памятка кадра на общем списке миров, как доход: не седьмой обход
+    // всех миров за кадр.
+    expect(MAIN).toContain(
+      "perWorld('control', () => controlCounter(s, data, ME, controlLimitOf(s, ME), worldPlanets()))",
+    );
   });
 
   it('смена матча сбрасывает тревоги и прячет досье', () => {

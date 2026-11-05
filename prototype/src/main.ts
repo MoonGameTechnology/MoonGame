@@ -30,6 +30,7 @@ import {
   unreadMsgs,
 } from './messageLog';
 import { pendingDecisions } from '../../decisions/pendingDecisions';
+import { controlCounter, type ControlCounterView } from '../../decisions/controlCounter';
 import { battleConcernsMe } from './attentionBadges';
 import { pendingHtml } from './pendingPanel';
 import { tabPick, tabsForSelection } from '../../decisions/worldFleetTabs';
@@ -110,6 +111,7 @@ import {
   HOUR,
   buildBuilding,
   netIncome,
+  controlLimitOf,
   capitalOf,
   buySupply,
   type AiProfile,
@@ -1216,6 +1218,7 @@ initMapFog({
  *  кадр берёт сам. */
 interface WorldDerived {
   income: Record<string, number>;
+  control: ControlCounterView | null;
   sight: SightCircle[];
   aa: RangeRing[];
   radar: RadarSources;
@@ -2129,6 +2132,8 @@ initTopBar({
   scoreLimit: () => SCORE_LIMIT,
   nick: () => nickInput.value,
   income: () => perWorld('income', () => netIncome(s, ME, worldPlanets())),
+  control: () =>
+    perWorld('control', () => controlCounter(s, data, ME, controlLimitOf(s, ME), worldPlanets())),
   mobile: () => MOBILE,
   aiSeats: () => AI_PLAYERS.size,
   speedControl: () => devSpeedControl,

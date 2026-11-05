@@ -13,9 +13,14 @@
  * живут в `main.ts`; модуль получает их хуками {@link initTopBar}: импорт оттуда был бы циклом.
  */
 import type { GameState } from '../../packages/shared-core/src/index';
-import { identifiedNodes, scanNodeThreats } from '../../packages/shared-core/src/index';
+import {
+  identifiedNodes,
+  scanNodeThreats,
+  UNCONTROLLED_OUTPUT,
+} from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { capitalProgress } from '../../decisions/capitalProgress';
+import { controlTip, type ControlCounterView } from '../../decisions/controlCounter';
 import { allyPanelView } from '../../decisions/allyPanel';
 import { devourSieges } from '../../decisions/devourSiege';
 import type { MissionRow } from '../../decisions/missionView';
@@ -98,6 +103,9 @@ export interface TopBarHost {
   nick(): string;
   /** Приток и расход ресурсов в час — памятка кадра. */
   income(): Record<string, number>;
+  /** Планеты места и лимит управления (`decisions/controlCounter.ts`) — памятка кадра;
+   *  `null`, где лимит не действует. */
+  control(): ControlCounterView | null;
   /** Телефонная раскладка. */
   mobile(): boolean;
   /** Сколько мест ведёт локальный ИИ. */
@@ -373,6 +381,13 @@ export function renderTopBar(missions: MissionRow[]): void {
     ? `<button type="button" class="dl-ally${game.allyPulsing() ? ' pulse' : ''}" data-ally-open="1" title="${esc(t('ally.title'))}">` +
       `<i aria-hidden="true">${ALLY_EMBLEM}</i><span>${esc(t('ally.label'))}</span><b>${esc(t(`ally.step.${allyView.step}`))}</b></button>`
     : '';
+  // BAL-19: планеты места и лимит управления сразу за часами. Сверх лимита чип красный, как
+  // фишка «Вне управления» в окне мира; нажатие объясняет правило числами.
+  const control = game.control();
+  const controlHtml = control
+    ? `<button type="button" class="dl-control${control.over > 0 ? ' over' : ''}" data-control="1" title="${esc(t('hud.control.title'))}">` +
+      `<i aria-hidden="true">⊙</i><span>${esc(t('hud.control.label'))}</span><b>${control.planets}/${control.limit}</b></button>`
+    : '';
   // В забеге время суток ничего не значит (дня в шапке нет) — часы показывают, сколько
   // забег идёт, в тех же реальных минутах, что и все его таймеры.
   const clockHtml = `<span id="clock">${isSectorZeroRun() ? runClockText(s.time) : clockHM(s.time)}</span>`;
@@ -381,6 +396,7 @@ export function renderTopBar(missions: MissionRow[]): void {
     lastClockHead = clockHtml;
   }
   const statusHtml =
+    controlHtml +
     missionHtml +
     allyHtml +
     siegeHtml +
@@ -732,6 +748,14 @@ export function initTopBar(host: TopBarHost): void {
     }
     if ((event.target as Element).closest('[data-ally-open]')) {
       game.openAlly();
+      return;
+    }
+    if ((event.target as Element).closest('[data-control]')) {
+      const view = game.control();
+      if (view) {
+        const tip = controlTip(view, UNCONTROLLED_OUTPUT);
+        note(t(tip.key, tip.args));
+      }
       return;
     }
   });

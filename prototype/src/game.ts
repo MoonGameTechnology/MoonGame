@@ -75,7 +75,13 @@ export {
   HUNGER_MULT,
   hungerModule,
 } from '../../packages/shared-core/src/index';
-export { completedUnitSpend, economySnapshot, netIncome, hpOfLevel } from './economy';
+export {
+  completedUnitSpend,
+  controlLimitOf,
+  economySnapshot,
+  netIncome,
+  hpOfLevel,
+} from './economy';
 // BAL-5: разложение счёта на слагаемые — читает харнес замера (`selfplay.mjs`).
 export { scoreParts, type ScoreParts } from './scoreParts';
 // AI-BAL-10: диагноз мёртвого контента для харнеса замера. Чистая функция (исходник бота
