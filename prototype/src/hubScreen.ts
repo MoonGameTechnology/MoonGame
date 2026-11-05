@@ -159,6 +159,7 @@ export function hubTab(tab: string): void {
   // Retired tabs and stale links return to the home panel instead of a blank hub.
   if (!Object.hasOwn(HUB_PANELS, tab)) tab = 'home';
   currentHubTab = tab;
+  hubEl.dataset.panel = tab;
   // ADDR-4: свои партии — главный экран, а не вкладка обозревателя, поэтому лента
   // переспрашивается при каждом заходе домой (день и число игроков успевают устареть).
   if (tab === 'home') detach('хаб: свои партии', refreshMyMatches());
