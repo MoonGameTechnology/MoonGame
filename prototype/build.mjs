@@ -610,7 +610,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <div class="sz-bottomline"><span data-i18n="sector-zero.title"></span><span aria-hidden="true">00 / ∞</span></div>
   </div>
 </section>
-<div id="hub">
+<!-- data-panel — видимая вкладка (hubScreen.ts ставит её при каждом переходе); с неё же
+     CSS прячет шапку профиля и валют вне «Домой». -->
+<div id="hub" data-panel="home">
   <div class="hub-id">
     <button type="button" class="hub-av" id="hubav" data-i18n-title="hub.avatar.title" data-i18n-aria="hub.avatar.title">◆</button>
     <div class="hub-who">

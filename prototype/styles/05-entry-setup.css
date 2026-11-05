@@ -66,7 +66,7 @@
 #connect[data-stage="browse"]{padding:0;align-items:stretch;background:var(--sf-panel),#030b14;}
 #connect[data-stage="browse"] .cwrap{display:flex;flex-direction:column;width:100%;margin:0;padding:0;}
 #connect[data-stage="browse"] :is(.clang,.cfoot,.cver,.cupd,.tm-open){display:none;}
-#connect[data-stage="browse"] .cbox{flex:1 1 auto;display:flex;flex-direction:column;gap:12px;width:100%;min-height:0;margin:0;
+#connect[data-stage="browse"] .cbox{flex:1 1 auto;display:flex;flex-direction:column;gap:10px;width:100%;min-height:0;margin:0;
   border:0;border-radius:0;background:none;box-shadow:none;color:var(--sf-text);
   font-family:var(--sf-font);font-variant-numeric:tabular-nums;
   padding:calc(8px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
@@ -93,7 +93,7 @@
 #connect .mtab.active .mcount{background:color-mix(in srgb,var(--sf-accent) 22%,transparent);color:var(--sf-hi);}
 /* The session number is the copy action; legacy UUIDs never dictate the card width. */
 :is(#hub,#connect) .mnumber{display:inline-flex;align-items:center;gap:8px;max-width:100%;min-height:36px;
-  padding:6px 10px;margin-top:8px;border:1px solid var(--sf-edge);border-radius:8px;
+  padding:6px 10px;margin-top:6px;border:1px solid var(--sf-edge);border-radius:8px;
   background:var(--sf-inset);color:var(--sf-accent);font:600 13px/1.4 var(--sf-font);
   font-variant-numeric:tabular-nums;cursor:pointer;text-align:left;}
 :is(#hub,#connect) .mnumber-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -108,7 +108,7 @@
 @media (pointer:coarse){:is(#hub,#connect) .mnumber{min-height:44px;}}
 /* Середина листается целиком: карточка сервера, фильтр и список. */
 #connect .mbody{order:4;flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  display:flex;flex-direction:column;gap:12px;}
+  display:flex;flex-direction:column;gap:10px;}
 /* «Сервер не отвечает» — адрес виден, только когда он нужен (decisions/browserFallback.ts, правило 4). */
 #connect .msrv{flex:none;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 12px;padding:14px 16px;
   border:1px solid color-mix(in srgb,var(--amber) 55%,transparent);border-radius:12px;background:var(--sf-card);}
@@ -172,7 +172,7 @@
    входа, описания и архива стоят своим рядом, чтобы не сжимать название карты.
    На ПК кнопки справа от обеих строк (bridge-shell.css). */
 #connect .mrow{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name btns" "meta meta";
-  align-items:center;gap:6px 12px;padding:12px 14px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);}
+  align-items:center;gap:4px 10px;padding:10px 12px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);}
 #connect .mrow.mrow-2{grid-template-areas:"name name" "meta meta" "number number" "btns btns";}
 #connect .mrow .mnumber{grid-area:number;justify-self:start;}
 #connect .mrow:hover{border-color:var(--sf-edge-hi);}

@@ -99,6 +99,16 @@ describe('главный экран хаба (UIX-10.1)', () => {
     expect(MAIN).toMatch(/initMatchBrowser\(\{[\s\S]*?\n {2}hubTab,\n[\s\S]*?\n\}\);/);
   });
 
+  it('шапка с профилем и валютами — только на «Домой» (заказ владельца 2026-11-05)', () => {
+    // Вкладку хаб пишет в data-panel при каждом переходе; разметка начинает с «Домой»,
+    // поэтому шапка не мигает до первого перехода. Поведение в браузере держит
+    // `hubnavigationtest.mjs`.
+    const css = readFileSync(new URL('../styles/06-hub.css', import.meta.url), 'utf8');
+    expect(BUILD).toContain('<div id="hub" data-panel="home">');
+    expect(HUB).toContain('hubEl.dataset.panel = tab;');
+    expect(css).toContain('#hub:not([data-panel=home]) .hub-id{display:none;}');
+  });
+
   it('новости открываются кнопкой в шапке, главный экран остаётся для игр', () => {
     expect(HOME).not.toContain('id="news-teaser"');
     expect(HOME).not.toContain('id="news-col"');
