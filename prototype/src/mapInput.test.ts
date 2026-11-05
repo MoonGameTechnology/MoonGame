@@ -211,6 +211,7 @@ async function boot(opts: { pc?: boolean } = {}) {
     mobileOrderKind: ca.mobileOrderKind,
     mobileTargetAvailable: ca.mobileTargetAvailable,
     mobileTargetLabel: ca.mobileTargetLabel,
+    troopsMenu: () => {},
   });
   ca.initCmdActions({
     world: () => env.world,
