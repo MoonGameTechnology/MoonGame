@@ -35,11 +35,9 @@ export function mobileTargetPoint(
   target: MobileOrderTarget,
   planet: (id: string) => Point | null,
   fleet: (id: string) => Point | null,
+  lane: (target: Extract<MobileOrderTarget, { kind: 'lane' }>) => Point | null,
 ): Point | null {
   if (target.kind === 'planet') return planet(target.id);
   if (target.kind === 'fleet') return fleet(target.id);
-  const a = planet(target.from),
-    b = planet(target.to);
-  if (!a || !b) return null;
-  return { x: a.x + (b.x - a.x) * target.t, y: a.y + (b.y - a.y) * target.t };
+  return lane(target);
 }
