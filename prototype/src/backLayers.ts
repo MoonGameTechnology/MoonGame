@@ -139,6 +139,7 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['trader', 'layer'], // торговец экспедиции («живой курс»), z47
   ['ally', 'layer'], // связь с союзником главы IV (PVR-7.5), z47
   ['constructor', 'layer'], // «Производство» — заказ и оснащение (REFM-13, ROS-3.1), z47
+  ['troopswin', 'layer'], // separate loading/unloading dialog, z47
   ['codex', 'layer'], // кодекс объекта, z46
   ['tgted', 'layer'], // меню точки в режиме «Приказ» (CHAIN-UX), z46
   ['logwin', 'layer'], // журнал, z46

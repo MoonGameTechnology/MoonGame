@@ -98,13 +98,15 @@ describe('army transfer source rows', () => {
     const before = structuredClone(state);
     const rows = armyTransferRows(state, fleet, true, data);
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toMatchObject({ key: 'garrison:new', grade: 0, health: 100, reserved: 0 });
+    expect(rows[0]).toMatchObject({ key: 'garrison:new', grade: 0, health: 100, hp: 80, maxHp: 80, reserved: 0 });
     expect(rows[1]).toMatchObject({
       key: 'garrison:veteran',
       group: 'veteran',
       grade: 3,
       battles: 3,
       health: 50,
+      hp: 40,
+      maxHp: 80,
       garrison: 4,
       reserved: 3,
       queued: 1,
@@ -114,6 +116,8 @@ describe('army transfer source rows', () => {
       group: 'aboard',
       grade: 1,
       health: 50,
+      hp: 30,
+      maxHp: 60,
       hold: 1,
       holdAll: 3,
       queued: 2,

@@ -291,6 +291,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <!--dev-only--><span class="sep" id="restart-sep" style="display:none"></span><button id="restart" data-i18n-title="speed.restart" style="display:none">⟳</button><span class="sep"></span><!--/dev-only--><button id="tomenu" class="spd-pc-hide" data-i18n-title="speed.exit">⌂</button>
 </div>
 <div id="cmdbar"></div>
+<div id="troopswin" role="dialog" aria-modal="true" aria-labelledby="troops-title" hidden><div class="troops-box"><header class="troops-head"><div><b id="troops-title" data-i18n="fleet.console.load"></b><span class="troops-fleet"></span></div><button type="button" class="btn-x" data-cmd="tcancel" data-i18n-aria="card.close">×</button></header><div class="troops-content"></div></div></div>
 <div id="codex"></div>
 <div id="codexhub"></div>
 <div id="intro"></div>

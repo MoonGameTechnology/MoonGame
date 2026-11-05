@@ -182,6 +182,9 @@ jobs:
       - name: Hub navigation smoke
         run: node prototype/hubnavigationtest.mjs
 
+      - name: Army transfer window smoke
+        run: node prototype/troopselectiontest.mjs
+
       - name: Corporation identity smoke
         run: node prototype/corptest.mjs --identity-only
 

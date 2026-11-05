@@ -5253,6 +5253,7 @@ export const en: Record<string, string> = {
   'troops.recruits': 'Recruits',
   'troops.battles': 'Battles: {n}',
   'troops.health': 'Health: {n}%',
+  'troops.hp': 'HP: {a}/{b}',
   'troops.reserved': 'Reserved: {n}',
   'troops.refresh': 'Refresh formations',
   'troops.transferring': 'Transfer in progress: {n}',

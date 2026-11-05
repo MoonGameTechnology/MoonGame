@@ -101,6 +101,8 @@ export interface CmdBarHost {
   mobileTargetAvailable(target: MobileOrderTarget, order: MobileOrderKind): boolean;
   /** Подпись цели черновика. */
   mobileTargetLabel(target: MobileOrderTarget): string;
+  /** Dedicated transfer window, outside the command grid and selection sheet. */
+  troopsMenu(html: string, fleetName?: string): void;
 }
 
 let game: CmdBarHost;
@@ -238,6 +240,7 @@ export function renderCmdBar(): void {
   // без выделения (режим держит свои fleetIds), поэтому ветка стоит ДО раннего
   // выхода на пустом выделении.
   if (chainMode) {
+    game.troopsMenu('');
     renderChainBar();
     return;
   }
@@ -246,6 +249,7 @@ export function renderCmdBar(): void {
   // консоли ПК ряд стоит в том же окне выбора, и окно ловило клик по точке вместо карты.
   // Приказы ряда отходу не нужны: прицел снимают тап по точке, Escape и Back.
   if (retreatAim) {
+    game.troopsMenu('');
     cmdbar.classList.remove('show');
     return;
   }
@@ -257,6 +261,7 @@ export function renderCmdBar(): void {
   // живым и на нуле выделенных: ⊕ обязана остаться достижимой, иначе опустевшая группа
   // запирает игрока в режиме без выхода.
   if (!barStays(ids.length, pickMode)) {
+    game.troopsMenu('');
     // Прицелы и меню ряда гаснут вместе с ним (`armDisarm.ts`, правило 13): иначе ⇵ или ✨
     // всплыли бы над СЛЕДУЮЩИМ выбранным флотом, а повторный выбор открывал бы их сам.
     disarm('bar-hidden', MOBILE);
@@ -265,6 +270,7 @@ export function renderCmdBar(): void {
     return;
   }
   if (MOBILE && (game.mobileOrderKind() || pickMode)) {
+    game.troopsMenu('');
     const order = game.mobileOrderKind();
     if (
       !mobileDraftMatches(mobileDraft, order, ids) ||
@@ -344,9 +350,7 @@ export function renderCmdBar(): void {
   // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
-  // Окно флота консолью (ПК, один свой флот): ⇅ переезжает в колонку «Десант» листа
-  // кнопкой «Погрузка и выгрузка», и его меню встаёт поверх той же колонки. Пустой трюм
-  // колонку не рисует — тогда ⇅ остаётся в ряду, а меню встаёт поверх «Состава».
+  // The console keeps the transfer launcher in its landing column.
   const consoleOn = !!lone && game.consoleFleet() === lone;
   const landShown = consoleOn && game.fleetLandShown(lone);
   // Hero-flagship aboard a selected fleet → its castable abilities become a ✨ popover
@@ -370,6 +374,7 @@ export function renderCmdBar(): void {
   );
   if (!life.cast) drop('castMenu');
   if (!life.troops) drop('troopsPlan');
+  renderTroopsMenu(troopsPlan && troopsIn ? troopsIn : null);
   // Состав ряда — `cmdPresence.ts` (REFM-185): серая кнопка и ОТСУТСТВУЮЩАЯ значат
   // разное. Отсутствием показывается то, чего у выделения нет по природе (нечего
   // останавливать, нет флагмана, нет артиллерии), гашением — то, что есть, но сейчас
@@ -545,9 +550,7 @@ export function renderCmdBar(): void {
           })
           .join('') +
         `</div><span class="retr-hint">${t('cmd.retreat.hint')}</span></div>`
-      : '') +
-    // ⇅ поповер десанта: строка на тип, знаковый счётчик «сколько», одно подтверждение.
-    (troopsPlan && troopsIn && !consoleOn ? troopsPopHtml(troopsIn) : '');
+      : '');
   if (game.holo()) {
     // Пустой набор группы — это режим, а не «0 флотов».
     const title = lone
@@ -573,7 +576,6 @@ export function renderCmdBar(): void {
       title,
       sub,
       !!lone && !aiming && !merging && !pickMode,
-      consoleOn && troopsPlan && troopsIn ? troopsPopHtml(troopsIn) : '',
     );
   }
   if (html !== lastCmdHtml) {
@@ -590,7 +592,14 @@ export function renderCmdBar(): void {
   cmdbar.classList.add('show');
 }
 
-/** ⇅-меню десанта: строка на тип, знаковый счётчик «сколько», одно подтверждение. */
+function renderTroopsMenu(input: TroopsInput | null): void {
+  game.troopsMenu(
+    input ? troopsPopHtml(input) : '',
+    input && troopsPlan ? fleetCallsign(troopsPlan.fleetId) : '',
+  );
+}
+
+/** Transfer content: one row per formation and one confirmation for the plan. */
 function troopsPopHtml(input: TroopsInput): string {
   const s = game.world();
   const ME = game.me();

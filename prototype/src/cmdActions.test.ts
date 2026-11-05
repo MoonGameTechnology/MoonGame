@@ -175,6 +175,7 @@ async function boot() {
     mobileOrderKind: ca.mobileOrderKind,
     mobileTargetAvailable: ca.mobileTargetAvailable,
     mobileTargetLabel: ca.mobileTargetLabel,
+    troopsMenu: () => {},
   });
   ca.initCmdActions({
     world: () => env.world,

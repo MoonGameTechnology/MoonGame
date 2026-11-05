@@ -5,7 +5,7 @@
  * The pure model reserves actual free cargo, never space from a future unload.
  */
 import { t } from '../../localization/runtime';
-import { esc } from './format';
+import { esc, kfmt } from './format';
 import type { ArmyGroupDetails } from '../../decisions/armyTransferRows';
 
 /** Одна строка меню — выбранная группа в гарнизоне или трюме. */
@@ -212,8 +212,7 @@ const maxBtn = (
 ): string =>
   `<button data-cmd="tmax" class="tall btn-quiet" data-unit="${esc(unit)}" data-group="${esc(group)}" data-dir="${dir}" title="${esc(title)}" aria-label="${esc(title)}"${off ? ' disabled' : ''}>${glyph}</button>`;
 
-/** Разметка поповера. Живёт внутри строки #cmdbar, поэтому диспатчится общим
- *  `data-cmd`-обработчиком ряда и не заводит ни своего узла, ни своего слушателя.
+/** Contents of the transfer window. Commands use the fleet command dispatcher.
  *  Живых тикающих чисел здесь нет намеренно: ряд диффится по строке каждый кадр,
  *  и счётчик времени переписывал бы DOM под пальцем, глотая нажатия. */
 export function troopsMenuHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
@@ -227,7 +226,7 @@ export function troopsMenuHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
       const group = rowKey(r);
       const locationKey = r.side === 'garrison' ? 'troops.at-world' : 'troops.aboard';
       const details = r.side
-        ? `<span class="tgroup-grade">${esc(r.grade ? t('troops.service', { n: r.grade }) : t('troops.recruits'))} · ${esc(t('troops.battles', { n: r.battles ?? 0 }))}</span><span class="tgroup-health${(r.health ?? 100) < 100 ? ' wounded' : ''}">${esc(t('troops.health', { n: r.health ?? 100 }))}<span aria-hidden="true" class="tgroup-bar"><i style="width:${r.health ?? 100}%"></i></span></span>`
+        ? `<span class="tgroup-grade">${esc(r.grade ? t('troops.service', { n: r.grade }) : t('troops.recruits'))} · ${esc(t('troops.battles', { n: r.battles ?? 0 }))}</span><span class="tgroup-health${(r.health ?? 100) < 100 ? ' wounded' : ''}">${r.hp !== undefined && r.maxHp !== undefined ? `<b>${esc(t('troops.hp', { a: kfmt(r.hp), b: kfmt(r.maxHp) }))}</b> · ` : ''}${esc(t('troops.health', { n: r.health ?? 100 }))}<span aria-hidden="true" class="tgroup-bar"><i style="width:${r.health ?? 100}%"></i></span></span>`
         : '';
       const countLabel = r.side
         ? esc(t(locationKey, { n: r.side === 'garrison' ? r.garrisonAll : r.holdAll }))
@@ -260,6 +259,7 @@ export function troopsMenuHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
     // прямой ответ на «сколько ещё влезет», ради которого меню и заводилось.
     `<div class="thead">${esc(t('troops.title'))} · ${esc(t('troops.hold', { a: m.capacity - m.freeCargo, b: m.capacity }))}${planned}</div>` +
     `<div class="tlegend">${esc(t('side.ground.legend'))}</div>` +
+    `<div class="tlist">` +
     rows +
     (m.rows.some((r) => r.prepared === false)
       ? `<button type="button" class="btn-second" data-cmd="trefresh">${esc(t('troops.refresh'))}</button>`
@@ -271,9 +271,10 @@ export function troopsMenuHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
     (m.garrisonDry ? `<div class="tnote warn">${esc(t('cargo.garrison-empty'))}</div>` : '') +
     `<div class="tnote">${esc(t('troops.timing'))}</div>` +
     `<div class="tnote">${esc(t('troops.selection-note'))}</div>` +
+    (m.asking && m.askFirst ? `<div class="tnote">${esc(t('troops.first.ask'))}</div>` : '') +
+    `</div>` +
     (m.asking && m.askFirst
-      ? `<div class="tnote">${esc(t('troops.first.ask'))}</div>` +
-        `<div class="tacts">` +
+      ? `<div class="tacts">` +
         `<button data-cmd="tfirst" data-first="wounded" class="cbtn btn-main">${esc(t('troops.first.wounded'))}</button>` +
         `<button data-cmd="tfirst" data-first="healthy" class="cbtn btn-main">${esc(t('troops.first.healthy'))}</button>` +
         `<button data-cmd="tcancel" class="cbtn btn-quiet">${esc(t('ping.cancel'))}</button>` +
