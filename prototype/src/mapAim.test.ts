@@ -464,6 +464,8 @@ describe('REFM-233 — прицелы и цели на карте', () => {
     aim.drawAimPreview(0);
     expect(arcAt(frame.calls, env.draft, targetPipRadius(false))).toBe(true);
     expect(frame.named('stroke')[0]!.stroke).toBe(rgba(palette.LOCK, 0.6));
+    expect(frame.named('fillText')).toHaveLength(1);
+    expect(frame.named('fillText')[0]!.args.slice(1)).toEqual([env.draft.x, env.draft.y - 22]);
   });
 });
 
