@@ -57,6 +57,7 @@ import type { UnitCatalogTab } from './buildScreen';
 import { bombardVolleyAt } from './bombardClock';
 import { builtTileHtml } from './catalogTile';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
+import { controlLimitOf } from './economy';
 import { buildingName, cost, displayUnit, esc, resLine } from './format';
 import { data } from './gameData';
 import { canOrder, ctx } from './game';
@@ -723,7 +724,7 @@ export function planetPanelHtml(p: Planet): string {
     // ECON-2: блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
     blackout: showsBlackout(mine, s.players[ME]?.arrears),
     // BAL-19: своя планета за лимитом управления — половина дохода, юниты не строятся.
-    uncontrolled: mine && uncontrolledPlanets(s, data, ME, s.modeId).has(p.id),
+    uncontrolled: mine && uncontrolledPlanets(s, data, ME, s.modeId, controlLimitOf(s, ME)).has(p.id),
     // BAL-19: освоение взятой планеты — у взявшего доля выхода, у потерявшего право отбить.
     integration:
       p.integration && isIntegrating(p, s.time)

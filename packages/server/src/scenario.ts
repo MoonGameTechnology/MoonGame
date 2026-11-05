@@ -100,7 +100,11 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '102'; // BAL-19: порядок тот же; `economy` 1.3.0 считает
+export const MODULE_MANIFEST_VERSION = '103'; // BAL-19: порядок тот же; `technology` 1.6.0 —
+// узлы с `effects.controlLimit` поднимают лимит управления через хук `control.limit` (три узла
+// «Командования» основной игры: 5 → 6 → 8 → 10). Партия на 102 держала бы лимит 5 при любых
+// исследованиях.
+// export const MODULE_MANIFEST_VERSION = '102'; // BAL-19: порядок тот же; `economy` 1.3.0 считает
 // стройку за порогом 50% по правилу Симпсона, и на осваиваемой планете её доход точен при любой
 // нарезке времени (замечание Codex на #1996). Партия на 101 начисляла бы такой стройке разное
 // в зависимости от того, как часто обновляется мир.

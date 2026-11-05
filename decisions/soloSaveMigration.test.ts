@@ -39,6 +39,7 @@ import {
   CONTROL_RECHECK_SOLO_MIGRATION as controlRecheck,
   INTEGRATION_SOLO_MIGRATION as integration,
   RAMP_SETTLEMENT_SOLO_MIGRATION as rampSettlement,
+  CONTROL_TECH_SOLO_MIGRATION as controlTech,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -184,7 +185,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement, controlTech]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -666,5 +667,19 @@ describe('the rules-only ramp settlement pair', () => {
     before.state.version = { data: rampSettlement.fromData, dataHash: rampSettlement.fromDataHash, manifest: '1' };
     const raw = serializeSoloSave(before, rampSettlement.fromRules);
     expect(parseCompatibleSoloSave(raw, rampSettlement.toRules)).toEqual(before);
+  });
+});
+
+describe('the control technologies catalogue and rules pair (0.1.79 → 0.1.80)', () => {
+  it('reads a save of the ramp settlement release and moves only the catalogue pin', () => {
+    const before = oldSave();
+    before.state.version = { data: controlTech.fromData, dataHash: controlTech.fromDataHash, manifest: '1' };
+    const raw = serializeSoloSave(before, controlTech.fromRules);
+    expect(parseCompatibleSoloSave(raw, controlTech.toRules)).toEqual({
+      ...before,
+      state: { ...before.state, version: {
+        ...before.state.version, data: controlTech.toData, dataHash: controlTech.toDataHash,
+      } },
+    });
   });
 });

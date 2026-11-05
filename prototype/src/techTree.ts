@@ -69,6 +69,9 @@ export const TECH_ICONS: Record<string, string> = {
   signal_corps: '📶',
   logistics_command: '🧠',
   ai_stewardship: '😴',
+  provincial_administration: '🏛',
+  colonial_governance: '🗺',
+  imperial_chancery: '📜',
 };
 export const TECH_FX_LABEL: Record<string, string> = {
   productionBonus: 'tech.fx.production',
@@ -151,6 +154,7 @@ export function techFx(td: TechDefLike): string {
     .filter(([, v]) => (v as number) !== 0)
     .map(([k, v]) => {
       if (k === 'heroSlots') return t('tech.fx.hero-slots', { n: v });
+      if (k === 'controlLimit') return t('tech.fx.control-limit', { n: v });
       const label =
         k === 'combatDamageBonus' && td.damageScope
           ? DAMAGE_SCOPE_LABEL[td.damageScope]

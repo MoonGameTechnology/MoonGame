@@ -61,6 +61,9 @@ export function researchOrders(bot: AiTurn, home: HomeTurn): void {
     const rank = (id: string): number => {
       const def = data.technologies[id]!;
       if (def.ruleset === 'main' && def.tier === 1 && def.unlocks.units?.length) return -1;
+      // BAL-19: планета за лимитом управления даёт половину и не строит юниты, поэтому узел,
+      // поднимающий лимит, идёт вровень с путём доктрины, пока такие планеты есть.
+      if (bot.beyondLimit && (def.effects.controlLimit ?? 0) > 0) return 0;
       return ranks?.get(id) ?? 2;
     };
     const open = Object.keys(data.technologies)

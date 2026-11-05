@@ -4,6 +4,7 @@ import type { GameModule } from '../kernel/module';
 import { economyModule } from './economy';
 import { constructionModule } from './construction';
 import { capitalModule } from './capital';
+import { technologyModule } from './technology';
 import {
   controlModule,
   controlledPlanets,
@@ -37,6 +38,10 @@ const data: GameData = parseGameData({
   },
   modes: {
     waves: { name: 'Waves', pve: { waves: 1, npcFaction: 'x', waveIntervalHours: 1 } },
+  },
+  technologies: {
+    office: { name: 'Office', effects: { controlLimit: 1 } },
+    chancery: { name: 'Chancery', effects: { controlLimit: 1 } },
   },
   events: {},
 });
@@ -281,6 +286,31 @@ describe('control module', () => {
     const r = okAdvance(kernel.advanceTo(s, ctx(HOUR)));
     expect(r.state.players.p1!.resources.metal).toBeCloseTo(100 + 6 * 10 + 2 * 10 * UNCONTROLLED_OUTPUT);
     expect(r.state.players.p2!.resources.metal).toBeCloseTo(100 + 10);
+  });
+
+  it('research raises the limit: the planets it brings under control yield in full and build units', () => {
+    const kernel = createKernel([economyModule, constructionModule, controlModule, technologyModule]);
+    const researched = (...ids: string[]): GameState => {
+      const s = chain();
+      s.players.p1!.technologies = { completed: ids };
+      return s;
+    };
+    const metal = (s: GameState): number =>
+      okAdvance(kernel.advanceTo(s, ctx(HOUR))).state.players.p1!.resources.metal ?? 0;
+    // +1: six planets in full, a6 still at half; +2: all seven in full.
+    expect(metal(researched('office'))).toBeCloseTo(100 + 6 * 10 + 10 * UNCONTROLLED_OUTPUT);
+    expect(metal(researched('office', 'chancery'))).toBeCloseTo(100 + 7 * 10);
+    expect(kernel.applyAction(researched('office'), unitOrder('a5'), ctx(0)).ok).toBe(true);
+    expect(kernel.applyAction(researched('office'), unitOrder('a6'), ctx(0))).toMatchObject({
+      ok: false,
+      code: 'E_NOT_CONTROLLED',
+    });
+    // Without the technology module nothing answers the hook, and the limit stays at five.
+    const bare = createKernel([constructionModule, controlModule]);
+    expect(bare.applyAction(researched('office'), unitOrder('a5'), ctx(0))).toMatchObject({
+      ok: false,
+      code: 'E_NOT_CONTROLLED',
+    });
   });
 
   it('is inert in a PvE mode', () => {

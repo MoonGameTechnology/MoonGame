@@ -22,8 +22,10 @@ import { recordValues } from '../util/records';
  *   - builds no units (`construction.requirement` → `E_NOT_CONTROLLED`); buildings are
  *     still allowed. A unit already building there when control moves away is parked
  *     (`control.changed`) and resumes only under control again.
- * The limit is CONTROL_LIMIT run through the `control.limit` hook (args `{ playerId }`), the
- * seam technologies raise it through. Designating another capital moves control with it.
+ * The limit is CONTROL_LIMIT run through the `control.limit` hook (args `{ playerId }`): the
+ * technology module adds the `controlLimit` of the player's research there. A raised limit only
+ * brings planets under control, so nothing running needs to be re-asked. Designating another
+ * capital moves control with it.
  *
  * Inert in a PvE match (Sector Zero and the online waves keep their own economy) and for a
  * seat with no capital on record (scenarios, NPC sides): no anchor means no limit.
@@ -128,7 +130,8 @@ export function controlledPlanets(
 /**
  * `owner`'s planets beyond the limit: each yields UNCONTROLLED_OUTPUT and builds no units.
  * Empty when the limit does not bind them. For hosts reading a settled state (the HUD, the
- * bots); the kernel asks the same {@link controlledPlanets}.
+ * bots); the kernel asks the same {@link controlledPlanets}. A host passes the owner's limit as
+ * the kernel sees it, research included (`CONTROL_LIMIT + controlLimitBonus`).
  */
 export function uncontrolledPlanets(
   state: GameState,
