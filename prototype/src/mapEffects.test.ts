@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import type { GameState } from '../../packages/shared-core/src/index';
 import { rgba } from '../../packages/client/src/holoDraw';
 import { toBake } from '../../decisions/mapLayerView';
+import { LANDING_FLASH_MS, landingBurst } from '../../decisions/troopTransferEffects';
 import { AA_SHOTS_MAX } from './fireEffects';
 import { FLAK_LIFE_MS, flakBurstRadius, flakDashOffset, flakLook, type FlakTier } from './flakTiers';
 import { fadeOf, growRadius, noticeRing, waveRadius } from './flashFx';
@@ -269,6 +270,31 @@ describe('REFM-234 — вспышки на карте', () => {
     expect(fx.noticeFlashes).toHaveLength(16);
     expect(fx.noticeFlashes[0]!.at.x).toBe(4);
   });
+
+  it('высадка: поверхность мира вспыхивает цветом штурма, кольцо уходит наружу и гаснет за 600 мс', async () => {
+    const { fx, env, frame, palette, home, at } = await boot();
+    fx.flashLanding(null);
+    expect(fx.noticeFlashes).toHaveLength(0);
+    fx.flashLanding(home.position);
+    env.now += LANDING_FLASH_MS / 2; // малая вспышка за это время уже погасла бы
+    fx.drawNoticeFlashes(env.now);
+    const burst = landingBurst(0.5, true);
+    const c = at(home.position);
+    expect(arcAt(frame.calls, c, burst.glow)).toBe(true);
+    expect(arcAt(frame.calls, c, burst.ring)).toBe(true);
+    expect(frame.named('fill')[0]!.fill).toBe(rgba(palette.ASSAULT_TONE, 0.3 * burst.alpha));
+    expect(frame.named('stroke')[0]!.stroke).toBe(rgba(palette.ASSAULT_TONE, 0.9 * burst.alpha));
+    // Без движения кольцо стоит на середине разлёта и только гаснет.
+    const prefs = await import('./graphicsPrefs');
+    prefs.setMotion(false);
+    frame.calls.length = 0;
+    fx.drawNoticeFlashes(env.now);
+    expect(arcAt(frame.calls, c, landingBurst(0.5, false).ring)).toBe(true);
+    prefs.setMotion(true);
+    env.now += LANDING_FLASH_MS / 2;
+    fx.drawNoticeFlashes(env.now);
+    expect(fx.noticeFlashes).toHaveLength(0);
+  });
 });
 
 describe('REFM-234 — стык вспышек с main.ts', () => {
@@ -295,6 +321,7 @@ describe('REFM-234 — стык вспышек с main.ts', () => {
     expect(FEED.match(/\bflashProvince\(/g)).toHaveLength(1);
     expect(MAIN.match(/\bflashProvince\(/g)).toHaveLength(1);
     expect(FEED).toContain('flashMines(at, p.position as { x: number; y: number } | undefined);');
+    expect(FEED).toContain('if (p.owner === ME) flashLanding(s.planets[p.planetId as string]?.position);');
     const install = /export function installMatch\([^)]*\): void \{([\s\S]*?)\n\}/.exec(LIFE)?.[1];
     expect(install).toContain('clearFlak();');
     expect(MAIN).toContain('ring: flashGo,');

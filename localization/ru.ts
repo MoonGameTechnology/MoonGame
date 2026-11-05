@@ -2351,7 +2351,6 @@ export const ru: Record<string, string> = {
   'map.radar.detect': '◌ засечка {n}',
   'map.radar.identify': '● опознание {n}',
   'map.transfer.assault': 'Штурмовая высадка',
-  'map.transfer.fleets': '{n} {n|флот|флота|флотов}',
   'map.transfer.load': 'Погрузка',
   'map.transfer.unload': 'Высадка',
 

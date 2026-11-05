@@ -1626,7 +1626,7 @@ function renderMap(now: number) {
   drawMinefields(); // SM-3.5: свои минные поля «💣 ×заряд» и установки
   drawDevourSieges(); // PVR-4.7: осада «Поглощения мира» над своим миром — кольцо-часы и отсчёт
   drawBombardTimers(); // таймер обстрела: до сноса следующей постройки мира
-  drawTroopTransferTimers(); // погрузка и высадка: отсчёт над объектом без выбора флота
+  drawTroopTransferTimers(detail); // погрузка и высадка: плашки у мира и кольцо-часы штурма
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
   drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром

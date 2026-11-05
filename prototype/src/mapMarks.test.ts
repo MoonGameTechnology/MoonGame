@@ -351,9 +351,20 @@ describe('таймер бомбардировки', () => {
   });
 });
 
-describe('таймеры перевозки на карте', () => {
-  it('над миром без выбора флота — отдельные отсчёты погрузки и высадки; время обновляется по миру', async () => {
+describe('плашки перевозки на карте', () => {
+  /** Подпись вида в плашке — строкой локали, заглавными. */
+  const title = (t: (key: string) => string, key: string) => t(key).toUpperCase();
+  /** Есть ли линия, которая кончается на окружности радиуса `r` вокруг `c`. */
+  const endsOn = (calls: Call[], c: XY, r: number) =>
+    calls.some(
+      (k) =>
+        k.name === 'lineTo' &&
+        Math.abs(Math.hypot((k.args[0] as number) - c.x, (k.args[1] as number) - c.y) - r) < 1e-6,
+    );
+
+  it('над миром без выбора флота — плашки погрузки и выгрузки с подписью и временем; время идёт по миру', async () => {
     const { marks, camera, env, frame, home, own, at, put, t } = await boot();
+    const { TAG } = await import('../../decisions/transferTags');
     camera.centerOn(home.position, 2.4);
     const startAt = env.world.time;
     put({ ...own, loading: [
@@ -361,36 +372,77 @@ describe('таймеры перевозки на карте', () => {
     ], unloading: [
       { unit: 'militia', count: 1, to: home.id, startAt, doneAt: startAt + 1_800_000 },
     ] });
-    marks.drawTroopTransferTimers();
+    marks.drawTroopTransferTimers(1);
     const texts = frame.named('fillText');
     expect(texts.map((k) => k.args[0])).toEqual([
-      `▲ ${t('map.transfer.load')} · ${countdownHMS(3_600_000)}`,
-      `▼ ${t('map.transfer.unload')} · ${countdownHMS(1_800_000)}`,
+      title(t, 'map.transfer.load'),
+      countdownHMS(3_600_000),
+      title(t, 'map.transfer.unload'),
+      countdownHMS(1_800_000),
     ]);
     const c = at(home.position);
+    // При полной детализации — выше кольца орбиты и плашек флотов, как и прежде.
     expect(texts.every((k) => (k.args[2] as number) < c.y - 76)).toBe(true);
-    expect((texts[1]!.args[2] as number) - (texts[0]!.args[2] as number)).toBe(24);
+    expect((texts[2]!.args[2] as number) - (texts[0]!.args[2] as number)).toBe(TAG.fullH + TAG.gap);
+    // Выноска доходит до края мира; кольца-часов у погрузки нет.
+    expect(endsOn(frame.calls, c, 13 + 5)).toBe(true);
+    expect(arcAt(frame.calls, c, 13 + 7)).toBe(false);
     frame.calls.length = 0;
     env.world = { ...env.world, time: startAt + 60_000 };
-    marks.drawTroopTransferTimers();
-    expect(frame.named('fillText')[0]!.args[0]).toContain(countdownHMS(3_540_000));
+    marks.drawTroopTransferTimers(1);
+    expect(frame.named('fillText')[1]!.args[0]).toBe(countdownHMS(3_540_000));
     frame.calls.length = 0;
     put({ ...own, loading: undefined, unloading: undefined });
-    marks.drawTroopTransferTimers();
-    expect(frame.named('fillText')).toHaveLength(0);
+    marks.drawTroopTransferTimers(1);
+    expect(frame.calls).toHaveLength(0);
   });
 
-  it('штурмовая высадка отмечает её цель; чужие заявки и отсутствующая цель не рисуются', async () => {
-    const { marks, env, frame, next, own, put, t } = await boot();
-    const claim = { planetId: next.id, startAt: env.world.time, doneAt: env.world.time + 5_400_000 };
+  it('штурмовая высадка: плашка цвета штурма и кольцо-часы вокруг цели растут к касанию; чужие заявки и пропавшая цель не рисуются', async () => {
+    const { marks, env, frame, next, own, at, put, t } = await boot();
+    const { ASSAULT_TONE } = await import('./mapPalette');
+    const startAt = env.world.time;
+    const claim = { planetId: next.id, startAt, doneAt: startAt + 5_400_000 };
     put({ ...own, location: next.id, assaultLanding: claim });
-    marks.drawTroopTransferTimers();
-    expect(frame.named('fillText')[0]!.args[0]).toBe(`▼ ${t('map.transfer.assault')} · ${countdownHMS(5_400_000)}`);
+    marks.drawTroopTransferTimers(1);
+    const texts = frame.named('fillText');
+    expect(texts.map((k) => k.args[0])).toEqual([title(t, 'map.transfer.assault'), countdownHMS(5_400_000)]);
+    expect(texts[0]!.fill).toBe(ASSAULT_TONE);
+    const c = at(next.position);
+    // Кольцо целиком — бледное; дуги прогресса в начале высадки нет.
+    expect(arcAt(frame.calls, c, 13 + 7)).toBe(true);
+    expect(frame.named('arc').some((k) => k.args[3] === -Math.PI / 2)).toBe(false);
+    // Выноска кончается за кольцом-часами, а не на сфере.
+    expect(endsOn(frame.calls, c, 13 + 7 + 2)).toBe(true);
+    frame.calls.length = 0;
+    env.world = { ...env.world, time: startAt + 1_350_000 };
+    marks.drawTroopTransferTimers(1);
+    const grown = frame.named('arc').find((k) => k.args[3] === -Math.PI / 2)!;
+    expect(grown.args).toEqual([c.x, c.y, 20, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * 0.25]);
+    expect(grown.stroke).toBe(ASSAULT_TONE);
     frame.calls.length = 0;
     put({ ...own, owner: 'p2', location: next.id, assaultLanding: claim });
     put({ ...own, id: 'missing-target', location: 'missing', assaultLanding: { ...claim, planetId: 'missing' } });
-    marks.drawTroopTransferTimers();
+    marks.drawTroopTransferTimers(1);
     expect(frame.named('fillText')).toHaveLength(0);
+    expect(frame.named('arc')).toHaveLength(0);
+  });
+
+  it('на общем плане плашка без подписи и стоит у самого мира', async () => {
+    const { marks, env, frame, next, own, at, put, t } = await boot();
+    const claim = { planetId: next.id, startAt: env.world.time, doneAt: env.world.time + 5_400_000 };
+    put({ ...own, location: next.id, assaultLanding: claim });
+    marks.drawTroopTransferTimers(1);
+    const near = frame.named('fillText').find((k) => k.args[0] === countdownHMS(5_400_000))!;
+    frame.calls.length = 0;
+    marks.drawTroopTransferTimers(0);
+    const texts = frame.named('fillText');
+    expect(texts.map((k) => k.args[0])).toEqual([countdownHMS(5_400_000)]);
+    expect(texts.some((k) => k.args[0] === title(t, 'map.transfer.assault'))).toBe(false);
+    const c = at(next.position);
+    // Ближе к миру, чем при полной детализации (там стопка у верхнего края ушла под мир).
+    expect(Math.abs((texts[0]!.args[2] as number) - c.y)).toBeLessThan(
+      Math.abs((near.args[2] as number) - c.y),
+    );
   });
 });
 
@@ -599,7 +651,7 @@ describe('REFM-234 — стык меток с main.ts', () => {
       'drawMinefields();',
       'drawDevourSieges();',
       'drawBombardTimers();',
-      'drawTroopTransferTimers();',
+      'drawTroopTransferTimers(detail);',
     ])
       expect(MAIN, call).toContain(call);
     expect(MAIN).toMatch(/drawMissionTargets\(\);\s*drawAllyMarks\(\);/);
