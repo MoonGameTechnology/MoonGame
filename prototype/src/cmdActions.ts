@@ -16,7 +16,7 @@
  * заградителя и звук отправки модуль получает хуками `initCmdActions(host)`.
  */
 import type { Fleet, GameState } from '../../packages/shared-core/src/index';
-import { shipsEngaged } from '../../packages/shared-core/src/index';
+import { laneRoad, pointAlong, shipsEngaged } from '../../packages/shared-core/src/index';
 import { prepareArmy } from '../../decisions/actions';
 import { t } from '../../localization/runtime';
 import { assaultTargetOk } from '../../decisions/aimTargets';
@@ -175,6 +175,10 @@ export function mobileDraftPoint(): { x: number; y: number } | null {
     mobileDraft.target,
     (id) => (s.planets[id] ? world(s.planets[id]!.position) : null),
     (id) => (s.fleets[id] ? fleetAnchor(s.fleets[id]!) : null),
+    (target) => {
+      const road = laneRoad(s, target.from, target.to);
+      return road ? world(pointAlong(road, target.t)) : null;
+    },
   );
 }
 

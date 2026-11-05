@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mobileDraftMatches, mobileTargetPoint, type MobileOrderDraft } from './mobileOrders';
 import { releaseCommits } from '../../decisions/aimGesture';
 import { dragIntent } from '../../decisions/dragIntent';
@@ -42,11 +42,15 @@ describe('phone orders require a stable selection and an explicit send', () => {
       const p = before(id);
       return { x: p.x * 2 - 30, y: p.y * 2 + 12 };
     };
-    expect(mobileTargetPoint(target, before, () => null)).toEqual({ x: 35, y: 30 });
-    expect(mobileTargetPoint(target, after, () => null)).toEqual({ x: 40, y: 72 });
+    // Curved road positions come from the world's road resolver, not its endpoint chord.
+    const resolve = vi.fn(() => ({ x: 35, y: 130 }));
+    expect(mobileTargetPoint(target, before, () => null, resolve)).toEqual({ x: 35, y: 130 });
+    expect(resolve).toHaveBeenCalledWith(target);
+    expect(mobileTargetPoint(target, after, () => null, () => ({ x: 40, y: 272 }))).toEqual({ x: 40, y: 272 });
     expect(
       mobileTargetPoint(
         target,
+        () => null,
         () => null,
         () => null,
       ),
@@ -54,6 +58,7 @@ describe('phone orders require a stable selection and an explicit send', () => {
     expect(
       mobileTargetPoint({ kind: 'fleet', id: 'moving' }, before, (id) =>
         id === 'moving' ? { x: 210, y: 40 } : null,
+        () => null,
       ),
     ).toEqual({ x: 210, y: 40 });
   });

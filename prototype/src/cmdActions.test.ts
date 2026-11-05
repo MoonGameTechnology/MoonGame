@@ -643,6 +643,26 @@ describe('REFM-227 — мобильный черновик приказа', () =
     expect(ca.mobileTargetAvailable({ kind: 'fleet', id: enemy.id }, 'engage')).toBe(false);
   });
 
+  it('держит прицел на изогнутой дороге до отправки и после движения камеры', async () => {
+    const { ca, env, home, fleet, select } = await boot();
+    const { laneRoad, pointAlong } = await import('../../packages/shared-core/src/index');
+    const camera = await import('./mapCamera');
+    const to = home.links![0]!;
+    const end = env.world.planets[to]!;
+    const bend = { x: (home.position.x + end.position.x) / 2 + 100,
+      y: (home.position.y + end.position.y) / 2 + 250 };
+    home.roads = { trails: [], crossings: { [to]: bend } } as typeof home.roads;
+    end.roads = { trails: [], crossings: { [home.id]: bend } } as typeof end.roads;
+    const road = laneRoad(env.world, home.id, to)!;
+    const point = pointAlong(road, 0.5);
+    select(fleet.id);
+    ca.stageMobileTarget('move', { kind: 'lane', from: home.id, to, t: 0.5 });
+    expect(ca.mobileDraftPoint()).toEqual(camera.world(point));
+    camera.setView({ scale: 3, x: 120, y: -80 });
+    expect(ca.mobileDraftPoint()).toEqual(camera.world(point));
+    expect(sent).toHaveLength(0);
+  });
+
   it('подпись и точка цели на экране', async () => {
     const { ca, env, home, fleet, select } = await boot();
     const { world } = await import('./mapCamera');
