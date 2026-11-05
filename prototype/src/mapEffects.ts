@@ -2,7 +2,7 @@
  * Вспышки и залпы карты (REFM-234): то, что живёт на карте доли секунды и гаснет само, —
  * трассы огня ПКО, перехвата, корабельного ПВО и удара шаттлов, волна над перекрашенной
  * провинцией, вспышка сработавших мин, кольцо над миром, куда игрок перешёл ссылкой плана,
- * и малая вспышка «своя постройка готова, свой флот дошёл».
+ * малая вспышка «своя постройка готова, свой флот дошёл» и вспышка «свой десант на земле».
  *
  * Очереди вспышек — состояние модуля, и пишут их только двери ниже: события партии
  * (`handleEvents`) ставят залпы, захваты и мины, камера ставит кольцо перехода, смена
@@ -14,13 +14,14 @@
 import type { GameState } from '../../packages/shared-core/src/index';
 import { rgba } from '../../packages/client/src/holoDraw';
 import { toBake } from '../../decisions/mapLayerView';
+import { LANDING_FLASH_MS, landingBurst } from '../../decisions/troopTransferEffects';
 import { AA_SHOTS_MAX, capShots } from './fireEffects';
 import { FLAK_LIFE_MS, flakBurstRadius, flakDashOffset, flakLook, type FlakTier } from './flakTiers';
 import { fadeOf, flashDone, flashProgress, growRadius, noticeRing, waveRadius } from './flashFx';
 import { fxBlur, motionOn } from './graphicsPrefs';
 import { visible, world } from './mapCamera';
 import { mapView, provincePolygon } from './mapLayer';
-import { LOCK, TAU, ownerColor } from './mapPalette';
+import { ASSAULT_TONE, LOCK, TAU, ownerColor } from './mapPalette';
 
 /** Что вспышкам нужно от игры. */
 export interface MapEffectsHost {
@@ -181,32 +182,55 @@ export function drawGoFlash(now: number): void {
   cx.restore();
 }
 /** Малая вспышка (UIX-4.1, скилл `mobile-game-feel`): своя постройка готова, свой флот
- *  дошёл. Одно кольцо на 200 мс — малый тир; размер и затухание — `noticeRing`. */
+ *  дошёл. Одно кольцо на 200 мс — малый тир; размер и затухание — `noticeRing`. В той же
+ *  очереди — вспышка высадки, средний тир: её вид — `landingBurst`. */
 const NOTICE_FLASH_MS = 200;
 const NOTICE_FLASHES_MAX = 16;
-export const noticeFlashes: { at: { x: number; y: number }; t: number }[] = [];
+export const noticeFlashes: { at: { x: number; y: number }; t: number; landing?: true }[] = [];
 export function noticeFlash(at: { x: number; y: number } | null | undefined): void {
   if (!at) return;
   noticeFlashes.push({ at: { x: at.x, y: at.y }, t: performance.now() });
+  capShots(noticeFlashes, NOTICE_FLASHES_MAX);
+}
+/** Свой десант ступил на мир (`assault.ashore`): дуга штурма кончается касанием. */
+export function flashLanding(at: { x: number; y: number } | null | undefined): void {
+  if (!at) return;
+  noticeFlashes.push({ at: { x: at.x, y: at.y }, t: performance.now(), landing: true });
   capShots(noticeFlashes, NOTICE_FLASHES_MAX);
 }
 export function drawNoticeFlashes(now: number): void {
   const cx = game.ctx();
   for (let i = noticeFlashes.length - 1; i >= 0; i--) {
     const f = noticeFlashes[i]!;
-    if (flashDone(now, f.t, NOTICE_FLASH_MS)) {
+    const life = f.landing ? LANDING_FLASH_MS : NOTICE_FLASH_MS;
+    if (flashDone(now, f.t, life)) {
       noticeFlashes.splice(i, 1);
       continue;
     }
     const c = world(f.at);
-    if (!visible(c, 30)) continue;
-    const ring = noticeRing(flashProgress(now, f.t, NOTICE_FLASH_MS), motionOn(), 12, 10);
+    if (!visible(c, f.landing ? 48 : 30)) continue;
+    const k = flashProgress(now, f.t, life);
     cx.save();
-    cx.strokeStyle = rgba(LOCK, 0.9 * ring.alpha);
-    cx.lineWidth = 2;
-    cx.beginPath();
-    cx.arc(c.x, c.y, ring.r, 0, TAU);
-    cx.stroke();
+    if (f.landing) {
+      // Поверхность вспыхивает, кольцо уходит от края мира наружу.
+      const burst = landingBurst(k, motionOn());
+      cx.fillStyle = rgba(ASSAULT_TONE, 0.3 * burst.alpha);
+      cx.beginPath();
+      cx.arc(c.x, c.y, burst.glow, 0, TAU);
+      cx.fill();
+      cx.strokeStyle = rgba(ASSAULT_TONE, 0.9 * burst.alpha);
+      cx.lineWidth = 2.5;
+      cx.beginPath();
+      cx.arc(c.x, c.y, burst.ring, 0, TAU);
+      cx.stroke();
+    } else {
+      const ring = noticeRing(k, motionOn(), 12, 10);
+      cx.strokeStyle = rgba(LOCK, 0.9 * ring.alpha);
+      cx.lineWidth = 2;
+      cx.beginPath();
+      cx.arc(c.x, c.y, ring.r, 0, TAU);
+      cx.stroke();
+    }
     cx.restore();
   }
 }

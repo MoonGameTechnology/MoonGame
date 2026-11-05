@@ -75,7 +75,7 @@ import { captureHeard, gainRepaint, researchHeard } from './gainNews';
 import { data } from './gameData';
 import { heroDiedNews, heroRespawnedNews } from './heroNews';
 import { jumpToPing, unworld } from './mapCamera';
-import { addFlak, flashMines, flashProvince, noticeFlash } from './mapEffects';
+import { addFlak, flashLanding, flashMines, flashProvince, noticeFlash } from './mapEffects';
 import { admits, fleetKnown, fleetNode, known, rememberScan, vision } from './mapFog';
 import { markUnread, pushMsg } from './messageLog';
 import { EVENT_LOG_MAX, isRepeat, LOG_LINES, pushBounded } from './noteLog';
@@ -1240,6 +1240,8 @@ export function handleEvents(events: DomainEvent[]) {
         }
         break;
       }
+      case 'assault.ashore': // свой десант ступил на мир — вспышка высадки; последний case, без break
+        if (p.owner === ME) flashLanding(s.planets[p.planetId as string]?.position);
     }
   }
   trackBattles(s, ME);

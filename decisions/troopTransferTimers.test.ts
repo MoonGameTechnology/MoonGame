@@ -34,8 +34,14 @@ describe('погрузка и высадка — таймеры над объе�
       fleet({ id: 'reinforcement', location: 'fortress', unloading: [unload(HOUR, 'fortress')] }),
     ];
     expect(troopTransferTimers(fleets, 'p1', 60_000)).toEqual([
-      { target: 'earth', rows: [{ kind: 'load', fleets: 1, leftMs: HOUR - 60_000 }] },
-      { target: 'fortress', rows: [{ kind: 'unload', fleets: 1, leftMs: HOUR - 60_000 }] },
+      {
+        target: 'earth',
+        rows: [{ kind: 'load', fleets: 1, leftMs: HOUR - 60_000, progress: 1 / 60 }],
+      },
+      {
+        target: 'fortress',
+        rows: [{ kind: 'unload', fleets: 1, leftMs: HOUR - 60_000, progress: 1 / 60 }],
+      },
     ]);
   });
 
@@ -45,7 +51,10 @@ describe('погрузка и высадка — таймеры над объе�
       fleet({ id: 'second', loading: [load(2 * HOUR)] }),
     ];
     expect(troopTransferTimers(fleets, 'p1', HOUR / 4)).toEqual([
-      { target: 'earth', rows: [{ kind: 'load', fleets: 2, leftMs: 1.75 * HOUR }] },
+      {
+        target: 'earth',
+        rows: [{ kind: 'load', fleets: 2, leftMs: 1.75 * HOUR, progress: 0.125 }],
+      },
     ]);
   });
 
@@ -59,9 +68,9 @@ describe('погрузка и высадка — таймеры над объе�
       fleet({ loading: [load()] }),
     ];
     expect(troopTransferTimers(fleets, 'p1', 0)[0]!.rows).toEqual([
-      { kind: 'load', fleets: 1, leftMs: HOUR },
-      { kind: 'unload', fleets: 1, leftMs: HOUR },
-      { kind: 'assault', fleets: 1, leftMs: 1.5 * HOUR },
+      { kind: 'load', fleets: 1, leftMs: HOUR, progress: 0 },
+      { kind: 'unload', fleets: 1, leftMs: HOUR, progress: 0 },
+      { kind: 'assault', fleets: 1, leftMs: 1.5 * HOUR, progress: 0 },
     ]);
   });
 
@@ -113,5 +122,24 @@ describe('погрузка и высадка — таймеры над объе�
     expect(troopTransferTimers(fleets, 'p1', 0)[0]!.rows[0]!.leftMs).toBe(HOUR);
     expect(troopTransferTimers(fleets, 'p1', HOUR / 2)[0]!.rows[0]!.leftMs).toBe(HOUR / 2);
     expect(fleets).toEqual(before);
+  });
+
+  it('доля пройденного — от начала первой заявки группы до конца последней, как и отсчёт', () => {
+    const fleets = [
+      fleet({ assaultLanding: { planetId: 'earth', startAt: 0, doneAt: HOUR } }),
+      fleet({
+        id: 'late',
+        assaultLanding: { planetId: 'earth', startAt: HOUR / 2, doneAt: 2 * HOUR },
+      }),
+    ];
+    const row = (now: number) => troopTransferTimers(fleets, 'p1', now)[0]!.rows[0]!;
+    expect(row(0).progress).toBe(0);
+    expect(row(HOUR).progress).toBe(0.5);
+    expect(row(HOUR).leftMs).toBe(HOUR);
+    // Срок вышел, мир ещё не ответил: полоса полная, отсчёт на нуле.
+    expect(row(3 * HOUR)).toMatchObject({ progress: 1, leftMs: 0 });
+    // Заявка с нулевым окном не делит на ноль.
+    const instant = [fleet({ loading: [{ ...load(0), startAt: 0 }] })];
+    expect(troopTransferTimers(instant, 'p1', 0)[0]!.rows[0]!.progress).toBe(1);
   });
 });

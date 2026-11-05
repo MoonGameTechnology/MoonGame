@@ -36,6 +36,7 @@ interface OwnerCalls {
   captures: Array<[string, string]>;
   mines: Array<[string, XY | undefined]>;
   notices: Array<XY | null | undefined>;
+  landings: Array<XY | null | undefined>;
   tells: unknown[];
 }
 
@@ -48,6 +49,7 @@ function mockOwners(rec: OwnerCalls): void {
     flashProvince: (node: string, owner: string) => void rec.captures.push([node, owner]),
     flashMines: (node: string, position: XY | undefined) => void rec.mines.push([node, position]),
     noticeFlash: (at: XY | null | undefined) => void rec.notices.push(at),
+    flashLanding: (at: XY | null | undefined) => void rec.landings.push(at),
   }));
   vi.doMock('./orderPipeline', () => ({
     tellSteward: (kind: StewardEvent, p: Record<string, unknown>) =>
@@ -62,7 +64,7 @@ function mockOwners(rec: OwnerCalls): void {
 // греется один раз; тесты после `vi.resetModules()` берут его из кеша трансформаций.
 beforeAll(async () => {
   vi.stubGlobal('__PLAYER_BUILD__', false);
-  mockOwners({ shots: [], captures: [], mines: [], notices: [], tells: [] });
+  mockOwners({ shots: [], captures: [], mines: [], notices: [], landings: [], tells: [] });
   await import('./eventFeed');
   vi.unstubAllGlobals();
 }, 60_000);
@@ -140,6 +142,7 @@ async function boot(opts: { fog?: boolean } = {}) {
     captures: [] as Array<[string, string]>,
     mines: [] as Array<[string, XY | undefined]>,
     notices: [] as Array<XY | null | undefined>,
+    landings: [] as Array<XY | null | undefined>,
     pulses: 0,
     jumps: [] as string[],
   };
@@ -693,6 +696,16 @@ describe('REFM-230 — двери игры', () => {
       ev('fleet.arrived', { fleetId: 'F1' }),
     ]);
     expect(env.notices).toEqual([{ x: 0, y: 0 }]);
+  });
+
+  it('свой десант ступил на мир — вспышка высадки у мира; чужой — нет', async () => {
+    const { feed, env } = await boot();
+    feed.handleEvents([
+      ev('assault.ashore', { fleetId: 'F1', planetId: 'N', owner: 'p1' }),
+      ev('assault.ashore', { fleetId: 'G', planetId: 'A', owner: 'p2' }),
+    ]);
+    expect(env.landings).toEqual([{ x: 60, y: 0 }]);
+    expect(env.notices).toEqual([]);
   });
 
   it('вахта и герой: рассказ просят только о своём', async () => {
