@@ -2,7 +2,7 @@
 // against a fake DOM/canvas, drive several animation frames + a click, and
 // assert nothing throws. Not a substitute for a real browser, but it exercises
 // init, the real-time loop, rendering calls, the side panel and input.
-import { build } from 'esbuild';
+import { build, stop } from 'esbuild';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -42,6 +42,11 @@ function mkEl(id) {
       const m = listeners.get(this) ?? {};
       (m[type] ??= []).push(fn);
       listeners.set(this, m);
+    },
+    contains(node) {
+      for (let current = node; current; current = current.parentNode)
+        if (current === this) return true;
+      return false;
     },
     appendChild(child) {
       child.parentNode?.removeChild(child);
@@ -127,6 +132,19 @@ globalThis.document = {
   createComment: () => ({ ...mkEl('comment'), nodeType: 8 }),
   body: mkEl('body'),
 };
+// The transfer dialog has fixed children in build.mjs before the controller boots.
+const troopsRoot = getEl('troopswin');
+troopsRoot.hidden = true;
+const troopsHead = troopsRoot.appendChild(mkEl('troops-head'));
+const troopsFleet = troopsHead.appendChild(mkEl('troops-fleet'));
+const troopsClose = troopsHead.appendChild(mkEl('troops-close'));
+troopsClose.dataset.cmd = 'tcancel';
+const troopsContent = troopsRoot.appendChild(mkEl('troops-content'));
+troopsRoot.querySelector = (selector) => ({
+  '.troops-fleet': troopsFleet,
+  '.troops-content': troopsContent,
+  '[data-cmd="tcancel"]': troopsClose,
+})[selector] ?? null;
 let t = 0;
 const realPerformance = globalThis.performance;
 globalThis.performance = new Proxy(realPerformance, {
@@ -304,6 +322,8 @@ const res = await build({
   },
 });
 
+// Child boot checks build their own profile; release this compiler's asset graph first.
+await stop();
 const mod = { exports: {} };
 // Production keeps scheduling after a failed frame. The smoke test must still fail
 // when that recovery path logs a render error, rather than report healthy frames.
