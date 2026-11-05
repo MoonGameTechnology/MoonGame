@@ -254,7 +254,7 @@ body.holo-ui .cw-send{border-radius:4px;}
 @keyframes holo-transmission{from{background-color:rgba(87,204,227,.16);}to{background-color:transparent;}}
 @keyframes holo-receive{0%{opacity:.9;transform:scaleY(.2);}35%{opacity:.8;transform:scaleY(1);}100%{opacity:0;transform:scaleY(1);}}
 body.holo-ui #hub{background-color:var(--glass);}
-body.holo-ui #hub :is(.hub-banner,.hub-id,.hub-body,.hub-note,.hub-nav){width:min(1040px,86%);}
+body.holo-ui #hub :is(.hub-id,.hub-body,.hub-note,.hub-nav){width:min(1040px,86%);}
 body.holo-ui #connect :is(.cbox,.cwrap){width:min(700px,calc(var(--vpw) * .88));}
 body.holo-ui #setup .sbox{width:min(1080px,calc(var(--vpw) * .9));max-height:calc(var(--vph) * .88);}
 body.holo-ui #setup .spane{min-height:0;}

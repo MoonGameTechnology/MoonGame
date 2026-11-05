@@ -105,14 +105,21 @@ async function load() {
   vi.doMock('./helpCenter', () => ({ openCodex: () => {} }));
   vi.doMock('./eventFeed', () => ({ note: () => {} })); // лента рисует на канвасе
   const hub = await import('./hubScreen');
+  let browsing = false;
   const host: HubScreenHost = {
     nick: () => 'Vega',
     setNick: () => {},
     serverField: () => '',
     resolveServer: () => null,
     status: () => {},
-    showConnect: (show) => env.calls.push(`connect:${show}`),
-    enterBrowse: log('enterBrowse'),
+    showConnect: (show) => {
+      env.calls.push(`connect:${show}`);
+      hub.showBrowserHub(show && browsing);
+    },
+    enterBrowse: () => {
+      browsing = true;
+      env.calls.push('enterBrowse');
+    },
     halt: log('halt'),
     refreshAccountDeletion: async () => {},
     openNewsSettings: () => {},
@@ -152,11 +159,30 @@ describe('REFM-220 · вкладки хаба', () => {
     expect(active()).toEqual(['arsenal']);
   });
 
-  it('«Игры» прячут хаб и ведут в обозреватель партий', async () => {
+  it('«Игры» оставляют навигацию хаба; переход домой закрывает только обозреватель', async () => {
     const hub = await load();
     hub.hubTab('games');
+    expect(env.els.get('hub')?.style.display).toBe('flex');
+    expect(shown('hp-games')).toBe(true);
+    expect(active()).toEqual(['games']);
+    expect(env.calls).toEqual(['enterBrowse', 'connect:true']);
+    hub.hubTab('home');
+    expect(env.els.get('hub')?.style.display).toBe('flex');
+    expect(shown('hp-games')).toBe(false);
+    expect(shown('hp-home')).toBe(true);
+    expect(active()).toEqual(['home']);
+    expect(env.calls.at(-1)).toBe('connect:false');
+  });
+
+  it('впуск в матч убирает оболочку игр, но скрытие входа не закрывает другие вкладки', async () => {
+    const hub = await load();
+    hub.showBrowserHub(true);
+    hub.showBrowserHub(false);
     expect(env.els.get('hub')?.style.display).toBe('none');
-    expect(env.calls).toEqual(['connect:true', 'enterBrowse']);
+    hub.hubTab('arsenal');
+    hub.showBrowserHub(false);
+    expect(env.els.get('hub')?.style.display).toBe('flex');
+    expect(active()).toEqual(['arsenal']);
   });
 });
 

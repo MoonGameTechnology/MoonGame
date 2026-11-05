@@ -131,6 +131,7 @@ function pollCorpAttention(on: boolean): void {
 
 const HUB_PANELS: Record<string, string> = {
   home: 'hp-home',
+  games: 'hp-games',
   rank: 'hp-rank',
   friends: 'hp-friends',
   arsenal: 'hp-arsenal',
@@ -147,19 +148,47 @@ let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can re
 // prettier-ignore
 const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['auction', 'rank', 'friends', 'supply', 'shop', 'community']);
 
+/** Выбрать страницу общей оболочки, не запрашивая её содержимое повторно. */
+function showHubPanel(tab: string): void {
+  currentHubTab = tab;
+  hubEl.dataset.panel = tab;
+  if (hubEl.style.display !== 'flex') showHub(true);
+  for (const [k, pid] of Object.entries(HUB_PANELS))
+    $(pid).style.display = k === tab ? 'flex' : 'none';
+  if (tab === 'corp') corp?.showHub();
+  else corp?.hideHub();
+  const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;
+  for (const b of Array.from(document.querySelectorAll('.hub-tab')))
+    b.classList.toggle('active', (b as HTMLElement).dataset.hub === navTab);
+}
+
+/** Показ обозревателя, в том числе из приглашения или после отмены выбора места.
+ *  Отдельная дверь без enterBrowse: смена стадии не запускает переход рекурсивно. */
+export function showBrowserHub(show: boolean): void {
+  if (!show) {
+    if (currentHubTab === 'games') showHub(false);
+    return;
+  }
+  $('hub-name').textContent = game.nick().trim() || t('auth.commander');
+  applyProfilePortrait();
+  hubWallet?.render();
+  arsenal?.close();
+  shop?.close();
+  showHubPanel('games');
+}
+
 export function hubTab(tab: string): void {
   hubNote.textContent = '';
   hubWallet?.render();
   if (tab === 'games') {
-    showHub(false);
+    game.enterBrowse();
     game.showConnect(true);
-    game.enterBrowse(); // hand off to the existing match browser
     return;
   }
   // Retired tabs and stale links return to the home panel instead of a blank hub.
   if (!Object.hasOwn(HUB_PANELS, tab)) tab = 'home';
-  currentHubTab = tab;
-  hubEl.dataset.panel = tab;
+  game.showConnect(false);
+  showHubPanel(tab);
   // ADDR-4: свои партии — главный экран, а не вкладка обозревателя, поэтому лента
   // переспрашивается при каждом заходе домой (день и число игроков успевают устареть).
   if (tab === 'home') detach('хаб: свои партии', refreshMyMatches());
@@ -176,14 +205,6 @@ export function hubTab(tab: string): void {
   if (tab === 'supply' && metaEconomy) detach('хаб: снабжение', metaEconomy.refresh());
   if (tab === 'shop' && shop) detach('хаб: магазин', shop.refresh());
   if (tab !== 'shop') shop?.close(); // the phone sheet lives over the hub, like the arsenal's
-  for (const [k, pid] of Object.entries(HUB_PANELS))
-    $(pid).style.display = k === tab ? 'flex' : 'none';
-  // CORP-3: the corporation tab paints after its panel is visible — the panorama centres by width.
-  if (tab === 'corp') corp?.showHub();
-  else corp?.hideHub();
-  const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;
-  for (const b of Array.from(document.querySelectorAll('.hub-tab')))
-    b.classList.toggle('active', (b as HTMLElement).dataset.hub === navTab);
 }
 
 // --- «Друзья» — the account's roster (hub tab, FRIENDS-1) --------------------

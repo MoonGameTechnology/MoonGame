@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import jsQR from 'jsqr';
-import { launchBrowser, serve, builtPage, waitForApp } from './harnessKit.mjs';
+import { launchBrowser, serve, builtPage, waitForApp, enterHubByCallsign as enterHub } from './harnessKit.mjs';
 const require=createRequire(import.meta.url);
 const {PNG}=createRequire(require.resolve('qrcode/package.json'))('pngjs');
 const config=JSON.parse(readFileSync('mobile/distribution.json','utf8'));
@@ -16,7 +16,6 @@ const link=root+'/player/latest.apk';
 const ANDROID_UA='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
 const IPHONE_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const fulfilApk=async(page)=>{let requested='';await page.route(link,async route=>{requested=route.request().url();await route.fulfill({contentType:'application/vnd.android.package-archive',headers:{'Content-Disposition':'attachment; filename=probe.apk'},body:'APK download fixture'});});return ()=>requested;};
-const enterHub=async(page,nick,tap)=>{if(!(await page.locator('#cwnick').isVisible()))await page.locator('#clogin')[tap?'tap':'click']();await page.locator('#cwnick').fill(nick);await page.locator('#cwgo')[tap?'tap':'click']();await page.locator('#hub-play').waitFor({state:'visible'});};
 // Even signed legacy manifests can carry internal commit/repository metadata.
 // None of it belongs in the update prompt, whether plain text or markup.
 const hostileNotes='Merge pull request #1864 from MoonGameTechnology/MoonGame/feat/player-card-stats\nhttps://github.com/MoonGameTechnology/MoonGame <img src=x onerror="window.__xss=1">';
@@ -34,8 +33,9 @@ try {
     const page=await browser.newPage({viewport:{width:1366,height:1000},locale});page.on('pageerror',e=>errors.push(e.message));
     await page.goto(pages.url+profile);await waitForApp(page);
     await enterHub(page,'APK download probe');
-    // The button sits in the hub header next to the game mark; on a mouse PC hovering it opens the QR.
-    await page.locator('.hub-banner #hub-android-download').waitFor({state:'visible'});
+    // The button sits beside the callsign; hovering it on a mouse PC opens the QR.
+    await page.locator('.hub-id #hub-android-download').waitFor({state:'visible'});
+    assert.equal(await page.locator('#hub .hub-banner').count(),0,'the brand row must not return');
     assert.equal(await page.locator('#hub-android-download').getAttribute('href'),link);
     assert.equal((await page.locator('#hub-android-download').textContent()).trim(),locale==='ru'?'Скачать APK':'Download APK');
     assert.equal(await page.locator('#hub-android-qr').isVisible(),false,'QR opens on hover, not over the hub');
@@ -47,16 +47,17 @@ try {
     const requested=await fulfilApk(page);
     const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#hub-android-download').click()]);
     assert.equal(requested(),link);assert.equal(download.suggestedFilename(),'probe.apk');
-    // Android phone browser: the same button in the one-line header, fully on screen and beside the mark.
+    await page.close();
+    // Android phone browser: compact button beside the callsign, fully on screen.
     for(const width of [390,360,320]) {
       const phone=await browser.newPage({viewport:{width,height:844},hasTouch:true,isMobile:true,userAgent:ANDROID_UA,locale});phone.on('pageerror',e=>errors.push(e.message));
       await phone.goto(pages.url+profile);await waitForApp(phone);
       await enterHub(phone,'APK phone probe',true);
-      const btn=await phone.locator('.hub-banner #hub-android-download').boundingBox(),mark=await phone.locator('.hub-bt').boundingBox();
-      assert.ok(btn&&mark,'phone header shows the APK button');
+      const btn=await phone.locator('.hub-id #hub-android-download').boundingBox(),nick=await phone.locator('#hub-name').boundingBox();
+      assert.ok(btn&&nick,'phone profile shows the APK button');
       assert.ok(btn.x>=0&&btn.x+btn.width<=width,`APK button stays on screen at ${width}px`);
-      assert.ok(mark.x+mark.width<=btn.x,`APK button sits beside the mark, not over it, at ${width}px`);
-      assert.ok(mark.height<24,`the mark stays one line at ${width}px`);
+      assert.ok(nick.x+nick.width<=btn.x,`APK button sits beside the callsign, not over it, at ${width}px`);
+      assert.ok(btn.width>=44&&btn.height>=44,'phone download remains a finger-sized target');
       assert.equal(await phone.locator('#hub-android-qr').isVisible(),false,'a phone gets the file, not a QR');
       if(width===390){const asked=await fulfilApk(phone);const [file]=await Promise.all([phone.waitForEvent('download'),phone.locator('#hub-android-download').tap()]);assert.equal(asked(),link);assert.equal(file.suggestedFilename(),'probe.apk');await phone.screenshot({path:`.playwright-mcp/android-hub-phone-${profile==='/'?'dev':'player'}.png`});}
       await phone.close();
@@ -65,7 +66,7 @@ try {
     const iphone=await browser.newPage({viewport:{width:390,height:844},hasTouch:true,isMobile:true,userAgent:IPHONE_UA,locale});
     await iphone.goto(pages.url+profile);await waitForApp(iphone);await enterHub(iphone,'APK iPhone probe',true);
     assert.equal(await iphone.locator('#hub-android').count(),0,'iPhone must not be offered an APK');
-    await iphone.close();await page.close();
+    await iphone.close();
   }
   for(const lane of ['alpha','player']) {
     for(const scenario of ['newer','stale','forged','equal','older','offline']) {

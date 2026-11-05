@@ -76,7 +76,12 @@ export function showStage(stage: 'welcome' | 'register' | 'recover' | 'reset' | 
   browseStageEl.style.display = stage === 'browse' ? '' : 'none';
   // Раскладка экрана — по стадии: «Матчи» — страница во весь экран, а не карточка (UIX-17.1).
   const connect = document.getElementById('connect');
-  if (connect) connect.dataset.stage = stage;
+  if (connect) {
+    connect.dataset.stage = stage;
+    // Виден обозреватель — он живёт в хабе; видна форма входа — у своего корня.
+    // Скрытый сброс стадии не должен сам открывать ни один из экранов.
+    if (connect.style.display !== 'none') game.showConnect(true);
+  }
   // PTM-1.2: карточку входа УВИДЕЛИ — раз за загрузку и только на видимом экране
   // подключения: `showStage('welcome')` зовут и чтобы сбросить скрытый экран на будущее.
   if (stage === 'welcome' && !loginShown && connect?.style.display !== 'none') {
