@@ -486,32 +486,32 @@ body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 /* ⇅ десант (GRND-1): тот же поповер, но не список приказов, а строки «кого и сколько».
    Кнопки в нём — компактные глифы в ряд, поэтому базовые правила .cmdpop button
    (широкая строка с текстом слева) для .tbtns переопределяются. */
-#cmdbar .cmdpop.tpop{min-width:min(320px,86vw);max-width:min(360px,92vw);gap:0;padding:8px 10px 10px;
+#troopswin .cmdpop.tpop{min-width:min(320px,86vw);max-width:min(360px,92vw);gap:0;padding:8px 10px 10px;
   max-height:min(58vh,420px);overflow-y:auto;-webkit-overflow-scrolling:touch;}
-#cmdbar .tpop .thead{color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;
+#troopswin .tpop .thead{color:var(--cyan);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;
   white-space:nowrap;}
-#cmdbar .tpop .tlegend{color:var(--dim);font-size:var(--fs-caption);margin:2px 0 4px;}
-#cmdbar .tpop .trow{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;
+#troopswin .tpop .tlegend{color:var(--dim);font-size:var(--fs-caption);margin:2px 0 4px;}
+#troopswin .tpop .trow{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;
   padding:6px 0;border-top:1px solid var(--line);}
-#cmdbar .tpop .tinfo{display:flex;flex-direction:column;gap:1px;min-width:0;}
-#cmdbar .tpop .tname{display:flex;align-items:center;gap:4px;color:var(--ink);
+#troopswin .tpop .tinfo{display:flex;flex-direction:column;gap:1px;min-width:0;}
+#troopswin .tpop .tname{display:flex;align-items:center;gap:4px;color:var(--ink);
   font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-#cmdbar .tpop .tcnt{color:var(--dim);font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;font-variant-numeric:tabular-nums;}
-#cmdbar .tpop .tcnt em{color:var(--amber);font-style:normal;}
-#cmdbar .tpop .tbtns{display:flex;align-items:center;gap:3px;}
-#cmdbar .tpop .tbtns button{flex-direction:row;justify-content:center;gap:0;min-width:30px;width:30px;
+#troopswin .tpop .tcnt{color:var(--dim);font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;font-variant-numeric:tabular-nums;}
+#troopswin .tpop .tcnt em{color:var(--amber);font-style:normal;}
+#troopswin .tpop .tbtns{display:flex;align-items:center;gap:3px;}
+#troopswin .tpop .tbtns button{flex-direction:row;justify-content:center;gap:0;min-width:30px;width:30px;
   height:30px;padding:0;text-align:center;font-size:var(--fs-body);border-radius:5px;}
 /* пресеты «до упора» — форма и вес отличаются от мелкого шага, чтобы под пальцем
    ▲ и + не читались как одна кнопка: шаг — вторичная кнопка в рамке, пресет — тихая */
-#cmdbar .tpop .tbtns button.tall{font-size:var(--fs-caption);}
-#cmdbar .tpop .tdelta{min-width:30px;text-align:center;color:var(--dim);
+#troopswin .tpop .tbtns button.tall{font-size:var(--fs-caption);}
+#troopswin .tpop .tdelta{min-width:30px;text-align:center;color:var(--dim);
   font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;font-variant-numeric:tabular-nums;}
-#cmdbar .tpop .tdelta.pos{color:var(--grn);}
-#cmdbar .tpop .tdelta.neg{color:var(--amber);}
-#cmdbar .tpop .tnote{color:var(--dim);font-size:var(--fs-caption);line-height:1.45;margin-top:5px;}
-#cmdbar .tpop .tnote.warn{color:var(--amber);}
-#cmdbar .tpop .tacts{display:flex;gap:8px;margin-top:9px;}
-#cmdbar .tpop .tacts .cbtn{flex-direction:row;justify-content:center;height:auto;min-width:0;
+#troopswin .tpop .tdelta.pos{color:var(--grn);}
+#troopswin .tpop .tdelta.neg{color:var(--amber);}
+#troopswin .tpop .tnote{color:var(--dim);font-size:var(--fs-caption);line-height:1.45;margin-top:5px;}
+#troopswin .tpop .tnote.warn{color:var(--amber);}
+#troopswin .tpop .tacts{display:flex;gap:8px;margin-top:9px;}
+#troopswin .tpop .tacts .cbtn{flex-direction:row;justify-content:center;height:auto;min-width:0;
   padding:9px 8px;text-align:center;}
 /* Ряд команд ПРИВЯЗАН к листу, а не к догадке о его высоте: лист приклеен к низу и
    растёт по содержимому (max-height:34vh), поэтому короткий лист — мир без построек,
@@ -933,11 +933,11 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .set-lbl .set-sub{font-size:var(--fs-caption);color:var(--dim);}
 
 /* Explicit troop formations: health and service stay visible beside the quantity. */
-#cmdbar .tpop .tgroup-grade{font-size:var(--fs-caption);color:var(--dim);}
-#cmdbar .tpop .tgroup-health{font-size:var(--fs-caption);color:var(--grn);display:flex;align-items:center;gap:6px;}
-#cmdbar .tpop .tgroup-health.wounded{color:var(--amber);}
-#cmdbar .tpop .tgroup-bar{width:48px;height:4px;border-radius:2px;background:var(--line);overflow:hidden;}
-#cmdbar .tpop .tgroup-bar i{display:block;height:100%;background:currentColor;}
-#cmdbar .tpop .trow.chosen{background:rgba(68,213,223,.08);border-radius:6px;}
-#cmdbar .tpop .trow{padding:8px 3px;grid-template-columns:minmax(0,1fr);}
-#cmdbar .tpop .tbtns{justify-content:flex-end;}
+#troopswin .tpop .tgroup-grade{font-size:var(--fs-caption);color:var(--dim);}
+#troopswin .tpop .tgroup-health{font-size:var(--fs-caption);color:var(--grn);display:flex;align-items:center;gap:6px;}
+#troopswin .tpop .tgroup-health.wounded{color:var(--amber);}
+#troopswin .tpop .tgroup-bar{width:48px;height:4px;border-radius:2px;background:var(--line);overflow:hidden;}
+#troopswin .tpop .tgroup-bar i{display:block;height:100%;background:currentColor;}
+#troopswin .tpop .trow.chosen{background:rgba(68,213,223,.08);border-radius:6px;}
+#troopswin .tpop .trow{padding:8px 3px;grid-template-columns:minmax(0,1fr);}
+#troopswin .tpop .tbtns{justify-content:flex-end;}

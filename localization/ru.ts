@@ -5258,6 +5258,7 @@ export const ru: Record<string, string> = {
   'troops.recruits': 'Новобранцы',
   'troops.battles': 'Боёв: {n}',
   'troops.health': 'Здоровье: {n}%',
+  'troops.hp': 'HP: {a}/{b}',
   'troops.reserved': 'Зарезервировано: {n}',
   'troops.refresh': 'Обновить состав',
   'troops.transferring': 'В процессе перевозки: {n}',

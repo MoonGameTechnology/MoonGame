@@ -410,8 +410,10 @@ import {
   mobileOrderKind,
   mobileTargetAvailable,
   mobileTargetLabel,
+  onCommandClick,
 } from './cmdActions';
 import { initCmdBar, invalidateCmdBar, renderCmdBar } from './cmdBar';
+import { initTroopsWindow } from './troopsWindow';
 import { flushPinch, initMapInput, selectionBox, tapByTouch } from './mapInput';
 import { chainMode, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer } from './chainComposer';
 import { activeConstruction, coreQueue, enqueueBuild, initWorldQueries, progressPct } from './worldQueries';
@@ -1891,9 +1893,9 @@ function updateMobileHud(): void {
   );
 }
 
-// Ряд команд — разметка, поповеры, полоска «Приказ» и кэш разметки — живёт в `cmdBar.ts`
-// (REFM-226). Здесь только хуки: мир, своё место, раскладка, окно флота, тип сектора, имя
-// места и мобильный черновик приказа из `cmdActions.ts` (REFM-227).
+// `cmdBar.ts` owns the commands and transfer-window content; main wires their hosts.
+// The command dispatcher remains `cmdActions.ts` (REFM-227).
+const troopsWindow = initTroopsWindow({ root: document.getElementById('troopswin')!, command: onCommandClick, cancel: () => { drop('troopsPlan'); invalidatePanel(); renderPanel(); renderCmdBar(); } });
 initCmdBar({
   world: () => s,
   me: () => ME,
@@ -1906,6 +1908,7 @@ initCmdBar({
   mobileOrderKind,
   mobileTargetAvailable,
   mobileTargetLabel,
+  troopsMenu: (html, fleet) => troopsWindow.render(html, fleet),
 });
 
 // Боковая панель — выбор карточки, лист с кэшем разметки и дверью перерисовки, живые сроки,
@@ -3116,6 +3119,7 @@ const BACK_LAYERS: BackLayer[] = [
   // «Завершить экспедицию?» — та же ступень и то же правило: Back ведёт в «остаться».
   { id: 'abandon', isOpen: () => shown('abandon'), close: () => closeAbandon() }, // z48
   { id: 'pushask', isOpen: () => push?.asking() ?? false, close: () => push?.dismiss() }, // z48
+  { id: 'troopswin', isOpen: () => troopsWindow.isOpen(), close: () => troopsWindow.close() }, // z47
   { id: 'pingmenu', isOpen: () => pings?.menuOpen() ?? false, close: () => pings?.closeMenu() }, // z47
   { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
   { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
@@ -3583,6 +3587,7 @@ function frame(nowReal: number, nativeGap: number) {
   const previousViewport = insets();
   holographic.sync(VW, VH, holoCoarsePointer?.matches ?? false, inMatch());
   mobileHud.sync(MOBILE && inMatch());
+  if (!inMatch()) troopsWindow.render('');
   phoneNav.sync(MOBILE && inMatch());
   if (!MOBILE) { stageDraft(null); offerChoices([]); }
   if (wasHolographic !== holographic.active()) {

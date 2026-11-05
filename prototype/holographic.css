@@ -194,9 +194,6 @@ body.holo-ui #cmdbar .holo-command-details{margin:0 12px 10px;border:0;border-to
 body.holo-ui #cmdbar .cmdpop{position:static;grid-column:1/-1;min-width:0;max-width:none;width:100%;margin-top:5px;
   padding:8px;border-radius:4px;background:rgba(0,6,12,.65);box-shadow:none;}
 body.holo-ui #cmdbar .cmdpop button{width:100%;min-height:38px;flex-wrap:wrap;}
-body.holo-ui #cmdbar .tpop .tbtns button{width:28px;min-width:28px;min-height:30px;padding:3px;}
-body.holo-ui #cmdbar .tpop .tbtns{flex-wrap:wrap;justify-content:flex-end;}
-body.holo-ui #cmdbar .tpop .trow{grid-template-columns:1fr;gap:4px;padding:8px 0;}
 body.holo-ui.chain-mode #cmdbar{width:350px;padding:12px;}
 body.holo-ui.chain-mode #cmdbar.show{display:flex;flex-flow:row wrap;gap:7px;}
 body.holo-ui.chain-mode #cmdbar .chlabel{flex:1 0 100%;white-space:normal;padding:0 0 6px;line-height:1.6;}
@@ -299,8 +296,7 @@ body.holo-ui:where(.holo-w900) :is(#tech,#steward,#buildwin) .twbox,body.holo-ui
 body.holo-ui:where(.holo-w900) #logwin .lwbox,body.holo-ui:where(.holo-w900) #diplo .dpbox,body.holo-ui:where(.holo-w900) #constructor .cnbox{width:min(720px,calc(var(--vpw) * .92));}
 @media(pointer:coarse){
   body.holo-ui .holo-back{width:44px;}
-  body.holo-ui #cmdbar button,body.holo-ui #cmdbar .cmdpop button,
-  body.holo-ui #cmdbar .tpop .tbtns button{min-height:44px;min-width:44px;}
+  body.holo-ui #cmdbar button,body.holo-ui #cmdbar .cmdpop button{min-height:44px;min-width:44px;}
   body.holo-ui #cmdbar button.holo-command-close{height:44px;width:44px;min-height:44px;min-width:44px;}
   body.holo-ui #side :is(.pclose,.ptab,button.b){min-height:44px;min-width:44px;}
   body.holo-ui #side .pclose{height:44px;width:44px;}
@@ -475,7 +471,7 @@ body.holo-ui #holo-selection-window.fleet-console :is(#cmdbar,#side,#side .pscro
 body.holo-ui #holo-selection-window.fleet-console #side :is(.phead,.pdesc){display:none!important;}
 /* Ручка нижнего листа телефона (`styles/`, узкий экран) — окну она ни к чему. */
 body.holo-ui #holo-selection-window.fleet-console #side::before{content:none;}
-body.holo-ui #holo-selection-window.fleet-console :is(.holo-command-body,.fc-comp,.fc-land,#side .object-detail,#cmdbar .tpop){
+body.holo-ui #holo-selection-window.fleet-console :is(.holo-command-body,.fc-comp,.fc-land,#side .object-detail){
   min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;
   scrollbar-width:thin;scrollbar-color:var(--line-hi) transparent;}
 /* Шапка: захват, имя и где флот — в ширину «Приказов»; корпус и щит — над двумя другими. */
@@ -569,16 +565,6 @@ body.holo-ui #side .fc-load{display:flex;align-items:center;justify-content:cent
 body.holo-ui #side .fc-load .holo-icon svg{width:22px;height:22px;}
 body.holo-ui #side .fc-load:hover{border-color:var(--cyan);background:rgba(45,106,125,.2);}
 body.holo-ui #side .fc-load.on{border-color:var(--cyan);color:var(--holo-reflection);background:rgba(26,115,130,.3);}
-/* ⇅-меню десанта встаёт поверх колонки «Десант», а не под кнопками приказов. */
-body.holo-ui #holo-selection-window.fleet-console #cmdbar .cmdpop.tpop{grid-column:land;grid-row:2;position:relative;
-  inset:auto;z-index:5;margin:0;padding:12px 14px;min-width:0;max-width:none;width:auto;max-height:none;border:0;
-  border-radius:0;background:#06131c;}
-body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop .trow{grid-template-columns:minmax(0,1fr) auto;gap:6px;}
-body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop .thead{font-family:inherit;font-size:14px;font-weight:600;
-  color:var(--ink);white-space:normal;}
-body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop :is(.tname,.tcnt,.tdelta){font-family:inherit;}
-body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop .tname{font-size:var(--fs-body);font-weight:600;}
-body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop :is(.tlegend,.tnote){font-size:var(--fs-caption);}
 /* Низ окна: аура героя слева, «Подробнее о флоте» справа. */
 body.holo-ui #holo-selection-window.fleet-console .fc-foot{grid-column:1/-1;grid-row:3;display:flex;align-items:center;
   min-height:44px;padding:8px 16px;border-top:1px solid var(--line-hi);}
@@ -612,24 +598,22 @@ body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console.has-info{
   grid-template-rows:[head] auto [main] minmax(0,1fr) [land] minmax(0,1fr) [foot] auto [end];}
 body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console #cmdbar .holo-command-body{grid-row:2/4;}
 body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console .fc-comp{grid-column:comp;grid-row:2;border-right:0;}
-body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console :is(.fc-land,#cmdbar .cmdpop.tpop){grid-column:comp;grid-row:3;
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console .fc-land{grid-column:comp;grid-row:3;
   border-top:1px solid var(--line-hi);}
 body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console :is(.fc-vitals,#side .object-detail){grid-column:comp/end;}
 body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console #side .object-detail{grid-row:2/4;}
 body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console :is(.fc-foot,#cmdbar .holo-command-details){grid-row:4;}
 body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console .fc-vital{min-width:220px;}
 /* Пустой трюм — колонки «Десант» нет (`decisions/landColumn.ts`): окно уже на её ширину,
-   ⇅ стоит в «Приказах», а его меню встаёт поверх «Состава». */
+   ⇅ стоит в «Приказах» и открывает отдельное окно. */
 body.holo-ui #holo-selection-window.fleet-console.no-land.has-info{width:min(880px,calc(var(--vpw) - 110px));
   grid-template-columns:[orders] 348px [comp] minmax(0,1fr) [end];}
 body.holo-ui #holo-selection-window.fleet-console.no-land .fc-comp{border-right:0;}
-body.holo-ui #holo-selection-window.fleet-console.no-land #cmdbar .cmdpop.tpop{grid-column:comp;}
 body.holo-ui:where(.holo-w1100) #holo-selection-window.fleet-console.no-land.has-info{width:min(880px,calc(var(--vpw) - 36px));
   grid-template-columns:[orders] 232px [comp] minmax(0,1fr) [end];}
 body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console.no-land.has-info{
   grid-template-rows:[head] auto [main] minmax(0,1fr) [foot] auto [end];}
 body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console.no-land :is(#cmdbar .holo-command-body,#side .object-detail){grid-row:2;}
-body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console.no-land #cmdbar .cmdpop.tpop{grid-row:2;border-top:0;}
 body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console.no-land :is(.fc-foot,#cmdbar .holo-command-details){grid-row:3;}
 /* Всплывашка надбавок в стекле окна. */
 body.holo-ui #statpop{width:min(300px,calc(100vw - 16px));padding:11px 13px 12px;font-size:var(--fs-body);

@@ -91,6 +91,7 @@ async function boot() {
   });
   const env = {
     world,
+    troopsHtml: '',
     mobile: false,
     holo: false,
     console: null as Fleet | null,
@@ -160,6 +161,7 @@ async function boot() {
     mobileOrderKind: () => env.orderKind,
     mobileTargetAvailable: () => env.targetOk,
     mobileTargetLabel: (target: MobileOrderTarget) => `цель ${target.kind}`,
+    troopsMenu: (html) => { env.troopsHtml = html; },
   });
   const inter = await import('./interaction');
   const home = Object.values(world.planets).find((p) => p.owner === 'p1')!;
@@ -442,10 +444,11 @@ describe('REFM-226 — поповеры ряда', () => {
     expect(cmds()).toContain('troops');
     inter.arm('troopsPlan', { fleetId: fleet.id, plan: {} });
     cb.renderCmdBar();
-    expect(page.bar.innerHTML).toContain('class="trow');
+    expect(env.troopsHtml).toContain('class="trow');
     select('x');
     cb.renderCmdBar();
     expect(inter.troopsPlan).toBeNull();
+    expect(env.troopsHtml).toBe('');
     expect(page.bar.innerHTML).not.toContain('class="trow');
   });
 });
@@ -489,16 +492,16 @@ describe('REFM-226 — телефон и окно ПК', () => {
       `<div class="fc-title fc-orders"><b>${esc(t('fleet.console.orders'))}</b></div>`,
     );
     expect(cmds()).not.toContain('troops');
-    // Меню десанта встаёт поверх колонки листа, а не в ряд.
-    const [row, aside] = page.bar.innerHTML.split('</div><div class="cmdpop');
-    expect(row).not.toContain('class="trow');
-    expect(aside ?? page.bar.innerHTML).toContain('class="trow');
+    // Transfer controls live in a separate dialog on desktop too.
+    expect(page.bar.innerHTML).not.toContain('class="trow');
+    expect(env.troopsHtml).toContain('class="trow');
     // Набор группы без флотов — это режим, а не «0 флотов».
     env.console = null;
     select();
     inter.arm('pickMode', true);
     cb.renderCmdBar();
     expect(page.bar.innerHTML).toContain(`<b>${esc(t('cmd.multiselect'))}</b>`);
+    expect(env.troopsHtml).toBe('');
   });
 
   it('только что открытый поповер окна ПК докручивается в вид, дальше прокрутка за игроком', async () => {

@@ -1,0 +1,108 @@
+/* Army transfer is a modal task, independent of the fleet command grid. */
+#troopswin:not([hidden]) { display: flex; }
+#troopswin {
+  position: fixed;
+  inset: 0;
+  z-index: 47;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  background: rgba(0, 6, 12, .72);
+}
+#troopswin .troops-box {
+  display: flex;
+  flex-direction: column;
+  width: min(620px, 100%);
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-hi);
+  border-radius: 16px;
+  background: linear-gradient(155deg, #0a1e2b, #030c17);
+  color: var(--ink);
+  box-shadow: 0 12px 36px #0009, 0 0 18px #58cee01a;
+}
+.troops-head {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.troops-head > div { flex: 1; min-width: 0; }
+.troops-head b { display: block; font: 600 18px/1.3 var(--sf-font); }
+.troops-fleet {
+  display: block;
+  margin-top: 3px;
+  color: var(--dim);
+  font-size: var(--fs-caption);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.troops-head button {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  font-size: 24px;
+  border-radius: 10px;
+}
+.troops-content { display: flex; flex-direction: column; min-height: 0; }
+#troopswin .cmdpop.tpop {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+#troopswin .tpop .thead,
+#troopswin .tpop .tlegend { flex: none; white-space: normal; padding: 0 12px; }
+#troopswin .tpop .thead { padding-top: 10px; }
+#troopswin .tpop .tlegend { margin: 4px 0 8px; }
+#troopswin .tpop .tlist {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 0 12px 10px;
+}
+#troopswin .tpop .trow { padding: 12px 0; gap: 8px; }
+#troopswin .tpop .tgroup-health { flex-wrap: wrap; gap: 5px; }
+#troopswin .tpop .tgroup-health b { font-weight: 600; }
+#troopswin .tpop .tbtns { gap: 8px; }
+#troopswin .tpop .tbtns button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+  font-size: var(--fs-body);
+}
+#troopswin .tpop .tacts {
+  flex: none;
+  margin: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  background: #06131c;
+}
+#troopswin .tpop .tacts .cbtn { flex: 1; min-height: 44px; }
+@media (min-width: 600px) {
+  #troopswin .tpop .trow { grid-template-columns: minmax(0, 1fr) auto; }
+}
+body.mobile-ui #troopswin {
+  padding-top: calc(var(--tbh) + 8px + env(safe-area-inset-top));
+  padding-bottom: calc(var(--phone-navh) + 8px);
+}
+body.mobile-ui #troopswin .troops-box { width: min(620px, 100%); }
+@media (max-height: 520px) {
+  #troopswin .troops-head { padding: 6px 12px; }
+  #troopswin .troops-head b { font-size: var(--fs-body); }
+  #troopswin .troops-fleet { display: none; }
+}

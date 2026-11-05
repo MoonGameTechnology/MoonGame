@@ -20,6 +20,8 @@ export interface ArmyGroupDetails {
   grade: number;
   battles: number;
   health: number;
+  hp: number;
+  maxHp: number;
 }
 
 /** Separate rows keep the chosen formation, its wounds and its service visible. */
@@ -69,6 +71,8 @@ export function armyTransferRows(state: GameState, fleet: Fleet, mine: boolean, 
           cargoSize: def.stats.cargoSize ?? 1,
           grade: medalsOf(stack, data).find((m) => m.line === 'service')?.grade ?? 0,
           battles: Math.floor(stack.battles ?? 0),
+          hp: stack.hp ?? maximum,
+          maxHp: maximum,
           health: Math.max(0, Math.min(100, Math.round(((stack.hp ?? maximum) / maximum) * 100))),
         },
       ];
