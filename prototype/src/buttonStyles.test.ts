@@ -394,7 +394,6 @@ describe('три стиля кнопок (UIX-11.1)', () => {
         'crecback:btn-quiet',
         'crecgo:btn-main',
         'cresetgo:btn-main',
-        'cback:btn-quiet',
         'cgo:btn-second',
         'match-create-go:btn-main',
         'mnum-go:btn-second',

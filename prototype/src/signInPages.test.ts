@@ -186,6 +186,16 @@ describe('REFM-218 — стадии и позывной', () => {
     }
   });
 
+  it('смена видимой стадии обновляет оболочку; скрытый сброс не открывает экран', async () => {
+    const { pages, env } = await boot();
+    el('connect').style.display = 'flex';
+    pages.showStage('browse');
+    expect(env.connect).toEqual([true]);
+    el('connect').style.display = 'none';
+    pages.showStage('welcome');
+    expect(env.connect).toEqual([true]);
+  });
+
   it('подсказанный позывной берётся из списка по счётчику и не повторяется', async () => {
     const { pages } = await boot();
     const first = pages.suggestCallsign();

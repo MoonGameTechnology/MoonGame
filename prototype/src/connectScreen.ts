@@ -22,14 +22,23 @@ import { bakedServer } from './updater';
 
 declare const __SECTOR_ZERO_ONLY__: boolean;
 
+export interface ConnectScreenHost {
+  /** Обозреватель — вкладка хаба; при входе в матч его оболочка закрывается. */
+  showBrowserHub(show: boolean): void;
+}
+
 export let connectEl: HTMLElement;
 export let srvInput: HTMLInputElement;
 export let nickInput: HTMLInputElement;
 export let statusEl: HTMLElement;
 let activity: ReturnType<typeof startPlayerActivity> | undefined;
+let game: ConnectScreenHost;
+let connectHome: HTMLElement;
 
-export function initConnectScreen(): void {
+export function initConnectScreen(host: ConnectScreenHost): void {
+  game = host;
   connectEl = document.getElementById('connect') as HTMLElement;
+  connectHome = connectEl.parentElement!;
   srvInput = document.getElementById('csrv') as HTMLInputElement;
   nickInput = document.getElementById('cnick') as HTMLInputElement;
   statusEl = document.getElementById('cstatus') as HTMLElement;
@@ -43,7 +52,13 @@ export function initConnectScreen(): void {
 }
 
 export function showConnect(show: boolean): void {
+  // Переносим живой узел: поля, статус и обработчики остаются теми же. Скрытый экран
+  // возвращается к корню, чтобы следующая просьба войти не зависела от видимости хаба.
+  const browser = show && connectEl.dataset.stage === 'browse';
+  const parent = browser ? document.getElementById('hp-games')! : connectHome;
+  if (connectEl.parentElement !== parent) parent.appendChild(connectEl);
   connectEl.style.display = show ? 'flex' : 'none';
+  game.showBrowserHub(browser);
 }
 
 /** Виден ли экран подключения. Нужен там, где решение зависит от того, ПРОЧИТАЕТ ли

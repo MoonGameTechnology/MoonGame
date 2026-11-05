@@ -29,8 +29,8 @@ const SHEETS: Record<string, string> = {
   'ship-art.css': read('../ship-art.css'),
 };
 
-/** Знак игры: «VOID DOMINION» на хабе и на входе и строка под ним — логотип, а не подпись. */
-const BRAND = ['.hub-bt', '.ccrest .wm', '.ccrest .wtag'];
+/** Знак игры на входе и строка под ним — логотип, а не подпись. */
+const BRAND = ['.ccrest .wm', '.ccrest .wtag'];
 /** Ряды значков (★★★ модуля, ●●○ слотов героя) и «⠿» за ручкой окна — рисунок из символов. */
 const GLYPHS = ['.hx-pips', '.sc-stars', '.holo-drag-handle::before'];
 

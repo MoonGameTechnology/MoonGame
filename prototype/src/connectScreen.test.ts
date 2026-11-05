@@ -13,10 +13,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { t } from '../../localization/runtime';
 
-interface Field {
-  value: string;
-  textContent: string;
-  style: Record<string, string>;
+class Field {
+  value = '';
+  textContent = '';
+  style: Record<string, string> = {};
+  dataset: Record<string, string> = {};
+  parentElement: Field | null = null;
+  appendChild(child: Field): void {
+    child.parentElement = this;
+  }
 }
 
 interface Env {
@@ -33,7 +38,7 @@ async function load(stored: Record<string, string> = {}, sectorZeroOnly = false)
   env = { els: new Map(), store: new Map(Object.entries(stored)), calls: [], target: null };
   const el = (id: string): Field => {
     let e = env.els.get(id);
-    if (!e) env.els.set(id, (e = { value: '', textContent: '', style: {} }));
+    if (!e) env.els.set(id, (e = new Field()));
     return e;
   };
   vi.stubGlobal('__SECTOR_ZERO_ONLY__', sectorZeroOnly);
@@ -62,7 +67,8 @@ async function load(stored: Record<string, string> = {}, sectorZeroOnly = false)
     },
   }));
   const screen = await import('./connectScreen');
-  screen.initConnectScreen();
+  el('connect').parentElement = el('body');
+  screen.initConnectScreen({ showBrowserHub: (show) => env.calls.push(`browser:${show}`) });
   return screen;
 }
 
@@ -100,6 +106,36 @@ describe('REFM-247 · поля и показ экрана', () => {
     expect(screen.connectShown()).toBe(true);
     screen.showConnect(false);
     expect(screen.connectShown()).toBe(false);
+  });
+
+  it('обозреватель переносится в хаб и обратно без потери полей и статуса', async () => {
+    const screen = await load({ 'void.nick': 'Vega' });
+    const connect = field('connect');
+    connect.dataset.stage = 'browse';
+    field('cstatus').textContent = 'loading';
+    screen.showConnect(true);
+    expect(connect.parentElement).toBe(field('hp-games'));
+    expect(env.calls).toEqual(['browser:true']);
+    screen.showConnect(false);
+    expect(connect.parentElement).toBe(field('body'));
+    expect(screen.connectShown()).toBe(false);
+    screen.showConnect(true);
+    expect(screen.connectEl).toBe(connect);
+    expect(connect.parentElement).toBe(field('hp-games'));
+    expect(field('cnick').value).toBe('Vega');
+    expect(field('cstatus').textContent).toBe('loading');
+    expect(env.calls).toEqual(['browser:true', 'browser:false', 'browser:true']);
+  });
+
+  it('форма повторного входа выходит из вкладки игр, но остаётся видимой', async () => {
+    const screen = await load();
+    field('connect').dataset.stage = 'browse';
+    screen.showConnect(true);
+    field('connect').dataset.stage = 'welcome';
+    screen.showConnect(true);
+    expect(field('connect').parentElement).toBe(field('body'));
+    expect(screen.connectShown()).toBe(true);
+    expect(env.calls).toEqual(['browser:true', 'browser:false']);
   });
 });
 

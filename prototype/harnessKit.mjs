@@ -166,6 +166,15 @@ export async function waitForApp(page, { timeout = 15000 } = {}) {
   if (failed !== null) throw new Error(`игра не запустилась: ${failed}`);
 }
 
+/** Вход по позывному на локальном сервере без аккаунтов; общая дверь UI-харнесов. */
+export async function enterHubByCallsign(page, nick, tap = false) {
+  const press = (el) => el[tap ? 'tap' : 'click']();
+  if (!(await page.locator('#cwnick').isVisible())) await press(page.locator('#clogin'));
+  await page.locator('#cwnick').fill(nick);
+  await press(page.locator('#cwgo'));
+  await page.locator('#hub-play').waitFor({ state: 'visible' });
+}
+
 /**
  * Хаб → сетап → запуск соло-партии, с подтверждением «Заменить сохранённую партию?».
  * `fromWelcome` — начать с карточки входа («Новый командир»). `tap` — сенсорный ввод.

@@ -338,6 +338,7 @@ import {
   profile,
   saveMeta,
   shop,
+  showBrowserHub,
   showHub,
   tutorialMedal,
 } from './hubScreen';
@@ -2531,7 +2532,7 @@ document.getElementById('rail-constructor')?.addEventListener('click', () => shi
 
 // Экран подключения — у владельца, `connectScreen.ts` (REFM-247): узлы экрана, показ, адрес и
 // позывной по умолчанию, разбор адреса, вход в обозреватель и такт активности игрока.
-initConnectScreen();
+initConnectScreen({ showBrowserHub });
 
 // The dev test mode is a DEV-CLIENT feature: the player build compiles it out (and
 // build.mjs strips its button/markup), so a regular player's client has no test overlay
@@ -2648,11 +2649,6 @@ initMatchBrowser({
   hubTab,
   mapLabel,
   leaveMatch,
-});
-$('cback').addEventListener('click', () => {
-  showStage('welcome'); // reset #connect's inner stage for next time
-  statusEl.textContent = '';
-  openHub(); // back from the browser → the hub
 });
 // Выбор языка — кнопка со списком (`localeMenu.ts`, заказ владельца 2026-09-25): на экране
 // входа и в меню Sector Zero. Выбор сохраняется, перезагрузка перестраивает все

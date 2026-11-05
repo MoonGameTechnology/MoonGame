@@ -158,7 +158,7 @@
   #objtip .hl{font-style:normal;font-weight:700;color:var(--amber);text-shadow:0 0 7px rgba(255,180,58,.35);}
   /* main menu (hub): don't stretch the console across the whole monitor — a
      centred column at 80% of the screen; the hub's backdrop still fills it all */
-  #hub .hub-banner,#hub .hub-id,#hub .hub-body,#hub .hub-note,#hub .hub-nav{
+  #hub .hub-id,#hub .hub-body,#hub .hub-note,#hub .hub-nav{
     width:80%;margin-left:auto;margin-right:auto;
     border-left:1px solid var(--line-hi);border-right:1px solid var(--line-hi);}
 }

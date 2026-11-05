@@ -179,6 +179,9 @@ jobs:
           pnpm run prototype
           pnpm run smoke:apk-site
 
+      - name: Hub navigation smoke
+        run: node prototype/hubnavigationtest.mjs
+
       - name: Corporation identity smoke
         run: node prototype/corptest.mjs --identity-only
 

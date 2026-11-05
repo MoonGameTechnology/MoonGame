@@ -442,7 +442,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </div>
       <div id="cbrowse" style="display:none">
         <div class="mhead">
-          <button id="cback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
           <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.browse.title"></b></div>
         </div>
         <!-- Позывной приходит со входа, а не со страницы (UIX-17.1): поле — спрятанный носитель
@@ -611,9 +610,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   </div>
 </section>
 <div id="hub">
-  <div class="hub-banner">
-    <div class="hub-crest"><span class="dia"></span></div>
-    <div class="hub-bt">VOID DOMINION</div>
+  <div class="hub-id">
+    <button type="button" class="hub-av" id="hubav" data-i18n-title="hub.avatar.title" data-i18n-aria="hub.avatar.title">◆</button>
+    <div class="hub-who">
+      <div class="hub-profile-title">
+      <div class="hub-name" id="hub-name">Командир</div>
     ${external ? '' : `<div class="hub-apk" id="hub-android">
       <a id="hub-android-download" class="hub-apk-btn" href="${androidDownloadUrl}" data-i18n-aria="hub.android.download">
         <svg class="hub-apk-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
@@ -622,11 +623,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </a>
       <a id="hub-android-qr" class="hub-apk-qr" href="${androidDownloadUrl}" data-i18n-aria="hub.android.qr"><b data-i18n="hub.android.title"></b>${androidQr}<span data-i18n="hub.android.scan"></span></a>
     </div>`}
-  </div>
-  <div class="hub-id">
-    <button type="button" class="hub-av" id="hubav" data-i18n-title="hub.avatar.title" data-i18n-aria="hub.avatar.title">◆</button>
-    <div class="hub-who">
-      <div class="hub-name" id="hub-name">Командир</div>
+      </div>
       <div class="hub-st" data-i18n="hub.status.online"></div>
     </div>
     <div class="hub-wallet-row"><div class="hub-wallet" id="hubwallet"></div>
@@ -661,6 +658,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </div>
       </div>
     </div>
+    <div class="hub-panel" id="hp-games" style="display:none"></div>
     <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
     <div class="hub-panel" id="hp-supply" style="display:none"></div>
     <div class="hub-panel" id="hp-shop" style="display:none"></div>

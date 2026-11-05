@@ -167,24 +167,12 @@ body.holo-ui #connect[data-stage="browse"] .mcreate .inp { flex: 0 1 320px; }
 
 /* The hub keeps the original live panels and routes, framed as separate screens. */
 body.holo-ui #hub { padding: 24px 28px; gap: 13px; }
-body.holo-ui #hub :is(.hub-banner, .hub-id, .hub-body, .hub-note, .hub-nav) {
+body.holo-ui #hub :is(.hub-id, .hub-body, .hub-note, .hub-nav) {
   width: min(1080px, 100%);
   margin-left: auto;
   margin-right: auto;
   border: 0;
 }
-body.holo-ui #hub .hub-banner {
-  height: 94px;
-  min-height: 72px;
-  flex-direction: row;
-  justify-content: flex-start;
-  gap: 20px;
-  padding: 12px 3px;
-}
-body.holo-ui #hub .hub-banner::before { display: none; }
-body.holo-ui #hub .hub-crest { width: 50px; height: 50px; }
-body.holo-ui #hub .hub-crest .dia { border-color: #a8dce8; box-shadow: 0 0 24px rgba(128, 204, 230, .15); }
-body.holo-ui #hub .hub-bt { color: #e1edf5; font-size: 29px; font-weight: 450; letter-spacing: 5px; text-shadow: none; }
 body.holo-ui #hub :is(.hub-id, .hub-body, .hub-nav) {
   border: 1px solid var(--bridge-edge);
   border-radius: 18px; /* UIX-10.1: то же скругление, что у окон и карточек меню */
@@ -293,8 +281,6 @@ body.holo-ui:where(.holo-w1050) #connect { padding: 26px 40px; }
 body.holo-ui:where(.holo-w1050) #connect .cwrap { margin-left: auto; }
 body.holo-ui:where(.holo-w1050) #connect::after { right: calc(var(--vpw) * -.42); opacity: .65; }
 body.holo-ui:where(.holo-w1050) #hub { padding: 18px 22px; gap: 10px; }
-body.holo-ui:where(.holo-w1050) #hub .hub-banner { height: 76px; min-height: 64px; }
-body.holo-ui:where(.holo-w1050) #hub .hub-bt { font-size: 25px; letter-spacing: 4px; }
 body.holo-ui:where(.holo-w1050) #hub .hub-body { padding: 20px; }
 body.holo-ui:where(.holo-w1050) #setup .sbox { padding: 20px; }
 body.holo-ui:where(.holo-w1050) #setup .spane { gap: 12px; }
@@ -309,9 +295,6 @@ body.holo-ui:where(.holo-h760) #connect .csub { margin-bottom: 18px; }
 body.holo-ui:where(.holo-h760) #connect .cdiv { margin: 15px 0 12px; }
 body.holo-ui:where(.holo-h760) #connect .cstack { margin-top: 16px; }
 body.holo-ui:where(.holo-h760) #hub { padding-top: 12px; padding-bottom: 12px; }
-body.holo-ui:where(.holo-h760) #hub .hub-banner { height: 56px; min-height: 48px; padding: 4px; }
-body.holo-ui:where(.holo-h760) #hub .hub-bt { font-size: 25px; }
-body.holo-ui:where(.holo-h760) #hub .hub-crest { transform: scale(.8); }
 body.holo-ui:where(.holo-h760) #hub .hub-id { padding: 11px 18px; }
 body.holo-ui:where(.holo-h760) #hub .hub-nav { min-height: 58px; padding: 5px; }
 body.holo-ui:where(.holo-h760) #hub .hub-body { padding: 18px; }
