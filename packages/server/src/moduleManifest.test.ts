@@ -137,7 +137,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 101: членство — `integration` (освоение взятой планеты) сразу за `control`; economy 1.2.0.
 // 102: порядок тот же; economy 1.3.0 — стройка за порогом считается по правилу Симпсона.
 // 103: порядок тот же; technology 1.6.0 — исследования поднимают лимит управления.
-const PINNED_FOR_VERSION = '103';
+// 104: порядок тот же; economy 1.4.0 и technology 1.7.0 — надбавка к содержанию армии.
+const PINNED_FOR_VERSION = '104';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

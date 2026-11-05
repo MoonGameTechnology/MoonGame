@@ -72,12 +72,16 @@ export const TECH_ICONS: Record<string, string> = {
   provincial_administration: '🏛',
   colonial_governance: '🗺',
   imperial_chancery: '📜',
+  viceroyalties: '👑',
+  military_governorates: '🪖',
+  imperial_protectorate: '🦅',
 };
 export const TECH_FX_LABEL: Record<string, string> = {
   productionBonus: 'tech.fx.production',
   fleetSpeedBonus: 'tech.fx.fleet-speed',
   combatDamageBonus: 'tech.fx.damage',
   radarRangeBonus: 'tech.fx.radar',
+  armyUpkeep: 'tech.fx.army-upkeep',
 };
 /** Урон теха с областью (`damageScope`, BAL-6) бьёт только в своём канале огня, и строка
  *  эффекта называет канал: «+8% урон в космосе», а не «+8% урон». */
@@ -118,7 +122,11 @@ export function techCondText(c: TechCond): string {
   switch (c.type) {
     case 'has_scientist':
       return t('tech.req.scientist', {
-        b: c.branch ? branchLabel(c.branch) : t('tech.req.scientist.any'),
+        b: c.scientist
+          ? tData(data.scientists[c.scientist]?.name ?? c.scientist)
+          : c.branch
+            ? branchLabel(c.branch)
+            : t('tech.req.scientist.any'),
       });
     case 'own_sectors':
       return t('tech.req.sectors', { n: c.min });
@@ -243,10 +251,18 @@ export function techTreeHtml(
     // «Командование 3/7» не помещалось.
     return `<button class="tt-tab${b.key === tab ? ' on' : ''}" data-ttab="${b.key}"><span>${t(b.label)}</span>${cnt}</button>`;
   }).join('');
-  // Кто из совета курирует эту ветку — и честное предупреждение, если никто.
-  const lead = (seat?.scientists ?? [])
-    .map((c) => data.scientists[c.id])
-    .find((d) => d?.branch === tab);
+  // Кто из совета курирует эту ветку — и честное предупреждение, если никто. Учёный без
+  // ветки ведёт её, если в ней его собственная линия (Наместник, BAL-19).
+  const council = (seat?.scientists ?? []).map((c) => ({ id: c.id, def: data.scientists[c.id] }));
+  const ownsLineHere = (id: string): boolean =>
+    Object.values(techs).some(
+      (td) =>
+        (td.branch ?? 'space') === tab &&
+        (td.conditions ?? []).some((c) => c.type === 'has_scientist' && c.scientist === id),
+    );
+  const lead = (
+    council.find((c) => c.def?.branch === tab) ?? council.find((c) => ownsLineHere(c.id))
+  )?.def;
   const leadHtml = lead
     ? `🧪 ${t('tech.curator')} <b>${esc(tData(lead.name))}</b>`
     : `🔭 ${t('tech.curator.none')}`;

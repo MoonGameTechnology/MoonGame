@@ -100,7 +100,11 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '103'; // BAL-19: порядок тот же; `technology` 1.6.0 —
+export const MODULE_MANIFEST_VERSION = '104'; // BAL-19: порядок тот же; `economy` 1.4.0 —
+// хук `economy.unitUpkeep` множит содержание войск владельца; `technology` 1.7.0 вешает на него
+// `effects.armyUpkeep` и знает учёного по id в `has_scientist` (линия Наместника: +2 планеты
+// под управлением и +10% содержания армии за узел). Партия на 103 не брала бы надбавку.
+// export const MODULE_MANIFEST_VERSION = '103'; // BAL-19: порядок тот же; `technology` 1.6.0 —
 // узлы с `effects.controlLimit` поднимают лимит управления через хук `control.limit` (три узла
 // «Командования» основной игры: 5 → 6 → 8 → 10). Партия на 102 держала бы лимит 5 при любых
 // исследованиях.

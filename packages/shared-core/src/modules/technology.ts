@@ -104,7 +104,7 @@ function hasCompleted(player: Player | undefined, technology: string): boolean {
 function effectsSum(
   player: Player | undefined,
   data: GameData,
-  key: 'productionBonus' | 'fleetSpeedBonus' | 'controlLimit',
+  key: 'productionBonus' | 'fleetSpeedBonus' | 'controlLimit' | 'armyUpkeep',
 ): number {
   // Summed inline (no intermediate def array) — this runs from the fleet.speed /
   // economy.production hooks, i.e. per movement leg and production span.
@@ -122,6 +122,13 @@ function effectsSum(
  *  is not asked outside the kernel), the way the research screen sums its slots. */
 export function controlLimitBonus(player: Player | undefined, data: GameData): number {
   return effectsSum(player, data, 'controlLimit');
+}
+
+/** The surcharge the player's research puts on its units' daily upkeep (BAL-19,
+ *  `effects.armyUpkeep`): 0.3 = +30%. The module raises the `economy.unitUpkeep` multiplier
+ *  by it; exported for the hosts, which show the same bill off a settled state. */
+export function armyUpkeepSurcharge(player: Player | undefined, data: GameData): number {
+  return effectsSum(player, data, 'armyUpkeep');
 }
 
 /** Технологии, любая из которых открывает юнита или здание (пусто — не заперто). Тот же
@@ -225,6 +232,8 @@ export function conditionMet(
       // catalog, so the id lookups are snapshot-safe.
       return scientistsOf(state.players[playerId]).some((chosen) => {
         if (chosen.level < cond.minLevel) return false;
+        // A leader's own line (BAL-19's viceroy) opens to that leader alone.
+        if (cond.scientist !== undefined && chosen.id !== cond.scientist) return false;
         const def = data.scientists[chosen.id];
         if (!def) return false; // a chosen id absent from the catalog satisfies nothing
         return cond.branch === undefined || def.branch === cond.branch;
@@ -814,7 +823,9 @@ export const technologyModule: GameModule = {
   // 1.4.0: возможность `technology.grant` — технология мимо лаборатории (SPY-10).
   // 1.5.0: очередь исследований (RQ-1) — `technology.queue` / `.dequeue` / `.queue.move`.
   // 1.6.0: `effects.controlLimit` поднимает лимит управления (хук `control.limit`, BAL-19).
-  version: '1.6.0',
+  // 1.7.0: `effects.armyUpkeep` дорожает содержание войск (хук `economy.unitUpkeep`), условие
+  // `has_scientist` знает учёного по id (BAL-19, линия Наместника).
+  version: '1.7.0',
   setup(api) {
     api.provideCapability<TechnologyGrant>('technology.grant', grantTechnology);
     api.onAction('technology.research', startResearch);
@@ -903,6 +914,14 @@ export const technologyModule: GameModule = {
       const playerId = (args as { playerId?: string }).playerId;
       if (typeof playerId !== 'string') return limit;
       return limit + controlLimitBonus(h.state.players[playerId], h.ctx.data);
+    });
+
+    // BAL-19: the viceroy's line makes the player's army dearer to keep (args `{ playerId }`).
+    api.hook<number>('economy.unitUpkeep', (share, args, h) => {
+      const playerId = (args as { playerId?: string }).playerId;
+      if (typeof playerId !== 'string') return share;
+      const surcharge = armyUpkeepSurcharge(h.state.players[playerId], h.ctx.data);
+      return surcharge !== 0 ? share * (1 + surcharge) : share;
     });
 
     api.hook<number>('fleet.speed', (speed, args, h) => {

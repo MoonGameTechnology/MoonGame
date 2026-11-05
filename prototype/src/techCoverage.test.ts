@@ -97,11 +97,40 @@ describe('BAL-12 — слой has_scientist в отчёте', () => {
   });
 
   it('на ЖИВЫХ данных слой читается так, как его описал кирпич', () => {
-    // Сторож: сегодня `has_scientist` стоит ровно на линии «Хранителя», и она за окном
-    // стандартного прогона (14 дней против `dayGate: 15`). Появится второй такой узел
-    // или сдвинется гейт — тест заставит переписать разбор, а не унаследовать его.
+    // Сторож: сегодня `has_scientist` стоит на линии «Хранителя», и она за окном
+    // стандартного прогона (14 дней против `dayGate: 15`), и на линии Наместника (BAL-19):
+    // своих ворот дня у неё нет, её держит цепочка за «Имперской канцелярией» (день 12).
+    // Появится ещё такой узел или сдвинется гейт — тест заставит переписать разбор, а не
+    // унаследовать его.
     const live = scientistGatedNodes(data.technologies, data.scientists, new Map(), 14);
-    expect(live.map((r) => r.id)).toEqual(['ai_stewardship']);
-    expect(live[0]).toMatchObject({ branch: 'command', hasLeader: true, outsideWindow: true });
+    expect(live.map((r) => r.id)).toEqual([
+      'ai_stewardship',
+      'viceroyalties',
+      'military_governorates',
+      'imperial_protectorate',
+    ]);
+    expect(live[0]).toMatchObject({
+      branch: 'command',
+      scientist: null,
+      hasLeader: true,
+      outsideWindow: true,
+    });
+    for (const row of live.slice(1)) {
+      expect(row).toMatchObject({ branch: null, scientist: 'viceroy', hasLeader: true });
+    }
+  });
+
+  it('узел, запертый на учёного по имени, без этого учёного в каталоге недостижим', () => {
+    const own = {
+      own_line: {
+        dayGate: 0,
+        conditions: [{ type: 'has_scientist' as const, scientist: 'viceroy', minLevel: 1 }],
+      },
+    };
+    const row = (scientists: Record<string, { branch?: string }>) =>
+      scientistGatedNodes(own, scientists, new Map(), 14)[0]!;
+    expect(row({ viceroy: {} }).hasLeader).toBe(true);
+    // Учёный ветки чужую линию не открывает.
+    expect(row({ overseer: { branch: 'command' } }).hasLeader).toBe(false);
   });
 });

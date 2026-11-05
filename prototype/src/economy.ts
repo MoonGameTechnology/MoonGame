@@ -33,6 +33,7 @@ import {
   CONTROL_LIMIT,
   UNCONTROLLED_OUTPUT,
   controlLimitBonus,
+  armyUpkeepSurcharge,
   integrationShare,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
@@ -305,12 +306,14 @@ export function netIncome(
     }
     if (credits !== 0) out.credits = (out.credits ?? 0) + credits;
   }
+  // The core's `economy.unitUpkeep` multiplier: research can make the army dearer (BAL-19).
+  const unitShare = 1 + armyUpkeepSurcharge(me, data);
   const addUpkeep = (stacks: Array<{ unit: string; count: number }>) => {
     for (const st of stacks) {
       const def = data.units[st.unit];
       if (!def) continue;
       for (const res of Object.keys(def.upkeep))
-        out[res] = (out[res] ?? 0) - ((def.upkeep[res] ?? 0) * st.count) / 24;
+        out[res] = (out[res] ?? 0) - ((def.upkeep[res] ?? 0) * st.count * unitShare) / 24;
     }
   };
   for (const f of recordValues(state.fleets))
@@ -387,12 +390,13 @@ export function incomeBreakdown(
     }
     if (credits !== 0) cell('credits').production += credits;
   }
+  const unitShare = 1 + armyUpkeepSurcharge(me, data); // как `netIncome`
   const addUnitUpkeep = (stacks: Array<{ unit: string; count: number }>) => {
     for (const st of stacks) {
       const def = data.units[st.unit];
       if (!def) continue;
       for (const res of Object.keys(def.upkeep)) {
-        const v = ((def.upkeep[res] ?? 0) * st.count) / 24;
+        const v = ((def.upkeep[res] ?? 0) * st.count * unitShare) / 24;
         cell(res).unitUpkeep += v;
       }
     }

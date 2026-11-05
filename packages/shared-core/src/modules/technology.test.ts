@@ -111,11 +111,19 @@ const data: GameData = parseGameData({
       researchTimeHours: 1,
       conditions: [{ type: 'has_scientist', branch: 'space', minLevel: 5 }],
     },
+    // BAL-19: a leader's own line (the viceroy's) — only that scientist opens it.
+    own_line: {
+      name: 'Own Line',
+      cost: { metal: 5 },
+      researchTimeHours: 1,
+      conditions: [{ type: 'has_scientist', scientist: 'line_sci' }],
+    },
   },
   scientists: {
     void_sci: { name: 'Void Sci', branch: 'space' },
     ground_sci: { name: 'Ground Sci', branch: 'ground' },
     slot_sci: { name: 'Slot Sci', slotBonus: 1 },
+    line_sci: { name: 'Line Sci' },
   },
 });
 
@@ -366,6 +374,27 @@ describe('technology module — session research tree', () => {
     ).toBe(true);
   });
 
+  it('has_scientist { scientist } opens a leader\'s own line to that leader alone (BAL-19)', () => {
+    const kernel = createKernel([technologyModule]);
+    const council = (ids: string[]): GameState => {
+      const s = stateWith({ players: [player('p1', { metal: 30 })] });
+      (s.players.p1 as Player).scientists = ids.map((id) => ({ id, level: 1 }));
+      return s;
+    };
+    // Branch leaders and the +slot generalist do not open it…
+    expect(
+      errCode(kernel.applyAction(council(['void_sci', 'slot_sci']), research('own_line'), ctx(0))),
+    ).toBe('E_CONDITIONS_UNMET');
+    // …its own leader does, from either council slot…
+    expect(
+      okApply(kernel.applyAction(council(['ground_sci', 'line_sci']), research('own_line'), ctx(0))).ok,
+    ).toBe(true);
+    // …and opens no branch-focus gate: it has no branch.
+    expect(
+      errCode(kernel.applyAction(council(['line_sci']), research('void_doctrine'), ctx(0))),
+    ).toBe('E_CONDITIONS_UNMET');
+  });
+
   it('has_scientist gates branch-focus and capstone content on the chosen leader', () => {
     const kernel = createKernel([technologyModule]);
     const withScientist = (sci?: { id: string; level: number }): GameState => {
@@ -612,6 +641,58 @@ describe('technology module — session research tree', () => {
     });
     const moved = okApply(movementKernel.applyAction(movementState, move('F', 'B'), ctx(0)));
     expect(moved.state.fleets.F?.movement?.arrivesAt).toBeCloseTo(2 * HOUR);
+  });
+});
+
+describe('technology module — army upkeep surcharge (BAL-19)', () => {
+  const DAY = 24 * HOUR;
+  const upkeepData = parseGameData({
+    version: '0.1.0',
+    resources: ['credits'],
+    units: {
+      trooper: { faction: 'x', stats: { attack: 1, defense: 1, speed: 1 }, upkeep: { credits: 10 } },
+    },
+    factions: {},
+    buildings: { post: { name: 'Post', upkeep: { credits: 4 }, buildTimeHours: 0 } },
+    events: {},
+    technologies: {
+      viceroyalty: { name: 'Viceroyalty', effects: { controlLimit: 2, armyUpkeep: 0.1 } },
+      protectorate: { name: 'Protectorate', effects: { controlLimit: 2, armyUpkeep: 0.2 } },
+    },
+  });
+  /** A day of upkeep: p1 keeps a trooper in a fleet, two in the garrison and a post; p2 one
+   *  trooper and no research. */
+  const afterDay = (completed: string[], modules: GameModule[]): GameState => {
+    const home: Planet = {
+      ...planet('A', 'p1'),
+      buildings: [{ type: 'post', level: 1, hp: 0 }],
+      garrison: [{ unit: 'trooper', count: 2 }],
+    };
+    const p1 = { ...player('p1', { credits: 1000 }), technologies: { completed } };
+    const s = stateWith({
+      players: [p1, player('p2', { credits: 1000 })],
+      planets: [home],
+      fleets: [
+        { ...fleet('f1', 'p1', 'A'), units: [{ unit: 'trooper', count: 1 }] },
+        { ...fleet('f2', 'p2', 'A'), units: [{ unit: 'trooper', count: 1 }] },
+      ],
+    });
+    return okAdvance(createKernel(modules).advanceTo(s, { now: DAY, data: upkeepData })).state;
+  };
+  const credits = (s: GameState, id: string): number => s.players[id]!.resources.credits ?? 0;
+
+  it('raises only the researcher\'s unit upkeep: +10% per node, buildings at their price', () => {
+    const both = [economyModule, technologyModule];
+    expect(credits(afterDay([], both), 'p1')).toBe(1000 - 30 - 4);
+    expect(credits(afterDay(['viceroyalty'], both), 'p1')).toBeCloseTo(1000 - 33 - 4, 9);
+    const all = afterDay(['viceroyalty', 'protectorate'], both);
+    expect(credits(all, 'p1')).toBeCloseTo(1000 - 39 - 4, 9);
+    expect(credits(all, 'p2')).toBe(1000 - 10);
+  });
+
+  it('without the technology module the army costs its base price', () => {
+    const s = afterDay(['viceroyalty', 'protectorate'], [economyModule]);
+    expect(credits(s, 'p1')).toBe(1000 - 30 - 4);
   });
 });
 

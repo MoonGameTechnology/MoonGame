@@ -2,6 +2,7 @@ import { gameCss } from '../gameSheets.mjs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t, tData } from '../../localization/runtime';
 import { newGame, data, DAY, HOUR, order, researchTech, advance } from './game';
+import { networkSeats } from './matchSetup';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { MAX_RESEARCH_QUEUE } from '../../packages/shared-core/src/index';
 import { queueTech } from '../../decisions/actions';
@@ -199,6 +200,38 @@ describe('дерево технологий — подписи', () => {
       const ids = Object.keys(TECHS).filter((id) => (TECHS[id]!.branch ?? 'space') === b.key);
       for (const id of ids) expect(html, `${b.key}/${id}`).toContain(`data-tech="${id}"`);
     }
+  });
+});
+
+describe('дерево технологий — линия Наместника (BAL-19)', () => {
+  /** Партия основной игры: линия Наместника есть только в её дереве. */
+  const mainGame = (council: string[]): GameState => {
+    const s = newGame({ mapId: 'ffa-4', seats: networkSeats('ffa', 'ffa-4') });
+    s.players.p1!.scientists = council.map((id) => ({ id, level: 1 }));
+    delete s.players.p1!.scientist;
+    return s;
+  };
+
+  it('замок узла называет учёного, а не ветку', () => {
+    const cond = data.technologies.viceroyalties!.conditions[0]!;
+    expect(techCondText(cond)).toBe('нужен учёный: Наместник');
+  });
+
+  it('эффект узла — планеты под управлением и надбавка к содержанию армии', () => {
+    expect(techFx(data.technologies.viceroyalties!)).toBe(
+      '+2 планеты под управлением · +10% содержание армии',
+    );
+  });
+
+  it('без Куратора «Командование» ведёт Наместник: в ветке его линия', () => {
+    const head = (council: string[]): string => techTreeHtml(mainGame(council), 'p1', 'command', null);
+    expect(head(['viceroy', 'polymath'])).toContain(`${t('tech.curator')} <b>Наместник</b>`);
+    expect(head(['overseer', 'viceroy'])).toContain(`${t('tech.curator')} <b>Куратор</b>`);
+    expect(head(['void_admiral', 'polymath'])).toContain(t('tech.curator.none'));
+    // В чужой ветке своей линии у Наместника нет.
+    expect(techTreeHtml(mainGame(['viceroy', 'polymath']), 'p1', 'space', null)).toContain(
+      t('tech.curator.none'),
+    );
   });
 });
 

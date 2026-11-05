@@ -1,6 +1,7 @@
 /** НАУКА В ХОДЕ БОТА (SLIM-3): какой узел исследовать и на что копить (копилка доктрины). */
 import {
   BASE_RESEARCH_SLOTS,
+  conditionMet,
   matchCost,
   techInMatch,
   technologyLock,
@@ -53,11 +54,16 @@ export function researchOrders(bot: AiTurn, home: HomeTurn): void {
         .filter(([r, v]) => (pl.resources[r] ?? 0) < v + pad(r, ORDER_RESERVE[r] ?? 0))
         .map(([r]) => r);
     // Доктрина: узлы своей ветки идут вперёд цены (ранг `doctrineRanks`). Без доктрины
-    // ранг у всех один, и порядок прежний — по цене.
+    // ранг у всех один, и порядок прежний — по цене. Узел, запертый на учёного не из совета,
+    // доктрине не цель: совет внутри матча неизменен, а линия Наместника (BAL-19) стала
+    // высшим тиром «Командования» и увела бы туда путь Куратора.
+    const reachable = (id: string): boolean =>
+      techInMatch(state, id, data) &&
+      (data.technologies[id]?.conditions ?? []).every(
+        (c) => c.type !== 'has_scientist' || conditionMet(c, state, ai, data),
+      );
     const ranks =
-      doctrine !== undefined
-        ? doctrineRanks(data.technologies, doctrine, (id) => techInMatch(state, id, data))
-        : undefined;
+      doctrine !== undefined ? doctrineRanks(data.technologies, doctrine, reachable) : undefined;
     const rank = (id: string): number => {
       const def = data.technologies[id]!;
       if (def.ruleset === 'main' && def.tier === 1 && def.unlocks.units?.length) return -1;

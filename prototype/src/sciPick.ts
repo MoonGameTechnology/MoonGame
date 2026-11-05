@@ -22,7 +22,8 @@ export const COUNCIL_SIZE = 2;
 
 /** Что этот кандидат открывает игроку — одной строкой. Генералист не привязан к ветке;
  *  у остальных перечисляем технологии их ветки, которые без учёного просто закрыты
- *  (`has_scientist`), — это и есть влияние, которое игрок просил показать заранее. */
+ *  (`has_scientist`), — это и есть влияние, которое игрок просил показать заранее. Узел,
+ *  запертый на учёного по имени (линия Наместника, BAL-19), открывает только он. */
 export function sciInfluenceText(
   id: string,
   data: GameData,
@@ -30,13 +31,21 @@ export function sciInfluenceText(
 ): string {
   const def = data.scientists[id];
   if (!def) return '';
-  if (!def.branch) return t('scipick.generalist');
-  const opens = Object.values(data.technologies)
-    .filter(
-      (td) =>
-        td.branch === def.branch && (td.conditions ?? []).some((c) => c.type === 'has_scientist'),
-    )
-    .map((td) => tData(td.name));
+  const opensFor = (branch: string | undefined) =>
+    Object.values(data.technologies)
+      .filter((td) =>
+        (td.conditions ?? []).some(
+          (c) =>
+            c.type === 'has_scientist' &&
+            (c.scientist !== undefined ? c.scientist === id : td.branch === branch),
+        ),
+      )
+      .map((td) => tData(td.name));
+  if (!def.branch) {
+    const own = opensFor(undefined);
+    return own.length ? t('scipick.opens-own', { list: own.join(', ') }) : t('scipick.generalist');
+  }
+  const opens = opensFor(def.branch);
   const br = branchLabel(def.branch);
   return opens.length
     ? t('scipick.opens', { br, list: opens.join(', ') })

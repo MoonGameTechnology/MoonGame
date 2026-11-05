@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.80'); // BAL-19: three command nodes raise the control limit 5→10.
+    expect(data.version).toBe('0.1.81'); // BAL-19: the viceroy's line raises the control limit to 16.
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -538,7 +538,17 @@ describe('game data schema (docs/architecture.md §2)', () => {
     );
     for (const [id, def] of Object.entries(data.technologies)) {
       for (const cond of def.conditions) {
-        if (cond.type !== 'has_scientist' || cond.branch === undefined) continue;
+        if (cond.type !== 'has_scientist') continue;
+        // BAL-19: a leader's own line names the leader — it must exist and fit the branch.
+        if (cond.scientist !== undefined) {
+          const leader = data.scientists[cond.scientist];
+          expect(
+            leader !== undefined && (cond.branch === undefined || leader.branch === cond.branch),
+            `technology "${id}" is gated on the scientist "${cond.scientist}", which the catalog does not hold (or not in that branch) — the node is unreachable`,
+          ).toBe(true);
+          continue;
+        }
+        if (cond.branch === undefined) continue;
         expect(
           leaderBranches.has(cond.branch),
           `technology "${id}" is gated on a ${cond.branch} scientist, but no scientist in the catalog leads that branch — the node is unreachable`,

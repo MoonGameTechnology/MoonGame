@@ -643,6 +643,9 @@ export const TechnologyEffectsSchema = z.object({
   heroSlots: z.number().int().min(0).max(2).optional(),
   /** Planets added to the control limit (BAL-19); an integer, not a percentage. */
   controlLimit: z.number().int().nonnegative().optional(),
+  /** Surcharge on the daily upkeep of the player's units (not buildings), e.g. 0.1 = +10%:
+   *  the price of the viceroy's control-limit line (BAL-19). */
+  armyUpkeep: z.number().nonnegative().optional(),
   /** Multiplier on owned planetary production, e.g. 0.1 = +10%. */
   productionBonus: z.number().default(0),
   /** Multiplier on owned fleet movement speed, e.g. 0.15 = +15%. */
@@ -685,13 +688,16 @@ export const TechnologyConditionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('controls_planet_type'), planetType: z.string(), min: conditionMin }),
   /** Field at least `min` of `unit` across fleets, their cargo, and garrisons. */
   z.object({ type: z.literal('has_unit'), unit: z.string(), min: conditionMin }),
-  /** Have a chosen scientist (optionally of `branch`) at level ≥ `minLevel` — the
-   *  seam for branch-focus and late-game capstone content. `minLevel` is a meta level;
-   *  a capstone should anchor it to the account/scientist max once account-level lands
-   *  (docs-only today), not a guessed magic number. */
+  /** Have a chosen scientist (optionally of `branch`, or exactly the leader `scientist`)
+   *  at level ≥ `minLevel` — the seam for branch-focus and late-game capstone content.
+   *  `scientist` names one leader's own line (BAL-19's viceroy), which no branch leader
+   *  opens. `minLevel` is a meta level; a capstone should anchor it to the
+   *  account/scientist max once account-level lands (docs-only today), not a guessed
+   *  magic number. */
   z.object({
     type: z.literal('has_scientist'),
     branch: BranchSchema.optional(),
+    scientist: z.string().min(1).optional(),
     minLevel: z.number().int().positive().default(1),
   }),
 ]);

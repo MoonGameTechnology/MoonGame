@@ -1028,5 +1028,83 @@
     "effects": {
       "controlLimit": 2
     }
+  },
+  "viceroyalties": {
+    "name": "Viceroyalties",
+    "description": "tech.node.viceroyalties.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 5,
+    "cost": {
+      "credits": 450,
+      "metal": 340,
+      "microelectronics": 50
+    },
+    "researchTimeHours": 16,
+    "prerequisites": [
+      "imperial_chancery"
+    ],
+    "conditions": [
+      {
+        "type": "has_scientist",
+        "scientist": "viceroy"
+      }
+    ],
+    "effects": {
+      "controlLimit": 2,
+      "armyUpkeep": 0.1
+    }
+  },
+  "military_governorates": {
+    "name": "Military Governorates",
+    "description": "tech.node.military-governorates.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 5,
+    "cost": {
+      "credits": 500,
+      "metal": 380,
+      "microelectronics": 60
+    },
+    "researchTimeHours": 18,
+    "prerequisites": [
+      "viceroyalties"
+    ],
+    "conditions": [
+      {
+        "type": "has_scientist",
+        "scientist": "viceroy"
+      }
+    ],
+    "effects": {
+      "controlLimit": 2,
+      "armyUpkeep": 0.1
+    }
+  },
+  "imperial_protectorate": {
+    "name": "Imperial Protectorate",
+    "description": "tech.node.imperial-protectorate.desc",
+    "ruleset": "main",
+    "branch": "command",
+    "tier": 5,
+    "cost": {
+      "credits": 550,
+      "metal": 420,
+      "microelectronics": 70
+    },
+    "researchTimeHours": 20,
+    "prerequisites": [
+      "military_governorates"
+    ],
+    "conditions": [
+      {
+        "type": "has_scientist",
+        "scientist": "viceroy"
+      }
+    ],
+    "effects": {
+      "controlLimit": 2,
+      "armyUpkeep": 0.1
+    }
   }
 }
