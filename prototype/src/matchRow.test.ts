@@ -1,46 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import {
-  ENTRY_UNBOUNDED_MS,
-  fmtJoinWindow,
-  joinWindow,
-  modeLabel,
-  rowAction,
-  ruleSummary,
-  type MatchTab,
-} from './matchRow';
-import { t, tData } from '../../localization/runtime';
+import { ENTRY_UNBOUNDED_MS, fmtJoinWindow, joinWindow, rowAction, type MatchTab } from './matchRow';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-
-describe('строка матча — сводка правил', () => {
-  it('для захвата столиц показывает одну цель без очковой гонки', () => {
-    expect(ruleSummary({ timeScale: 24, victory: {
-      capitalCapture: true, scoreLimit: 560, dominationPercent: 0.8,
-    } })).toBe(`×24 · ${t('browser.description.capitals')}`);
-  });
-  it('скорость есть всегда, по умолчанию ×1', () => {
-    expect(ruleSummary({})).toBe('×1');
-    expect(ruleSummary({ timeScale: 20 })).toBe('×20');
-  });
-
-  it('НЕЗАДАННОЕ УСЛОВИЕ ПОБЕДЫ НЕ ЗАНИМАЕТ МЕСТА — строка и так тесная', () => {
-    expect(ruleSummary({ timeScale: 5, victory: {} })).toBe('×5');
-  });
-
-  it('оба условия победы показываются вместе', () => {
-    const s = ruleSummary({ timeScale: 5, victory: { scoreLimit: 1000, dominationPercent: 0.6 } });
-    expect(s).toContain('×5');
-    expect(s).toContain('1000');
-    expect(s).toContain('60'); // доля карты — в процентах, а не в долях
-    expect(s).toContain(t('browser.description.score', { n: 1000 }));
-  });
-
-  it('PvE не обещает победу по очкам или контролю карты', () => {
-    expect(ruleSummary({ timeScale: 2, victory: { scoreLimit: 600, dominationPercent: .6 } }, 'pve'))
-      .toBe('×2');
-  });
-});
 
 describe('строка матча — счётчик остатка', () => {
   it('дни и часы, часы, «вот-вот» — три разных подписи', () => {
@@ -101,47 +63,13 @@ describe('строка матча — окно входа', () => {
   });
 });
 
-describe('строка матча — вторая кнопка', () => {
-  it('ЧУЖОЙ МАТЧ В АРХИВ НЕ УБИРАЕТСЯ — на «доступных» второй кнопки нет', () => {
+describe('строка матча — архив в «Описании»', () => {
+  it('ЧУЖОЙ МАТЧ В АРХИВ НЕ УБИРАЕТСЯ — на «доступных» архива нет', () => {
     expect(rowAction('available')).toBeNull();
   });
 
   it('свой активный прячут, архивный возвращают', () => {
     expect(rowAction('active')).toBe('archive');
     expect(rowAction('archived')).toBe('restore');
-  });
-});
-
-describe('строка матча — режим партии', () => {
-  it('СТАРЫЙ СЕРВЕР (режима нет) — строка молчит, а не выдумывает', () => {
-    expect(modeLabel({})).toEqual({ kind: 'none' });
-  });
-
-  it('режим со значком вида: PvE и PvP различимы', () => {
-    expect(modeLabel({ modeId: 'pve_waves', kind: 'pve' })).toEqual({
-      kind: 'shown',
-      modeId: 'pve_waves',
-      badge: 'pve',
-    });
-    expect(modeLabel({ modeId: 'standard', kind: 'pvp' })).toEqual({
-      kind: 'shown',
-      modeId: 'standard',
-      badge: 'pvp',
-    });
-  });
-
-  it('НЕИЗВЕСТНЫЙ ВИД НЕ ВРЁТ «PVP»: режим назван, значка нет', () => {
-    // Живой случай, а не теория: прото-хост зовёт `new MatchRegistry(accountStore)`
-    // БЕЗ каталога, поэтому `kind` не считается вовсе (BRW-1). Имя режима сервер при
-    // этом прислал — прятать его было бы потерей того, что он честно сказал.
-    expect(modeLabel({ modeId: 'pve_waves' })).toEqual({ kind: 'shown', modeId: 'pve_waves' });
-  });
-
-  it('ИМЯ РЕЖИМА БЕРЁТСЯ ПО id ЧЕРЕЗ tData — сцепка id→ключ локали держится', () => {
-    // На строке нет `name` — сервер шлёт только id. Работает это лишь потому, что
-    // `dataKey()` превращает `pve_waves` в тот же `data.pve-waves`, что и имя
-    // «PvE Waves» из data/modes.json. Разъедется — игрок увидит сырой id.
-    expect(tData('pve_waves')).not.toBe('pve_waves');
-    expect(tData('standard')).not.toBe('standard');
   });
 });

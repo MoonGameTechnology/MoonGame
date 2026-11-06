@@ -411,9 +411,12 @@ describe('три стиля кнопок (UIX-11.1)', () => {
     expect(browser).toContain('<button class="mbtn btn-second" id="msolo-go">');
     expect(browser).toContain('<button class="mbtn btn-second" id="mfind-go">');
     expect(browser).toContain('<button class="mbtn btn-second" id="mreset-go">');
-    expect(browser).toContain("join.className = 'mbtn btn-second';");
-    expect(browser).toContain("arch.className = 'mbtn btn-quiet';");
-    expect(browser).toContain("open.className = 'mbtn btn-second';");
+    expect(browser).toContain("go.className = 'mbtn btn-second mgo';");
+    expect(browser).toContain("button.className = 'mbtn btn-quiet mdescription';");
+    // «В архив» / «Восстановить» живут в «Описании» (UIX-10.4): тихая рядом с «Закрыть».
+    const description = read('./matchDescription.ts');
+    expect(description).toContain('class="mbtn btn-quiet" data-description-action');
+    expect(description).toContain('class="mbtn btn-second" data-description-close');
     expect(read('./matchNumberButton.ts')).toContain("button.className = 'mnumber btn-quiet';");
   });
 

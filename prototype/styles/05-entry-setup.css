@@ -66,7 +66,7 @@
 #connect[data-stage="browse"]{padding:0;align-items:stretch;background:var(--sf-panel),#030b14;}
 #connect[data-stage="browse"] .cwrap{display:flex;flex-direction:column;width:100%;margin:0;padding:0;}
 #connect[data-stage="browse"] :is(.clang,.cfoot,.cver,.cupd,.tm-open){display:none;}
-#connect[data-stage="browse"] .cbox{flex:1 1 auto;display:flex;flex-direction:column;gap:10px;width:100%;min-height:0;margin:0;
+#connect[data-stage="browse"] .cbox{flex:1 1 auto;display:flex;flex-direction:column;gap:8px;width:100%;min-height:0;margin:0;
   border:0;border-radius:0;background:none;box-shadow:none;color:var(--sf-text);
   font-family:var(--sf-font);font-variant-numeric:tabular-nums;
   padding:calc(8px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
@@ -77,7 +77,8 @@
 #connect .mhead{order:1;display:flex;align-items:center;gap:14px;}
 #connect .mhead .cback{flex:none;min-height:44px;margin:0;padding:0 4px;}
 #connect .mhead .ctitle{min-width:0;font-size:20px;font-weight:700;line-height:1.3;color:var(--sf-hi);}
-#connect .mhead .ctitle .dia{flex:none;width:10px;height:10px;background:var(--sf-accent);box-shadow:0 0 10px var(--sf-accent);}
+/* Повёрнутый квадрат выступает за свою коробку на ~2px: отступ ставит угол вровень с краем вкладок. */
+#connect .mhead .ctitle .dia{flex:none;width:10px;height:10px;margin-left:3px;background:var(--sf-accent);box-shadow:0 0 10px var(--sf-accent);}
 #connect .mtabs{order:2;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}
 #connect .mtab{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:0 10px;
   border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card-off);color:var(--sf-dim);
@@ -93,7 +94,7 @@
 #connect .mtab.active .mcount{background:color-mix(in srgb,var(--sf-accent) 22%,transparent);color:var(--sf-hi);}
 /* The session number is the copy action; legacy UUIDs never dictate the card width. */
 :is(#hub,#connect) .mnumber{display:inline-flex;align-items:center;gap:8px;max-width:100%;min-height:36px;
-  padding:6px 10px;margin-top:6px;border:1px solid var(--sf-edge);border-radius:8px;
+  padding:6px 10px;border:1px solid var(--sf-edge);border-radius:8px;
   background:var(--sf-inset);color:var(--sf-accent);font:600 13px/1.4 var(--sf-font);
   font-variant-numeric:tabular-nums;cursor:pointer;text-align:left;}
 :is(#hub,#connect) .mnumber-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -108,7 +109,7 @@
 @media (pointer:coarse){:is(#hub,#connect) .mnumber{min-height:44px;}}
 /* Середина листается целиком: карточка сервера, фильтр и список. */
 #connect .mbody{order:4;flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  display:flex;flex-direction:column;gap:10px;}
+  display:flex;flex-direction:column;gap:8px;}
 /* «Сервер не отвечает» — адрес виден, только когда он нужен (decisions/browserFallback.ts, правило 4). */
 #connect .msrv{flex:none;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 12px;padding:14px 16px;
   border:1px solid color-mix(in srgb,var(--amber) 55%,transparent);border-radius:12px;background:var(--sf-card);}
@@ -157,7 +158,7 @@
   background:var(--sf-hi);cursor:pointer;}
 #connect .mfrange:focus-visible::-webkit-slider-thumb{outline:2px solid var(--sf-hi);outline-offset:2px;}
 #connect .mfrange:focus-visible::-moz-range-thumb{outline:2px solid var(--sf-hi);outline-offset:2px;}
-#connect .mlist{flex:none;display:flex;flex-direction:column;gap:8px;}
+#connect .mlist{flex:none;display:flex;flex-direction:column;gap:6px;}
 #connect .mnum{flex:none;display:flex;gap:8px;}
 #connect .mnum input{flex:1;min-width:0;min-height:44px;padding:0 12px;background:rgba(2,10,14,.9);
   border:1px solid var(--line-hi);border-radius:7px;color:var(--ink);font:var(--fs-body)/1.4 var(--sf-font);
@@ -168,46 +169,69 @@
 #connect .msolo{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 8px 16px;text-align:center;}
 #connect .msolo .mbtn{min-height:46px;padding:0 20px;}
 #connect .msolo-sub{font-size:14px;line-height:1.45;color:var(--sf-dim);}
-/* Строка матча: карта и режим, ниже день, места точками, правила и окно входа. На телефоне кнопки
-   входа, описания и архива стоят своим рядом, чтобы не сжимать название карты.
-   На ПК кнопки справа от обеих строк (bridge-shell.css). */
-#connect .mrow{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name btns" "meta meta";
-  align-items:center;gap:4px 10px;padding:10px 12px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);}
-#connect .mrow.mrow-2{grid-template-areas:"name name" "meta meta" "number number" "btns btns";}
-#connect .mrow .mnumber{grid-area:number;justify-self:start;}
-#connect .mrow:hover{border-color:var(--sf-edge-hi);}
-#connect .minfo{display:contents;}
-#connect .mname{grid-area:name;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0;font-size:16px;line-height:1.35;}
-#connect .mname b{font-weight:600;color:var(--sf-text);}
-#connect .mmodename{font-size:14px;color:var(--sf-dim);}
-#connect .mmode{padding:0 7px;border:1px solid currentColor;border-radius:999px;font-size:12px;font-weight:700;line-height:1.6;}
-#connect .mmode.pve{color:var(--amber,#e0a942);}
-#connect .mmode.pvp{color:var(--sf-accent);}
-#connect .mended{padding:0 8px;border-radius:999px;background:var(--sf-inset);font-size:12px;line-height:1.6;color:var(--sf-dim);}
-#connect .mmeta{grid-area:meta;display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:14px;line-height:1.4;color:var(--sf-dim);}
-#connect .mseats{display:inline-flex;align-items:center;gap:3px;}
-#connect .mseats i{width:9px;height:9px;border:1px solid var(--sf-accent);border-radius:50%;}
-#connect .mseats i.on{background:var(--sf-accent);}
-#connect .mseats b{margin-left:4px;font-weight:600;color:var(--sf-text);}
-#connect .mwin{color:var(--sf-accent);}
-#connect .mwin.soon{color:var(--amber,#e0a942);}
-#connect .mwin.shut{color:var(--sf-dim);text-decoration:line-through;}
-#connect .mbtns{grid-area:btns;justify-self:end;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;}
+/* Карточка партии (UIX-10.4, decisions/matchCard.ts) — одна у «Доступных», своих вкладок и «Моих
+   партий» хаба. Сверху имя карты с пометками того, чего в имени нет (PvE, режим, столицы,
+   «завершён»), и день: у своей партии он справа в той же строке, на «Доступных» под именем идут
+   места, скорость и окно входа. Снизу ряд: главная кнопка и номер; «Описание» (в нём и архив) —
+   значок «i» в углу. С 700px всё в одну строку, «Описание» — подписью. */
+:is(#hub,#connect) .mcard{position:relative;display:flex;flex-direction:column;gap:8px;padding:10px 12px;
+  border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);}
+:is(#hub,#connect) .mcard:hover{border-color:var(--sf-edge-hi);}
+:is(#hub,#connect) .minfo{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 12px;min-width:0;}
+:is(#hub,#connect) .mname{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0;font-size:16px;line-height:1.35;}
+:is(#hub,#connect) .mname b{font-weight:600;color:var(--sf-text);}
+:is(#hub,#connect) .mmodename{font-size:14px;color:var(--sf-dim);}
+:is(#hub,#connect) :is(.mmode,.mtag,.mended){padding:0 8px;border-radius:999px;font-size:12px;line-height:1.6;white-space:nowrap;}
+:is(#hub,#connect) :is(.mmode,.mtag){border:1px solid currentColor;font-weight:700;}
+:is(#hub,#connect) .mmode.pve{color:var(--amber,#e0a942);}
+:is(#hub,#connect) .mtag{color:var(--sf-accent);}
+:is(#hub,#connect) .mended{background:var(--sf-inset);color:var(--sf-dim);}
+:is(#hub,#connect) .mmeta{display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px;font-size:14px;line-height:1.4;color:var(--sf-dim);}
+:is(#hub,#connect) .mmeta > *{white-space:nowrap;}
+:is(#hub,#connect) .mcard.available .mmeta{flex-basis:100%;}
+:is(#hub,#connect) .mseats{display:inline-flex;align-items:center;gap:3px;}
+:is(#hub,#connect) .mseats i{width:9px;height:9px;border:1px solid var(--sf-accent);border-radius:50%;}
+:is(#hub,#connect) .mseats i.on{background:var(--sf-accent);}
+:is(#hub,#connect) .mseats b{margin-left:4px;font-weight:600;color:var(--sf-text);}
+:is(#hub,#connect) .mwin{color:var(--sf-accent);}
+:is(#hub,#connect) .mwin.soon{color:var(--amber,#e0a942);}
+:is(#hub,#connect) .mwin.shut{color:var(--sf-dim);text-decoration:line-through;}
+/* Ряд кнопок: главная растягивается, номер — по содержимому; не влез (длинный номер битвы
+   корпораций на узком телефоне) — уходит вторым рядом. «Описание» на телефоне — значок «i» в правом
+   верхнем углу карточки: подписью в этом ряду оно не помещалось. */
+:is(#hub,#connect) .mbtns{display:flex;flex-wrap:wrap;gap:6px;}
+:is(#hub,#connect) .mcard .mbtn{min-height:44px;padding:0 14px;border-radius:12px;font-size:15px;white-space:nowrap;}
+:is(#hub,#connect) .mcard .mgo{flex:1 1 auto;}
+:is(#hub,#connect) .mcard .mnumber{margin:0;min-height:44px;}
+:is(#hub,#connect) .mcard .mdescription{display:inline-flex;align-items:center;justify-content:center;}
+:is(#hub,#connect) .mcard .mdescription svg{flex:none;width:22px;height:22px;}
+@media (max-width:699px){
+  :is(#hub,#connect) .mcard .minfo{padding-right:26px;}
+  :is(#hub,#connect) .mcard .mdescription{position:absolute;top:0;right:0;width:44px;height:44px;padding:0;}
+  :is(#hub,#connect) .mcard .mdescription .mlabel{display:none;}
+}
+@media (min-width:700px){
+  :is(#hub,#connect) .mcard{flex-direction:row;align-items:center;gap:16px;padding:8px 8px 8px 14px;}
+  :is(#hub,#connect) .mcard .minfo{flex:1 1 auto;justify-content:flex-start;column-gap:16px;}
+  :is(#hub,#connect) .mcard.available .mmeta{flex-basis:auto;}
+  :is(#hub,#connect) .mcard .mbtns{flex:none;flex-wrap:nowrap;}
+  :is(#hub,#connect) .mcard .mgo{flex:none;min-width:140px;}
+  :is(#hub,#connect) .mcard .mdescription svg{display:none;}
+}
 #connect .mbtn{min-height:44px;padding:0 16px;border-radius:12px;font-size:15px;white-space:nowrap;}
 /* The browser and home hub share one native, keyboard-accessible details dialog. */
 #match-description{box-sizing:border-box;width:min(520px,calc(100% - 32px));max-width:none;max-height:calc(100dvh - 48px);
   margin:auto;padding:22px;color:var(--sf-text);background:var(--sf-panel),#07121d;border:1px solid var(--sf-edge-hi);
   border-radius:16px;font:16px/1.5 var(--sf-font);box-shadow:var(--sf-shadow);overflow-y:auto;overflow-wrap:anywhere;}
 #match-description::backdrop{background:rgba(2,8,14,.82);backdrop-filter:blur(3px);}
-#match-description h2{margin:0 0 14px;font-size:20px;color:var(--sf-hi);}
-#match-description h3{margin:0;font-size:18px;color:var(--sf-hi);}
-#match-description p{margin:8px 0 16px;color:var(--sf-dim);}
-#match-description dl{margin:16px 0 20px;}
+#match-description h2{margin:0;font-size:20px;line-height:1.3;color:var(--sf-hi);}
+#match-description dl{margin:12px 0 18px;}
 #match-description dl > div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px;
   padding:9px 0;border-bottom:1px solid var(--sf-edge);}
 #match-description dt{color:var(--sf-dim);}
 #match-description dd{margin:0;}
-#match-description .mbtn{width:100%;min-height:44px;border-radius:12px;font:inherit;}
+#match-description .mdesc-btns{display:flex;gap:10px;}
+#match-description .mbtn{flex:1 1 0;min-height:44px;border-radius:12px;font:inherit;}
 /* «Настройки матча» (окно перед созданием сетевой партии) — в стиле окна описания. */
 #match-create-dialog{box-sizing:border-box;width:min(560px,calc(100% - 32px));max-width:none;max-height:calc(100dvh - 48px);
   margin:auto;padding:22px;color:var(--sf-text);background:var(--sf-panel),#07121d;border:1px solid var(--sf-edge-hi);

@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { t, tData } from '../../localization/runtime';
 import { saveSession } from '../../decisions/sessionStore';
-import { fmtJoinWindow, ruleSummary } from './matchRow';
+import { fmtJoinWindow } from './matchRow';
 
 const BASE = 'ws://srv.test:8080';
 const HTTP = 'http://srv.test:8080';
@@ -228,6 +228,9 @@ let clipboard: { writeText(s: string): Promise<void> } | undefined;
 let detached: unknown[][];
 /** Поддельный `document`: в нём же фокус — пока игрок правит адрес, переопрос ждёт. */
 let doc: { activeElement: El | null } & Record<string, unknown>;
+/** Действие, с которым открыли «Описание» последним: «В архив» / «Восстановить» живут там
+ *  (UIX-10.4). `undefined` — описание открыто без действия. */
+let described: { label: string; run(): void } | undefined;
 
 const $ = (id: string): El => root.all().find((n) => n.id === id)!;
 const of = (name: string): unknown[][] => calls.filter((c) => c[0] === name);
@@ -245,6 +248,11 @@ const rows = () =>
       buttons: r.children[1]!.children,
     }));
 const ids = () => rows().map((r) => r.id);
+/** Открыть «Описание» строки и нажать в нём «В архив» / «Восстановить». */
+const archiveFrom = (i: number): void => {
+  rows()[i]!.buttons.at(-1)!.click();
+  described!.run();
+};
 const tab = (name: string): El => root.querySelector(`.mtab[data-tab="${name}"]`)!;
 /** Числа на ярлыках вкладок; пустая строка — числа нет. */
 const counts = () =>
@@ -262,6 +270,7 @@ beforeEach(() => {
   connectShown = true;
   clipboard = { writeText: async (s) => void calls.push(['clipboard', s]) };
   detached = [];
+  described = undefined;
   vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => void detached.push(args));
   // Хост без аккаунтов: проба режима отвечает «не знаю такого адреса».
   server = (url) => url.endsWith('/auth/status') ? reply(404)
@@ -320,8 +329,10 @@ async function boot() {
   }));
   vi.doMock('./matchDescription', () => ({
     isMatchDescriptionOpen: () => !!doc.descriptionOpen,
-    openMatchDescription: (match: { matchId: string }, label: string) =>
-      void calls.push(['description', match.matchId, label]),
+    openMatchDescription: (match: { matchId: string }, label: string, action?: { label: string; run(): void }) => {
+      calls.push(['description', match.matchId, label]);
+      described = action;
+    },
   }));
   const mb = await import('./matchBrowser');
   mb.initMatchBrowser({
@@ -443,7 +454,7 @@ describe('REFM-217 — лента обозревателя', () => {
     expect(counts()).toEqual(['2', '2', '1']);
   });
 
-  it('строка: карта, день, игроки, правила, режим и окно входа', async () => {
+  it('карточка «Доступных»: пометки того, чего нет в имени, день, места, скорость и окно входа', async () => {
     lists.available = [
       row('a1', {
         modeId: 'pve_waves',
@@ -467,26 +478,51 @@ describe('REFM-217 — лента обозревателя', () => {
         '<i></i>'.repeat(6) +
         '<b>2/8</b></span>',
     );
-    expect(a1).toContain(ruleSummary({ timeScale: 1, victory: { scoreLimit: 500 } }, 'pve'));
+    // Скорость остаётся — по ней выбирают партию; условия победы живут в «Описании».
+    expect(a1).toContain('>×1</span>');
     expect(a1).not.toContain(t('browser.description.score', { n: 500 }));
-    // Идущий матч — обычное состояние: «идёт» на каждой строке было шумом.
-    expect(a1).not.toContain(t('browser.running'));
+    // Идущий матч — обычное состояние: помечен только завершённый.
+    expect(a1).not.toContain('mended');
     expect(a1).toContain(
       `<span class="mwin">${t('browser.join-window', { dur: fmtJoinWindow(30 * 3_600_000) })}</span>`,
     );
-    expect(a2).toContain(`<span class="mmode pvp">${t('browser.mode.pvp')}</span>`);
+    // PvP — обычное состояние, а «Дуэль» повторяла бы «1 на 1» в имени карты.
+    expect(a2).not.toContain('mmode');
+    expect(a2).not.toContain(tData('duel'));
     expect(a2).toContain('<span class="mwin soon">');
     expect(a3).toContain(`<span class="mwin shut">${t('acc.join-closed')}</span>`);
     expect(a3).toContain(`<span class="mended">${t('browser.finished')}</span>`);
     expect(a3).not.toContain('mmode');
   });
 
-  it('номер стоит отдельной кнопкой и не вытесняет название', async () => {
+  it('своя карточка: без скорости, места — только при свободных креслах, захват столиц помечен', async () => {
+    lists.active = [
+      row('m1', {
+        modeId: 'capital_duel',
+        kind: 'pvp',
+        players: { seated: 2, capacity: 2 },
+        rules: { timeScale: 12, victory: { capitalCapture: true } },
+      }),
+      row('m2', { players: { seated: 8, capacity: 20 } }),
+    ];
+    await browsing();
+    tab('active').click();
+    const [m1, m2] = rows().map((r) => r.info);
+    expect(m1).toContain(`<span class="mtag">${t('browser.capitals')}</span>`);
+    expect(m1).not.toContain(tData('capital_duel'));
+    expect(m1).toContain(t('browser.day', { n: 3 }));
+    expect(m1).not.toContain('mseats');
+    expect(m1).not.toContain('×12');
+    expect(m2).toContain('<b>8/20</b>');
+  });
+
+  it('номер — кнопка в ряду под картой, а не строка в названии', async () => {
     await browsing();
     const first = rows()[0]!;
     expect(first.info).not.toContain('a1');
     expect(first.row.title).toBe('a1');
-    expect(first.row.querySelector('.mnumber')!.innerHTML).toContain('№ a1');
+    expect(first.buttons[1]!.has('mnumber')).toBe(true);
+    expect(first.buttons[1]!.innerHTML).toContain('№ a1');
   });
 
   it('больше восьми мест — без точек, только число', async () => {
@@ -507,25 +543,30 @@ describe('REFM-217 — лента обозревателя', () => {
     await browsing();
     const join = rows()[0]!.buttons[0]!;
     expect(join.textContent).toBe(t('browser.join'));
-    expect(rows()[0]!.buttons).toHaveLength(2);
-    expect(rows()[0]!.row.className).toBe('mrow mrow-2');
+    expect(rows()[0]!.buttons).toHaveLength(3);
+    expect(rows()[0]!.row.className).toBe('mrow mcard available');
     join.click();
     expect(calls).toEqual([['openSessionTab', 'a1', false]]);
+    // Чужую партию в архив не убирают: «Описание» открывается без действия.
+    rows()[0]!.buttons.at(-1)!.click();
+    expect(described).toBeUndefined();
   });
 
-  it('«Активные»: «Продолжить» возвращает на своё место, рядом «В архив»', async () => {
+  it('«Активные»: «Продолжить» возвращает на своё место, «В архив» — в «Описании»', async () => {
     await browsing();
     tab('active').click();
     expect(tab('active').has('active')).toBe(true);
     expect(tab('available').has('active')).toBe(false);
     expect(ids()).toEqual(['m2', 'm1']);
-    const [resume, archive] = rows()[1]!.buttons;
+    const [resume, number, description] = rows()[1]!.buttons;
     expect(resume!.textContent).toBe(t('browser.resume'));
-    expect(archive!.textContent).toBe(t('browser.archive'));
-    // Двум кнопкам на телефоне нужен свой ряд: рядом с картой они сжали бы имя.
-    expect(rows()[1]!.row.className).toBe('mrow mrow-2');
+    expect(number!.has('mnumber')).toBe(true);
+    expect(description!.textContent).toBe(t('browser.description'));
+    expect(rows()[1]!.row.className).toBe('mrow mcard own');
     resume!.click();
     expect(calls).toEqual([['openSessionTab', 'm1', true]]);
+    description!.click();
+    expect(described!.label).toBe(t('browser.archive'));
   });
 
   it('поле номера: своя партия — возврат на место, чужая — вход, мусор — подсказка', async () => {
@@ -548,26 +589,24 @@ describe('REFM-217 — лента обозревателя', () => {
     await browsing();
     tab('archived').click();
     expect(ids()).toEqual(['z1']);
-    expect(rows()[0]!.buttons.map((b) => b.textContent)).toEqual([
-      t('browser.resume'),
-      t('browser.restore'),
-      t('browser.description'),
-    ]);
+    expect(rows()[0]!.buttons[0]!.textContent).toBe(t('browser.resume'));
+    rows()[0]!.buttons.at(-1)!.click();
+    expect(described!.label).toBe(t('browser.restore'));
   });
 
   it('завершённый архив открывает карту на своём месте без выбора фракции и без восстановления', async () => {
     lists.archived = [row('finished', { status: 'ended', archiveExpiresAt: 1_800_000_000_000 })];
     await browsing();
     tab('archived').click();
-    expect(rows()[0]!.buttons.map((b) => b.textContent)).toEqual([
-      t('browser.view-map'), t('browser.description'),
-    ]);
+    expect(rows()[0]!.buttons[0]!.textContent).toBe(t('browser.view-map'));
     rows()[0]!.buttons[0]!.click();
     expect(of('openSessionTab')).toEqual([['openSessionTab', 'finished', true]]);
     $('mnum-in').value = 'finished';
     $('mnum').fire('submit');
     expect(of('openSessionTab').at(-1)).toEqual(['openSessionTab', 'finished', true]);
-    expect(rows()[0]!.row.innerHTML).not.toContain(t('browser.restore'));
+    // Завершённую не восстанавливают: «Описание» без действия.
+    rows()[0]!.buttons.at(-1)!.click();
+    expect(described).toBeUndefined();
   });
 
   it('описание доступно во всех вкладках и в хабе без входа в матч', async () => {
@@ -581,6 +620,8 @@ describe('REFM-217 — лента обозревателя', () => {
     await mb.refreshMyMatches();
     $('hub-mine').querySelector('.mdescription')!.click();
     expect(of('description').at(-1)).toEqual(['description', 'm1', 'карта nexus']);
+    // В хабе архива нет, как и раньше: только обозреватель.
+    expect(described).toBeUndefined();
     expect(of('openSessionTab')).toEqual([]);
   });
 
@@ -667,7 +708,7 @@ describe('REFM-217 — архив', () => {
     tab('active').click();
     server = (url) =>
       url.endsWith('/auth/status') ? reply(404) : reply(200, url.includes('/archive') ? {} : lists);
-    rows()[1]!.buttons[1]!.click();
+    archiveFrom(1);
     await settle();
     expect(fetched.filter((f) => f.method === 'POST')).toEqual([
       { url: `${HTTP}/matches/m1/archive?nick=Orion`, method: 'POST', auth: undefined },
@@ -680,11 +721,11 @@ describe('REFM-217 — архив', () => {
     await browsing();
     server = (url) => (url.includes('archive') ? reply(403) : reply(404));
     tab('active').click();
-    rows()[1]!.buttons[1]!.click();
+    archiveFrom(1);
     await settle();
     expect(status).toBe(t('browser.archive-failed'));
     tab('archived').click();
-    rows()[0]!.buttons[1]!.click();
+    archiveFrom(0);
     await settle();
     expect(fetched.at(-1)!.url).toBe(`${HTTP}/matches/z1/unarchive?nick=Orion`);
     expect(status).toBe(t('browser.restore-failed'));
@@ -695,7 +736,7 @@ describe('REFM-217 — архив', () => {
     await browsing();
     tab('active').click();
     srv = null;
-    rows()[0]!.buttons[1]!.click();
+    archiveFrom(1);
     await settle();
     expect(fetched).toEqual([]);
     // Чего не хватает, уже сказал разбор адреса; «связи нет» поверх было бы неправдой.
@@ -708,7 +749,7 @@ describe('REFM-217 — архив', () => {
       throw new Error('offline');
     };
     tab('active').click();
-    rows()[1]!.buttons[1]!.click();
+    archiveFrom(1);
     await settle();
     expect(status).toBe(t('browser.archive-error'));
   });
@@ -839,13 +880,16 @@ describe('REFM-217 — «Мои партии» хаба', () => {
     expect(of('status')).toEqual([]);
     expect($('hub-mine-sec').hidden).toBe(false);
     expect(cards()).toHaveLength(2);
-    const first = cards()[0]!;
-    // Под партией — её номер, а не адрес (плейтест 2026-10-17).
-    expect(first.querySelector('.mnumber')!.innerHTML).toContain('№ m1');
-    expect(first.innerHTML).not.toContain('/game/');
-    expect(first.innerHTML).toContain('▶');
-    expect(cards()[1]!.innerHTML).toContain('◼');
-    const open = first.children.at(-1)!.children[0]!;
+    const [first, ended] = cards();
+    // Та же карточка, что у обозревателя (UIX-10.4); в ней номер, а не адрес (плейтест 2026-10-17).
+    expect(first!.className).toBe('hm-row mcard own');
+    expect(first!.querySelector('.mnumber')!.innerHTML).toContain('№ m1');
+    expect(first!.children[0]!.innerHTML).not.toContain('/game/');
+    // Идущая партия не помечена — это обычное состояние; «Продолжить» не дублирует значок ▶.
+    expect(first!.children[0]!.innerHTML).not.toContain('mended');
+    expect(ended!.children[0]!.innerHTML).toContain(`<span class="mended">${t('browser.finished')}</span>`);
+    expect(ended!.children.at(-1)!.children[0]!.textContent).toBe(t('browser.view-map'));
+    const open = first!.children.at(-1)!.children[0]!;
     expect(open.textContent).toBe(t('browser.resume'));
     open.click();
     expect(of('openSessionTab')).toEqual([['openSessionTab', 'm1', true]]);
@@ -1018,13 +1062,16 @@ describe('вкладка битв корпораций', () => {
     expect($('mfilter').style.display).toBe('none');
     const live = rows()[0]!;
     expect(live.buttons[0]!.textContent).toBe(t('browser.resume'));
-    expect(live.buttons[1]!.textContent).toBe(t('browser.archive'));
+    live.buttons.at(-1)!.click();
+    expect(described!.label).toBe(t('browser.archive'));
     live.buttons[0]!.click();
     rows()[1]!.buttons[0]!.click();
     expect(of('openSessionTab').slice(-2)).toEqual([['openSessionTab', 'ava-live', true], ['openSessionTab', 'ava-join', false]]);
-    expect(rows()[2]!.buttons[1]!.textContent).toBe(t('browser.restore'));
+    rows()[2]!.buttons.at(-1)!.click();
+    expect(described!.label).toBe(t('browser.restore'));
     expect(rows()[3]!.buttons[0]!.textContent).toBe(t('browser.view-map'));
-    expect(rows()[3]!.buttons).toHaveLength(2);
+    rows()[3]!.buttons.at(-1)!.click();
+    expect(described).toBeUndefined();
   });
   it('пустая вкладка получает своё сообщение', async () => {
     await browsing();
