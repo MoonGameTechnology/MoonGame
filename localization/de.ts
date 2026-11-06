@@ -4627,7 +4627,7 @@ export const de: Record<string, string> = {
   'tech.action.slots-full': 'Plätze belegt',
   'tech.action.unmet': 'Bedingung nicht erfüllt',
   'tech.curator': 'Zweig geleitet von',
-  'tech.curator.none': 'Kein Zweigleiter — durch Wissenschaftler beschränkte Knoten bleiben gesperrt',
+  'tech.curator.none': 'Ohne Zweigleiter bleiben Knoten mit Wissenschaftler-Bedingung gesperrt',
   'tech.branch.done': 'Zweig vollständig erforscht.',
   'tech.day': 'Tag {n}',
   'tech.from-day': 'ab Tag {n}',

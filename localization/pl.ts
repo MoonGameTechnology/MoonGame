@@ -4658,7 +4658,7 @@ export const pl: Record<string, string> = {
   'tech.action.slots-full': 'Gniazda zajęte',
   'tech.action.unmet': 'Warunek niespełniony',
   'tech.curator': 'Opiekun gałęzi',
-  'tech.curator.none': 'Brak lidera — węzły wymagające naukowca są zablokowane',
+  'tech.curator.none': 'Bez lidera gałęzi węzły wymagające naukowca pozostają zablokowane',
   'tech.branch.done': 'Gałąź zbadana w całości.',
   'tech.day': 'Dzień {n}',
   'tech.from-day': 'od dnia {n}',
