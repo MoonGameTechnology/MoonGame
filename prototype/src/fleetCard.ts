@@ -39,6 +39,7 @@ import { t, tData } from '../../localization/runtime';
 import { aloftCard, type AloftCard } from '../../decisions/aloftCard';
 import { anchoredPopover } from '../../decisions/anchoredPopover';
 import { cloakFacts } from '../../decisions/cloakTag';
+import { fleetCounts } from '../../decisions/fleetCounts';
 import { fleetAloftPlaces, fleetHolds } from '../../decisions/fleetHolds';
 import { ambushOf } from '../../decisions/forkAmbush';
 import { landColumnShown } from '../../decisions/landColumn';
@@ -486,9 +487,7 @@ export function fleetPanelHtml(f: Fleet): string {
   let h = kitCardHeader(
     ownerColor(f.owner),
     fleetTitle,
-    (pcUi()
-      ? t('side.fleet.sub.pc', { s: nShips, tr: nTr })
-      : t('side.fleet.sub', { s: nShips, tr: nTr })) +
+    t(...fleetCounts(nShips, nTr, pcUi())) +
       hullTag +
       fleetSubNotes(f, nTr),
     { compact: pcUi(), titleAct: 'fleetinfo', subLive: fleetLandingNote(f) },
@@ -1054,38 +1053,18 @@ function strikeBaseName(base: StrikeBase): string {
   return base.kind === 'planet' ? placeName(base.id) : fleetTitleOf(base.id);
 }
 
-/** Чем занята эскадра (`aloftCard.ts`, правило 7) и что отсчитывает таймер. Ключи стоят
- *  литералами в каждой ветке: разбор гейта локализации видит только литеральные ключи. */
-function aloftOrderText(card: AloftCard): { what: string; until: string } {
+/** Чем занята эскадра (`aloftCard.ts`, правило 7). Ключи стоят литералами в каждой ветке:
+ *  разбор гейта локализации видит только литеральные ключи. */
+function aloftOrderText(card: AloftCard): string {
   const o = card.order;
-  if (o.kind === 'fleet')
-    return {
-      what: t('side.aloft.order.strike', { name: fleetTitleOf(o.id) }),
-      until: t('side.aloft.until.target'),
-    };
-  if (o.kind === 'planet')
-    return {
-      what: t('side.aloft.order.strike', { name: placeName(o.id) }),
-      until: t('side.aloft.until.target'),
-    };
-  if (o.kind === 'land')
-    return {
-      what: t('side.aloft.order.land', { name: placeName(o.id) }),
-      until: t('side.aloft.until.target'),
-    };
-  if (o.kind === 'patrol-out')
-    return { what: t('side.aloft.order.patrol-out'), until: t('side.aloft.until.point') };
-  if (o.kind === 'patrol')
-    return { what: t('side.aloft.order.patrol'), until: t('side.aloft.until.patrol') };
+  if (o.kind === 'fleet') return t('side.aloft.order.strike', { name: fleetTitleOf(o.id) });
+  if (o.kind === 'planet') return t('side.aloft.order.strike', { name: placeName(o.id) });
+  if (o.kind === 'land') return t('side.aloft.order.land', { name: placeName(o.id) });
+  if (o.kind === 'patrol-out') return t('side.aloft.order.patrol-out');
+  if (o.kind === 'patrol') return t('side.aloft.order.patrol');
   if (o.kind === 'relocate')
-    return {
-      what: t('side.aloft.order.relocate', { name: strikeBaseName(o.base) }),
-      until: t('side.aloft.until.land'),
-    };
-  return {
-    what: t('side.aloft.order.home', { name: strikeBaseName(o.base) }),
-    until: t('side.aloft.until.land'),
-  };
+    return t('side.aloft.order.relocate', { name: strikeBaseName(o.base) });
+  return t('side.aloft.order.home', { name: strikeBaseName(o.base) });
 }
 
 /**
@@ -1105,20 +1084,17 @@ export function aloftPanelHtml(st: ShuttleStrike): string {
   });
   if (!card) return `<div class="hint">${t('side.empty')}</div>`;
   const cargo = card.cargo.reduce((n, c) => n + c.count, 0);
+  // Под именем — приказ и его срок вместо «в полёте» (правка владельца 2026-11-06 по снимку
+  // листа: строки приказа и срока — в шапку). Отсчёт патчит `updatePanelLive` (`.pn-timer`):
+  // в разметке только срок, и панель не перестраивается каждый кадр под пальцем.
   const notes = [
-    t('side.aloft.sub'),
-    ...(cargo > 0 ? [t('side.wing.cargo', { n: cargo })] : []),
-    ...(card.hull !== null ? [t('side.wing.hull', { p: card.hull })] : []),
+    esc(aloftOrderText(card)),
+    liveTimerHtml(card.until),
+    ...(cargo > 0 ? [esc(t('side.wing.cargo', { n: cargo }))] : []),
+    ...(card.hull !== null ? [esc(t('side.wing.hull', { p: card.hull }))] : []),
   ];
-  const text = aloftOrderText(card);
-  // Отсчёт патчит `updatePanelLive` (`.pn-timer`): в разметке только срок, и панель не
-  // перестраивается каждый кадр под пальцем. Поэтому внутри заглушка, а не сами цифры:
-  // с цифрами разметка всё равно менялась бы вместе с ними.
-  const timer = liveTimerHtml(card.until);
-  let h = cardHeader(ownerColor(ME), strikeTitle(st), notes.join(' · '));
-  h += `<div class="row"><b>${esc(text.what)}</b></div>`;
-  h += `<div class="row dim">${esc(text.until)} ${timer}</div>`;
-  h += unitRows(card.stacks);
+  const sub = { compact: pcUi(), subLive: notes.join(' · ') };
+  let h = kitCardHeader(ownerColor(ME), strikeTitle(st), '', sub) + unitRows(card.stacks);
   // Повернувшая домой бить снова не может (правило 3): без строки игрок искал бы кнопку.
   if (card.returning) h += `<div class="row dim">${esc(t('side.aloft.returning'))}</div>`;
   const buttons =
@@ -1135,7 +1111,7 @@ export function aloftPanelHtml(st: ShuttleStrike): string {
         )
       : '') +
     (card.canRecall ? btn('wingrecall', card.strikeId, t('side.wing.recall'), true) : '');
-  return buttons ? `${h}<div class="row">${buttons}</div>` : h;
+  return buttons ? `${h}<div class="row aloft-acts">${buttons}</div>` : h;
 }
 
 // --- Всплывашка надбавок: тап по параметру флота (заказ владельца 2026-09-27) ----------

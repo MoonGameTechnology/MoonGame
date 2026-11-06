@@ -18,6 +18,7 @@ import {
 } from '../../decisions/cmdAvailability';
 import { allOn } from '../../decisions/cmdHighlight';
 import { cmdShown } from '../../decisions/cmdPresence';
+import { fleetCounts } from '../../decisions/fleetCounts';
 import {
   castOptionsOf,
   chainAbilityHoldH,
@@ -564,7 +565,7 @@ export function renderCmdBar(): void {
     const sub = lone
       ? [
           loneNode ? game.placeName(loneNode) : '',
-          t('side.fleet.sub.pc', { s: sumUnits(lone.units), tr: sumUnits(lone.landing ?? []) }),
+          t(...fleetCounts(sumUnits(lone.units), sumUnits(lone.landing ?? []), true)),
         ]
           .filter(Boolean)
           .join(' · ')

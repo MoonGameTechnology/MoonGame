@@ -200,6 +200,9 @@ const act = (name: string): string => `data-act="${name}"`;
 /** Подзаголовок шапки: всё, что стоит в `<span>` рядом с именем. */
 const sub = (html: string): string =>
   /<div class="ptitle">.*?<span>([^<]*)<\/span>/s.exec(html)![1]!;
+/** Подпись под именем как разметка: у эскадры в ней живой отсчёт. */
+const subLine = (html: string): string =>
+  /<div class="ptitle">.*?<span>(.*?)<\/span><\/div>/s.exec(html)![1]!;
 /** Что увидит игрок после живого патча к моменту `now`: текст без тегов. */
 const seen = (html: string, now: number): string => liveText(html, now);
 
@@ -310,6 +313,18 @@ describe('свой флот', () => {
     env.pc = true;
     // Узкая шапка ПК сжимает « · » до «·» (`panelKit.ts`).
     expect(sub(card('F3'))).toContain(t('side.fleet.sub.pc', { s: 2, tr: 5 }).replace(/ · /g, '·'));
+  });
+
+  it('флот без десанта не пишет «0 десанта»', async () => {
+    const { env, card, put } = await boot();
+    put(fleet('F4', 'p1', 'A', [{ unit: 'cruiser', count: 2 }]));
+    expect(sub(card('F4'))).toContain(t('side.fleet.sub.ships', { s: 2 }));
+    expect(sub(card('F4'))).not.toContain(t('side.fleet.sub', { s: 2, tr: 0 }));
+    env.pc = true;
+    expect(sub(card('F4'))).toContain(t('side.fleet.sub.pc.ships', { s: 2 }));
+    expect(sub(card('F4'))).not.toContain(
+      t('side.fleet.sub.pc', { s: 2, tr: 0 }).replace(/ · /g, '·'),
+    );
   });
 
   it('высадка штурмом: в шапке срок под живой патч, разметка не тикает с часами', async () => {
@@ -703,7 +718,7 @@ describe('эскадра в воздухе', () => {
   /** Кнопка приказа вылета: действие и адрес — id вылета. */
   const order = (name: string, id: string): string => `${act(name)} data-arg="${id}"`;
 
-  it('удар по флоту: позывной в шапке, приказ, срок под живой патч и кнопки', async () => {
+  it('удар по флоту: позывной, под ним приказ и срок под живой патч, кнопки', async () => {
     const { m, env } = await boot();
     const sp = await import('./squadronPanel');
     const st = strike('S1');
@@ -714,16 +729,20 @@ describe('эскадра в воздухе', () => {
     expect(html).toContain(m.strikeTitle(st));
     expect(html).toContain('background:#side-p1');
     expect(html).toContain('data-codex="u:interceptor"');
-    expect(sub(html)).toBe(t('side.aloft.sub'));
-    expect(html).toContain(`<b>${t('side.aloft.order.strike', { name: 'Флот «F2»' })}</b>`);
-    expect(html).toContain(
-      `${t('side.aloft.until.target')} <span class="pn-timer" data-at="${11 * HOUR}">…</span>`,
+    // Приказ и срок — подпись под именем, а не «в полёте» и две строки под шапкой (правка
+    // владельца 2026-11-06 по снимку листа).
+    expect(subLine(html)).toBe(
+      `${t('side.aloft.order.strike', { name: 'Флот «F2»' })} · <span class="pn-timer" data-at="${11 * HOUR}">…</span>`,
     );
+    expect(html).not.toContain(t('side.aloft.sub'));
     // Цифры приносит живой патч: с ними в разметке лист пересобирался бы с каждым шагом часов.
     env.s.time += 0.5 * HOUR;
     expect(m.aloftPanelHtml(st)).toBe(html);
+    // Кнопки стоят в помеченном ряду: свёрнутый лист телефона показывает из карточки только
+    // его (UIX-10.5).
+    const row = html.slice(html.indexOf('<div class="row aloft-acts">'));
     for (const a of ['aloftstrike', 'aloftpatrol', 'aloftsplit', 'wingrecall'])
-      expect(html).toContain(order(a, 'S1'));
+      expect(row).toContain(order(a, 'S1'));
     // Сесть некуда — перелёта нет; патруля нет — нечего и держать.
     expect(html).not.toContain(act('aloftrelocate'));
     expect(html).not.toContain(act('wingkeep'));
@@ -747,8 +766,9 @@ describe('эскадра в воздухе', () => {
         target: { kind: 'planet', id: 'N' },
       }),
     );
-    expect(sub(html)).toBe(`${t('side.aloft.sub')} · ${t('side.wing.cargo', { n: 4 })}`);
-    expect(html).toContain(t('side.aloft.order.land', { name: worldName(env.s, 'N') }));
+    expect(subLine(html)).toBe(
+      `${t('side.aloft.order.land', { name: worldName(env.s, 'N') })} · <span class="pn-timer" data-at="${11 * HOUR}">…</span> · ${t('side.wing.cargo', { n: 4 })}`,
+    );
     expect(html).not.toContain(act('aloftpatrol'));
   });
 
@@ -768,8 +788,8 @@ describe('эскадра в воздухе', () => {
     const st = strike('S4', { damage: 10 });
     const hull = aloftCard(st, { me: 'p1', data, relocate: false, split: true })!.hull;
     expect(hull).not.toBeNull();
-    expect(sub(m.aloftPanelHtml(st))).toBe(
-      `${t('side.aloft.sub')} · ${t('side.wing.hull', { p: hull! })}`,
+    expect(subLine(m.aloftPanelHtml(st))).toMatch(
+      new RegExp(` · ${t('side.wing.hull', { p: hull! })}$`),
     );
   });
 
@@ -777,14 +797,12 @@ describe('эскадра в воздухе', () => {
     const { m } = await boot();
     const patrol = { hours: 3, radius: 40 };
     const out = m.aloftPanelHtml(strike('P1', { target: { kind: 'point' }, patrol }));
-    expect(out).toContain(`<b>${t('side.aloft.order.patrol-out')}</b>`);
-    expect(out).toContain(t('side.aloft.until.point'));
+    expect(subLine(out)).toMatch(new RegExp(`^${t('side.aloft.order.patrol-out')} · <span class="pn-timer"`));
     expect(out).toContain(`${order('wingkeep', 'P1')} >${t('side.wing.keep')}</button>`);
     const held = m.aloftPanelHtml(
       strike('P2', { target: { kind: 'point' }, leg: 'patrol', patrol: { ...patrol, hold: true } }),
     );
-    expect(held).toContain(`<b>${t('side.aloft.order.patrol')}</b>`);
-    expect(held).toContain(t('side.aloft.until.patrol'));
+    expect(subLine(held)).toMatch(new RegExp(`^${t('side.aloft.order.patrol')} · <span class="pn-timer"`));
     expect(held).toContain(`${order('wingkeep', 'P2')} >${t('side.wing.keep.off')}</button>`);
   });
 
@@ -792,8 +810,9 @@ describe('эскадра в воздухе', () => {
     const { m, env } = await boot();
     const { worldName } = await import('./planetName');
     const html = m.aloftPanelHtml(strike('H1', { leg: 'back' }));
-    expect(html).toContain(t('side.aloft.order.home', { name: worldName(env.s, 'A') }));
-    expect(html).toContain(t('side.aloft.until.land'));
+    expect(subLine(html)).toMatch(
+      new RegExp(`^${t('side.aloft.order.home', { name: worldName(env.s, 'A') })} · <span class="pn-timer"`),
+    );
     expect(html).toContain(`<div class="row dim">${t('side.aloft.returning')}</div>`);
     for (const a of ['aloftstrike', 'aloftpatrol', 'wingrecall'])
       expect(html).not.toContain(act(a));

@@ -187,7 +187,7 @@ try {
         const id = await page.evaluate((k) => window.__patrolTest.prepare(k), kind);
         const base = kind === 'port' ? { kind: 'planet', id } : { kind: 'fleet', id };
         // Телефон показывает сначала короткую карточку; ангар живёт в подробностях.
-        if (phone) await page.locator('.mobile-quick [data-mobile="details"]').tap();
+        if (phone) await page.locator('#mobile-sheet .mobile-info').tap();
 
         // Кнопка у эскадры, и она ВЗВОДИТ прицел патруля, а не удар.
         await press(page.locator('[data-act="wingpatrol"]'));

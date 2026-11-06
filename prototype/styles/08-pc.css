@@ -197,7 +197,7 @@
   #side .phead .pflag{width:12px;height:12px;}
   #side .ptitle{display:flex;align-items:baseline;gap:8px;min-width:0;}
   #side .ptitle b{display:inline;font-size:var(--fs-body);flex:0 0 auto;}
-  #side .ptitle span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  #side .ptitle > span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap;font-size:var(--fs-caption);}
   #side .pclose{width:22px;height:22px;font-size:var(--fs-caption);}
   #side .pstats{gap:5px;margin:2px 0 3px;}

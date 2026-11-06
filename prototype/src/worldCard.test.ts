@@ -225,7 +225,7 @@ describe('шапка известного мира', () => {
     expect(sub(card('A'))).toMatch(/^A·Орион·/);
   });
 
-  it('род узла — тип сектора с карты, без него — сырой род, без обоих — прочерк', async () => {
+  it('род узла — тип сектора с карты, без него — сырой род, без обоих не пишется', async () => {
     const { env, card } = await boot();
     const typeName = tData(data.planetTypes.terran!.name ?? 'terran');
     env.types.A = { name: 'Asteroid Field' } as SectorType;
@@ -234,7 +234,9 @@ describe('шапка известного мира', () => {
     delete env.types.A;
     expect(sub(card('A'))).toContain(`·raw-kind·${typeName}`);
     delete env.kinds.A;
-    expect(sub(card('A'))).toContain(`·—·${typeName}`);
+    // Прочерк на месте рода ничего не сообщал (UIX-10.5): за владельцем сразу тип мира.
+    expect(sub(card('A'))).toMatch(new RegExp(`^[^·]+·${typeName}`));
+    expect(sub(card('A'))).not.toContain('—');
   });
 
   it('ничейный мир подписан ничейным', async () => {
