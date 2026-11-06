@@ -71,7 +71,7 @@ permissions:
 jobs:
   check:
     name: lint · typecheck · test · audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     services:
       postgres:
@@ -113,6 +113,16 @@ jobs:
         with:
           node-version: '22'
           cache: 'pnpm'
+
+      # The backup drills restore into PostgreSQL 16. A newer pg_dump emits SET
+      # parameters the server cannot parse, so select the matching client explicitly.
+      - name: PostgreSQL 16 client tools for backup drills
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+          printf '%s\n' '/usr/lib/postgresql/16/bin' >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version
+          /usr/lib/postgresql/16/bin/psql --version
 
       - run: pnpm install --frozen-lockfile
 

@@ -129,6 +129,8 @@ const SCHEMA_SQL = `
     -- seat lock (REL-5): sha256 of the seat ticket; NULL = seat claimed before the
     -- lock existed (adopted on the owner's next join). Plaintext never stored.
     ALTER TABLE seats ADD COLUMN IF NOT EXISTS ticket_hash text;
+    ALTER TABLE seats ADD COLUMN IF NOT EXISTS archived boolean NOT NULL DEFAULT false;
+    CREATE INDEX IF NOT EXISTS seats_archived_nick_idx ON seats (nick) WHERE archived;
 
     CREATE TABLE IF NOT EXISTS receipts (
       match_id   text NOT NULL,
@@ -901,6 +903,21 @@ export class PostgresMatchStore implements MatchStore {
 
 export class PostgresAccountStore implements AccountStore {
   constructor(private readonly pool: Pool) {}
+
+  async archivedMatches(nick: string, rooms: readonly string[]): Promise<string[]> {
+    const result = await this.pool.query<{ room: string }>(
+      'SELECT room FROM seats WHERE nick = $1 AND archived AND room = ANY($2::text[])', [nick, rooms],
+    );
+    return result.rows.map(row => row.room);
+  }
+
+  async setMatchArchived(room: string, nick: string, archived: boolean): Promise<boolean> {
+    const result = await this.pool.query(
+      'UPDATE seats SET archived = $3 WHERE room = $1 AND nick = $2 RETURNING room',
+      [room, nick, archived],
+    );
+    return result.rows.length > 0;
+  }
 
   async resolveSeat(
     room: string,

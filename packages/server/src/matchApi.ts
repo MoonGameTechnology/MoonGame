@@ -489,17 +489,29 @@ export function registerBrowserApi(
     identify ? ((await identify(request))?.login ?? null) : nickOf(request);
 
   // The three tabs (available/active/archived) for one viewer.
-  app.get('/matches', async (request: FastifyRequest) => registry.list(await viewerOf(request)));
+  app.get('/matches', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      return await registry.list(await viewerOf(request));
+    } catch {
+      void reply.code(503);
+      return { ok: false, code: 'E_MATCH_LIST_STORE' };
+    }
+  });
 
   const archive = async (request: FastifyRequest, reply: FastifyReply): Promise<unknown> => {
-    const { id, intent } = request.params as { id: string; intent: string };
-    const nick = (await viewerOf(request)) ?? '';
-    const result =
-      intent === 'archive'
-        ? await registry.archive(id, nick)
-        : await registry.unarchive(id, nick);
-    if (!result.ok) void reply.code(result.code === 'E_NO_MATCH' ? 404 : 403);
-    return result;
+    try {
+      const { id, intent } = request.params as { id: string; intent: string };
+      const nick = (await viewerOf(request)) ?? '';
+      const result =
+        intent === 'archive'
+          ? await registry.archive(id, nick)
+          : await registry.unarchive(id, nick);
+      if (!result.ok) void reply.code(result.code === 'E_NO_MATCH' ? 404 : result.code === 'E_ARCHIVE_STORE' ? 503 : 403);
+      return result;
+    } catch {
+      void reply.code(503);
+      return { ok: false, code: 'E_ARCHIVE_STORE' };
+    }
   };
   app.post('/matches/:id/:intent(archive|unarchive)', archive);
 }

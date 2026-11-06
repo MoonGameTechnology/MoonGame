@@ -158,6 +158,27 @@ export class MemoryMatchStore implements MatchStore {
 
 /** In-memory seat map — `room → nick → side`. */
 export class MemoryAccountStore implements AccountStore {
+  private readonly archives = new Map<string, Set<string>>();
+
+  archivedMatches(nick: string, rooms: readonly string[]): Promise<string[]> {
+    return Promise.resolve(rooms.filter(room => this.archives.get(room)?.has(nick)));
+  }
+
+  setMatchArchived(room: string, nick: string, archived: boolean): Promise<boolean> {
+    if (!this.rooms.get(room)?.has(nick)) return Promise.resolve(false);
+    if (archived) {
+      let nicks = this.archives.get(room);
+      if (!nicks) {
+        nicks = new Set();
+        this.archives.set(room, nicks);
+      }
+      nicks.add(nick);
+    } else {
+      this.archives.get(room)?.delete(nick);
+      if (!this.archives.get(room)?.size) this.archives.delete(room);
+    }
+    return Promise.resolve(true);
+  }
   private readonly rooms = new Map<string, Map<string, PlayerId>>();
   /** Seat-lock ticket hashes — `room → nick → sha256(ticket)` (REL-5). */
   private readonly tickets = new Map<string, Map<string, string>>();
@@ -217,6 +238,8 @@ export class MemoryAccountStore implements AccountStore {
     const seat = this.rooms.get(room)?.get(nick) ?? null;
     if (seat === null) return Promise.resolve(null);
     this.rooms.get(room)?.delete(nick);
+    this.archives.get(room)?.delete(nick);
+    if (!this.archives.get(room)?.size) this.archives.delete(room);
     // Билет уходит вместе с местом: оставленный хэш запер бы кресло для того, кто
     // сядет в него следующим (`bindSeatTicket` — «первый связавший выигрывает»).
     this.tickets.get(room)?.delete(nick);

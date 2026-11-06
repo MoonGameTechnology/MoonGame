@@ -55,6 +55,51 @@ async function startHttpWithSession(registry: MatchRegistry): Promise<string> {
 }
 
 describe('match-browser over HTTP (read-model + archive intent)', () => {
+  it('never exposes database errors or fabricates a match list on a failed archive read', async () => {
+    const accounts = new MemoryAccountStore();
+    accounts.archivedMatches = async () => { throw new Error('private database detail'); };
+    const base = await startHttpWithSession(new MatchRegistry(accounts));
+    expect(await getJson(`${base}/matches`, { headers: { authorization: 'Bearer alice' } })).toEqual({
+      status: 503, body: { ok: false, code: 'E_MATCH_LIST_STORE' },
+    });
+  });
+
+  it('keeps the archive after logout and a fresh HTTP server, scoped to the verified login', async () => {
+    const accounts = new MemoryAccountStore();
+    const meta = { mapId: 'nexus-duel', rules: { timeScale: 1 }, createdAt: 1 };
+    const reg = new MatchRegistry(accounts);
+    reg.register(createDevMatch(data, { id: 'relogin' }), meta);
+    await accounts.resolveSeat('relogin', 'alice', ['green', 'red']);
+    await accounts.resolveSeat('relogin', 'bob', ['green', 'red']);
+    const first = await startHttpWithSession(reg);
+    const auth = { headers: { authorization: 'Bearer alice' } };
+    expect((await getJson(`${first}/matches/relogin/archive`, { ...auth, method: 'POST' })).status).toBe(200);
+    expect((await getJson<MatchLists>(`${first}/matches`)).body.archived).toEqual([]);
+    await handle!.close(); handle = null;
+    const reopened = new MatchRegistry(accounts);
+    reopened.register(createDevMatch(data, { id: 'relogin' }), meta);
+    const next = await startHttpWithSession(reopened);
+    const after = (await getJson<MatchLists>(`${next}/matches?nick=bob`, auth)).body;
+    expect(after.active).toEqual([]);
+    expect(after.archived.map(m => m.matchId)).toEqual(['relogin']);
+    const bob = (await getJson<MatchLists>(`${next}/matches`, { headers: { authorization: 'Bearer bob' } })).body;
+    expect(bob.active.map(m => m.matchId)).toEqual(['relogin']);
+  });
+
+  it('returns a stable 503 on storage failure without claiming the archive succeeded', async () => {
+    const accounts = new MemoryAccountStore();
+    const reg = new MatchRegistry(accounts);
+    reg.register(createDevMatch(data, { id: 'fail' }), { mapId: 'nexus-duel', rules: { timeScale: 1 }, createdAt: 1 });
+    await accounts.resolveSeat('fail', 'alice', ['green', 'red']);
+    accounts.setMatchArchived = async () => { throw new Error('private database detail'); };
+    const base = await startHttpWithSession(reg);
+    const auth = { headers: { authorization: 'Bearer alice' } };
+    expect(await getJson(`${base}/matches/fail/archive`, { ...auth, method: 'POST' })).toEqual({
+      status: 503, body: { ok: false, code: 'E_ARCHIVE_STORE' },
+    });
+    expect((await getJson<MatchLists>(`${base}/matches`, auth)).body.active.map(m => m.matchId)).toEqual(['fail']);
+  });
+
   // С включёнными аккаунтами клиент ходит СЕССИЕЙ, а не `?nick=` — и до этого теста
   // маршрут читал только query, поэтому у севшего игрока вкладка «мои матчи» была
   // пуста всегда, а не только после рестарта: полный матч уходит из «доступных», и

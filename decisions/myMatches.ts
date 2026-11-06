@@ -16,9 +16,9 @@
  * 2. **Архив — тоже мой, но УБРАННЫЙ С ГЛАЗ.** В список он не входит: иначе «убрал»
  *    ничего не значит — партия вернулась бы на главный экран, откуда игрок её только
  *    что унёс.
- * 3. **Живые впереди законченных.** Внутри группы порядок сервера сохраняется — он уже
- *    отсортирован по новизне. Без этого правила доигранная партия теснила бы ту, где
- *    идёт война, просто потому что её начали позже.
+ * 3. **Завершённые партии — только в архиве.** Старый сервер или устаревшая лента
+ *    могут оставить их в `active`; хаб их всё равно скрывает. При совпадении id
+ *    между вкладками архив имеет приоритет. Порядок остальных строк сохраняется.
  * 4. **Главный экран — не второй браузер.** Больше горстки строк — и он перестаёт быть
  *    коротким ответом на «куда вернуться»; остаток честно считается числом, которое
  *    уводит в обозреватель.
@@ -53,6 +53,7 @@ export type MyMatchesView<R> =
 /** Строка ленты в объёме, который нужен ЭТОМУ решению: чем партия кончилась. Всё
  *  остальное (карта, день, места) читает UI прямо из своей строки. */
 interface HasStatus {
+  matchId?: string;
   status?: string;
 }
 
@@ -62,15 +63,12 @@ export function myMatches<R extends HasStatus>(
   limit: number,
 ): MyMatchesView<R> {
   if (!lists) return { kind: 'unknown' }; // правило 5
-  const mine = lists.active ?? []; // правила 1–2: архив сюда не входит
-  if (mine.length === 0) return { kind: 'none' };
-  // Правило 3. Два прохода, а не сортировка: порядок сервера внутри группы сохраняется
-  // по построению, без опоры на стабильность чужого алгоритма.
-  const live = mine.filter((m) => m.status !== 'ended');
-  const done = mine.filter((m) => m.status === 'ended');
-  const ordered = [...live, ...done];
+  const archivedIds = new Set((lists.archived ?? []).map(m => m.matchId).filter(id => id !== undefined));
+  const live = (lists.active ?? []).filter(m => m.status !== 'ended' &&
+    (m.matchId === undefined || !archivedIds.has(m.matchId)));
+  if (live.length === 0) return { kind: 'none' };
   // Кап не может обнулить список: «мои партии» без единой строки — это состояние
   // «их нет», а оно здесь уже разобрано и значит другое.
   const cap = Math.max(1, Math.floor(limit) || 0);
-  return { kind: 'list', rows: ordered.slice(0, cap), more: Math.max(0, ordered.length - cap) };
+  return { kind: 'list', rows: live.slice(0, cap), more: Math.max(0, live.length - cap) };
 }
