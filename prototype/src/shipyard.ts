@@ -22,7 +22,7 @@
  * here decides what a build costs or whether it is legal.
  *
  * Same REFM shape as the other screens: the markup is pure (`yardBoxHtml`,
- * `loadoutPaneHtml`, `orderBarHtml`, `slotLayerHtml`, `statBarHtml`, `bagText`) and the draft is a plain value
+ * `loadoutPaneHtml`, `orderBarHtml`, `slotLayerHtml`, `statBarHtml`) and the draft is a plain value
  * (`YardDraft`) normalised by a pure `normalizeDraft`; only `initShipyard(host)`
  * touches the DOM, through explicit hooks instead of `main.ts`'s module-level state.
  */
@@ -138,18 +138,9 @@ export function hullsOfTab(tab: YardTab): string[] {
 /** How many hulls one order may queue at once (the ± stepper's range). */
 const MAX_COUNT = 20;
 
-// Подписи ресурса в ценнике и статов в чипе. Ключа нет — `t()` отдаёт его как есть
-// («+8 pointDefense», «25 biomass»), поэтому сторож в `shipyard.test.ts` сверяет оба
-// словаря со всеми статами модулей и ресурсами из `data/` (UIX-5.1).
-export const RES_KEY: Record<string, string> = {
-  biomass: 'res.of.biomass',
-  metal: 'res.of.metal',
-  credits: 'res.of.credits',
-  energy: 'res.of.energy',
-  food: 'res.of.food',
-  microelectronics: 'res.of.microelectronics',
-};
-// Подписи статов и чип эффекта модуля — у арсенала и верфи общие (`moduleEffect.ts`).
+// Подписи статов и чип эффекта модуля — у арсенала и верфи общие (`moduleEffect.ts`). Ключа
+// нет — `t()` отдаёт его как есть («+8 pointDefense»), поэтому сторож в `shipyard.test.ts`
+// сверяет словарь со всеми статами модулей из `data/` (UIX-5.1).
 export { STAT_KEY };
 
 /**
@@ -186,14 +177,6 @@ export function selectedBay(slots: readonly { moduleId?: string }[], wanted?: nu
   if (wanted !== undefined && wanted >= 0 && wanted < slots.length) return wanted;
   const free = slots.findIndex((sl) => !sl.moduleId);
   return free < 0 ? 0 : free;
-}
-
-/** A price as text: «120 металл · 40 кредиты», or «бесплатно» when nothing is due. */
-export function bagText(bag: Record<string, number>): string {
-  const parts = Object.entries(bag)
-    .filter(([, n]) => n)
-    .map(([r, n]) => `${Math.round(n)} ${t(RES_KEY[r] ?? r)}`);
-  return parts.length ? parts.join(' · ') : t('yard.free');
 }
 
 /** Статья словаря у строки характеристики (UIX-9.4): подпись строки — слово-термин. «Урон в
@@ -334,9 +317,10 @@ export function loadoutPaneHtml(
   const art = callouts
     ? `<div class="cn-art">${portrait}${slotLayerHtml(m.slots, callouts, sel, undefined, (sl) => `data-cnrm="${sl.moduleId}"`)}</div>`
     : portrait;
+  const slotsLine = slotCountText(m.slots);
   const hullCard =
     `<div class="cn-hull${portrait ? ' with-art' : ''}">${art}<div class="cn-hull-info"><div class="cn-hic">${unitIconHtml(draft.hull, data, view.youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(draft.hull))}</div>` +
-    `<div class="cn-hm">${slotCountText(m.slots)}</div></div></div></div>`;
+    `${slotsLine ? `<div class="cn-hm">${slotsLine}</div>` : ''}</div></div></div>`;
   // Строка отсека открывает его, как плитка на арте; снять модуль — крестиком у открытой
   // плитки, а у корпуса без арта с плитками — кнопкой над модулями отсека.
   const bays = m.slots
@@ -370,7 +354,7 @@ export function loadoutPaneHtml(
     if (o.installable) {
       return (
         `<button class="cn-mod r-${o.rarity}" data-cnmod="${o.id}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
-        `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span>${moduleGradeHtml(o.rarity, o.star)}<span class="cn-me">${eff}</span><span class="cn-mc">${bagText(o.cost)}</span></button>`
+        `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span>${moduleGradeHtml(o.rarity, o.star)}<span class="cn-me">${eff}</span><span class="cn-mc">${priceHtml(o.cost)}</span></button>`
       );
     }
     // Причина берётся из КОДА отказа ядра, а не гадается: «нет слота» и «не для
@@ -382,12 +366,12 @@ export function loadoutPaneHtml(
         : t('yard.slot.named', { s: t(SLOT_KEY[o.slot] ?? o.slot) });
     return (
       `<div class="cn-mod locked r-${o.rarity}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
-      `<span class="cn-mn">${esc(tData(o.name))}</span>${moduleGradeHtml(o.rarity, o.star)}<span class="cn-me">${why}</span><span class="cn-mc">${bagText(o.cost)}</span></div>`
+      `<span class="cn-mn">${esc(tData(o.name))}</span>${moduleGradeHtml(o.rarity, o.star)}<span class="cn-me">${why}</span><span class="cn-mc">${priceHtml(o.cost)}</span></div>`
     );
   };
   // LARS-4: the palette already reads the LIVE arsenal snapshot (a module bought
-  // mid-match shows up here without a new match) — this note is the only thing that
-  // needed adding: make the timing honest (built, not instant).
+  // mid-match shows up here without a new match) and the note says so. That it works on
+  // a new build only is the lock note's line under the stats (UIX-10.8: said once).
   const liveNote = snap ? `<div class="cn-note">${t('yard.arsenal.note')}</div>` : '';
   // Модули открытого отсека. Надетый в нём модуль на время выбора снят: так его замена
   // предлагается как годная и встаёт в тот же отсек.
@@ -476,7 +460,7 @@ export function loadoutPaneHtml(
           .join('')}</select></div>`
       : `<div class="cn-noplace">${t('yard.troop.none')}</div>`;
   const stats =
-    `<div class="cn-side"><div class="cn-ph">${m.hasSlots ? `${t('yard.cost.with-modules')} — <em>${t('yard.cost.live')}</em>` : t('yard.stats')}</div>${bars}${damage}${troopRow}` +
+    `<div class="cn-side"><div class="cn-ph">${m.hasSlots ? t('yard.cost.with-modules') : t('yard.stats')}</div>${bars}${damage}${troopRow}` +
     (m.hasSlots ? `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div>` : '') +
     `</div>`;
   // Раскладка (шаг 3): на ПК три колонки — корпуса, корабль с характеристиками, модули
@@ -547,10 +531,11 @@ export function yardQueueHtml(
   );
 }
 
-/** Подпись под корпусом: сколько у него слотов и сколько из них куплено звёздами корабля —
- *  «по размеру корпуса» про купленные было бы неправдой. */
+/** Подпись под корпусом: сколько у него слотов и сколько из них куплено звёздами корабля. Корпус
+ *  без слотов подписи не получает: ноль не пишется (UIX-10.8), а что модулей нет, видно и так —
+ *  на арте нет выносок, в окне нет отсеков. */
 function slotCountText(slots: LoadoutModel['slots']): string {
-  if (slots.length === 0) return t('yard.slots.none');
+  if (slots.length === 0) return '';
   const bought = slots.filter((sl) => sl.bonus).length;
   return bought > 0
     ? t('yard.slots.count-bonus', { n: String(slots.length), b: String(bought) })
@@ -659,8 +644,10 @@ export function orderBarHtml(
   const canBuild = affordable && draft.planet !== '' && (!lander || troop !== undefined);
   const worlds = buildSites(state, me, draft.hull);
   const ahead = draft.planet ? unitLaneAhead(state, draft.planet, draft.hull) : null;
+  // Пустая очередь — обычный случай и не подписывается («Начнётся сразу» снято, UIX-10.8):
+  // строка появляется, только когда перед заказом кто-то есть.
   const queue = !ahead
-    ? t('yard.queue.now')
+    ? ''
     : ahead.nextInHours > 0
       ? t('yard.queue.ahead', { n: ahead.count, eta: fmtEta(ahead.nextInHours) })
       : t('yard.queue.waiting', { n: ahead.count });
@@ -673,14 +660,14 @@ export function orderBarHtml(
             // Мир по имени, как на карте (UIX-5.2); значение опции — id.
             `<option value="${p.id}"${p.id === draft.planet ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`,
         )
-        .join('')}</select><span class="cn-oq">${queue}</span>`
+        .join('')}</select>${queue ? `<span class="cn-oq">${queue}</span>` : ''}`
     : `<div class="cn-noplace">${t('yard.no-place')}</div>`;
   return (
     `<div class="cn-order">` +
     `<div class="cn-oprice">${priceHtml(total, res)}<span class="cn-otime" title="${t('yard.build-time')}">⏱ ${fmtDur(matchHours(state, orderHours(data, draft.hull, troop)))}</span></div>` +
     `<div class="cn-oworld">${where}</div>` +
     `<div class="cn-ogo"><div class="cn-step"><button data-cncount="-" ${draft.count <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${draft.count}</span><button data-cncount="+" ${draft.count >= MAX_COUNT ? 'disabled' : ''}>+</button></div>` +
-    `<button class="cn-build btn-main" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build', { n: String(draft.count) })}</button></div>` +
+    `<button class="cn-build btn-main" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build')}</button></div>` +
     `</div>`
   );
 }

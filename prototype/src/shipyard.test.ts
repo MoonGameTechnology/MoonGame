@@ -9,7 +9,6 @@ import { data } from './gameData';
 import { worldName } from './planetName';
 import type { Action, ArsenalItem, GameState } from '../../packages/shared-core/src/index';
 import {
-  bagText,
   statBarHtml,
   originTagHtml,
   ownedHullsOf,
@@ -25,7 +24,6 @@ import {
   groundHullsOf,
   hullsOfTab,
   buildSites,
-  RES_KEY,
   STAT_KEY,
   selectedBay,
   repeatOrderHtml,
@@ -124,19 +122,6 @@ function hostOf(over: Partial<YardHost> = {}): YardHost {
 }
 
 describe('верфь — цена и полоса характеристики', () => {
-  it('цена читается ресурсами, нули не показываются', () => {
-    const text = bagText({ metal: 120, credits: 0, energy: 40 });
-    expect(text).toContain('120');
-    expect(text).toContain('40');
-    // нулевой ресурс не занимает место в ценнике — его подписи там нет
-    expect(text).not.toContain(bagText({ credits: 1 }).replace('1 ', ''));
-  });
-
-  it('пустая цена — «бесплатно» ключом, а не пустая строка', () => {
-    expect(bagText({})).toBe(bagText({ metal: 0 }));
-    expect(bagText({})).not.toBe('');
-  });
-
   it('прирост от модулей виден как база → итог с дельтой', () => {
     const html = statBarHtml(
       { stat: 'attack', label: 'атака', base: 10, effective: 14, delta: 4 },
@@ -566,9 +551,9 @@ describe('верфь — окно', () => {
       }),
     );
     yard.open();
-    expect(win.html()).toContain(t('yard.queue.now'));
+    // Пустая очередь — обычный случай: строки очереди нет вовсе (UIX-10.8).
+    expect(win.html()).not.toContain('cn-oq');
     win.fire(click('[data-cnbuild]'));
-    expect(win.html()).not.toContain(t('yard.queue.now'));
     expect(win.html()).toContain(
       t('yard.queue.ahead', { n: 1, eta: fmtEta(data.units.cruiser!.buildTimeHours) }),
     );
@@ -903,10 +888,9 @@ describe('верфь — десантный челнок с бойцом (SHU-5.
   });
 });
 
-describe('верфь — подписи статов и ресурсов (UIX-5.1)', () => {
-  // Без записи в словаре `t()` отдаёт сам ключ данных: чип читался «+8 pointDefense»,
-  // ценник — «25 biomass». Сторож берёт статы и ресурсы прямо из `data/`, поэтому новый
-  // стат или ресурс без подписи роняет его сразу.
+describe('верфь — подписи статов (UIX-5.1)', () => {
+  // Без записи в словаре `t()` отдаёт сам ключ данных: чип читался «+8 pointDefense».
+  // Сторож берёт статы прямо из `data/`, поэтому новый стат без подписи роняет его сразу.
   const moduleStats = [
     ...new Set(
       Object.values(data.modules).flatMap((m) => [
@@ -923,26 +907,16 @@ describe('верфь — подписи статов и ресурсов (UIX-5.
     expect(en[key!]).toBeTruthy();
   });
 
-  it.each(data.resources)('ресурс %s подписан по-русски и по-английски', (res) => {
-    const key = RES_KEY[res];
-    expect(key).toBeDefined();
-    expect(ru[key!]).toBeTruthy();
-    expect(en[key!]).toBeTruthy();
-  });
-
-  it('цена в биомассе — словом', () => {
-    expect(bagText({ biomass: 25 })).toBe('25 биомассы');
-  });
 });
 
 describe('производство — корпус без отсеков и очередь мира (переделка окна, шаг 1)', () => {
   it.each(['militia', 'tank', 'landing_shuttle'])(
-    '%s модулей не несёт: ни отсеков, ни серого каталога',
+    '%s модулей не несёт: ни отсеков, ни серого каталога, ни подписи «0 слотов» (UIX-10.8)',
     (hull) => {
       const s = rich();
       const html = loadoutPaneHtml(s, 'p1', draftOf({ hull }), [hull], view);
       expect(Object.values(data.units[hull]!.slots ?? {}).every((n) => !n)).toBe(true);
-      expect(html).toContain(t('yard.slots.none'));
+      expect(html).not.toContain('cn-hm');
       expect(html).not.toContain('cn-pal');
       expect(html).not.toContain('cn-mod');
       expect(html).not.toContain('cn-bay');
@@ -954,7 +928,7 @@ describe('производство — корпус без отсеков и о�
     const html = loadoutPaneHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf(), YARD_HULLS), YARD_HULLS, view);
     expect(html).toContain('cn-pal');
     expect(html).toContain(t('yard.loadout.note'));
-    expect(html).not.toContain(t('yard.slots.none'));
+    expect(html).toContain(`<div class="cn-hm">${t('yard.slots.count', { n: '3' })}</div>`);
   });
 
   it('очередь мира: свободно — null; идёт стройка и ждёт заказ — двое впереди и срок идущей', () => {
@@ -1084,6 +1058,22 @@ describe('производство — модули открытого отсе�
     // Оружие крейсера: свёрнуты тяговый луч (только флагман героя) и перехватная турель
     // (только перехватчик).
     expect(pane({ slot: 0 })).toContain(`aria-expanded="false">${t('yard.modules.unfit', { n: 2 })}<`);
+  });
+
+  it('цена модуля — значками ресурсов, как любая цена, а не словами (UIX-10.8)', () => {
+    const html = pane({ hull: 'frigate', modules: ['cargo_bay', 'ion_engine'], slot: 3 });
+    for (const id of offered(html)) {
+      const card = new RegExp(`data-cnmod="${id}">(.*?)</button>`).exec(html)?.[1] ?? '';
+      expect(card).toContain(`<span class="cn-mc">${priceHtml(data.modules[id]!.cost)}</span>`);
+    }
+    expect(html).not.toContain('металла');
+  });
+
+  it('у отсека и окна нет хвостов-подсказок: «пусто», «Итог с модулями» (UIX-10.8)', () => {
+    const html = pane({});
+    expect(t('yard.slot.empty')).toBe('пусто');
+    expect(html).toContain(`<div class="cn-ph">${t('yard.cost.with-modules')}</div>`);
+    expect(html).not.toContain(' — ');
   });
 
   it('нет ни одного модуля для отсека — так и сказано, а не пустая колонка', () => {
