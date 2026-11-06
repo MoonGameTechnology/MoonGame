@@ -6,6 +6,7 @@ import { seedRng, type RngState } from '../rng/rng';
 import type { FleetChain } from './chain';
 import type { Coalition, CoalitionClock } from './coalition';
 import type { SightRules } from './sensorView';
+import type { SeenSortie } from './aircraftSight';
 export type { SightRules } from './sensorView';
 
 /**
@@ -1082,6 +1083,8 @@ export interface GameState {
    *  Чужие вылеты из `strikes` сняты целиком, а висящий патруль приходит сюда тем, что
    *  видно со стороны ({@link SeenPatrol}). Отсутствует = не видно ни одного. */
   seenPatrols?: SeenPatrol[];
+  /** Чужие эскадры в полёте в обзоре зрителя (SHU-6.16) — поле только проекции, как `seenPatrols`. */
+  seenSorties?: SeenSortie[];
   /** Monotonic counter handing each strike its id — детерминированный, как `battleSeq`. */
   strikeSeq?: number;
   /** Monotonic counter handing each SQUADRON its id (SHU-4.2) — той же природы, что

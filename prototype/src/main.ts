@@ -174,7 +174,7 @@ import { initApkUpdater } from './apkUpdate';
 import { measureViewport } from './viewport';
 import { hideMapLoading, initMapLoading, leaveLoadingMap, mapPreparation, needMapPreparation, prepareEnteringMap } from './mapLoading';
 import { forgetBorderLayer, initBorderLayer } from './borderLayer';
-import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawRallyPoint, drawSeenPatrols, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
+import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawRallyPoint, drawSeenAircraft, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
 import { drawAimPreview, drawAssaultTargets, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
 import { drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
 import { chainHits, drawAllyMarks, drawBombardTimers, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, drawTroopTransferTimers, initMapMarks, pingHits } from './mapMarks';
@@ -1589,7 +1589,7 @@ function renderMap(now: number) {
   drawFleetRoutes();
   drawRallyPoint(); // RALLY-1: точка сбора выбранного мира-верфи
   drawPatrolRings(); // SHU-6.3: круг патруля и остаток висения — под значками вылетов
-  drawSeenPatrols(); // SHU-6.10: чужой висящий патруль в моём обзоре — круг и состав
+  drawSeenAircraft(); // SHU-6.10, SHU-6.16: чужие патрули и эскадры в полёте в моём обзоре
   drawStrikeTrails(now); // остаток SHU-3.1: вылет в воздухе виден на карте
   drawTroopTransferEffects(s, ME, cx, hologramTime); // свои погрузки и высадки: световые капсулы
   drawOrdnance(cx, mineView(), ME, world, cam.scale);

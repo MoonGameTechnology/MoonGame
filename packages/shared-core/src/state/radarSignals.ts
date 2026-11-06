@@ -12,6 +12,8 @@ export interface SignatureContact {
   size: SignatureSize;
   /** Present for an in-transit contact; no fleet id, owner or composition. */
   position?: { x: number; y: number };
+  /** Авиация — эскадра челноков в воздухе, а не корабль. Чья и чем — не сказано. */
+  air?: true;
 }
 
 export function signatureSize(strength: number): SignatureSize {

@@ -1552,6 +1552,7 @@
 | SHU-6.13 | ✅ | core | `docs/shuttles-roadmap.md` | Эскадра в воздухе: приказы |
 | SHU-6.14 | ✅ | proto | `docs/shuttles-roadmap.md` | Эскадра в воздухе: выделение и карточка |
 | SHU-6.15 | ✅ | data | `docs/shuttles-roadmap.md` | Авиация медленнее, круг патруля меньше |
+| SHU-6.16 | ✅ | core proto | `docs/shuttles-roadmap.md` | Чужой вылет в полёте: глазами и радаром |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |
 | ST-3.2 | ✅ | srv proto | `docs/steward-roadmap.md` | Драйвер: эвакуация под угрозой (поза defend) |
 | ST-3.3 | ✅ | core srv proto | `docs/steward-roadmap.md` | Поза «Активная оборона» — контрудар при приемлемых потерях |

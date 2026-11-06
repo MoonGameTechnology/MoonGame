@@ -204,4 +204,13 @@ describe('SHU-6.10 — чужой висящий патруль на карте 
     expect(fn).toContain('vision?.seenPatrols');
     expect(fn).not.toContain('strikes');
   });
+
+  it('чужая эскадра в полёте — тоже по правилу ядра, и карта не читает чужие `strikes` сама', () => {
+    expect(fnOf('./mapFog.ts', 'computeVision')).toContain(
+      'seenSorties: NET ? (s.seenSorties ?? []) : sortiesSeenBy(s, ME, data),',
+    );
+    const fn = fnOf('./mapOverlays.ts', 'drawSeenSorties');
+    expect(fn).toContain('vision?.seenSorties');
+    expect(fn).not.toContain('strikes');
+  });
 });

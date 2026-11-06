@@ -16,6 +16,7 @@ import { legT, rallyPointOf, roadAhead } from '../../packages/shared-core/src/in
 import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { rgba } from '../../packages/client/src/holoDraw';
 import { patrolMarks } from '../../decisions/patrolMarks';
+import { seenSortieMarks } from '../../decisions/seenSortieMarks';
 import { routeShown, routeStroke } from '../../decisions/fleetRoute';
 import { swarmNetMarks } from '../../decisions/swarmNetMarks';
 import { abilityRings } from './abilityRings';
@@ -426,6 +427,54 @@ export function drawSeenPatrols(): void {
       cx.font = '10px ui-monospace, monospace';
       cx.textAlign = 'center';
       cx.fillText(`·${machines}`, c.x, c.y - 9);
+      cx.textAlign = 'start';
+    }
+  }
+  cx.restore();
+}
+
+/** Чужая авиация в моём обзоре: висящие патрули (круг и состав), затем эскадры в полёте. */
+export function drawSeenAircraft(): void {
+  drawSeenPatrols();
+  drawSeenSorties();
+}
+
+/**
+ * ЧУЖИЕ ЭСКАДРЫ В ПОЛЁТЕ (резолюция владельца 2026-11-06) — кто летит через мой обзор.
+ *
+ * Кого видно и где он в этом кадре, решают ядро (`sortiesSeenBy`) и `seenSortieMarks.ts`;
+ * здесь только канва. Корпус ведущей машины цветом хозяина, носом по курсу, и число бортов.
+ * Трассы нет: база и цель чужой эскадры зрителю не видны, курс читается по носу.
+ */
+export function drawSeenSorties(): void {
+  const cx = game.ctx();
+  const s = game.world();
+  const marks = seenSortieMarks(vision?.seenSorties, s.time, game.now());
+  if (!marks.length) return;
+  cx.save();
+  for (const m of marks) {
+    const c = world(m.at);
+    if (!visible(c, 40)) continue;
+    const tone = ownerColor(m.owner);
+    const dom = dominantUnit(m.units, data);
+    cx.save();
+    cx.translate(c.x, c.y);
+    cx.rotate(m.heading + Math.PI / 2);
+    cx.scale(0.68, 0.68);
+    cx.translate(-12, -12);
+    cx.fillStyle = rgba(tone, 0.24);
+    cx.strokeStyle = rgba(tone, m.leg === 'back' ? 0.55 : 0.95);
+    drawShipShape(
+      cx,
+      (dom && unitShape(dom.def, dom.unit, s.players[m.owner]?.faction)) || 'fighter',
+      cam.scale >= 0.9,
+    );
+    cx.restore();
+    if (cam.scale >= 0.9) {
+      cx.fillStyle = rgba(tone, 0.8);
+      cx.font = '10px ui-monospace, monospace';
+      cx.textAlign = 'center';
+      cx.fillText(`·${m.machines}`, c.x, c.y - 9);
       cx.textAlign = 'start';
     }
   }

@@ -13,6 +13,8 @@ export interface RadarContact {
   node: string;
   size: SigSize;
   position?: { x: number; y: number };
+  /** Авиация в воздухе, а не корабль (ядро помечает отметку вылета). */
+  air?: true;
 }
 
 /** Грубый контакт, каким его присылает сервер. */
@@ -34,6 +36,7 @@ export function netContacts(
     if (!c.position && known(c.location)) return;
     const contact: RadarContact = { key: `sig:${c.location}:${i}`, node: c.location, size: c.size };
     if (c.position) contact.position = { ...c.position };
+    if (c.air) contact.air = true;
     out.push(contact);
   });
   return out;
