@@ -28,8 +28,6 @@ export interface ConveyorView {
   paused: Array<{ id: string | number; label: string; progress: number }>;
   /** Голова очереди ждёт денег — тогда это её цена (уже размеченная строка). */
   waitingCost: string | null;
-  /** Компактная подача (ПК с включённой настройкой): лишние строки убираются. */
-  compact: boolean;
 }
 
 /** Подписи конвейера — все тексты приходят готовыми, модуль их не сочиняет. */
@@ -38,10 +36,7 @@ export interface ConveyorLabels {
   cancel: string;
   waiting: (cost: string) => string;
   idle: string;
-  idleTag: string;
-  idleSub: string;
   dequeue: string;
-  queueEmpty: string;
   paused: (pct: number) => string;
   resume: string;
 }
@@ -73,11 +68,10 @@ export function conveyorHtml(
     // ценой, а не строкой «простаивает», которая читается как сломанный конвейер.
     html += `<div class="current idle"><b>⏳ ${labels.waiting(view.waitingCost)}</b></div>`;
     html += bar();
-  } else if (view.compact) {
-    html += `<div class="current idle"><b>${labels.idle}</b></div>`;
-    html += bar();
   } else {
-    html += `<div class="current idle"><span>${labels.idleTag}</span><b>${labels.idleSub}</b><em>—</em></div>`;
+    // Простой — одной строкой на любой раскладке (UIX-10.6): «Простой · готов к следующему
+    // заказу · —» и «очередь пуста» под ним говорили одно и то же трижды.
+    html += `<div class="current idle"><b>${labels.idle}</b></div>`;
     html += bar();
   }
 
@@ -92,8 +86,6 @@ export function conveyorHtml(
         )
         .join('') +
       `</div>`;
-  } else if (!view.compact) {
-    html += `<div class="queue empty">${labels.queueEmpty}</div>`;
   }
 
   if (view.paused.length) {

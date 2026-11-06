@@ -63,7 +63,9 @@ export function cardHeader(
   </div>`;
 }
 
-/** Вкладка карточки мира со счётчиком. Активная помечается классом, а не исчезновением. */
+/** Вкладка карточки мира со счётчиком. Активная помечается классом, а не исчезновением.
+ *  Ноль не пишется (UIX-10.6): пустую вкладку видно по отсутствию числа, а сама вкладка
+ *  говорит «нет» словами. */
 export function tabButton(
   tab: string,
   label: string,
@@ -72,7 +74,8 @@ export function tabButton(
   desc?: string,
 ): string {
   const d = desc ? ` data-desc="${esc(desc)}"` : '';
-  return `<button class="ptab${active ? ' on' : ''}" data-act="tab" data-arg="${esc(tab)}"${d}>${label}<b>${count}</b></button>`;
+  const n = count > 0 ? `<b>${count}</b>` : '';
+  return `<button class="ptab${active ? ' on' : ''}" data-act="tab" data-arg="${esc(tab)}"${d}>${label}${n}</button>`;
 }
 
 /** Как показать одну строку состава: иконка, подпись и к какому домену относится юнит. */

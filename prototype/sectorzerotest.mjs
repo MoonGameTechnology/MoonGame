@@ -281,7 +281,7 @@ async function check(label, run) {
     assert((await page.evaluate((id) => window.__szTest.garrisonUnits(id), home)).includes('garrison'), `${label}: у дома гарнизон крепости`);
     await page.evaluate(() => window.__szTest.tab('ships'));
     assert.equal(await page.locator('#side .ptile').count(), 0, `${label}: во «Флоте» нет наземных плиток`);
-    assert.equal(await page.locator('#side .sec', { hasText: /Флоты на орбите|Fleets in orbit/ }).count(), 1, `${label}: во «Флоте» — орбита`);
+    assert.equal(await page.locator('#side .sec', { hasText: /На орбите|In orbit/ }).count(), 1, `${label}: во «Флоте» — орбита`);
     await page.evaluate(() => window.__szTest.tab('ground'));
     // SZ-map-ids: карточка мира, журнал и панели называют места именами провинций. Id
     // узлов глав — английские слова (`home_a`, `drift`): на русском экране забега их быть

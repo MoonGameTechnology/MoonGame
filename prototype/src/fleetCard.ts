@@ -589,22 +589,20 @@ export function fleetPanelHtml(f: Fleet): string {
     // Панель осталась информационной ровно как у стоячих приказов (SO-UI ниже).
     // Только на СВОЕЙ точке: на чужой сводка перечислила бы гарнизон противника.
     if (groundSummaryShown(here!.owner, ME)) {
+      // Заголовок и есть легенда чисел в строках («Гарнизон ▸ трюм»): отдельной строки легенды
+      // и отсылки к ⇅ «Десант» из ряда команд нет (UIX-10.6, без повторов и прозы).
       let ga = `<div class="sec">${t('side.ground.title')}</div>`;
       const rows = groundRowsAt(here!.garrison, f.landing ?? []);
       const loadingN = (f.loading ?? []).reduce((n, claim) => n + claim.count, 0);
       // Выгрузка идёт час, как погрузка: до срока войска ещё в трюме (`▸` справа).
       const unloadingN = (f.unloading ?? []).reduce((n, claim) => n + claim.count, 0);
-      if (rows.length) {
-        ga += `<div class="row dim">${t('side.ground.legend')}</div>`;
-        for (const r of rows)
-          ga += `<div class="row"><span class="bicon">${unitIconHtml(r.unit, data, youColor, 16, s.players[ME]?.faction)}</span>${esc(displayUnit(r.unit))} <b>${r.planet} ▸ ${r.aboard}</b></div>`;
-      }
+      for (const r of rows)
+        ga += `<div class="row"><span class="bicon">${unitIconHtml(r.unit, data, youColor, 16, s.players[ME]?.faction)}</span>${esc(displayUnit(r.unit))} <b>${r.planet} ▸ ${r.aboard}</b></div>`;
       if (loadingN) ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
       if (unloadingN)
         ga += `<div class="hint">${t('side.ground.unloading', { n: unloadingN })}</div>`;
       if (!rows.length && !loadingN && !unloadingN)
-        ga += `<div class="row dim">${t('side.ground.empty')}</div>`;
-      ga += `<div class="hint">${t('side.ground.via-cmd')}</div>`;
+        ga += `<div class="row dim">${t('side.none')}</div>`;
       cols.push(ga);
     }
     h += pcols(cols);

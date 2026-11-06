@@ -528,6 +528,30 @@ describe('свой флот', () => {
     expect(html).not.toContain(t('side.strike.forecast.hint'));
   });
 
+  // UIX-10.6: заголовок «Гарнизон ▸ трюм» сам читает числа строк, поэтому строки легенды под
+  // ним и подсказки о ⇅ «Десант» нет, а пустая сводка говорит «нет».
+  it('сводка десанта: заголовок и есть легенда, подсказки нет, пустая — «нет»', async () => {
+    const { env, card, put } = await boot();
+    const ground = (html: string): string => html.slice(html.indexOf(t('side.ground.title')));
+    put(
+      fleet('F3', 'p1', 'A', [{ unit: 'cruiser', count: 1 }], {
+        landing: [{ unit: 'militia', count: 2 }],
+      }),
+    );
+    const full = ground(card('F3'));
+    expect(
+      full.startsWith(`${t('side.ground.title')}</div><div class="row"><span class="bicon">`),
+    ).toBe(true);
+    expect(full).not.toContain('class="hint"');
+    env.s.planets.A!.garrison = [];
+    put(fleet('F4', 'p1', 'A', [{ unit: 'cruiser', count: 1 }]));
+    expect(
+      ground(card('F4')).startsWith(
+        `${t('side.ground.title')}</div><div class="row dim">${t('side.none')}</div></div>`,
+      ),
+    ).toBe(true);
+  });
+
   // Заказ владельца 2026-11-01: бомбардировка и штурм — в ряду приказов (правило 3г
   // `cmdPresence`), а не отдельным разделом листа. Лист оставляет себе только прогноз.
   it('у чужого мира — прогноз штурма, но кнопок удара в листе нет', async () => {

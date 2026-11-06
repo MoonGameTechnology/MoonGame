@@ -6,10 +6,7 @@ const labels: ConveyorLabels = {
   cancel: 'отменить',
   waiting: (c) => `ждём: ${c}`,
   idle: 'простаивает',
-  idleTag: 'КОНВЕЙЕР',
-  idleSub: 'готов к заказу',
   dequeue: 'убрать из очереди',
-  queueEmpty: 'очередь пуста',
   paused: (n) => `пауза ${n}%`,
   resume: 'продолжить',
 };
@@ -19,7 +16,6 @@ const view = (over: Partial<ConveyorView> = {}): ConveyorView => ({
   queued: [],
   paused: [],
   waitingCost: null,
-  compact: false,
   ...over,
 });
 
@@ -64,19 +60,13 @@ describe('конвейер — когда стройки нет', () => {
       labels,
     );
     expect(html).toContain('ждём: 100¤');
-    expect(html).not.toContain('готов к заказу');
+    expect(html).not.toContain('простаивает');
   });
 
-  it('простой в обычной раскладке подписан двумя строками', () => {
+  it('простой — одна строка, без пометки «очередь пуста» под ней (UIX-10.6)', () => {
     const html = conveyorHtml('C1R1', 'buildings', view(), labels);
-    expect(html).toContain('КОНВЕЙЕР');
-    expect(html).toContain('готов к заказу');
-  });
-
-  it('КОМПАКТНАЯ подача короче — одна строка вместо двух', () => {
-    const html = conveyorHtml('C1R1', 'buildings', view({ compact: true }), labels);
-    expect(html).toContain('простаивает');
-    expect(html).not.toContain('КОНВЕЙЕР');
+    expect(html).toContain('<div class="current idle"><b>простаивает</b></div>');
+    expect(html).not.toContain('class="queue');
   });
 
   it('пустая полоса рисуется в любом случае — иначе строка прыгает', () => {
@@ -106,14 +96,6 @@ describe('конвейер — очередь', () => {
     expect(html).toContain('data-arg="12"');
   });
 
-  it('пустая очередь говорит об этом словами', () => {
-    expect(conveyorHtml('C1R1', 'buildings', view(), labels)).toContain('очередь пуста');
-  });
-
-  it('в компактной подаче пустая очередь молчит — экономим строку', () => {
-    const html = conveyorHtml('C1R1', 'buildings', view({ compact: true }), labels);
-    expect(html).not.toContain('очередь пуста');
-  });
 });
 
 describe('конвейер — приостановленное', () => {
