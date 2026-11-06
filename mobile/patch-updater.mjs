@@ -146,9 +146,12 @@ public class MainActivity extends BridgeActivity {
                 connection.setReadTimeout(30000);
                 int responseCode = connection.getResponseCode();
                 if (responseCode != 200) return responseCode == 404 ? "E_UPDATE_STALE" : "E_UPDATE_HTTP";
-                if (connection.getContentLengthLong() > MAX_APK) return "E_UPDATE_DOWNLOAD";
+                long length = connection.getContentLengthLong();
+                if (length > MAX_APK) return "E_UPDATE_DOWNLOAD";
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
                 long total = 0;
+                long lastProgressAt = android.os.SystemClock.elapsedRealtime();
+                reportProgress(0, length);
                 try (InputStream in = connection.getInputStream(); OutputStream out = new FileOutputStream(apk)) {
                     byte[] buffer = new byte[65536];
                     int n;
@@ -157,8 +160,16 @@ public class MainActivity extends BridgeActivity {
                         if (total > MAX_APK) return "E_UPDATE_DOWNLOAD";
                         digest.update(buffer, 0, n);
                         out.write(buffer, 0, n);
+                        long now = android.os.SystemClock.elapsedRealtime();
+                        if (now - lastProgressAt >= 200) {
+                            reportProgress(total, length);
+                            lastProgressAt = now;
+                        }
                     }
                 }
+                if (total == 0 || (length >= 0 && total != length)) return "E_UPDATE_DOWNLOAD";
+                reportProgress(total, length);
+                report("verifying");
                 if (!MessageDigest.isEqual(digest.digest(), hex(sha256))) return "E_UPDATE_DIGEST";
                 PackageInfo info = activity.getPackageManager().getPackageArchiveInfo(apk.getPath(), 0);
                 if (info == null || !activity.getPackageName().equals(info.packageName)) return "E_UPDATE_PACKAGE";
@@ -198,6 +209,13 @@ public class MainActivity extends BridgeActivity {
                 out[i] = (byte) Integer.parseInt(value.substring(i * 2, i * 2 + 2), 16);
             }
             return out;
+        }
+
+        /** Numeric byte counters only; bounded to five progress events per second. */
+        private void reportProgress(long received, long total) {
+            String script = "window.dispatchEvent(new CustomEvent('void-apk-update',{detail:{status:'downloading',received:"
+                    + received + ",total:" + total + "}}))";
+            activity.runOnUiThread(() -> webView.evaluateJavascript(script, null));
         }
 
         /** Fixed status codes only — never page-supplied text — back to the web layer. */

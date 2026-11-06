@@ -513,6 +513,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="updbar" role="region" aria-live="polite">
   <div class="ub-t" data-i18n="upd.available"></div>
   <p id="ub-status"></p>
+  <progress id="ub-progress" max="1" hidden aria-labelledby="ub-status"></progress>
   <div class="ub-row">
     <a id="ub-go" class="ub-go" href="#" rel="noopener" data-i18n="upd.go"></a>
     <button id="ub-later" class="ub-later" type="button" data-i18n="upd.later"></button>

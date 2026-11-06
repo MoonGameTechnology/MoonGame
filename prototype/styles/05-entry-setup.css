@@ -704,3 +704,11 @@
   #connect .csoc{width:46px;height:46px;}
   #connect .cstack{margin-top:14px;}
 }
+
+/* Native APK download: measured bytes, indeterminate while preparing/checking. */
+#ub-progress{display:block;width:100%;height:8px;margin:12px 0 4px;accent-color:var(--cyan);border:0;border-radius:4px;overflow:hidden;}
+#ub-progress[hidden]{display:none;}
+#ub-progress::-webkit-progress-bar{background:var(--line);}
+#ub-progress::-webkit-progress-value{background:var(--cyan);}
+#ub-progress::-moz-progress-bar{background:var(--cyan);}
+#updbar .ub-go[aria-disabled="true"]{opacity:.55;cursor:wait;}

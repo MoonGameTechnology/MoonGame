@@ -53,6 +53,10 @@ export function updateMessage(r: UpdateCheck): string {
  */
 export function installMessage(code: unknown): string {
   switch (code) {
+    case 'preparing':
+      return t('upd.preparing');
+    case 'verifying':
+      return t('upd.verifying');
     case 'downloading':
       return t('upd.downloading');
     case 'installing':
@@ -78,6 +82,29 @@ export function installMessage(code: unknown): string {
     default:
       return t('upd.err-download');
   }
+}
+
+/** Native byte counts, including old bridges that report only a status string.
+ * Unknown lengths stay indeterminate; verification never invents a percentage. */
+export function installProgress(detail: unknown): {
+  message: string; value: number | null; visible: boolean; busy: boolean;
+} {
+  const data = detail && typeof detail === 'object' ? detail as Record<string, unknown> : null;
+  const code = typeof detail === 'string' ? detail : data?.status;
+  const busy = code === 'preparing' || code === 'downloading' || code === 'verifying';
+  const result = { message: installMessage(code), value: null as number | null,
+    visible: busy || code === 'installing', busy };
+  if (code === 'installing') result.value = 1;
+  if (code !== 'downloading' || !data) return result;
+  const valid = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= 128 * 1024 * 1024;
+  if (!valid(data.received)) return result;
+  const received = (data.received / 1048576).toFixed(1);
+  if (valid(data.total) && data.total > 0 && data.total >= data.received) {
+    result.value = data.received / data.total;
+    result.message = t('upd.download-progress', { percent: Math.floor(result.value * 100),
+      received, total: (data.total / 1048576).toFixed(1) });
+  } else result.message = t('upd.download-bytes', { received });
+  return result;
 }
 
 /** Re-check the signed manifest at the moment of download: banners can outlive
@@ -123,12 +150,28 @@ export function initApkUpdater(): void {
   if (cupd) cupd.style.display = '';
 
   let preparingDownload = false;
+  let downloading = false;
   const status = (text: string): void => {
     const line = el('ub-status');
     if (line) line.textContent = text;
   };
+  const renderProgress = (detail: unknown): void => {
+    const view = installProgress(detail);
+    downloading = view.busy;
+    status(view.message);
+    const progress = el('ub-progress') as HTMLProgressElement | null;
+    if (progress) {
+      progress.hidden = !view.visible;
+      if (view.value === null) progress.removeAttribute('value');
+      else progress.value = view.value;
+    }
+    el('ub-go')?.setAttribute('aria-disabled', String(preparingDownload || downloading));
+  };
   const showUpdate = (): void => {
+    if (preparingDownload || downloading) return;
     status('');
+    const progress = el('ub-progress');
+    if (progress) progress.hidden = true;
     const bar = el('updbar');
     if (bar) bar.style.display = 'block'; // override the stylesheet's display:none
   };
@@ -160,19 +203,33 @@ export function initApkUpdater(): void {
   el('ub-go')?.addEventListener('click', (e) => {
     e.preventDefault();
     const native = (globalThis as { VoidNative?: { installVerified?: (url: string, sha256: string) => void } }).VoidNative;
-    if (preparingDownload) return;
+    if (preparingDownload || downloading) return;
     if (!native?.installVerified) {
       status(installMessage(null));
       return;
     }
     preparingDownload = true;
+    let started = false;
+    renderProgress('preparing');
     detach('APK download', beginVerifiedUpdate({
       check: checkForUpdateDetailed,
-      install: (url, hash) => native.installVerified!(url, hash),
+      install: (url, hash) => {
+        renderProgress('downloading');
+        native.installVerified!(url, hash);
+        started = true;
+      },
       status,
-    }).finally(() => { preparingDownload = false; }));
+    }).finally(() => {
+      preparingDownload = false;
+      if (!started) {
+        downloading = false;
+        const progress = el('ub-progress');
+        if (progress) progress.hidden = true;
+      }
+      el('ub-go')?.setAttribute('aria-disabled', String(downloading));
+    }));
   });
-  window.addEventListener('void-apk-update', (e) => status(installMessage((e as CustomEvent).detail)));
+  window.addEventListener('void-apk-update', (e) => renderProgress((e as CustomEvent).detail));
   el('ub-later')?.addEventListener('click', () => {
     const bar = el('updbar');
     if (bar) bar.style.display = 'none';

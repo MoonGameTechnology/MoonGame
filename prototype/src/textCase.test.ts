@@ -88,9 +88,9 @@ describe('без КАПС с разрядкой (UIX-11.1)', () => {
 /** Сокращения пишутся заглавными и в обычной строке; остальное слово целиком заглавными —
  *  это КАПС-лейбл. Название игры и Sector Zero — имена собственные. */
 const ACRONYMS: Record<'ru' | 'en', ReadonlySet<string>> = {
-  ru: new Set('ИИ ПКО ПВО ЛС ОП КД ЛКМ ПКМ ПК НПЗ ОЗ ПРО БЧ АТК ЗАЩ СКР'.split(' ')),
+  ru: new Set('ИИ ПКО ПВО ЛС ОП КД ЛКМ ПКМ ПК НПЗ ОЗ ПРО БЧ АТК ЗАЩ СКР МБ'.split(' ')),
   en: new Set([
-    ...'AI HP XP CD HQ DM AA PD PVE PVP FFA DEV FPS PC APK VPN'.split(' '),
+    ...'AI HP XP CD HQ DM AA PD PVE PVP FFA DEV FPS PC APK VPN MB'.split(' '),
     ...'ATK DEF SPD II III IV VI VOID DOMINION SECTOR ZERO'.split(' '),
   ]),
 };
