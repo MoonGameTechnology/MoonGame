@@ -6,7 +6,7 @@ import { networkSeats } from './matchSetup';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { MAX_RESEARCH_QUEUE } from '../../packages/shared-core/src/index';
 import { queueTech } from '../../decisions/actions';
-import { fmtEta } from './format';
+import { esc, fmtEta } from './format';
 import { liveRender, plainText } from './liveTimers.fixture';
 import {
   TECH_BRANCHES,
@@ -493,6 +493,21 @@ describe('дерево технологий — окно', () => {
     expect(win.shown()).toBe(true);
     expect(body.html()).toContain('tt-tabs');
     expect(intros()).toBe(1);
+  });
+
+  // Путь от запертого юнита, здания или крепости: окно открывается сразу на досье нужной
+  // технологии и на её ветке — без поиска по вкладкам.
+  it('open(focus) открывает досье технологии на её ветке; простой open() — без досье', () => {
+    const { api, body } = wire();
+    const id = firstOf('command');
+    api.open(id);
+    expect(body.html()).toContain('<button class="tt-tab on" data-ttab="command">');
+    expect(body.html()).toContain('tt-modal');
+    expect(body.html()).toContain(esc(tData(data.technologies[id]!.name)));
+    api.open();
+    expect(body.html()).not.toContain('tt-modal');
+    api.open('нет-такой-технологии'); // чужой id — просто окно, а не пустое досье
+    expect(body.html()).not.toContain('tt-modal');
   });
 
   it('переключение вкладки перерисовывает дерево другой ветки', () => {

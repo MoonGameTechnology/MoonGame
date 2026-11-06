@@ -174,8 +174,8 @@ export interface SidePanelHost {
   openShipCard(fleetId: string, index: number): void;
   /** Карточка справочника по ключу плитки. */
   openCodex(key: string): void;
-  /** Дерево технологий. */
-  techTree(): { open(): void };
+  /** Дерево технологий; `focus` — открыть сразу на досье этой технологии. */
+  techTree(): { open(focus?: string): void };
   /** Окно построек. */
   buildWin(): { open(planetId: string, units?: UnitCatalogTab): void };
   /** Окно боя. */
@@ -676,7 +676,7 @@ function onSideClick(ev: MouseEvent): void {
   } else if (act === 'repairfortress') {
     playerOrder(repairStation(ME, arg));
   } else if (act === 'opentech') {
-    game.techTree().open();
+    game.techTree().open(arg || undefined);
   } else if (act === 'build') {
     enqueueBuild(selPlanet!, { kind: 'building', id: arg, count: 1 });
   } else if (act === 'unit') {

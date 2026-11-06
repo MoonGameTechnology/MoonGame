@@ -416,13 +416,17 @@
 .bw-st{flex:none;max-width:56%;font-size:var(--fs-caption);line-height:1.3;text-align:right;color:var(--dim);}
 .bw-st.done{color:#4fe0b0;}
 .bw-st.run{color:var(--amber);font-weight:700;}
-/* Вид «Построить» — классом .btn-main (UIX-11.1); здесь только размер и место. */
-.bw-take{flex:none;padding:6px 11px;border-radius:8px;font-size:var(--fs-body);white-space:nowrap;}
+/* Вид «Построить» — классом .btn-main, «Исследовать» запертой строки — .btn-second (UIX-11.1); здесь только размер и место. */
+.bw-take,.bw-tech{flex:none;padding:6px 11px;border-radius:8px;font-size:var(--fs-body);white-space:nowrap;}
 /* Улучшаемое здание горит так же, как доступное к стройке: в строке есть что нажать. */
 .bw-item:is(.st-avail,.st-up){border-color:var(--cyan);}
 .bw-item.st-queued{border-color:var(--amber);}
 .bw-item.st-built{opacity:.75;}
 .bw-item.st-lock{opacity:.62;}
+/* Заперто технологией: строке есть что нажать («Исследовать»), поэтому она не гаснет, как
+   замок, а несёт рамку цвета причины; гаснут только эффект и цена — строить пока нельзя. */
+.bw-item.st-tech{border-color:color-mix(in srgb,#e6c77a 45%,var(--line));}
+.bw-item.st-tech :is(.bw-fx,.bw-foot){opacity:.7;}
 @media(hover:hover){
   :where(.bw-item:hover){border-color:var(--line-hi);}
 }
@@ -431,7 +435,9 @@
 .bw-open{margin-top:8px;width:100%;padding:10px;border-radius:10px;font-size:var(--fs-caption);}
 /* Крепость не изучена — причина под серой кнопкой и путь к технологиям (сообщение владельца
    2026-09-24: кнопка горела, а ядро отвечало безымянным «нужна технология»). */
-.fort-why{margin-top:6px;font-size:var(--fs-caption);line-height:1.45;color:#e6c77a;}
+/* Та же строка у юнита и здания, запертых технологией (`techOffer.ts`): окно стройки и карточка. */
+.fort-why,.bw-why{margin-top:6px;font-size:var(--fs-caption);line-height:1.45;color:#e6c77a;}
+.bw-ih + .bw-why{margin-top:4px;}
 /* Серая кнопка панели должна БЫТЬ серой: погашенная «Возвести крепость» светилась так же, как
    живая, и нажатие «ничего не делало». Серой её делает класс стиля; цена внутри — цветом
    кнопки, а не бледным .dim. */

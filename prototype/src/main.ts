@@ -1854,6 +1854,7 @@ initHelpCenter({
   buildingLocked,
   fleetTitle: fleetTitleOf,
   sectorZeroToolsHidden,
+  openTech: (id) => techTree.open(id),
 });
 
 function updateMobileHud(): void {
@@ -2369,6 +2370,7 @@ const buildWin = initBuildScreen({
   openUnitInfo: (id) => openCodex(`u:${id}`),
   openInfo: (id) => openCodex(`b:${id}`),
   lockText: errText,
+  openTech: (id) => techTree.open(id),
   dossierBody: (id, level) => buildingDossier(id, level)?.body ?? '',
 });
 

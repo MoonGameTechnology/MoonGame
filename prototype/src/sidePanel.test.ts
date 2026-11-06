@@ -426,7 +426,7 @@ async function boot({ tip = true } = {}) {
     buildingLocked: (_planetId, id) => (env.locked.includes(id) ? 'built' : null),
     openShipCard: (fleetId, index) => env.calls.push(['shipcard', fleetId, index]),
     openCodex: (key) => env.calls.push(['codex', key]),
-    techTree: () => ({ open: () => env.calls.push(['tech']) }),
+    techTree: () => ({ open: (focus) => env.calls.push(focus ? ['tech', focus] : ['tech']) }),
     buildWin: () => ({ open: (id, units) => env.calls.push(['build', id, units]) }),
     battleWindow: () => ({ open: (id) => env.calls.push(['battle', id]) }),
     pings: () => (env.pings ? { openMenu: () => env.calls.push(['ping']) } : null),
@@ -1003,6 +1003,8 @@ describe('REFM-225 — нажатия по листу', () => {
       ['openunits', 'ground', 'world', [['build', H, 'ground']]],
       ['openunits', 'buildings', 'world', []],
       ['opentech', '', 'world', [['tech']]],
+      // Крепость не изучена — кнопка открывает сразу досье её технологии.
+      ['opentech', 'void_fortification', 'world', [['tech', 'void_fortification']]],
       ['openbattle', 'B1', 'fleet', [['battle', 'B1']]],
       ['openbattle', '', 'fleet', []],
       ['ping', '', 'world', [['ping']]],

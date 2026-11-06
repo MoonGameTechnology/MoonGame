@@ -159,6 +159,11 @@ describe('три стиля кнопок (UIX-11.1)', () => {
     );
     expect(tags.length).toBeGreaterThanOrEqual(10);
     expect(tags.filter((tag) => !tag.includes('btn-main'))).toEqual([]);
+    // «Исследовать» у запертой технологией строки — вторичная: это путь в другое окно, а
+    // главная кнопка строки — «Строить», когда её откроет технология.
+    expect([...src.matchAll(/<button class="bw-tech[^"]*"/g)].map((m) => m[0])).toEqual([
+      '<button class="bw-tech btn-second"',
+    ]);
   });
 
   it('ряд приказов: «Курс» — главная, остальные — вторичные, состояние добавляется к стилю', () => {

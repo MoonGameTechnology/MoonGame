@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
-import { setLocale } from '../../localization/runtime';
+import { setLocale, tData } from '../../localization/runtime';
 import { newGame, canOrder, data, order } from './game';
+import { networkSeats } from './matchSetup';
 import { buildBuilding, upgradeBuilding } from '../../decisions/actions';
 import { cost } from './format';
 import { buildingLevel } from '../../packages/shared-core/src/index';
@@ -477,6 +478,7 @@ describe('окно построек — проводка', () => {
       openUnitInfo: (id) => opened.push(id),
       openInfo: (id) => opened.push(id),
       lockText,
+      openTech: (id) => opened.push(`tech:${id}`),
       dossierBody: () => 'описание',
     };
     return { api: initBuildScreen(host), root, body, s, built, upgraded, opened };
@@ -521,6 +523,15 @@ describe('окно построек — проводка', () => {
     api.open(home(s));
     root.fire(tap('[data-bw]', { bw: 'fort' }));
     expect(opened).toEqual(['fort']);
+  });
+
+  it('«Исследовать» запертой строки ведёт в досье технологии и НЕ открывает карточку', () => {
+    const { api, root, s, opened } = wire();
+    api.open(home(s), 'ground');
+    root.fire(tap('[data-bw-tech]', { bwTech: 'militia_training' }));
+    expect(opened).toEqual(['tech:militia_training']);
+    // Окно стройки остаётся под окном технологий: закрыл досье — вернулся к строке.
+    expect(api.isOpen()).toBe(true);
   });
 
   it('крестик закрывает окно', () => {
@@ -646,5 +657,92 @@ describe('каталог юнитов окна производства — с �
     for (const art of ['frigate', 'cruiser', 'dropship'])
       expect(out, art).toContain(`data-ship-art="${art}"`);
     expect(out.match(/bw-item[^"]*with-art/g)).toHaveLength(3);
+  });
+});
+
+// Сообщение владельца 2026-11-06: «чтоб предлагало изучить технологию, как с космической
+// крепостью, только с юнитами и зданиями». В основной игре заперто почти всё, и строка окна
+// говорила безымянное «нужна технология».
+describe('заперто технологией — строка предлагает её изучить', () => {
+  const mainGame = (): GameState => newGame({ mapId: 'duel-1', seats: networkSeats('ffa', 'duel-1') });
+  const ROSTER = Object.keys(data.units);
+
+  it('здание и юнит называют технологию, кнопка «Исследовать» несёт её id', () => {
+    const s = mainGame();
+    const pid = home(s);
+    const row = rowOf(html(s, pid), 'spaceport');
+    expect(row).toContain('st-tech');
+    expect(row).toContain('data-bw-tech="spaceport_infrastructure"');
+    expect(row).toContain('⚗ Исследовать');
+    expect(row).toContain(`Нужна технология «${tData(data.technologies.spaceport_infrastructure!.name)}»`);
+    expect(row).not.toContain('bw-st lock'); // безымянного замка больше нет
+    const units = unitScreenHtml(s, 'p1', pid, ['frigate'], probe(s), lockText);
+    expect(units).toContain('data-bw-tech="frigate_design"');
+    expect(units).toContain('st-tech');
+  });
+
+  it('ПАРИТЕТ С ЯДРОМ: предложенная технология и правда снимает отказ', () => {
+    const s = mainGame();
+    const pid = home(s);
+    const rows = [
+      ...Object.keys(data.buildings).map((id) => ({ id, out: rowOf(html(s, pid), id) })),
+      ...ROSTER.map((id) => ({ id, out: unitScreenHtml(s, 'p1', pid, [id], probe(s), lockText) })),
+    ];
+    let offers = 0;
+    for (const { id, out } of rows) {
+      const tech = out.match(/data-bw-tech="([^"]+)"/)?.[1];
+      if (!tech) {
+        // Нет предложения — нет и отказа технологией у строки на экране.
+        expect(out, id).not.toContain(lockText('E_TECH_LOCKED'));
+        continue;
+      }
+      offers++;
+      const learnt = structuredClone(s);
+      learnt.players.p1!.technologies!.completed.push(tech);
+      const kind = data.buildings[id] && out.includes(`data-bw="${id}"`) ? 'building' : 'unit';
+      const action =
+        kind === 'building'
+          ? buildBuilding('p1', pid, id)
+          : { id: 'x', type: 'unit.build', playerId: 'p1', issuedAt: 0, payload: { planetId: pid, unit: id, count: 1 } };
+      expect(canOrder(s, action), id).toBe('E_TECH_LOCKED');
+      expect(canOrder(learnt, action), `${id} после ${tech}`).not.toBe('E_TECH_LOCKED');
+    }
+    expect(offers).toBeGreaterThan(10);
+  });
+
+  it('уже исследуется или стоит в очереди — кнопка так и говорит', () => {
+    const s = mainGame();
+    const pid = home(s);
+    s.players.p1!.technologies!.active = [{ technology: 'frigate_design', startedAt: 0, completesAt: 1 }];
+    s.players.p1!.technologies!.queue = ['cruiser_design'];
+    const out = unitScreenHtml(s, 'p1', pid, ['frigate', 'cruiser'], probe(s), lockText);
+    expect(out).toContain('⚗ Исследуется');
+    expect(out).toContain('⏳ №1 в очереди');
+  });
+
+  it('десантный челнок заперт своей технологией, а открытый без бойцов — технологией бойца', () => {
+    // Мир — новый на каждый вопрос: проба ядра помнит ответ для того же объекта состояния.
+    const lander = (learnt: string[]) => {
+      const s = mainGame();
+      const pid = home(s);
+      s.planets[pid]!.buildings.push(
+        { type: 'spaceport', level: 1, hp: data.buildings.spaceport!.hp },
+        { type: 'barracks', level: 1, hp: data.buildings.barracks!.hp },
+      );
+      s.players.p1!.technologies!.completed.push(...learnt);
+      return unitScreenHtml(s, 'p1', pid, ['landing_shuttle'], probe(s), lockText);
+    };
+    expect(lander([])).toContain('data-bw-tech="landing_design"');
+    const open = lander(['landing_design']);
+    expect(open).toMatch(/data-bw-tech="(militia_training|drop_training|heavy_infantry_training|armored_warfare|special_operations)"/);
+    expect(open).not.toContain('data-unit-troop=');
+  });
+
+  it('технологии нет в этом матче — строка остаётся замком с причиной, кнопки в никуда нет', () => {
+    const s = mainGame();
+    s.techRules = { ...s.techRules!, exclude: ['frigate_design'] };
+    const out = unitScreenHtml(s, 'p1', home(s), ['frigate'], probe(s), lockText);
+    expect(out).not.toContain('data-bw-tech=');
+    expect(out).toContain('bw-st lock');
   });
 });

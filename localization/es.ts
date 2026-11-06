@@ -750,6 +750,7 @@ export const es: Record<string, string> = {
   'build.state.queued': 'en construcción',
   'build.state.upgrading': 'mejorando',
   'build.state.waiting': 'en cola',
+  'build.tech.needs': 'Requiere {tech}',
   'callsign.comet': 'Cometa',
   'callsign.falcon': 'Halcón',
   'callsign.orion': 'Orión',

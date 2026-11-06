@@ -749,6 +749,7 @@ export const de: Record<string, string> = {
   'build.state.queued': 'in Bau',
   'build.state.upgrading': 'wird aufgewertet',
   'build.state.waiting': 'in Warteschlange',
+  'build.tech.needs': 'Benötigt {tech}',
   'callsign.comet': 'Komet',
   'callsign.falcon': 'Falke',
   'callsign.orion': 'Orion',

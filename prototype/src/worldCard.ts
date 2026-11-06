@@ -915,9 +915,10 @@ export function planetPanelHtml(p: Planet): string {
         const names = fortress.needs
           .map((id) => `«${tData(data.technologies[id]?.name ?? id)}»`)
           .join(t('side.fortress.or'));
+        // Кнопка открывает сразу досье первой из них — как у запертых юнитов и зданий.
         blds +=
           `<div class="fort-why">${esc(t('side.fortress.needs-tech', { tech: names }))}</div>` +
-          `<button class="bw-open btn-quiet" data-act="opentech">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
+          `<button class="bw-open btn-quiet" data-act="opentech" data-arg="${esc(fortress.needs[0] ?? '')}">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
       }
     }
     cols.push(blds);
@@ -970,7 +971,7 @@ export function forkPanelHtml(fork: { province: string; trail: number }): string
         .join(t('side.fortress.or'));
       h +=
         `<div class="fort-why">${esc(t('side.fortress.needs-tech', { tech: names }))}</div>` +
-        `<button class="bw-open btn-quiet" data-act="opentech">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
+        `<button class="bw-open btn-quiet" data-act="opentech" data-arg="${esc(raise.needs[0] ?? '')}">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
     }
   } else if (raise.blocked === 'not-owned') {
     h += `<div class="row dim">${esc(t('side.fork.not-owned'))}</div>`;
