@@ -155,7 +155,9 @@ body.holo-ui #side .pdesc{display:none;}
 body.holo-ui #side .phead{margin:0 0 12px;padding-bottom:12px;gap:10px;}
 body.holo-ui #side .ptitle{display:block;min-width:0;}
 body.holo-ui #side .ptitle b{font-size:15px;}
-body.holo-ui #side .ptitle span{display:block;font-size:var(--fs-body);margin-top:5px;white-space:normal;line-height:1.5;}
+/* Только подпись под именем: живой отсчёт внутри неё (`.pn-timer` эскадры в полёте и высадки) —
+   строчный, а блочный встал бы отдельной строкой. */
+body.holo-ui #side .ptitle > span{display:block;font-size:var(--fs-body);margin-top:5px;white-space:normal;line-height:1.5;}
 body.holo-ui #side .pclose{width:28px;height:28px;flex:0 0 auto;border-radius:4px;}
 body.holo-ui #side .row{font-size:var(--fs-body);line-height:1.6;margin:6px 0;}
 body.holo-ui #side .sec{font-size:var(--fs-caption);margin:15px 0 7px;color:var(--dim);}
@@ -354,7 +356,7 @@ body.holo-ui.chain-mode #holo-selection-window #cmdbar{width:100%;padding:12px;}
 /* Доводка окна выбора (заказ владельца 2026-09-25: «концепция интересная, но не доработанная»):
    подзаголовок мира — не больше двух строк, а не три с обрывом; вкладки — одним рядом,
    а не «Здания» отдельной строкой; одинокая последняя команда — на всю ширину. */
-body.holo-ui #holo-selection-window #side .ptitle span{display:-webkit-box;-webkit-box-orient:vertical;
+body.holo-ui #holo-selection-window #side .ptitle > span{display:-webkit-box;-webkit-box-orient:vertical;
   -webkit-line-clamp:2;line-clamp:2;overflow:hidden;white-space:normal;}
 body.holo-ui #holo-selection-window #side .ptabs{flex-wrap:nowrap;gap:5px;}
 body.holo-ui #holo-selection-window #side .ptab{flex:1 1 0;min-width:0;padding:7px 4px;justify-content:center;
