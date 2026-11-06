@@ -492,6 +492,18 @@ export const TECHNOLOGY_PRICES_SOLO_MIGRATION = {
   toDataHash: '0f70af91e21327',
 } as const;
 
+/** Rules-only patch: fleet-ops 1.14.1 and auto-merge 1.0.1 preserve enabled
+ * bombardment/auto-assault on fusion. Saved fleets, cargo and clocks retain their
+ * shape; only future merges use the new inheritance rule. */
+export const FLEET_MERGE_ORDERS_SOLO_MIGRATION = {
+  fromRules: TECHNOLOGY_PRICES_SOLO_MIGRATION.toRules,
+  fromData: TECHNOLOGY_PRICES_SOLO_MIGRATION.toData,
+  fromDataHash: TECHNOLOGY_PRICES_SOLO_MIGRATION.toDataHash,
+  toRules: '08565a49533ff1',
+  toData: TECHNOLOGY_PRICES_SOLO_MIGRATION.toData,
+  toDataHash: TECHNOLOGY_PRICES_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -535,6 +547,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   CONTROL_TECH_SOLO_MIGRATION,
   VICEROY_SOLO_MIGRATION,
   TECHNOLOGY_PRICES_SOLO_MIGRATION,
+  FLEET_MERGE_ORDERS_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
