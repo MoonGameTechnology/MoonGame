@@ -110,6 +110,7 @@ interface RadarMark {
   size: 'S' | 'M' | 'L';
   at: number;
   position?: { x: number; y: number };
+  air?: true;
 }
 /** Radar contacts as PAINTED BY THE SWEEP: a signature is refreshed only as the arm
  *  crosses it, then lingers at that last-swept spot (a dim ghost) until the next
@@ -249,12 +250,16 @@ export function updateRadarContacts(now: number): void {
       if (paintedThisFrame(sweepArms, pos, sweepPrevAng, sweepAng)) {
         hit = true;
         if (!radarMemory.has(c.key))
-          game.note(t('threat.contact', { size: c.size, at: game.placeName(c.node) }), c.node);
+          game.note(
+            t(c.air ? 'threat.contact-air' : 'threat.contact', { size: c.size, at: game.placeName(c.node) }),
+            c.node,
+          );
         radarMemory.set(c.key, {
           node: c.node,
           size: c.size,
           at: now,
           ...(c.position ? { position: { ...c.position } } : {}),
+          ...(c.air ? { air: true as const } : {}),
         });
       }
     }
@@ -287,7 +292,7 @@ export function drawRadarContacts(now: number): void {
     }
     const pos = world(m.position ?? node.position);
     if (!visible(pos, 120)) continue;
-    drawSignatureAt(pos, m.size, contactAlpha(age), now);
+    drawSignatureAt(pos, m.size, contactAlpha(age), now, m.air === true);
   }
 }
 
@@ -322,12 +327,14 @@ export function planetRadar(p: Planet): number {
 
 /** Draw a coarse amber signature blip (size bucket S/M/L) at a screen point, no
  *  identity. `fade` (0..1) dims it — radar contacts are painted by the sweep and
- *  fade between passes (see drawRadarContacts). */
+ *  fade between passes (see drawRadarContacts). `air` — эскадра челноков: треугольник
+ *  вместо ромба, тот же янтарь «не опознан». */
 function drawSignatureAt(
   pos: { x: number; y: number },
   cls: 'S' | 'M' | 'L',
   fade: number,
   now: number,
+  air = false,
 ): void {
   const cx = game.ctx();
   const r = cls === 'L' ? 9 : cls === 'M' ? 7 : 5;
@@ -339,18 +346,26 @@ function drawSignatureAt(
   cx.strokeStyle = rgba('#ffb43a', (0.5 + 0.3 * pulse) * fade); // amber = unidentified contact
   cx.fillStyle = rgba('#ffb43a', (0.1 + 0.08 * pulse) * fade);
   cx.lineWidth = 1.3;
-  cx.beginPath(); // diamond
-  cx.moveTo(0, -r);
-  cx.lineTo(r, 0);
-  cx.lineTo(0, r);
-  cx.lineTo(-r, 0);
+  cx.beginPath();
+  if (air) {
+    // triangle: aviation
+    cx.moveTo(0, -r);
+    cx.lineTo(r, r * 0.8);
+    cx.lineTo(-r, r * 0.8);
+  } else {
+    // diamond: ship
+    cx.moveTo(0, -r);
+    cx.lineTo(r, 0);
+    cx.lineTo(0, r);
+    cx.lineTo(-r, 0);
+  }
   cx.closePath();
   cx.fill();
   cx.stroke();
   cx.fillStyle = rgba('#ffd98a', 0.92 * fade);
   cx.font = '700 9px ui-monospace,Menlo,monospace';
   cx.textAlign = 'center';
-  cx.fillText('◆' + cls, 0, r + 12);
+  cx.fillText((air ? '▲' : '◆') + cls, 0, r + 12);
   cx.restore();
 }
 

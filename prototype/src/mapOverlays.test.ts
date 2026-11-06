@@ -282,6 +282,20 @@ describe('REFM-233 — наложения на карте', () => {
     expect(frame.named('fillText')).toHaveLength(0);
   });
 
+  it('чужая эскадра в полёте в обзоре — корпус цветом хозяина по курсу и число бортов', async () => {
+    const { ov, palette, fog, env, frame, next, at } = await boot({ net: true });
+    env.world = {
+      ...env.world,
+      seenSorties: [{ owner: 'p2', at: { ...next.position }, velocity: { x: 0, y: 0 }, leg: 'out', units: [{ unit: 'interceptor', count: 4 }] }],
+    };
+    fog.refreshVision();
+    ov.drawSeenSorties();
+    const c = at(next.position);
+    expect(frame.named('translate')[0]!.args).toEqual([c.x, c.y]);
+    expect(frame.calls.some((k) => k.stroke === rgba(palette.ownerColor('p2'), 0.95))).toBe(true);
+    expect(frame.named('fillText').map((k) => k.args[0])).toEqual(['·4']);
+  });
+
   it('коридоры героев: одноразовый мигает без срока, временный — со сроком; чужой в тумане не виден', async () => {
     const { ov, palette, env, frame, home, next } = await boot();
     const { fmtHrs } = await import('./format');
@@ -430,10 +444,10 @@ describe('REFM-233 — стык наложений с main.ts', () => {
 
   it('рисовалки живут только в модуле, кадр зовёт их оттуда', () => {
     expect(MAIN).not.toMatch(
-      /\bfunction (targetBrackets|drawBattlePulse|drawSelectionBox|drawSwarmNet|drawFleetRoutes|drawStrikeTrails|drawPatrolRings|drawPatrolCircle|drawSeenPatrols|drawCorridors|drawCombatRanges|drawAbilityCircle|drawAbilityRings)\(/,
+      /\bfunction (targetBrackets|drawBattlePulse|drawSelectionBox|drawSwarmNet|drawFleetRoutes|drawStrikeTrails|drawPatrolRings|drawPatrolCircle|drawSeenPatrols|drawSeenSorties|drawSeenAircraft|drawCorridors|drawCombatRanges|drawAbilityCircle|drawAbilityRings)\(/,
     );
     expect(MAIN).not.toContain('const PATROL_LOOK');
-    for (const call of ['drawSelectionBox(selectionBox);', 'drawSwarmNet();', 'drawFleetRoutes();', 'drawPatrolRings();', 'drawSeenPatrols();', 'drawCombatRanges();', 'drawAbilityRings();'])
+    for (const call of ['drawSelectionBox(selectionBox);', 'drawSwarmNet();', 'drawFleetRoutes();', 'drawPatrolRings();', 'drawSeenAircraft();', 'drawCombatRanges();', 'drawAbilityRings();'])
       expect(MAIN, call).toContain(call);
   });
 

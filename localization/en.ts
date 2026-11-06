@@ -3069,6 +3069,7 @@ export const en: Record<string, string> = {
 
   // --- threat — Оповещение об угрозе: подход врага, радарный контакт.
   'threat.contact': '◆ new radar contact ({size}) at {at}',
+  'threat.contact-air': '▲ aircraft on radar ({size}) at {at}',
   'threat.here': '⚠ An enemy at {node}!',
   'threat.incoming': '⚠ An enemy is heading for {node}: arrival in {dur}',
 

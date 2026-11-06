@@ -242,6 +242,8 @@ export {
   fleetsSeenByPosition,
   // SHU-6.10: чужие висящие патрули, которые видит зритель (соло считает их сам).
   patrolsSeenBy,
+  // Чужие эскадры в полёте в обзоре зрителя (соло считает их сам, сеть — из проекции).
+  sortiesSeenBy,
   worldRadarReach,
   fleetRadarReach,
   // SM-4.3: маскировочное поле — опознанный мир не выдаёт флот под полем.
@@ -250,6 +252,7 @@ export {
 export { CLOAK_BREAK_MS, CLOAK_CAP, cloakBroken, fleetCloak, fleetCloakRating } from './state/cloak';
 // FOG-LEAK: чей мир в глазах игрока — право прохода и окно войны судят по нему.
 export { knownOwner } from './state/knownOwner';
+export type { SeenSortie } from './state/aircraftSight';
 export { signatureSize, fleetSignalStrength, radarThreshold, SIG_MEDIUM, SIG_LARGE, SIGNAL_CLUSTER_RADIUS } from './state/radarSignals';
 export { viewSightCircles, sharedRadarSources, type SensorView, type RadarFootprint } from './state/sensorView';
 export type {

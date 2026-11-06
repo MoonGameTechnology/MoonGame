@@ -22,6 +22,7 @@ import {
   fleetsSeenByPosition,
   seenAtNode,
   patrolsSeenBy,
+  sortiesSeenBy,
   radarSignatures,
   viewCoverage,
   type Battle,
@@ -32,6 +33,7 @@ import {
   type Planet,
   type ProvinceSurvey,
   type SeenPatrol,
+  type SeenSortie,
   type SightCircle,
   type SignatureContact,
 } from '../../packages/shared-core/src/index';
@@ -93,6 +95,9 @@ export interface Vision {
   /** Чужие висящие патрули в моём обзоре — круг и состав (SHU-6.10). В сети их считает
    *  проекция сервера, в соло — то же правило ядра (`patrolsSeenBy`) по полному миру. */
   seenPatrols: SeenPatrol[];
+  /** Чужие эскадры в полёте в моём обзоре — точка, скорость и состав. Источник тот же, что
+   *  у `seenPatrols`: проекция сервера в сети, правило ядра (`sortiesSeenBy`) в соло. */
+  seenSorties: SeenSortie[];
 }
 
 /** The map node a fleet occupies / is travelling over / is parked nearest to. */
@@ -161,6 +166,7 @@ function computeVision(): Vision {
     engaged: engagementOf(s, ME),
     seenAt,
     seenPatrols: NET ? (s.seenPatrols ?? []) : patrolsSeenBy(s, ME, data),
+    seenSorties: NET ? (s.seenSorties ?? []) : sortiesSeenBy(s, ME, data),
   };
 }
 

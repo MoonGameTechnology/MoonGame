@@ -147,7 +147,7 @@ describe('SHU-6.10 — кого из чужих патрулей видит зр
     expect(patrolsSeenBy(world([patrolOf(Q2)]), 'p1', data)).toEqual([]);
   });
 
-  it('ЛЕТЯЩИЙ К ТОЧКЕ И ДОМОЙ не виден даже в обзоре: налёт остаётся внезапным', () => {
+  it('ЛЕТЯЩИЙ К ТОЧКЕ И ДОМОЙ — не патруль: его показывает `sortiesSeenBy`, без круга', () => {
     for (const leg of ['out', 'back'] as const) {
       expect(patrolsSeenBy(world([patrolOf(Q1, { leg })]), 'p1', data)).toEqual([]);
     }

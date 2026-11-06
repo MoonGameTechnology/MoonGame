@@ -11,6 +11,14 @@ import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
 import { emptyOrdnance, inRadius, isMissileFleet, rocketMineModule } from './ordnance';
 import { cloakedReach, eyeReach, fleetCloak } from './cloak';
 import { visibleMinefields, isMineFleet, mineDetectionRange, mineFleetVisible } from './minefields';
+import {
+  airEmitters as foreignAirEmitters,
+  hangingPatrolsSeen,
+  liveStacks,
+  sortiesInSight,
+  type AircraftView,
+  type SeenSortie,
+} from './aircraftSight';
 import { detectSignals, fleetSignalStrength, type RadarSource, type SignalEmitter, type SignatureContact } from './radarSignals';
 import { coverageInCircles, withProjectedSensors, type Coverage, type SightCircle } from './sensorView';
 export type { Coverage, SightCircle } from './sensorView';
@@ -418,50 +426,36 @@ export function missileVisible(
   return !!at && circles.some((c) => inRadius(at, c, c.identify));
 }
 
-/**
- * Чужие висящие патрули, которые видит зритель (SHU-6.10; рекомендация карточки
- * владельцу 2026-10-04 — «видно в обзоре», как самолёты в Conflict of Nations).
- *
- * 1. **Только висящий.** Эскадра на пути к точке и домой скрыта, как любой чужой вылет
- *    (SHU-3.1): налёт остаётся внезапным.
- * 2. **Точка в обзоре зрителя** — внутри опознания хоть одного его круга, с блоком зрения.
- *    Это та же граница, что нарисована на карте: видно то, что внутри неё.
- * 3. **Или в круге патруля стоит флот блока.** Обзор флота (40 по умолчанию) меньше
- *    круга патруля (90), и без этого правила патруль бил бы флот, оставаясь невидимым.
- *    Граница круга включительна — та же мерка, по которой патруль выбирает цель. Ракета
- *    (SM-3.7b) не в счёт: она не глаз, и её пролёт не разведывает патрули по пути.
- * 4. **Со стороны видно круг и состав**, а не базу, эскадру, удержание и срок
- *    ({@link SeenPatrol}). Свой патруль сюда не входит: он целиком в `strikes`.
- */
+/** Чужие висящие патрули, которые видит зритель (SHU-6.10): круг и состав. Правила —
+ *  `hangingPatrolsSeen` (`aircraftSight.ts`); свой патруль сюда не входит, он в `strikes`. */
 export function patrolsSeenBy(state: GameState, viewerId: PlayerId, data: GameData): SeenPatrol[] {
-  const hanging = (state.strikes ?? []).filter(
-    (st) => st.owner !== viewerId && st.leg === 'patrol' && (st.patrol?.radius ?? 0) > 0,
-  );
-  if (hanging.length === 0) return [];
-  const eyes = sightCircles(state, viewerId, data);
-  const bloc = new Set(visionBloc(state, viewerId));
-  const guarded: Array<{ x: number; y: number }> = [];
-  for (const fleet of Object.values(state.fleets)) {
-    if (!bloc.has(fleet.owner) || !fleet.units.some((u) => u.count > 0)) continue;
-    if (isMissileFleet(fleet, data)) continue; // правило 3: ракета — не глаз
-    const at = fleetPosition(state, fleet);
-    if (at) guarded.push(at);
-  }
-  const out: SeenPatrol[] = [];
-  for (const st of hanging) {
-    const radius = st.patrol!.radius;
-    const seen =
-      eyes.some((c) => inRadius(st.to, c, c.identify)) || // правило 2
-      guarded.some((at) => inRadius(at, st.to, radius)); // правило 3
-    if (!seen && state.match.status !== 'ended') continue;
-    out.push({
-      owner: st.owner,
-      at: { x: st.to.x, y: st.to.y },
-      radius,
-      units: st.units.filter((u) => u.count > 0).map((u) => ({ unit: u.unit, count: u.count })),
-    });
-  }
-  return out;
+  return hangingPatrolsSeen(state, viewerId, data, aircraftView(state, viewerId, data)).map((st) => ({
+    owner: st.owner,
+    at: { x: st.to.x, y: st.to.y },
+    radius: st.patrol!.radius,
+    units: liveStacks(st),
+  }));
+}
+
+/** Чужие эскадры в полёте, которые видит зритель (SHU-6.16): правила — `sortiesInSight`. */
+export function sortiesSeenBy(state: GameState, viewerId: PlayerId, data: GameData): SeenSortie[] {
+  return sortiesInSight(state, viewerId, aircraftView(state, viewerId, data));
+}
+
+/** Глаза и блок зрения зрителя для правил авиации (`aircraftSight.ts`); круги — лениво. */
+function aircraftView(state: GameState, viewerId: PlayerId, data: GameData, planets?: readonly Planet[], known?: readonly SightCircle[]): AircraftView {
+  let eyes = known;
+  return { bloc: new Set(visionBloc(state, viewerId)), eyes: () => (eyes ??= sightCircles(state, viewerId, data, planets)) };
+}
+
+/** Чужая авиация в проекции: висящие патрули и эскадры в полёте; пустой список — без поля. */
+function writeSeenAircraft(view: GameState, state: GameState, viewerId: PlayerId, data: GameData): void {
+  const patrols = patrolsSeenBy(state, viewerId, data);
+  if (patrols.length > 0) view.seenPatrols = patrols;
+  else delete view.seenPatrols;
+  const sorties = sortiesSeenBy(state, viewerId, data);
+  if (sorties.length > 0) view.seenSorties = sorties;
+  else delete view.seenSorties;
 }
 
 /** What `viewerId` can sense this instant: an identify range (full detail) and a
@@ -802,6 +796,10 @@ export function radarSignatures(
     if (cloak > 0) cloakEmitters.push({ emitter, cloak });
     else emitters.push(emitter);
   }
+  // Чужая авиация, не увиденная глазами, — отметка по сигнатуре машин (SHU-6.16).
+  const air = foreignAirEmitters(state, viewerId, data, aircraftView(state, viewerId, data, planets, eyes), (at) =>
+    nearestOf((provinces ??= publicProvinces(state)), state, at),
+  );
   // Decoys obey the same sensitivity, proximity and expiry rules as real emissions.
   for (const hero of Object.values(state.heroes ?? {})) {
     if (hero.owner === viewerId || hero.alive !== true) continue;
@@ -819,6 +817,8 @@ export function radarSignatures(
   // Маскировочное поле (SM-4.3): тот же радар, но с меньшей дальностью для этого флота.
   for (const { emitter, cloak } of cloakEmitters)
     contacts.push(...detectSignals([emitter], sources.map((r) => ({ ...r, range: cloakedReach(r.range, cloak) }))));
+  // Авиация группируется только с авиацией: эскадра над флотом не прибавляет ему размера.
+  for (const contact of detectSignals(air, sources)) contacts.push({ ...contact, air: true });
   return contacts;
 }
 
@@ -1251,18 +1251,15 @@ function project(
     if (Object.keys(view.rallyPoints).length === 0) delete view.rallyPoints;
   }
 
-  // Челночные удары (SHU-1.2): свои видны, чужие сняты целиком. Иначе игрок заранее
-  // знает о налёте, и внезапность, ради которой челнок и летит мимо линий, исчезает.
+  // Челночные удары (SHU-1.2): свои видны, чужие сняты целиком — база, цель, эскадра и
+  // срок остаются тылом хозяина. Что о чужом вылете видно со стороны, пишут списки ниже.
   if (view.strikes) {
     const mine = view.strikes.filter((s) => s.owner === viewerId);
     if (mine.length === 0) delete view.strikes;
     else view.strikes = mine.map((s) => ({ ...s, units: s.units.map((u) => ({ ...u })) }));
   }
-  // SHU-6.10: чужой ВИСЯЩИЙ патруль в обзоре виден — отдельным списком, а не вылетом: у
-  // вылета база, эскадра и срок, а со стороны видно только круг и состав.
-  const patrols = patrolsSeenBy(state, viewerId, data);
-  if (patrols.length > 0) view.seenPatrols = patrols;
-  else delete view.seenPatrols;
+  // SHU-6.10, SHU-6.16: чужой патруль и чужая эскадра в полёте в обзоре — своими списками.
+  writeSeenAircraft(view, state, viewerId, data);
 
   // Planets: keep topology (id/position/links) but strip contents you can't see.
   // A world you have seen before shows its remembered snapshot (variant B);

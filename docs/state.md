@@ -214,7 +214,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 | `fleets`, `fleetSeq?` | флоты: место или курс, стеки `units`, десант, ангар, орбита; счётчик id |
 | `battles`, `battleSeq` | бои: место, фаза `orbital`/`ground`, стороны `sides`, раунд; счётчик id |
 | `scheduled`, `scheduleSeq` | будущие события `{id, at, type, payload, seq}` для `advanceTo` |
-| `fog?`, `surveyed?`, `seenPatrols?` | память тумана по игрокам; тип провинций, где побывали их корабли; видимые чужие патрули (только в проекции) |
+| `fog?`, `surveyed?`, `seenPatrols?`, `seenSorties?` | память тумана по игрокам; тип провинций, где побывали их корабли; видимые чужие патрули и эскадры в полёте (только в проекции) |
 | `heroes?`, `tempLanes?`, `topology?`, `heroSeq?` | герои, их временные лейны, версия графа |
 | `diplomacy?`, `mapShares?` | стойки пар (нет записи — `war`), договоры обмена картами |
 | `coalitions?`, `coalitionSeq?`, `coalitionJoinAfter?`, `coalitionClock?` | состав коалиций и ожидаемые выходы; счётчик id; UTC-сроки запрета вступления; серверная привязка реального времени к часам матча |
