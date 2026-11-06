@@ -42,6 +42,7 @@ import {
   CONTROL_TECH_SOLO_MIGRATION as controlTech,
   VICEROY_SOLO_MIGRATION as viceroy,
   TECHNOLOGY_PRICES_SOLO_MIGRATION as technologyPrices,
+  FLEET_MERGE_ORDERS_SOLO_MIGRATION as fleetMergeOrders,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -98,6 +99,18 @@ function oldSave(): SoloSave {
   state.scheduleSeq = 5;
   return { state, ai: [], normalSpeed: 1, fastSpeed: 24, autoAssault: [], memory: [] };
 }
+
+it('the merge-orders patch preserves saved cargo, enabled modes and the pending volley', () => {
+  const before = oldSave();
+  before.state.version = { data: fleetMergeOrders.fromData,
+    dataHash: fleetMergeOrders.fromDataHash, manifest: '1' };
+  before.state.fleets.F = { id: 'F', owner: 'p1', location: 'A', movement: null,
+    units: [{ unit: 'frigate', count: 3 }], landing: [{ unit: 'militia', count: 5 }],
+    traits: [], orbit: 'near', bombarding: true, bombardNextAt: 3_600_000 };
+  before.state.autoAssault = { F: true };
+  const raw = serializeSoloSave(before, fleetMergeOrders.fromRules);
+  expect(parseCompatibleSoloSave(raw, fleetMergeOrders.toRules)).toEqual(before);
+});
 
 describe('explicit 0.1.66 mining save migration', () => {
   it('preserves the entire old world except its explicitly upgraded version pin', () => {
@@ -187,7 +200,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement, controlTech, viceroy, technologyPrices]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement, controlTech, viceroy, technologyPrices, fleetMergeOrders]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([

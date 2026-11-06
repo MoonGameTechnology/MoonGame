@@ -15,6 +15,24 @@ export function fuseFleets(h: HandlerContext, fromId: string, intoId: string, ow
   if (!from || !into) return;
   into.units = mergeStacks(into.units, from.units);
   into.landing = mergeStacks(into.landing ?? [], from.landing ?? []);
+  // Both enabled modes survive, regardless of which fleet keeps its identity.
+  // Keep one existing reload deadline: merging must neither restart the wait nor
+  // create an immediate/second volley. A disabled fleet's stale clock is ignored.
+  if (from.bombarding) {
+    const nextAt = into.bombarding ? into.bombardNextAt : undefined;
+    into.bombarding = true;
+    if (from.bombardNextAt !== undefined && (nextAt === undefined || from.bombardNextAt < nextAt)) {
+      into.bombardNextAt = from.bombardNextAt;
+    } else if (nextAt === undefined) {
+      delete into.bombardNextAt;
+    }
+  }
+  const autoAssault = h.state.autoAssault;
+  if (autoAssault) {
+    if (autoAssault[fromId]) autoAssault[intoId] = true;
+    delete autoAssault[fromId];
+    if (Object.keys(autoAssault).length === 0) delete h.state.autoAssault;
+  }
   // Шаттлы в трюме едут вместе с кораблями (SHU-5.1): без этой строки эскадры
   // сплавленного флота исчезали бы молча вместе с его записью.
   if (from.hangar?.length) into.hangar = [...(into.hangar ?? []), ...from.hangar];

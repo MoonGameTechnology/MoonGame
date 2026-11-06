@@ -62,7 +62,8 @@ export const fleetOpsModule: GameModule = {
   //         считается по одному корпусу дважды.
   // 1.14.0: высадка, отменённая вылетом (`assault.cancelled`), тоже решает слияние, которое
   //         она приостановила.
-  version: '1.14.0',
+  // 1.14.1: merged fleets retain bombardment, its reload clock and auto-assault.
+  version: '1.14.1',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed

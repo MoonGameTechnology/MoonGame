@@ -42,7 +42,8 @@ function idleAt(h: HandlerContext, f: Fleet, at: string): boolean {
 
 export const autoMergeModule: GameModule = {
   id: 'auto-merge',
-  version: '1.0.0',
+  // 1.0.1: merged fleets retain bombardment and auto-assault orders.
+  version: '1.0.1',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
