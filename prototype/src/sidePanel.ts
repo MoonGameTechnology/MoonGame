@@ -55,6 +55,7 @@ import { mobileOrderKind, onCommandClick } from './cmdActions';
 import { invalidateCmdBar, renderCmdBar } from './cmdBar';
 import { dossierLevel, nextHover, showsBody } from './dossierHover';
 import type { Dossier } from './dossiers';
+import { openSeatCard } from './diploWindow';
 import { note, toast } from './eventFeed';
 import {
   aloftPanelHtml,
@@ -834,6 +835,8 @@ function onSideClick(ev: MouseEvent): void {
     }
   } else if (act === 'ping') {
     game.pings()?.openMenu();
+  } else if (act === 'seat') {
+    if (arg) openSeatCard(arg);
   } else if (act === 'openbattle') {
     if (arg) game.battleWindow().open(arg);
   } else if (act === 'retreat') {

@@ -4528,6 +4528,7 @@ export const es: Record<string, string> = {
   'side.world.make-capital': '★ Nombrar capital',
   'side.world.output': 'Producción base',
   'side.world.ping': '📍 Ping',
+  'side.world.owner': '👤 {name}',
   'side.world.rally': 'Punto de reunión',
   'side.world.rally.none': 'Las nuevas naves se quedan en órbita',
   'side.world.rally.to': 'Las nuevas naves vuelan a {w}',

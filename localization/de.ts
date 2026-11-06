@@ -4512,6 +4512,7 @@ export const de: Record<string, string> = {
   'side.world.make-capital': '★ Zur Hauptstadt ernennen',
   'side.world.output': 'Grundertrag',
   'side.world.ping': '📍 Ping',
+  'side.world.owner': '👤 {name}',
   'side.world.rally': 'Sammelpunkt',
   'side.world.rally.none': 'Neue Schiffe bleiben im Orbit',
   'side.world.rally.to': 'Neue Schiffe fliegen nach {w}',

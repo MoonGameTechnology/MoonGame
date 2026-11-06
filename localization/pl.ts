@@ -4536,6 +4536,7 @@ export const pl: Record<string, string> = {
   'side.world.make-capital': 'Przenieś stolicę tutaj',
   'side.world.output': 'Wydobycie sektora',
   'side.world.ping': 'Wyślij sygnał sojusznikom',
+  'side.world.owner': '👤 {name}',
   'side.world.rally': 'Punkt zborny',
   'side.world.rally.none': 'brak wyznaczonego punktu zbornego',
   'side.world.rally.to': 'Nowe okręty lecą do {w}',

@@ -5038,6 +5038,7 @@ export const ru: Record<string, string> = {
   'side.world.make-capital': '★ Сделать столицей',
   'side.world.output': 'Базовый выход',
   'side.world.ping': '📍 Пинг',
+  'side.world.owner': '👤 {name}',
   'side.world.rally': 'Точка сбора',
   'side.world.rally.none': 'Новые корабли остаются на орбите',
   'side.world.rally.to': 'Новые корабли летят к {w}',
