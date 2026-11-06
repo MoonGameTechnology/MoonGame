@@ -93,8 +93,10 @@ describe('панель — вкладки', () => {
     expect(tabButton('units', 'Войска', 0, false)).toContain('class="ptab"');
   });
 
-  it('счётчик показывается даже нулевым — пустая вкладка это тоже факт', () => {
-    expect(tabButton('units', 'Войска', 0, false)).toContain('<b>0</b>');
+  it('ноль не пишется: у пустой вкладки только имя', () => {
+    expect(tabButton('units', 'Войска', 0, false)).not.toContain('<b>');
+    expect(tabButton('units', 'Войска', 0, false)).toContain('>Войска</button>');
+    expect(tabButton('units', 'Войска', 2, false)).toContain('Войска<b>2</b>');
   });
 
   it('вкладка несёт своё имя в аргументе и экранирует его', () => {

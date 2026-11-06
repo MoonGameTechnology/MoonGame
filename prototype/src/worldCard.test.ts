@@ -407,6 +407,23 @@ describe('вкладки', () => {
     expect(html).toMatch(/data-arg="ground" data-desc="tab:ground">[^<]+<b>3<\/b>/);
   });
 
+  it('ноль на вкладке не пишется: пустую видно по отсутствию числа (UIX-10.6)', async () => {
+    const { card } = await boot();
+    const html = card('Z', 'ships');
+    for (const tab of ['ground', 'ships', 'shuttle', 'buildings'])
+      expect(html).toMatch(new RegExp(`data-arg="${tab}" data-desc="tab:${tab}">[^<]+</button>`));
+  });
+
+  it('под вкладкой нет заголовка с её же именем (UIX-10.6)', async () => {
+    const { card } = await boot();
+    expect(card('A', 'buildings')).not.toContain(
+      `<div class="sec">${t('side.tab.buildings')}</div>`,
+    );
+    expect(card('Z', 'shuttle')).toContain(
+      `<div class="block"><div class="row dim">${t('side.wing.no-port')}</div></div>`,
+    );
+  });
+
   it('земля: плитки гарнизона рисует игра, очередь и каталог юнитов — только своему миру', async () => {
     const { rec, card } = await boot();
     const mine = card('A', 'ground');
@@ -433,6 +450,8 @@ describe('вкладки', () => {
     expect(card('A', 'ground')).not.toContain(t('dossier.tab.ground.desc'));
     env.pc = false;
     expect(card('A', 'ground')).toContain(t('dossier.tab.ground.desc'));
+    // У «Флота» её нет и на телефоне: она пересказывала заголовки орбиты и очереди (UIX-10.6).
+    expect(card('A', 'ships')).not.toContain(t('dossier.tab.ships.desc'));
   });
 
   it('орбита: флоты у мира, свой — с кнопкой выбора; корабли гарнизона — плитками', async () => {

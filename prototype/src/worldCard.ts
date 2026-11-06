@@ -385,22 +385,18 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
       paused: (s.planets[planetId]?.pausedConstruction ?? [])
         .filter((p) => orderLane(data, p) === lane)
         .map((p) => ({ id: p.id, label: esc(pausedLabel(p)), progress: p.progress })),
-      // Строку «ждём цену» показываем только на ПК: на телефоне место дороже.
-      // Условие простое именно потому, что решает ЯДРО: полоса свободна, а голова всё
-      // ещё ждёт — значит она уперлась ровно в деньги (BLD-1, правило 4); своего
-      // прайс-листа для этого вывода клиенту больше не нужно.
-      waitingCost: !active && pcUi() && head ? cost(buildCost(planetId, head), myRes()) : null,
-      compact: pcUi(),
+      // Строка «ждём цену» встаёт вместо строки простоя, поэтому стоит и на телефоне: без
+      // неё ждущий заказ стоял бы под «Ожидание заказов» (UIX-10.6). Условие простое именно
+      // потому, что решает ЯДРО: полоса свободна, а голова всё ещё ждёт — значит она уперлась
+      // ровно в деньги (BLD-1, правило 4); своего прайс-листа для этого вывода клиенту не нужно.
+      waitingCost: !active && head ? cost(buildCost(planetId, head), myRes()) : null,
     },
     {
       now: t('side.conveyor.now'),
       cancel: t('side.conveyor.cancel.title'),
       waiting: (c) => t('side.conveyor.waiting', { c }),
       idle: t('side.conveyor.idle'),
-      idleTag: t('side.conveyor.idle.tag'),
-      idleSub: t('side.conveyor.idle.sub'),
       dequeue: t('side.conveyor.dequeue.title'),
-      queueEmpty: t('side.conveyor.queue-empty'),
       paused: (n) => t('side.conveyor.paused', { n }),
       resume: t('side.conveyor.resume.title'),
     },
@@ -805,11 +801,8 @@ export function planetPanelHtml(p: Planet): string {
     if (mine) {
       cols.push(laneConveyors(p.id, ['ships']) + unitCatalogButton('ships'));
     }
-    if (!pcUi()) {
-      // PC carries this in the ФЛОТ tab's hover dossier ('tab:ships') — TXT-3 свёл
-      // обе поверхности на ОДИН ключ, до него текст жил двумя разошедшимися копиями.
-      cols.push(`<div class="hint">${t('dossier.tab.ships.desc')}</div>`);
-    }
+    // Подсказки вкладки на телефоне нет (UIX-10.6): она пересказывала заголовки орбиты и
+    // очереди над ней. Её текст остался досье вкладки по наведению на ПК ('tab:ships').
   } else if (game.planetTab() === 'shuttle') {
     // SHU-3.1 — АНГАР ПОРТА, а не гарнизон. Раньше здесь стоял `wing` — гарнизон,
     // отфильтрованный по трейту `shuttle`, — и вкладка была гарантированно пустой:
@@ -838,10 +831,8 @@ export function planetPanelHtml(p: Planet): string {
     } else {
       // Порта нет — говорим об этом прямо. Пустой список читался бы как «челноков нет»,
       // хотя их тут негде и держать.
-      cols.push(
-        `<div class="sec">${t('side.garrison.wing')}</div>` +
-          `<div class="row dim">${t('side.wing.no-port')}</div>`,
-      );
+      // Заголовка «Эскадра в порту» нет: он повторял имя вкладки (UIX-10.6).
+      cols.push(`<div class="row dim">${t('side.wing.no-port')}</div>`);
     }
     if (mine) {
       cols.push(laneConveyors(p.id, ['shuttles']) + unitCatalogButton('shuttle'));
@@ -859,8 +850,8 @@ export function planetPanelHtml(p: Planet): string {
     // Сначала то, что СТОИТ на мире, потом очередь стройки — как на вкладках юнитов. Очередь
     // есть только у своего мира: у чужого вместо неё стояла строка «телеметрия недоступна»,
     // целый блок о том, чего не видно.
-    let blds = `<div class="sec">${t('side.tab.buildings')}</div>`;
-    if (p.buildings.length === 0) blds += `<div class="row dim">${t('side.none')}</div>`;
+    // Заголовка «Здания» нет: он повторял вкладку прямо над списком (UIX-10.6).
+    let blds = p.buildings.length === 0 ? `<div class="row dim">${t('side.none')}</div>` : '';
     // BUILD-1 (макет владельца): построенное — ИКОНКАМИ со значком уровня. Тап
     // открывает карточку кодекса с листалкой уровней и кнопкой «Улучшить» —
     // описание, апгрейд и «что даст следующий уровень» переехали туда из строк.
