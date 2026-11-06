@@ -43,7 +43,6 @@ import {
   VICEROY_SOLO_MIGRATION as viceroy,
   TECHNOLOGY_PRICES_SOLO_MIGRATION as technologyPrices,
   FLEET_MERGE_ORDERS_SOLO_MIGRATION as fleetMergeOrders,
-  ARMY_POOLING_SOLO_MIGRATION as armyPooling,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -201,7 +200,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement, controlTech, viceroy, technologyPrices, fleetMergeOrders, armyPooling]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement, controlTech, viceroy, technologyPrices, fleetMergeOrders]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -712,20 +711,4 @@ describe('the viceroy catalogue and rules pair (0.1.80 → 0.1.81)', () => {
       } },
     });
   });
-});
-
-
-it('migrates the preceding release without pooling away reserved army sources', () => {
-  const before = oldSave();
-  before.state.version = { data: armyPooling.fromData, dataHash: armyPooling.fromDataHash, manifest: '1' };
-  before.state.planets.A!.garrison = [
-    { unit: 'militia', count: 4, armyGroup: 'army:1' },
-    { unit: 'militia', count: 2, armyGroup: 'army:2', hp: 12, shieldHp: 3, battles: 4 },
-  ];
-  before.state.fleets.f = {
-    id: 'f', owner: 'p1', location: 'A', movement: null, units: [], traits: [],
-    loading: [{ unit: 'militia', count: 1, from: 'A', startAt: 0, doneAt: 3600000,
-      sources: [{ group: 'army:2', count: 1 }] }],
-  };
-  expect(parseCompatibleSoloSave(serializeSoloSave(before, armyPooling.fromRules), armyPooling.toRules)).toEqual(before);
 });

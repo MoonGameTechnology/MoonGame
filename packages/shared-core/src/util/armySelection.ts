@@ -1,6 +1,6 @@
 import type { GameData } from '../data/schemas';
 import type { GameState, UnitStack } from '../state/gameState';
-import { consolidateGroundStacks, takeFromStacks } from './stacks';
+import { takeFromStacks } from './stacks';
 
 export interface ArmySource {
   group: string;
@@ -89,16 +89,6 @@ export function prepareArmyGroups(
       );
       pinned.push(claim);
     }
-  mergeArmyGroups(stacks, claims, data);
-}
-
-/** Keep accepted source identities intact until their lift finishes or cancels. */
-export function mergeArmyGroups(stacks: UnitStack[], claims: readonly ArmySelection[], data: GameData): void {
-  const reserved = new Set(claims.flatMap((c) => c.sources?.map((s) => s.group) ?? []));
-  const legacy = new Set(claims.filter((c) => c.sources === undefined).map((c) => c.unit));
-  const merged = consolidateGroundStacks(stacks, data,
-    (s) => !legacy.has(s.unit) && (!s.armyGroup || !reserved.has(s.armyGroup)));
-  stacks.splice(0, stacks.length, ...merged);
 }
 
 export function armyClaimCount(stacks: readonly UnitStack[], claim: ArmySelection): number {

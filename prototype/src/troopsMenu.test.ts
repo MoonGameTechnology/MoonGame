@@ -414,3 +414,18 @@ describe('compact formation transfer', () => {
     expect(unload).toContain('aria-labelledby="troops-tab-unload"');
   });
 });
+
+
+it('expands one display row into precise original sources for either transfer direction', () => {
+  const transferSources = [{ group: 'wounded', count: 4 }, { group: 'healthy', count: 4 }];
+  const units = [unit({ unit: 'militia', key: 'garrison:wounded', group: 'wounded', side: 'garrison',
+    prepared: true, garrison: 8, garrisonAll: 8, transferSources })];
+  expect(planOrders(troopsModel(input({ units, plan: { 'garrison:wounded': 2 } })))).toEqual({
+    load: [{ unit: 'militia', group: 'wounded', count: 1 }, { unit: 'militia', group: 'healthy', count: 1 }], unload: [],
+  });
+  const hold = [unit({ unit: 'militia', key: 'hold:wounded', group: 'wounded', side: 'hold',
+    prepared: true, hold: 8, holdAll: 8, transferSources })];
+  expect(planOrders(troopsModel(input({ units: hold, used: 8, plan: { 'hold:wounded': -2 } })))).toEqual({
+    unload: [{ unit: 'militia', group: 'wounded', count: 1 }, { unit: 'militia', group: 'healthy', count: 1 }], load: [],
+  });
+});

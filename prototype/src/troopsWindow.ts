@@ -1,3 +1,27 @@
+/** Update matching controls in place: blur/change must not delete the button
+ * between pointerdown and click, nor replace a slider during a drag. */
+function patchTransferChildren(current: Node, next: Node): void {
+  const key = (node: Node) => node instanceof Element
+    ? [node.tagName, ...['id', 'type', 'data-troop-group', 'data-cmd', 'data-group', 'data-n', 'data-dir', 'data-direction']
+        .map((name) => node.getAttribute(name))].join('|')
+    : String(node.nodeType);
+  for (let i = 0; i < next.childNodes.length; i++) {
+    const incoming = next.childNodes[i]!;
+    const existing = current.childNodes[i];
+    if (!existing) { current.appendChild(incoming.cloneNode(true)); continue; }
+    if (key(existing) !== key(incoming)) { current.replaceChild(incoming.cloneNode(true), existing); continue; }
+    if (existing instanceof Element && incoming instanceof Element) {
+      for (const attr of [...existing.attributes]) if (!incoming.hasAttribute(attr.name)) existing.removeAttribute(attr.name);
+      for (const attr of [...incoming.attributes])
+        if (existing.getAttribute(attr.name) !== attr.value) existing.setAttribute(attr.name, attr.value);
+      if (existing instanceof HTMLInputElement && incoming instanceof HTMLInputElement &&
+          document.activeElement !== existing && !existing.matches(':active')) existing.value = incoming.value;
+      patchTransferChildren(existing, incoming);
+    } else if (existing.nodeValue !== incoming.nodeValue) existing.nodeValue = incoming.nodeValue;
+  }
+  while (current.childNodes.length > next.childNodes.length) current.removeChild(current.lastChild!);
+}
+
 /** A separate transfer dialog; game orders still go through the fleet dispatcher. */
 export function initTroopsWindow(host: {
   root: HTMLElement;
@@ -16,13 +40,13 @@ export function initTroopsWindow(host: {
     else if (!(event.target instanceof HTMLInputElement)) host.command(event);
   });
   root.addEventListener('change', (event) => {
-    if (event.target instanceof HTMLInputElement && event.target.dataset.cmd === 'tset') host.command(event);
+    if (event.target instanceof HTMLInputElement && event.target.dataset.cmd === 'tset') {
+      host.command(event);
+      event.target.value = event.target.getAttribute('value') ?? '0';
+    }
   });
   root.addEventListener('input', (event) => {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement) || input.type !== 'range') return;
-    const number = input.closest('.trow')?.querySelector<HTMLInputElement>('input[type="number"]');
-    if (number) number.value = input.value;
+    if (event.target instanceof HTMLInputElement && event.target.dataset.cmd === 'tset') host.command(event);
   });
   root.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') event.stopPropagation();
@@ -43,7 +67,7 @@ export function initTroopsWindow(host: {
       (event.shiftKey ? buttons.at(-1) : buttons[0])?.focus();
     }
   });
-  return {
+  const view = {
     isOpen: (): boolean => !root.hidden,
     close: (): void => host.cancel(),
     render(html: string, fleetName = ''): void {
@@ -54,12 +78,12 @@ export function initTroopsWindow(host: {
       if (root.hidden !== !html) root.hidden = !html;
       if (fleet.textContent !== fleetName) fleet.textContent = fleetName;
       if (html !== lastHtml) {
-        // Do not replace a native slider under an active touch/pointer drag.
-        if (content.querySelector('input:active')) return;
         const scrollTop = content.querySelector<HTMLElement>('.tlist')?.scrollTop ?? 0;
         const active = document.activeElement as HTMLButtonElement | HTMLInputElement | null;
         const focused = active && content.contains(active) ? { dataset: { ...active.dataset }, type: active.type } : null;
-        content.innerHTML = html;
+        const template = document.createElement('template');
+        template.innerHTML = html;
+        patchTransferChildren(content, template.content);
         lastHtml = html;
         const list = content.querySelector<HTMLElement>('.tlist');
         if (list) list.scrollTop = scrollTop;
@@ -85,4 +109,5 @@ export function initTroopsWindow(host: {
       }
     },
   };
+  return view;
 }

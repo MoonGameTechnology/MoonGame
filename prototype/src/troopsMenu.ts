@@ -1,12 +1,12 @@
 /**
- * Army transfer menu: a separate row for each source formation, with its wounds
+ * Army transfer menu: compatible source formations share a row, with total wounds
  * and service visible. Positive deltas load, negative deltas unload. A plan uses
- * persistent server-owned group IDs; old callers may still supply unit-only rows.
+ * persistent server-owned source IDs; old callers may still supply unit-only rows.
  * The pure model reserves actual free cargo, never space from a future unload.
  */
 import { t } from '../../localization/runtime';
 import { esc, kfmt } from './format';
-import type { ArmyGroupDetails } from '../../decisions/armyTransferRows';
+import { splitArmyTransferSources, type ArmyGroupDetails } from '../../decisions/armyTransferRows';
 
 /** Одна строка меню — выбранная группа в гарнизоне или трюме. */
 export interface TroopsUnitInput extends Partial<ArmyGroupDetails> {
@@ -174,9 +174,16 @@ export function planOrders(m: TroopsModel): {
   const load: Array<{ unit: string; count: number; group?: string }> = [];
   const unload: Array<{ unit: string; count: number; group?: string }> = [];
   for (const r of m.rows) {
-    const group = r.group ? { group: r.group } : {};
-    if (r.delta > 0) load.push({ unit: r.unit, count: r.delta, ...group });
-    else if (r.delta < 0) unload.push({ unit: r.unit, count: -r.delta, ...group });
+    if (r.transferSources) {
+      const orders = splitArmyTransferSources(r.transferSources, Math.abs(r.delta))
+        .map((source) => ({ unit: r.unit, ...source }));
+      if (r.delta > 0) load.push(...orders);
+      else if (r.delta < 0) unload.push(...orders);
+    } else {
+      const group = r.group ? { group: r.group } : {};
+      if (r.delta > 0) load.push({ unit: r.unit, count: r.delta, ...group });
+      else if (r.delta < 0) unload.push({ unit: r.unit, count: -r.delta, ...group });
+    }
   }
   return { load, unload };
 }

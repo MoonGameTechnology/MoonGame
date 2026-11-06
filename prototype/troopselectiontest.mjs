@@ -154,8 +154,12 @@ try {
           assert.match(await row.innerText(), locale === 'ru' ? /Боёв: 3/ : /Battles: 3/);
           // Both direct entry and native range changes reach the same clamped plan.
           await row.locator('.tdelta').fill('3');
-          await row.locator('.tdelta').press('Tab');
-          assert.equal(await row.locator('.trange').inputValue(), '3');
+          await row.locator('[data-cmd="tstep"][data-n="1"]').click();
+          assert.equal(await row.locator('.tdelta').inputValue(), '4', 'blur/change must not swallow the next plus click');
+          await row.locator('.tdelta').fill('1');
+          await menu.locator('[data-direction="unload"]').click();
+          assert.equal(await menu.locator('[data-direction="unload"]').getAttribute('aria-selected'), 'true');
+          await menu.locator('[data-direction="load"]').click();
           await row.locator('.trange').fill('2');
           await row.locator('.trange').dispatchEvent('change');
           assert.equal(await row.locator('.tdelta').inputValue(), '2');
@@ -178,18 +182,22 @@ try {
           assert.ok(overflow.scroll <= overflow.client + 1, JSON.stringify(overflow));
           assert.ok(overflow.left >= -1 && overflow.right <= width + 1, JSON.stringify(overflow));
           if (out) await page.screenshot({ path: `${out}/${width}-${locale}.png` });
+          await row.locator('.tdelta').fill('1');
+          await row.locator('.tdelta').press('Tab');
+          await row.locator('.tdelta').fill('2');
           await menu.locator('[data-cmd="tok"]').click();
+          await page.locator('#troopswin').waitFor({ state: 'hidden' });
           const ordered = await page.evaluate(() => window.__armySelection.snapshot());
-          assert.deepEqual(ordered.loading[0].sources, [{ group, count: 2 }]);
-          assert.equal(ordered.garrison[1].count, 8);
+          assert.deepEqual(ordered.loading.flatMap(c => c.sources), [{ group, count: 1 }, { group: before.garrison[2].armyGroup, count: 1 }]);
+          assert.deepEqual(ordered.garrison, before.garrison);
           await page.evaluate(() => window.__armySelection.advance());
           const loaded = await page.evaluate(() => window.__armySelection.snapshot());
-          assert.equal(loaded.landing[0].count, 2);
-          assert.equal(loaded.landing[0].hp, hp * 1.5);
+          assert.equal(loaded.landing.reduce((n,s) => n+s.count, 0), 2);
+          assert.equal(loaded.landing.reduce((n,s) => n+(s.hp ?? s.count*hp), 0), hp * 1.5);
           assert.equal(loaded.landing[0].battles, 3);
           assert.deepEqual(
             loaded.garrison.map((s) => s.count),
-            [4, 6],
+            [4, 3, 3],
           );
           if (phone && !(await page.locator('[data-cmd="troops"]:visible').count()))
             await page.locator('[data-cmd="more"]:visible').first().click();
@@ -207,11 +215,11 @@ try {
           await menu.locator('[data-cmd="tok"]').click();
           const unloading = await page.evaluate(() => window.__armySelection.snapshot());
           assert.deepEqual(unloading.unloading[0].sources, [{ group: aboard, count: 1 }]);
-          assert.equal(unloading.landing[0].count, 2);
+          assert.equal(unloading.landing.reduce((n,s) => n+s.count,0), 2);
           await page.evaluate(() => window.__armySelection.advance());
           const done = await page.evaluate(() => window.__armySelection.snapshot());
           assert.equal(done.landing[0].count, 1);
-          assert.equal(done.landing[0].hp, hp * .75);
+          assert.equal(done.landing.reduce((n,s) => n+(s.hp ?? s.count*hp), 0), hp);
           // The reported failure: heavy infantry below a long list of formations.
           const {heavyHp} = await page.evaluate(() => window.__armySelection.stage(true));
           await page.locator('#maploading').waitFor({ state: 'hidden' });

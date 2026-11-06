@@ -11,7 +11,6 @@ import {
   armyClaimCount,
   takeArmySelection,
   groundClaims,
-  mergeArmyGroups,
 } from '../util/armySelection';
 import { garrisonUnderAssault, requireOwnedIdleFleet } from '../util/fleet';
 import { isAllied } from '../util/combat';
@@ -90,7 +89,7 @@ function claimedCargo(fleet: Fleet, data: GameData): number {
  */
 export const armyModule: GameModule = {
   id: 'army',
-  version: '1.5.0',
+  version: '1.4.0',
   setup(api) {
     api.onAction('army.prepare', (action, h) => {
       const p = action.payload as { fleetId?: unknown } | undefined;
@@ -242,11 +241,11 @@ export const armyModule: GameModule = {
         const size = def.stats.cargoSize;
         const take = Math.min(claim.count, have, size > 0 ? Math.floor(room / size) : claim.count);
         if (take <= 0) continue;
-        // Split actual pools proportionally, then combine compatible unreserved cargo.
+        // `takeFromStacks` делит пул ран пропорционально и копирует оснастку и заслугу,
+        // `mergeStacks` не сливает раненый стек со здоровым — раны не размазываются.
         const moved = takeArmySelection(planet.garrison, claim, take);
         planet.garrison = planet.garrison.filter((s) => s.count > 0);
         fleet.landing = mergeStacks(fleet.landing ?? [], moved);
-        mergeArmyGroups(fleet.landing, fleet.unloading ?? [], h.ctx.data);
         h.emit('army.loaded', {
           fleetId: fleet.id,
           planetId: planet.id,
@@ -257,9 +256,6 @@ export const armyModule: GameModule = {
       }
       if (keep.length) fleet.loading = keep;
       else delete fleet.loading;
-      if (fleet.location && h.state.planets[fleet.location])
-        mergeArmyGroups(h.state.planets[fleet.location]!.garrison,
-          groundClaims(h.state, fleet.location), h.ctx.data);
     });
 
     /** Ушёл — значит отменил (правило 5 клиентской копии, теперь правило мира).
@@ -371,7 +367,6 @@ export const armyModule: GameModule = {
         const moved = takeArmySelection(fleet.landing ?? [], claim, take);
         fleet.landing = (fleet.landing ?? []).filter((s) => s.count > 0);
         planet.garrison = mergeStacks(planet.garrison, moved);
-        mergeArmyGroups(planet.garrison, groundClaims(h.state, planet.id), h.ctx.data);
         h.emit('army.unloaded', {
           fleetId: fleet.id,
           planetId: planet.id,
@@ -382,12 +377,6 @@ export const armyModule: GameModule = {
       }
       if (keep.length) fleet.unloading = keep;
       else delete fleet.unloading;
-      mergeArmyGroups(fleet.landing ?? [], keep, h.ctx.data);
-    });
-    api.on('fleet.merged', (event, h) => {
-      const { into } = event.payload as { into?: string };
-      const fleet = into && h.state.fleets[into];
-      if (fleet) mergeArmyGroups(fleet.landing ?? [], fleet.unloading ?? [], h.ctx.data);
     });
   },
 };

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createInitialState, parseGameData, type Fleet } from '../packages/shared-core/src/index';
-import { armyTransferRows, hasPlannedArmyLoad } from './armyTransferRows';
+import { createInitialState, createKernel, armyModule, veteranXp, parseGameData, type Fleet } from '../packages/shared-core/src/index';
+import { armyTransferRows, hasPlannedArmyLoad, splitArmyTransferSources } from './armyTransferRows';
+import { damageUnits } from '../packages/shared-core/src/util/combat';
 
 const stats = { attack: 1, defense: 1, speed: 0, hp: 20, cargoSize: 1 };
 const data = parseGameData({
@@ -143,4 +144,87 @@ describe('army transfer source rows', () => {
     fleet.location = null;
     expect(armyTransferRows(state, fleet, true, data)).toEqual([]);
   });
+});
+
+
+describe('compatible formation display without changing combat wounds', () => {
+  it('shows one row with total HP and preserves casualties after opening the real menu', () => {
+    const { state, fleet } = fixture();
+    state.players.p = { id: 'p', name: 'P', faction: 'x', status: 'active', resources: {} };
+    delete state.fleets.other;
+    fleet.loading = []; fleet.unloading = []; fleet.landing = [];
+    state.planets.a!.garrison = [
+      { unit: 'infantry', count: 1, hp: 4 }, { unit: 'infantry', count: 1, hp: 4 },
+    ];
+    const baseline = structuredClone(state.planets.a!.garrison);
+    const prepared = createKernel([armyModule]).applyAction(state,
+      { id: 'prepare', type: 'army.prepare', playerId: 'p', issuedAt: 0, payload: { fleetId: 'f' } }, { now: 0, data });
+    if (!prepared.ok) throw new Error(prepared.code);
+    const rows = armyTransferRows(prepared.state, prepared.state.fleets.f!, true, data);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ garrisonAll: 2, hp: 8, maxHp: 40, health: 20 });
+    expect(rows[0]!.transferSources).toHaveLength(2);
+    const actual = damageUnits(prepared.state.planets.a!.garrison, 1, data);
+    const expected = damageUnits(baseline, 1, data);
+    expect(actual.deaths).toEqual(expected.deaths);
+    expect(actual.deaths).toEqual([]);
+    expect(actual.survivors.map(({ count, hp }) => ({ count, hp })))
+      .toEqual(expected.survivors.map(({ count, hp }) => ({ count, hp })));
+    expect(state.planets.a!.garrison).toEqual([{ unit: 'infantry', count: 1, hp: 4 }, { unit: 'infantry', count: 1, hp: 4 }]);
+  });
+  it('combines health for display but retains the precise reservations and loadouts', () => {
+    const { state, fleet } = fixture();
+    fleet.landing = [];
+    state.planets.a!.garrison = [
+      { unit: 'infantry', count: 4, armyGroup: 'healthy', battles: 3 },
+      { unit: 'infantry', count: 2, armyGroup: 'veteran', battles: 3, hp: 24.8 },
+      { unit: 'infantry', count: 1, armyGroup: 'equipped', battles: 3, modules: ['plate'] },
+    ];
+    // The other fleet owns two units of the wounded source; this fleet owns one.
+    const before = structuredClone(state);
+    const rows = armyTransferRows(state, fleet, true, data);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ hp: 104.8, maxHp: 120, health: 87.3, garrisonAll: 6, reserved: 2 });
+    expect(rows[0]!.transferSources).toEqual([{ group: 'healthy', count: 4 }, { group: 'veteran', count: 0 }]);
+    expect(state).toEqual(before);
+  });
+  it('apportions whole units without consuming reservations or duplicating a source', () => {
+    const sources = [{ group: 'reserved', count: 0 }, { group: 'one', count: 1 }, { group: 'nine', count: 9 }];
+    for (let requested = 0; requested <= 12; requested++) {
+      const result = splitArmyTransferSources(sources, requested);
+      expect(result.reduce((sum, s) => sum + s.count, 0)).toBe(Math.min(requested, 10));
+      for (const source of result) expect(source.count).toBeLessThanOrEqual(sources.find(s => s.group === source.group)!.count);
+      expect(new Set(result.map(s => s.group)).size).toBe(result.length);
+    }
+    expect(splitArmyTransferSources(sources, NaN)).toEqual([]);
+    expect(splitArmyTransferSources(sources, -1)).toEqual([]);
+    expect(splitArmyTransferSources([{ group: 'wounded', count: 4 }, { group: 'healthy', count: 4 }], 2))
+      .toEqual([{ group: 'wounded', count: 1 }, { group: 'healthy', count: 1 }]);
+  });
+});
+
+
+it('opening and regrouping the menu never mints veteran XP or averages valour ledgers', () => {
+  const { state, fleet } = fixture();
+  const rewardData = { ...data, rewards: { ...data.rewards, medalXp: [10, 20, 40, 100] } };
+  state.players.p = { id: 'p', name: 'P', faction: 'x', status: 'active', resources: {} };
+  delete state.fleets.other;
+  fleet.loading = []; fleet.unloading = []; fleet.landing = [];
+  state.planets.a!.garrison = [
+    { unit: 'infantry', count: 100, damageDealt: 59 },
+    { unit: 'infantry', count: 1, damageDealt: 250 },
+  ];
+  expect(veteranXp(state, 'p', rewardData)).toBe(1100);
+  const kernel = createKernel([armyModule]);
+  let current = state;
+  for (let i = 0; i < 100; i++) {
+    const prepared = kernel.applyAction(current,
+      { id: 'prepare:' + i, type: 'army.prepare', playerId: 'p', issuedAt: 0, payload: { fleetId: 'f' } }, { now: 0, data: rewardData });
+    if (!prepared.ok) throw new Error(prepared.code);
+    current = prepared.state;
+    expect(armyTransferRows(current, current.fleets.f!, true, rewardData)).toHaveLength(1);
+  }
+  expect(veteranXp(JSON.parse(JSON.stringify(current)), 'p', rewardData)).toBe(1100);
+  expect(current.planets.a!.garrison.map(({ count, damageDealt }) => ({ count, damageDealt })))
+    .toEqual(state.planets.a!.garrison.map(({ count, damageDealt }) => ({ count, damageDealt })));
 });

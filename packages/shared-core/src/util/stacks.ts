@@ -267,44 +267,6 @@ function mergeMerit(base: UnitStack, add: UnitStack): void {
   }
 }
 
-/** Ground units of the same equipment/service share their actual HP pools.
- * Reserved formations can be excluded: an accepted lift keeps its exact source.
- * Space stacks retain their existing merge rules. No rounding of stored pools. */
-export function consolidateGroundStacks(
-  stacks: readonly UnitStack[],
-  data: GameData,
-  available: (stack: UnitStack) => boolean = () => true,
-): UnitStack[] {
-  const out: UnitStack[] = [];
-  for (const stack of stacks) {
-    if (stack.count <= 0) continue;
-    const def = data.units[stack.unit];
-    const match = def?.domain === 'ground' && available(stack)
-      ? out.find((s) => s.unit === stack.unit && available(s) &&
-          s.stationScale === stack.stationScale &&
-          moduleValueKey(s) === moduleValueKey(stack) &&
-          serviceKey(s.battles) === serviceKey(stack.battles))
-      : undefined;
-    if (!match) {
-      out.push({ ...stack,
-        ...(stack.modules ? { modules: [...stack.modules] } : {}),
-        ...(stack.moduleStars ? { moduleStars: { ...stack.moduleStars } } : {}),
-        ...(stack.moduleRarity ? { moduleRarity: { ...stack.moduleRarity } } : {}),
-      });
-      continue;
-    }
-    const stats = effectiveStats(def!, stack, data);
-    if (match.hp !== undefined || stack.hp !== undefined)
-      match.hp = (match.hp ?? match.count * stats.hp!) + (stack.hp ?? stack.count * stats.hp!);
-    if (match.shieldHp !== undefined || stack.shieldHp !== undefined)
-      match.shieldHp = (match.shieldHp ?? match.count * (stats.shield ?? 0)) +
-        (stack.shieldHp ?? stack.count * (stats.shield ?? 0));
-    mergeMerit(match, stack);
-    match.count += stack.count;
-  }
-  return out;
-}
-
 /** Soft efficiency thresholds: every living unit fires, at min(1, limit / N). */
 export const COMBAT_UNIT_CAP = 10;
 export const GROUND_COMBAT_UNIT_CAP = 20;
