@@ -79,6 +79,12 @@ function fixture() {
   return { state, fleet };
 }
 describe('army transfer source rows', () => {
+  it('reports pooled HP with a tenth of a percent without changing stored HP', () => {
+    const { state, fleet } = fixture();
+    state.planets.a!.garrison = [{ unit: 'infantry', count: 6, hp: 104.8, armyGroup: 'pool' }];
+    expect(armyTransferRows(state, fleet, true, data)[0]).toMatchObject({ hp: 104.8, maxHp: 120, health: 87.3 });
+    expect(state.planets.a!.garrison[0]!.hp).toBe(104.8);
+  });
   it('recognizes a selected formation for tutorial readiness and ignores unloads, stale groups and other types', () => {
     const { state, fleet } = fixture();
     state.fleets[fleet.id] = fleet;

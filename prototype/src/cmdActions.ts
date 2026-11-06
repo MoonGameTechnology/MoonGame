@@ -236,10 +236,10 @@ function sendMobileOrder(): void {
 
 /** Нажатие командной кнопки (`data-cmd`). Слушает ряд команд, а окно флота на ПК
  *  зовёт сюда же кнопки своей колонки «Десант» — ⇅-меню живёт в ней, а не в ряду. */
-export function onCommandClick(ev: MouseEvent): void {
+export function onCommandClick(ev: Event): void {
   const ME = game.me();
   const MOBILE = game.mobile();
-  const bEl = (ev.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+  const bEl = (ev.target as HTMLElement).closest('button,input[data-cmd="tset"]') as HTMLButtonElement | HTMLInputElement | null;
   if (!bEl || bEl.disabled) return;
   // Серая кнопка с причиной (`cmdBtn`, `why`): приказа нет — есть объяснение.
   if (bEl.getAttribute('aria-disabled') === 'true') {
@@ -325,16 +325,27 @@ export function onCommandClick(ev: MouseEvent): void {
     }
   } else if (cmd === 'trefresh') {
     if (troopsPlan) playerOrder(prepareArmy(ME, troopsPlan.fleetId));
-  } else if (cmd === 'tstep' || cmd === 'tmax') {
+  } else if (cmd === 'tdirection' || cmd === 'tclear') {
+    if (troopsPlan) {
+      if (cmd === 'tdirection') troopsPlan.direction = bEl.dataset.direction === 'unload' ? 'unload' : 'load';
+      troopsPlan.plan = {};
+      delete troopsPlan.asking;
+    }
+  } else if (cmd === 'tstep' || cmd === 'tmax' || cmd === 'tset') {
     // Набор количества. Шаг КЛАМПИТСЯ моделью, а не блокируется — как «+10» в
     // диалоге разделения флота: «+5» при трёх доступных даст +3, а не откажет.
     const inp = troopsPlan ? troopsInputFor(troopsPlan.fleetId) : null;
     if (troopsPlan && inp) {
       const unit = bEl.dataset.group ?? bEl.dataset.unit ?? '';
+      const current = troopsModel(inp).rows.find((r) => (r.key ?? r.unit) === unit)?.delta ?? 0;
+      const value = Number(bEl.value);
+      if (cmd === 'tset' && !Number.isFinite(value)) return;
       troopsPlan.plan =
         cmd === 'tmax'
           ? maxPlan(inp, unit, Number(bEl.dataset.dir) > 0 ? 1 : -1)
-          : stepPlan(inp, unit, Number(bEl.dataset.n));
+          : stepPlan(inp, unit, cmd === 'tset'
+            ? Math.max(0, Math.trunc(value)) * (Number(bEl.dataset.dir) < 0 ? -1 : 1) - current
+            : Number(bEl.dataset.n));
       delete troopsPlan.asking; // план поменялся — вопрос задаётся заново
     }
   } else if (cmd === 'tok' || cmd === 'tfirst') {

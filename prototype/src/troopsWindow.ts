@@ -1,7 +1,7 @@
 /** A separate transfer dialog; game orders still go through the fleet dispatcher. */
 export function initTroopsWindow(host: {
   root: HTMLElement;
-  command(event: MouseEvent): void;
+  command(event: Event): void;
   cancel(): void;
 }) {
   const { root } = host;
@@ -13,12 +13,30 @@ export function initTroopsWindow(host: {
   root.addEventListener('click', (event) => {
     event.stopPropagation();
     if (event.target === root) host.cancel();
-    else host.command(event);
+    else if (!(event.target instanceof HTMLInputElement)) host.command(event);
+  });
+  root.addEventListener('change', (event) => {
+    if (event.target instanceof HTMLInputElement && event.target.dataset.cmd === 'tset') host.command(event);
+  });
+  root.addEventListener('input', (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.type !== 'range') return;
+    const number = input.closest('.trow')?.querySelector<HTMLInputElement>('input[type="number"]');
+    if (number) number.value = input.value;
   });
   root.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') event.stopPropagation();
+    const tab = (event.target as HTMLElement).closest<HTMLButtonElement>('[role="tab"]');
+    if (tab && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      const direction = event.key === 'Home' ? 'load' : event.key === 'End' ? 'unload'
+        : tab.dataset.direction === 'load' ? 'unload' : 'load';
+      root.querySelector<HTMLButtonElement>(`[data-direction="${direction}"]`)?.click();
+      root.querySelector<HTMLButtonElement>(`[data-direction="${direction}"]`)?.focus();
+      return;
+    }
     if (event.key !== 'Tab') return;
-    const buttons = [...root.querySelectorAll<HTMLButtonElement>('button:not([disabled])')];
+    const buttons = [...root.querySelectorAll<HTMLElement>('button:not([disabled]):not([tabindex="-1"]),input:not([disabled])')];
     const edge = event.shiftKey ? buttons[0] : buttons.at(-1);
     if (document.activeElement === edge) {
       event.preventDefault();
@@ -36,16 +54,18 @@ export function initTroopsWindow(host: {
       if (root.hidden !== !html) root.hidden = !html;
       if (fleet.textContent !== fleetName) fleet.textContent = fleetName;
       if (html !== lastHtml) {
+        // Do not replace a native slider under an active touch/pointer drag.
+        if (content.querySelector('input:active')) return;
         const scrollTop = content.querySelector<HTMLElement>('.tlist')?.scrollTop ?? 0;
-        const active = document.activeElement as HTMLButtonElement | null;
-        const focused = active && content.contains(active) ? { ...active.dataset } : null;
+        const active = document.activeElement as HTMLButtonElement | HTMLInputElement | null;
+        const focused = active && content.contains(active) ? { dataset: { ...active.dataset }, type: active.type } : null;
         content.innerHTML = html;
         lastHtml = html;
         const list = content.querySelector<HTMLElement>('.tlist');
         if (list) list.scrollTop = scrollTop;
         if (focused)
-          [...content.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
-            ['cmd', 'group', 'n', 'dir', 'first'].every((key) => button.dataset[key] === focused[key]),
+          [...content.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button,input')].find((button) =>
+            button.type === focused.type && ['cmd', 'group', 'n', 'dir', 'first', 'direction'].every((key) => button.dataset[key] === focused.dataset[key]),
           )?.focus({ preventScroll: true });
       }
       if (opening) closeButton.focus({ preventScroll: true });

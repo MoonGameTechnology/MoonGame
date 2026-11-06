@@ -28,8 +28,8 @@
   display: flex;
   align-items: center;
   flex: none;
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--line);
 }
 .troops-head > div { flex: 1; min-width: 0; }
@@ -97,8 +97,50 @@
   #troopswin .tpop .trow { grid-template-columns: minmax(0, 1fr) auto; }
 }
 body.mobile-ui #troopswin {
-  padding-top: calc(var(--tbh) + 8px + env(safe-area-inset-top));
-  padding-bottom: calc(var(--phone-navh) + 8px);
+  padding: max(8px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right))
+    max(8px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+}
+
+/* Compact transfer task: only the troop list scrolls; controls keep 44px targets. */
+#troopswin .compact-troops .troute { padding: 6px 12px 0; color: var(--dim); font-size: var(--fs-caption); }
+#troopswin .compact-troops .ttabs { display: flex; gap: 3px; padding: 3px; margin: 6px 12px; border: 1px solid var(--line); border-radius: 12px; background: #041219; flex: none; }
+#troopswin .ttabs button { flex: 1; min-width: 0; min-height: 44px; display: flex; gap: 8px; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--dim); font: 600 var(--fs-body)/1.2 var(--sf-font); }
+#troopswin .ttabs button[aria-selected="true"] { background: #103a47; color: var(--ink); border-color: var(--cyan); box-shadow: inset 0 -2px var(--cyan); }
+#troopswin .ttabs button span { font-size: var(--fs-caption); }
+#troopswin .tcapacity { flex: none; margin: 0 12px 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #06171f; font-size: var(--fs-caption); }
+#troopswin .tcapacity small { color: var(--dim); font-size: var(--fs-caption); }
+#troopswin .tcapacity-bar { height: 4px; position: relative; background: #20404b; margin: 6px 0; border-radius: 4px; overflow: hidden; }
+#troopswin .tcapacity-bar i, #troopswin .tcapacity-bar b { position: absolute; inset: 0 auto 0 0; background: var(--cyan); }
+#troopswin .tcapacity-bar i { opacity: .4; }
+#troopswin .compact-troops .tlist { display: flex; flex-direction: column; gap: 6px; padding: 0 12px 8px; }
+#troopswin .compact-troops .trow { display: flex; flex-direction: column; align-items: stretch; padding: 9px 10px; gap: 6px; flex: none; border: 1px solid var(--line); border-radius: 11px; background: #081d27; }
+#troopswin .compact-troops .trow.chosen { border-color: var(--cyan); background: #0b2832; }
+#troopswin .tunit-head { display: flex; align-items: center; gap: 8px; }
+#troopswin .tunit-head > .bicon { width: 32px; height: 32px; display: grid; place-items: center; flex: none; border-radius: 8px; background: #0e303b; }
+#troopswin .tunit-head .tinfo { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+#troopswin .tunit-head .tname { white-space: normal; font-size: var(--fs-body); }
+#troopswin .tavailable { text-align: right; font-size: var(--fs-caption); color: var(--dim); }
+#troopswin .compact-troops .tgroup-grade, #troopswin .compact-troops .tcnt { font-size: var(--fs-caption); color: var(--dim); }
+#troopswin .compact-troops .tgroup-health { display: flex; align-items: center; gap: 6px; font-size: var(--fs-caption); }
+#troopswin .compact-troops .tgroup-health > b { margin-left: auto; font-size: var(--fs-caption); color: var(--dim); }
+#troopswin .compact-troops .tgroup-bar { flex: 1; min-width: 20px; max-width: 140px; height: 4px; }
+#troopswin .tquantity { display: flex; align-items: center; gap: 6px; }
+#troopswin .trange { flex: 1; min-width: 24px; width: 100%; height: 44px; margin: 0; accent-color: var(--cyan); touch-action: pan-y; }
+#troopswin .compact-troops .tbtns { display: flex; align-items: center; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; flex: none; }
+#troopswin .compact-troops .tbtns button { border: 0; border-radius: 0; background: transparent; width: 44px; min-width: 44px; height: 44px; }
+#troopswin .compact-troops input.tdelta { width: 34px; min-width: 0; height: 44px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--ink); text-align: center; font-weight: 700; appearance: textfield; }
+#troopswin .tdelta::-webkit-inner-spin-button, #troopswin .tdelta::-webkit-outer-spin-button { -webkit-appearance: none; }
+#troopswin .tquantity > .tall { min-width: 44px; min-height: 44px; padding: 0 3px; font-size: var(--fs-caption); }
+#troopswin .compact-troops .tacts { display: flex; flex-direction: column; gap: 4px; padding: 7px 12px; }
+#troopswin .tsummary { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--fs-caption); }
+#troopswin .tsummary button { min-height: 44px; padding: 0 4px; }
+#troopswin .compact-troops .tacts .cbtn { flex: none; width: 100%; min-height: 46px; }
+#troopswin .compact-troops .tacts small { text-align: center; font-size: var(--fs-caption); color: var(--dim); }
+@media (max-height: 520px) and (min-width: 600px) {
+  #troopswin .troops-box { width: min(760px, 100%); }
+  #troopswin .compact-troops .troute, #troopswin .tcapacity small { display: none; }
+  #troopswin .compact-troops .tacts { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; }
+  #troopswin .compact-troops .tacts small { grid-column: 1 / -1; }
 }
 body.mobile-ui #troopswin .troops-box { width: min(620px, 100%); }
 @media (max-height: 520px) {

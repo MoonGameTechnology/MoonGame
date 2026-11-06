@@ -206,10 +206,11 @@ async function boot() {
   const press = (
     cmd: string | undefined,
     dataset: Record<string, string> = {},
-    state: { disabled?: boolean; why?: boolean } = {},
+    state: { disabled?: boolean; why?: boolean; value?: string } = {},
   ) => {
     const button = {
       disabled: !!state.disabled,
+      value: state.value,
       dataset: { ...(cmd === undefined ? {} : { cmd }), ...dataset },
       getAttribute: (name: string) => (name === 'aria-disabled' && state.why ? 'true' : null),
     };
@@ -377,6 +378,29 @@ describe('REFM-227 — нажатия ряда', () => {
     press('troops');
     press('troops');
     expect(inter.troopsPlan).toBeNull();
+  });
+
+  it('clamps direct quantities and clears unconfirmed choices on direction change without sending orders', async () => {
+    const { inter, go, fleet, select, press } = await boot();
+    select(fleet.id);
+    press('troops');
+    const row = go.troopsInputFor(fleet.id)!.units.find((u) => u.unit === 'militia')!;
+    const dataset = { group: row.key!, dir: '1' };
+    press('tset', dataset, { value: '999999' });
+    const maximum = inter.troopsPlan!.plan[row.key!]!;
+    expect(maximum).toBeGreaterThan(0);
+    expect(maximum).toBeLessThanOrEqual(row.garrison);
+    press('tset', dataset, { value: '1.9' });
+    expect(inter.troopsPlan!.plan[row.key!]).toBe(1);
+    press('tset', dataset, { value: 'invalid' });
+    expect(inter.troopsPlan!.plan[row.key!]).toBe(1);
+    press('tclear');
+    expect(inter.troopsPlan!.plan).toEqual({});
+    press('tset', dataset, { value: '1' });
+    press('tdirection', { direction: 'unload' });
+    expect(inter.troopsPlan!.direction).toBe('unload');
+    expect(inter.troopsPlan!.plan).toEqual({});
+    expect(sent.map((a) => a.type)).toEqual(['army.prepare']);
   });
 
   it('⇅ «Готово» у осаждённого мира выгружает, но не грузит', async () => {

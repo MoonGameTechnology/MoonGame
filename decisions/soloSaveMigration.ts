@@ -504,6 +504,17 @@ export const FLEET_MERGE_ORDERS_SOLO_MIGRATION = {
   toDataHash: TECHNOLOGY_PRICES_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Army 1.5 pools compatible unreserved ground formations. Saved queues, wounds
+ * and group IDs are retained; pooling happens through the authoritative module. */
+export const ARMY_POOLING_SOLO_MIGRATION = {
+  fromRules: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toRules,
+  fromData: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toData,
+  fromDataHash: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toDataHash,
+  toRules: '19effc631d87a6',
+  toData: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toData,
+  toDataHash: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -548,6 +559,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   VICEROY_SOLO_MIGRATION,
   TECHNOLOGY_PRICES_SOLO_MIGRATION,
   FLEET_MERGE_ORDERS_SOLO_MIGRATION,
+  ARMY_POOLING_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

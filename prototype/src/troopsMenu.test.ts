@@ -387,3 +387,30 @@ describe('кого грузить первыми (раненых или здор
     expect(troopsMenuHtml(troopsModel(mixed({ militia: 3 })), o)).toContain('data-cmd="tok"');
   });
 });
+
+
+describe('compact formation transfer', () => {
+  it('shows only the selected direction and bounds both quantity controls by available cargo', () => {
+    const units = [
+      unit({ unit: 'militia', key: 'garrison:g', group: 'g', side: 'garrison', prepared: true,
+        garrison: 6, garrisonAll: 6, hp: 524, maxHp: 600, health: 87.3 }),
+      unit({ unit: 'militia', key: 'hold:h', group: 'h', side: 'hold', prepared: true,
+        hold: 2, holdAll: 2, hp: 140, maxHp: 200, health: 70 }),
+    ];
+    const model = troopsModel(input({ units, capacity: 4, used: 2, plan: { 'garrison:g': 1 } }));
+    const opts = { name: () => '<Infantry>', icon: () => '', world: '<METIS>' };
+    const load = troopsMenuHtml(model, { ...opts, direction: 'load' });
+    expect(load).toContain('data-troop-group="garrison:g"');
+    expect(load).not.toContain('data-troop-group="hold:h"');
+    expect(load).toContain('87.3%');
+    expect(load).toContain('524/600');
+    expect(load).toContain('&lt;Infantry&gt;');
+    expect(load).toContain('&lt;METIS&gt;');
+    expect(load.match(/min="0" max="2" step="1" value="1"/g)).toHaveLength(2);
+    const unload = troopsMenuHtml(troopsModel(input({ units, used: 2 })), { ...opts, direction: 'unload' });
+    expect(unload).toContain('data-troop-group="hold:h"');
+    expect(unload).not.toContain('data-troop-group="garrison:g"');
+    expect(unload).toContain('data-dir="-1"');
+    expect(unload).toContain('aria-labelledby="troops-tab-unload"');
+  });
+});

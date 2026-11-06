@@ -36,7 +36,7 @@ function initial(): GameState {
     garrison: [
       { unit: 'infantry', count: 4 },
       { unit: 'infantry', count: 4, battles: 3, hp: 40, damageDealt: 12 },
-      { unit: 'infantry', count: 4, battles: 3 },
+      { unit: 'infantry', count: 4, battles: 2 },
     ],
   };
   for (const id of ['f', 'g'])
@@ -137,7 +137,7 @@ describe('explicit army formation selection', () => {
       apply(s, 'army.load', { fleetId: 'g', unit: 'infantry', count: 2, group: other }),
     );
     expect(done.fleets.f!.landing![0]).toMatchObject({ count: 3, hp: 30, battles: 3 });
-    expect(done.fleets.g!.landing![0]).toEqual({ unit: 'infantry', count: 2, battles: 3 });
+    expect(done.fleets.g!.landing![0]).toEqual({ unit: 'infantry', count: 2, battles: 2 });
   });
 
   it('pins a legacy saved order before a new explicit order can take its troops', () => {

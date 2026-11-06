@@ -182,6 +182,8 @@ export function planOrders(m: TroopsModel): {
 }
 
 export interface TroopsMenuOpts {
+  direction?: 'load' | 'unload';
+  world?: string;
   /** SVG-значок типа юнита (тот же, что в списках флота). */
   icon: (unit: string) => string;
   /** Локализованное имя типа. */
@@ -216,6 +218,7 @@ const maxBtn = (
  *  Живых тикающих чисел здесь нет намеренно: ряд диффится по строке каждый кадр,
  *  и счётчик времени переписывал бы DOM под пальцем, глотая нажатия. */
 export function troopsMenuHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
+  if (opts.world !== undefined || opts.direction !== undefined || m.rows.some((r) => r.side)) return compactTroopsHtml(m, opts);
   const rows = m.rows
     .map((r) => {
       const nm = opts.name(r.unit);
@@ -285,4 +288,47 @@ export function troopsMenuHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
         `</div>`) +
     `</div>`
   );
+}
+
+/** The real formation menu: one direction, compact cards, fixed confirmation. */
+function compactTroopsHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
+  const mode = opts.direction ?? (m.rows.some((r) => r.side === 'garrison') ? 'load' : 'unload');
+  const loading = mode === 'load';
+  const direction = loading ? 1 : -1;
+  const label = loading ? t('troops.load-action') : t('troops.unload-action');
+  const totals = {
+    load: m.rows.reduce((n, r) => n + r.garrisonAll, 0),
+    unload: m.rows.reduce((n, r) => n + r.holdAll, 0),
+  };
+  const selected = m.loadTotal + m.unloadTotal;
+  const occupied = m.used + m.reservedCargo;
+  const projected = m.capacity - m.freeCargo;
+  const percent = (n: number) => m.capacity > 0 ? clamp(100 * n / m.capacity, 0, 100) : 0;
+  const rows = m.rows.filter((r) => r.side === (loading ? 'garrison' : 'hold')).map((r) => {
+    const name = opts.name(r.unit), key = rowKey(r);
+    const qty = Math.abs(r.delta), maximum = loading ? r.maxLoad : r.maxUnload;
+    const health = clamp(r.health ?? 100, 0, 100);
+    const quantityLabel = esc(t('troops.quantity', { u: name }));
+    const attrs = `data-cmd="tset" data-group="${esc(key)}" data-dir="${direction}" min="0" max="${maximum}" step="1" value="${qty}" aria-label="${quantityLabel}"${maximum <= 0 ? ' disabled' : ''}`;
+    return `<div class="trow${qty ? ' chosen' : ''}" data-troop-group="${esc(key)}">
+      <div class="tunit-head"><span class="bicon">${opts.icon(r.unit)}</span><span class="tinfo"><b class="tname">${esc(name)}</b><span class="tgroup-grade">${esc(r.grade ? t('troops.service', { n: r.grade }) : t('troops.recruits'))} · ${esc(t('troops.battles', { n: r.battles ?? 0 }))}</span></span><span class="tavailable">${esc(t('troops.available', { n: loading ? r.garrison - r.reserved : r.hold }))}</span></div>
+      <div class="tgroup-health${health < 100 ? ' wounded' : ''}"><span>${esc(t('troops.health', { n: health }))}</span><span class="tgroup-bar" aria-hidden="true"><i style="width:${health}%"></i></span><b>${esc(t('troops.hp', { a: kfmt(r.hp ?? 0), b: kfmt(r.maxHp ?? 0) }))}</b></div>
+      <div class="tquantity"><input class="trange" type="range" ${attrs}><div class="tbtns">
+      ${stepBtn(r.unit, -direction, '−', t('troops.decrease', { u: name }), qty <= 0, key)}
+      <input class="tdelta" type="number" inputmode="numeric" ${attrs}>
+      ${stepBtn(r.unit, direction, '+', t('troops.increase', { u: name }), qty >= maximum, key)}
+      </div>${maxBtn(r.unit, direction, esc(t('troops.max')), label, qty >= maximum, key)}</div>
+      ${r.reserved ? `<span class="tcnt">${esc(t('troops.reserved', { n: r.reserved }))}</span>` : ''}
+      ${r.queued ? `<span class="tcnt">${esc(t('troops.transferring', { n: r.queued }))}</span>` : ''}
+      ${r.prepared === false ? `<button data-cmd="trefresh" class="btn-second">${esc(t('troops.refresh'))}</button>` : ''}
+    </div>`;
+  }).join('');
+  const tabs = (['load', 'unload'] as const).map((dir) => `<button type="button" role="tab" aria-selected="${dir === mode}" aria-controls="troops-list" id="troops-tab-${dir}" tabindex="${dir === mode ? 0 : -1}" data-cmd="tdirection" data-direction="${dir}">${esc(dir === 'load' ? t('troops.load') : t('troops.unload'))}<span>${totals[dir]}</span></button>`).join('');
+  return `<div class="cmdpop tpop compact-troops">
+    ${opts.world ? `<div class="troute">${esc(opts.world)}</div>` : ''}
+    <div class="ttabs" role="tablist" aria-label="${esc(t('troops.direction'))}">${tabs}</div>
+    <div class="tcapacity"><div>${esc(t('troops.hold', { a: occupied, b: m.capacity }))}${selected ? ` → ${esc(t('troops.hold', { a: projected, b: m.capacity }))}` : ''}</div><div class="tcapacity-bar" aria-hidden="true"><i style="width:${percent(occupied)}%"></i><b style="width:${percent(projected)}%"></b></div><small>${esc(t('troops.free', { n: m.freeCargo }))}</small></div>
+    <div class="tlist" id="troops-list" role="tabpanel" aria-labelledby="troops-tab-${mode}">${rows || `<div class="tnote">${esc(t('troops.empty'))}</div>`}${loading && m.holdFull ? `<div class="tnote warn">${esc(t('cargo.hold-full'))}</div>` : ''}</div>
+    <div class="tacts"><div class="tsummary"><b>${esc(t('troops.selected', { n: selected }))}</b><button data-cmd="tclear" class="btn-quiet"${selected ? '' : ' disabled'}>${esc(t('troops.clear'))}</button></div><button data-cmd="tok" class="cbtn btn-main"${m.valid ? '' : ' disabled'}>${esc(label)}${selected ? ` · ${selected}` : ''}</button><small>${esc(t('troops.timing'))}</small></div>
+  </div>`;
 }

@@ -73,7 +73,7 @@ export function armyTransferRows(state: GameState, fleet: Fleet, mine: boolean, 
           battles: Math.floor(stack.battles ?? 0),
           hp: stack.hp ?? maximum,
           maxHp: maximum,
-          health: Math.max(0, Math.min(100, Math.round(((stack.hp ?? maximum) / maximum) * 100))),
+          health: Math.max(0, Math.min(100, Math.round(((stack.hp ?? maximum) / maximum) * 1000) / 10)),
         },
       ];
     });
