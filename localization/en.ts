@@ -908,6 +908,7 @@ export const en: Record<string, string> = {
   'build.state.queued': 'in progress',
   'build.state.upgrading': 'upgrading',
   'build.state.waiting': 'queued',
+  'build.tech.needs': 'Requires {tech}',
   'callsign.comet': 'Comet',
   'callsign.falcon': 'Falcon',
   'callsign.orion': 'Orion',

@@ -133,6 +133,7 @@ async function load(world: () => GameState) {
     buildingLocked: () => null,
     fleetTitle: (id) => id,
     sectorZeroToolsHidden: () => sectorZero,
+    openTech: (id) => env.calls.push(`tech:${id}`),
   });
   return help;
 }
@@ -224,6 +225,32 @@ describe('REFM-221 · справка — справочник', () => {
       .get('codex')!
       .fire('click', hit({ '.cx-build': { dataset: { build: 'unit:frigate' } } }));
     expect(env.calls).toEqual(['build:' + home.id + ':unit:frigate', 'invalidate', 'render']);
+    expect(shown('codex')).toBe(false);
+  });
+
+  // Заперто технологией (основная игра): вместо «Построить здесь», которое ядро отбило бы
+  // безымянным «нужна технология», карточка называет технологию и ведёт в её досье.
+  it('заперто технологией — карточка предлагает изучить её, а не строить', async () => {
+    const { networkSeats } = await import('./matchSetup');
+    const s = game.newGame({ mapId: 'duel-1', seats: networkSeats('ffa', 'duel-1') });
+    const help = await load(() => s);
+    env.sel = Object.values(s.planets).find((p) => p.owner === 'p1' && p.buildings.length > 0)!.id;
+    for (const [key, tech] of [
+      ['u:frigate', 'frigate_design'],
+      ['b:spaceport', 'spaceport_infrastructure'],
+    ] as const) {
+      help.openCodex(key);
+      const html = env.els.get('codex')!.innerHTML;
+      expect(html, key).toContain(`data-cx-tech="${tech}"`);
+      expect(html, key).toContain('bw-why');
+      expect(html, key).not.toContain('data-build=');
+    }
+    // Разведчик изучен со старта — у него по-прежнему «Построить здесь».
+    help.openCodex('u:scout');
+    expect(env.els.get('codex')!.innerHTML).toContain('data-build="unit:scout"');
+    help.openCodex('u:frigate');
+    env.els.get('codex')!.fire('click', hit({ '[data-cx-tech]': { dataset: { cxTech: 'frigate_design' } } }));
+    expect(env.calls).toEqual(['tech:frigate_design']);
     expect(shown('codex')).toBe(false);
   });
 

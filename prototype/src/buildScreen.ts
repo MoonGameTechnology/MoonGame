@@ -47,6 +47,8 @@ import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation'
 import { worldName } from './planetName';
 import { buildingRepairHtml } from './fortressView';
 import { patchLiveTimers } from './liveTimers';
+import { techNeed, type TechNeed } from '../../decisions/techNeed';
+import { techOfferLabel, techWhyHtml } from './techOffer';
 
 type BuildingDef = (typeof data.buildings)[string];
 
@@ -219,6 +221,22 @@ function builtRight(
   return `<span class="bw-st done">✓ ${done}${st.count > 1 ? ` ×${st.count}` : ''}</span>`;
 }
 
+/**
+ * Заперто ТЕХНОЛОГИЕЙ — строка называет её и ведёт в досье (как крепость, FORT-0.2): кнопка
+ * на месте замка, причина с именем — строкой под заголовком. Решает отказ ядра на настоящий
+ * приказ, а не своя проверка; `null` — причина другая или назвать нечего (технологии нет в
+ * этом матче), и строка остаётся замком с причиной, как была.
+ */
+function techLock(code: string | null, need: () => TechNeed | null): { right: string; why: string } | null {
+  if (code !== 'E_TECH_LOCKED') return null;
+  const n = need();
+  if (!n) return null;
+  return {
+    right: `<button class="bw-tech btn-second" data-bw-tech="${esc(n.offer)}">${techOfferLabel(n)}</button>`,
+    why: techWhyHtml(n),
+  };
+}
+
 /** Всё тело окна для одного мира. Чистая функция — `initBuildScreen` кормит её живым
  *  состоянием; `lockText` переводит незнакомый код отказа в слова (errText хоста).
  *  `activeCat` — какая вкладка открыта (рисуются только её строки); `null` = все. */
@@ -258,6 +276,8 @@ export function buildScreenHtml(
     const def = data.buildings[id]!;
     const st = buildRowState(state, me, planetId, id, probe, localQueued);
     if (st.st === 'hidden') continue;
+    const tech =
+      st.st === 'lock' ? techLock(st.code, () => techNeed(state, me, data, 'building', id)) : null;
     const maxLvl = buildingMaxLevel(def);
     const shownLvl = st.st === 'built' ? st.level : 1;
     // Уровень — у СТОЯЩЕГО здания и словами, «Ур. 1 / 3»: римская цифра после имени
@@ -273,7 +293,9 @@ export function buildScreenHtml(
         ? builtRight(st, id, maxLvl, lockText)
         : st.st === 'queued'
           ? `<span class="bw-st run">⏳ ${st.waiting ? t('build.state.waiting') : t('build.state.queued')}</span>`
-          : st.st === 'lock'
+          : tech
+            ? tech.right
+            : st.st === 'lock'
             ? `<span class="bw-st lock">🔒 ${esc(lockText(st.code))}</span>`
             : `<button class="bw-take btn-main" data-bw-go="${id}"${st.affordable ? '' : ' disabled'}>▷ ${
                 st.affordable ? t('build.action.build') : t('build.action.no-res')
@@ -290,8 +312,9 @@ export function buildScreenHtml(
         `<span class="bw-dur">${fmtDur(matchHours(state, lv.buildTimeHours))}</span></div>`
       : '';
     // Рамка строки — что с ней можно сделать: улучшаемое горит, как доступное к стройке.
-    const look =
-      st.st !== 'built'
+    const look = tech
+      ? 'tech'
+      : st.st !== 'built'
         ? st.st
         : st.up.up === 'ready'
           ? 'up'
@@ -301,6 +324,7 @@ export function buildScreenHtml(
     const row =
       `<div class="bw-item st-${look}"${p.fortress && id === 'starfort' ? '' : ` data-bw="${id}"`}>` +
       `<div class="bw-ih"><span class="bw-ic">${BUILD_ICON[id] ?? '▣'}</span><b>${name}</b>${right}</div>` +
+      (tech?.why ?? '') +
       (fx ? `<div class="bw-fx">${fx}</div>` : '') +
       foot +
       p.buildings.filter((b) => b.type === id).map((b) => buildingRepairHtml(state, me, planetId, b, probe)).join('') +
@@ -357,12 +381,16 @@ export function unitScreenHtml(
       const code = probe(buildUnit(me, planetId, id, 1));
       if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET') return '';
       const locked = code !== null && code !== 'E_INSUFFICIENT';
-      const right = locked
+      const tech = techLock(code, () => techNeed(state, me, data, 'unit', id));
+      const right = tech
+        ? tech.right
+        : locked
         ? `<span class="bw-st lock">🔒 ${esc(lockText(code))}</span>`
         : `<button class="bw-take btn-main" data-unit-go="${esc(id)}"${code ? ' disabled' : ''}>▷ ${t(code ? 'build.action.no-res' : 'build.action.build')}</button>`;
       const art = unitArt(state, me, id);
       return (
-        `<div class="bw-item st-${locked ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
+        `<div class="bw-item st-${tech ? 'tech' : locked ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
+        (tech?.why ?? '') +
         `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>` +
         `<div class="bw-foot"><span>${cost(matchUnitCost(state, def), res)}</span><span class="bw-dur">${fmtDur(matchHours(state, def.buildTimeHours))}</span></div></div>`
       );
@@ -407,10 +435,17 @@ function landerRowHtml(
   const first = candidates.find((g) => probe(order(g)) !== 'E_FORBIDDEN') ?? candidates[0];
   const code = troops.length === 0 ? (first ? probe(order(first)) : 'E_NOT_BUILDABLE') : null;
   if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET') return '';
+  // Заперт сам челнок — ведём к его технологии; челнок открыт, а некого посадить — к
+  // технологии первого бойца: того самого, чьим отказом заперта строка.
+  const tech = techLock(
+    code,
+    () => techNeed(state, me, data, 'unit', id) ?? (first ? techNeed(state, me, data, 'unit', first) : null),
+  );
   const head =
     `<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>` +
-    (code ? `<span class="bw-st lock">🔒 ${esc(lockText(code))}</span>` : '') +
-    `</div>`;
+    (tech ? tech.right : code ? `<span class="bw-st lock">🔒 ${esc(lockText(code))}</span>` : '') +
+    `</div>` +
+    (tech?.why ?? '');
   const fx = `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>`;
   const pick = troops
     .map((g) => {
@@ -423,7 +458,7 @@ function landerRowHtml(
     })
     .join('');
   return (
-    `<div class="bw-item st-${code ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}${head}${fx}` +
+    `<div class="bw-item st-${tech ? 'tech' : code ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}${head}${fx}` +
     (pick ? `<div class="bw-fx">${t('build.lander.troop')}</div>${pick}` : '') +
     `</div>`
   );
@@ -454,6 +489,8 @@ export interface BuildHost {
   openInfo(id: string): void;
   /** Незнакомый код отказа → слова (errText хоста). */
   lockText(code: string): string;
+  /** Окно технологий на досье технологии `id` — кнопка запертой технологией строки. */
+  openTech(id: string): void;
   /** Короткое описание здания для строк без числового эффекта (досье). */
   dossierBody(id: string, level: number): string;
 }
@@ -515,6 +552,13 @@ export function initBuildScreen(host: BuildHost): {
     if (unitGo && planetId && units && host.unitIds(units).includes(unitGo)) {
       host.buildUnit(planetId, unitGo, goEl?.dataset.unitTroop);
       repaint();
+      return;
+    }
+    // «Исследовать» лежит внутри кликабельной строки — выходим раньше карточки, как «Строить».
+    // Окно стройки остаётся под окном технологий: закрыл досье — вернулся к той же строке.
+    const tech = tg.closest<HTMLElement>('[data-bw-tech]')?.dataset.bwTech;
+    if (tech) {
+      host.openTech(tech);
       return;
     }
     const unitInfo = tg.closest<HTMLElement>('[data-unit-info]')?.dataset.unitInfo;

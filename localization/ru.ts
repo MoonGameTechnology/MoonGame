@@ -911,6 +911,7 @@ export const ru: Record<string, string> = {
   'build.state.queued': 'строится',
   'build.state.upgrading': 'улучшается',
   'build.state.waiting': 'в очереди',
+  'build.tech.needs': 'Нужна технология {tech}',
   'callsign.comet': 'Комета',
   'callsign.falcon': 'Сокол',
   'callsign.orion': 'Орион',

@@ -536,9 +536,11 @@ export interface TechHost {
 
 /** Wire the window up. Call once at boot (it attaches the click delegate); `open()` is
  *  what the rail button and the Steward's «research it» call, `repaint()` what the frame
- *  loop calls to keep progress bars and ETAs live while the window is open. */
+ *  loop calls to keep progress bars and ETAs live while the window is open.
+ *  `open(focus)` opens straight on that technology's dossier, on its own branch tab — the
+ *  path from a unit, building or fortress locked behind it («research it»). */
 export function initTechTree(host: TechHost): {
-  open: () => void;
+  open: (focus?: string) => void;
   repaint: () => void;
   isOpen: () => boolean;
 } {
@@ -689,8 +691,16 @@ export function initTechTree(host: TechHost): {
   });
 
   return {
-    open: () => {
+    open: (focus?: string) => {
       modalId = null; // свежее открытие — без прошлого досье
+      // Пришли от запертого юнита или здания — сразу досье нужной технологии на её ветке:
+      // цена, срок и кнопка «Исследовать» в один тап, а не поиск по шести вкладкам.
+      const td = focus ? data.technologies[focus] : undefined;
+      if (focus && td) {
+        tab = td.branch ?? 'space';
+        modalId = focus;
+        modalPop = true;
+      }
       host.root().classList.add('show');
       repaint();
       host.onOpen();

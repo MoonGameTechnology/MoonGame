@@ -36,7 +36,7 @@ import { eventLog } from './eventFeed';
 import { veteranPowerOn } from './fleetCard';
 import { stackHullPct } from './fleetSummary';
 import { buildingName, cost, esc } from './format';
-import { canOrder, data, upgradeBuilding } from './game';
+import { buildBuilding, buildUnit, canOrder, data, upgradeBuilding } from './game';
 import { BUILD_ICON, unitIconHtml } from './icons';
 import { selPlanet } from './interaction';
 import { type IntroCard, parseSeenIntros, resolveIntro } from './intros';
@@ -47,6 +47,8 @@ import { buildRecap } from './recap';
 import { catalogPortraitHtml } from './shipArt';
 import { shipCardHtml } from './shipCard';
 import { invalidatePanel, renderPanel } from './sidePanel';
+import { techNeed } from '../../decisions/techNeed';
+import { techOfferLabel, techWhyHtml } from './techOffer';
 import { enqueueBuild, myRes } from './worldQueries';
 
 /** Что справке нужно от игры. Мир, позывной, мета, досье и забег — в `main.ts`. */
@@ -69,6 +71,8 @@ export interface HelpCenterHost {
   fleetTitle(id: string): string;
   /** Идёт забег Sector Zero: очков и статей о них нет. */
   sectorZeroToolsHidden(): boolean;
+  /** Окно технологий на досье технологии `id` — кнопка «Исследовать» запертой карточки. */
+  openTech(id: string): void;
 }
 
 let game: HelpCenterHost;
@@ -154,13 +158,29 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
     // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
     // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
     if (!buildable || game.buildingLocked(p.id, id)) return '';
+    const offer = codexTechOffer(p.id, 'building', id);
+    if (offer) return offer;
     if (level > 1) return ''; // листаешь будущие уровни — строится всё равно первый
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(matchCost(live(), data.buildings[id]?.cost), myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
+    const offer = codexTechOffer(p.id, 'unit', id);
+    if (offer) return offer;
     return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16, live().players[me()]?.faction)} ${t('codex.build-here')} · ${cost(matchUnitCost(live(), data.units[id]), myRes())}</button>`;
   }
   return '';
+}
+
+/** Заперто технологией — вместо «Построить здесь», которое ядро отбило бы безымянным «нужна
+ *  технология», карточка называет её и ведёт в досье: тот же путь, что у строки окна стройки
+ *  (`techOffer.ts`). Решает отказ ядра на настоящий приказ; иная причина — пустая строка. */
+function codexTechOffer(planetId: string, kind: 'unit' | 'building', id: string): string {
+  const order =
+    kind === 'unit' ? buildUnit(me(), planetId, id, 1) : buildBuilding(me(), planetId, id);
+  if (canOrder(live(), order) !== 'E_TECH_LOCKED') return '';
+  const need = techNeed(live(), me(), data, kind, id);
+  if (!need) return '';
+  return `${techWhyHtml(need)}<button class="cx-build" data-cx-tech="${esc(need.offer)}">${techOfferLabel(need)}</button>`;
 }
 
 // --- ONB-4 codex/help hub: searchable index over the article corpus ----------
@@ -426,6 +446,14 @@ export function initHelpCenter(host: HelpCenterHost): void {
         invalidatePanel();
         renderPanel();
         openCodex(`b:${upg}`);
+        return;
+      }
+      // «Исследовать» запертой карточки: карточка закрывается (её кнопка не живая и после
+      // начала исследования соврала бы), окно технологий открывается на нужном досье.
+      const tech = (tg.closest('[data-cx-tech]') as HTMLElement | null)?.dataset.cxTech;
+      if (tech) {
+        codexEl.classList.remove('show');
+        game.openTech(tech);
         return;
       }
       // Карточка корабля ведёт в справочник своего корпуса — той же дорогой, что плитка.
