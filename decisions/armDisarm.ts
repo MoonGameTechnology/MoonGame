@@ -86,7 +86,7 @@ export type ArmedState = 'merge' | 'cast' | 'troops' | 'assault' | 'engage' | 'r
 export const KEEPS_ARMED: Record<ArmedState, readonly string[]> = {
   merge: ['merge'],
   cast: ['cast', 'castdo'],
-  troops: ['troops', 'tstep', 'tmax', 'tok'],
+  troops: ['troops', 'tstep', 'tmax', 'tset', 'tdirection', 'tclear', 'trefresh', 'tfirst', 'tok'],
   assault: ['attack'],
   // ATK-1: «Атака» держится только своей кнопкой — как и остальные прицелы.
   engage: ['engage'],

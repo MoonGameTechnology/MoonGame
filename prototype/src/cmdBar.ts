@@ -77,6 +77,7 @@ import { mobileOrderBar } from './mobileHud';
 import { mobileDraftMatches, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
 import { barStays, popoverLife } from './popoverLife';
 import { troopsMenuHtml, troopsModel, type TroopsInput } from './troopsMenu';
+import { worldName } from './planetName';
 
 /** Что ряду нужно от игры. Мобильный черновик main.ts берёт у `cmdActions.ts` и отдаёт сюда. */
 export interface CmdBarHost {
@@ -605,6 +606,9 @@ function troopsPopHtml(input: TroopsInput): string {
   const s = game.world();
   const ME = game.me();
   return troopsMenuHtml(troopsModel(input), {
+    direction: troopsPlan?.direction,
+    world: troopsPlan && s.fleets[troopsPlan.fleetId]?.location
+      ? worldName(s, s.fleets[troopsPlan.fleetId]!.location!) : undefined,
     icon: (u) => unitIconHtml(u, data, youColor, 18, s.players[ME]?.faction),
     name: displayUnit,
   });

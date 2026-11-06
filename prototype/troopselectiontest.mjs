@@ -1,4 +1,4 @@
-/* global window, document, localStorage, location, history */
+/* global window, document, localStorage, location, history, getComputedStyle */
 /** Exact army selection through the real menu and kernel, desktop/mobile and RU/EN. */
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
@@ -146,16 +146,33 @@ try {
             window.__armySelection.snapshot().garrison.every((s) => !!s.armyGroup),
           );
           const before = await page.evaluate(() => window.__armySelection.snapshot());
-          assert.equal(await menu.locator('[data-troop-group]').count(), 3);
+          assert.equal(await menu.locator('[data-troop-group]').count(), 2);
           const group = before.garrison[1].armyGroup;
           const row = menu.locator(`[data-troop-group="garrison:${group}"]`);
-          assert.match(await row.innerText(), /50%/);
+          assert.match(await row.innerText(), /75%/);
           assert.match(await row.innerText(), locale === 'ru' ? /Выслуга: 3/ : /Service grade: 3/);
           assert.match(await row.innerText(), locale === 'ru' ? /Боёв: 3/ : /Battles: 3/);
+          // Both direct entry and native range changes reach the same clamped plan.
+          await row.locator('.tdelta').fill('3');
           await row.locator('[data-cmd="tstep"][data-n="1"]').click();
-          await row.locator('[data-cmd="tstep"][data-n="1"]').click();
-          assert.equal(await row.locator('.tdelta').innerText(), '+2');
+          assert.equal(await row.locator('.tdelta').inputValue(), '4', 'blur/change must not swallow the next plus click');
+          await row.locator('.tdelta').fill('1');
+          await menu.locator('[data-direction="unload"]').click();
+          assert.equal(await menu.locator('[data-direction="unload"]').getAttribute('aria-selected'), 'true');
+          await menu.locator('[data-direction="load"]').click();
+          await row.locator('.trange').fill('2');
+          await row.locator('.trange').dispatchEvent('change');
+          assert.equal(await row.locator('.tdelta').inputValue(), '2');
           assert.equal(await menu.locator('.chosen').count(), 1);
+          const compact = await row.evaluate((el) => ({
+            width: el.getBoundingClientRect().width,
+            inner: el.querySelector('.tunit-head').getBoundingClientRect().width,
+            accent: getComputedStyle(el.querySelector('.trange')).accentColor,
+            gap: getComputedStyle(el.parentElement).gap,
+          }));
+          assert.ok(compact.inner >= compact.width - 24, JSON.stringify(compact));
+          assert.notEqual(compact.accent, 'auto');
+          assert.equal(compact.gap, '6px');
           const overflow = await menu.evaluate((el) => ({
             scroll: el.scrollWidth,
             client: el.clientWidth,
@@ -165,18 +182,22 @@ try {
           assert.ok(overflow.scroll <= overflow.client + 1, JSON.stringify(overflow));
           assert.ok(overflow.left >= -1 && overflow.right <= width + 1, JSON.stringify(overflow));
           if (out) await page.screenshot({ path: `${out}/${width}-${locale}.png` });
+          await row.locator('.tdelta').fill('1');
+          await row.locator('.tdelta').press('Tab');
+          await row.locator('.tdelta').fill('2');
           await menu.locator('[data-cmd="tok"]').click();
+          await page.locator('#troopswin').waitFor({ state: 'hidden' });
           const ordered = await page.evaluate(() => window.__armySelection.snapshot());
-          assert.deepEqual(ordered.loading[0].sources, [{ group, count: 2 }]);
-          assert.equal(ordered.garrison[1].count, 4);
+          assert.deepEqual(ordered.loading.flatMap(c => c.sources), [{ group, count: 1 }, { group: before.garrison[2].armyGroup, count: 1 }]);
+          assert.deepEqual(ordered.garrison, before.garrison);
           await page.evaluate(() => window.__armySelection.advance());
           const loaded = await page.evaluate(() => window.__armySelection.snapshot());
-          assert.equal(loaded.landing[0].count, 2);
-          assert.equal(loaded.landing[0].hp, hp);
+          assert.equal(loaded.landing.reduce((n,s) => n+s.count, 0), 2);
+          assert.equal(loaded.landing.reduce((n,s) => n+(s.hp ?? s.count*hp), 0), hp * 1.5);
           assert.equal(loaded.landing[0].battles, 3);
           assert.deepEqual(
             loaded.garrison.map((s) => s.count),
-            [4, 2, 4],
+            [4, 3, 3],
           );
           if (phone && !(await page.locator('[data-cmd="troops"]:visible').count()))
             await page.locator('[data-cmd="more"]:visible').first().click();
@@ -187,17 +208,18 @@ try {
           const aboard = await page.evaluate(
             () => window.__armySelection.snapshot().landing[0].armyGroup,
           );
+          await menu.locator('[data-cmd="tdirection"][data-direction="unload"]').click();
           const unload = menu.locator(`[data-troop-group="hold:${aboard}"]`);
-          assert.match(await unload.innerText(), /50%/);
+          assert.match(await unload.innerText(), /75%/);
           await unload.locator('[data-cmd="tstep"][data-n="-1"]').click();
           await menu.locator('[data-cmd="tok"]').click();
           const unloading = await page.evaluate(() => window.__armySelection.snapshot());
           assert.deepEqual(unloading.unloading[0].sources, [{ group: aboard, count: 1 }]);
-          assert.equal(unloading.landing[0].count, 2);
+          assert.equal(unloading.landing.reduce((n,s) => n+s.count,0), 2);
           await page.evaluate(() => window.__armySelection.advance());
           const done = await page.evaluate(() => window.__armySelection.snapshot());
           assert.equal(done.landing[0].count, 1);
-          assert.equal(done.landing[0].hp, hp / 2);
+          assert.equal(done.landing.reduce((n,s) => n+(s.hp ?? s.count*hp), 0), hp);
           // The reported failure: heavy infantry below a long list of formations.
           const {heavyHp} = await page.evaluate(() => window.__armySelection.stage(true));
           await page.locator('#maploading').waitFor({ state: 'hidden' });
@@ -218,11 +240,11 @@ try {
           const scroll = await menu.locator('.tlist').evaluate(el => el.scrollTop);
           assert.ok(!phone || scroll > 0, 'heavy infantry fixture exercises the scrollable phone list');
           await tapButton(page, plus, phone);
-          assert.equal(await heavyRow.locator('.tdelta').innerText(), '+1');
+          assert.equal(await heavyRow.locator('.tdelta').inputValue(), '1');
           assert.ok(Math.abs(await menu.locator('.tlist').evaluate(el => el.scrollTop) - scroll) <= 1,
             'changing quantity must preserve scroll position');
           await tapButton(page, plus, phone);
-          assert.equal(await heavyRow.locator('.tdelta').innerText(), '+2');
+          assert.equal(await heavyRow.locator('.tdelta').inputValue(), '2');
           assert.equal(await menu.locator('.chosen').count(), 1);
           assert.ok((await buttonPoint(confirm)).visible, 'confirmation stays visible after scrolling');
           if (out) await page.screenshot({path:`${out}/${width}-${locale}-heavy.png`});
@@ -242,7 +264,7 @@ try {
             await menu.waitFor();
             // Keyboard focus stays inside the dialog; Android Back cancels it.
             await page.keyboard.press('Shift+Tab');
-            assert.equal(await page.evaluate(() => document.activeElement?.dataset.cmd), 'tcancel');
+            assert.equal(await page.evaluate(() => document.activeElement === [...document.querySelectorAll('#troopswin button:not([disabled]):not([tabindex="-1"]),#troopswin input:not([disabled])')].at(-1)), true);
             await page.keyboard.press('Tab');
             assert.equal(await page.evaluate(() => !!document.activeElement?.closest('.troops-head')), true);
             if (phone) await page.evaluate(() => history.back());
