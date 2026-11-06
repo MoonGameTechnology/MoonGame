@@ -158,7 +158,7 @@ body.holo-ui #connect[data-stage="browse"] :is(.cbtn, .mbtn) { border-radius: 12
 body.holo-ui #connect[data-stage="browse"] .mtab { flex: 0 0 auto; padding: 0 18px; }
 body.holo-ui #connect[data-stage="browse"] .mfdrop { flex: 0 1 260px; }
 body.holo-ui #connect[data-stage="browse"] .mfplayers { flex: 1 1 280px; }
-body.holo-ui #connect[data-stage="browse"] :is(.mrow, .mrow.mrow-2) { grid-template-areas: "name btns" "meta btns" "number btns"; padding: 12px 16px; }
+body.holo-ui #connect[data-stage="browse"] :is(.mrow, .mrow.mrow-2) { grid-template-areas: "name btns" "meta btns" "number btns"; padding: 10px 14px; }
 body.holo-ui #connect[data-stage="browse"] .msrv .cbtn { flex: 0 0 auto; }
 body.holo-ui #connect[data-stage="browse"] .msrv .cfield { margin: 0; font-size: 14px; }
 body.holo-ui #connect[data-stage="browse"] .msrv .cfield input { margin-top: 6px; border-radius: 12px; background: var(--sf-inset); font-size: 15px; }
@@ -166,7 +166,7 @@ body.holo-ui #connect[data-stage="browse"] .mcreate label { flex: none; }
 body.holo-ui #connect[data-stage="browse"] .mcreate .inp { flex: 0 1 320px; }
 
 /* The hub keeps the original live panels and routes, framed as separate screens. */
-body.holo-ui #hub { padding: 24px 28px; gap: 13px; }
+body.holo-ui #hub { padding: 16px 24px; gap: 10px; }
 body.holo-ui #hub :is(.hub-id, .hub-body, .hub-note, .hub-nav) {
   width: min(1080px, 100%);
   margin-left: auto;
@@ -180,15 +180,15 @@ body.holo-ui #hub :is(.hub-id, .hub-body, .hub-nav) {
   box-shadow: var(--bridge-shadow);
   backdrop-filter: blur(14px);
 }
-body.holo-ui #hub .hub-id { padding: 15px 21px; gap: 15px; }
+body.holo-ui #hub .hub-id { padding: 10px 18px; gap: 12px; }
 body.holo-ui #hub .hub-av { width: 42px; height: 42px; border-radius: 8px; font-size: 19px; }
 body.holo-ui #hub .hub-av::after { box-shadow: none; background: #95cedb; }
 body.holo-ui #hub .hub-name { font-size: 16px; font-weight: 550; }
 body.holo-ui #hub .hub-st { color: #9ab6c4; font-size: var(--fs-caption); margin-top: 5px; }
 body.holo-ui #hub .hub-st::before { box-shadow: none; }
 body.holo-ui #hub .hub-msg { border-radius: 5px; border-color: var(--bridge-edge); }
-body.holo-ui #hub .hub-body { padding: 24px; min-height: 0; }
-body.holo-ui #hub .hub-panel { gap: 15px; }
+body.holo-ui #hub .hub-body { padding: 18px; min-height: 0; }
+body.holo-ui #hub .hub-panel { gap: 12px; }
 body.holo-ui #hub #hp-home { flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
 body.holo-ui #hub #hp-home > * { flex: 1 0 100%; min-width: 0; }
 /* Дверь — во всю ширину, режимы — два на два (UIX-10.1). */
@@ -205,18 +205,18 @@ body.holo-ui #hub .hub-solo {
   background: rgba(4, 16, 29, .32);
 }
 body.holo-ui #hub .hub-solo:hover:not(:disabled) { border-color: #b3e6f2; background-color: rgba(107, 187, 208, .11); }
-body.holo-ui #hub .hub-sec { margin-top: 11px; padding-bottom: 10px; }
-body.holo-ui #hub .hub-card { border-color: rgba(130, 197, 218, .18); border-radius: 5px; padding: 18px; background: rgba(16, 36, 51, .28); }
+body.holo-ui #hub .hub-sec { margin-top: 6px; padding-bottom: 8px; }
+body.holo-ui #hub .hub-card { border-color: rgba(130, 197, 218, .18); border-radius: 5px; padding: 14px; background: rgba(16, 36, 51, .28); }
 body.holo-ui #hub .hub-card .hc-ic { width: 35px; height: 35px; border-radius: 5px; font-size: 18px; background: rgba(91, 151, 176, .08); color: #a1d1df; }
 body.holo-ui #hub .hub-card .hc-t { font-size: 14px; line-height: 1.4; }
 body.holo-ui #hub .hub-card .hc-s { font-size: var(--fs-body); line-height: 1.6; margin-top: 5px; }
 body.holo-ui #hub .hm-more { font-size: var(--fs-body); line-height: 1.6; }
-body.holo-ui #hub .hub-grid { grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 12px; }
-body.holo-ui #hub .hub-tile { min-height: 91px; border-radius: 5px; font-family: inherit; font-size: var(--fs-body); font-weight: 500; gap: 10px; }
+body.holo-ui #hub .hub-grid { grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 10px; }
+body.holo-ui #hub .hub-tile { min-height: 80px; border-radius: 5px; font-family: inherit; font-size: var(--fs-body); font-weight: 500; gap: 8px; }
 body.holo-ui #hub .hub-tile .ht-ic { color: #a4cddf; text-shadow: none; }
 body.holo-ui #hub .hub-tile.wide { min-height: 44px; }
-body.holo-ui #hub .hub-nav { padding: 8px; gap: 5px; min-height: 66px; }
-body.holo-ui #hub .hub-tab { border: 1px solid transparent; border-radius: 5px; font-family: inherit; font-size: var(--fs-body); gap: 6px; color: #9db6c6; padding: 8px 6px; }
+body.holo-ui #hub .hub-nav { padding: 6px; gap: 5px; min-height: 58px; }
+body.holo-ui #hub .hub-tab { border: 1px solid transparent; border-radius: 5px; font-family: inherit; font-size: var(--fs-body); gap: 4px; color: #9db6c6; padding: 6px; }
 body.holo-ui #hub .hub-tab .hn-ic { color: inherit; font-size: 18px; }
 body.holo-ui #hub .hub-tab.active { border-color: rgba(123, 191, 211, .3); background: rgba(83, 140, 165, .12); color: #d1eef5; }
 body.holo-ui #hub .hub-tab.active .hn-ic { text-shadow: none; }
@@ -280,8 +280,8 @@ body.holo-ui :is(#hub, #connect, #setup, #seatpick) button:disabled { opacity: .
 body.holo-ui:where(.holo-w1050) #connect { padding: 26px 40px; }
 body.holo-ui:where(.holo-w1050) #connect .cwrap { margin-left: auto; }
 body.holo-ui:where(.holo-w1050) #connect::after { right: calc(var(--vpw) * -.42); opacity: .65; }
-body.holo-ui:where(.holo-w1050) #hub { padding: 18px 22px; gap: 10px; }
-body.holo-ui:where(.holo-w1050) #hub .hub-body { padding: 20px; }
+body.holo-ui:where(.holo-w1050) #hub { padding: 14px 18px; gap: 8px; }
+body.holo-ui:where(.holo-w1050) #hub .hub-body { padding: 16px; }
 body.holo-ui:where(.holo-w1050) #setup .sbox { padding: 20px; }
 body.holo-ui:where(.holo-w1050) #setup .spane { gap: 12px; }
 body.holo-ui:where(.holo-w1050) #setup .scol { padding: 12px; }
@@ -294,10 +294,10 @@ body.holo-ui:where(.holo-h760) #connect .ccrest .wm { font-size: 25px; }
 body.holo-ui:where(.holo-h760) #connect .csub { margin-bottom: 18px; }
 body.holo-ui:where(.holo-h760) #connect .cdiv { margin: 15px 0 12px; }
 body.holo-ui:where(.holo-h760) #connect .cstack { margin-top: 16px; }
-body.holo-ui:where(.holo-h760) #hub { padding-top: 12px; padding-bottom: 12px; }
-body.holo-ui:where(.holo-h760) #hub .hub-id { padding: 11px 18px; }
-body.holo-ui:where(.holo-h760) #hub .hub-nav { min-height: 58px; padding: 5px; }
-body.holo-ui:where(.holo-h760) #hub .hub-body { padding: 18px; }
+body.holo-ui:where(.holo-h760) #hub { padding-top: 10px; padding-bottom: 10px; }
+body.holo-ui:where(.holo-h760) #hub .hub-id { padding: 8px 16px; }
+body.holo-ui:where(.holo-h760) #hub .hub-nav { min-height: 52px; padding: 4px; }
+body.holo-ui:where(.holo-h760) #hub .hub-body { padding: 14px; }
 body.holo-ui:where(.holo-h760) #setup .smap { min-height: 200px; }
 @media (prefers-reduced-motion: reduce) {
   body.holo-ui :is(#connect, #hub, #setup, #seatpick, #endscreen, #settings) *,

@@ -54,8 +54,12 @@ try {
         assert.equal(await page.locator('#hub .hub-banner').count(), 0);
         const games = page.locator('.hub-tab[data-hub="games"]');
         const nav = page.locator('.hub-nav');
+        // The profile and wallet header belongs to «Домой» only (owner, 2026-11-05).
+        const header = page.locator('#hub .hub-id');
+        assert.equal(await header.isVisible(), true, 'the header stands on «Домой»');
         await games.click();
         await page.locator('#mlist .mrow').first().waitFor();
+        assert.equal(await header.isVisible(), false, 'no header on «Игры»');
         assert.equal(await page.locator('#hp-games > #connect').count(), 1);
         assert.equal(await page.locator('#cback').count(), 0);
         assert.equal(await games.evaluate(el => el.classList.contains('active')), true);
@@ -77,7 +81,15 @@ try {
           if (await intro.isVisible()) await intro.click();
           assert.equal(await nav.isVisible(), true);
           assert.equal(await page.locator(`#hp-${tab}`).isVisible(), true);
+          assert.equal(await header.isVisible(), tab === 'home', `header on «${tab}»`);
           assert.equal(await page.locator('#connect').isVisible(), false);
+          if (tab === 'more') {
+            // A page opened from «Ещё» keeps «Ещё» lit and has no header either.
+            await page.locator('#hub-rank').click();
+            assert.equal(await page.locator('#hub').getAttribute('data-panel'), 'rank');
+            assert.equal(await header.isVisible(), false, 'no header on a page from «Ещё»');
+            assert.equal(await nav.locator('.hub-tab.active').getAttribute('data-hub'), 'more');
+          }
           await games.click();
           await page.locator('.mtab[data-tab="active"].active').waitFor();
           assert.equal(await page.locator('#mnum-in').inputValue(), '87654321');

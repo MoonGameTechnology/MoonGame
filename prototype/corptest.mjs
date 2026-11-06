@@ -108,6 +108,8 @@ try {
       await page.keyboard.press('Escape');
       await page.locator('#corp-sheet.open').waitFor({ state: 'detached' });
       // Public corporation card reached from a player has one back action, with focus restored.
+      // The profile header (avatar, wallet) lives on «Домой» only.
+      await page.click('[data-hub="home"]');
       await page.click('#hubav');
       await page.locator('#profile.show').waitFor();
       await page.click('#profile [data-pstab="career"]');
@@ -127,6 +129,7 @@ try {
       await corporation.waitFor();
       await page.keyboard.press('Escape');
       await page.locator('#profile.show').waitFor({ state: 'detached' });
+      await openTab();
       if (identityOnly) {
         await page.reload();
         await waitForApp(page);
