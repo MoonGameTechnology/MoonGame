@@ -340,7 +340,7 @@ export function startGuidedMatch(): void {
   // installMatch → maybeStartPendingTour runs the guide; the scenario adds the operation's
   // hero refit, granted technologies and the guild's market lots.
   const setup = buildSetupConfig();
-  game.startMatch(setup, false, (st) => guideScenario(st, setup.seats[0]!.id));
+  game.startMatch(setup, false, (st) => guideScenario(st, setup.seats[0]!.id, data));
   // The bot-free lesson accelerates the real construction, research and travel clocks.
   guidedLesson = true;
   applyTimeSpeed(300);

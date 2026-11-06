@@ -1,6 +1,6 @@
 /** Progress facts for the bot-free duel-1 lesson. Count hulls, not fleet records:
  * construction can join an existing fleet. Only the named destination counts. */
-import { heroCooldownKey, type GameData, type GameState } from '../packages/shared-core/src/index';
+import { heroCooldownKey, matchCost, type GameData, type GameState } from '../packages/shared-core/src/index';
 
 export const GUIDE_TARGET = 'shale';
 export const GUIDE_MAP = 'duel-1';
@@ -84,10 +84,14 @@ export const GUIDE_LOT_SELL = { resource: 'metal', amount: 30, price: 4 } as con
  * (`defeated`): it never plays, never scores and never shows up as a rival, but it owns
  * the two lots, because a lot whose owner does not exist cannot be taken.
  */
-export function guideScenario(s: GameState, me: string): GameState {
+export function guideScenario(s: GameState, me: string, data: GameData): GameState {
   const next = structuredClone(s);
   const player = next.players[me];
   if (!player) return next;
+  // The bot-free lesson supplies its mandatory research, paid at the catalogue price.
+  // Ordinary match treasuries and research prices stay unchanged.
+  for (const [resource, amount] of Object.entries(matchCost(next, data.technologies[GUIDE_TECH]?.cost) ?? {}))
+    player.resources[resource] = (player.resources[resource] ?? 0) + amount;
   const done = player.technologies?.completed ?? [];
   player.technologies = {
     ...player.technologies,

@@ -106,7 +106,10 @@ export function researchOrders(bot: AiTurn, home: HomeTurn): void {
         rank(id) < Math.min(2, pick !== undefined ? rank(pick) : 2) &&
         shortOf(id).every((r) => {
           const gap = (costOf(id)[r] ?? 0) + pad(r, ORDER_RESERVE[r] ?? 0) - (pl.resources[r] ?? 0);
-          return (flow[r] ?? 0) > 0 && gap <= (flow[r] ?? 0) * DOCTRINE_SAVE_HOURS;
+          // Opening unit unlocks must accumulate their price even when it takes longer
+          // than the doctrine window; otherwise scout production spends it every turn.
+          return (flow[r] ?? 0) > 0 &&
+            (rank(id) === -1 || gap <= (flow[r] ?? 0) * DOCTRINE_SAVE_HOURS);
         }),
     );
     if (goal !== undefined) bot.saving = new Set(shortOf(goal));

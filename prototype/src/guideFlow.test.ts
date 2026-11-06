@@ -228,7 +228,7 @@ describe('REFM-221 · ведомый первый матч и цели', () => {
   });
 
   it('все цели урока — похвала и XP ровно один раз; флаг помнит награду по позывному', async () => {
-    let s = guideScenario(game.newGame(), 'p1');
+    let s = guideScenario(game.newGame(), 'p1', game.data);
     const guide = await load(() => s);
     guide.startGuidedMatch();
     guide.maybeStartPendingTour();

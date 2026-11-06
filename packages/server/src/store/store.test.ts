@@ -183,6 +183,25 @@ function accountStoreContract(name: string, make: () => AccountStore, uniq: (p: 
   describe(`AccountStore — ${name}`, () => {
     const seats = ['p1', 'p2'] as const;
 
+    it('persists personal archive choices across reads, reconnect and adapter recreation', async () => {
+      const store = make(), room = uniq('personal-archive');
+      expect(await store.setMatchArchived(room, 'alice', true)).toBe(false);
+      await store.resolveSeat(room, 'alice', seats);
+      await store.resolveSeat(room, 'bob', seats);
+      expect(await store.setMatchArchived(room, 'alice', true)).toBe(true);
+      expect(await store.setMatchArchived(room, 'alice', true)).toBe(true);
+      await store.resolveSeat(room, 'alice', seats);
+      const reopened = name === 'postgres' ? make() : store;
+      expect(await reopened.archivedMatches('alice', [room])).toContain(room);
+      expect(await reopened.archivedMatches('bob', [room])).not.toContain(room);
+      await reopened.setMatchArchived(room, 'alice', false);
+      expect(await store.archivedMatches('alice', [room])).not.toContain(room);
+      await reopened.setMatchArchived(room, 'alice', true);
+      await store.releaseSeat(room, 'alice');
+      await store.resolveSeat(room, 'alice', seats);
+      expect(await store.archivedMatches('alice', [room])).not.toContain(room);
+    });
+
     it('assigns a free seat and returns the SAME one on return', async () => {
       const store = make();
       const first = await store.resolveSeat(uniq('r1'), 'alice', seats);

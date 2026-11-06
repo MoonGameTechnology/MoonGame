@@ -17,10 +17,10 @@ export const MATCH_ARCHIVE_MS = 7 * MS_PER_DAY;
  *
  * Design invariant (docs/main-menu.md §2): NONE of this lives in `GameState`. The
  * deterministic core knows nothing about menus, maps, rules-as-metadata or archive
- * flags — that is between-match meta-state. The registry holds it BESIDE each room
- * and projects read-models (the three browser tabs) + accepts fail-secure intents
- * (archive). Identity is the lightweight nick→seat from `AccountStore` (real accounts
- * are the blocker for the full menu, docs/main-menu.md §6 — this stands in for now).
+ * flags — that is between-match meta-state. The registry holds match metadata beside
+ * each room; personal archive choices live in AccountStore beside the participant's
+ * seat. It projects the three browser tabs and accepts fail-secure archive intents.
+ * The authenticated host supplies the verified login used to resolve that seat.
  */
 
 /** Per-match metadata the browser shows that the simulation itself doesn't carry. */
@@ -50,9 +50,6 @@ export interface MatchMeta {
    *  session's time scale. A RECONNECT (a nick already holding a seat) is never
    *  gated — only a first-time claim. */
   entryWindowMs?: number;
-  /** Nicks that have moved this match to their OWN archive — PER-PLAYER, not global:
-   *  archiving only hides the match from that one player's Available/Active tabs. */
-  archivedBy?: Set<string>;
 }
 
 // Форма ленты браузера матчей объявлена в `@void/protocol` — её ЧИТАЕТ второй конец,
@@ -106,7 +103,7 @@ export function matchKind(data: GameData | undefined, modeId: string | undefined
 }
 
 /** Fail-secure result of an archive/restore intent (A10: a stable code, no detail). */
-export type ArchiveResult = { ok: true } | { ok: false; code: 'E_NO_MATCH' | 'E_FORBIDDEN' };
+export type ArchiveResult = { ok: true } | { ok: false; code: 'E_NO_MATCH' | 'E_FORBIDDEN' | 'E_ARCHIVE_STORE' };
 
 interface Entry {
   room: MatchRoom;
@@ -133,7 +130,7 @@ export class MatchRegistry {
 
   /** Add a match (room + its meta). Re-registering the same id replaces the entry. */
   register(room: MatchRoom, meta: MatchMeta): void {
-    this.entries.set(room.id, { room, meta: { ...meta, archivedBy: meta.archivedBy ?? new Set() } });
+    this.entries.set(room.id, { room, meta: { ...meta } });
   }
 
   get(id: string): MatchRoom | undefined {
@@ -259,11 +256,12 @@ export class MatchRegistry {
    */
   async list(nick: string | null): Promise<MatchLists> {
     const out: MatchLists = { available: [], active: [], archived: [] };
+    const archived = new Set(nick ? await this.accounts.archivedMatches(nick, [...this.entries.keys()]) : []);
     for (const entry of this.entries.values()) {
       if (this.expired(entry)) continue;
       const sum = await this.summary(entry);
       const seat = nick ? await this.accounts.seatOf(entry.room.id, nick) : null;
-      if (seat && (sum.status === 'ended' || entry.meta.archivedBy?.has(nick!))) {
+      if (seat && (sum.status === 'ended' || archived.has(entry.room.id))) {
         out.archived.push(sum);
         continue;
       }
@@ -315,8 +313,7 @@ export class MatchRegistry {
     const entry = this.entries.get(matchId);
     if (!entry || this.expired(entry)) return { ok: false, code: 'E_NO_MATCH' };
     if (!nick || !(await this.accounts.seatOf(matchId, nick))) return { ok: false, code: 'E_FORBIDDEN' };
-    (entry.meta.archivedBy ??= new Set()).add(nick);
-    return { ok: true };
+    return this.saveArchive(matchId, nick, true);
   }
 
   /** Restore a match from a player's archive (the inverse of {@link archive}). */
@@ -325,7 +322,15 @@ export class MatchRegistry {
     if (!entry || this.expired(entry)) return { ok: false, code: 'E_NO_MATCH' };
     if (!nick || !(await this.accounts.seatOf(matchId, nick))) return { ok: false, code: 'E_FORBIDDEN' };
     if (entry.room.state.match.status === 'ended') return { ok: false, code: 'E_FORBIDDEN' };
-    entry.meta.archivedBy?.delete(nick);
-    return { ok: true };
+    return this.saveArchive(matchId, nick, false);
+  }
+
+  private async saveArchive(matchId: string, nick: string, archived: boolean): Promise<ArchiveResult> {
+    try {
+      return await this.accounts.setMatchArchived(matchId, nick, archived)
+        ? { ok: true } : { ok: false, code: 'E_FORBIDDEN' };
+    } catch {
+      return { ok: false, code: 'E_ARCHIVE_STORE' };
+    }
   }
 }

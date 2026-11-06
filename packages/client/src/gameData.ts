@@ -5,7 +5,7 @@
  * both. Re-exported here so this module stays the client's single door to game data.
  * Maps stay local: they are the client's own screens, not shared content.
  */
-import { parseMatchMap, buildStateFromMap, mapForDifficulty, pairKey } from '@void/shared-core';
+import { parseMatchMap, buildStateFromMap, mapForDifficulty, pairKey, matchCost } from '@void/shared-core';
 import type { GameData, GameState, MapObjective, MatchMap } from '@void/shared-core';
 
 import { FRAGMENTS, shippedGameData } from '../../../data/bundle';
@@ -166,6 +166,9 @@ function trainingMatchMap(): MatchMap {
 export function trainingState(data: GameData): GameState {
   const map = parseMatchMap(trainingMap);
   const world = buildStateFromMap(map, data);
+  // The training map supplies its mandatory research in addition to its build budget.
+  for (const [resource, amount] of Object.entries(matchCost(world, data.technologies.orbital_defense_grid?.cost) ?? {}))
+    world.players.p1!.resources[resource] = (world.players.p1!.resources[resource] ?? 0) + amount;
   const seats = Object.values(world.players).filter((p) => !p.npc).map((p) => p.id);
   const diplomacy = { ...world.diplomacy };
   for (const a of seats) for (const b of seats) if (a < b) diplomacy[pairKey(a, b)] = 'war';

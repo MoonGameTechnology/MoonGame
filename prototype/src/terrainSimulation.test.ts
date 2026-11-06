@@ -44,6 +44,8 @@ const geography = (state: GameState) => Object.values(state.planets).map(p => ({
 
 it.each(MAP_IDS)('AC15: %s simulation is identical with environment preparation between steps', mapId => {
   const initial = newGame({ mapId, seats: networkSeats('ffa', mapId) });
+  // Scripted research/build orders isolate terrain preparation from the economy.
+  initial.players.p1!.resources = { credits: 10000, metal: 10000, microelectronics: 1000, energy: 1000, food: 1000 };
   const home = Object.values(initial.planets).find(p => p.owner === 'p1')!;
   // Send the starting scout to the nearest unowned decorated environment, so all
   // three cases exercise actual features rather than only the empty home-world scene.
