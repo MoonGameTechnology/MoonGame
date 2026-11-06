@@ -481,6 +481,17 @@ export const VICEROY_SOLO_MIGRATION = {
   toDataHash: '086a8a70acb1f4',
 } as const;
 
+/** Research catalogue prices ×10. Keep the world, treasury, host price multipliers,
+ *  already-paid research and its completion time; new starts use the new catalogue. */
+export const TECHNOLOGY_PRICES_SOLO_MIGRATION = {
+  fromRules: VICEROY_SOLO_MIGRATION.toRules,
+  fromData: VICEROY_SOLO_MIGRATION.toData,
+  fromDataHash: VICEROY_SOLO_MIGRATION.toDataHash,
+  toRules: '0a6f76b86a4d0a',
+  toData: '0.1.82',
+  toDataHash: '0f70af91e21327',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -523,6 +534,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   RAMP_SETTLEMENT_SOLO_MIGRATION,
   CONTROL_TECH_SOLO_MIGRATION,
   VICEROY_SOLO_MIGRATION,
+  TECHNOLOGY_PRICES_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
