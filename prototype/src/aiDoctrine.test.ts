@@ -72,9 +72,9 @@ describe('исследования по доктрине', () => {
   });
 
   it('на узел ветки, который доход закроет за 4 часа, бот копит: ни чужих узлов, ни войск', () => {
-    // «Ударные векторы» стоят 280 кредитов, 220 металла и 30 микроэлектроники; с запасом
-    // заказа металла недостаёт 30, а шахта дома даёт его каждый час.
-    const s = done(game2('wing_commodore', { ...RICH, metal: 250 }), 'flight_decks');
+    // With the order reserve, metal is 30 short; the home mine earns it within 4h.
+    const metal = data.technologies.strike_vectors!.cost.metal! + 60 - 30;
+    const s = done(game2('wing_commodore', { ...RICH, metal }), 'flight_decks');
     const acts = orders(s);
     expect(only(acts, 'technology.research')).toEqual([]);
     const metalUnits = only(acts, 'unit.build').filter(

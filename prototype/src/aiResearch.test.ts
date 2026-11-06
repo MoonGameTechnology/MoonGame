@@ -13,12 +13,15 @@ import { newGame, aiOrders, data, START_CANDIDATES } from './game';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 
 function game2(): GameState {
-  return newGame({
+  const s = newGame({
     seats: [
       { id: 'p1', name: 'A', faction: 'azure', start: START_CANDIDATES[0]!, ai: true },
       { id: 'p2', name: 'B', faction: 'crimson', start: START_CANDIDATES[1]!, ai: true },
     ],
   });
+  // These tests isolate research selection, not the time needed to save its price.
+  s.players.p2!.resources = { credits: 10000, metal: 10000, microelectronics: 1000, energy: 1000, food: 1000 };
+  return s;
 }
 
 const research = (actions: Action[]): Action[] =>

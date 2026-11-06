@@ -15,7 +15,7 @@ export function lessonWorld(): GameState {
     scientists: ['overseer', 'polymath'],
     heroes: DEFAULT_HEROES.map((h) => ({ ...h, abilities: [...h.abilities] })),
   });
-  return advance(guideScenario(base, 'p1'), base.time + 1).state;
+  return advance(guideScenario(base, 'p1', data), base.time + 1).state;
 }
 
 /** A screen that shows nothing and has nothing selected: every operation step waits. */

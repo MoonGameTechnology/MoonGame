@@ -33,12 +33,16 @@ const PLAYER_VICTORY_PATHS = ['prototype/src/protoKernel.ts', 'prototype/netserv
 const read = (p: string): string => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 
 function game2(): GameState {
-  return newGame({
+  const s = newGame({
     seats: [
       { id: 'p1', name: 'A', faction: 'azure', start: START_CANDIDATES[0]!, ai: true },
       { id: 'p2', name: 'B', faction: 'crimson', start: START_CANDIDATES[1]!, ai: true },
     ],
   });
+  // Keep affordability independent of the profile's decision/skip windows.
+  for (const p of Object.values(s.players))
+    p.resources = { credits: 10000, metal: 10000, microelectronics: 1000, energy: 1000, food: 1000 };
+  return s;
 }
 
 const research = (actions: Action[]): Action[] =>

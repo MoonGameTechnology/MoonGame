@@ -64,15 +64,18 @@ describe('main-game research progression', () => {
     }
   });
 
-  it('can afford both first military researches and then construct the unlocked ship', () => {
+  it('earns the first military research prices and then constructs the unlocked ship', () => {
     let s = fresh();
     expect(canOrder(s, buildUnit('p1', 'home_1', 'frigate'))).toBe('E_TECH_LOCKED');
+    expect(canOrder(s, researchTech('p1', 'frigate_design'))).toBe('E_INSUFFICIENT');
     for (const tech of ['frigate_design', 'militia_training']) {
+      for (let hours = 0; hours < 160 && canOrder(s, researchTech('p1', tech)) === 'E_INSUFFICIENT'; hours++)
+        s = advance(s, s.time + HOUR).state;
       const r = order(s, researchTech('p1', tech), s.time);
       expect(r.error).toBeUndefined(); s = r.state;
     }
-    expect(s.players.p1!.technologies!.active).toHaveLength(2);
-    s = advance(s, 2 * HOUR).state;
+    s = advance(s, s.time + 2 * HOUR).state;
+    expect(s.players.p1!.technologies!.completed).toEqual(expect.arrayContaining(['frigate_design', 'militia_training']));
     expect(canOrder(s, buildUnit('p1', 'home_1', 'frigate'))).toBeNull();
     expect(canOrder(s, buildUnit('p1', 'home_1', 'cruiser'))).toBe('E_TECH_LOCKED');
   });
@@ -107,7 +110,7 @@ describe('main-game research progression', () => {
     let s = fresh();
     s.players.p2!.ai = true;
     let research = 0;
-    for (let hour = 0; hour <= 16; hour += 2) {
+    for (let hour = 0; hour <= 160; hour += 2) {
       s = advance(s, hour * HOUR).state;
       for (const a of aiOrders(s, 'p2', 'expand', profile)) {
         const result = order(s, a, s.time);
