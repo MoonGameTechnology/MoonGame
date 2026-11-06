@@ -122,16 +122,24 @@
 #hubwallet .tw-cur:hover .hw-go{background:color-mix(in srgb,currentColor 36%,transparent);}
 /* Узкий экран: кошелёк — своей строкой под именем, а не вместо него. */
 @media (max-width:900px){#hub .hub-id{flex-wrap:wrap;row-gap:8px;}#hub .hub-wallet-row{order:10;flex:1 0 100%;justify-content:space-between;}}
-#hub .hub-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px 10px;}
-#hub .hub-panel{display:flex;flex-direction:column;gap:10px;}
+/* Поля по бокам на главной и в «Играх» — 4px (заказ владельца 2026-11-06): шире они читались
+   чёрными полосами вокруг карточек партий и режимов. Остальные вкладки держат 12px — у них текст
+   стоит прямо на поле панели и у самого края экрана теснится. Заголовки разделов на узких полях
+   отступают на 4px, чтобы не липнуть к краю. На ПК поля задаёт рамка окна (bridge-shell.css). */
+#hub .hub-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 12px;}
+#hub:is([data-panel=home],[data-panel=games]) .hub-body{padding-left:4px;padding-right:4px;}
+#hub .hub-panel{display:flex;flex-direction:column;gap:8px;}
 /* Живой обозреватель переносит connectScreen: внутри хаба это страница с общей
    навигацией, а не фиксированное окно. У вложенного экрана нет второго зума ПК. */
 #hub[data-panel=games] .hub-body{min-height:0;overflow:hidden;}
 #hp-games{height:100%;min-height:0;min-width:0;}
-#hub #connect[data-stage=browse]{position:relative;inset:auto;z-index:auto;flex:1;min-height:0;width:100%;height:100%;padding:0;overflow:hidden;background:none;zoom:1;}
+/* Без обрезки: страница листается в своей середине, а ромбик заголовка со свечением выходит за край
+   блока — `overflow:hidden` срезал ему левый угол. */
+#hub #connect[data-stage=browse]{position:relative;inset:auto;z-index:auto;flex:1;min-height:0;width:100%;height:100%;padding:0;overflow:visible;background:none;zoom:1;}
 #hub #connect[data-stage=browse]::before,#hub #connect[data-stage=browse]::after{display:none;}
 #hub #connect[data-stage=browse] .cwrap{flex:1;min-height:0;width:100%;height:100%;margin:0;padding:0;}
 #hub #connect[data-stage=browse] .cbox{width:100%;height:100%;padding:0;border:0;border-radius:0;background:none;box-shadow:none;}
+#hub #connect[data-stage=browse] .mflabel{padding-left:4px;}
 /* Главная дверь хаба (UIX-10.1, decisions/hubDoor.ts): крупная кнопка в палитре меню над
    режимами — «Продолжить» с картой и днём партии или, новичку, «Начать обучение». */
 #hub .hub-door{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;padding:14px 18px;
@@ -151,7 +159,7 @@
 #hub .hub-tutor .ob-later:hover{color:var(--sf-text);}
 /* Режимы списком: название и строка, чем режим отличается; «›» — строка ведёт дальше. */
 #hub .hub-mode{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;
-  width:100%;min-height:60px;padding:9px 44px 9px 14px;border-radius:12px;border:1px solid var(--sf-edge);
+  width:100%;min-height:56px;padding:8px 40px 8px 12px;border-radius:12px;border:1px solid var(--sf-edge);
   background:var(--sf-card);color:var(--sf-text);font-family:var(--sf-font);text-align:left;cursor:pointer;}
 #hub .hub-mode b{font-size:17px;font-weight:600;line-height:1.25;}
 #hub .hub-mode span{font-size:14px;line-height:1.35;color:var(--sf-dim);}
@@ -172,6 +180,7 @@
 #solo-save-status:empty{display:none;}
 #hub .hub-sec{margin-top:2px;padding-bottom:5px;border-bottom:1px solid var(--line);
   font:600 14px var(--sf-font);color:var(--sf-head);}
+#hub[data-panel=home] .hub-sec{padding-left:4px;}
 #hub .hub-card{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line-hi);border-radius:10px;
   padding:10px 12px;background:rgba(255,255,255,.02);}
 #hub .hub-card .hc-ic{width:38px;height:38px;border-radius:8px;display:grid;place-items:center;flex:0 0 auto;
@@ -179,16 +188,7 @@
 #hub .hub-card .hc-t{font-size:16px;color:#dfeef2;}
 #hub .hub-card .hc-s{font-size:14px;color:var(--dim);margin-top:2px;line-height:1.4;}
 /* ADDR-4 «Мои партии» — свои партии прямо на главном экране */
-#hub .hm-list{display:flex;flex-direction:column;gap:8px;}
-#hub .hm-row{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px 10px;}
-#hub .hm-row .hm-body{min-width:0;}
-#hub .hm-row .hm-btns{grid-column:1 / -1;display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;}
-#hub .hm-row .hm-btns .mbtn{min-height:44px;padding:0 14px;border-radius:10px;font-size:var(--fs-body);white-space:nowrap;}
-#hub .hm-row .hm-btns .btn-second{flex:1 1 auto;}
-@media (min-width:700px){
-  #hub .hm-row{grid-template-columns:38px minmax(0,1fr) auto;}
-  #hub .hm-row .hm-btns{grid-column:3;grid-row:1;flex-direction:column;}
-}
+#hub .hm-list{display:flex;flex-direction:column;gap:6px;}
 #hub .hm-more{font-size:var(--fs-caption);color:var(--dim);background:transparent;border:none;padding:2px 0;
   cursor:pointer;text-align:left;text-decoration:underline;}
 /* Своих партий нет: строка и дверь туда, где партии берут (правило 6 decisions/myMatches.ts). */
@@ -197,7 +197,7 @@
 #hub .hm-go:hover{border-color:var(--sf-edge-hi);}
 /* The home panel keeps the games; news opens from the wallet row. */
 #hp-home{height:100%;overflow-y:auto;overscroll-behavior:contain;container:home / size;}
-#hub .home-grid,#hub .home-main{display:flex;flex-direction:column;gap:10px;min-width:0;}
+#hub .home-grid,#hub .home-main{display:flex;flex-direction:column;gap:8px;min-width:0;}
 .nw-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:14px 16px 0;}
 .nw-h h3{margin:0;font:600 var(--fs-heading) var(--sf-font);color:var(--sf-hi);}
 .nw-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px 12px;border-bottom:1px solid var(--line);}

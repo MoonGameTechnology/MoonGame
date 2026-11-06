@@ -1,5 +1,5 @@
 /**
- * Строка обозревателя матчей: правила партии и окно входа (REFM-50).
+ * Строка обозревателя матчей: окно входа и архив (REFM-50).
  *
  * Список матчей приходит с сервера тремя вкладками — «доступные», «мои активные» и
  * «архив», — и одна и та же строка на них значит разное. Отсюда правила.
@@ -17,11 +17,7 @@
  * 4. **Меньше суток — это «скоро».** Отдельный признак, потому что «осталось 3ч» и
  *    «осталось 3д» набраны одинаково, а решают для игрока разное.
  *
- * 5. **Режим (BRW-4) знает ДВА разных «не знаю».** Нет `modeId` — сервер про режим не
- *    сказал ничего (или он старый), строка молчит целиком. Есть `modeId`, но нет `kind`
- *    — режим назван, а вид (PvP/PvE) сервер не посчитал: имя показывается, значок нет.
- *    Достроить значок самим нельзя: `kind` пуст и когда режим НЕИЗВЕСТЕН серверу, так
- *    что «раз не PvE, значит PvP» — это ровно та ложь, от которой BRW-1 и уводил.
+ * Что карточка пишет про режим, места и правила, решает `decisions/matchCard.ts` (UIX-10.4).
  *
  * Счётчик времени НИКОГДА не печатает отрицательное: просроченное окно — это «вот-вот»,
  * а не «осталось −3ч».
@@ -44,18 +40,6 @@ export const ENTRY_UNBOUNDED_MS = 3650 * 24 * 60 * 60 * 1000;
 
 /** Меньше суток реального времени — окно закрывается «скоро» (правило 4). */
 export const ENTRY_SOON_MS = 24 * 60 * 60 * 1000;
-
-/** Сводка правил партии: скорость и условия победы, только заданные. */
-export function ruleSummary(r: MatchRules, kind?: 'pvp' | 'pve'): string {
-  const parts = [`×${r.timeScale ?? 1}`];
-  if (kind === 'pve') return parts.join(' · ');
-  if (r.victory?.capitalCapture)
-    return [...parts, t('browser.description.capitals')].join(' · ');
-  if (r.victory?.scoreLimit) parts.push(t('browser.description.score', { n: r.victory.scoreLimit }));
-  if (r.victory?.dominationPercent)
-    parts.push(t('browser.goal.map', { p: Math.round(r.victory.dominationPercent * 100) }));
-  return parts.join(' · ');
-}
 
 /** Остаток времени → «Nд Mч» / «Mч» / «вот-вот». Отрицательное не печатается. */
 export function fmtJoinWindow(ms: number): string {
@@ -88,7 +72,7 @@ export function joinWindow(row: EntryFields, tab: MatchTab): JoinWindow {
   return { kind: 'open', left: row.entryClosesInMs, soon: row.entryClosesInMs < ENTRY_SOON_MS };
 }
 
-/** Действие второй кнопки строки: убрать в архив, вернуть из него или ничего. */
+/** Действие строки в её «Описании» (UIX-10.4): убрать в архив, вернуть из него или ничего. */
 export type RowAction = 'archive' | 'restore' | null;
 
 /** «Доступные» — чужие матчи, их не архивируют; свои активные прячут, архивные возвращают. */
@@ -96,23 +80,4 @@ export function rowAction(tab: MatchTab, status?: string): RowAction {
   if (status === 'ended') return null;
   if (tab === 'archived') return 'restore';
   return tab === 'active' ? 'archive' : null;
-}
-
-/** Поля строки, от которых зависит подпись режима. Оба необязательны: сервер до BRW-1
- *  их не слал вовсе, а `kind` не считается и на новом сервере без каталога данных. */
-export interface ModeFields {
-  modeId?: string;
-  kind?: 'pvp' | 'pve';
-}
-
-/** Что строка говорит про режим. `modeId` отдаётся сырым: имя из него делает `tData()`
- *  у хозяина разметки — здесь решение, а не текст (как у {@link joinWindow}). */
-export type ModeLabel = { kind: 'none' } | { kind: 'shown'; modeId: string; badge?: 'pvp' | 'pve' };
-
-/** Решить, что строка говорит про режим партии (правило 5). */
-export function modeLabel(row: ModeFields): ModeLabel {
-  if (row.modeId === undefined) return { kind: 'none' };
-  return row.kind === undefined
-    ? { kind: 'shown', modeId: row.modeId }
-    : { kind: 'shown', modeId: row.modeId, badge: row.kind };
 }

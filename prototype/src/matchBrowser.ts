@@ -44,16 +44,9 @@ import {
 import { openSessionTab } from './matchJoin';
 import { inviteMatches } from '../../decisions/friendInvite';
 import type { InviteMatch } from './friendsScreen';
-import { isMatchDescriptionOpen, openMatchDescription } from './matchDescription';
-import {
-  fmtJoinWindow,
-  joinWindow,
-  modeLabel,
-  rowAction,
-  ruleSummary,
-  type MatchRules,
-  type MatchTab,
-} from './matchRow';
+import { isMatchDescriptionOpen, openMatchDescription, type DescriptionAction } from './matchDescription';
+import { cardFacts, type CardPlace } from '../../decisions/matchCard';
+import { fmtJoinWindow, joinWindow, rowAction, type MatchRules, type MatchTab } from './matchRow';
 import { openSetup } from './setupScreen';
 import { canCreateOnlineMatch, forgetMatchCreation, initMatchCreation, refreshMatchCreation } from './matchCreation';
 
@@ -98,7 +91,8 @@ export interface MatchRow {
   entryOpen?: boolean;
   entryClosesInMs?: number;
   /** Game mode (BRW-1): the preset id the session runs, and whether the server judged
-   *  it PvP or PvE. Either may be absent — see rule 5 in `matchRow.ts`. */
+   *  it PvP or PvE. Either may be absent; what the card says about them is decided in
+   *  `decisions/matchCard.ts`. */
   modeId?: string;
   kind?: 'pvp' | 'pve';
 }
@@ -305,93 +299,127 @@ function renderEmpty(el: HTMLElement, plan: Extract<Fallback, { kind: 'empty' }>
   document.getElementById('mfind-go')?.addEventListener('click', () => openTab('available'));
 }
 
-/** Строка матча: карта и режим, ниже день, места, правила и окно входа; справа кнопки. */
-function matchRow(m: MatchRow, source: MatchTab): HTMLElement {
-  // «В архив» / «Восстановить» — только на своих вкладках. «Описание» доступно везде;
-  // кнопкам на телефоне нужен свой ряд, чтобы они не сжимали название карты.
-  const action = rowAction(source, m.status);
-  const row = document.createElement('div');
-  row.className = 'mrow mrow-2';
-  // Полный номер остаётся в подсказке; компактная кнопка под данными копирует его целиком.
-  row.dataset.match = m.matchId;
-  row.title = m.matchId;
+/** Куда встаёт карточка партии и что ей нужно от владельца. */
+interface CardOptions {
+  /** Вкладка ленты: от неё зависят главная кнопка, места, скорость, окно входа и архив. */
+  source: MatchTab;
+  /** `mrow` в обозревателе, `hm-row` в хабе: по ним строки находят тесты и харнесы. */
+  anchor: 'mrow' | 'hm-row';
+  /** Куда сказать, что номер скопирован. */
+  notice(text: string): void;
+  /** «В архив» / «Восстановить» в «Описании» — только у обозревателя, как и раньше. */
+  archive: boolean;
+}
+
+/**
+ * Карточка партии (UIX-10.4): имя карты с пометками и день, где решают — места, скорость и
+ * окно входа; под ними главная кнопка, номер и «Описание». Что писать, решает
+ * `decisions/matchCard.ts`; разметка одна у обозревателя и «Моих партий» хаба.
+ */
+function matchCard(m: MatchRow, o: CardOptions): HTMLElement {
+  const place: CardPlace = o.source === 'available' ? 'available' : 'own';
+  const facts = cardFacts(m, place);
+  const card = document.createElement('div');
+  card.className = `${o.anchor} mcard ${place}`;
+  // Полный номер остаётся в подсказке; кнопка в ряду копирует его целиком.
+  card.dataset.match = m.matchId;
+  card.title = m.matchId;
+  // Пометки — только то, чего в имени карты нет (правила 1, 2 и 5). Имя режима приходит НЕ
+  // со строки: сервер шлёт id, человеческое имя даёт `tData()` по тому же слагу
+  // (`pve_waves` → `data.pve-waves`). Идущий матч — обычное состояние, помечен завершённый.
+  let tags = '';
+  if (facts.pve) tags += `<span class="mmode pve">${t('browser.mode.pve')}</span>`;
+  if (facts.modeId) tags += `<span class="mmodename">${esc(tData(facts.modeId))}</span>`;
+  if (facts.capitals) tags += `<span class="mtag">${t('browser.capitals')}</span>`;
+  if (m.status === 'ended') tags += `<span class="mended">${t('browser.finished')}</span>`;
+  let meta = `<span>${t('browser.day', { n: m.days })}</span>`;
+  if (facts.seats) meta += seatsHtml(m.players);
+  if (facts.speed) {
+    const speed = `×${m.rules.timeScale ?? 1}`;
+    meta += `<span title="${esc(`${t('browser.description.speed')} ${speed}`)}">${speed}</span>`;
+  }
+  meta += windowHtml(m, o.source);
   const info = document.createElement('div');
   info.className = 'minfo';
-  // Режим партии (BRW-4): значок вида + имя пресета. Имя приходит НЕ со строки —
-  // сервер шлёт только id, а человеческое имя даёт `tData()` по тому же слагу
-  // (`pve_waves` → `data.pve-waves`). Что именно печатать, решает `modeLabel()`:
-  // значка нет, пока сервер сам не назвал вид, а без `modeId` строки нет вовсе.
-  const mode = modeLabel(m);
-  let modeHtml = '';
-  if (mode.kind === 'shown') {
-    if (mode.badge) {
-      const kind = mode.badge === 'pve' ? t('browser.mode.pve') : t('browser.mode.pvp');
-      modeHtml += `<span class="mmode ${mode.badge}">${kind}</span>`;
-    }
-    modeHtml += `<span class="mmodename">${esc(tData(mode.modeId))}</span>`;
-  }
-  // Идущий матч — обычное состояние, и «идёт» на каждой строке было шумом: помечен только
-  // завершённый.
-  const ended = m.status === 'ended' ? `<span class="mended">${t('browser.finished')}</span>` : '';
-  // Места — точками, пока их не больше восьми (`matchesPage.ts`, правило 2).
-  const pips = seatPips(m.players.seated, m.players.capacity);
-  const seatsLabel = esc(t('browser.seats', { s: m.players.seated, c: m.players.capacity }));
-  const seats =
-    `<span class="mseats" title="${seatsLabel}" aria-label="${seatsLabel}">` +
+  info.innerHTML = `<div class="mname"><b>${esc(matchName(m))}</b>${tags}</div><div class="mmeta">${meta}</div>`;
+  card.appendChild(info);
+  const btns = document.createElement('div');
+  btns.className = 'mbtns';
+  const go = document.createElement('button');
+  go.type = 'button';
+  go.className = 'mbtn btn-second mgo';
+  // «Войти» на партии, где ты уже сидишь, обещает не то: место занято тобой, и речь
+  // о возвращении, а не о вступлении.
+  const seated = o.source !== 'available';
+  go.textContent = t(m.status === 'ended' ? 'browser.view-map' : seated ? 'browser.resume' : 'browser.join');
+  go.addEventListener('click', () => openSessionTab(m.matchId, seated));
+  btns.appendChild(go);
+  // Номер — в том же ряду: отдельной строкой он один занимал 50 px высоты.
+  btns.appendChild(matchNumberButton(m.matchId, o.notice));
+  btns.appendChild(descriptionButton(m, o.archive ? archiveAction(m, o.source) : undefined));
+  card.appendChild(btns);
+  return card;
+}
+
+/** Места: точками, пока их не больше восьми (`matchesPage.ts`, правило 2), словами — в подсказке. */
+function seatsHtml(p: MatchRow['players']): string {
+  const pips = seatPips(p.seated, p.capacity);
+  const label = esc(t('browser.seats', { s: p.seated, c: p.capacity }));
+  return (
+    `<span class="mseats" title="${label}" aria-label="${label}">` +
     (pips ? pips.map((on) => (on ? '<i class="on"></i>' : '<i></i>')).join('') : '') +
-    `<b>${m.players.seated}/${m.players.capacity}</b></span>`;
-  // Entry window (SES-2.4): on «Доступные», show how long a newcomer may still take a
-  // seat — the server already drops fully-closed sessions from this tab, so an open
-  // countdown reassures, a soon-to-close one nudges. Unbounded (dev / old server) or
-  // other tabs: omitted. Own «Мои»/«Архив» rows don't gate a reconnect, so no window there.
+    `<b>${p.seated}/${p.capacity}</b></span>`
+  );
+}
+
+/**
+ * Окно входа (SES-2.4) и срок архива. На «Доступных» видно, сколько новичок ещё может занять
+ * место: полностью закрытые сессии сервер оттуда уже убрал, так что отсчёт успокаивает, а
+ * близкий конец подгоняет. Без границы (dev, старый сервер) и на своих вкладках — пусто:
+ * возвращение окном не ограничено.
+ */
+function windowHtml(m: MatchRow, source: MatchTab): string {
   const win = joinWindow(m, source);
-  let windowHtml = '';
-  if (win.kind === 'closed') windowHtml = `<span class="mwin shut">${t('acc.join-closed')}</span>`;
+  let html = '';
+  if (win.kind === 'closed') html = `<span class="mwin shut">${t('acc.join-closed')}</span>`;
   else if (win.kind === 'open')
-    windowHtml = `<span class="mwin${win.soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(win.left) })}</span>`;
+    html = `<span class="mwin${win.soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(win.left) })}</span>`;
   if (m.status === 'ended' && m.archiveExpiresAt !== undefined) {
     const date = new Date(m.archiveExpiresAt).toLocaleString(LOCALE, {
       day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
     });
-    windowHtml += `<span class="mwin">${esc(t('browser.archive-until', { date }))}</span>`;
+    html += `<span class="mwin">${esc(t('browser.archive-until', { date }))}</span>`;
   }
-  info.innerHTML =
-    `<div class="mname"><b>${esc(matchName(m))}</b>${modeHtml}${ended}</div>` +
-    `<div class="mmeta"><span>${t('browser.day', { n: m.days })}</span>${seats}` +
-    `<span>${esc(ruleSummary(m.rules, m.kind))}</span>${windowHtml}</div>`;
-  info.appendChild(matchNumberButton(m.matchId, text => game.status(text)));
-  row.appendChild(info);
-  const btns = document.createElement('div');
-  btns.className = 'mbtns';
-  const join = document.createElement('button');
-  join.className = 'mbtn btn-second';
-  // «Войти» на партии, где ты уже сидишь, обещает не то: место занято тобой, и речь
-  // о возвращении, а не о вступлении.
-  const seated = source !== 'available';
-  join.textContent = t(m.status === 'ended' ? 'browser.view-map' : seated ? 'browser.resume' : 'browser.join');
-  join.addEventListener('click', () => openSessionTab(m.matchId, seated));
-  btns.appendChild(join);
-  if (action) {
-    const restore = action === 'restore';
-    const arch = document.createElement('button');
-    arch.className = 'mbtn btn-quiet';
-    arch.textContent = restore ? t('browser.restore') : t('browser.archive');
-    arch.addEventListener('click', () =>
-      detach('обозреватель: архив партии', toggleArchive(m.matchId, restore)),
-    );
-    btns.appendChild(arch);
-  }
-  btns.appendChild(descriptionButton(m));
-  row.appendChild(btns);
-  return row;
+  return html;
 }
 
-function descriptionButton(match: MatchRow): HTMLButtonElement {
+/** «В архив» / «Восстановить» (`rowAction`): нужны редко, поэтому живут в «Описании», а не
+ *  третьей кнопкой на карточке. Чужие и завершённые партии их не получают. */
+function archiveAction(m: MatchRow, source: MatchTab): DescriptionAction | undefined {
+  const action = rowAction(source, m.status);
+  if (!action) return undefined;
+  const restore = action === 'restore';
+  return {
+    label: t(restore ? 'browser.restore' : 'browser.archive'),
+    run: () => detach('обозреватель: архив партии', toggleArchive(m.matchId, restore)),
+  };
+}
+
+/** «Описание». На телефоне это значок «i» в углу карточки: подписью рядом с главной кнопкой и
+ *  номером оно не влезало в ряд (стили — `05-entry-setup.css`); имя держат подсказка и
+ *  `aria-label`. С 700px видна подпись. */
+function descriptionButton(match: MatchRow, action?: DescriptionAction): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'mbtn btn-quiet mdescription';
-  button.textContent = t('browser.description');
-  button.addEventListener('click', () => openMatchDescription(match, matchName(match)));
+  const label = t('browser.description');
+  button.title = label;
+  button.ariaLabel = label;
+  button.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">' +
+    '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.01"/></svg>' +
+    `<span class="mlabel">${esc(label)}</span>`;
+  button.addEventListener('click', () => openMatchDescription(match, matchName(match), action));
   return button;
 }
 
@@ -460,9 +488,11 @@ function renderMatches(): void {
     return;
   }
   el.textContent = '';
+  const card = (m: MatchRow, source: MatchTab): HTMLElement =>
+    matchCard(m, { source, anchor: 'mrow', notice: (text) => game.status(text), archive: true });
   if (activeTab === 'corporate')
-    for (const { match, source } of corporate) el.appendChild(matchRow(match, source));
-  else for (const m of rows) el.appendChild(matchRow(m, activeTab));
+    for (const { match, source } of corporate) el.appendChild(card(match, source));
+  else for (const m of rows) el.appendChild(card(m, activeTab));
 }
 
 /**
@@ -470,9 +500,9 @@ function renderMatches(): void {
  *
  * Обозреватель отвечает на «куда пойти играть», этот список — на «где я уже играю и куда
  * вернуться». Какие партии сюда попадают, в каком порядке и что значит пустота — решает
- * `decisions/myMatches.ts`; здесь только разметка, номер и переходы.
+ * `decisions/myMatches.ts`; карточка — та же, что у обозревателя.
  *
- * Под партией — её НОМЕР, а не адрес (`matchNumber.ts`, плейтест 2026-10-17): его копируют
+ * В карточке — НОМЕР партии, а не адрес (`matchNumber.ts`, плейтест 2026-10-17): его копируют
  * и вводят в поле «Номер партии» обозревателя.
  */
 function renderMyMatches(): void {
@@ -496,34 +526,12 @@ function renderMyMatches(): void {
     return;
   }
   el.textContent = '';
-  for (const m of view.rows) {
-    const card = document.createElement('div');
-    card.className = 'hub-card hm-row';
-    card.innerHTML =
-      `<div class="hc-ic">${m.status === 'ended' ? '◼' : '▶'}</div>` +
-      `<div class="hm-body">` +
-      // Номер стоит ниже отдельной строкой: в заголовке он вытеснял бы то, ради чего
-      // сюда смотрят (какая партия, какой день, сколько игроков).
-      `<div class="hc-t">${esc(matchName(m))}</div>` +
-      `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
-      `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
-      `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +
-      `<div class="hm-number"></div>` +
-      `</div>`;
-    const btns = document.createElement('div');
-    btns.className = 'hm-btns';
-    const open = document.createElement('button');
-    open.className = 'mbtn btn-second';
-    // Лента хаба — это СВОИ партии (`myMatches` читает `lists.active`), поэтому здесь
-    // всегда возвращение.
-    open.textContent = t('browser.resume');
-    open.addEventListener('click', () => openSessionTab(m.matchId, true));
-    btns.appendChild(open);
-    card.querySelector('.hm-number')!.appendChild(matchNumberButton(m.matchId, text => game.hubNote(text)));
-    btns.appendChild(descriptionButton(m));
-    card.appendChild(btns);
-    el.appendChild(card);
-  }
+  // Та же карточка, что у обозревателя (UIX-10.4): лента хаба — это СВОИ партии
+  // (`myMatches` читает `lists.active`), поэтому главная кнопка — возвращение.
+  for (const m of view.rows)
+    el.appendChild(
+      matchCard(m, { source: 'active', anchor: 'hm-row', notice: (text) => game.hubNote(text), archive: false }),
+    );
   if (view.more > 0) {
     // Правило 4: остаток — не строки, а один переход в обозреватель.
     const more = document.createElement('button');
@@ -629,7 +637,8 @@ export function initMatchBrowser(host: MatchBrowserHost): void {
 
   // Кнопки «Обновить список» нет (UIX-17.1): открытая страница освежается сама — тихий
   // переопрос раз в десять секунд (`startPoll`). «Подключиться» в карточке «Сервер не
-  // отвечает» и правка адреса там же переспрашивают сразу; «Войти»/«В архив» в строке — про матч.
+  // отвечает» и правка адреса там же переспрашивают сразу; «Войти» в строке и «В архив» в её
+  // «Описании» — про матч.
   const reload = (): void => detach('обозреватель: список партий', refreshMatches());
   $('cgo').addEventListener('click', reload);
   srvInput.addEventListener('change', reload);
