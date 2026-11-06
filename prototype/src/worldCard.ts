@@ -87,6 +87,7 @@ import {
   unitRows as kitUnitRows,
 } from './panelKit';
 import { worldName } from './planetName';
+import { seatNick } from './seatNicks';
 import { isGroundUnit, planetSummary } from './planetSummary';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
 import { spyOffer } from './spyOffer';
@@ -486,13 +487,23 @@ export function unknownPlanetHtml(p: Planet): string {
 /**
  * Действия с миром в его шапке: сделать столицей, точка удержания, «Пинг», разведка.
  * ЧТО предлагать, решают `worldOrders.ts` и `spyOffer.ts` (REFM-91/92), здесь только
- * кнопки. На телефоне «Пинг» стоит в нижней полосе листа, и в шапке его прячет CSS: кнопка
- * остаётся в разметке, потому что полоса листа показывается по её наличию.
+ * кнопки. На телефоне «Пинг», «Построить» и ник хозяина стоят в нижней полосе листа, и в шапке
+ * их прячет CSS: кнопки остаются в разметке, потому что полоса листа показывается по их наличию.
  */
 function worldActionsHtml(p: Planet, mine: boolean): string {
   const s = game.world();
   const ME = game.me();
   const out: string[] = [];
+  // Хозяин чужого мира — кнопкой с его ником, она открывает карточку места (UIX-10.10).
+  // Ника нет (бот, одиночная партия) — подписью служит имя дома.
+  if (p.owner && !mine) {
+    const name = seatNick(p.owner) ?? game.names()[p.owner] ?? p.owner;
+    out.push(btn('seat', p.owner, t('side.world.owner', { name }), true));
+  }
+  // Телефон поднимает «Построить» в нижнюю полосу листа, рядом с «Пингом», чтобы строить без
+  // раскрытия листа; полоса показывается по наличию этой кнопки (UIX-10.10).
+  if (!pcUi() && mine && buildsAnything(p, data, feedsOnBiomass(s, ME, data)))
+    out.push(`<button class="b btn-second" data-act="openbuild">▣ ${t('side.build.open')}</button>`);
   // Столица — здесь возрождаются герои и меняют модули (Phase C).
   if (capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(data, p),
     !!ctx(s.time, s).config?.victory?.capitalCapture) === 'designate')
@@ -656,7 +667,6 @@ function incomeOf(type: string, level: number): string {
 export function planetPanelHtml(p: Planet): string {
   const s = game.world();
   const ME = game.me();
-  const NAME = game.names();
   const mine = p.owner === ME;
   if (p.fortress) {
     let station = cardHeader(ownerColor(p.owner), placeName(p.id), t('fleet.kind.fortress')) +
@@ -683,7 +693,10 @@ export function planetPanelHtml(p: Planet): string {
   const kindName = sectorTypeOf(p.id)?.name ?? game.sectorOf(p.id);
   // Чего у мира нет (сектора, типа), подпись не пишет: прочерк в ней ничего не сообщал, а на
   // телефоне переносил подпись на лишнюю строку (UIX-10.5).
-  const facets = [kindName, ptName, sec].filter((n): n is string => !!n).map((n) => tData(n));
+  // Одно имя дважды не пишется: у астероидов тип узла и сектор оба «Астероидное поле» (UIX-10.10).
+  const facets = [
+    ...new Set([kindName, ptName, sec].filter((n): n is string => !!n).map((n) => tData(n))),
+  ];
   // Разбор гарнизона по вкладкам и их счётчики — в `planetTabs.ts` (REFM-41), там же
   // правило «вкладка флота считает и орбиту»: построенное само уходит в космос.
   const { ground, ships } = garrisonByTab(p.garrison, data);
@@ -709,7 +722,9 @@ export function planetPanelHtml(p: Planet): string {
   let h = cardHeader(
     ownerColor(p.owner),
     placeName(p.id),
-    `${game.devUi() ? `${esc(p.id)} · ` : ''}${[p.owner ? NAME[p.owner] : t('side.neutral'), ...facets].join(' · ')}`,
+    // Хозяина подпись не называет: чужой мир показывает его кнопкой-ником в ряду действий,
+    // свой — обычный случай (UIX-10.10). Ничейный мир кнопки не имеет, и слово остаётся.
+    `${game.devUi() ? `${esc(p.id)} · ` : ''}${[...(p.owner ? [] : [t('side.neutral')]), ...facets].join(' · ')}`,
     undefined,
     dev + vp,
   );

@@ -70,7 +70,8 @@ import { aaImpact } from './fireEffects';
 import { flakTier } from './flakTiers';
 import { fleetAnchor, fleetPos, strikeBasePos, strikeWorldPos } from './fleetGeometry';
 import { destroyHeard, reorgHeard, reorgKey, tradeHeard, tradeSide } from './fleetNews';
-import { costText, countdownHMS, displayUnit, gameStamp, TECH_CUR } from './format';
+import { costText, countdownHMS, displayUnit, TECH_CUR } from './format';
+import type { LogEntry } from './eventLogView';
 import { captureHeard, gainRepaint, researchHeard } from './gainNews';
 import { data } from './gameData';
 import { heroDiedNews, heroRespawnedNews } from './heroNews';
@@ -129,14 +130,8 @@ export function initEventFeed(host: EventFeedHost): void {
   game = host;
 }
 
-/** Запись журнала: строка с игровой меткой и узел карты, к которому её кнопка ⌖ ведёт
- *  камеру. Узла нет — нет и кнопки. */
-export interface LogEntry {
-  line: string;
-  at?: string;
-}
-
-/** Журнал матча — строки ленты с игровой меткой времени (предел — `noteLog.ts`). */
+/** Журнал матча — записи ленты с игровым временем (предел — `noteLog.ts`); разметку по дням
+ *  строит `eventLogView.ts`. */
 export const logLines: LogEntry[] = [];
 /** Номер правки журнала: экран пересобирает его разметку, только когда номер сменился. */
 export let logVersion = 0;
@@ -196,13 +191,14 @@ let lastNoteAtMs = 0;
  *  и тосты поверх карты засыпали бы её как раз тогда, когда флот идёт в чужие земли. */
 export function note(msg: string, at?: string, opts?: { quiet?: boolean }) {
   // Защита от повторов и пределы лент — `noteLog.ts` (REFM-101): повтор глушится по
-  // РЕАЛЬНОМУ времени, а метка ставится ИГРОВОЕ — «День 3, 07:45» (`gameStamp`, UIX-5.3).
+  // РЕАЛЬНОМУ времени, а запись хранит ИГРОВОЕ: окно называет день у первой записи дня, а у
+  // остальных — время суток (UIX-5.3, UIX-10.9).
   const nowMs = Date.now();
   if (isRepeat(msg, lastNoteMsg, nowMs, lastNoteAtMs)) return;
   lastNoteMsg = msg;
   lastNoteAtMs = nowMs;
-  const line = `${gameStamp(game.world().time)} · ${msg}`;
-  pushBounded(logLines, at ? { line, at } : { line }, LOG_LINES);
+  const time = game.world().time;
+  pushBounded(logLines, at ? { time, msg, at } : { time, msg }, LOG_LINES);
   logVersion++;
   pushBounded(eventLog, { at: game.world().time, text: msg, anchor: at }, EVENT_LOG_MAX);
   if (!opts?.quiet) toast(msg, at);

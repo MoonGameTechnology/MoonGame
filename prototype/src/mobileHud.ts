@@ -34,6 +34,22 @@ interface MobileHudHost {
   tab(tab: CardTab): void;
 }
 
+/** Кнопки шапки мира, которые лист поднимает в нижнюю полосу (UIX-10.10): «Построить» и ник
+ *  хозяина. Это копии: тап жмёт кнопку боковой панели, подпись берётся с неё же. */
+const LIFTED = ['openbuild', 'seat'] as const;
+
+function liftedButton(act: string): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'btn-second';
+  b.dataset.mobile = 'lift';
+  b.dataset.lift = act;
+  return b;
+}
+
+const liftedSource = (side: HTMLElement, act: string) =>
+  side.querySelector<HTMLButtonElement>(`.pacts [data-act="${act}"]`);
+
 export function initMobileHud(host: MobileHudHost) {
   const sheet = document.createElement('section');
   sheet.id = 'mobile-sheet';
@@ -110,7 +126,9 @@ export function initMobileHud(host: MobileHudHost) {
   summaryButton.type = 'button';
   summaryButton.className = 'btn-second';
   summaryButton.dataset.mobile = 'summary';
+  const lifted = LIFTED.map(liftedButton);
   quick.appendChild(summaryButton);
+  for (const b of lifted) quick.appendChild(b);
   quick.appendChild(pingButton);
   sheet.appendChild(head);
   sheet.appendChild(tabs);
@@ -185,6 +203,7 @@ export function initMobileHud(host: MobileHudHost) {
       swiped = false;
     } else if (action === 'close') host.dismiss();
     else if (action === 'ping') host.ping();
+    else if (action === 'lift') liftedSource(host.side, button.dataset.lift!)?.click();
     else if (action === 'badge') {
       const mark = marks[Number(button.dataset.index)];
       if (mark?.key) host.describe(mark.key);
@@ -318,7 +337,14 @@ export function initMobileHud(host: MobileHudHost) {
       const noPing = !host.side.querySelector('[data-act="ping"]') || !key.startsWith('planet:');
       setHidden(summaryButton, noSummary);
       setHidden(pingButton, noPing);
-      setHidden(quick, mode || choosing || (noSummary && noPing));
+      let noLift = true;
+      for (const b of lifted) {
+        const src = key.startsWith('planet:') ? liftedSource(host.side, b.dataset.lift!) : null;
+        setText(b, src?.textContent ?? '');
+        setHidden(b, !src);
+        if (src) noLift = false;
+      }
+      setHidden(quick, mode || choosing || (noSummary && noPing && noLift));
     },
   };
 }

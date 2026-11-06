@@ -216,13 +216,39 @@ afterEach(() => {
 });
 
 describe('шапка известного мира', () => {
-  it('имя места и владелец по имени из игры; код узла — только в режиме отладки', async () => {
+  it('имя места из игры, хозяина подпись не называет; код узла — только в режиме отладки', async () => {
     const { env, card } = await boot();
     const html = card('A');
     expect(html).toContain(`<b>${worldName(env.s, 'A')}</b>`);
-    expect(sub(html)).toMatch(/^Орион·/);
+    expect(sub(html)).not.toContain('Орион');
+    expect(sub(card('N'))).not.toContain('Багровые');
     env.dev = true;
-    expect(sub(card('A'))).toMatch(/^A·Орион·/);
+    expect(sub(card('A'))).toMatch(/^A·/);
+  });
+
+  it('одно имя в подписи пишется один раз (UIX-10.10)', async () => {
+    const { env, card } = await boot();
+    const sector = env.s.planets.A!.terrain;
+    env.types.A = { name: data.sectors[sector ?? '']?.name ?? 'x' } as SectorType;
+    const parts = sub(card('A')).split('·');
+    expect(new Set(parts).size).toBe(parts.length);
+  });
+
+  it('хозяин чужого мира — кнопка с ником, у своего и ничейного её нет (UIX-10.10)', async () => {
+    const { card } = await boot();
+    const owner = t('side.world.owner', { name: 'Багровые' });
+    expect(card('N')).toContain(`${act('seat', 'p2')} >${owner}</button>`);
+    expect(card('A')).not.toContain('data-act="seat"');
+    expect(card('Z')).not.toContain('data-act="seat"');
+  });
+
+  it('телефон кладёт «Построить» в действия своего мира, ПК — нет (UIX-10.10)', async () => {
+    const { env, card } = await boot({ pc: false });
+    const pacts = (html: string) => /<div class="pacts">.*?<\/div>/.exec(html)?.[0] ?? '';
+    expect(pacts(card('A', 'ground'))).toContain('data-act="openbuild"');
+    expect(pacts(card('N', 'ground'))).not.toContain('data-act="openbuild"');
+    env.pc = true;
+    expect(pacts(card('A', 'ground'))).not.toContain('data-act="openbuild"');
   });
 
   it('род узла — тип сектора с карты, без него — сырой род, без обоих не пишется', async () => {
@@ -230,12 +256,12 @@ describe('шапка известного мира', () => {
     const typeName = tData(data.planetTypes.terran!.name ?? 'terran');
     env.types.A = { name: 'Asteroid Field' } as SectorType;
     env.kinds.A = 'raw-kind';
-    expect(sub(card('A'))).toContain(`·${tData('Asteroid Field')}·${typeName}`);
+    expect(sub(card('A'))).toMatch(new RegExp(`^${tData('Asteroid Field')}·${typeName}`));
     delete env.types.A;
-    expect(sub(card('A'))).toContain(`·raw-kind·${typeName}`);
+    expect(sub(card('A'))).toMatch(new RegExp(`^raw-kind·${typeName}`));
     delete env.kinds.A;
-    // Прочерк на месте рода ничего не сообщал (UIX-10.5): за владельцем сразу тип мира.
-    expect(sub(card('A'))).toMatch(new RegExp(`^[^·]+·${typeName}`));
+    // Прочерк на месте рода ничего не сообщал (UIX-10.5): подпись начинается с типа мира.
+    expect(sub(card('A'))).toMatch(new RegExp(`^${typeName}`));
     expect(sub(card('A'))).not.toContain('—');
   });
 

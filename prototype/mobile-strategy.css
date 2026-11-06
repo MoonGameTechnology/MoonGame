@@ -102,8 +102,10 @@ body.mobile-ui #tech :is(.tt-ifx, .tt-lead) {
   font-size: var(--fs-body);
   line-height: 1.5;
 }
-body.mobile-ui #tech .tt-ifoot {
-  flex-wrap: wrap;
+/* Цена переносится внутри себя, а срок стоит справа от неё, как на ПК: перенос всего низа
+   плитки ставил срок отдельной строкой под ценой (UIX-10.7). */
+body.mobile-ui #tech .tt-ifoot > span:first-child {
+  min-width: 0;
 }
 body.mobile-ui #tech .tt-take {
   width: 100%;

@@ -228,9 +228,30 @@ describe('дерево технологий — линия Наместника 
     expect(head(['viceroy', 'polymath'])).toContain(`${t('tech.curator')} <b>Наместник</b>`);
     expect(head(['overseer', 'viceroy'])).toContain(`${t('tech.curator')} <b>Куратор</b>`);
     expect(head(['void_admiral', 'polymath'])).toContain(t('tech.curator.none'));
-    // В чужой ветке своей линии у Наместника нет.
-    expect(techTreeHtml(mainGame(['viceroy', 'polymath']), 'p1', 'space', null)).toContain(
-      t('tech.curator.none'),
+    // В чужой ветке своей линии у Наместника нет. Замков «учёный» в «Космосе» нет вовсе,
+    // поэтому нет и предупреждения о них (UIX-10.7).
+    const space = techTreeHtml(mainGame(['viceroy', 'polymath']), 'p1', 'space', null);
+    expect(space).not.toContain('Наместник');
+    expect(space).not.toContain('tt-lead');
+  });
+
+  it('предупреждение «без лидера» — только в ветке с замками «учёный» (UIX-10.7)', () => {
+    const lead = (council: string[], tab: string): string => {
+      const html = techTreeHtml(mainGame(council), 'p1', tab, null);
+      return /<div class="tt-lead[^"]*">(.*?)<\/div>/.exec(html)?.[1] ?? '';
+    };
+    // Замки «учёный» стоят только в «Командовании».
+    const gatedBranches = new Set(
+      Object.values(TECHS)
+        .filter((td) => (td.conditions ?? []).some((c) => c.type === 'has_scientist'))
+        .map((td) => td.branch ?? 'space'),
+    );
+    expect([...gatedBranches]).toEqual(['command']);
+    for (const b of TECH_BRANCHES.map((x) => x.key))
+      expect(lead(['polymath'], b)).toBe(b === 'command' ? `🔭 ${t('tech.curator.none')}` : '');
+    // Выбранный лидер ветки назван и там, где замков нет.
+    expect(lead(['void_admiral', 'polymath'], 'space')).toBe(
+      `🧪 ${t('tech.curator')} <b>${tData(data.scientists.void_admiral!.name)}</b>`,
     );
   });
 });
@@ -290,6 +311,25 @@ describe('дерево технологий — условия узла', () => 
   it('урон теха с областью называет свой канал огня (BAL-6)', () => {
     expect(techFx(TECHS.siege_doctrine!)).toContain(`+8% ${t('tech.fx.damage-space')}`);
     expect(techFx(TECHS.combined_arms!)).toContain(`+5% ${t('tech.fx.damage-ground')}`);
+  });
+
+  it('открытое узлом — одной строкой «открывает: А, Б», слово не повторяется (UIX-10.7)', () => {
+    const names = TECHS.orbital_defense_grid!.unlocks!.buildings!.map((b) =>
+      tData(data.buildings[b]!.name),
+    );
+    expect(names).toHaveLength(2);
+    expect(techFx(TECHS.orbital_defense_grid!)).toBe(t('tech.grants', { x: names.join(', ') }));
+    // Юниты и здания — в одной строке, юниты первыми.
+    const mixed = techFx({
+      effects: {},
+      unlocks: { units: ['frigate'], buildings: ['hospital'] },
+    } as never);
+    expect(mixed.split(t('tech.grants', { x: '' }).trim())).toHaveLength(2);
+    expect(mixed).toMatch(/: .+, .+/);
+    // Два здания с одним именем — имя один раз.
+    const hangar = tData(data.buildings.void_hangar!.name);
+    expect(tData(data.buildings.station_hangar!.name)).toBe(hangar);
+    expect(techFx(TECHS.void_shipworks!)).toBe(t('tech.grants', { x: hangar }));
   });
 });
 
@@ -467,8 +507,25 @@ describe('дерево технологий — разметка', () => {
     expect(techTreeHtml(st, 'p1', 'space', null)).toMatch(
       new RegExp(`tt-take btn-main" data-go="${id}">`),
     );
+    // Без казны — «＋ В очередь» вместо выключенной «Не хватает ресурсов»: нехватку уже
+    // называет цена красным «−N» (UIX-10.7).
     st.players.p1!.resources = {};
-    expect(techTreeHtml(st, 'p1', 'space', null)).toContain(`data-go="${id}" disabled`);
+    const broke = techTreeHtml(st, 'p1', 'space', null);
+    expect(broke).toContain(`data-q="${id}"`);
+    expect(broke).not.toContain(`data-go="${id}"`);
+    expect(broke).not.toContain(t('tech.action.no-resources'));
+    // Очередь полна — поставить в план нельзя, и выключенная кнопка остаётся единственной
+    // причиной на плитке.
+    const p1 = st.players.p1!;
+    p1.technologies = {
+      completed: p1.technologies?.completed ?? [],
+      queue: Object.keys(TECHS)
+        .filter((x) => x !== id)
+        .slice(0, MAX_RESEARCH_QUEUE),
+    };
+    const full = techTreeHtml(st, 'p1', 'space', null);
+    expect(full).toContain(`data-go="${id}" disabled`);
+    expect(full).not.toContain(`data-q="${id}"`);
   });
 
   it('исчезнувший из данных узел не оставляет висящее досье', () => {
@@ -791,12 +848,14 @@ describe('дерево технологий — очередь исследов�
     expect(html).not.toContain(`data-q="${root}"`);
   });
 
-  it('без казны строка честно гаснет И предлагает поставить тему в очередь', () => {
+  it('без казны в строке «В очередь», а нехватку называет цена (UIX-10.7)', () => {
     const st = newGame();
     st.players.p1!.resources = {};
     const html = techTreeHtml(st, 'p1', 'space', null);
-    expect(html).toContain(`data-go="${root}" disabled`);
-    expect(html).toContain(`data-q="${root}"`);
+    const tile = new RegExp(`data-tech="${root}">(.*?)</div></div>`).exec(html)?.[1] ?? '';
+    expect(tile).toContain(`data-q="${root}"`);
+    expect(tile).not.toContain(`data-go="${root}"`);
+    expect(tile).toContain('class="lack"');
   });
 
   it('очередь видна полосой: номер, имя и чего ждёт каждая тема', () => {

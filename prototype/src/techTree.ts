@@ -169,14 +169,45 @@ export function techFx(td: TechDefLike): string {
           : TECH_FX_LABEL[k];
       return `+${Math.round((v as number) * 100)}% ${t(label ?? k)}`;
     });
-  for (const u of td.unlocks?.units ?? [])
-    // no `name` on unit defs — displayUnit() is the canonical unit label (see has_unit)
-    fx.push(t('tech.grants', { x: esc(displayUnit(u)) }));
-  for (const b of td.unlocks?.buildings ?? [])
-    fx.push(t('tech.grants', { x: esc(tData(data.buildings[b]?.name ?? b)) }));
+  // Открытые юниты и здания — одной строкой «открывает: А, Б» (UIX-10.7): слово не
+  // повторяется перед каждым. У юнита нет `name` — его подпись даёт displayUnit() (см. has_unit).
+  // Одинаковые имена пишутся один раз: у «Верфей пустоты» оба открытых здания зовутся
+  // «ангар крепости», и различить их игрок всё равно не может.
+  const grants = new Set([
+    ...(td.unlocks?.units ?? []).map((u) => esc(displayUnit(u))),
+    ...(td.unlocks?.buildings ?? []).map((b) => esc(tData(data.buildings[b]?.name ?? b))),
+  ]);
+  if (grants.size) fx.push(t('tech.grants', { x: [...grants].join(', ') }));
   for (const a of td.unlocks?.abilities ?? [])
     fx.push(t('tech.grants.ability', { x: a === 'steward' ? t('tech.grants.steward') : esc(a) }));
   return fx.join(' · ');
+}
+
+/** Кто из совета ведёт ветку `tab` — и честное предупреждение, если никто. Учёный без ветки
+ *  ведёт её, если в ней его собственная линия (Наместник, BAL-19). Пусто, когда сказать нечего. */
+function branchLeadHtml(
+  seat: GameState['players'][string] | undefined,
+  techs: Record<string, TechDefLike>,
+  tab: string,
+): string {
+  const council = (seat?.scientists ?? []).map((c) => ({ id: c.id, def: data.scientists[c.id] }));
+  const inTab = Object.values(techs).filter((td) => (td.branch ?? 'space') === tab);
+  const ownsLineHere = (id: string): boolean =>
+    inTab.some((td) =>
+      (td.conditions ?? []).some((c) => c.type === 'has_scientist' && c.scientist === id),
+    );
+  const lead = (
+    council.find((c) => c.def?.branch === tab) ?? council.find((c) => ownsLineHere(c.id))
+  )?.def;
+  if (lead)
+    return `<div class="tt-lead">🧪 ${t('tech.curator')} <b>${esc(tData(lead.name))}</b></div>`;
+  // PVR-6.17: предупреждение «без лидера ветки узлы с условием „учёный“ закрыты» — только
+  // когда оно про что-то. Совета учёных у забега нет, и единственный такой узел («Хранитель»)
+  // режим убрал: строка обещала замок, которого в дереве нет. По той же причине его нет и в
+  // ветке без таких узлов (UIX-10.7): замки «учёный» стоят в одном «Командовании», и в
+  // остальных пяти ветках янтарная строка обещала замок, которого в них нет.
+  const gated = inTab.some((td) => (td.conditions ?? []).some((c) => c.type === 'has_scientist'));
+  return gated ? `<div class="tt-lead closed">🔭 ${t('tech.curator.none')}</div>` : '';
 }
 
 /** The whole window body for one branch tab: the «researching now» strip + the branch's
@@ -251,28 +282,7 @@ export function techTreeHtml(
     // «Командование 3/7» не помещалось.
     return `<button class="tt-tab${b.key === tab ? ' on' : ''}" data-ttab="${b.key}"><span>${t(b.label)}</span>${cnt}</button>`;
   }).join('');
-  // Кто из совета курирует эту ветку — и честное предупреждение, если никто. Учёный без
-  // ветки ведёт её, если в ней его собственная линия (Наместник, BAL-19).
-  const council = (seat?.scientists ?? []).map((c) => ({ id: c.id, def: data.scientists[c.id] }));
-  const ownsLineHere = (id: string): boolean =>
-    Object.values(techs).some(
-      (td) =>
-        (td.branch ?? 'space') === tab &&
-        (td.conditions ?? []).some((c) => c.type === 'has_scientist' && c.scientist === id),
-    );
-  const lead = (
-    council.find((c) => c.def?.branch === tab) ?? council.find((c) => ownsLineHere(c.id))
-  )?.def;
-  const leadHtml = lead
-    ? `🧪 ${t('tech.curator')} <b>${esc(tData(lead.name))}</b>`
-    : `🔭 ${t('tech.curator.none')}`;
-  // PVR-6.17: предупреждение «без лидера ветки узлы с условием „учёный“ закрыты» — только
-  // когда оно про что-то. Совета учёных у забега нет, и единственный такой узел («Хранитель»)
-  // режим убрал: строка обещала замок, которого в дереве нет.
-  const scientistGated = Object.values(techs).some((td) =>
-    (td.conditions ?? []).some((c) => c.type === 'has_scientist'),
-  );
-  const showLead = !!lead || scientistGated;
+  const leadLine = branchLeadHtml(seat, techs, tab);
   // СПИСОК вместо сетки (TT-4, макет владельца): узлы ветки идут ярусами, каждый —
   // полноразмерной строкой, где ЭФФЕКТ, ЦЕНА и СРОК видны без тапа. Сетка 52-пиксельных
   // иконок помещала на экран больше узлов, но про каждый молчала: чтобы узнать, что даёт
@@ -316,7 +326,9 @@ export function techTreeHtml(
     const affordable = Object.entries(price).every(([k, v]) => (res[k] ?? 0) >= v);
     // Правое поле строки — состояние: сделано / идёт / в очереди / можно взять / причина
     // замка. Под ним — «＋ В очередь», если начать прямо сейчас нельзя, а поставить в план
-    // можно (RQ-1): причина остаётся на виду, а действие — в тот же тап.
+    // можно (RQ-1): причина остаётся на виду, а действие — в тот же тап. Нехватку денег
+    // называет цена внизу плитки красным «−680», поэтому у такой темы «В очередь» стоит
+    // одна: выключенная «Не хватает ресурсов» над ней говорила то же самое (UIX-10.7).
     const queueBtn = canQueue(id)
       ? `<button class="tt-qadd btn-second" data-q="${id}">＋ ${t('tech.action.queue')}</button>`
       : '';
@@ -328,9 +340,10 @@ export function techTreeHtml(
     else if (st.st === 'avail' && freeSlot && affordable)
       right = `<button class="tt-take btn-main" data-go="${id}">▷ ${t('tech.action.research')}</button>`;
     else if (st.st === 'avail' && !affordable)
+      // Выключенная кнопка — только когда ставить в очередь нельзя (очередь полна).
       right =
-        `<button class="tt-take btn-main" data-go="${id}" disabled>▷ ${t('tech.action.no-resources')}</button>` +
-        queueBtn;
+        queueBtn ||
+        `<button class="tt-take btn-main" data-go="${id}" disabled>▷ ${t('tech.action.no-resources')}</button>`;
     else if (st.st === 'avail')
       right = queueBtn || `<span class="tt-st lock">⏳ ${t('tech.action.slots-full')}</span>`;
     else right = `<span class="tt-st lock">🔒 ${lockText(id, st.st)}</span>` + queueBtn;
@@ -512,7 +525,7 @@ export function techTreeHtml(
     activeHtml +
     queueHtml +
     `<div class="tt-tabs">${tabs}</div>` +
-    (showLead ? `<div class="tt-lead${lead ? '' : ' closed'}">${leadHtml}</div>` : '') +
+    leadLine +
     `<div class="tt-scroll"><div class="tt-list">${listHtml}</div></div>` +
     modal;
   return html;

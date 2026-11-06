@@ -418,6 +418,7 @@ import { flushPinch, initMapInput, selectionBox, tapByTouch } from './mapInput';
 import { chainMode, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer } from './chainComposer';
 import { activeConstruction, coreQueue, enqueueBuild, initWorldQueries, progressPct } from './worldQueries';
 import { flushStrayLosses, handleEvents, initEventFeed, killStats, logLines, logVersion, note, toast } from './eventFeed';
+import { eventLogHtml } from './eventLogView';
 import { tickScoutNews } from './scoutNews';
 import {
   PLAY_BASE,
@@ -3765,23 +3766,12 @@ function frame(nowReal: number, nativeGap: number) {
   }
   // Журнал: разведка и потери вне боя дописываются по кадру, а не по событию. Разметка
   // пересобирается по номеру правки — шестьдесят строк каждым кадром склеивать незачем.
-  // Свежие записи сверху; у записи с местом — кнопка ⌖, ведущая камеру туда.
+  // Свежие сверху, по дням (`eventLogView.ts`).
   tickScoutNews({ world: s, me: ME, names: NAME, placeName }, nowReal);
   flushStrayLosses();
   if (logVersion !== lastLogVersion) {
     lastLogVersion = logVersion;
-    const pingTitle = esc(t('win.log.ping'));
-    logEl.innerHTML = logLines
-      .map(
-        (l) =>
-          `<div class="lg-row"><span>${esc(l.line)}</span>` +
-          (l.at
-            ? `<button type="button" class="lg-ping" data-ping="${esc(l.at)}" title="${pingTitle}" aria-label="${pingTitle}">⌖</button>`
-            : '') +
-          `</div>`,
-      )
-      .reverse()
-      .join('');
+    logEl.innerHTML = eventLogHtml(logLines);
   }
   // Пути НАРУЖУ из матча — `matchExits.ts` (REFM-193): кнопка перезапуска в баннере только
   // на настоящем конце СОЛО-матча (на сетевом «переподключаюсь» она увела бы из живой

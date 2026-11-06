@@ -188,6 +188,8 @@ it('«Сведения» — значок в шапке у крестика, а 
   ]);
   expect(part(sheet, 'mobile-quick').children.map((el) => el.dataset.mobile)).toEqual([
     'summary',
+    'lift',
+    'lift',
     'ping',
   ]);
   const info = head.children[3]!;
@@ -218,4 +220,37 @@ it('свёрнутый лист эскадры в полёте держит ря
   // Ряд приказов есть только у эскадры: у флота свой ряд команд.
   hud.update('fleet:f1', false, false, []);
   expect(sheet.classList.contains('aloft')).toBe(false);
+});
+
+it('«Построить» и ник хозяина мира — в нижнем ряду рядом с «Пингом» (UIX-10.10)', () => {
+  const { hud, sheet, side } = boot();
+  const lifted = () =>
+    part(sheet, 'mobile-quick')
+      .children.filter((el) => el.dataset.mobile === 'lift')
+      .map((el) => [el.dataset.lift, el.hidden ? null : el.textContent]);
+  hud.update('planet:A', false, false, []);
+  expect(lifted()).toEqual([
+    ['openbuild', null],
+    ['seat', null],
+  ]);
+  const build = new FakeEl();
+  build.textContent = 'Построить';
+  side.found['.pacts [data-act="openbuild"]'] = build;
+  hud.update('planet:A', false, false, []);
+  expect(lifted()).toEqual([
+    ['openbuild', 'Построить'],
+    ['seat', null],
+  ]);
+  delete side.found['.pacts [data-act="openbuild"]'];
+  const owner = new FakeEl();
+  owner.textContent = 'Орлан';
+  side.found['.pacts [data-act="seat"]'] = owner;
+  hud.update('planet:B', false, false, []);
+  expect(lifted()).toEqual([
+    ['openbuild', null],
+    ['seat', 'Орлан'],
+  ]);
+  // У флота кнопок мира нет, даже если панель ещё держит прежнюю разметку.
+  hud.update('fleet:f1', false, false, []);
+  expect(part(sheet, 'mobile-quick').hidden).toBe(true);
 });

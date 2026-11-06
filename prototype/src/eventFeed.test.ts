@@ -185,8 +185,8 @@ async function boot(opts: { fog?: boolean } = {}) {
     pulseAlly: () => void env.pulses++,
   });
   const format = await import('./format');
-  /** Тексты ленты без метки времени. */
-  const lines = () => feed.logLines.map((l) => l.line.split(' · ').slice(1).join(' · '));
+  /** Тексты ленты. */
+  const lines = () => feed.logLines.map((l) => l.msg);
   return { feed, fog, env, format, lines };
 }
 
@@ -237,10 +237,10 @@ function stubToasts() {
 }
 
 describe('REFM-230 — строка ленты', () => {
-  it('пишет игровую метку в журнал и событие — в сводку возвращения', async () => {
-    const { feed, env, format } = await boot();
+  it('пишет игровое время в журнал и событие — в сводку возвращения', async () => {
+    const { feed, env } = await boot();
     feed.note('взрыв', 'A');
-    expect(feed.logLines).toEqual([{ line: `${format.gameStamp(env.s.time)} · взрыв`, at: 'A' }]);
+    expect(feed.logLines).toEqual([{ time: env.s.time, msg: 'взрыв', at: 'A' }]);
     expect(feed.eventLog).toEqual([{ at: env.s.time, text: 'взрыв', anchor: 'A' }]);
   });
 
@@ -263,7 +263,7 @@ describe('REFM-230 — строка ленты', () => {
     const total = log.EVENT_LOG_MAX + 5;
     for (let i = 0; i < total; i++) feed.note(`n${i}`);
     expect(feed.logLines).toHaveLength(log.LOG_LINES);
-    expect(feed.logLines.at(-1)!.line).toMatch(/ · n84$/);
+    expect(feed.logLines.at(-1)!.msg).toBe('n84');
     expect(feed.eventLog).toHaveLength(log.EVENT_LOG_MAX);
     expect(feed.eventLog[0]!.text).toBe('n5');
   });
