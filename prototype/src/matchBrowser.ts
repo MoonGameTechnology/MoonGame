@@ -46,6 +46,7 @@ import { inviteMatches } from '../../decisions/friendInvite';
 import type { InviteMatch } from './friendsScreen';
 import { isMatchDescriptionOpen, openMatchDescription, type DescriptionAction } from './matchDescription';
 import { cardFacts, type CardPlace } from '../../decisions/matchCard';
+import { INFO_ICON } from './infoIcon';
 import { fmtJoinWindow, joinWindow, rowAction, type MatchRules, type MatchTab } from './matchRow';
 import { openSetup } from './setupScreen';
 import { canCreateOnlineMatch, forgetMatchCreation, initMatchCreation, refreshMatchCreation } from './matchCreation';
@@ -415,10 +416,7 @@ function descriptionButton(match: MatchRow, action?: DescriptionAction): HTMLBut
   const label = t('browser.description');
   button.title = label;
   button.ariaLabel = label;
-  button.innerHTML =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">' +
-    '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.01"/></svg>' +
-    `<span class="mlabel">${esc(label)}</span>`;
+  button.innerHTML = INFO_ICON + `<span class="mlabel">${esc(label)}</span>`;
   button.addEventListener('click', () => openMatchDescription(match, matchName(match), action));
   return button;
 }

@@ -133,7 +133,7 @@ function boot() {
   });
   hud.sync(true);
   const sheet = body.children.find((el) => el.id === 'mobile-sheet')!;
-  return { hud, sheet, made, writes: () => made.reduce((n, el) => n + el.writes, 0) };
+  return { hud, sheet, side, made, writes: () => made.reduce((n, el) => n + el.writes, 0) };
 }
 
 it('кадр без перемен ничего не переписывает в листе', () => {
@@ -170,4 +170,52 @@ it('все метки шапки карточки переезжают в лис
     ['⬢ 98', false],
     ['✦ 10', false],
   ]);
+});
+
+/** Узел листа по классу: шапка, нижний ряд. */
+const part = (sheet: FakeEl, className: string): FakeEl =>
+  sheet.children.find((el) => el.className === className)!;
+
+it('«Сведения» — значок в шапке у крестика, а не кнопка нижнего ряда', () => {
+  const { hud, sheet } = boot();
+  const head = part(sheet, 'mobile-sheet-head');
+  expect(head.children.map((el) => el.className)).toEqual([
+    'mobile-grab',
+    'mobile-badge',
+    'mobile-badge',
+    'mobile-info btn-second',
+    'mobile-close btn-x',
+  ]);
+  expect(part(sheet, 'mobile-quick').children.map((el) => el.dataset.mobile)).toEqual([
+    'summary',
+    'ping',
+  ]);
+  const info = head.children[3]!;
+  hud.update('planet:A', false, false, []);
+  expect(info.hidden).toBe(false);
+  // Выбор из нескольких под пальцем: раскрывать пока нечего.
+  hud.update('planet:A', false, false, [{ kind: 'fleet', id: 'f1', title: 'Флот', sub: '3' }]);
+  expect(info.hidden).toBe(true);
+});
+
+it('нижний ряд виден, только пока в нём есть кнопка', () => {
+  const { hud, sheet } = boot();
+  const quick = part(sheet, 'mobile-quick');
+  hud.update('planet:A', false, false, []); // свой мир: «Метка»
+  expect(quick.hidden).toBe(false);
+  hud.update('fleet:f1', false, false, []); // свёрнутый флот: ни «Метки», ни «Характеристик»
+  expect(quick.hidden).toBe(true);
+});
+
+it('свёрнутый лист эскадры в полёте держит ряд её приказов', () => {
+  const { hud, sheet, side } = boot();
+  // Чужая эскадра: приказов в карточке нет, лист остаётся шапкой.
+  hud.update('strike:s1', false, false, []);
+  expect(sheet.classList.contains('aloft')).toBe(false);
+  side.found['.aloft-acts'] = new FakeEl();
+  hud.update('strike:s1', false, false, []);
+  expect(sheet.classList.contains('aloft')).toBe(true);
+  // Ряд приказов есть только у эскадры: у флота свой ряд команд.
+  hud.update('fleet:f1', false, false, []);
+  expect(sheet.classList.contains('aloft')).toBe(false);
 });

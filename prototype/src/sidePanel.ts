@@ -305,13 +305,25 @@ function renderObjDesc(): void {
 }
 
 let sheetWasOpen = false;
+/** Карта — рабочая поверхность (`mapIsWorkspace`): последний кадр `renderPanel`. */
+let mapWorkspace = false;
 /** Keep the selected marker above the measured sheet, without following a moving fleet. */
 export function revealMobileSelection(): void {
   const s = game.world();
   const MOBILE = game.mobile();
   const VW = game.vw();
   const VH = game.vh();
-  if (!MOBILE || !inMatch() || mobileOrderKind() || pickMode || chainMode || pointers.size > 0)
+  // Пока игрок целится в карту (отход, удар, сбор), камера не уходит к выделению: лист,
+  // сменивший высоту под прицелом, уводил бы точку прицела с экрана (UIX-10.5).
+  if (
+    !MOBILE ||
+    !inMatch() ||
+    mapWorkspace ||
+    mobileOrderKind() ||
+    pickMode ||
+    chainMode ||
+    pointers.size > 0
+  )
     return;
   const el = document.getElementById('mobile-sheet');
   if (!el || el.hidden) return;
@@ -362,13 +374,14 @@ export function renderPanel(): void {
     hasSelection: hasSelection(),
   };
   const open = panelOpen(dock);
+  mapWorkspace = mapIsWorkspace(dock);
   side.style.display = open ? 'flex' : 'none';
   document.body.classList.toggle('sheet-open', open); // mobile: hide log/comms under the sheet
   // Нижний хаб (рейл/скорость/цели) уезжает на телефоне, пока карта — рабочая
   // поверхность. Класс ставится здесь, а не в обработчиках: renderPanel гоняется
   // каждый кадр, поэтому класс физически не может разъехаться с состоянием — а
   // взводится и гасится прицел из полутора десятков мест.
-  document.body.classList.toggle('aim-mode', mapIsWorkspace(dock));
+  document.body.classList.toggle('aim-mode', mapWorkspace);
   // Phone: the bottom sheet covers ~50vh — when it OPENS, pan the camera so the
   // selected object is not the one thing the panel talks about yet hides.
   // Момент открытия и величина подъёма — `sheetLift.ts` (REFM-83).

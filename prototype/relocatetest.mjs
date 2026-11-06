@@ -205,7 +205,7 @@ try {
         const arm = async () => {
           await frame();
           if (phone && !(await page.locator('#mobile-sheet.expanded').count())) {
-            await page.locator('.mobile-quick [data-mobile="details"]').tap();
+            await page.locator('#mobile-sheet .mobile-info').tap();
           }
           await press(button);
           await frame();

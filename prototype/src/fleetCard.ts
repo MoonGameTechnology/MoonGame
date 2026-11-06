@@ -39,6 +39,7 @@ import { t, tData } from '../../localization/runtime';
 import { aloftCard, type AloftCard } from '../../decisions/aloftCard';
 import { anchoredPopover } from '../../decisions/anchoredPopover';
 import { cloakFacts } from '../../decisions/cloakTag';
+import { fleetCounts } from '../../decisions/fleetCounts';
 import { fleetAloftPlaces, fleetHolds } from '../../decisions/fleetHolds';
 import { ambushOf } from '../../decisions/forkAmbush';
 import { landColumnShown } from '../../decisions/landColumn';
@@ -486,9 +487,7 @@ export function fleetPanelHtml(f: Fleet): string {
   let h = kitCardHeader(
     ownerColor(f.owner),
     fleetTitle,
-    (pcUi()
-      ? t('side.fleet.sub.pc', { s: nShips, tr: nTr })
-      : t('side.fleet.sub', { s: nShips, tr: nTr })) +
+    t(...fleetCounts(nShips, nTr, pcUi())) +
       hullTag +
       fleetSubNotes(f, nTr),
     { compact: pcUi(), titleAct: 'fleetinfo', subLive: fleetLandingNote(f) },
@@ -1135,7 +1134,7 @@ export function aloftPanelHtml(st: ShuttleStrike): string {
         )
       : '') +
     (card.canRecall ? btn('wingrecall', card.strikeId, t('side.wing.recall'), true) : '');
-  return buttons ? `${h}<div class="row">${buttons}</div>` : h;
+  return buttons ? `${h}<div class="row aloft-acts">${buttons}</div>` : h;
 }
 
 // --- Всплывашка надбавок: тап по параметру флота (заказ владельца 2026-09-27) ----------

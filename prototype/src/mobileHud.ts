@@ -1,6 +1,7 @@
 /** Phone presentation of the real selection/command hosts; no copied game actions. */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
+import { INFO_ICON } from './infoIcon';
 import type { TapPick } from '../../decisions/tapCycle';
 import type { CardTab } from '../../decisions/worldFleetTabs';
 
@@ -53,6 +54,15 @@ export function initMobileHud(host: MobileHudHost) {
   close.className = 'mobile-close btn-x';
   close.dataset.mobile = 'close';
   close.textContent = '×';
+  // «Сведения» — значок «i» в шапке рядом с ✕ (UIX-10.5, заказ владельца 2026-11-06: «Сведения
+  // так же через восклицательный знак можно поместить на отметку»): тот же рисунок, что у
+  // «Описания» карточки партии. Нижний ряд под ним кнопки больше не держит, и свёрнутый лист
+  // флота стал на этот ряд ниже. Раскрытый лист значок подсвечивает: второй тап сворачивает.
+  const info = document.createElement('button');
+  info.type = 'button';
+  info.className = 'mobile-info btn-second';
+  info.dataset.mobile = 'details';
+  info.innerHTML = INFO_ICON;
   // Метки карточки рядом с именем (`.phead .pbadge`: развитость и очки победы мира): шапка
   // карточки на телефоне скрыта, и метки переезжают сюда. Тап — досье метки, как у фишек мира.
   const BADGE_SLOTS = 2;
@@ -67,6 +77,7 @@ export function initMobileHud(host: MobileHudHost) {
   });
   head.appendChild(grab);
   for (const badge of badges) head.appendChild(badge);
+  head.appendChild(info);
   head.appendChild(close);
   // Вкладки «Флот» / «Мир» (UIX-7.1): видны, только когда выбор — свой мир с одним своим
   // флотом; какая из них открыта, решает выбор, а не разметка.
@@ -89,12 +100,8 @@ export function initMobileHud(host: MobileHudHost) {
   choices.className = 'mobile-choices';
   const quick = document.createElement('div');
   quick.className = 'mobile-quick';
-  // «Сведения», «Сводка», «Метка» — вторичные кнопки карточки (UIX-11.1): главная у неё
-  // приказ «Курс» в ряду команд.
-  const detailButton = document.createElement('button');
-  detailButton.type = 'button';
-  detailButton.className = 'btn-second';
-  detailButton.dataset.mobile = 'details';
+  // «Характеристики» и «Метка» — вторичные кнопки карточки (UIX-11.1): главная у неё приказ
+  // «Курс» в ряду команд. Ряд виден, только пока в нём есть кнопка (UIX-10.5).
   const pingButton = document.createElement('button');
   pingButton.type = 'button';
   pingButton.className = 'btn-second';
@@ -103,7 +110,6 @@ export function initMobileHud(host: MobileHudHost) {
   summaryButton.type = 'button';
   summaryButton.className = 'btn-second';
   summaryButton.dataset.mobile = 'summary';
-  quick.appendChild(detailButton);
   quick.appendChild(summaryButton);
   quick.appendChild(pingButton);
   sheet.appendChild(head);
@@ -143,8 +149,11 @@ export function initMobileHud(host: MobileHudHost) {
     expanded = next;
     sheet.classList.toggle('expanded', expanded);
     grab.setAttribute('aria-expanded', String(expanded));
-    detailButton.setAttribute('aria-expanded', String(expanded));
-    setText(detailButton, expanded ? t('hud.mobile.collapse') : t('hud.mobile.details'));
+    info.setAttribute('aria-expanded', String(expanded));
+    info.classList.toggle('on', expanded);
+    const label = expanded ? t('hud.mobile.collapse') : t('hud.mobile.details');
+    info.setAttribute('aria-label', label);
+    info.setAttribute('title', label);
   };
   // Only the handle owns sheet swipes. Scrolling content always stays native.
   grab.addEventListener('pointerdown', (ev) => {
@@ -271,6 +280,14 @@ export function initMobileHud(host: MobileHudHost) {
       sheet.classList.toggle('order-mode', mode);
       sheet.classList.toggle('more-open', more);
       sheet.classList.toggle('has-commands', host.commands.classList.contains('show'));
+      // Эскадра в полёте (UIX-10.5, заказ владельца «кнопки приказов тоже у авиации сделать»):
+      // свёрнутый лист показывает ряд приказов её карточки, как ряд команд у флота. Кнопки те
+      // же, что в карточке, — стиль листа прячет остальное (`mobile-console.css`). Чужой
+      // эскадре приказывать нечего: без ряда лист остаётся одной шапкой.
+      sheet.classList.toggle(
+        'aloft',
+        key.startsWith('strike:') && !!host.side.querySelector('.aloft-acts'),
+      );
       setHidden(head, mode);
       setHidden(tabs, mode || choosing || !tab);
       if (!tabs.hidden) {
@@ -280,7 +297,7 @@ export function initMobileHud(host: MobileHudHost) {
         setAttr(worldTab, 'aria-selected', String(tab === 'world'));
       }
       setHidden(choices, !choosing);
-      setHidden(quick, mode || choosing);
+      setHidden(info, choosing);
       if (grab.disabled !== choosing) grab.disabled = choosing;
       setText(caption, choosing ? t('hud.mobile.choose') : title);
       setText(subtitle, choosing ? t('hud.mobile.choose-hint') : sub);
@@ -292,14 +309,16 @@ export function initMobileHud(host: MobileHudHost) {
       });
       setAttr(grab, 'aria-label', `${title} — ${t('hud.mobile.details')}`);
       setAttr(close, 'aria-label', t('card.close'));
-      setText(detailButton, expanded ? t('hud.mobile.collapse') : t('hud.mobile.details'));
+      const infoLabel = expanded ? t('hud.mobile.collapse') : t('hud.mobile.details');
+      setAttr(info, 'aria-label', infoLabel);
+      setAttr(info, 'title', infoLabel);
       setText(pingButton, t('side.world.ping'));
       setText(summaryButton, t('hud.mobile.summary'));
-      setHidden(summaryButton, !expanded || !host.side.querySelector('[data-act="fleetinfo"]'));
-      setHidden(
-        pingButton,
-        !host.side.querySelector('[data-act="ping"]') || !key.startsWith('planet:'),
-      );
+      const noSummary = !expanded || !host.side.querySelector('[data-act="fleetinfo"]');
+      const noPing = !host.side.querySelector('[data-act="ping"]') || !key.startsWith('planet:');
+      setHidden(summaryButton, noSummary);
+      setHidden(pingButton, noPing);
+      setHidden(quick, mode || choosing || (noSummary && noPing));
     },
   };
 }

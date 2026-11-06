@@ -312,6 +312,18 @@ describe('свой флот', () => {
     expect(sub(card('F3'))).toContain(t('side.fleet.sub.pc', { s: 2, tr: 5 }).replace(/ · /g, '·'));
   });
 
+  it('флот без десанта не пишет «0 десанта»', async () => {
+    const { env, card, put } = await boot();
+    put(fleet('F4', 'p1', 'A', [{ unit: 'cruiser', count: 2 }]));
+    expect(sub(card('F4'))).toContain(t('side.fleet.sub.ships', { s: 2 }));
+    expect(sub(card('F4'))).not.toContain(t('side.fleet.sub', { s: 2, tr: 0 }));
+    env.pc = true;
+    expect(sub(card('F4'))).toContain(t('side.fleet.sub.pc.ships', { s: 2 }));
+    expect(sub(card('F4'))).not.toContain(
+      t('side.fleet.sub.pc', { s: 2, tr: 0 }).replace(/ · /g, '·'),
+    );
+  });
+
   it('высадка штурмом: в шапке срок под живой патч, разметка не тикает с часами', async () => {
     // Цифры отсчёта прямо в подписи меняли разметку листа с каждым шагом часов, и лист
     // пересобирался вместе с кнопками удара под курсором (сообщение владельца 2026-10-24).
@@ -722,8 +734,11 @@ describe('эскадра в воздухе', () => {
     // Цифры приносит живой патч: с ними в разметке лист пересобирался бы с каждым шагом часов.
     env.s.time += 0.5 * HOUR;
     expect(m.aloftPanelHtml(st)).toBe(html);
+    // Кнопки стоят в помеченном ряду: свёрнутый лист телефона показывает из карточки только
+    // его (UIX-10.5).
+    const row = html.slice(html.indexOf('<div class="row aloft-acts">'));
     for (const a of ['aloftstrike', 'aloftpatrol', 'aloftsplit', 'wingrecall'])
-      expect(html).toContain(order(a, 'S1'));
+      expect(row).toContain(order(a, 'S1'));
     // Сесть некуда — перелёта нет; патруля нет — нечего и держать.
     expect(html).not.toContain(act('aloftrelocate'));
     expect(html).not.toContain(act('wingkeep'));

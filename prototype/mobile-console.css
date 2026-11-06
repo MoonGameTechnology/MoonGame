@@ -39,8 +39,8 @@ body.mobile-ui #mobile-sheet {
   display: flex;
   align-items: center;
   flex: none;
-  padding: 0 8px 0 14px;
-  min-height: 60px;
+  padding: 0 6px 0 12px;
+  min-height: 56px;
   gap: 8px;
 }
 /* Полоски-ручки над заголовком нет (заказ владельца 2026-09-29: убрать и освободить место):
@@ -49,7 +49,7 @@ body.mobile-ui #mobile-sheet {
   position: relative;
   flex: 1;
   min-width: 0;
-  padding: 10px 0 8px;
+  padding: 8px 0 6px;
   background: none;
   border: 0;
   text-align: left;
@@ -72,7 +72,7 @@ body.mobile-ui #mobile-sheet {
   font: var(--fs-caption)/1.5 var(--sf-font);
   font-variant-numeric: tabular-nums;
   color: #8dafbd;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 .mobile-badge {
   flex: none;
@@ -93,10 +93,27 @@ body.mobile-ui #mobile-sheet {
   background-color: #0c1b2b;
   font: 24px/1 sans-serif;
 }
+/* «Сведения» значком «i» рядом с ✕ (UIX-10.5). Вид — классом .btn-second, раскрытый лист —
+   его же состоянием .on; здесь только размер и рисунок. */
+.mobile-info {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 12px;
+  background-color: #0c1b2b;
+}
+.mobile-info svg {
+  width: 22px;
+  height: 22px;
+}
 .mobile-quick {
   display: flex;
   gap: 8px;
-  padding: 8px 12px 12px;
+  padding: 0 10px 10px;
   flex: none;
 }
 /* Вид — классом .btn-second (UIX-11.1); здесь только размер. */
@@ -120,7 +137,7 @@ body.mobile-ui #mobile-sheet #side {
   background: none;
   clip-path: none;
 }
-body.mobile-ui #mobile-sheet:not(.expanded) #side {
+body.mobile-ui #mobile-sheet:not(.expanded):not(.aloft) #side {
   display: none !important;
 }
 body.mobile-ui #mobile-sheet #side::before {
@@ -130,7 +147,7 @@ body.mobile-ui #mobile-sheet #side .phead {
   display: none;
 }
 body.mobile-ui #mobile-sheet #side .pscroll {
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-top: 1px solid #6292a32e;
   max-height: 46dvh;
   overflow-y: auto;
@@ -178,7 +195,7 @@ body.mobile-ui #mobile-sheet #cmdbar {
   flex: none;
   max-width: none;
   margin: 0;
-  padding: 0 12px 4px;
+  padding: 0 10px 10px;
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -194,9 +211,9 @@ body.mobile-ui #mobile-sheet #cmdbar.show {
 body.mobile-ui #mobile-sheet #cmdbar > button {
   min-width: 0;
   width: 100%;
-  min-height: 54px;
+  min-height: 48px;
   height: auto;
-  padding: 8px 3px;
+  padding: 5px 3px;
   border-radius: 11px;
 }
 body.mobile-ui #mobile-sheet #cmdbar > button .cl {
@@ -273,11 +290,48 @@ body.mobile-ui #mobile-sheet.choosing #side,
 body.mobile-ui #mobile-sheet.choosing #cmdbar {
   display: none !important;
 }
+/* Эскадра в полёте (UIX-10.5, заказ владельца 2026-11-06: «кнопки приказов тоже у авиации
+   сделать»). Ряда команд у неё нет: приказы стоят в её карточке. Свёрнутый лист показывает
+   из карточки только этот ряд, раскрытый — ставит его сразу под шапку, как у флота. Кнопки
+   те же самые, поэтому и нажатие то же. */
+body.mobile-ui #mobile-sheet.aloft #side .pscroll {
+  display: flex;
+  flex-direction: column;
+}
+body.mobile-ui #mobile-sheet.aloft:not(.expanded) #side .pscroll {
+  max-height: none;
+  padding: 0 10px 10px;
+  border-top: 0;
+  overflow: visible;
+}
+body.mobile-ui #mobile-sheet.aloft:not(.expanded) #side .pscroll > :not(.aloft-acts) {
+  display: none;
+}
+/* Колонка не уже самого длинного слова в ней: «Перебазировать» иначе вылезало из кнопки,
+   а соседние колонки отдают ей место поровну. */
+body.mobile-ui #mobile-sheet.aloft #side .aloft-acts {
+  order: -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(min-content, 1fr));
+  gap: 8px;
+  margin: 0 0 8px;
+}
+body.mobile-ui #mobile-sheet.aloft:not(.expanded) #side .aloft-acts {
+  margin: 0;
+}
+body.mobile-ui #mobile-sheet.aloft #side .aloft-acts > button {
+  min-height: 44px;
+  margin: 0;
+  padding: 4px 6px;
+  border-radius: 11px;
+  white-space: normal;
+  line-height: 1.2;
+}
 /* UIX-7.1: вкладки «Флот» / «Мир» у своего мира со своим флотом. */
 .mobile-tabs {
   display: flex;
-  gap: 6px;
-  padding: 0 12px 8px;
+  gap: 8px;
+  padding: 0 10px 8px;
   flex: none;
 }
 .mobile-tabs[hidden] {

@@ -151,7 +151,7 @@ try {
   assert(!(await sheet.locator('#side').isVisible()));
   assert((await sheet.boundingBox()).height < 280, 'compact card leaves most of the map visible');
   await p.screenshot({ path: 'prototype/dist/mobile-fleet.png' });
-  await sheet.locator('.mobile-quick [data-mobile="details"]').tap();
+  await sheet.locator('.mobile-info').tap();
   assert(await sheet.locator('#side').isVisible());
   await sheet.locator('[data-mobile="summary"]').tap();
   // Сводка встаёт РЯДОМ с карточкой (`objectPanelHtml`), а назад из неё ведёт своя

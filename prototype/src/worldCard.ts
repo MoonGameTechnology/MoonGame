@@ -680,11 +680,14 @@ export function planetPanelHtml(p: Planet): string {
     }
     return station;
   }
-  const sec = tData(data.sectors[p.terrain ?? '']?.name ?? p.terrain ?? '—');
+  const sec = data.sectors[p.terrain ?? '']?.name ?? p.terrain;
   const pt = p.planetType ? data.planetTypes[p.planetType] : undefined;
-  const ptName = tData(pt?.name ?? p.planetType ?? '—');
+  const ptName = pt?.name ?? p.planetType;
   // Province type (the structural kind) — shown so the map's provinces read clearly.
-  const kindName = tData(sectorTypeOf(p.id)?.name ?? game.sectorOf(p.id) ?? '—');
+  const kindName = sectorTypeOf(p.id)?.name ?? game.sectorOf(p.id);
+  // Чего у мира нет (сектора, типа), подпись не пишет: прочерк в ней ничего не сообщал, а на
+  // телефоне переносил подпись на лишнюю строку (UIX-10.5).
+  const facets = [kindName, ptName, sec].filter((n): n is string => !!n).map((n) => tData(n));
   // Разбор гарнизона по вкладкам и их счётчики — в `planetTabs.ts` (REFM-41), там же
   // правило «вкладка флота считает и орбиту»: построенное само уходит в космос.
   const { ground, ships } = garrisonByTab(p.garrison, data);
@@ -710,7 +713,7 @@ export function planetPanelHtml(p: Planet): string {
   let h = cardHeader(
     ownerColor(p.owner),
     placeName(p.id),
-    `${game.devUi() ? `${esc(p.id)} · ` : ''}${p.owner ? NAME[p.owner] : t('side.neutral')} · ${kindName} · ${ptName} · ${sec}`,
+    `${game.devUi() ? `${esc(p.id)} · ` : ''}${[p.owner ? NAME[p.owner] : t('side.neutral'), ...facets].join(' · ')}`,
     undefined,
     dev + vp,
   );
