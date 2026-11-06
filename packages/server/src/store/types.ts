@@ -88,6 +88,10 @@ export interface SeatAssignment {
  *  a returning player resumes their own seat. The full account model (email/JWT) is
  *  in docs/persistence-accounts-roadmap.md; this is the prototype-grade first step. */
 export interface AccountStore {
+  /** Personal archive is durable seat metadata, shared across sessions/hosts. */
+  archivedMatches(nick: string, rooms: readonly string[]): Promise<string[]>;
+  /** Return false if the participant's seat disappeared before the write. */
+  setMatchArchived(room: string, nick: string, archived: boolean): Promise<boolean>;
   /** Resolve a nick to a seat in a room: the SAME seat on return, a free seat from
    *  `seats` on first join (or the `preferred` slot if given and free), or null when
    *  every seat is taken by another nick. */

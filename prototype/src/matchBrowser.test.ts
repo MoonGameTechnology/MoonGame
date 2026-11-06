@@ -874,31 +874,41 @@ describe('REFM-217 — фильтр «Доступных»', () => {
 describe('REFM-217 — «Мои партии» хаба', () => {
   const cards = () => $('hub-mine').children.filter((c) => c.has('hm-row'));
 
-  it('свои партии, идущие первыми; строку статуса обозревателя не трогает', async () => {
+  it('в хабе только идущие свои партии; строку статуса обозревателя не трогает', async () => {
     const mb = await boot();
     await mb.refreshMyMatches();
     expect(of('status')).toEqual([]);
     expect($('hub-mine-sec').hidden).toBe(false);
-    expect(cards()).toHaveLength(2);
-    const [first, ended] = cards();
+    expect(cards()).toHaveLength(1);
+    const [first] = cards();
     // Та же карточка, что у обозревателя (UIX-10.4); в ней номер, а не адрес (плейтест 2026-10-17).
     expect(first!.className).toBe('hm-row mcard own');
     expect(first!.querySelector('.mnumber')!.innerHTML).toContain('№ m1');
     expect(first!.children[0]!.innerHTML).not.toContain('/game/');
     // Идущая партия не помечена — это обычное состояние; «Продолжить» не дублирует значок ▶.
     expect(first!.children[0]!.innerHTML).not.toContain('mended');
-    expect(ended!.children[0]!.innerHTML).toContain(`<span class="mended">${t('browser.finished')}</span>`);
-    expect(ended!.children.at(-1)!.children[0]!.textContent).toBe(t('browser.view-map'));
     const open = first!.children.at(-1)!.children[0]!;
     expect(open.textContent).toBe(t('browser.resume'));
     open.click();
     expect(of('openSessionTab')).toEqual([['openSessionTab', 'm1', true]]);
   });
 
+  it('архивная строка скрыта в хабе, но доступна во вкладке архива', async () => {
+    lists.active = [row('hidden'), row('live')];
+    lists.archived = [row('hidden'), row('finished', { status: 'ended' })];
+    const mb = await boot();
+    await mb.refreshMyMatches();
+    expect(cards()).toHaveLength(1);
+    expect(cards()[0]!.querySelector('.mnumber')!.innerHTML).toContain('live');
+    await mb.refreshMatches();
+    tab('archived').click();
+    expect(ids()).toEqual(['hidden', 'finished']);
+  });
+
   it('ленты нет — раздел молчит вместе с заголовком, прежние строки уходят', async () => {
     const mb = await boot();
     await mb.refreshMyMatches();
-    expect(cards()).toHaveLength(2);
+    expect(cards()).toHaveLength(1);
     server = (url) => (url.endsWith('/auth/status') ? reply(404) : reply(500));
     await mb.refreshMyMatches();
     expect($('hub-mine-sec').hidden).toBe(true);

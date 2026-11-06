@@ -24,12 +24,28 @@ describe('какие партии — МОИ (ADDR-4)', () => {
 });
 
 describe('порядок и длина списка (ADDR-4)', () => {
-  it('ЖИВЫЕ ВПЕРЕДИ ЗАКОНЧЕННЫХ: доигранная партия не теснит ту, где идёт война', () => {
+  it('завершённые партии не попадают в хаб даже из старой active-ленты', () => {
     const v = myMatches<Row>(
       { active: [row('m-done', 'ended'), row('m-live'), row('m-done2', 'ended'), row('m-live2')] },
       HUB_MY_MATCHES,
     );
-    expect(ids(v)).toEqual(['m-live', 'm-live2', 'm-done']);
+    expect(ids(v)).toEqual(['m-live', 'm-live2']);
+  });
+
+  it('архив имеет приоритет при совпадении идентификаторов с active', () => {
+    const active = [row('hidden'), row('a'), row('ended', 'ended'), row('b'), row('c'), row('d')];
+    const archived = [row('hidden')];
+    const v = myMatches<Row>({ active, archived }, HUB_MY_MATCHES);
+    expect(ids(v)).toEqual(['a', 'b', 'c']);
+    expect(v.kind === 'list' && v.more).toBe(1);
+    expect(active.map(r => r.matchId)).toEqual(['hidden', 'a', 'ended', 'b', 'c', 'd']);
+    expect(archived.map(r => r.matchId)).toEqual(['hidden']);
+  });
+
+  it('после удаления всех завершённых/архивных показывает пустое состояние', () => {
+    expect(myMatches<Row>({ active: [row('done', 'ended')] }, HUB_MY_MATCHES)).toEqual({ kind: 'none' });
+    expect(myMatches<Row>({ active: [row('old')], archived: [row('old')] }, HUB_MY_MATCHES)).toEqual({ kind: 'none' });
+    expect(myMatches<Row>({ archived: [row('done', 'ended')] }, HUB_MY_MATCHES)).toEqual({ kind: 'none' });
   });
 
   it('внутри группы порядок сервера сохраняется — он уже отсортирован по новизне', () => {

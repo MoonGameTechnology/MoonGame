@@ -19,6 +19,35 @@ function room(id: string, opts: { days?: number; players?: string[]; config?: Ma
 }
 
 describe('MatchRegistry — match-browser read-model', () => {
+  it('refuses a failed archive write without leaking storage details or changing the list', async () => {
+    const accounts = new MemoryAccountStore();
+    const reg = new MatchRegistry(accounts);
+    reg.register(room('failed-write'), { mapId: 'duel', rules: { timeScale: 1 }, createdAt: 1 });
+    await accounts.resolveSeat('failed-write', 'alice', ['green', 'red']);
+    accounts.setMatchArchived = async () => { throw new Error('private database detail'); };
+    expect(await reg.archive('failed-write', 'alice')).toEqual({ ok: false, code: 'E_ARCHIVE_STORE' });
+    expect((await reg.list('alice')).active.map(m => m.matchId)).toEqual(['failed-write']);
+  });
+
+  it('keeps a personal archive through reconnect, re-registration and a new registry', async () => {
+    const accounts = new MemoryAccountStore();
+    const meta = { mapId: 'duel', rules: { timeScale: 1 }, createdAt: 1 };
+    const first = new MatchRegistry(accounts);
+    first.register(room('persist'), meta);
+    await accounts.resolveSeat('persist', 'alice', ['green', 'red']);
+    await accounts.resolveSeat('persist', 'bob', ['green', 'red']);
+    expect(await first.archive('persist', 'alice')).toEqual({ ok: true });
+    await accounts.resolveSeat('persist', 'alice', ['green', 'red']);
+    first.register(room('persist'), meta);
+    expect((await first.list('alice')).active).toHaveLength(0);
+    const next = new MatchRegistry(accounts);
+    next.register(room('persist'), meta);
+    expect((await next.list('alice')).archived.map(m => m.matchId)).toEqual(['persist']);
+    expect((await next.list('bob')).active.map(m => m.matchId)).toEqual(['persist']);
+    await next.unarchive('persist', 'alice');
+    expect((await first.list('alice')).active.map(m => m.matchId)).toEqual(['persist']);
+  });
+
   it('buckets matches into available / active / archived for a viewer', async () => {
     const accounts = new MemoryAccountStore();
     const reg = new MatchRegistry(accounts);
