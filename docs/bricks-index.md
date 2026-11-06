@@ -72,6 +72,7 @@
 | UIX-10.6 | ✅ | proto | `docs/backlog.md` | Карточки мира и флота без повторов и подсказок-прозы. |
 | UIX-10.7 | ✅ | proto | `docs/backlog.md` | Окно науки без повторов. |
 | UIX-10.8 | ✅ | proto | `docs/backlog.md` | Окно производства без подсказок-прозы. |
+| UIX-10.9 | ✅ | proto | `docs/backlog.md` | Журнал «Событий» без повторов дня. |
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
 | CORP-5 | ✅ | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
 | CORP-6 | ✅ | data srv proto | `docs/backlog.md` | Уровни корпорации 4 и 5. |
