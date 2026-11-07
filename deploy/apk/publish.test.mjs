@@ -17,6 +17,27 @@ const publicKey=keys.publicKey;
 const acquire=async path=>{await writeFile(path,bytes);return {bytes:bytes.length,sha256:sha};};
 const verify=async()=>{};
 describe('verified atomic site publication',()=>{
+  it.each([6*1024**3, 6*1024**3+128*1024**2, NaN])('preserves current without downloading when available bytes are %s',async available=>{
+    const root=await mkdtemp(join(tmpdir(),'apk-disk-'));
+    try {
+      await installRelease({root,lane:'player',signed:signed(),publicKey,acquire,verify,checkSpace:false});
+      let downloads=0;
+      await expect(installRelease({root,lane:'player',signed:signed(manifest(2)),publicKey,verify,
+        statfsImpl:async()=>({bavail:available,bsize:1}),
+        acquire:async path=>{downloads++;return acquire(path);}})).rejects.toThrow('E_APK_DISK');
+      expect(downloads).toBe(0);
+      expect(await readlink(join(root,'player/current'))).toBe('1-deadbee');
+      expect((await readdir(join(root,'player'))).filter(x=>x.startsWith('.'))).toEqual([]);
+    } finally {await rm(root,{recursive:true,force:true});}
+  });
+  it.each([6*1024**3+129*1024**2, Math.floor(6.2*1024**3)])('publishes with the six-GiB reserve and staging allowance at %s free bytes',async available=>{
+    const root=await mkdtemp(join(tmpdir(),'apk-disk-safe-'));
+    try {
+      expect(await installRelease({root,lane:'player',signed:signed(),publicKey,acquire,verify,
+        statfsImpl:async()=>({bavail:available,bsize:1})})).toBe(true);
+      expect(await readlink(join(root,'player/current'))).toBe('1-deadbee');
+    } finally {await rm(root,{recursive:true,force:true});}
+  });
   it('pairs the stable APK and version through a single pointer; preserves old immutable APKs',async()=>{
     const root=await mkdtemp(join(tmpdir(),'apk-publish-'));
     try {
