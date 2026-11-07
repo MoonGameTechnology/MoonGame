@@ -17,6 +17,7 @@ export const STAT_KEY: Record<string, string> = {
   speed: 'stat.speed',
   cargoCapacity: 'stat.cargo',
   radarRange: 'stat.radar',
+  sightRange: 'stat.sight',
   pointDefense: 'stat.point-defense',
   siegeDamage: 'loadout.stat.siege',
   shuttleDamage: 'loadout.stat.air-damage',

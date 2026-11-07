@@ -79,6 +79,7 @@ const stats: Record<string, string> = {
   speed: 'loadout.stat.speed',
   cargoCapacity: 'loadout.stat.cargo',
   radarRange: 'loadout.stat.radar',
+  sightRange: 'loadout.stat.sight',
   pointDefense: 'data.area-defense-array',
   shieldRegen: 'loadout.stat.shield-regen',
   hullRepair: 'loadout.stat.hull-repair',
@@ -110,7 +111,7 @@ const effectText = (values: Record<string, number>): string =>
     .map(([key, value]) => `${esc(t(stats[key] ?? key))} ${statValue(key, value, true)}`)
     .join(' · ');
 /** Порядок строк сравнения — тот же, что у полосы статов корабля. */
-const STAT_ORDER = ['attack', 'defense', 'hp', 'shield', 'speed', 'shieldRegen', 'hullRepair', 'fleetHullRepair', 'cargoCapacity', 'radarRange', 'pointDefense', 'siegeDamage', 'retreatPull', 'salvageBonus', 'mineCharge', 'mineHit', 'cloak'];
+const STAT_ORDER = ['attack', 'defense', 'hp', 'shield', 'speed', 'shieldRegen', 'hullRepair', 'fleetHullRepair', 'cargoCapacity', 'radarRange', 'sightRange', 'pointDefense', 'siegeDamage', 'retreatPull', 'salvageBonus', 'mineCharge', 'mineHit', 'cloak'];
 /**
  * «Было → станет» списком (PVR-6.5): одна разметка на корабль и на улучшение модуля. Прибавка
  * зелёная, потеря красная — цвет несёт смысл, а число рядом дублирует его для тех, кто

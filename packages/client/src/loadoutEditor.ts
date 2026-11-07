@@ -133,6 +133,7 @@ const PREVIEW_STATS = [
   'speed',
   'cargoCapacity',
   'radarRange',
+  'sightRange',
 ] as const;
 
 /** Display labels, from `/localization` (LOC-3). `attack` and `defense` are the
@@ -146,6 +147,7 @@ const STAT_LABELS: Record<string, string> = {
   speed: t('loadout.stat.speed'),
   cargoCapacity: t('loadout.stat.cargo'),
   radarRange: t('loadout.stat.radar'),
+  sightRange: t('loadout.stat.sight'),
   siegeDamage: t('loadout.stat.siege'),
 };
 

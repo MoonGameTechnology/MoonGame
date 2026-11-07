@@ -44,6 +44,7 @@ import {
   TECHNOLOGY_PRICES_SOLO_MIGRATION as technologyPrices,
   FLEET_MERGE_ORDERS_SOLO_MIGRATION as fleetMergeOrders,
   FORTRESS_PRICE_SOLO_MIGRATION as fortressPrice,
+  LONG_RANGE_OPTICS_SOLO_MIGRATION as longRangeOptics,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -201,7 +202,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement, controlTech, viceroy, technologyPrices, fleetMergeOrders, fortressPrice]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement, controlTech, viceroy, technologyPrices, fleetMergeOrders, fortressPrice, longRangeOptics]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([

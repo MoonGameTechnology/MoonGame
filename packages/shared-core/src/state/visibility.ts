@@ -10,6 +10,7 @@ import { laneIsPublic } from './corridor';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
 import { emptyOrdnance, inRadius, isMissileFleet, rocketMineModule } from './ordnance';
 import { cloakedReach, eyeReach, fleetCloak } from './cloak';
+import { fleetSightBonus } from './fleetSight';
 import { visibleMinefields, isMineFleet, mineDetectionRange, mineFleetVisible } from './minefields';
 import {
   airEmitters as foreignAirEmitters,
@@ -22,6 +23,7 @@ import {
 import { detectSignals, fleetSignalStrength, type RadarSource, type SignalEmitter, type SignatureContact } from './radarSignals';
 import { coverageInCircles, withProjectedSensors, type Coverage, type SightCircle } from './sensorView';
 export type { Coverage, SightCircle } from './sensorView';
+export { fleetSightBonus } from './fleetSight';
 export type { SignatureContact, SignatureSize } from './radarSignals';
 import type { DomainEvent } from '../action/types';
 import type {
@@ -293,7 +295,7 @@ function circlesByOwner(
     }
     // Ракета (SM-3.7b) не глаз и не радар: она летит к цели, а не смотрит.
     if (isMissileFleet(fleet, data)) continue;
-    if (pos) circle(ownerId, { kind: 'fleet', id: fleet.id }, pos, rules.fleet, fleetRadarRange(fleet, data) * mult);
+    if (pos) circle(ownerId, { kind: 'fleet', id: fleet.id }, pos, rules.fleet + fleetSightBonus(fleet, data), fleetRadarRange(fleet, data) * mult);
   }
   patrolEyes(state, byOwner);
   // HERO-FX3 `reveal` (scan): the owner's OWN living heroes' active time-boxed reveals
