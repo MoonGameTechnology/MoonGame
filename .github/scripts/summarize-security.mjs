@@ -62,6 +62,9 @@ const EXPECTED = [
   },
   { key: 'dast-zap', name: 'OWASP ZAP — DAST (baseline против запущенного сервера)' },
   { key: 'zizmor', name: 'zizmor — безопасность workflow' },
+  { key: 'actionlint', name: 'actionlint — корректность workflow + встроенный shell' },
+  { key: 'shellcheck', name: 'ShellCheck — shell-скрипты' },
+  { key: 'hadolint', name: 'Hadolint — Dockerfile' },
   {
     key: 'scorecard',
     name: 'OpenSSF Scorecard — постура',
