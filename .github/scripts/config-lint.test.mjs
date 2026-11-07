@@ -21,7 +21,12 @@ describe('configuration scanners', () => {
     expect(workflow).toContain('  workflow_dispatch:');
     for (const key of ['actionlint', 'shellcheck', 'hadolint']) {
       const job = workflow.split(`\n  ${key}:`)[1].split(/\n {2}[a-z]/)[0];
-      expect(job).not.toMatch(/^ {4}if:/m); // Runs on weekly main as well as PR/queue.
+      // Only the shared run-policy gate: still runs on weekly main, PR and queue;
+      // a push duplicate of an already covered PR is the one case it skips.
+      expect(job).toContain('    needs: run-policy\n');
+      expect(job.match(/^ {4}if: (.*)$/m)?.[1]).toBe(
+        "${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}",
+      );
       expect(job).toContain(`config-lint.mjs ${key} config-report`);
       expect(job).toContain('persist-credentials: false');
       expect(job).toContain('if-no-files-found: error');
