@@ -537,6 +537,17 @@ export const PRODUCTION_WORKBENCH_SOLO_MIGRATION = {
   toDataHash: LONG_RANGE_OPTICS_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Category timing for new main-game maps after shared mobilization. Campaign and
+ * saved pricing, accepted work and paid repair budgets retain their original terms. */
+export const BUILD_PRODUCTION_TIMES_SOLO_MIGRATION = {
+  fromRules: PRODUCTION_WORKBENCH_SOLO_MIGRATION.toRules,
+  fromData: PRODUCTION_WORKBENCH_SOLO_MIGRATION.toData,
+  fromDataHash: PRODUCTION_WORKBENCH_SOLO_MIGRATION.toDataHash,
+  toRules: '1633b24f2a883e',
+  toData: PRODUCTION_WORKBENCH_SOLO_MIGRATION.toData,
+  toDataHash: PRODUCTION_WORKBENCH_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -584,6 +595,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   FORTRESS_PRICE_SOLO_MIGRATION,
   LONG_RANGE_OPTICS_SOLO_MIGRATION,
   PRODUCTION_WORKBENCH_SOLO_MIGRATION,
+  BUILD_PRODUCTION_TIMES_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

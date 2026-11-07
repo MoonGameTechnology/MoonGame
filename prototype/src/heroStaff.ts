@@ -27,7 +27,7 @@ import {
   activeHeroCount,
   heroActiveCap,
   HERO_ACTIVE_CAP,
-  matchHours,
+  matchUnitHours,
   heroModuleSlots,
   knownSkillNodes,
   moduleAllowed,
@@ -218,7 +218,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     ? hero.mobilization.queued ? t('build.state.waiting') : t('hero.hq.mobilizing', { time: liveTimerHtml(hero.mobilization.readyAt, 'hms') })
     : null;
   const deployLabel = state.techRules?.ruleset === 'main'
-    ? t('hero.hq.mobilize', { h: fmtHrs(matchHours(state, data.units[heroHullOf(hero)]?.buildTimeHours || 10)) })
+    ? t('hero.hq.mobilize', { h: fmtHrs(matchUnitHours(state, data.units[heroHullOf(hero)]?.buildTimeHours || 10)) })
     : t('hero.hq.deploy');
   const deploy = mobilizing ? `<span class="hx-note">${mobilizing}</span>` : dead && (state.techRules?.ruleset !== 'main' || (hero.cooldowns.respawn ?? 0) > state.time)
     ? `<span class="hx-dead">${t('hero.hq.dead')}</span>`

@@ -206,7 +206,8 @@ describe('guided first match: every chapter is playable by real orders', () => {
     s = until(s, (x) => x.planets[GUIDE_ASSAULT]!.owner === ME);
     tour.refresh();
     expect(result?.completed).toBe(true);
-    // Shared hero/troop mobilization keeps the lesson below 75 game hours (15 minutes at ×300).
-    expect((s.time - start) / HOUR).toBeLessThan(75);
+    // Category timers plus shared mobilization keep the lesson within six game days:
+    // at the unchanged ×300 tutorial speed, that is less than 29 real minutes.
+    expect((s.time - start) / HOUR).toBeLessThan(144);
   });
 });

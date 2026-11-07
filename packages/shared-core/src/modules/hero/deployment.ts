@@ -10,7 +10,7 @@ import { mobilizationBusy, mobilizationHead, queuedHeroCount } from '../../state
 import { orderLane } from '../../state/buildLane';
 import { battleAt } from '../../state/battle';
 import { isBombarded } from '../../state/orbit';
-import { matchHours } from '../../util/pricing';
+import { matchUnitHours } from '../../util/pricing';
 
 type Destination = { at: string; beside?: string } | { code: string };
 interface DeploymentBodies {
@@ -120,7 +120,7 @@ export function registerHeroDeployment(api: ModuleSetupApi, bodies: DeploymentBo
 
   function start(h: HandlerContext, hero: Hero, at: string): void {
     const hours = h.ctx.data.units[bodies.heroShipUnit(h, hero)]?.buildTimeHours || 10;
-    const readyAt = h.ctx.now + hoursToMs(h.ctx, matchHours(h.state, hours));
+    const readyAt = h.ctx.now + hoursToMs(h.ctx, matchUnitHours(h.state, hours));
     hero.mobilization = { target: at, startedAt: h.ctx.now, readyAt };
     h.schedule(readyAt, 'hero.mobilization.complete', { heroId: hero.id, readyAt });
     h.emit('hero.mobilization.started', { owner: hero.owner, heroId: hero.id, at, readyAt });

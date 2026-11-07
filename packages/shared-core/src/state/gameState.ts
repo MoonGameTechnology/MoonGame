@@ -1,3 +1,5 @@
+import type { MatchPricing } from './pricing';
+export type { MatchPricing } from './pricing';
 import type { UnitStack } from './unitStack';
 export type { UnitStack } from './unitStack';
 import type { MatchState } from './matchState';
@@ -1765,19 +1767,6 @@ export interface ProvinceSurvey {
   planetType?: string;
   /** Simulation time (ms) of the last crossing. */
   at: number;
-}
-
-/** Множители цен партии (`MatchMap.pricing`, `util/pricing.ts`). */
-export interface MatchPricing {
-  /** Множитель цены по ресурсу: строка каталога × множитель. Нет ресурса ⇒ ×1. */
-  cost?: Record<string, number>;
-  /** Additional resource multipliers for buildable ship hulls only. Applied before
-   *  rounding, together with `cost`; no entry means the original match price. */
-  shipCost?: Record<string, number>;
-  /** Множитель сроков постройки и исследования. Нет ⇒ ×1. */
-  hours?: number;
-  /** Множитель стартового запаса места по ресурсу. Нет ресурса ⇒ ×1. */
-  start?: Record<string, number>;
 }
 
 /** Правила дерева технологий матча (PVR-6.17). */

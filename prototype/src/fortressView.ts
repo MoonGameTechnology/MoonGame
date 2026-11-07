@@ -1,6 +1,6 @@
 import {
   buildingLevel, buildingRepairQuote, effectiveStats, fortressFleetId, fortressRepairQuote,
-  matchCost, matchHours, type Action, type BuildingInstance, type GameState, type Planet,
+  matchCost, matchBuildingHours, type Action, type BuildingInstance, type GameState, type Planet,
   fleetAtStation,
 } from '../../packages/shared-core/src/index';
 import { repairBuilding, repairStation } from '../../decisions/actions';
@@ -49,7 +49,7 @@ export function buildingRepairHtml(
   const quote = buildingRepairQuote(building, data);
   if (!(quote.missingHp > 0) || state.planets[planetId]?.owner !== me) return `<div class="building-health">${health}</div>`;
   const block = probe(repairBuilding(me, planetId, building.type, building.uid));
-  return `<div class="bw-foot repair-offer">${health}<span>${cost(matchCost(state, quote.cost), state.players[me]?.resources ?? {})} · ${fmtEta(matchHours(state, quote.hours))}</span>` +
+  return `<div class="bw-foot repair-offer">${health}<span>${cost(matchCost(state, quote.cost), state.players[me]?.resources ?? {})} · ${fmtEta(matchBuildingHours(state, quote.hours))}</span>` +
     `<button class="bw-take btn-second" data-bw-repair="${esc(building.type)}" data-uid="${esc(building.uid ?? '')}"${block ? ' disabled' : ''}>${t('repair.start')}</button></div>`;
 }
 
@@ -78,7 +78,7 @@ export function fortressStatusHtml(state: GameState, site: Planet, me: string, p
     else {
       const quote = fortressRepairQuote(state, site, data);
       const blocked = quote.missingHp > 0 && probe(repairStation(me, site.id)) !== null;
-      if (quote.missingHp > 0) html += `<div class="repair-offer">${cost(matchCost(state, quote.cost), state.players[me]?.resources ?? {})} · ${fmtEta(matchHours(state, quote.hours))}` +
+      if (quote.missingHp > 0) html += `<div class="repair-offer">${cost(matchCost(state, quote.cost), state.players[me]?.resources ?? {})} · ${fmtEta(matchBuildingHours(state, quote.hours))}` +
         `<button class="bw-open btn-second" data-act="repairfortress" data-arg="${esc(site.id)}"${blocked ? ' disabled' : ''}>${t('repair.hull')}</button></div>`;
     }
     html += `<p class="dim">${esc(t('fortress.damage-rule'))}</p>`;
