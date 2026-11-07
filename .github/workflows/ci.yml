@@ -1,7 +1,7 @@
 name: CI
 
-# The gate for every work-branch push, every PR and the merge queue: lint + typecheck +
-# test + audit. (`main` itself is not re-run on push — see the `push` trigger below.)
+# Full gate for PRs, merge groups and branches without a PR: lint + typecheck +
+# test + audit. Redundant push copies only run the small selection job below.
 # A Postgres service is attached and DATABASE_URL is set, so the durable-path adapter
 # tests (store.test.ts, gated behind DATABASE_URL) actually run in CI instead of being
 # skipped — the production persistence path is exercised, not just the in-memory one.
@@ -9,68 +9,53 @@ name: CI
 # checkout sets `persist-credentials: false` (the job only reads) — same hardening as
 # security.yml, self-flagged by its zizmor job.
 
-# ТРИГГЕРЫ. Раньше гейт бежал только на `main` и на pull_request — то есть пуш в фиче-ветку
-# не проверялся ВООБЩЕ, и обратная связь появлялась лишь в момент открытия PR. Локально
-# хук `.githooks/pre-push` гоняет `pnpm run check`, но может быть обойдён клиентом.
-# Чтобы удалённая проверка работала и до открытия PR, гейт
-# бежит на push в любую ветку. Цена этого решения — на ветке с открытым PR гейт бежит
-# ДВАЖДЫ (от push и от pull_request); `concurrency` ниже дубль не гасит, и почему гасить
-# его нельзя — расписано там же.
+# Keep triggers unchanged: filtering queue push events previously stopped checks
+# (AUD-9). A small read-only job skips duplicate WORK, not event delivery.
+# PR/merge_group remain canonical; a branch without an open PR still gets feedback.
 on:
   workflow_dispatch:
-  # ВНИМАНИЕ: здесь стояло `branches-ignore: ['gh-readonly-queue/**']` (AUD-9) — и после
-  # того, как эта правка доехала до `main`, очередь встала НАСМЕРТЬ: на всех ветках
-  # очереди, собранных поверх такого `main`, не запускалось НИ ОДНОГО прогона (`merge_group`
-  # в том числе), required-чеки не отчитывались никогда, и записи выбрасывало по таймауту.
-  # Корреляция точная: pr-497 и pr-500 на прежнем `main` — прогоны были; pr-507…pr-510 на
-  # новом — ноль. Похоже, GitHub решает, слать ли событие, по конфигу с БАЗОВОЙ ветки, а не
-  # с ветки очереди. Механизм до конца не доказан, но цена ошибки несимметрична: столкновение
-  # прогонов стоит редкого ложного выброса, а нерассылка событий — полной остановки мержа.
-  # Возвращаем заведомо рабочую форму, а задачу AUD-9 решаем ключом `concurrency` ниже.
-  #
-  # `!main`: гейт на push в `main` не бежит. В `main` приезжает только коммит, который
-  # очередь уже прогнала на своей ветке (`merge_group`/push в `gh-readonly-queue/**`), —
-  # повторный прогон ничего не проверял и половину раз гасился следующим мержем
-  # (`cancelled`). Ветки очереди под `!main` не подпадают: шаблон сравнивается с именем
-  # ветки целиком. Ручной прогон на `main` — `workflow_dispatch`.
   push:
     branches: ['**', '!main']
   pull_request:
-  # Merge queue: the queue builds a temporary "latest main + this PR" branch and waits
-  # for the REQUIRED checks on it — but a workflow only runs there if it subscribes to
-  # `merge_group`. Without this line the queue never sees `lint · typecheck · test ·
-  # audit` report and every PR sits until it times out. Harmless while no queue is
-  # configured (the event simply never fires), so it can land ahead of the setting.
   merge_group:
 
 concurrency:
-  # Про push+pull_request: ключ их НЕ схлопывает, и это осознанно — полный разбор в
-  # шапке `concurrency` в security.yml (там же, почему `github.ref_name` брать нельзя).
-  # Здесь ключ гасит только последовательные пуши в одну ветку.
-  # `github.event_name` в ключе — это и есть починка AUD-9, но без правки триггеров.
-  # Ветку очереди создаёт merge-queue, и на неё прилетают ОБА события — `merge_group` и
-  # `push`. Без префикса по событию ключ у них совпадал (`github.head_ref` на обоих пуст,
-  # остаётся `github.ref` = имя ветки очереди), а у push-прогона `cancel-in-progress`
-  # истинно — он убивал merge_group-прогон через секунду после старта, очередь читала
-  # отменённый required-чек как провал и выбрасывала PR с `CI_FAILURE` при зелёном коде.
-  # Guard ниже от этого не спасал: он разводит merge_group-прогоны между собой, а убивал
-  # их push. С префиксом группы разные — погасить друг друга они больше не могут.
-  # Последовательные пуши в одну ветку по-прежнему схлопываются: у них и событие одно.
+  # Events must not cancel one another. Repeated queue attempts also keep running.
   group: ci-${{ github.event_name }}-${{ github.head_ref || github.ref }}
-  # На `merge_group` отменять НЕЛЬЗЯ. Ключ группы там складывается из имени ветки очереди
-  # (`gh-readonly-queue/main/pr-N-<база>`), а оно одинаково у всех попыток поставить тот же
-  # PR на ту же базу. Повторная постановка гасила бы ещё идущий прогон прошлой записи,
-  # очередь читала бы отменённый required-чек как провал и выбрасывала PR с `CI_FAILURE`
-  # при полностью зелёном коде. Прогон очереди решает, влить или нет, — его результат
-  # нельзя терять; лишний доигравший прогон дешевле ложного выброса.
   cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 permissions:
   contents: read
 
 jobs:
+  run-policy:
+    name: Select CI execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.policy.outputs.result }}
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        id: policy
+        with:
+          script: |
+            const { runPolicy } = await import(process.env.GITHUB_WORKSPACE + '/.github/scripts/ci-run-policy.mjs');
+            return await runPolicy({ github, context, core });
+
   check:
-    name: lint · typecheck · test · audit
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}lint · typecheck · test · audit
     runs-on: ubuntu-24.04
 
     services:

@@ -1,7 +1,7 @@
 name: Security scan
 
-# Security pipeline. Runs a DIVERSE set of scanners on every push to a work branch,
-# on PRs, in the merge queue and weekly on `main` —
+# Security pipeline. Full scans on PRs, merge groups, branches without a PR,
+# manual runs and weekly on `main`; duplicate push jobs are skipped below —
 # different methods / data sources / surfaces, not clones — aggregates everything
 # into ONE report: job summary + artifact + ONE sticky comment per open PR, edited in
 # place on later runs. Never a commit comment: a NEW comment mails every watcher, and
@@ -98,70 +98,54 @@ name: Security scan
 # published against the pinned base surfaces as a failed run within a week, not
 # whenever the next commit lands.
 
-# `pull_request` добавлен ради ФОРКОВ: этот воркфлоу подписан на push, а пуш в форк
-# происходит в чужом репозитории — то есть PR от внешнего контрибьютора приезжал бы
-# вообще без сканеров, ровно в тот момент, когда чужой код нужно проверять больше всего.
-# Права у форк-прогона урезаны (нет секретов, нет `security-events: write`), поэтому
-# заливка SARIF и постинг комментария там тихо не сработают — оба шага под
-# `continue-on-error`, а сами гейты (semgrep/gitleaks/osv/trivy) от прав не зависят.
+# Keep push/PR/queue triggers intact (AUD-9); deduplicate expensive jobs below.
+# Fork PRs retain their scans with GitHub's reduced token permissions.
 on:
   push:
-    # Здесь стояло `branches-ignore: ['gh-readonly-queue/**']` (AUD-9) и возвращено обратно:
-    # с ним очередь встала насмерть — на ветках очереди не запускалось ни одного прогона,
-    # required-чеки не отчитывались, записи выбрасывало по таймауту. Полный разбор — в
-    # шапке `push` в ci.yml. Столкновение push и merge_group теперь разводит ключ
-    # `concurrency` ниже, а не фильтр событий.
-    #
-    # `!main`: push в `main` сканеры больше не будит. В `main` попадает только коммит,
-    # который очередь уже прогнала целиком на своей ветке (то же дерево «свежий main + PR»),
-    # так что прогон на push в `main` повторял уже сданный экзамен. Свежесть CVE-лент на
-    # `main` держит недельный cron ниже (SEC-10), Scorecard бежит на нём же. Исключение
-    # точечное: ветки очереди (`gh-readonly-queue/main/...`) под `!main` не подпадают —
-    # шаблон сравнивается с именем ветки целиком.
     branches: ['**', '!main']
   pull_request:
-  # Merge queue: очередь собирает временную ветку «свежий main + этот PR» и ждёт на НЕЙ
-  # отчёта от required-чеков — но воркфлоу попадает туда, только если подписан на
-  # `merge_group`. Без этой строки очередь не увидит отсюда ни одного сканера и будет
-  # ждать до таймаута, а PR останется висеть. Ровно то же соображение, что в ci.yml;
-  # там строка уже стоит, здесь её не хватало — и очередь вставала на первом же PR.
   merge_group:
   schedule:
-    # Monday 05:17 UTC. Off-the-hour minute: GitHub drops cron runs queued at peak
-    # times (:00 is the worst), and a rescan that silently never ran is fail-open.
+    # Monday 05:17 UTC / 08:17 Moscow, on the default branch. Delivery may be delayed.
     - cron: '17 5 * * 1'
   workflow_dispatch:
 
 concurrency:
-  # ЧТО ЭТОТ КЛЮЧ ДЕЛАЕТ НА САМОМ ДЕЛЕ — и это НЕ то, что тут было написано раньше.
-  # `github.head_ref` пуст везде, кроме `pull_request`. Значит на push ключ равен
-  # `security-refs/heads/foo`, а на PR из той же ветки — `security-foo`. Группы РАЗНЫЕ,
-  # и дубль «push + pull_request» он не гасит: на каждый коммит в PR сканеры бегут
-  # дважды. Прежний комментарий утверждал обратное — исправлен по факту.
-  #
-  # ПОЧЕМУ НЕ СХЛОПЫВАЕМ (`github.ref_name` вместо `github.ref` дал бы совпадение).
-  # Потому что вместе с `cancel-in-progress: true` совпадение означает не «один прогон
-  # вместо двух», а «кто стартовал вторым, гасит первого». Push и synchronize приходят
-  # на один и тот же коммит практически одновременно, порядок не определён — и в части
-  # случаев отменённым окажется ИМЕННО прогон от `pull_request`, тот самый, чей
-  # required-чек читает очередь. Отменённый required-чек она считает провалом и
-  # выбрасывает PR с `CI_FAILURE` при зелёном коде — ровно та авария, которую чинил #464
-  # для `merge_group`. Лишний прогон стоит минут раннера; ложный выброс стоит доверия к
-  # гейту, поэтому размен сознательный, а не «руки не дошли».
-  # Префикс по событию (AUD-9, вторая редакция): на ветке очереди `push` и `merge_group`
-  # давали ОДИН ключ и гасили друг друга — теперь группы разные. Разбор в ci.yml.
+  # Push and PR/merge_group must never cancel one another's required checks.
   group: security-${{ github.event_name }}-${{ github.head_ref || github.ref }}
-  # На `merge_group` не отменяем — по той же причине, что в `ci.yml`: у всех попыток
-  # поставить тот же PR на ту же базу имя ветки очереди совпадает, и повторная постановка
-  # гасила бы ещё идущий прогон прошлой записи. Отменённый required-чек очередь считает
-  # провалом и выбрасывает PR с `CI_FAILURE`, хотя код зелёный.
   cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 permissions: {}
 
 jobs:
+  run-policy:
+    name: Select security execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.policy.outputs.result }}
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        id: policy
+        with:
+          script: |
+            const { runPolicy } = await import(process.env.GITHUB_WORKSPACE + '/.github/scripts/ci-run-policy.mjs');
+            return await runPolicy({ github, context, core });
+
   semgrep:
-    name: SAST patterns (Semgrep)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}SAST patterns (Semgrep)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -214,7 +198,9 @@ jobs:
           fi
 
   codeql:
-    name: SAST dataflow (CodeQL)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}SAST dataflow (CodeQL)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -259,7 +245,9 @@ jobs:
           if-no-files-found: warn
 
   gitleaks:
-    name: Secrets — tree (Gitleaks)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}Secrets — tree (Gitleaks)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -309,7 +297,9 @@ jobs:
           fi
 
   trufflehog:
-    name: Secrets — history + verify (TruffleHog)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}Secrets — history + verify (TruffleHog)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -347,7 +337,9 @@ jobs:
           if-no-files-found: warn
 
   osv:
-    name: SCA — osv.dev (OSV-Scanner)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}SCA — osv.dev (OSV-Scanner)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -397,7 +389,9 @@ jobs:
           fi
 
   trivy-fs:
-    name: Vuln + IaC — files (Trivy fs)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}Vuln + IaC — files (Trivy fs)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -451,7 +445,9 @@ jobs:
           fi
 
   trivy-image:
-    name: Vuln — built image base OS (Trivy image)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}Vuln — built image base OS (Trivy image)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -554,7 +550,9 @@ jobs:
           exit $fail
 
   trivy-caddy:
-    name: Vuln — наш образ Caddy (Trivy image)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}Vuln — наш образ Caddy (Trivy image)
     # SEC-31. Caddy мы теперь собираем сами (`deploy/caddy/Dockerfile`): апстримный образ
     # не пересобирали с 2026-06-22, а его Go-бинарь несёт 13 stdlib-находок, которые
     # закрываются одной сменой тулчейна. Джоба делает три вещи: собирает образ (сборка
@@ -651,7 +649,9 @@ jobs:
           category: trivy-caddy
 
   trivy-deps:
-    name: Vuln — third-party prod images (Trivy image)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}Vuln — third-party prod images (Trivy image)
     # SEC-11: `trivy-image` above scans OUR image only. Production runs more containers
     # nobody was scanning — their refs are READ OUT OF THE COMPOSE FILES here (not a
     # second hardcoded list), so a digest bump in deploy/ can't drift away from what CI
@@ -839,7 +839,9 @@ jobs:
           fi
 
   kics:
-    name: IaC — Docker Compose (KICS)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}IaC — Docker Compose (KICS)
     # ЗАЧЕМ ОТДЕЛЬНЫЙ ДВИЖОК. У Trivy misconfig НЕТ формата Docker Compose (он умеет
     # Dockerfile/k8s/terraform/cloudformation/helm/ARM), поэтому рантайм-постура прода —
     # привилегии, лимиты, дефолты паролей, healthcheck'и в `deploy/docker-compose*.yml` —
@@ -1036,7 +1038,8 @@ jobs:
           fi
 
   dependency-review:
-    name: SCA — что вносит ЭТОТ PR (Dependency Review)
+    needs: run-policy
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}SCA — что вносит ЭТОТ PR (Dependency Review)
     # ЧЕМ ОТЛИЧАЕТСЯ ОТ OSV. Блокирующий `osv` смотрит на lockfile ЦЕЛИКОМ и отвечает
     # «в проекте есть уязвимая зависимость». Это действие диффает граф зависимостей базы
     # и головы и отвечает на другой вопрос — «уязвимость приехала ИМЕННО В ЭТОМ PR».
@@ -1049,7 +1052,7 @@ jobs:
     # ТОЛЬКО НА PR: вне pull_request диффать нечего, базы для сравнения не существует.
     # Сводный отчёт знает про это (`prOnly`) и печатает «⏭ пропущено», а не «НЕ подтверждён».
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') && (github.event_name == 'pull_request') }}
     permissions:
       contents: read
       pull-requests: write # для comment-summary-in-pr: on-failure
@@ -1105,7 +1108,8 @@ jobs:
           fi
 
   dependency-check:
-    name: SCA — NVD/CPE (OWASP Dependency-Check)
+    needs: run-policy
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}SCA — NVD/CPE (OWASP Dependency-Check)
     # SEC-15. A SECOND SCA engine over the same dependencies, deliberately different from
     # OSV/Trivy: those resolve advisories by package identity (GHSA/OSV records keyed to an
     # ecosystem name), this one matches CPEs straight out of the NVD feed. Different
@@ -1140,7 +1144,7 @@ jobs:
     #      didn't"). Move it back onto push only if a measured run turns out to be fast.
     # ТОЛЬКО крон и ручной запуск. Раньше условие было «не push» — с появлением
     # `pull_request` в триггерах это молча означало бы 40-минутную джобу на КАЖДЫЙ PR.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -1227,7 +1231,9 @@ jobs:
           fi
 
   dast-zap:
-    name: DAST — running server (ZAP baseline)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}DAST — running server (ZAP baseline)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1358,7 +1364,9 @@ jobs:
           fi
 
   sbom:
-    name: SBOM — files (Syft / CycloneDX)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}SBOM — files (Syft / CycloneDX)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1390,7 +1398,9 @@ jobs:
           if-no-files-found: warn
 
   zizmor:
-    name: Workflow security (zizmor)
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}Workflow security (zizmor)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1430,9 +1440,10 @@ jobs:
           category: zizmor
 
   scorecard:
-    name: Repo posture (OpenSSF Scorecard)
+    needs: run-policy
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}Repo posture (OpenSSF Scorecard)
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' # posture checks are meaningful on the default branch
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') && (github.ref == 'refs/heads/main') }}
     permissions:
       contents: read
       security-events: write
@@ -1476,8 +1487,9 @@ jobs:
           if-no-files-found: warn
 
   report:
-    name: summarize + report
-    # Список обязан совпадать с реестром EXPECTED в summarize-security.mjs. Джоба, которой
+    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}summarize + report
+    # Все сканеры реестра EXPECTED должны входить в needs; run-policy только выбирает запуск.
+    # Реестр задан в summarize-security.mjs. Джоба, которой
     # тут нет, не удерживает `report` — а он забирает артефакты БЕЗ `name`, то есть только
     # уже загруженные. Опоздавший сентинел даёт «⚠️ НЕ подтверждён» на исправно
     # отработавшем сканере, и это хуже, чем кажется: обесценивается ровно тот сигнал,
@@ -1489,6 +1501,7 @@ jobs:
     # больше не держится на честном слове: его проверяет `summarize-security.test.mjs`.
     needs:
       [
+        run-policy,
         semgrep,
         codeql,
         gitleaks,
@@ -1506,7 +1519,7 @@ jobs:
         zizmor,
         scorecard,
       ]
-    if: always()
+    if: ${{ always() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
