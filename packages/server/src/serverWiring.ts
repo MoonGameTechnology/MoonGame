@@ -1,7 +1,6 @@
 import type { SecurityAudit } from './securityAudit';
 import type { ActionGate } from '@void/action-layer';
 import {
-  hashGameDataBundle,
   mapVictoryRules,
   type Action,
   type DomainEvent,
@@ -22,6 +21,7 @@ import { expiredSeatClaims } from './seatExpiry';
 import { detach } from './detach';
 import { commitMatch } from './matchCommit';
 import { archiveExpired } from './matchArchive';
+import { loadCompatibleSnapshot, matchRules, skipIncompatibleMatch } from './matchRules';
 
 /**
  * The match-loading wiring `main.ts` hands to the LazyRoomRegistry, extracted
@@ -43,10 +43,8 @@ export interface MatchLoaderDeps {
   now?: () => number;
   /** Stall reporter — a same-instant scheduling loop wedged the world clock. */
   onStall?: (matchId: string) => void;
-  /** MP-4 integrity-check reporter — the persisted match's `version.dataHash`
-   *  doesn't match the currently-deployed game-data bundle (`data/*.json` was
-   *  swapped out from under it). The load is refused either way; this is purely
-   *  for operator visibility (defaults to a stderr line, see below). */
+  /** Operator notification when persisted data/manifest/hash disagree with deployed
+   *  rules. Loading is refused and logged regardless of this callback. */
   onIntegrityFailure?: (matchId: string) => void;
   /** Optional per-match extras, resolved before the room is built. main.ts uses
    *  this for the AvA wiring (AVA-8): on an AvA session, PLAYER diplomacy is
@@ -92,40 +90,12 @@ export function createMatchLoader(
   const { stores, data } = deps;
   const now = deps.now ?? ((): number => Date.now());
   // MP-4: computed once (the bundle doesn't change while the process is up), not per load.
-  const expectedDataHash = hashGameDataBundle(data);
+  const expected = matchRules(data, MODULE_MANIFEST_VERSION);
   return async (matchId: string): Promise<LoadedMatch | null> => {
-    const snap = await stores.store.load(matchId);
+    const snap = await skipIncompatibleMatch(
+      () => loadCompatibleSnapshot(stores.store, matchId, expected), deps.onIntegrityFailure,
+    );
     if (!snap || archiveExpired(snap, now())) return null;
-    // MP-4: the match pinned the game-data bundle's hash at creation — a mismatch means
-    // data/*.json was swapped out from under a LIVE match (accidental drift or tampering,
-    // "подмена бандла меняет правила"). Fail-secure: refuse to resume rather than run it
-    // under different rules than it started with. Snapshots with no pinned hash (persisted
-    // before MP-4) skip the check — graceful degradation, not a crash.
-    const pinnedHash = snap.state.version.dataHash;
-    if (pinnedHash && pinnedHash !== expectedDataHash) {
-      deps.onIntegrityFailure?.(matchId);
-      process.stderr.write(
-        `match ${matchId}: game-data integrity check failed — the deployed data/*.json ` +
-          `bundle no longer matches the hash this match was created with (pinned ` +
-          `${pinnedHash}, deployed ${expectedDataHash}). Refusing to load.\n`,
-      );
-      return null;
-    }
-    // Invariant #6 (module execution order = the determinism contract): a match pins
-    // the module manifest version it was created under (`MODULE_MANIFEST_VERSION`,
-    // `scenario.ts`) — a mismatch means `DEV_MODULES`' membership/order changed since,
-    // so resuming under the new graph would silently diverge from the match's own
-    // history. Fail-secure, same posture as the dataHash check above.
-    const pinnedManifest = snap.state.version.manifest;
-    if (pinnedManifest !== MODULE_MANIFEST_VERSION) {
-      deps.onIntegrityFailure?.(matchId);
-      process.stderr.write(
-        `match ${matchId}: module manifest mismatch — the deployed module graph no ` +
-          `longer matches the one this match was created with (pinned ${pinnedManifest}, ` +
-          `deployed ${MODULE_MANIFEST_VERSION}). Refusing to load.\n`,
-      );
-      return null;
-    }
     const initialReceipts = await stores.receiptStore.loadAll(matchId);
     const extras = (await deps.matchExtras?.(matchId)) ?? null;
 

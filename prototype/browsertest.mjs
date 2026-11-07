@@ -6,9 +6,9 @@
  * Why this exists next to `uitest.mjs`: that one drives a fake DOM and a Proxy
  * canvas, so it answers «the code did not throw». This one answers «the shipped
  * bundle actually boots in a browser» — the only place a whole class of defects is
- * visible at all (`prototype/` is outside ESLint and outside tsc; esbuild-only bugs
- * like the `httpBase` TDZ trap live exclusively in the built file; console errors,
- * unhandled rejections and browser warnings have no other reporter).
+ * visible at all. `prototype/` also passes ESLint and tsc; the browser checks the
+ * built document, console errors, unhandled rejections and browser warnings that
+ * static analysis and the fake DOM cannot exercise.
  *
  * It talks to the SAME pinned MCP server the humans/agents use (`scripts/mcp-browser.mjs`)
  * over stdio JSON-RPC, so CI and interactive sessions exercise one identical path —

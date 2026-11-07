@@ -14,6 +14,7 @@ import { avaMatchId } from '@void/protocol';
 import { pickAvaMap } from './avaMapPool';
 import { avaModeId } from './avaFormats';
 import { mergeArsenal } from './arsenal';
+import { skipIncompatibleMatch } from './matchRules';
 import { avaBattleReport, warOpenedAt } from './avaBattleView';
 import type {
   AvaBattleReport,
@@ -337,9 +338,9 @@ export class AvaOrchestrator {
     let cancelled = 0;
     for (const matchup of locked) {
       if (await this.sessions.byMatchup(matchup.id)) continue;
-      const res = await this.orchestrate(matchup.id);
-      if (res.ok) raised += 1;
-      else if (res.code === 'E_NO_MAP' && this.cancel && (await this.cancel(matchup.id))) {
+      const res = await skipIncompatibleMatch(() => this.orchestrate(matchup.id));
+      if (res?.ok) raised += 1;
+      else if (res?.code === 'E_NO_MAP' && this.cancel && (await this.cancel(matchup.id))) {
         cancelled += 1;
       }
     }

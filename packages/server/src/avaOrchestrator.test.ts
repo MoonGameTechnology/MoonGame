@@ -11,6 +11,7 @@ import {
   type AvaSessionSpec,
 } from './avaOrchestrator';
 import { loadAvaMaps, loadShippedData, MODULE_MANIFEST_VERSION } from './scenario';
+import { MatchRulesMismatch } from './matchRules';
 import {
   MemoryAvaChallengeStore,
   MemoryAvaRosterStore,
@@ -39,7 +40,7 @@ interface Harness {
   built: AvaSessionSpec[];
 }
 
-function harness(): Harness {
+function harness(createRoom?: (spec: AvaSessionSpec) => Promise<void>): Harness {
   const challenges = new MemoryAvaChallengeStore();
   const roster = new MemoryAvaRosterStore();
   const sessions = new MemoryAvaSessionStore();
@@ -51,14 +52,25 @@ function harness(): Harness {
     data,
     maps,
     manifest: MODULE_MANIFEST_VERSION,
-    createRoom: (spec) => {
+    createRoom: async (spec) => {
+      await createRoom?.(spec);
       built.push(spec);
-      return Promise.resolve();
     },
     now: () => 42,
   });
   return { orch, challenges, roster, sessions, built };
 }
+
+it('one incompatible saved battle does not block other matchups or create a false session link', async () => {
+  const h = harness((spec) => spec.matchupId === 'broken'
+    ? Promise.reject(new MatchRulesMismatch(spec.matchId, 'manifest')) : Promise.resolve());
+  await lockedMatchup(h, 'broken', ['a1'], ['b1']);
+  await lockedMatchup(h, 'healthy', ['a2'], ['b2']);
+  expect(await h.orch.sweep()).toEqual({ raised: 1, cancelled: 0 });
+  expect(h.built.map(spec => spec.matchupId)).toEqual(['healthy']);
+  expect(await h.sessions.byMatchup('broken')).toBeNull();
+  expect((await h.challenges.getChallenge('broken'))?.status).toBe('locked');
+});
 
 /** Seed a LOCKED matchup with the given roster on each side (bypassing AvaService). The
  *  format defaults to the larger side — the size the roster alone used to pick (CORP-7). */
