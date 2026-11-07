@@ -38,16 +38,16 @@ describe('цены основной игры', () => {
     for (const m of mainMaps) expect(m.json.pricing, m.file).toEqual(first);
   });
 
-  it('новые партии: здания и улучшения ×3, юниты ×2, исследования без новой надбавки', () => {
+  it('новые партии: здания и улучшения ×2, юниты ×2, исследования без новой надбавки', () => {
     for (const map of mainMaps) {
       const pricing = MatchPricingSchema.parse(map.json.pricing);
-      expect(pricing.buildingHours, map.file).toBe(3);
+      expect(pricing.buildingHours, map.file).toBe(2);
       expect(pricing.unitHours, map.file).toBe(2);
       const state = { pricing };
       for (const def of Object.values(data.buildings)) {
         for (const step of [def, ...def.upgrades])
           expect(matchBuildingHours(state, step.buildTimeHours), map.file)
-            .toBe(matchHours(state, step.buildTimeHours) * 3);
+            .toBe(matchHours(state, step.buildTimeHours) * 2);
       }
       for (const def of Object.values(data.units))
         expect(matchUnitHours(state, def.buildTimeHours), map.file)
