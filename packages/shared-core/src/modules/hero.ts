@@ -2,7 +2,7 @@ import { heroModuleSlots } from '../state/heroFlagship';
 export { heroModuleSlots } from '../state/heroFlagship';
 import { heroFlagshipUnit } from '../state/heroFlagship';
 import { registerHeroFlagship } from './hero/flagship';
-import { heroShipStack, rememberHeroModule } from '../util/heroLoadout';
+import { carriesHeroFlagship, heroShipStack, rememberHeroModule } from '../util/heroLoadout';
 import type { HeroCasualty } from '../util/casualties';
 import { activeHeroCount, heroActiveCap } from '../state/heroDeployment';
 import { registerHeroDeployment } from './hero/deployment';
@@ -150,7 +150,7 @@ function heroOf(state: GameState, playerId: PlayerId): Hero | undefined {
 function fleetHasHero(h: HandlerContext, fleetId: string): boolean {
   const fleet = h.state.fleets[fleetId];
   if (!fleet) return false;
-  return stacksHaveTrait(h.ctx.data, fleet.units, HERO_TRAIT);
+  return stacksHaveTrait(h.ctx.data, fleet.units, HERO_TRAIT) || carriesHeroFlagship(h.state, fleetId);
 }
 
 /** ms from now after `hours`, compressed by the match timeScale like every duration. */

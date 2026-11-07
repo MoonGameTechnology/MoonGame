@@ -614,6 +614,39 @@ describe('верфь — окно', () => {
     expect(html).toContain('<progress');
   });
 
+  it('refreshes completed and next orders on Heroes without replacing the hero pane', () => {
+    let s = rich();
+    const home = Object.values(s.planets).find(p => p.owner === 'p1')!.id;
+    s = applyOrder(s, buildShip('p1', home, 'cruiser', 1, []), s.time).state;
+    const win = fakeWin();
+    const details = { open: false };
+    let queueHtml = '';
+    const queue = {
+      get innerHTML() { return queueHtml; },
+      set innerHTML(html: string) { queueHtml = html; details.open = true; },
+      querySelector: () => details,
+    };
+    const yard = initShipyard(hostOf({ root: () => win, state: () => s }));
+    yard.open('heroes', home);
+    const originalPane = win.innerHTML;
+    win.querySelector = ((selector: string) => selector === '#cn-queue' ? queue : null) as typeof win.querySelector;
+    // The hero HTML is unchanged when an unrelated order finishes; resources can change too.
+    s.scheduled = s.scheduled.filter(e => e.type !== 'construction.complete');
+    s.players.p1!.resources.metal = 8000;
+    yard.refreshHeroes();
+    yard.refreshQueue();
+    expect(queueHtml).toContain('data-pw-empty="ships"');
+    expect(details.open).toBe(false);
+    expect(win.innerHTML).toBe(originalPane);
+    s = applyOrder(s, buildShip('p1', home, 'cruiser', 2, []), s.time).state;
+    yard.refreshHeroes();
+    yard.refreshQueue();
+    expect(queueHtml).toContain('×2');
+    expect(queueHtml).not.toContain('data-pw-empty="ships"');
+    expect(details.open).toBe(false);
+    expect(win.innerHTML).toBe(originalPane);
+  });
+
   it('queue escapes IDs even if a malformed snapshot contains strings in numeric fields', () => {
     const s = rich();
     const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;

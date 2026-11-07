@@ -1135,8 +1135,8 @@ export function initShipyard(host: YardHost): {
       }
     },
     refreshQueue: () => {
-      if (tab === 'heroes' || heroScrolling || !host.root().classList.contains('show')) return;
-      if (tab === 'buildings' || availability() !== lastAvailability) { paint(); return; }
+      if (heroScrolling || !host.root().classList.contains('show')) return;
+      if (tab !== 'heroes' && (tab === 'buildings' || availability() !== lastAvailability)) { paint(); return; }
       const el = host.root().querySelector('#cn-queue');
       if (!el) return;
       const before = queuePainted;

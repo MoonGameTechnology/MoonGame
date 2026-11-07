@@ -1,7 +1,16 @@
 import type { HandlerContext } from '../kernel/module';
-import type { Hero, UnitStack, PlayerArsenal } from '../state/gameState';
+import type { GameState, Hero, UnitStack, PlayerArsenal } from '../state/gameState';
 import { starsOf, rarityOf } from './stacks';
 import { constructionModuleSnapshot } from './arsenalLoadout';
+
+/** Explicit hulls retain the hero aura only while their living commander is aboard. */
+export function carriesHeroFlagship(state: GameState, fleetId: string): boolean {
+  const fleet = state.fleets[fleetId];
+  return fleet?.units.some(stack => {
+    const hero = stack.heroId === undefined ? undefined : state.heroes?.[stack.heroId];
+    return stack.count > 0 && hero?.alive === true && hero.fleetId === fleetId && hero.owner === fleet.owner;
+  }) ?? false;
+}
 
 export function heroShipStack(h: HandlerContext, hero: Hero, unit: string): UnitStack {
   const stack: UnitStack = { unit, count: 1, ...(hero.flagship ? { heroId: hero.id } : {}) };
