@@ -4541,6 +4541,7 @@ export const es: Record<string, string> = {
   'side.world.rally.clear': 'Quitar',
   'side.world.production': 'prod. {p}',
   'side.world.spy-window': '🕵 Ventana de espionaje',
+  'side.world.spy-menu': '🕵 Espionaje',
   'side.world.spy-window.left': 'quedan {left}',
   'side.world.spy-layer': '🕵 Reconocimiento: nivel {n} de 4',
   'side.world.disrupted': '📉 Economía saboteada: producción −25%, restan {left}',

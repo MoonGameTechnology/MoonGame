@@ -133,7 +133,7 @@ import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { splitOne } from './squadronPanel';
 import { cursorTipPos } from './tipPlacement';
 import { arrivalHours } from './travelEta';
-import { forkPanelHtml, planetPanelHtml, type PlanetTab, unknownPlanetHtml } from './worldCard';
+import { forkPanelHtml, planetPanelHtml, type PlanetTab, toggleSpyMenu, unknownPlanetHtml } from './worldCard';
 import { enqueueBuild, timeLeft } from './worldQueries';
 import { openFortressDialog } from './fortressDialog';
 
@@ -820,6 +820,8 @@ function onSideClick(ev: MouseEvent): void {
       arg === 'counter'
     )
       playerOrder(spyOn(ME, selPlanet!, arg));
+  } else if (act === 'spymenu') {
+    if (arg) toggleSpyMenu(arg);
   } else if (act === 'spyrecall') {
     playerOrder(recallSpy(ME, selPlanet!, arg === 'recon' ? 'recon' : undefined));
   } else if (act === 'capital') {

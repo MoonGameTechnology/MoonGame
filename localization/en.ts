@@ -5046,6 +5046,7 @@ export const en: Record<string, string> = {
   'side.world.rally.clear': 'Clear',
   'side.world.production': 'prod {p}',
   'side.world.spy-window': '🕵 Intel window',
+  'side.world.spy-menu': '🕵 Espionage',
   'side.world.spy-window.left': '{left} left',
   'side.world.spy-layer': '🕵 Recon: layer {n} of 4',
   'side.world.disrupted': '📉 Economy sabotaged: output −25%, {left} left',
