@@ -14,6 +14,7 @@ import {
   engagementOf,
   flashBattles,
   fleetRadarRange,
+  fleetSightBonus,
   identifiedNodes,
   isVisibleTo,
   radarSignatures,
@@ -64,6 +65,12 @@ const data: GameData = parseGameData({
       tag: 'horizontal',
       effects: { stats: { radarRange: 180 } },
       allowed: { units: ['picket'] },
+    },
+    optics: {
+      name: 'Optics',
+      slot: 'utility',
+      tag: 'horizontal',
+      effects: { stats: { sightRange: 30 } },
     },
   },
 });
@@ -1199,6 +1206,33 @@ describe('зрение — только круги (решение владел�
     st.planets.BEYOND = planet('BEYOND', null, ['POST'], at(2000 + DEFAULT_SIGHT.fleet + 50));
     const seen = identifiedNodes(st, 'p1', data);
     expect([seen.has('POST'), seen.has('BY'), seen.has('BEYOND')]).toEqual([true, true, false]);
+  });
+
+  it('оптика расширяет глаза флота, а не радар: лучший корабль, без множителя радара', () => {
+    const fleet: Fleet = {
+      id: 'f',
+      owner: 'p1',
+      location: 'POST',
+      movement: null,
+      units: [
+        { unit: 'cruiser', count: 3 },
+        { unit: 'picket', count: 1, modules: ['optics'] },
+        { unit: 'picket', count: 1, modules: ['optics'] },
+      ],
+      traits: [],
+    };
+    expect(fleetSightBonus(fleet, data)).toBe(30); // по флоту — максимум, не 60
+    expect(fleetSightBonus({ units: [{ unit: 'picket', count: 1, modules: ['optics', 'optics'] }] }, data)).toBe(60);
+    expect(fleetSightBonus({ units: [{ unit: 'picket', count: 0, modules: ['optics'] }] }, data)).toBe(0);
+    const st = circlesState({ fleets: { f: fleet }, sight: { world: 0, fleet: 40, radarScale: 2 } });
+    st.planets.POST = planet('POST', null, [], at(2000));
+    const eye = sightCircles(st, 'p1', data).find((c) => c.source.id === 'f')!;
+    // 40 + 30 = 70 глаз; радар пикета 60 × 2 = 120, его половина 60 < 70.
+    expect([eye.identify, eye.signature]).toEqual([70, 120]);
+    st.planets.SEEN = planet('SEEN', null, [], at(2000 + 69));
+    st.planets.DARK = planet('DARK', null, [], at(2000 + 71));
+    const seen = identifiedNodes(st, 'p1', data);
+    expect([seen.has('SEEN'), seen.has('DARK')]).toEqual([true, false]);
   });
 
   it('числа режима: масштаб радара растягивает оба кольца', () => {

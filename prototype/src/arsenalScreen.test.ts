@@ -170,7 +170,7 @@ describe('арсенал — список', () => {
     const html = arsenalHtml(state());
     expect(html).toContain('В сетевой партии верфь строит только то, что есть в арсенале.');
     expect(html).toMatch(
-      /data-ar-tab="modules" aria-selected="true">Модули<small>\d+ из 17<\/small>/,
+      /data-ar-tab="modules" aria-selected="true">Модули<small>\d+ из 18<\/small>/,
     );
     expect(html).toContain(
       'data-ar-tab="hulls" aria-selected="false">Корабли<small>12 из 12</small>',
