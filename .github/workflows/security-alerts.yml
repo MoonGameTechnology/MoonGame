@@ -1,0 +1,51 @@
+name: Code scanning inventory
+
+# Default-branch code only, read-only token, no triggering-PR input is executed.
+on: # zizmor: ignore[dangerous-triggers] -- trusted checkout and read-only permissions
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Security scan]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  export:
+    name: Export open alerts (read only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: read
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      # workflow_run has privileged context: execute only trusted default-branch code.
+      # Never check out the triggering PR or use its artifacts as executable input.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Read GitHub Code scanning alerts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node .github/scripts/export-code-scanning.mjs
+      - name: Summary (including unavailable exports)
+        if: always()
+        run: |
+          if [ -f code-scanning-alerts.md ]; then
+            cat code-scanning-alerts.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: code-scanning-alerts
+          path: |
+            code-scanning-alerts.json
+            code-scanning-alerts.md
+          if-no-files-found: error
