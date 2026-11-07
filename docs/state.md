@@ -1240,7 +1240,9 @@ coarse ≈ fine на полном стеке), `delta` (`applyDelta∘diffState 
   В CI и security `run-policy` пропускает push-дубль только у PR без конфликтов с тем же SHA.
   Неизвестное состояние или ошибка API сохраняют проверки. Push очереди выполняет required-проверки,
   даже без `merge_group`; остальные push-контексты `Branch — …` отделены от required.
-- `security.yml`: 16 сканеров и сводка с полным JSON и сентинелами в артефакте; блокируют
+- `security.yml`: 19 заданий сканирования и сводка с 21 подтверждением (включая два smoke),
+  полным JSON и сентинелами в артефакте; actionlint, ShellCheck и Hadolint сохраняют
+  информационные находки и явно отмечают сбой скана. Недельный `main`: пн 05:17 UTC (08:17 МСК). Блокируют
   Semgrep, Gitleaks, OSV, Trivy fs/image; крон. `security-alerts.yml` отдельно экспортирует
   открытые алерты панели GitHub с правами только на чтение; ошибка API не считается нулём.
 - `image.yml` (push в `main`): образы сервера и Caddy → проверки → GHCR → подпись cosign.
