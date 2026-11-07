@@ -1,3 +1,4 @@
+import { networkConfig, networkProbe } from './matchRulesCatalog';
 import { mapPreset, victoryFor } from './mapCatalog';
 /**
  * The prototype's kernel assembly point (REFP-21) — the ordered module list, the
@@ -102,6 +103,8 @@ export function setMatchPveBoss(on: boolean): void {
 }
 
 export function ctx(now: number, state?: Pick<GameState, 'mapId'>): Context {
+  const pinned = networkConfig();
+  if (pinned) return { now, data, config: pinned };
   const config: MatchConfig = {
     timeScale: 1,
     // Порог и захват карты — если режим своих не объявил: учебный полигон (§14.9) кончается
@@ -170,6 +173,8 @@ export function order(state: GameState, action: Action, now: number): StepOut {
  * ради вопроса, чего проба делать не должна. Гейты `E_TIME_*` при этом заведомо чисты.
  */
 export function canOrder(state: GameState, action: Action): string | null {
+  const remote = networkProbe(action);
+  if (remote !== undefined) return remote;
   // Память ответов на ОДНО состояние. Ключ — сам объект состояния: `GameState`
   // неизменяем по инварианту №2 (редьюсер возвращает новый объект, а не правит старый),
   // поэтому «другой мир» — это всегда другая ссылка, и устареть ответ не может.
@@ -208,6 +213,7 @@ const memo = new Map<string, string | null>();
  * по массиву действий стоил бы дороже самой пробы.
  */
 export function canOrderAll(state: GameState, actions: readonly Action[]): string | null {
+  if (networkConfig()) return actions.map(networkProbe).find(code => code) ?? null;
   return kernel.canApplyAll(state, actions, ctx(state.time, state));
 }
 

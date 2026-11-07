@@ -77,7 +77,7 @@ describe('AvA battle end to end (CORP-4)', () => {
     wall += DAY; // the roster window closes
     expect(await ava.sweepRosters()).toEqual({ locked: 1, cancelled: 0 });
 
-    const load = createMatchLoader({ stores, data, now });
+    const load = createMatchLoader({ unversionedTestHost: true, stores, data, now });
     let live: LoadedMatch | null = null;
     const orch = new AvaOrchestrator({
       challengeStore: stores.challengeStore,
@@ -231,7 +231,7 @@ describe('AvA battle on the 20-start map (CORP-8)', () => {
     const session = await stores.sessionStore.byMatchup('mu-4v4');
     expect(session?.mapId).toBe('ffa-20');
 
-    const live = await createMatchLoader({ stores, data, now })(session!.matchId);
+    const live = await createMatchLoader({ unversionedTestHost: true, stores, data, now })(session!.matchId);
     const room = live!.room;
     room.tick();
     expect(room.modeId).toBe('team_4v4');
@@ -275,7 +275,7 @@ describe('AvA battle deck stays frozen (CORP-5)', () => {
       await arsenal.grant({ itemId, accountId: 'acc-1', kind, defId, form: 'blueprint',
         soulbound: false, origin: 'craft', acquiredAt: 0 });
     }
-    const load = createMatchLoader({
+    const load = createMatchLoader({ unversionedTestHost: true,
       stores: { store, receiptStore: new MemoryReceiptStore() },
       data,
       now: () => 1000,

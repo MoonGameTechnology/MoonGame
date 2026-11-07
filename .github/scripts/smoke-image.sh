@@ -35,9 +35,12 @@ node "$scripts/smoke-image-ca.mjs" "$image" || exit 1
 
 # Порт публикуем только на loopback: раннер одноразовый, но открывать наружу нечего.
 # Без --rm — контейнер нужен живым после падения, чтобы снять с него логи.
+# Like production, keep the signing key outside the read-only root filesystem.
+# This anonymous test volume inherits the non-root directory owner and is deleted by the trap.
 cid=$(docker run -d -e PROD=0 --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,size=16m,mode=1777 \
   --mount type=volume,dst=/app/playtest-logs \
+  --mount type=volume,dst=/app/ruleset-keys \
   -p "127.0.0.1:$port:8788" "$image")
 if [ -z "$cid" ]; then
   echo "::error::smoke: образ не запустился вообще (docker run не отдал контейнер)"

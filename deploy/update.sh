@@ -210,6 +210,9 @@ if [ -n "${VOID_IMAGE:-}" ]; then
   echo "[*] Забираем образ и поднимаем на нём стек..."
   docker pull "$VOID_IMAGE"
   if [ "$TLS" = 1 ]; then docker pull "$VOID_CADDY_IMAGE"; fi
+  if ! node "$DEPLOY_DIR/ruleset-cache.mjs" "$VOID_IMAGE" "${STATE_DIR:-$REPO_DIR}"; then
+    echo E_RULESET_CACHE >&2; restore_env; exit 1
+  fi
   if ! migrate_db "$VOID_IMAGE"; then
     echo "[✗] Миграция не прошла — обновление ОТМЕНЕНО, сервер не тронут." >&2
     restore_env
@@ -296,15 +299,26 @@ if ! production_preflight "$ENV_FILE"; then restore_env; exit 1; fi
 # Образ, на котором сервер работает ПРЯМО СЕЙЧАС — единственная точка отката.
 PREV_IMAGE_ID="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" ps -q server 2>/dev/null \
   | head -1 | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null || true)"
+BUILT_IMAGE="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" config --images server)"
+if [ -z "$PREV_IMAGE_ID" ]; then
+  PREV_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$BUILT_IMAGE" 2>/dev/null || true)"
+fi
+# Preserve the last local capsule BEFORE rebuilding its mutable image tag.
+if [ -n "$PREV_IMAGE_ID" ] && ! node "$DEPLOY_DIR/ruleset-cache.mjs" --local "$PREV_IMAGE_ID" "$REPO_DIR"; then
+  echo E_RULESET_CACHE >&2; restore_env; exit 1
+fi
 
 echo "[*] Пересобираем образ (сервер пока работает, ~1-3 мин)..."
 # Тоже от владельца: в группе docker состоит служебный пользователь (его туда завёл
 # установщик), а не тот, кто набрал `moongame update`.
 run_as_owner docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" build
+BUILT_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$BUILT_IMAGE")"
+if ! node "$DEPLOY_DIR/ruleset-cache.mjs" --local "$BUILT_IMAGE_ID" "$REPO_DIR"; then
+  echo E_RULESET_CACHE >&2; restore_env; exit 1
+fi
 
 # The source-build path also needs a separate migration before the runtime starts.
 if [ "$(env_value DB_AUTO_MIGRATE)" = 0 ]; then
-  BUILT_IMAGE="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" config --images server)"
   [ -n "$BUILT_IMAGE" ] && migrate_db "$BUILT_IMAGE" || {
     restore_env
     echo '[✗] Миграция не прошла — работающий сервер не перезапущен.' >&2

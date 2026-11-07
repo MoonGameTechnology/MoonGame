@@ -1,3 +1,4 @@
+import { retainedPin } from '../rulesets/snapshot';
 export { MemoryArsenalStore } from './memoryArsenal';
 import { reservedBotLogin } from '../botNicknames';
 import { loginSkeletons } from '@void/protocol';
@@ -68,6 +69,8 @@ import {
 export class MemoryMatchStore implements MatchStore {
   private readonly snaps = new Map<string, MatchSnapshot>();
 
+  hasPinnedMatches(): Promise<boolean> { return Promise.resolve([...this.snaps.values()].some(s => !!s.ruleset)); }
+
   economyMatchIds(after = '', limit = 100): Promise<string[]> {
     const size = Number.isSafeInteger(limit) ? Math.min(100, Math.max(1, limit)) : 100;
     return Promise.resolve([...this.snaps.keys()].filter((id) => id > after).sort().slice(0, size));
@@ -117,6 +120,7 @@ export class MemoryMatchStore implements MatchStore {
   private prepareSnapshot(snapshot: MatchSnapshot): MatchSnapshot | null {
     const prev = this.snaps.get(snapshot.matchId);
     if (!prev || snapshot.seq >= prev.seq) {
+      const ruleset = retainedPin(snapshot, prev?.ruleset);
       const economyObservations = { ...snapshot.economyObservations, ...prev?.economyObservations };
       const economyActivity: Record<string, string[]> = {};
       for (const [key, ids] of Object.entries(prev?.economyActivity ?? {})) economyActivity[key] = [...ids];
@@ -125,6 +129,7 @@ export class MemoryMatchStore implements MatchStore {
       }
       return clone({
         ...snapshot,
+        ...(ruleset ? { ruleset } : {}),
         ...((snapshot.matchRewardProgress ?? prev?.matchRewardProgress)
           ? { matchRewardProgress: snapshot.matchRewardProgress ?? prev?.matchRewardProgress } : {}),
         createdAt: prev?.createdAt ?? snapshot.createdAt ?? Date.now(),

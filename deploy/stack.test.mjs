@@ -45,6 +45,9 @@ function sandbox({ lastGood = IMAGE, healthOk = true } = {}) {
     cpSync(join(DEPLOY_DIR, f), join(release, f));
     chmodSync(join(release, f), 0o755);
   }
+  cpSync(join(DEPLOY_DIR, 'ruleset-cache.mjs'), join(release, 'ruleset-cache.mjs'));
+  mkdirSync(join(release, 'observability'));
+  cpSync(join(DEPLOY_DIR, 'observability/main-module.mjs'), join(release, 'observability/main-module.mjs'));
   for (const f of ['docker-compose.yml', 'docker-compose.release.yml'])
     writeFileSync(join(release, f), '# stub\n');
   stub(release, 'verify-image.sh', 'echo "verify $*" >> "$LOG"');

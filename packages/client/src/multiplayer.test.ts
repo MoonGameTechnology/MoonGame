@@ -42,6 +42,21 @@ function deltaMsg(delta: unknown, seq: number): string {
 // deltas patch it, and a full snapshot is surfaced through onSnapshot. This is
 // the exact receive() path the headless server tests never exercise.
 describe('MultiplayerClient', () => {
+  it('installs a rules catalog before exposing its world and rejects an incompatible catalog without changing the baseline', () => {
+    const calls: string[] = [];
+    let reject = false;
+    const client = new MultiplayerClient(new FakeSocket(), {
+      onRuleset: () => { calls.push('rules'); if (reject) throw Error('bad catalog'); },
+      onSnapshot: () => { calls.push('snapshot'); },
+      onError: code => { calls.push(code); },
+    });
+    client.receive(welcome(baseState(100)));
+    expect(calls).toEqual(['rules', 'snapshot']);
+    reject = true;
+    client.receive(welcome(baseState(999), 1));
+    expect(calls).toEqual(['rules', 'snapshot', 'rules', 'E_MATCH_RULES_MISMATCH']);
+  });
+
   it('reconstructs state from welcome + delta and reports status', () => {
     const socket = new FakeSocket();
     const snaps: MultiplayerSnapshot[] = [];

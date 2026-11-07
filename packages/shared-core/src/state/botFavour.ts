@@ -41,3 +41,17 @@ export function botEmbargoes(state: GameState, bot: string, player: string): boo
     botFavour(state, bot, player) < FAVOUR_EMBARGO
   );
 }
+
+/** Each viewer receives only the favour toward their own seat. Pure, also used by network hosts. */
+export function approvalView(view: GameState, viewer: string): GameState {
+  const { approval, ...rest } = view as ApprovalState;
+  if (approval === undefined) return view;
+  const mine: Record<string, Record<string, number>> = {};
+  for (const [bot, meter] of Object.entries(approval)) {
+    const favour = meter[viewer];
+    if (favour !== undefined) mine[bot] = { [viewer]: favour };
+  }
+  // An empty ledger is dropped, not shipped as `{}` — the same delta hygiene the core
+  // projection keeps for its per-viewer maps.
+  return (Object.keys(mine).length > 0 ? { ...rest, approval: mine } : rest) as GameState;
+}

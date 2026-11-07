@@ -274,6 +274,7 @@ export function createMetaRewardDelivery(deps: MetaRewardDeliveryDeps): {
     };
   };
   const matches: MatchStore = {
+    ...(deps.matches.hasPinnedMatches ? { hasPinnedMatches: () => deps.matches.hasPinnedMatches!() } : {}),
     load: (id) => deps.matches.load(id),
     save: async (snapshot) => {
       await deps.matches.save(withObservations(snapshot));

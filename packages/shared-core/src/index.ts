@@ -849,6 +849,7 @@ export { botDiplomacyModule } from './modules/botDiplomacy';
 export {
   botFavour,
   botEmbargoes,
+  approvalView,
   FAVOUR_BASE,
   FAVOUR_EMBARGO,
   FAVOUR_WAR,

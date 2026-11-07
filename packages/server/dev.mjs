@@ -3,12 +3,14 @@
 // reuse the repo's existing esbuild — no extra runtime dependency.
 // Run from the repo root: node packages/server/dev.mjs  (or: pnpm dev:server)
 import { build } from 'esbuild';
+import { buildRuleset } from './build-ruleset.mjs';
 import { mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const outfile = 'packages/server/dist/dev-server.mjs';
 mkdirSync('packages/server/dist', { recursive: true });
 
+await buildRuleset();
 await build({
   entryPoints: ['scripts/server.ts'],
   outfile,

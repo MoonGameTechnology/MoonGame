@@ -86,6 +86,7 @@ export type { ChatChannel, MultiplayerChatMessage, MultiplayerPing, PingAnchor, 
 export type PingDraft = Pick<MultiplayerPing, 'kind' | 'target' | 'to' | 'payload' | 'label'>;
 
 export interface MultiplayerClientHandlers {
+  onRuleset?(rules?: import('@void/protocol').MatchRulesCatalog): void;
   onStatus?(status: MultiplayerStatus): void;
   onSnapshot?(snapshot: MultiplayerSnapshot): void;
   onRejection?(actionId: string, code: string): void;
@@ -134,6 +135,7 @@ export interface MultiplayerClientHandlers {
 const OUTBOX_MAX = 64;
 
 interface InboundBase {
+  ruleset?: import('@void/protocol').MatchRulesCatalog;
   type: string;
   matchId?: string;
   seq?: number;
@@ -402,6 +404,10 @@ export class MultiplayerClient {
       typeof message.seq === 'number' &&
       message.state
     ) {
+      if (message.type === 'welcome') {
+        try { this.handlers.onRuleset?.(message.ruleset); }
+        catch { this.handlers.onError?.('E_MATCH_RULES_MISMATCH'); return; }
+      }
       // Full snapshot — resets the local baseline (join / resync). It also settles a
       // pending hash-desync report: the state IS the server's view, nothing to compare.
       this.lastState = message.state;

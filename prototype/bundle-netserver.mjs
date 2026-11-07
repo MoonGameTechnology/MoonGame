@@ -14,6 +14,8 @@
 // и запуск разделяет ровно этот файл: он только собирает и ничего не импортирует.
 import { build } from 'esbuild';
 import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { buildRuleset } from '../packages/server/build-ruleset.mjs';
 
 /** Куда кладём бандл. `ws`/`pg`/`fastify` остаются внешними, поэтому файл обязан лежать
  *  там, где pnpm сможет их разрешить — в packages/server/dist, не в prototype/dist. */
@@ -24,6 +26,7 @@ export const outfile = 'packages/server/dist/proto-server.mjs';
  */
 export async function bundleNetserver({ plugins = [], serverOutfile = outfile } = {}) {
   mkdirSync('packages/server/dist', { recursive: true });
+  await buildRuleset(dirname(serverOutfile));
   await build({
     entryPoints: ['prototype/netserver.ts'],
     outfile: serverOutfile,
@@ -38,6 +41,11 @@ export async function bundleNetserver({ plugins = [], serverOutfile = outfile } 
     // require of "crypto" is not supported», UIX-4.4; ловит productionBoot.test.mjs). Всё
     // остальное (@void/* TS-исходники и игра) вбандливается. Зеркалит packages/server/dev.mjs.
     external: ['nodemailer', 'ws', 'pg', 'fastify', 'web-push'],
+  });
+  await build({
+    entryPoints: ['packages/server/src/rulesets/legacyMain.ts'],
+    outfile: 'packages/server/dist/ruleset-legacy-bind.mjs',
+    bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg'],
   });
   await build({
     entryPoints: ['packages/server/src/databaseAdmin.ts'],
