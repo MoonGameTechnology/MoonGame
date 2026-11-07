@@ -7,14 +7,19 @@ import { verifyApk } from './apk-verify.mjs';
 export const distribution = JSON.parse(readFileSync(new URL('./distribution.json', import.meta.url), 'utf8'));
 export const LANES = Object.freeze({ alpha: 'com.voiddominion.prototype', player: 'com.voiddominion.player' });
 export const apkName = (lane) => `void-dominion-${lane}.apk`;
-export function validateManifest(m, lane) {
+// `signers` lists the APK certificates a manifest may name. New publications accept only
+// the current one; the host widens it (CURRENT_SIGNERS) solely to read its own
+// already-published build across a one-time certificate change.
+export const CURRENT_SIGNERS = Object.freeze([distribution.signerSha256,
+  ...(distribution.previousSignerSha256 ? [distribution.previousSignerSha256] : [])]);
+export function validateManifest(m, lane, signers = [distribution.signerSha256]) {
   if (!Object.hasOwn(LANES, lane) || !m || typeof m !== 'object' ||
       !Number.isInteger(m.versionCode) || m.versionCode <= 0 || m.versionCode > 2100000000 ||
       typeof m.versionName !== 'string' || !/^[a-zA-Z0-9._-]{1,80}$/.test(m.versionName) ||
       typeof m.sha !== 'string' || !/^[a-f0-9]{7,40}$/.test(m.sha) ||
       typeof m.notes !== 'string' || m.notes.length > 8192 ||
       !/^[a-f0-9]{64}$/.test(m.apkSha256) || m.appId !== LANES[lane] ||
-      m.signerSha256 !== distribution.signerSha256) throw new Error('E_APK_MANIFEST');
+      !signers.includes(m.signerSha256)) throw new Error('E_APK_MANIFEST');
   const apkUrl = `${distribution.origin}${distribution.basePath}/${lane}/${m.versionCode}-${m.sha}/${apkName(lane)}`;
   if (m.apkUrl !== apkUrl) throw new Error('E_APK_MANIFEST');
   // Drop every unknown property before publishing remotely supplied JSON.
@@ -32,7 +37,7 @@ export function signManifest(m, privateKeyPem) {
   const payload = Buffer.from(JSON.stringify(m), 'utf8');
   return { payload: payload.toString('base64'), signature: sign(null, payload, createPrivateKey(privateKeyPem)).toString('base64') };
 }
-export function openSignedManifest(envelope, lane, publicKey = distribution.manifestPublicKey) {
+export function openSignedManifest(envelope, lane, publicKey = distribution.manifestPublicKey, signers = undefined) {
   if (!envelope || typeof envelope !== 'object' || typeof envelope.payload !== 'string' ||
       typeof envelope.signature !== 'string' || typeof publicKey !== 'string' ||
       !/^[A-Za-z0-9+/]{43}=$/.test(publicKey)) throw new Error('E_APK_MANIFEST');
@@ -40,7 +45,7 @@ export function openSignedManifest(envelope, lane, publicKey = distribution.mani
   if (payload.toString('base64') !== envelope.payload || signature.length !== 64) throw new Error('E_APK_MANIFEST');
   const key = createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: Buffer.from(publicKey, 'base64').toString('base64url') }, format: 'jwk' });
   if (!verify(null, payload, key, signature)) throw new Error('E_APK_SIGNATURE');
-  return { manifest: validateManifest(JSON.parse(payload.toString('utf8')), lane), envelope: { payload: envelope.payload, signature: envelope.signature } };
+  return { manifest: validateManifest(JSON.parse(payload.toString('utf8')), lane, signers), envelope: { payload: envelope.payload, signature: envelope.signature } };
 }
 async function main() {
   const [apk, out] = process.argv.slice(2);

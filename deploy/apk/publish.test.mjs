@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtemp, mkdir, writeFile, readFile, readlink, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, readlink, readdir, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash, generateKeyPairSync } from 'node:crypto';
@@ -48,6 +48,18 @@ describe('verified atomic site publication',()=>{
     try {
       await installRelease({root,lane:'player',signed:signed(),publicKey,acquire,verify,checkSpace:false});
       await expect(installRelease({root,lane:'player',signed:signed({...manifest(),apkSha256:'0'.repeat(64)}),publicKey,acquire,verify,checkSpace:false})).rejects.toThrow('E_APK_VERSION_REUSE');
+    } finally {await rm(root,{recursive:true,force:true});}
+  });
+  it('replaces a build signed by the previous APK certificate, but never publishes one',async()=>{
+    const root=await mkdtemp(join(tmpdir(),'apk-rekey-'));
+    try {
+      const old={...manifest(1),signerSha256:distribution.previousSignerSha256};
+      await mkdir(join(root,'player/1-deadbee'),{recursive:true});
+      await writeFile(join(root,'player/1-deadbee/latest.json'),JSON.stringify(signed(old)));
+      await symlink('1-deadbee',join(root,'player/current'));
+      await expect(installRelease({root,lane:'player',signed:signed({...old,versionCode:2,apkUrl:manifest(2).apkUrl}),publicKey,acquire,verify,checkSpace:false})).rejects.toThrow('E_APK_MANIFEST');
+      expect(await installRelease({root,lane:'player',signed:signed(manifest(2)),publicKey,acquire,verify,checkSpace:false})).toBe(true);
+      expect(await readlink(join(root,'player/current'))).toBe('2-deadbee');
     } finally {await rm(root,{recursive:true,force:true});}
   });
   it('rejects wrong signer, package, lane or asset path before publishing',()=>{
