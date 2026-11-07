@@ -17,7 +17,7 @@
  *    назвать время стройки; полоса обязана показать 100%, а не NaN.
  */
 import type { GameData, GameState, QueuedConstruction } from '../../packages/shared-core/src/index';
-import { matchHours, orderLane } from '../../packages/shared-core/src/index';
+import { acceptedConstructionHours, orderLane } from '../../packages/shared-core/src/index';
 import type { ActiveBuild, BuildLane, ConstructionPayload } from './buildQueue';
 
 /** Полезная нагрузка события стройки, если она вообще похожа на неё. */
@@ -73,26 +73,15 @@ export function unitLaneOrders(
 }
 
 /**
- * Сколько часов занимает эта стройка по данным. Апгрейд на уровень L берёт
- * `upgrades[L - 2]`: нулевой элемент описывает переход на второй уровень (см. шапку).
- * Неизвестное — ноль часов, и полоса честно покажет «готово».
+ * Принятый срок заказа — из его нагрузки; старое расписание использует базовый
+ * срок каталога и свой общий множитель часов. Неизвестное — ноль, то есть «готово».
  */
 export function buildDurationHours(
   p: ConstructionPayload,
   data: GameData,
   match: Pick<GameState, 'pricing'> = {},
 ): number {
-  return matchHours(match, catalogHours(p, data));
-}
-
-/** Срок по каталогу — до множителя партии (`matchHours`). */
-function catalogHours(p: ConstructionPayload, data: GameData): number {
-  if (p.kind === 'unit' && p.unit) return data.units[p.unit]?.buildTimeHours ?? 0;
-  if (p.kind === 'upgrade' && p.building && typeof p.level === 'number') {
-    return data.buildings[p.building]?.upgrades[p.level - 2]?.buildTimeHours ?? 0;
-  }
-  if (p.building) return data.buildings[p.building]?.buildTimeHours ?? 0;
-  return 0;
+  return acceptedConstructionHours(match, data, p);
 }
 
 /**

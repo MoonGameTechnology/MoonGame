@@ -1,6 +1,7 @@
+import { fortressDeployPrice } from './matchRulesCatalog';
 import {
-  FORTRESS_BODY, FORTRESS_DEPLOY_COST, fortressLoadoutHull, issuedFortressModule,
-  matchCost, matchHours, type Action, type GameState,
+  FORTRESS_BODY, fortressLoadoutHull, issuedFortressModule,
+  matchCost, matchBuildingHours, type Action, type GameState,
 } from '../../packages/shared-core/src/index';
 import { createLoadoutEditor, applyLoadoutAction } from '../../packages/client/src/loadoutEditor';
 import { deployStation, deployForkFortress } from '../../decisions/actions';
@@ -47,7 +48,7 @@ export function openFortressDialog(host: FortressDialogHost, province: string, t
       ...(arsenal ? { ownedModules: new Set(arsenal.modules), moduleStars: arsenal.stars, moduleRarity: arsenal.rarity } : {}),
     });
     if (!model.ok) return;
-    const price = { ...matchCost(state, FORTRESS_DEPLOY_COST) };
+    const price = { ...matchCost(state, fortressDeployPrice()) };
     for (const [key, value] of Object.entries(model.modulesCost)) price[key] = (price[key] ?? 0) + value;
     const block = host.probe(order());
     const palette = model.palette.filter((o) => o.installable || modules.includes(o.id)).map((o) => {
@@ -58,7 +59,7 @@ export function openFortressDialog(host: FortressDialogHost, province: string, t
     }).join('');
     dialog.innerHTML = `<h2 id="fortress-order-title">${esc(t('fortress.order-title'))}</h2>` +
       `<p>${esc(t('fortress.order-note'))}</p><div class="fortress-modules">${palette}</div>` +
-      `<p>${cost(price, resources)} · ${fmtEta(matchHours(state, data.buildings.starfort?.buildTimeHours ?? 0))}</p>` +
+      `<p>${cost(price, resources)} · ${fmtEta(matchBuildingHours(state, data.buildings.starfort?.buildTimeHours ?? 0))}</p>` +
       (block ? `<p role="status">${esc(refusalText(block))}</p>` : '') +
       `<div class="fortress-dialog-actions"><button type="button" class="btn-second" data-fort-close>${t('browser.description.close')}</button>` +
       `<button type="button" class="btn-main" data-fort-build${block ? ' disabled' : ''}>${t('side.fortress.raise')}</button></div>`;

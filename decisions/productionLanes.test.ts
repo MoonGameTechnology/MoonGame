@@ -68,18 +68,17 @@ describe('какие очереди производства показать н
   it('полоса видна там, где стоит её постройка, в порядке переданных полос', () => {
     expect(
       shownProductionLanes(world(['factory', 'shipyard', 'barracks']), 'A', UNIT_LANES, data),
-    ).toEqual(['ships', 'infantry', 'vehicles']);
-    expect(shownProductionLanes(world(['barracks']), 'A', ['infantry', 'vehicles'], data)).toEqual([
-      'infantry',
+    ).toEqual(['ships', 'mobilization']);
+    expect(shownProductionLanes(world(['barracks']), 'A', ['mobilization'], data)).toEqual([
+      'mobilization',
     ]);
   });
 
   it('заказ держит свою полосу на виду, даже если постройку снесли', () => {
     const s = world(['barracks']);
     s.planets.A!.buildQueue = [{ id: 1, kind: 'unit', playerId: 'p1', unit: 'tank', count: 1 }];
-    expect(shownProductionLanes(s, 'A', ['infantry', 'vehicles'], data)).toEqual([
-      'infantry',
-      'vehicles',
+    expect(shownProductionLanes(s, 'A', ['mobilization'], data)).toEqual([
+      'mobilization',
     ]);
     const t = world([]);
     t.scheduled = [
@@ -95,8 +94,8 @@ describe('какие очереди производства показать н
   });
 
   it('мир без постройки и без дел — первая полоса вкладки, а не пустота', () => {
-    expect(shownProductionLanes(world([]), 'A', ['infantry', 'vehicles'], data)).toEqual([
-      'infantry',
+    expect(shownProductionLanes(world([]), 'A', ['mobilization'], data)).toEqual([
+      'mobilization',
     ]);
     expect(shownProductionLanes(world([]), 'нет', ['ships'], data)).toEqual(['ships']);
   });

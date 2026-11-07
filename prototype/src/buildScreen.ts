@@ -26,7 +26,8 @@ import {
   buildingMaxLevel,
   matchCost,
   matchUnitCost,
-  matchHours,
+  matchBuildingHours,
+  matchUnitHours,
 } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
@@ -46,9 +47,10 @@ import { canBuildHere } from '../../decisions/buildGate';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
 import { worldName } from './planetName';
 import { buildingRepairHtml } from './fortressView';
-import { patchLiveTimers } from './liveTimers';
 import { techNeed, type TechNeed } from '../../decisions/techNeed';
 import { techOfferLabel, techWhyHtml } from './techOffer';
+
+import { productionInfoButton, productionRequirementsHtml } from './productionRequirementsView';
 
 type BuildingDef = (typeof data.buildings)[string];
 
@@ -294,22 +296,24 @@ export function buildScreenHtml(
         : st.st === 'queued'
           ? `<span class="bw-st run">⏳ ${st.waiting ? t('build.state.waiting') : t('build.state.queued')}</span>`
           : tech
-            ? tech.right
+            ? ''
             : st.st === 'lock'
             ? `<span class="bw-st lock">🔒 ${esc(lockText(st.code))}</span>`
             : `<button class="bw-take btn-main" data-bw-go="${id}"${st.affordable ? '' : ' disabled'}>▷ ${
                 st.affordable ? t('build.action.build') : t('build.action.no-res')
               }</button>`;
     // Эффект СВОЕГО уровня: построенное показывает, что даёт СЕЙЧАС, остальное — L1.
-    const fx = p.fortress && id === 'starfort' ? t('fortress.core-effect', { n: buildingLevel(def, shownLvl).buildSlots })
+    const currentFx = p.fortress && id === 'starfort' ? t('fortress.core-effect', { n: buildingLevel(def, shownLvl).buildSlots })
       : buildFx(def, shownLvl) || (dossierBody ? dossierBody(id, shownLvl) : '');
     // Цена и срок: для построенного — цена СЛЕДУЮЩЕГО уровня (то, что можно купить),
     // для остального — вход первого уровня. Достроенному до упора платить нечего.
     const nextLvl = st.st === 'built' ? st.level + 1 : 1;
     const lv = nextLvl <= maxLvl ? buildingLevel(def, nextLvl) : null;
+    const fx = st.st === 'built' && lv && Object.keys(lv.produces ?? {}).length
+      ? `${resLine(buildingLevel(def, st.level).produces, { per: 'h' })} → <span class="pw-better">${resLine(lv.produces, { per: 'h' })}</span>` : currentFx;
     const foot = lv
       ? `<div class="bw-foot"><span>${st.st === 'built' ? `<i class="bw-next">▲ ${t('build.level.next', { n: nextLvl })}</i> ` : ''}${cost(matchCost(state, lv.cost), res)}</span>` +
-        `<span class="bw-dur">${fmtDur(matchHours(state, lv.buildTimeHours))}</span></div>`
+        `<span class="bw-dur">${fmtDur(matchBuildingHours(state, lv.buildTimeHours))}</span></div>`
       : '';
     // Рамка строки — что с ней можно сделать: улучшаемое горит, как доступное к стройке.
     const look = tech
@@ -323,8 +327,8 @@ export function buildScreenHtml(
             : st.up.up;
     const row =
       `<div class="bw-item st-${look}"${p.fortress && id === 'starfort' ? '' : ` data-bw="${id}"`}>` +
-      `<div class="bw-ih"><span class="bw-ic">${BUILD_ICON[id] ?? '▣'}</span><b>${name}</b>${right}</div>` +
-      (tech?.why ?? '') +
+      `<div class="bw-ih"><span class="bw-ic">${BUILD_ICON[id] ?? '▣'}</span><b>${name}</b>${right}${productionInfoButton('building', id)}</div>` +
+      productionRequirementsHtml(state, me, planetId, 'building', id) +
       (fx ? `<div class="bw-fx">${fx}</div>` : '') +
       foot +
       p.buildings.filter((b) => b.type === id).map((b) => buildingRepairHtml(state, me, planetId, b, probe)).join('') +
@@ -383,16 +387,16 @@ export function unitScreenHtml(
       const locked = code !== null && code !== 'E_INSUFFICIENT';
       const tech = techLock(code, () => techNeed(state, me, data, 'unit', id));
       const right = tech
-        ? tech.right
+        ? ''
         : locked
         ? `<span class="bw-st lock">🔒 ${esc(lockText(code))}</span>`
         : `<button class="bw-take btn-main" data-unit-go="${esc(id)}"${code ? ' disabled' : ''}>▷ ${t(code ? 'build.action.no-res' : 'build.action.build')}</button>`;
       const art = unitArt(state, me, id);
       return (
-        `<div class="bw-item st-${tech ? 'tech' : locked ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
-        (tech?.why ?? '') +
+        `<div class="bw-item st-${tech ? 'tech' : locked ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}${productionInfoButton('unit', id)}</div>` +
+        productionRequirementsHtml(state, me, planetId, 'unit', id) +
         `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>` +
-        `<div class="bw-foot"><span>${cost(matchUnitCost(state, def), res)}</span><span class="bw-dur">${fmtDur(matchHours(state, def.buildTimeHours))}</span></div></div>`
+        `<div class="bw-foot"><span>${cost(matchUnitCost(state, def), res)}</span><span class="bw-dur">${fmtDur(matchUnitHours(state, def.buildTimeHours))}</span></div></div>`
       );
     })
     .join('');
@@ -443,14 +447,14 @@ function landerRowHtml(
   );
   const head =
     `<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>` +
-    (tech ? tech.right : code ? `<span class="bw-st lock">🔒 ${esc(lockText(code))}</span>` : '') +
+    (tech ? '' : code ? `<span class="bw-st lock">🔒 ${esc(lockText(code))}</span>` : '') +
     `</div>` +
     (tech?.why ?? '');
   const fx = `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>`;
   const pick = troops
     .map((g) => {
       const short = probe(order(g)) !== null; // E_INSUFFICIENT: цена видна, кнопка серая
-      const hours = matchHours(state, orderHours(data, id, g));
+      const hours = matchUnitHours(state, orderHours(data, id, g));
       return (
         `<div class="bw-foot"><button class="bw-take btn-main" data-unit-go="${esc(id)}" data-unit-troop="${esc(g)}"${short ? ' disabled' : ''}>▷ ${unitIcon(g, data)} ${esc(displayUnit(g))}</button>` +
         `<span>${cost(landerCost(data, id, g, state), res)}</span><span class="bw-dur">${fmtDur(hours)}</span></div>`
@@ -459,156 +463,7 @@ function landerRowHtml(
     .join('');
   return (
     `<div class="bw-item st-${tech ? 'tech' : code ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}${head}${fx}` +
-    (pick ? `<div class="bw-fx">${t('build.lander.troop')}</div>${pick}` : '') +
+    (tech?.right ?? '') + (pick ? `<div class="bw-fx">${t('build.lander.troop')}</div>${pick}` : '') +
     `</div>`
   );
-}
-
-/** Что окну нужно от матч-экрана. */
-export interface BuildHost {
-  /** Само окно (`#buildwin`) — показ/скрытие классом .show и делегат кликов. */
-  root(): HTMLElement;
-  /** Тело (`#buildwinbody`) — часть, которая перерисовывается. */
-  body(): HTMLElement;
-  state(): GameState;
-  me(): string;
-  /** Проба ядра (canOrder) — та же, которой решается сам приказ. */
-  probe(a: Action): string | null;
-  /** Очередь стройки мира: заказ этого здания уже лежит в ней. */
-  localQueued(planetId: string, id: string): boolean;
-  /** Заказ стройки хостовым путём (enqueueBuild: сеть → приказ, соло → очередь). */
-  build(planetId: string, id: string): void;
-  /** Улучшение стоящего здания тем же хостовым путём, что и «Улучшить» в его карточке. */
-  upgrade(planetId: string, id: string): void;
-  repair(planetId: string, id: string, uid?: string): void;
-  unitIds(tab: UnitCatalogTab): string[];
-  /** `troop` — боец десантного челнока (SHU-5.2); у остальных юнитов его нет. */
-  buildUnit(planetId: string, id: string, troop?: string): void;
-  openUnitInfo(id: string): void;
-  /** Тап по строке → полная карточка здания (кодекс с листалкой уровней). */
-  openInfo(id: string): void;
-  /** Незнакомый код отказа → слова (errText хоста). */
-  lockText(code: string): string;
-  /** Окно технологий на досье технологии `id` — кнопка запертой технологией строки. */
-  openTech(id: string): void;
-  /** Короткое описание здания для строк без числового эффекта (досье). */
-  dossierBody(id: string, level: number): string;
-}
-
-export function initBuildScreen(host: BuildHost): {
-  open: (planetId: string, units?: UnitCatalogTab) => void;
-  repaint: () => void;
-  isOpen: () => boolean;
-} {
-  let planetId: string | null = null;
-  let units: UnitCatalogTab | null = null;
-  let activeCat: BuildCategory | null = null;
-  // Кэш разметки как у techTree: одинаковую строку не переприсваиваем — innerHTML
-  // пересоздаёт DOM даже на идентичном тексте и выбивал бы кнопку из-под пальца.
-  let lastHtml = '';
-
-  function repaint(): void {
-    if (!planetId) return;
-    const html = units
-      ? unitScreenHtml(
-          host.state(),
-          host.me(),
-          planetId,
-          host.unitIds(units),
-          (a) => host.probe(a),
-          (code) => host.lockText(code),
-        )
-      : buildScreenHtml(
-          host.state(),
-          host.me(),
-          planetId,
-          (a) => host.probe(a),
-          (pid, id) => host.localQueued(pid, id),
-          (code) => host.lockText(code),
-          (id, level) => host.dossierBody(id, level),
-          activeCat,
-        );
-    const body = host.body();
-    if (html !== lastHtml) {
-      const before = body.querySelector('.bw-scroll');
-      const sy = before?.scrollTop ?? 0;
-      body.innerHTML = html;
-      lastHtml = html;
-      const after = body.querySelector('.bw-scroll');
-      if (after) after.scrollTop = sy;
-    }
-    // Сроки ремонта — живые узлы: цифры ставятся на месте, окно не пересобирается.
-    patchLiveTimers(body, host.state().time);
-  }
-
-  host.root().addEventListener('click', (e) => {
-    const tg = e.target as HTMLElement;
-    if (tg === host.root() || tg.classList.contains('tw-close')) {
-      host.root().classList.remove('show');
-      return;
-    }
-    const goEl = tg.closest<HTMLElement>('[data-unit-go]');
-    const unitGo = goEl?.dataset.unitGo;
-    if (unitGo && planetId && units && host.unitIds(units).includes(unitGo)) {
-      host.buildUnit(planetId, unitGo, goEl?.dataset.unitTroop);
-      repaint();
-      return;
-    }
-    // «Исследовать» лежит внутри кликабельной строки — выходим раньше карточки, как «Строить».
-    // Окно стройки остаётся под окном технологий: закрыл досье — вернулся к той же строке.
-    const tech = tg.closest<HTMLElement>('[data-bw-tech]')?.dataset.bwTech;
-    if (tech) {
-      host.openTech(tech);
-      return;
-    }
-    const unitInfo = tg.closest<HTMLElement>('[data-unit-info]')?.dataset.unitInfo;
-    if (unitInfo) {
-      host.openUnitInfo(unitInfo);
-      return;
-    }
-    // Вкладка категории — переключает фильтр и перерисовывает список.
-    const tab = (tg.closest('[data-bwtab]') as HTMLElement | null)?.dataset.bwtab;
-    if (tab !== undefined) {
-      activeCat = tab === '*' ? null : (tab as BuildCategory);
-      lastHtml = ''; // вкладка сменилась — прошлая разметка не годится
-      repaint();
-      return;
-    }
-    // Кнопка «Строить» лежит ВНУТРИ кликабельной строки — спрашиваем по самому
-    // приказу (data-bw-go) и выходим рано, иначе тап дал бы и заказ, и карточку.
-    const repair = tg.closest<HTMLElement>('[data-bw-repair]');
-    if (repair?.dataset.bwRepair && planetId) {
-      host.repair(planetId, repair.dataset.bwRepair, repair.dataset.uid || undefined);
-      repaint();
-      return;
-    }
-    const go = (tg.closest('[data-bw-go]') as HTMLElement | null)?.dataset.bwGo;
-    if (go && planetId) {
-      host.build(planetId, go);
-      repaint(); // строка тут же перекрашивается в «строится»
-      return;
-    }
-    // «Улучшить» лежит там же и выходит так же рано.
-    const up = (tg.closest('[data-bw-up]') as HTMLElement | null)?.dataset.bwUp;
-    if (up && planetId) {
-      host.upgrade(planetId, up);
-      repaint(); // строка тут же перекрашивается в «улучшается»
-      return;
-    }
-    const row = (tg.closest('[data-bw]') as HTMLElement | null)?.dataset.bw;
-    if (row) host.openInfo(row);
-  });
-
-  return {
-    open: (pid: string, unitTab?: UnitCatalogTab) => {
-      units = unitTab ?? null;
-      planetId = pid;
-      activeCat = null; // новый мир открывается на «все»
-      lastHtml = ''; // другой мир — прошлая разметка не годится даже совпав строкой
-      host.root().classList.add('show');
-      repaint();
-    },
-    repaint,
-    isOpen: () => host.root().classList.contains('show'),
-  };
 }

@@ -1,4 +1,8 @@
-import { heroShipStack, rememberHeroModule } from '../util/heroLoadout';
+import { heroModuleSlots } from '../state/heroFlagship';
+export { heroModuleSlots } from '../state/heroFlagship';
+import { heroFlagshipUnit } from '../state/heroFlagship';
+import { registerHeroFlagship } from './hero/flagship';
+import { carriesHeroFlagship, heroShipStack, rememberHeroModule } from '../util/heroLoadout';
 import type { HeroCasualty } from '../util/casualties';
 import { activeHeroCount, heroActiveCap } from '../state/heroDeployment';
 import { registerHeroDeployment } from './hero/deployment';
@@ -29,7 +33,7 @@ import { laneIsPublic } from '../state/corridor';
 import { isAllied } from '../util/combat';
 import { canInstall } from '../util/fitting';
 import { knownSkillNodes } from '../util/heroSkills';
-import { moduleAllowed, type SlotCounts } from '../util/loadout';
+import { moduleAllowed } from '../util/loadout';
 import { canAfford, payCost } from '../util/treasury';
 
 /**
@@ -146,7 +150,7 @@ function heroOf(state: GameState, playerId: PlayerId): Hero | undefined {
 function fleetHasHero(h: HandlerContext, fleetId: string): boolean {
   const fleet = h.state.fleets[fleetId];
   if (!fleet) return false;
-  return stacksHaveTrait(h.ctx.data, fleet.units, HERO_TRAIT);
+  return stacksHaveTrait(h.ctx.data, fleet.units, HERO_TRAIT) || carriesHeroFlagship(h.state, fleetId);
 }
 
 /** ms from now after `hours`, compressed by the match timeScale like every duration. */
@@ -281,10 +285,7 @@ function passiveBonus(
 /** The hull the hero's ship is made of: the archetype's `ship.unit`, else the default
  *  projection `hero` unit (graceful when the archetype/data is absent). */
 function heroShipUnit(h: HandlerContext, hero: Hero): string {
-  return (
-    (hero.archetype !== undefined ? h.ctx.data.heroes[hero.archetype]?.ship.unit : undefined) ??
-    HERO_UNIT
-  );
+  return heroFlagshipUnit(hero, h.ctx.data);
 }
 
 /** Form the hero's ship at `at` — the single deploy path shared by the scheduled
@@ -383,16 +384,7 @@ export function heroSkillSlots(hero: Hero, data: HandlerContext['ctx']['data']):
  *  the player's personal flagship, carries one bay more) plus the hero's own snapshot
  *  (`Hero.moduleSlots`, the Sector Zero hero stars). Unknown hull or grade ⇒ the part that
  *  IS known still counts; nothing here can crash a match (modulesystem.md). */
-export function heroModuleSlots(hero: Hero, unit: string, data: GameData): SlotCounts {
-  const hull = data.units[unit]?.slots;
-  const bonus = hero.grade !== undefined ? data.heroGrades[hero.grade]?.moduleSlots : undefined;
-  const own = hero.moduleSlots;
-  return {
-    weapon: (hull?.weapon ?? 0) + (bonus?.weapon ?? 0) + (own?.weapon ?? 0),
-    defense: (hull?.defense ?? 0) + (bonus?.defense ?? 0) + (own?.defense ?? 0),
-    utility: (hull?.utility ?? 0) + (bonus?.utility ?? 0) + (own?.utility ?? 0),
-  };
-}
+
 
 /** The hero's ship as a `UnitStack`: the hull plus whatever hardware the hero carries.
  *  An empty set leaves the key ABSENT rather than writing `[]` — a stack's loadout is
@@ -460,6 +452,8 @@ const heroCasualty: HeroCasualty = (h, { unit, fleetId, owner, heroId }) => {
   const commander = typeof heroId === 'string'
     ? h.state.heroes?.[heroId]
     : typeof fleetId === 'string' ? heroByFleet(h.state, fleetId) : undefined;
+  // Losses aggregate by hull id; losing an escort of the same hull is not the hero's death.
+  if (commander?.flagship && commander.fleetId && h.state.fleets[commander.fleetId]?.units.some(st => st.heroId === commander.id && st.count > 0)) return;
   const hero = commander && unit === heroShipUnit(h, commander)
     ? commander
     : unit === HERO_UNIT && typeof heroId !== 'string'
@@ -682,7 +676,7 @@ export const heroModule: GameModule = {
   // 4.6.0: чужая ракета (SM-3.7b) для `hero.spawn` — как отсутствующая цель (`E_NO_PLANET`).
   // 4.10.0 combines remembered loadouts with aura removal before the reply volley.
   // 4.11.0: a closing corridor hands the edge it added to a corridor still on it (BAL-19).
-  version: '4.11.0',
+  version: '4.12.1',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
@@ -981,6 +975,7 @@ export const heroModule: GameModule = {
     api.on('fleet.fork', followShip);
 
     registerHeroDeployment(api, { formHeroShip, heroShipUnit });
+    registerHeroFlagship(api, heroModuleSlots);
 
     // HERO-7 — unlock a skill-tree node. The tree is pure data: branch/requires/cost
     // gate the order, and the grants simply extend the hero's own ability/passive
@@ -1108,9 +1103,7 @@ export const heroModule: GameModule = {
       const hero = h.state.heroes?.[heroId];
       if (!hero) return h.reject('E_NO_HERO');
       if (hero.owner !== action.playerId) return h.reject('E_FORBIDDEN');
-      if (hero.fleetId && h.state.fleets[hero.fleetId]) return h.reject('E_HERO_DEPLOYED');
-      // ARS-3 ownership gate, the same list `unit.build` checks: a seat with an arsenal
-      // snapshot installs only the modules it owns; no snapshot ⇒ unrestricted.
+      requireReserve(h, hero);
       const arsenal = h.state.players[action.playerId]?.arsenal;
       if (arsenal && !arsenal.modules.includes(moduleId)) return h.reject('E_NOT_OWNED');
       const unit = heroShipUnit(h, hero);
@@ -1122,6 +1115,7 @@ export const heroModule: GameModule = {
           item: (id) => h.ctx.data.modules[id],
           category: (m) => m.slot,
           capacity: (category) => slots[category as ShipSlotType],
+          wildcard: def?.slots.universal ?? 0,
           // The module's own allow rule still decides — bays did not turn the hero's
           // hull into a universal socket. No hull def ⇒ nothing is allowed (fail-secure).
           allowed: (m) => def !== undefined && moduleAllowed(unit, def, m),
@@ -1152,7 +1146,7 @@ export const heroModule: GameModule = {
       const hero = h.state.heroes?.[heroId];
       if (!hero) return h.reject('E_NO_HERO');
       if (hero.owner !== action.playerId) return h.reject('E_FORBIDDEN');
-      if (hero.fleetId && h.state.fleets[hero.fleetId]) return h.reject('E_HERO_DEPLOYED');
+      requireReserve(h, hero);
       const installed = hero.modules ?? [];
       if (!installed.includes(moduleId)) return h.reject('E_NO_MODULE');
       hero.modules = installed.filter((id) => id !== moduleId);
@@ -1161,3 +1155,8 @@ export const heroModule: GameModule = {
 
   },
 };
+
+function requireReserve(h: HandlerContext, hero: Hero): void {
+  if (hero.mobilization) return h.reject('E_HERO_MOBILIZING');
+  if (hero.fleetId && h.state.fleets[hero.fleetId]) return h.reject('E_HERO_DEPLOYED');
+}

@@ -258,7 +258,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="logwin"><div class="lwbox"><div class="lw-head"><b data-i18n="win.log.title"></b><button class="lw-recap" id="lw-recap" type="button" data-i18n-title="win.log.recap">🛰</button><button class="lw-close btn-x">✕</button></div><div id="log-pending"></div><div id="log"></div></div></div>
 <!-- technologies window — content rendered by renderTech() in main.ts -->
 <div id="tech"><div class="twbox"><div class="lw-head"><b data-i18n="win.tech.title"></b><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="techbody"></div></div></div>
-<div id="buildwin"><div class="twbox"><div class="lw-head"><b data-i18n="win.build.title"></b><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="buildwinbody"></div></div></div>
 <!-- steward («Хранитель») window — content rendered by renderSteward() in main.ts -->
 <div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="stewardbody"></div></div></div>
 <!-- окно боя: открывается тапом по значку боя на карте (battleScreen.ts) -->

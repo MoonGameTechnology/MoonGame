@@ -16,7 +16,8 @@ export function matchRules(data: GameData, manifest: string): Required<GameVersi
 export class MatchRulesMismatch extends Error {
   constructor(
     readonly matchId: string,
-    readonly reason: 'data' | 'manifest' | 'dataHash',
+    readonly reason: 'data' | 'manifest' | 'dataHash' | 'ruleset',
+    readonly rulesetCode?: string,
   ) {
     super('E_MATCH_RULES_MISMATCH');
   }
@@ -78,7 +79,7 @@ export async function skipIncompatibleMatch<T>(
     if (!(error instanceof MatchRulesMismatch)) throw error;
     onFailure?.(error.matchId);
     process.stderr.write(
-      `match ${error.matchId}: ${error.message} (${error.reason}); snapshot retained, resume refused.\n`,
+      `match ${error.matchId}: ${error.message} (${error.reason}${error.rulesetCode ? `:${error.rulesetCode}` : ''}); snapshot retained, resume refused.\n`,
     );
     return null;
   }

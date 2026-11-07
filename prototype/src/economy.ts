@@ -18,7 +18,7 @@ import {
   BROWNOUT,
   buildProgress,
   thresholdRamp,
-  matchHours,
+  acceptedConstructionHours,
   matchCost,
   matchUnitCost,
   loadoutCost,
@@ -131,6 +131,7 @@ export function netIncome(
   state: GameState,
   playerId: string,
   planets: readonly Planet[] = recordValues(state.planets),
+  onlyPlanet?: string,
 ): Record<string, number> {
   const out: Record<string, number> = {};
   const arrears = state.players[playerId]?.arrears ?? [];
@@ -143,10 +144,10 @@ export function netIncome(
     if (p.owner === playerId) {
       owned.push(p);
       if (isInhabited(data, p)) inhabited += 1;
-      stationed.push(p.garrison);
+      if (!onlyPlanet || p.id === onlyPlanet) stationed.push(p.garrison);
     }
     // Десант на плацдарме содержит его владелец — как ядро (`economy.upkeepByOwner`).
-    for (const b of p.beachheads ?? []) if (b.owner === playerId) stationed.push(b.units);
+    for (const b of p.beachheads ?? []) if (b.owner === playerId && (!onlyPlanet || p.id === onlyPlanet)) stationed.push(b.units);
   }
   // BF-35: mirror the faction + tech `economy.production` hooks (factionModule /
   // technologyModule) — the HUD `+/h` used to apply only the planetType bonus, so a
@@ -174,6 +175,7 @@ export function netIncome(
       else sites.set(at, [event]);
     }
   for (const p of owned) {
+    if (onlyPlanet && p.id !== onlyPlanet) continue;
     if (bombarded.has(p.id)) continue;
     // BAL-19: лимит управления и освоение — доля всего выхода мира.
     const control = held(p);
@@ -219,6 +221,7 @@ export function netIncome(
     // upkeep is charged on an unfinished building either, so no brownout applies here.
     for (const event of sites.get(p.id) ?? []) {
       const cp = event.payload as {
+        durationHours?: number;
         kind?: 'building' | 'unit' | 'upgrade';
         building?: string;
         level?: number;
@@ -228,7 +231,7 @@ export function netIncome(
         if (!def) continue;
         const level1 = buildingLevel(def, 1);
         const ramp = thresholdRamp(
-          buildProgress(state.time, event.at, matchHours(state, level1.buildTimeHours) * HOUR),
+          buildProgress(state.time, event.at, acceptedConstructionHours(state, data, cp) * HOUR),
         );
         if (ramp <= 0) continue;
         for (const res of Object.keys(level1.produces)) {
@@ -247,7 +250,7 @@ export function netIncome(
         const current = buildingLevel(def, instance.level);
         const target = buildingLevel(def, cp.level);
         const ramp = thresholdRamp(
-          buildProgress(state.time, event.at, matchHours(state, target.buildTimeHours) * HOUR),
+          buildProgress(state.time, event.at, acceptedConstructionHours(state, data, cp) * HOUR),
         );
         if (ramp <= 0) continue;
         const resources = new Set([
@@ -317,7 +320,7 @@ export function netIncome(
     }
   };
   for (const f of recordValues(state.fleets))
-    if (f.owner === playerId) {
+    if (!onlyPlanet && f.owner === playerId) {
       addUpkeep(f.units);
       if (f.landing) addUpkeep(f.landing);
     }

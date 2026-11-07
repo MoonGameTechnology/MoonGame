@@ -314,8 +314,19 @@ export interface HashField {
   hash?: string;
 }
 
+/** Public read-only catalog for this world; never executable code or credentials. */
+export interface MatchRulesCatalog {
+  id: string;
+  version: GameState['version'];
+  data: import('@void/shared-core').GameData;
+  config: MatchConfig;
+  actions: string[];
+  view?: { fortressDeployCost?: import('@void/shared-core').ResourceBag };
+}
+
 export interface ServerWelcomeMessage extends VisibilityFields, LobbyField, HashField {
   type: 'welcome';
+  ruleset?: MatchRulesCatalog;
   matchId: string;
   playerId: PlayerId;
   seq: number;

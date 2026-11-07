@@ -28,7 +28,8 @@ describe('карточка корабля — разметка (заказ вл�
       moduleRarity: { shield_booster: 'legendary' },
     });
     expect(html).toContain('mod:targeting_array');
-    expect(html).toContain('🎯');
+    expect(html).toContain('module-pictogram slot-weapon');
+    expect(html).toContain('<svg');
     expect(html).toContain('★★');
     expect(html).toContain(t('rarity.legendary'));
     expect(html).toContain(`+7.5 ${t('loadout.stat.shield')}`);

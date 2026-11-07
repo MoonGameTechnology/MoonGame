@@ -34,15 +34,20 @@ const authoredMap = (): MatchMap => {
 };
 
 describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
-  it('pins an independent ship-price table so future map edits cannot reprice a match', () => {
+  it('pins prices and category timings so future map edits cannot reprice a match', () => {
     const map = exampleMap();
-    map.pricing = { cost: { metal: 1.5 }, shipCost: { metal: 2.5, credits: 2 } };
+    map.pricing = { cost: { metal: 1.5 }, shipCost: { metal: 2.5, credits: 2 },
+      hours: 2, buildingHours: 3, unitHours: 2 };
     const state = buildStateFromMap(map, data);
     expect(state.pricing).toEqual(map.pricing);
     expect(state.pricing?.shipCost).not.toBe(map.pricing.shipCost);
     map.pricing.shipCost!.metal = 10;
+    map.pricing.buildingHours = 10;
+    map.pricing.unitHours = 10;
     expect(state.pricing?.shipCost?.metal).toBe(2.5);
     expect(JSON.parse(JSON.stringify(state)).pricing.shipCost.metal).toBe(2.5);
+    expect(JSON.parse(JSON.stringify(state)).pricing).toMatchObject({
+      hours: 2, buildingHours: 3, unitHours: 2 });
   });
 
   it('builds a GameState from the example map', () => {

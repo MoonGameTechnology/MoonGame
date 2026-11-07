@@ -108,7 +108,7 @@ export function fitTemplate(
 ): BuildTemplate | null {
   const def = data.units[tpl.hull];
   if (!def || !roster.includes(tpl.hull)) return null;
-  if (owned && !owned.hulls.includes(tpl.hull)) return null;
+  if (def.domain === 'space' && owned && !owned.hulls.includes(tpl.hull)) return null;
   const modules = tpl.modules.filter((id) => {
     const m = data.modules[id];
     return m !== undefined && moduleAllowed(tpl.hull, def, m) && (!owned || owned.modules.includes(id));

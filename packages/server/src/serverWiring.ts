@@ -1,3 +1,4 @@
+import { publicRules, type MatchRulesets } from './rulesets/service';
 import type { SecurityAudit } from './securityAudit';
 import type { ActionGate } from '@void/action-layer';
 import {
@@ -13,7 +14,7 @@ import { startClockDriver, HEARTBEAT_MS, type ClockDriverHandle } from './clockD
 import { snapshotOf, type Stores } from './persistence';
 import { nickSeatAccounts } from './commanderCredit';
 import type { LoadedMatch } from './roomRegistry';
-import type { MatchRoom, RoomObservation } from './matchRoom';
+import { MatchRoom, type RoomObservation } from './matchRoom';
 import { warDeclarationsFor, type AvaSessionSpec } from './avaOrchestrator';
 import type { ArsenalStore, MatchSnapshot, StoredReceipt } from './store';
 import { standingOrderTickActions } from './standingOrderDriver';
@@ -37,6 +38,9 @@ export interface MatchLoaderDeps {
     Partial<Pick<Stores, 'profileStore' | 'accountStore' | 'userStore'>>;
   careerAccounts?(matchId: string): Promise<Record<string, string>>;
   data: GameData;
+  rulesets?: MatchRulesets;
+  /** Explicit compatibility harness only. Both network entry points require capsules. */
+  unversionedTestHost?: true;
   /** Present ⇒ every loaded room is gated (validated action.v1 envelopes). */
   gateFactory?: () => ActionGate;
   /** Wall clock (injectable for tests). */
@@ -87,15 +91,23 @@ export interface MatchExtras {
 export function createMatchLoader(
   deps: MatchLoaderDeps,
 ): (matchId: string) => Promise<LoadedMatch | null> {
+  if (!deps.rulesets && !deps.unversionedTestHost) throw new Error('E_RULESET_MISSING');
   const { stores, data } = deps;
   const now = deps.now ?? ((): number => Date.now());
   // MP-4: computed once (the bundle doesn't change while the process is up), not per load.
   const expected = matchRules(data, MODULE_MANIFEST_VERSION);
   return async (matchId: string): Promise<LoadedMatch | null> => {
     const snap = await skipIncompatibleMatch(
-      () => loadCompatibleSnapshot(stores.store, matchId, expected), deps.onIntegrityFailure,
+      async () => {
+        if (!deps.rulesets) return loadCompatibleSnapshot(stores.store, matchId, expected);
+        const snap = await stores.store.load(matchId);
+        if (snap) await deps.rulesets.resolve(snap);
+        return snap;
+      }, deps.onIntegrityFailure,
     );
     if (!snap || archiveExpired(snap, now())) return null;
+    const runtime = snap.ruleset && deps.rulesets ? await deps.rulesets.resolve(snap) : undefined;
+    const data = runtime?.data ?? deps.data;
     const initialReceipts = await stores.receiptStore.loadAll(matchId);
     const extras = (await deps.matchExtras?.(matchId)) ?? null;
 
@@ -125,13 +137,15 @@ export function createMatchLoader(
     };
 
     const victory = mapVictoryRules(snap.state.mapId);
-    const room = createDevMatch(data, {
+    const roomOptions: Parameters<typeof createDevMatch>[1] = {
       id: matchId,
       now,
       observe,
       securityAudit: deps.securityAudit,
       persist,
       initialState: snap.state,
+      ...(runtime && snap.ruleset ? { kernel: runtime.kernel, projection: runtime.projection, ruleset: snap.ruleset,
+        rulesCatalog: publicRules(runtime, snap.state, snap.ruleset.config) } : {}),
       initialReceipts,
       initialSeq: snap.seq,
       initialCareer: snap.career,
@@ -149,18 +163,21 @@ export function createMatchLoader(
       // match on a catalogued map plays its victory rules, the table the players' host and
       // the HUD read: a corporations battle on a team map ends at that map's threshold,
       // not the core's (CORP-8). The dev scenario names no map and keeps the core's.
-      config: {
+      config: snap.ruleset?.config ?? {
         timeScale: 1,
         ...(snap.state.modeId !== undefined ? { modeId: snap.state.modeId } : {}),
         ...(victory !== undefined ? { victory } : {}),
       },
       // A room born on its own world clock resumes from the saved anchor; a room without
       // one keeps reading the wall clock as world time.
-      ...(snap.clock ? { initiallyStarted: true, initialClock: snap.clock } : {}),
+      ...(snap.clock ? { initiallyStarted: true, initialClock: snap.clock, timeScale: snap.clock.timeScale } : {}),
       gate: deps.gateFactory?.(),
       ...(extras?.denyPlayerActions ? { denyPlayerActions: extras.denyPlayerActions } : {}),
       ...(deps.arsenalStore && !extras?.frozenArsenal ? { arsenalStore: deps.arsenalStore } : {}),
-    });
+    };
+    const room = runtime
+      ? new MatchRoom({ ...roomOptions, id: matchId, initialState: snap.state, kernel: runtime.kernel, data })
+      : createDevMatch(data, roomOptions);
 
     if (snap.status === 'ended') await stores.profileStore?.creditCareer?.(snap);
     if (snap.state.match.status === 'ended' && deps.onTerminalState)
@@ -201,12 +218,14 @@ export function createMatchLoader(
             'постоянные приказы',
             (async () => {
               try {
-                for (const { playerId, action } of standingOrderTickActions(
+                for (const { playerId, action } of (runtime?.drivers?.canonicalStanding
+                  ? runtime.drivers.canonicalStanding(room.state, (state, actions) => room.canApplyAll(state, actions, room.state.time))
+                  : standingOrderTickActions(
                   room.state,
                   data,
                   (state: GameState, actions: readonly Action[]) =>
                     room.canApplyAll(state, actions, room.state.time),
-                )) {
+                ))) {
                   await room.submitServerAction(playerId, action);
                 }
                 // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не

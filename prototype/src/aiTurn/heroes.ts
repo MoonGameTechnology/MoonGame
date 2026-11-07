@@ -1,3 +1,4 @@
+import { heroFlagshipUnit } from '../../../packages/shared-core/src/state/heroFlagship';
 /**
  * ГЕРОИ В ХОДЕ СИЛЬНОГО БОТА (SLIM-3): подъём ростера, дерево навыков, железо корабля,
  * способности и ракетные мины — в прежнем порядке.
@@ -131,7 +132,7 @@ export function heroOrders(bot: AiTurn, pl: Player): void {
   );
   for (const x of roster) {
     if (x.fleetId !== undefined && state.fleets[x.fleetId] !== undefined) continue;
-    const hull = (x.archetype !== undefined ? data.heroes[x.archetype]?.ship.unit : undefined) ?? 'hero';
+    const hull = heroFlagshipUnit(x, data);
     const hullDef = data.units[hull];
     if (!hullDef) continue;
     const bonus = x.grade !== undefined ? data.heroGrades[x.grade]?.moduleSlots : undefined;

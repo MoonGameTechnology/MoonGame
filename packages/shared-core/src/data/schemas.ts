@@ -1513,6 +1513,8 @@ export const MatchPricingSchema = z
     /** Additional resource multipliers for ship hulls; other orders retain `cost`. */
     shipCost: z.record(z.string(), z.number().positive()).optional(),
     hours: z.number().positive().optional(),
+    buildingHours: z.number().positive().optional(),
+    unitHours: z.number().positive().optional(),
     start: z.record(z.string(), z.number().positive()).optional(),
   })
   .strict();

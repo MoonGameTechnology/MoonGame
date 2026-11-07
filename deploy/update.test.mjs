@@ -71,6 +71,9 @@ function sandbox({
   writeFileSync(join(deploy, 'production-preflight.sh'),
     readFileSync(join(DEPLOY_DIR, 'production-preflight.sh'), 'utf8').replaceAll('/var/lib/moongame', root));
   writeFileSync(join(deploy, 'release-state.sh'), readFileSync(join(DEPLOY_DIR, 'release-state.sh')));
+  writeFileSync(join(deploy, 'ruleset-cache.mjs'), readFileSync(join(DEPLOY_DIR, 'ruleset-cache.mjs')));
+  mkdirSync(join(deploy, 'observability'));
+  writeFileSync(join(deploy, 'observability/main-module.mjs'), readFileSync(join(DEPLOY_DIR, 'observability/main-module.mjs')));
   for (const f of ['docker-compose.yml', 'docker-compose.release.yml']) {
     writeFileSync(join(deploy, f), '# stub\n');
   }
@@ -93,7 +96,8 @@ if [ "$3" = "rev-parse" ]; then echo "${branch}"; fi`,
     `echo "docker[VOID_IMAGE=\${VOID_IMAGE:-}] $*" >> "$LOG"
 case "$*" in
   *" ps -q server"*) echo "container-1" ;;
-  inspect*) echo "sha256:prev-image" ;;
+  inspect*) echo "sha256:1111111111111111111111111111111111111111111111111111111111111111" ;;
+  image\\ inspect*) case "$*" in *"{{.Id}}"*) echo "sha256:2222222222222222222222222222222222222222222222222222222222222222" ;; esac ;;
   *config\\ --images*) echo "moongame-server:local" ;;
 esac`,
   );
@@ -182,6 +186,29 @@ describe('deploy/update.sh — сборка из исходников', () => {
     expect(log.match(/^systemctl restart moongame$/gm)).toHaveLength(1);
   });
 
+  it('archives both local immutable image IDs around rebuilding before restart', async () => {
+    const sb = sandbox();
+    writeFileSync(join(sb.deploy, 'ruleset-cache.mjs'), String.raw`import {appendFileSync} from 'node:fs'; appendFileSync(process.env.LOG, 'archive ' + process.argv.slice(2).join(' ') + '\n');`);
+    expect((await runUpdate(sb)).code).toBe(0);
+    const log = sb.readLog();
+    const old = log.indexOf(`archive --local sha256:${'1'.repeat(64)} ${sb.repo}`);
+    const next = log.indexOf(`archive --local sha256:${'2'.repeat(64)} ${sb.repo}`);
+    const build = log.indexOf(' build');
+    expect(old).toBeGreaterThan(-1);
+    expect(old).toBeLessThan(build);
+    expect(next).toBeGreaterThan(build);
+    expect(next).toBeLessThan(log.indexOf('systemctl restart'));
+  });
+
+  it('refuses to restart if the new local capsule cannot be archived', async () => {
+    const sb = sandbox();
+    writeFileSync(join(sb.deploy, 'ruleset-cache.mjs'), `if(process.argv[3] === 'sha256:${'2'.repeat(64)}')process.exit(1);`);
+    const res = await runUpdate(sb);
+    expect(res.code).toBe(1);
+    expect(res.stderr).toContain('E_RULESET_CACHE');
+    expect(sb.readLog()).not.toContain('systemctl restart');
+  });
+
   it('BRANCH из окружения перебивает текущую ветку', async () => {
     const sb = sandbox({ branch: 'playtest' });
     await runUpdate(sb, { BRANCH: 'main' });
@@ -196,7 +223,7 @@ describe('deploy/update.sh — сборка из исходников', () => {
 
     expect(res.code).toBe(1);
     const log = sb.readLog();
-    expect(log).toContain('docker[VOID_IMAGE=] tag sha256:prev-image moongame-server:local');
+    expect(log).toContain('docker[VOID_IMAGE=] tag sha256:1111111111111111111111111111111111111111111111111111111111111111 moongame-server:local');
     expect(log.match(/^systemctl restart moongame$/gm)).toHaveLength(2);
   });
 });
@@ -205,13 +232,13 @@ describe('deploy/update.sh — путь подписанного образа', 
   it('refuses missing recovery readiness before pull/migration/restart, preserving configuration', async () => {
     const before = 'PROD=1\nDB_AUTO_MIGRATE=0\nDB_REQUIRE_LEAST_PRIVILEGE=1\n';
     const sb = sandbox({ serverEnv: before });
-    const res = await runUpdate(sb, { PROD: '1', VOID_IMAGE: 'ghcr.io/x/y@sha256:deadbeef' });
+    const res = await runUpdate(sb, { PROD: '1', VOID_IMAGE: 'ghcr.io/x/y@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd' });
     expect(res.code).toBe(1);
     expect(res.stderr).toContain('E_DEPLOY_BACKUP_CHECK');
     expect(sb.readLog()).not.toMatch(/docker\[|systemctl/);
     expect(sb.readEnvFile()).toBe(before);
   });
-  const IMAGE = 'ghcr.io/moongametechnology/moongame@sha256:deadbeef';
+  const IMAGE = 'ghcr.io/moongametechnology/moongame@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
 
   it('непроверенная подпись → сервер не тронут', async () => {
     const sb = sandbox({ verifyExit: 1 });
@@ -222,6 +249,17 @@ describe('deploy/update.sh — путь подписанного образа', 
     expect(log).toContain(`verify-image ${IMAGE}`);
     expect(log).not.toContain('docker[');
     expect(log).not.toContain('systemctl');
+  });
+
+  it('archives a signed capsule in the git-clone cache before restarting', async () => {
+    const sb = sandbox();
+    writeFileSync(join(sb.deploy, 'ruleset-cache.mjs'), String.raw`import {appendFileSync} from 'node:fs'; appendFileSync(process.env.LOG, 'archive ' + process.argv.slice(2).join(' ') + '\n');`);
+    const res = await runUpdate(sb, { VOID_IMAGE: IMAGE });
+    expect(res.code, res.stderr).toBe(0);
+    const log = sb.readLog();
+    const archive = log.indexOf(`archive ${IMAGE} ${sb.repo}`);
+    expect(archive).toBeGreaterThan(log.indexOf(`verify-image ${IMAGE}`));
+    expect(archive).toBeLessThan(log.indexOf(`docker[VOID_IMAGE=${IMAGE}] compose`));
   });
 
   it('подпись подтверждена → образ поднят и записан как последний хороший', async () => {
@@ -252,7 +290,7 @@ describe('deploy/update.sh — путь подписанного образа', 
 });
 
 describe('deploy/update.sh — миграция схемы при DB_AUTO_MIGRATE=0 (SE-3.1)', () => {
-  const IMAGE = 'ghcr.io/moongametechnology/moongame@sha256:deadbeef';
+  const IMAGE = 'ghcr.io/moongametechnology/moongame@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
   const MIGRATE = 'database-admin.mjs migrate';
 
   it('по умолчанию мигратор не запускается: схему меняет сам сервер', async () => {
@@ -432,7 +470,7 @@ describe('update.sh — добор недостающих ключей server.en
   it('добирает ключи и на пути подписанного образа (рекомендованном)', async () => {
     // Иначе OPS-2 чинил бы только менее безопасную сборку из исходников.
     const sb = sandbox({ serverEnv: '# пусто\n' });
-    await runUpdate(sb, { VOID_IMAGE: 'ghcr.io/x/y@sha256:deadbeef' });
+    await runUpdate(sb, { VOID_IMAGE: 'ghcr.io/x/y@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd' });
     const env = sb.readEnvFile();
     expect(env).toMatch(/^TIME_SCALE=100$/m);
     expect(env).toMatch(/^AUTH_JWT_SECRET=[0-9a-f]{64}$/m);
@@ -444,7 +482,7 @@ describe('update.sh — добор недостающих ключей server.en
     // вошли бы прежним способом — дописанный секрет переводит сервер на аккаунты.
     const before = '# старая установка\nPORT=8788\n';
     const sb = sandbox({ serverEnv: before, healthFailFirst: 99 });
-    await runUpdate(sb, { VOID_IMAGE: 'ghcr.io/x/y@sha256:deadbeef' });
+    await runUpdate(sb, { VOID_IMAGE: 'ghcr.io/x/y@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd' });
     expect(sb.readEnvFile()).toBe(before);
   });
 

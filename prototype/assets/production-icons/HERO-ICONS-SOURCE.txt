@@ -1,0 +1,187 @@
+Hero icon proposal: official unmodified Phosphor duotone SVG assets.
+https://github.com/phosphor-icons/core/tree/2b75f3ad12b420c9504ef05df8d2564a28f8500e
+MIT: PHOSPHOR-LICENSE.txt
+{
+  "abilities": {
+    "corridor": [
+      "path",
+      "violet"
+    ],
+    "annihilate": [
+      "star-four",
+      "red"
+    ],
+    "rally": [
+      "flag-banner",
+      "gold"
+    ],
+    "scan": [
+      "scan",
+      "cyan"
+    ],
+    "recall": [
+      "arrow-u-up-left",
+      "cyan"
+    ],
+    "bulwark": [
+      "shield-check",
+      "blue"
+    ],
+    "boarding_translocation": [
+      "arrows-in",
+      "orange"
+    ],
+    "diplomatic_landing": [
+      "handshake",
+      "green"
+    ],
+    "warp_jump": [
+      "shooting-star",
+      "violet"
+    ],
+    "decoy_signal": [
+      "waveform",
+      "violet"
+    ],
+    "hive_call": [
+      "hexagon",
+      "green"
+    ],
+    "devour": [
+      "planet",
+      "red"
+    ]
+  },
+  "skills": {
+    "neural_lace": [
+      "brain",
+      "violet"
+    ],
+    "overclocked_helm": [
+      "cpu",
+      "orange"
+    ],
+    "corridor_sustained": [
+      "hourglass",
+      "violet"
+    ],
+    "corridor_open": [
+      "share-network",
+      "violet"
+    ],
+    "void_attunement": [
+      "spiral",
+      "violet"
+    ],
+    "psi_veil": [
+      "eye-closed",
+      "violet"
+    ],
+    "psi_weak_points": [
+      "crosshair-simple",
+      "red"
+    ],
+    "psi_evasion": [
+      "wind",
+      "cyan"
+    ],
+    "fleet_uplink": [
+      "plugs-connected",
+      "cyan"
+    ],
+    "void_translocator": [
+      "arrows-out-cardinal",
+      "violet"
+    ],
+    "false_echo": [
+      "copy",
+      "violet"
+    ],
+    "wreck_rig": [
+      "recycle",
+      "green"
+    ],
+    "wreck_battery": [
+      "crosshair",
+      "orange"
+    ],
+    "wreck_shears": [
+      "scissors",
+      "green"
+    ],
+    "wreck_foundry": [
+      "factory",
+      "orange"
+    ],
+    "wreck_mastery": [
+      "medal",
+      "gold"
+    ],
+    "command_relay": [
+      "broadcast",
+      "gold"
+    ],
+    "command_grid": [
+      "graph",
+      "gold"
+    ],
+    "asteroid_navigation": [
+      "compass",
+      "cyan"
+    ]
+  },
+  "passives": {
+    "vanguard_impulse": [
+      "lightning",
+      "orange"
+    ],
+    "rally_beacon": [
+      "flag",
+      "gold"
+    ],
+    "convoy_impulse": [
+      "fast-forward",
+      "cyan"
+    ],
+    "wreck_optics": [
+      "binoculars",
+      "cyan"
+    ],
+    "wreck_guns": [
+      "crosshair",
+      "orange"
+    ],
+    "wreck_cutters": [
+      "scissors",
+      "green"
+    ],
+    "wreck_barrels": [
+      "cylinder",
+      "orange"
+    ],
+    "wreck_mastery_salvage": [
+      "recycle",
+      "gold"
+    ],
+    "wreck_mastery_guns": [
+      "target",
+      "gold"
+    ],
+    "asteroid_pilot": [
+      "steering-wheel",
+      "cyan"
+    ],
+    "field_lab": [
+      "flask",
+      "green"
+    ],
+    "ballistic_model": [
+      "chart-line",
+      "orange"
+    ],
+    "swarm_instinct": [
+      "dna",
+      "violet"
+    ]
+  }
+}

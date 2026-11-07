@@ -495,10 +495,10 @@ clickSide({ act: 'tab', arg: 'ships' });
 assert.ok(sideEl.innerHTML.includes('data-act="openunits"'), 'a unit tab offers its catalog');
 assert.ok(!sideEl.innerHTML.includes('data-codex="u:'), 'the panel no longer carries a second catalog');
 clickSide({ act: 'openunits', arg: 'ships' });
-assert.ok(getEl('buildwin').classList.contains('show'), 'the entry opens the production window');
-assert.ok(getEl('buildwinbody').innerHTML.includes('data-unit-info='), 'units, not buildings');
-for (const handle of (listeners.get(getEl('buildwin')) ?? {}).click ?? [])
-  handle({ target: getEl('buildwin') });
+assert.ok(getEl('constructor').classList.contains('show'), 'the entry opens the production window');
+assert.ok(getEl('constructor').innerHTML.includes('data-cnhull='), 'units, not buildings');
+for (const handle of (listeners.get(getEl('constructor')) ?? {}).click ?? [])
+  handle({ target: getEl('constructor') });
 console.log('Unit production entry OK');
 for (const fn2 of sideClicks)
   fn2({

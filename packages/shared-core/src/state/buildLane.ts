@@ -2,14 +2,14 @@ import type { GameData, UnitDef } from '../data/schemas';
 
 /**
  * ПОЛОСА КОНВЕЙЕРА мира (BLD-2.1). На мире идёт ОДНА стройка на полосу, остальное ждёт
- * в `Planet.buildQueue` (BLD-1). Полос пять, и они независимы:
+ * в `Planet.buildQueue` (BLD-1). Полос четыре, и они независимы:
  *
  *   · `buildings` — здание и апгрейд: они спорят за одну стройплощадку;
  *   · `ships`     — корабли верфи;
  *   · `shuttles`  — челноки космопорта (десантный челнок с бойцом — тоже здесь: его
  *                   собирает порт, казармы он не занимает);
- *   · `infantry`  — пехота казарм (у роя — улья);
- *   · `vehicles`  — техника завода.
+ *   · `mobilization` — пехота, техника и герои в общей FIFO-очереди.
+ * Legacy infantry/vehicles pump events are accepted when restoring old saves.
  *
  * До BLD-2.1 все юниты стояли в одной полосе `units`, и пехота ждала крейсер. Полоса
  * юнита — это ЕГО ПРОИЗВОДСТВЕННАЯ ПОСТРОЙКА, и решается она по тем же полям данных,
@@ -20,15 +20,14 @@ import type { GameData, UnitDef } from '../data/schemas';
  * Чистая функция данных: её же читает клиент, чтобы нарисовать заказ в том конвейере,
  * где ядро его и ведёт.
  */
-export type BuildLane = 'buildings' | 'ships' | 'shuttles' | 'infantry' | 'vehicles';
+export type BuildLane = 'buildings' | 'ships' | 'shuttles' | 'mobilization' | 'infantry' | 'vehicles';
 
 /** Полосы юнитов в фиксированном порядке. Порядок значим: в нём будятся полосы после
  *  освобождения (детерминизм), и в нём же клиент рисует конвейеры. */
 export const UNIT_LANES = [
   'ships',
   'shuttles',
-  'infantry',
-  'vehicles',
+  'mobilization',
 ] as const satisfies readonly BuildLane[];
 
 /** Все полосы мира: стройка первой, потом юниты. */
@@ -43,7 +42,7 @@ export function isBuildLane(v: unknown): v is BuildLane {
 export function unitLane(def: Pick<UnitDef, 'domain' | 'kind' | 'traits'> | undefined): BuildLane {
   if (!def) return 'ships';
   if (def.traits.includes('shuttle')) return 'shuttles';
-  if (def.domain === 'ground') return def.kind === 'vehicle' ? 'vehicles' : 'infantry';
+  if (def.domain === 'ground') return 'mobilization';
   return 'ships';
 }
 

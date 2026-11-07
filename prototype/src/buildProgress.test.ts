@@ -17,7 +17,7 @@ const HOUR = 3_600_000;
 const data = {
   units: {
     cruiser: { buildTimeHours: 4, domain: 'space', traits: [] },
-    trooper: { buildTimeHours: 1, domain: 'ground', kind: 'infantry', traits: [] },
+    trooper: { buildTimeHours: 1, domain: 'ground', kind: 'mobilization', traits: [] },
   },
   buildings: {
     mine: {
@@ -55,7 +55,7 @@ describe('стройка — что это за нагрузка', () => {
 
   it('юнит идёт полосой своей постройки, здания и апгрейды — общей (BLD-2.1)', () => {
     expect(laneOfPayload(build({ kind: 'unit', unit: 'cruiser' }), data)).toBe('ships');
-    expect(laneOfPayload(build({ kind: 'unit', unit: 'trooper' }), data)).toBe('infantry');
+    expect(laneOfPayload(build({ kind: 'unit', unit: 'trooper' }), data)).toBe('mobilization');
     expect(laneOfPayload(build({ kind: 'building' }), data)).toBe('buildings');
     expect(laneOfPayload(build({ kind: 'upgrade', level: 2 }), data)).toBe('buildings');
   });
@@ -86,7 +86,7 @@ describe('стройка — какая идёт сейчас', () => {
     expect(activeConstruction(s, 'C1R1', 'ships', data)?.at).toBe(1000);
     expect(activeConstruction(s, 'C1R1', 'buildings', data)?.at).toBe(2000);
     // Пехота — своя полоса казарм: она не становится «идущей» на верфи.
-    expect(activeConstruction(s, 'C1R1', 'infantry', data)?.at).toBe(500);
+    expect(activeConstruction(s, 'C1R1', 'mobilization', data)?.at).toBe(500);
   });
 
   it('события ДРУГОГО вида в расписании игнорируются', () => {
@@ -105,6 +105,16 @@ describe('стройка — какая идёт сейчас', () => {
 });
 
 describe('стройка — сколько она длится', () => {
+  it.each([1, 2])('сохраняет старую полосу и принятый новый срок при множителе часов ×%i', (factor) => {
+    const match = { pricing: { hours: factor, buildingHours: 3, unitHours: 2 } };
+    const old = { at: 6 * factor * HOUR, seq: 1, payload: build() };
+    expect(progressPct(old, 3 * factor * HOUR, data, HOUR, match)).toBe(50);
+    const pinned = build({ durationHours: 18 * factor });
+    expect(buildDurationHours(pinned, data, match)).toBe(18 * factor);
+    expect(progressPct({ at: 18 * factor * HOUR, seq: 2, payload: pinned },
+      9 * factor * HOUR, data, HOUR, match)).toBe(50);
+  });
+
   it('юнит берёт своё время из данных', () => {
     expect(buildDurationHours(build({ kind: 'unit', unit: 'cruiser' }), data)).toBe(4);
   });

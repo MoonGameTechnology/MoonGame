@@ -13,9 +13,7 @@ import {
   buildFx,
   buildRowState,
   buildScreenHtml,
-  initBuildScreen,
   unitScreenHtml,
-  type BuildHost,
 } from './buildScreen';
 
 // Локаль прибита к RU (как в format.test.ts): у Node нет языка браузера, рантайм
@@ -424,178 +422,11 @@ describe('окно построек — разметка', () => {
   });
 });
 
-describe('окно построек — проводка', () => {
-  function fakeEl(): HTMLElement & {
-    fire: (t: unknown) => void;
-    shown: () => boolean;
-    html: () => string;
-  } {
-    let handler: ((ev: unknown) => void) | null = null;
-    const classes = new Set<string>();
-    const el = {
-      innerHTML: '',
-      classList: {
-        add: (c: string) => classes.add(c),
-        remove: (c: string) => classes.delete(c),
-        contains: (c: string) => classes.has(c),
-      },
-      querySelector: () => null,
-      querySelectorAll: () => [],
-      addEventListener: (_t: string, h: (ev: unknown) => void) => {
-        handler = h;
-      },
-      fire: (target: unknown) => handler?.({ target }),
-      shown: () => classes.has('show'),
-      html: () => (el as { innerHTML: string }).innerHTML,
-    };
-    return el as unknown as ReturnType<typeof fakeEl>;
-  }
-
-  const tap = (sel: string, dataset: Record<string, string> = {}): unknown => ({
-    classList: { contains: () => false },
-    closest: (q: string) => (q === sel ? { dataset } : null),
-  });
-
-  function wire() {
-    const root = fakeEl();
-    const body = fakeEl();
-    const s = newGame();
-    const built: Array<[string, string]> = [];
-    const upgraded: Array<[string, string]> = [];
-    const opened: string[] = [];
-    const host: BuildHost = {
-      root: () => root,
-      body: () => body,
-      state: () => s,
-      me: () => 'p1',
-      probe: (a) => canOrder(s, a),
-      localQueued: () => false,
-      build: (pid, id) => built.push([pid, id]),
-      upgrade: (pid, id) => upgraded.push([pid, id]),
-      repair: () => {},
-      unitIds: () => ['militia'],
-      buildUnit: (pid, id) => built.push([pid, id]),
-      openUnitInfo: (id) => opened.push(id),
-      openInfo: (id) => opened.push(id),
-      lockText,
-      openTech: (id) => opened.push(`tech:${id}`),
-      dossierBody: () => 'описание',
-    };
-    return { api: initBuildScreen(host), root, body, s, built, upgraded, opened };
-  }
-
-  it('units reuse the catalog and send a unit order, without opening the dossier', () => {
-    const { api, root, body, s, built, opened } = wire();
-    api.open(home(s), 'ground');
-    expect(body.html()).toContain('bw-list');
-    expect(body.html()).toContain('data-unit-info="militia"');
-    root.fire(tap('[data-unit-go]', { unitGo: 'militia' }));
-    expect(built).toEqual([[home(s), 'militia']]);
-    expect(opened).toEqual([]);
-  });
-
-  it('open() красит тело для нужного мира и показывает окно', () => {
-    const { api, root, body, s } = wire();
-    api.open(home(s));
-    expect(root.shown()).toBe(true);
-    expect(body.html()).toContain('bw-list');
-  });
-
-  it('кнопка в строке заказывает и НЕ открывает карточку поверх', () => {
-    const { api, root, s, built, opened } = wire();
-    api.open(home(s));
-    root.fire(tap('[data-bw-go]', { bwGo: 'refinery' }));
-    expect(built).toEqual([[home(s), 'refinery']]);
-    expect(opened).toEqual([]);
-  });
-
-  it('«Улучшить» в строке улучшает и НЕ открывает карточку поверх', () => {
-    const { api, root, s, built, upgraded, opened } = wire();
-    api.open(home(s));
-    root.fire(tap('[data-bw-up]', { bwUp: 'mine' }));
-    expect(upgraded).toEqual([[home(s), 'mine']]);
-    expect(built).toEqual([]);
-    expect(opened).toEqual([]);
-  });
-
-  it('тап по строке открывает карточку здания', () => {
-    const { api, root, s, opened } = wire();
-    api.open(home(s));
-    root.fire(tap('[data-bw]', { bw: 'fort' }));
-    expect(opened).toEqual(['fort']);
-  });
-
-  it('«Исследовать» запертой строки ведёт в досье технологии и НЕ открывает карточку', () => {
-    const { api, root, s, opened } = wire();
-    api.open(home(s), 'ground');
-    root.fire(tap('[data-bw-tech]', { bwTech: 'militia_training' }));
-    expect(opened).toEqual(['tech:militia_training']);
-    // Окно стройки остаётся под окном технологий: закрыл досье — вернулся к строке.
-    expect(api.isOpen()).toBe(true);
-  });
-
-  it('крестик закрывает окно', () => {
-    const { api, root, s } = wire();
-    api.open(home(s));
-    root.fire({ classList: { contains: (c: string) => c === 'tw-close' }, closest: () => null });
-    expect(api.isOpen()).toBe(false);
-  });
-
-  it('тап по вкладке переключает фильтр категорий', () => {
-    const { api, root, s, body } = wire();
-    api.open(home(s));
-    // по умолчанию «все» — шахта (экономика) видна
-    expect(body.html()).toContain('data-bw="mine"');
-    // тап по вкладке «оборона»
-    root.fire(tap('[data-bwtab]', { bwtab: 'defense' }));
-    expect(body.html()).toContain('data-bwtab="defense"');
-    // экономика скрыта на активной вкладке обороны
-    expect(body.html()).not.toContain('data-bw="mine"');
-    // тап по «все» возвращает экономику
-    root.fire(tap('[data-bwtab]', { bwtab: '*' }));
-    expect(body.html()).toContain('data-bw="mine"');
-  });
-});
-
-// Подключение к хосту живёт в main.ts без юнит-обвязки — сканом исходника, как в
-// cmdVisibility.test.ts: кнопка панели, ступень Back и живая перерисовка кадра.
-describe('окно построек — подключение к main.ts', () => {
-  const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-
-  it('кнопка «Построить» панели открывает окно выбранного мира', () => {
-    // Нажатия листа — у хозяина боковой панели (`sidePanel.ts`, REFM-225), окно — хуком.
-    const panel = readFileSync(new URL('./sidePanel.ts', import.meta.url), 'utf8');
-    expect(panel).toContain("act === 'openbuild'");
-    expect(panel).toContain('game.buildWin().open(selPlanet!)');
-    expect(src).toContain('buildWin: () => buildWin,');
-  });
-
-  it('окно стоит в лестнице Android-Back', () => {
-    expect(src).toMatch(
-      /id: 'buildwin',\s*isOpen: \(\) => buildWinEl\.classList\.contains\('show'\)/,
-    );
-  });
-
-  it('кадровый цикл держит открытое окно живым (стройка достраивается на глазах)', () => {
-    // Дроссель вынесен в `liveWindows.ts` (REFM-194); сторож проверяет ту же связку —
-    // окно открыто, отметка СВОЯ (`lastBuildAt`), срок — полсекунды окон с прогрессом.
-    expect(src).toContain('repaintDue(buildWin.isOpen(), nowReal, lastBuildAt, PROGRESS_MS)');
-  });
-
-  it('заказ идёт хостовым путём enqueueBuild — сеть и соло не разъезжаются', () => {
-    expect(src).toMatch(
-      /build: \(pid, id\) => enqueueBuild\(pid, \{ kind: 'building', id, count: 1 \}\)/,
-    );
-  });
-
-  it('улучшение — тем же enqueueBuild, что «Улучшить» в карточке здания', () => {
-    expect(src).toMatch(
-      /upgrade: \(pid, id\) => enqueueBuild\(pid, \{ kind: 'upgrade', id, count: 1 \}\)/,
-    );
-    // Мир карточки — `codexWorld()`: из хаба выбранного мира нет (справочник поверх хаба).
-    // Карточка здания — у справки (`helpCenter.ts`, REFM-221).
-    const help = readFileSync(new URL('./helpCenter.ts', import.meta.url), 'utf8');
-    expect(help).toContain("enqueueBuild(world, { kind: 'upgrade', id: upg, count: 1 })");
+describe('unified production entry', () => {
+  it('routes the planet entry to the shared workspace, retaining its planet', () => {
+    const source = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    expect(source).toContain("shipyard.open(units === 'ground' ? 'infantry'");
+    expect(source).not.toContain('initBuildScreen(');
   });
 });
 

@@ -7,6 +7,7 @@ import {
   activeHeroCount,
   heroActiveCap,
   matchHours,
+  matchUnitHours,
   createKernel,
   heroModule,
 } from '../../packages/shared-core/src/index';
@@ -20,7 +21,7 @@ function ready() {
   const state = newGame({ mapId: 'duel-1', seats: networkSeats('ffa', 'duel-1') });
   state.players.p1!.technologies!.completed.push('signal_corps', 'flagship_command');
   const heroes = Object.values(state.heroes!).filter((h) => h.owner === 'p1');
-  return { state, heroes, duration: matchHours(state, data.units.hero!.buildTimeHours) * HOUR };
+  return { state, heroes, duration: matchUnitHours(state, data.units.hero!.buildTimeHours) * HOUR };
 }
 
 describe('main-game hero mobilization', () => {
@@ -135,12 +136,12 @@ describe('main-game hero mobilization', () => {
     const before = staff.paneHtml();
     // Отсчёт — живой узел (`liveTimers.ts`): цифры ставит патч, разметка с часами не меняется.
     const seen = (html: string): string => liveText(html, current.time);
-    expect(seen(before)).toContain('Мобилизация: 20:00:00');
+    expect(seen(before)).toContain('Мобилизация: 40:00:00');
     expect(before).toContain(t('hero.hq.deployed-count', { a: 1, c: 1 }));
     expect(before).not.toContain(`data-hspawn="${heroes[0]!.id}"`);
     current = advance(current, 1000).state;
     expect(staff.paneHtml()).toBe(before);
-    expect(seen(before)).toContain('Мобилизация: 19:59:59');
+    expect(seen(before)).toContain('Мобилизация: 39:59:59');
     expect(techFx(data.technologies.hero_command_ii!)).toContain('+1 слот героя');
     expect(techFx(data.technologies.hero_command_ii!)).not.toContain('100%');
   });

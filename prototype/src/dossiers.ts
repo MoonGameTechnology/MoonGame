@@ -1,3 +1,4 @@
+import { comparisonHtml, resourceComparisonHtml } from './productionComparison';
 /**
  * Object dossiers + the build/unit codex (REFM-4).
  *
@@ -27,7 +28,8 @@ import {
   buildingMaxLevel,
   matchCost,
   matchUnitCost,
-  matchHours,
+  matchBuildingHours,
+  matchUnitHours,
   thresholdRamp,
   signatureSize,
   TURNED_HOURS,
@@ -658,7 +660,7 @@ export function createDossiers(host: DossierHost): {
    *  ('u'). BUILD-1: карточка здания принимает УРОВЕНЬ — цифры и цена считаются для
    *  него, а листалка уровней (когда их больше одного) даёт посмотреть, что даст
    *  прокачка, ДО того как за неё заплачено. */
-  function codexHtml(kind: string, id: string, level = 1): string {
+  function codexHtml(kind: string, id: string, level = 1, referenceLevel = level): string {
     if (kind === 'm') {
       // ONB-4 glossary article — a short mechanic/term explainer. Terms named in its
       // text are live words with their own tooltip (UIX-9.4).
@@ -675,40 +677,36 @@ export function createDossiers(host: DossierHost): {
       const maxLvl = 1 + (def.upgrades?.length ?? 0);
       const shown = Math.min(Math.max(1, level), maxLvl);
       const lv = buildingLevel(def, shown);
+      const ref = buildingLevel(def, Math.min(maxLvl, Math.max(1, referenceLevel)));
       // Цена и срок — ЭТОГО уровня: вход для L1, апгрейд для L2+ (то же поле, из
       // которого платит ядро, — buildingLevel сводит их одинаково).
       const rows = [
-        cxRow(t('codex.row.cost'), cost(matchCost(host.state(), lv.cost), treasury())),
-        cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: matchHours(host.state(), lv.buildTimeHours ?? 0) })),
-        cxRow(t('codex.row.hp'), String(lv.hp ?? 0)),
+        cxRow(t('codex.row.cost'), resourceComparisonHtml(matchCost(host.state(), lv.cost), matchCost(host.state(), ref.cost), undefined, true)),
+        cxRow(t('codex.row.build-time'), comparisonHtml(matchBuildingHours(host.state(), lv.buildTimeHours ?? 0), matchBuildingHours(host.state(), ref.buildTimeHours ?? 0), t('codex.value.hours', { n: matchBuildingHours(host.state(), lv.buildTimeHours ?? 0) }), true)),
+        cxRow(t('codex.row.hp'), comparisonHtml(lv.hp ?? 0, ref.hp ?? 0)),
       ];
       // Ресурс — иконкой и цветом (UI-RES2): карточка читается так же, как ценник
       // над ней и капсулы бара, а не переводом слова обратно в ресурс.
-      const prod = resLine(lv.produces ?? {}, { per: 'h' });
+      const prod = resourceComparisonHtml(lv.produces ?? {}, ref.produces ?? {}, 'h');
       if (prod) rows.push(cxRow(t('codex.row.produces'), prod));
       // Содержание здания лежит в данных за сутки, выработка — за час.
-      const keep = resLine(lv.upkeep ?? {}, { per: 'd' });
+      const keep = resourceComparisonHtml(lv.upkeep ?? {}, ref.upkeep ?? {}, 'd', true);
       if (keep) rows.push(cxRow(t('codex.row.upkeep'), keep));
       if ((lv.defenseBonus ?? 0) > BASE_BUILDING_DEFENSE)
         rows.push(
-          cxRow(t('codex.row.world-mitigation'), `−${Math.round((lv.defenseBonus ?? 0) * 100)}%`),
+          cxRow(t('codex.row.world-mitigation'), comparisonHtml(lv.defenseBonus ?? 0, ref.defenseBonus ?? 0, `−${Math.round((lv.defenseBonus ?? 0) * 100)}%`)),
         );
-      if ((lv.aaDamage ?? 0) > 0) rows.push(cxRow(t('codex.row.aa'), String(lv.aaDamage)));
+      if ((lv.aaDamage ?? 0) > 0) rows.push(cxRow(t('codex.row.aa'), comparisonHtml(lv.aaDamage!, ref.aaDamage ?? 0)));
       if ((lv.radarRange ?? 0) > 0) {
-        rows.push(cxRow(t('codex.row.radar'), String(lv.radarRange)));
-        rows.push(cxRow(t('codex.row.radar-level'), String(lv.radarLevel)));
+        rows.push(cxRow(t('codex.row.radar'), comparisonHtml(lv.radarRange!, ref.radarRange ?? 0)));
+        rows.push(cxRow(t('codex.row.radar-level'), comparisonHtml(lv.radarLevel!, ref.radarLevel ?? 0)));
         rows.push(cxRow(t('codex.row.radar-detects'), radarDetects(lv.radarLevel)));
       }
       if ((def.scoreValue ?? 0) > 0 && host.victoryPoints())
         rows.push(
           cxRow(t('codex.row.score'), t('codex.value.per-level', { n: buildingScorePerLevel(def.scoreValue ?? 0, host.state().match.buildingScoreDivisor ?? 1) })),
         );
-      rows.push(
-        cxRow(
-          t('codex.row.levels'),
-          maxLvl > 1 ? t('codex.value.levels-upgradable', { n: maxLvl }) : '1',
-        ),
-      );
+
       const dos = buildingDossier(id, shown);
       // Листалка уровней: кнопка на каждый уровень, открытый подсвечен. Появляется
       // только у зданий с прокачкой — «I» в одиночестве ничего не листает.
@@ -723,7 +721,7 @@ export function createDossiers(host: DossierHost): {
         `<div class="cx-head"><span class="cx-ic">${BUILD_ICON[id] ?? '▣'}</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('codex.tag.building')}</span></div>` +
         catalogPortraitHtml('b', id, data) +
         pager +
-        `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${dos?.body ?? ''}</div>`
+        `<details class="pw-section" open><summary>${t('yard.stats')}</summary><div class="cx-stats">${rows.join('')}</div></details><details class="pw-section"><summary>${t('production.features')}</summary><div class="cx-desc">${dos?.body ?? ''}</div></details>`
       );
     }
     // ARS-5: module/hero-fitting cards deep-link here too — the arsenal witryna is the
@@ -748,7 +746,7 @@ export function createDossiers(host: DossierHost): {
     const st = def.stats;
     const rows = [
       cxRow(t('codex.row.cost'), cost(matchUnitCost(host.state(), def), treasury())),
-      cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: matchHours(host.state(), def.buildTimeHours ?? 0) })),
+      cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: matchUnitHours(host.state(), def.buildTimeHours ?? 0) })),
       cxRow(t('codex.row.atk-def'), `${st.attack ?? 0} / ${st.defense ?? 0}`),
       cxRow(t('codex.row.hull'), String(st.hp ?? 0)),
     ];
@@ -785,9 +783,9 @@ export function createDossiers(host: DossierHost): {
     return (
       `<div class="cx-head"><span class="cx-ic">${unitIconHtml(id, data, host.youColor(), 24)}</span><b>${esc(dos?.name ?? displayUnit(id))}</b><span class="cx-tag">${def.domain === 'ground' ? t('codex.tag.ground-unit') : t('codex.tag.ship')}</span></div>` +
       catalogPortraitHtml('u', id, data) +
-      `<div class="cx-stats">${rows.join('')}</div>` +
+      `<details class="pw-section" open><summary>${t('yard.stats')}</summary><div class="cx-stats">${rows.join('')}</div></details>` +
       unitDamageHtml(unitDamageProfile(def, st)) +
-      `<div class="cx-desc">${dos?.body ?? ''}</div>`
+      `<details class="pw-section"><summary>${t('production.features')}</summary><div class="cx-desc">${dos?.body ?? ''}</div></details>`
     );
   }
 
