@@ -72,7 +72,7 @@ SEC-9: ReDoS `js/polynomial-redos` в `packages/server/src/authApi.ts` снят 
 
 - **Semgrep** — инлайн-комментарий на строке находки:
   `// nosemgrep: <rule-id> -- причина`. Работает и снимает результат из SARIF (проверено
-  на `no-sql-string-interpolation` в `packages/server/src/store/postgres.ts`).
+  на `no-sql-string-interpolation` в `packages/server/src/store/postgres/`).
   Оговорка из SEC-2: для AST-правил (`patterns:`) GitHub Code Scanning не всегда уважает
   inSource-suppression на new-alert чеке PR'а — там законный выход это `paths: exclude:`
   в самом правиле (`.semgrep/rules/no-innerhtml-assignment.yaml` — единственный такой

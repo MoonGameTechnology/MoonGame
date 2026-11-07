@@ -27,7 +27,7 @@
  *    последовательности возвращаются как есть: молчаливая порча ника — своя ошибка,
  *    просто не такая громкая, как инъекция.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { createInitialState } from '@void/shared-core';
@@ -50,8 +50,14 @@ const DB = process.env.DATABASE_URL;
 // КОНСТАНТА-перечень колонок. Сторож читает исходник и проверяет это сам, поэтому
 // новое подавление, поставленное над чем угодно другим, роняет тест, а не проезжает
 // мимо. База здесь не нужна: это вопрос о форме кода.
+/** Исходники Postgres-хранилищ: с SLIM-5 это файлы `store/postgres/` по доменам. */
+const PG_SOURCES = readdirSync(new URL('./postgres/', import.meta.url))
+  .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+  .sort()
+  .map((name) => `./postgres/${name}`);
+
 describe('SD-1.3 — в шаблон запроса попадают только списки колонок', () => {
-  const src = readFileSync(new URL('./postgres.ts', import.meta.url), 'utf8');
+  const src = PG_SOURCES.map((rel) => readFileSync(new URL(rel, import.meta.url), 'utf8')).join('\n');
   /** Литералы модульных констант: `const NAME = '…'` (возможно, с переносом строки). */
   const consts = new Map<string, string>();
   for (const m of src.matchAll(/^const ([A-Z][A-Z0-9_]*) =\s*\n?\s*'([^']*)'/gm))
@@ -87,7 +93,7 @@ describe('SD-1.3 — склейка запроса не проходит и ло
   const patterns = [...yaml.matchAll(/- pattern-regex: '((?:[^']|'')*)'/g)].map(
     (m) => new RegExp(m[1]!.replaceAll("''", "'")),
   );
-  const sources = ['./postgres.ts', '../metaMarket.ts'].map((rel) => ({
+  const sources = [...PG_SOURCES, '../metaMarket.ts'].map((rel) => ({
     rel,
     text: readFileSync(new URL(rel, import.meta.url), 'utf8'),
   }));

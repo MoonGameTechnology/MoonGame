@@ -1,6 +1,7 @@
+/** В памяти: арсенал игрока и выпавшая добыча (SLIM-5). */
+import { memoryEconomyLock, type MemoryEconomyLock } from '../../memoryEconomyLock';
+import type { DropStore, OwnedArsenalItem, ArsenalStore } from '../types';
 import type { ArsenalItem } from '@void/shared-core';
-import type { OwnedArsenalItem, ArsenalStore } from './types';
-import { memoryEconomyLock } from '../memoryEconomyLock';
 
 /** In-memory arsenal store (ARS-2) — `itemId → owned item`, plus the structural
  *  invariants: idempotent grant (first write wins), owner-guarded transfer/consume,
@@ -78,5 +79,51 @@ export class MemoryArsenalStore implements ArsenalStore {
       row.durability = Math.max(0, row.durability - by);
       return { durability: row.durability };
     });
+  }
+}
+
+/** In-memory drop-loop store (ARS-4): exactly-once per-(match, account) roll claims,
+ *  the pity counter and the salvage-shard balance. */
+export class MemoryDropStore implements DropStore {
+  private claims = new Set<string>();
+  private pity = new Map<string, number>();
+  private shards = new Map<string, number>();
+  private lock: MemoryEconomyLock = memoryEconomyLock(this);
+
+  bindEconomyLock(owner: object): void { this.lock = memoryEconomyLock(owner); }
+  snapshotState(): { claims: string[]; pity: Array<[string, number]>; shards: Array<[string, number]> } {
+    return { claims: [...this.claims], pity: [...this.pity], shards: [...this.shards] };
+  }
+  restoreState(state: ReturnType<MemoryDropStore['snapshotState']>): void {
+    this.claims = new Set(state.claims);
+    this.pity = new Map(state.pity);
+    this.shards = new Map(state.shards);
+  }
+  claim(matchId: string, accountId: string): Promise<boolean> {
+    return this.lock.run(async () => {
+      const key = JSON.stringify([matchId, accountId]);
+      if (this.claims.has(key)) return false;
+      this.claims.add(key);
+      return true;
+    });
+  }
+  pityOf(accountId: string): Promise<number> {
+    return this.lock.run(async () => this.pity.get(accountId) ?? 0);
+  }
+  setPity(accountId: string, value: number): Promise<void> {
+    return this.lock.run(async () => { this.pity.set(accountId, value); });
+  }
+  stepPity(accountId: string, hit: boolean, pityAfter: number): Promise<number> {
+    return this.lock.run(async () => {
+      const pity = this.pity.get(accountId) ?? 0;
+      this.pity.set(accountId, hit || pity + 1 >= pityAfter ? 0 : pity + 1);
+      return pity;
+    });
+  }
+  addShards(accountId: string, delta: number): Promise<void> {
+    return this.lock.run(async () => { this.shards.set(accountId, (this.shards.get(accountId) ?? 0) + delta); });
+  }
+  shardsOf(accountId: string): Promise<number> {
+    return this.lock.run(async () => this.shards.get(accountId) ?? 0);
   }
 }
