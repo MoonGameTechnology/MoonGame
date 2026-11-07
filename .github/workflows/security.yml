@@ -26,7 +26,8 @@ name: Security scan
 # (trivy-fs) / .trivyignore (trivy-image) WITH a reason + date (see
 # docs/security/pipeline.md). One list per perimeter — see each file's header.
 # Still informational (not yet triaged as bricks): codeql, trufflehog, trivy-deps,
-# kics, dependency-review, dependency-check, zizmor, scorecard. The functional gate
+# kics, dependency-review, dependency-check, zizmor, scorecard, actionlint,
+# shellcheck, hadolint. The functional gate
 # (`pnpm run check`) is NOT run here: it lives once, blocking, in ci.yml. A copy here
 # used to run it a second time on every event, informationally, and only fed one line
 # of the report.
@@ -1486,6 +1487,102 @@ jobs:
             status-scorecard.json
           if-no-files-found: warn
 
+  actionlint:
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}Workflow correctness (actionlint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: scan — findings informational, execution failures visible
+        run: node .github/scripts/config-lint.mjs actionlint config-report
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: report-actionlint
+          path: config-report/
+          if-no-files-found: error
+      - name: upload to code scanning
+        if: ${{ !cancelled() && hashFiles('config-report/actionlint.sarif') != '' }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: config-report/actionlint.sarif
+          category: actionlint
+
+  shellcheck:
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}Shell scripts (ShellCheck)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: scan — findings informational, execution failures visible
+        run: node .github/scripts/config-lint.mjs shellcheck config-report
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: report-shellcheck
+          path: config-report/
+          if-no-files-found: error
+      - name: upload to code scanning
+        if: ${{ !cancelled() && hashFiles('config-report/shellcheck.sarif') != '' }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: config-report/shellcheck.sarif
+          category: shellcheck
+
+  hadolint:
+    needs: run-policy
+    if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}Dockerfile practices (Hadolint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: scan — findings informational, execution failures visible
+        run: node .github/scripts/config-lint.mjs hadolint config-report
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: report-hadolint
+          path: config-report/
+          if-no-files-found: error
+      - name: upload to code scanning
+        if: ${{ !cancelled() && hashFiles('config-report/hadolint.sarif') != '' }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: config-report/hadolint.sarif
+          category: hadolint
+
   report:
     name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}summarize + report
     # Все сканеры реестра EXPECTED должны входить в needs; run-policy только выбирает запуск.
@@ -1517,6 +1614,9 @@ jobs:
         dast-zap,
         sbom,
         zizmor,
+        actionlint,
+        shellcheck,
+        hadolint,
         scorecard,
       ]
     if: ${{ always() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
