@@ -515,15 +515,15 @@ export const FORTRESS_PRICE_SOLO_MIGRATION = {
   toDataHash: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toDataHash,
 } as const;
 
-/** Data 0.1.83 adds category timing for new main-game maps. Campaign and saved
+/** Rules-only category timing for new main-game maps. Campaign and saved
  *  match pricing, accepted schedules, assembly and paid repair budgets stay intact. */
 export const BUILD_PRODUCTION_TIMES_SOLO_MIGRATION = {
   fromRules: FORTRESS_PRICE_SOLO_MIGRATION.toRules,
   fromData: FORTRESS_PRICE_SOLO_MIGRATION.toData,
   fromDataHash: FORTRESS_PRICE_SOLO_MIGRATION.toDataHash,
-  toRules: '0dce49a16a79a8',
-  toData: '0.1.83',
-  toDataHash: '0e98c112542816',
+  toRules: '04e8551b308555',
+  toData: FORTRESS_PRICE_SOLO_MIGRATION.toData,
+  toDataHash: FORTRESS_PRICE_SOLO_MIGRATION.toDataHash,
 } as const;
 
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
