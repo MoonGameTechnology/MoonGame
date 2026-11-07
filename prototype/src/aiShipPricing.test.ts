@@ -120,12 +120,12 @@ describe('wartime scouts preserve the next line ship budget', () => {
     expect(scoutOrder(s)).toBeDefined();
   });
 
-  it('saves for the first line hull research instead of spending its metal on scouts', () => {
+  it('continues scouting while the first line hull technology is locked', () => {
     const { s, base } = atWar(300, 10000, 10000);
     s.techRules = { ruleset: 'main', dayGates: true, exclude: [] };
     s.players.p2!.technologies = { completed: ['scout_design'] };
     expect(canOrder(s, buildUnit('p2', base.id, 'frigate', 1))).toBe('E_TECH_LOCKED');
-    expect(scoutOrder(s)).toBeUndefined();
+    expect(scoutOrder(s)).toBeDefined();
   });
 
   it('keeps the existing scout policy for neutral NPCs', () => {

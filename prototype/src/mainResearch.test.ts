@@ -67,7 +67,6 @@ describe('main-game research progression', () => {
   it('earns the first military research prices and then constructs the unlocked ship', () => {
     let s = fresh();
     expect(canOrder(s, buildUnit('p1', 'home_1', 'frigate'))).toBe('E_TECH_LOCKED');
-    expect(canOrder(s, researchTech('p1', 'frigate_design'))).toBe('E_INSUFFICIENT');
     for (const tech of ['frigate_design', 'militia_training']) {
       for (let hours = 0; hours < 160 && canOrder(s, researchTech('p1', tech)) === 'E_INSUFFICIENT'; hours++)
         s = advance(s, s.time + HOUR).state;

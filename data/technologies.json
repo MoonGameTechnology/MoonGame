@@ -5,8 +5,8 @@
     "branch": "industry",
     "tier": 1,
     "cost": {
-      "credits": 1200,
-      "metal": 800
+      "credits": 360,
+      "metal": 240
     },
     "researchTimeHours": 4,
     "effects": {
@@ -19,8 +19,8 @@
     "branch": "space",
     "tier": 1,
     "cost": {
-      "credits": 1600,
-      "metal": 1200
+      "credits": 480,
+      "metal": 360
     },
     "researchTimeHours": 6,
     "effects": {
@@ -33,8 +33,8 @@
     "branch": "space",
     "tier": 1,
     "cost": {
-      "credits": 1400,
-      "metal": 1000
+      "credits": 420,
+      "metal": 300
     },
     "researchTimeHours": 5,
     "unlocks": {
@@ -51,9 +51,9 @@
     "damageScope": "space",
     "tier": 2,
     "cost": {
-      "credits": 2600,
-      "metal": 2200,
-      "microelectronics": 400
+      "credits": 780,
+      "metal": 660,
+      "microelectronics": 120
     },
     "researchTimeHours": 10,
     "dayGate": 3,
@@ -75,8 +75,8 @@
     "branch": "ground",
     "tier": 2,
     "cost": {
-      "credits": 1800,
-      "metal": 2400
+      "credits": 540,
+      "metal": 720
     },
     "researchTimeHours": 8,
     "dayGate": 3,
@@ -90,8 +90,8 @@
     "branch": "industry",
     "tier": 2,
     "cost": {
-      "credits": 2200,
-      "metal": 1800
+      "credits": 660,
+      "metal": 540
     },
     "researchTimeHours": 10,
     "dayGate": 2,
@@ -108,8 +108,8 @@
     "branch": "space",
     "tier": 2,
     "cost": {
-      "credits": 2000,
-      "metal": 1400
+      "credits": 600,
+      "metal": 420
     },
     "researchTimeHours": 8,
     "dayGate": 2,
@@ -127,9 +127,9 @@
     "damageScope": "space",
     "tier": 3,
     "cost": {
-      "credits": 4200,
-      "metal": 3000,
-      "microelectronics": 600
+      "credits": 1260,
+      "metal": 900,
+      "microelectronics": 180
     },
     "researchTimeHours": 16,
     "dayGate": 8,
@@ -154,8 +154,8 @@
     "damageScope": "ground",
     "tier": 1,
     "cost": {
-      "credits": 1400,
-      "metal": 1000
+      "credits": 420,
+      "metal": 300
     },
     "researchTimeHours": 5,
     "effects": {
@@ -168,8 +168,8 @@
     "branch": "ground",
     "tier": 2,
     "cost": {
-      "credits": 2400,
-      "metal": 2000
+      "credits": 720,
+      "metal": 600
     },
     "researchTimeHours": 10,
     "dayGate": 5,
@@ -187,9 +187,9 @@
     "damageScope": "ground",
     "tier": 3,
     "cost": {
-      "credits": 4800,
-      "metal": 3600,
-      "microelectronics": 400
+      "credits": 1440,
+      "metal": 1080,
+      "microelectronics": 120
     },
     "researchTimeHours": 18,
     "dayGate": 12,
@@ -206,8 +206,8 @@
     "branch": "shuttle",
     "tier": 1,
     "cost": {
-      "credits": 1600,
-      "metal": 1200
+      "credits": 480,
+      "metal": 360
     },
     "researchTimeHours": 6,
     "dayGate": 2,
@@ -222,9 +222,9 @@
     "damageScope": "shuttle",
     "tier": 2,
     "cost": {
-      "credits": 2800,
-      "metal": 2200,
-      "microelectronics": 300
+      "credits": 840,
+      "metal": 660,
+      "microelectronics": 90
     },
     "researchTimeHours": 12,
     "dayGate": 5,
@@ -247,9 +247,9 @@
     "damageScope": "shuttle",
     "tier": 3,
     "cost": {
-      "credits": 5000,
-      "metal": 3800,
-      "microelectronics": 600
+      "credits": 1500,
+      "metal": 1140,
+      "microelectronics": 180
     },
     "researchTimeHours": 20,
     "dayGate": 12,
@@ -267,8 +267,8 @@
     "branch": "missile",
     "tier": 1,
     "cost": {
-      "credits": 1500,
-      "metal": 1100
+      "credits": 450,
+      "metal": 330
     },
     "researchTimeHours": 6,
     "dayGate": 2,
@@ -283,9 +283,9 @@
     "damageScope": "missile",
     "tier": 2,
     "cost": {
-      "credits": 2600,
-      "metal": 2400,
-      "microelectronics": 300
+      "credits": 780,
+      "metal": 720,
+      "microelectronics": 90
     },
     "researchTimeHours": 12,
     "dayGate": 5,
@@ -303,9 +303,9 @@
     "damageScope": "missile",
     "tier": 3,
     "cost": {
-      "credits": 5200,
-      "metal": 4000,
-      "microelectronics": 800
+      "credits": 1560,
+      "metal": 1200,
+      "microelectronics": 240
     },
     "researchTimeHours": 20,
     "dayGate": 12,
@@ -322,8 +322,8 @@
     "branch": "command",
     "tier": 1,
     "cost": {
-      "credits": 1300,
-      "metal": 900
+      "credits": 390,
+      "metal": 270
     },
     "researchTimeHours": 4,
     "effects": {
@@ -336,8 +336,8 @@
     "branch": "command",
     "tier": 2,
     "cost": {
-      "credits": 3000,
-      "metal": 2200
+      "credits": 900,
+      "metal": 660
     },
     "researchTimeHours": 12,
     "dayGate": 5,
@@ -355,8 +355,8 @@
     "branch": "command",
     "tier": 3,
     "cost": {
-      "credits": 4000,
-      "metal": 2600
+      "credits": 1200,
+      "metal": 780
     },
     "researchTimeHours": 14,
     "dayGate": 15,
@@ -379,8 +379,8 @@
     "branch": "space",
     "tier": 2,
     "cost": {
-      "credits": 2600,
-      "metal": 2000
+      "credits": 780,
+      "metal": 600
     },
     "researchTimeHours": 8,
     "prerequisites": [
@@ -398,9 +398,9 @@
     "branch": "space",
     "tier": 3,
     "cost": {
-      "credits": 3200,
-      "metal": 2400,
-      "microelectronics": 400
+      "credits": 960,
+      "metal": 720,
+      "microelectronics": 120
     },
     "researchTimeHours": 10,
     "prerequisites": [
@@ -419,9 +419,9 @@
     "branch": "space",
     "tier": 3,
     "cost": {
-      "credits": 3000,
-      "metal": 2200,
-      "microelectronics": 500
+      "credits": 900,
+      "metal": 660,
+      "microelectronics": 150
     },
     "researchTimeHours": 10,
     "prerequisites": [
@@ -458,8 +458,8 @@
     "branch": "space",
     "tier": 1,
     "cost": {
-      "credits": 400,
-      "metal": 250
+      "credits": 120,
+      "metal": 75
     },
     "researchTimeHours": 1,
     "unlocks": {
@@ -475,8 +475,8 @@
     "branch": "space",
     "tier": 2,
     "cost": {
-      "credits": 1000,
-      "metal": 700
+      "credits": 300,
+      "metal": 210
     },
     "researchTimeHours": 4,
     "prerequisites": [
@@ -495,9 +495,9 @@
     "branch": "space",
     "tier": 3,
     "cost": {
-      "credits": 2400,
-      "metal": 1600,
-      "microelectronics": 200
+      "credits": 720,
+      "metal": 480,
+      "microelectronics": 60
     },
     "researchTimeHours": 8,
     "prerequisites": [
@@ -517,8 +517,8 @@
     "branch": "command",
     "tier": 2,
     "cost": {
-      "credits": 1000,
-      "metal": 600
+      "credits": 300,
+      "metal": 180
     },
     "researchTimeHours": 4,
     "prerequisites": [
@@ -537,8 +537,8 @@
     "branch": "command",
     "tier": 2,
     "cost": {
-      "credits": 800,
-      "metal": 500
+      "credits": 240,
+      "metal": 150
     },
     "researchTimeHours": 3,
     "prerequisites": [
@@ -557,8 +557,8 @@
     "branch": "ground",
     "tier": 1,
     "cost": {
-      "credits": 300,
-      "metal": 200
+      "credits": 90,
+      "metal": 60
     },
     "researchTimeHours": 1,
     "unlocks": {
@@ -574,8 +574,8 @@
     "branch": "ground",
     "tier": 1,
     "cost": {
-      "credits": 500,
-      "metal": 300
+      "credits": 150,
+      "metal": 90
     },
     "researchTimeHours": 2,
     "prerequisites": [
@@ -594,8 +594,8 @@
     "branch": "ground",
     "tier": 2,
     "cost": {
-      "credits": 1000,
-      "metal": 700
+      "credits": 300,
+      "metal": 210
     },
     "researchTimeHours": 4,
     "prerequisites": [
@@ -614,9 +614,9 @@
     "branch": "ground",
     "tier": 3,
     "cost": {
-      "credits": 1800,
-      "metal": 1300,
-      "microelectronics": 200
+      "credits": 540,
+      "metal": 390,
+      "microelectronics": 60
     },
     "researchTimeHours": 6,
     "prerequisites": [
@@ -637,9 +637,9 @@
     "branch": "ground",
     "tier": 3,
     "cost": {
-      "credits": 2000,
-      "metal": 1000,
-      "microelectronics": 200
+      "credits": 600,
+      "metal": 300,
+      "microelectronics": 60
     },
     "researchTimeHours": 6,
     "prerequisites": [
@@ -660,8 +660,8 @@
     "branch": "shuttle",
     "tier": 1,
     "cost": {
-      "credits": 800,
-      "metal": 500
+      "credits": 240,
+      "metal": 150
     },
     "researchTimeHours": 3,
     "unlocks": {
@@ -677,8 +677,8 @@
     "branch": "shuttle",
     "tier": 2,
     "cost": {
-      "credits": 1300,
-      "metal": 900
+      "credits": 390,
+      "metal": 270
     },
     "researchTimeHours": 5,
     "prerequisites": [
@@ -698,8 +698,8 @@
     "branch": "shuttle",
     "tier": 1,
     "cost": {
-      "credits": 500,
-      "metal": 300
+      "credits": 150,
+      "metal": 90
     },
     "researchTimeHours": 2,
     "unlocks": {
@@ -715,9 +715,9 @@
     "branch": "shuttle",
     "tier": 3,
     "cost": {
-      "credits": 2400,
-      "metal": 1800,
-      "microelectronics": 200
+      "credits": 720,
+      "metal": 540,
+      "microelectronics": 60
     },
     "researchTimeHours": 8,
     "prerequisites": [
@@ -738,8 +738,8 @@
     "branch": "command",
     "tier": 2,
     "cost": {
-      "credits": 1400,
-      "metal": 900
+      "credits": 420,
+      "metal": 270
     },
     "researchTimeHours": 5,
     "prerequisites": [
@@ -758,8 +758,8 @@
     "branch": "ground",
     "tier": 2,
     "cost": {
-      "credits": 1000,
-      "metal": 600
+      "credits": 300,
+      "metal": 180
     },
     "researchTimeHours": 4,
     "prerequisites": [
@@ -779,8 +779,8 @@
     "branch": "industry",
     "tier": 2,
     "cost": {
-      "credits": 1200,
-      "metal": 1000
+      "credits": 360,
+      "metal": 300
     },
     "researchTimeHours": 4,
     "prerequisites": [
@@ -799,8 +799,8 @@
     "branch": "ground",
     "tier": 1,
     "cost": {
-      "credits": 700,
-      "metal": 600
+      "credits": 210,
+      "metal": 180
     },
     "researchTimeHours": 3,
     "unlocks": {
@@ -816,8 +816,8 @@
     "branch": "missile",
     "tier": 2,
     "cost": {
-      "credits": 1500,
-      "metal": 1100
+      "credits": 450,
+      "metal": 330
     },
     "researchTimeHours": 5,
     "prerequisites": [
@@ -837,8 +837,8 @@
     "branch": "shuttle",
     "tier": 1,
     "cost": {
-      "credits": 600,
-      "metal": 400
+      "credits": 180,
+      "metal": 120
     },
     "researchTimeHours": 2,
     "unlocks": {
@@ -854,8 +854,8 @@
     "branch": "industry",
     "tier": 2,
     "cost": {
-      "credits": 1200,
-      "metal": 800
+      "credits": 360,
+      "metal": 240
     },
     "researchTimeHours": 4,
     "prerequisites": [
@@ -874,8 +874,8 @@
     "branch": "industry",
     "tier": 2,
     "cost": {
-      "credits": 1200,
-      "metal": 1000
+      "credits": 360,
+      "metal": 300
     },
     "researchTimeHours": 5,
     "prerequisites": [
@@ -893,9 +893,9 @@
     "branch": "industry",
     "tier": 4,
     "cost": {
-      "credits": 3800,
-      "metal": 2600,
-      "microelectronics": 400
+      "credits": 1140,
+      "metal": 780,
+      "microelectronics": 120
     },
     "researchTimeHours": 12,
     "prerequisites": [
@@ -914,9 +914,9 @@
     "branch": "command",
     "tier": 4,
     "cost": {
-      "credits": 3200,
-      "metal": 2000,
-      "microelectronics": 400
+      "credits": 960,
+      "metal": 600,
+      "microelectronics": 120
     },
     "researchTimeHours": 10,
     "prerequisites": [
@@ -935,9 +935,9 @@
     "branch": "command",
     "tier": 3,
     "cost": {
-      "credits": 2500,
-      "metal": 1600,
-      "microelectronics": 100
+      "credits": 750,
+      "metal": 480,
+      "microelectronics": 30
     },
     "researchTimeHours": 8,
     "prerequisites": [
@@ -955,9 +955,9 @@
     "branch": "command",
     "tier": 4,
     "cost": {
-      "credits": 4000,
-      "metal": 2800,
-      "microelectronics": 300
+      "credits": 1200,
+      "metal": 840,
+      "microelectronics": 90
     },
     "researchTimeHours": 12,
     "prerequisites": [
@@ -976,8 +976,8 @@
     "branch": "command",
     "tier": 2,
     "cost": {
-      "credits": 2000,
-      "metal": 1500
+      "credits": 600,
+      "metal": 450
     },
     "researchTimeHours": 8,
     "prerequisites": [
@@ -995,9 +995,9 @@
     "branch": "command",
     "tier": 3,
     "cost": {
-      "credits": 3200,
-      "metal": 2400,
-      "microelectronics": 300
+      "credits": 960,
+      "metal": 720,
+      "microelectronics": 90
     },
     "researchTimeHours": 12,
     "prerequisites": [
@@ -1015,9 +1015,9 @@
     "branch": "command",
     "tier": 4,
     "cost": {
-      "credits": 4500,
-      "metal": 3400,
-      "microelectronics": 500
+      "credits": 1350,
+      "metal": 1020,
+      "microelectronics": 150
     },
     "researchTimeHours": 16,
     "prerequisites": [
@@ -1036,9 +1036,9 @@
     "branch": "command",
     "tier": 5,
     "cost": {
-      "credits": 4500,
-      "metal": 3400,
-      "microelectronics": 500
+      "credits": 1350,
+      "metal": 1020,
+      "microelectronics": 150
     },
     "researchTimeHours": 16,
     "prerequisites": [
@@ -1062,9 +1062,9 @@
     "branch": "command",
     "tier": 5,
     "cost": {
-      "credits": 5000,
-      "metal": 3800,
-      "microelectronics": 600
+      "credits": 1500,
+      "metal": 1140,
+      "microelectronics": 180
     },
     "researchTimeHours": 18,
     "prerequisites": [
@@ -1088,9 +1088,9 @@
     "branch": "command",
     "tier": 5,
     "cost": {
-      "credits": 5500,
-      "metal": 4200,
-      "microelectronics": 700
+      "credits": 1650,
+      "metal": 1260,
+      "microelectronics": 210
     },
     "researchTimeHours": 20,
     "prerequisites": [

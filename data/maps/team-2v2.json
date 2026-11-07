@@ -1514,7 +1514,7 @@
       "credits": 3
     },
     "hours": 2,
-    "buildingHours": 3,
+    "buildingHours": 2,
     "unitHours": 2,
     "start": {
       "metal": 1.5,
