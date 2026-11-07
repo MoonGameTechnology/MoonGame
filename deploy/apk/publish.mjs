@@ -10,6 +10,9 @@ const { AbortController } = globalThis;
 const REPO = 'https://api.github.com/repos/MoonGameTechnology/MoonGame';
 const ALLOWED = new Set(['api.github.com','github.com','objects.githubusercontent.com','release-assets.githubusercontent.com']);
 const MAX_APK = 128 * 1024 * 1024;
+// Preserve the VPS emergency reserve after the largest allowed staged download.
+const DISK_RESERVE = 6 * 1024 ** 3;
+const STAGING_METADATA = 1024 * 1024;
 
 /** Manual redirects keep an asset's Location from reaching arbitrary hosts. */
 export async function download(url, limit, { fetchImpl = fetch, destination } = {}) {
@@ -50,7 +53,7 @@ function currentManifest(text,lane,publicKey) {
   return typeof value?.payload==='string' ? openSignedManifest(value,lane,publicKey).manifest : validateManifest(value,lane);
 }
 /** Commit immutable files first, then switch ONE pointer shared by JSON and APK. */
-export async function installRelease({ root, lane, signed, acquire, verify=verifyApk, checkSpace=true, publicKey=distribution.manifestPublicKey }) {
+export async function installRelease({ root, lane, signed, acquire, verify=verifyApk, checkSpace=true, statfsImpl=statfs, publicKey=distribution.manifestPublicKey }) {
   // Clients verify the same signature; the host refuses to publish what they would refuse.
   const { manifest:m, envelope }=openSignedManifest(signed,lane,publicKey); const dir=join(root,lane); await mkdir(dir,{recursive:true,mode:0o755});
   // A killed process cannot run finally. The systemd oneshot serializes runs;
@@ -64,7 +67,10 @@ export async function installRelease({ root, lane, signed, acquire, verify=verif
     if(m.versionCode===current.versionCode && m.apkSha256!==current.apkSha256)throw new Error('E_APK_VERSION_REUSE');
     return false;
   }
-  if(checkSpace) { const fs=await statfs(root); if(fs.bavail*fs.bsize < 12*1024**3+MAX_APK)throw new Error('E_APK_DISK'); }
+  if(checkSpace) {
+    const fs=await statfsImpl(root), available=fs.bavail*fs.bsize;
+    if(!Number.isFinite(available) || available < DISK_RESERVE+MAX_APK+STAGING_METADATA)throw new Error('E_APK_DISK');
+  }
   const stage=join(dir,`.incoming-${randomBytes(12).toString('hex')}`);await mkdir(stage,{mode:0o755});
   const filename=apkName(lane), target=`${m.versionCode}-${m.sha}`, pointer=join(dir,`.current-${randomBytes(12).toString('hex')}`);
   try {
@@ -110,7 +116,12 @@ async function main() {
   let failed=false;
   for(const lane of Object.keys(LANES)) {
     try { const changed=await syncLane(root,lane);process.stdout.write(`${lane}: ${changed?'published':'unchanged'}\n`); }
-    catch {failed=true;process.stderr.write(`${lane}: E_APK_PUBLISH\n`);}
+    catch(e) {
+      failed=true;
+      // Only stable codes, never network response text, paths or credentials.
+      const code=e?.message==='E_APK_DISK'?'E_APK_DISK':'E_APK_PUBLISH';
+      process.stderr.write(`${lane}: ${code}\n`);
+    }
   }
   if(failed)process.exitCode=1;
 }
