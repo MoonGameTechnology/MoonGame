@@ -5,6 +5,7 @@ import { MemoryMatchStore, MemoryReceiptStore } from './store';
 import { snapshotOf } from './persistence';
 import { startClockDriver } from './clockDriver';
 import { createMatchLoader } from './serverWiring';
+import { LEGACY_MATCH_RULES } from './matchRules';
 import type { RoomPeer } from './matchRoom';
 
 // F8 (docs/infra-sizing-roadmap.md): the dev harness now persists after every commit
@@ -300,7 +301,7 @@ describe('MP-4 · game-data integrity check on load', () => {
     expect(flagged).toBe(MATCH);
   });
 
-  it('degrades gracefully for a pre-MP-4 snapshot carrying no pinned hash', async () => {
+  it('pins a hash-less snapshot only while deployed rules match the legacy baseline', async () => {
     const store = new MemoryMatchStore();
     const receiptStore = new MemoryReceiptStore();
     const seed = createDevMatch(data, { now: () => 1000, time: 1000 });
@@ -310,7 +311,13 @@ describe('MP-4 · game-data integrity check on load', () => {
 
     const load = createMatchLoader({ stores: { store, receiptStore }, data, now: () => 1000 });
     const loaded = await load(MATCH);
-    expect(loaded).not.toBeNull(); // no pinned hash → nothing to compare, not refused
+    if (Object.entries(LEGACY_MATCH_RULES).every(([key, value]) => seed.state.version[key as keyof typeof LEGACY_MATCH_RULES] === value)) {
+      expect(loaded).not.toBeNull();
+      expect((await store.load(MATCH))?.state.version).toEqual(seed.state.version);
+    } else {
+      expect(loaded).toBeNull();
+      expect((await store.load(MATCH))?.state.version).toEqual(versionWithoutHash);
+    }
     await loaded?.dispose();
   });
 });
@@ -318,11 +325,8 @@ describe('MP-4 · game-data integrity check on load', () => {
 // Invariant #6: a match pins the module-manifest version it was created under, and the
 // loader refuses to resume it on a different module graph — resuming would silently
 // diverge from the match's own history (and break its replay). The sibling of the MP-4
-// dataHash check above, with one deliberate difference: `version.manifest` is REQUIRED
-// in `GameVersion`, so — unlike the optional `dataHash` — there is no legitimate
-// snapshot without it, and "missing" means corrupt rather than "persisted before the
-// check existed". Hence no graceful-degradation path here. That asymmetry is the point
-// of the third test; pin it so it can't be "fixed" back into a hole.
+// dataHash check above. The bounded legacy migration never repairs an absent
+// manifest: an unknown module graph is not one of the recognized old formats.
 describe('invariant #6 · module-manifest check on load', () => {
   it('loads normally when the pinned manifest matches the deployed module graph', async () => {
     const store = new MemoryMatchStore();

@@ -11,8 +11,8 @@ name: CI
 
 # ТРИГГЕРЫ. Раньше гейт бежал только на `main` и на pull_request — то есть пуш в фиче-ветку
 # не проверялся ВООБЩЕ, и обратная связь появлялась лишь в момент открытия PR. Локально
-# правило «перед коммитом гоняй pnpm run check» машиной не принуждается (git-хуков в репо
-# нет), так что до открытия PR красный код мог жить в ветке сколько угодно. Теперь гейт
+# хук `.githooks/pre-push` гоняет `pnpm run check`, но может быть обойдён клиентом.
+# Чтобы удалённая проверка работала и до открытия PR, гейт
 # бежит на push в любую ветку. Цена этого решения — на ветке с открытым PR гейт бежит
 # ДВАЖДЫ (от push и от pull_request); `concurrency` ниже дубль не гасит, и почему гасить
 # его нельзя — расписано там же.
@@ -153,35 +153,20 @@ jobs:
         run: pnpm run perf
         continue-on-error: true
 
-      # Boots the BUILT prototype in a real headless browser and fails on any console
-      # error. `pnpm run check` cannot see this class of defect: prototype/ is outside
-      # ESLint and tsc, and uitest/perf drive a fake DOM — esbuild-only bugs, unhandled
-      # rejections and browser warnings show up nowhere else. Non-blocking for now (same
-      # posture as perf): the runner has to fetch a Chromium, so let it prove itself in
-      # the log before it can redden main.
-      #
-      # `continue-on-error` hides the step's own red mark, so the two ways this can go
-      # wrong are reported as ANNOTATIONS instead — they render on the run summary and
-      # survive the swallowed exit code. Until this run, both modes were invisible: the
-      # step crashed on `Cannot find module 'playwright-core/cli.js'` in EVERY run since
-      # 2026-08-15 and the job stayed green, so the watchdog reported nothing and nobody
-      # could tell. They are deliberately different severities:
-      #   warning — the smoke could not START (no browser). Says nothing about the code.
-      #   error   — the smoke RAN and found a defect in the built bundle. A real finding.
-      # Flipping this step to blocking is the natural next step now that it works (see
-      # SEC-16's «следующий слой» note in docs/backlog.md); that is the owner's call, so
-      # it stays non-blocking here.
-      - name: Browser smoke (non-blocking)
+      # Lint and tsc cover prototype/. The real browser additionally verifies the
+      # built bundle, DOM, console and rejected promises. Both setup and test failures
+      # block this required CI job; an unavailable browser is not a passing check.
+      - name: Browser smoke
+        id: browser
         run: |
           if ! pnpm run smoke:browser:install; then
-            echo "::warning title=Browser smoke::смоук не смог установиться (Chromium недоступен) — бандл НЕ проверялся"
+            echo "::error title=Browser smoke::смоук не смог установиться (Chromium недоступен) — бандл НЕ проверялся"
             exit 1
           fi
           if ! pnpm run smoke:browser; then
             echo "::error title=Browser smoke::смоук нашёл ошибку в собранном бандле — смотри лог шага"
             exit 1
           fi
-        continue-on-error: true
 
       - name: Site APK update and desktop download smoke
         run: |
@@ -199,13 +184,13 @@ jobs:
         run: node prototype/corptest.mjs --identity-only
 
       # The rest of the corporation flows: the base, corporation battles, the style and
-      # backdrop shop, building materials and the news window. Outside CI two of these
-      # rotted unnoticed when the base grew from 3 to 7 buildings, so they run on every
-      # push now. Non-blocking like the browser smoke above: a failure surfaces as an
-      # error annotation per smoke without reddening main. Each DB smoke makes and drops
-      # its own `*_test` database next to the service one.
-      - name: Corporation flows smoke (non-blocking)
+      # backdrop shop, building materials and the news window. All must pass. Continue
+      # through the loop to collect every failure, then fail the required CI job.
+      # Each DB smoke makes/drops its own *_test database next to the service one.
+      - name: Corporation flows smoke
+        id: corporation
         env:
+          HARNESS_OUT: .playwright-mcp/corporation
           AVA_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/void_test
           CORP_STYLE_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/void_test
           CORP_MATERIALS_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/void_test
@@ -218,7 +203,15 @@ jobs:
             fi
           done
           exit "$failed"
-        continue-on-error: true
+
+      - name: Browser and corporation failure diagnostics
+        if: failure() && (steps.browser.outcome == 'failure' || steps.corporation.outcome == 'failure')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-corporation-failure
+          path: .playwright-mcp/
+          include-hidden-files: true
+          retention-days: 7
 
       # YAG-1.1c: робот играет в СОБРАННЫЙ архив площадки (`prototype/dist/yandex/`) —
       # запуск, забег, «Продолжить», ролик за награду, закрытые двери по ссылке. Архив

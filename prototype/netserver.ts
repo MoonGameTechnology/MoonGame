@@ -15,7 +15,8 @@ import { MemoryMetaEconomyStore, PostgresMetaEconomyStore, type MetaEconomyStore
 import { createMetaRewardDelivery } from '../packages/server/src/metaEconomyDelivery';
 import { commerceOffers } from '../packages/server/src/commerceCatalog';
 import { registerMetaCommerce } from '../packages/server/src/metaCommerce';
-import { loadAvaMaps, loadDropTables, loadStarterArsenal } from '../packages/server/src/scenario';
+import { loadAvaMaps, loadDropTables, loadStarterArsenal, MODULE_MANIFEST_VERSION } from '../packages/server/src/scenario';
+import { loadCompatibleSnapshot, matchRules, skipIncompatibleMatch } from '../packages/server/src/matchRules';
 import { arsenalSnapshotOf, grantStarterArsenal } from '../packages/server/src/arsenal';
 import { initializeOrdinaryArsenal, syncAccountArsenal } from '../packages/server/src/mainGameArsenal';
 import { PostgresArsenalStore, type ArsenalStore } from '../packages/server/src/store';
@@ -592,9 +593,6 @@ const avaService: AvaService = corporationsEndpoint
 const medalService =
   corporateServices?.medals ?? new MedalService({ corpStore, resultStore, medalStore, catalog: medalCatalog });
 const corpArsenalService = new CorpArsenalService({ corpStore, arsenalStore, rentStore: corpRentStore, challengeStore, rosterStore });
-// Манифест, который несут партии самого прототипа (`newGame`). Хост игроков по нему партию не
-// отвергает, но битва, собранная здесь, остаётся одной из них.
-const PROTOTYPE_MANIFEST = '1';
 const avaMaps = loadAvaMaps(data);
 const avaOrchestrator = new AvaOrchestrator({
   challengeStore,
@@ -603,7 +601,7 @@ const avaOrchestrator = new AvaOrchestrator({
   data,
   maps: avaMaps.pool,
   retiredMaps: avaMaps.retired,
-  manifest: PROTOTYPE_MANIFEST,
+  manifest: MODULE_MANIFEST_VERSION,
   createRoom: (spec) => raiseAvaBattle(spec),
   // CORP-4: ни одна карта не подходит под запертый состав — битва отменяется, вызов возвращается.
   cancel: (matchupId) => avaService.cancelLocked(matchupId),
@@ -644,6 +642,7 @@ const MAX_TIMER_MS = 60 * 60_000; // 1h cap, passed as the driver's maxDelayMs
  *  AI (with the BF-17 reconnect grace), the standing-order drivers, the debounced
  *  durable snapshot and the offline wakeup timer. Everything that used to be a
  *  module-level single-match global lives in this closure now, one set per match. */
+const hostedRules = matchRules(data, MODULE_MANIFEST_VERSION);
 interface HostedMatch {
   id: string;
   room: MatchRoom;
@@ -693,7 +692,7 @@ async function createHostedMatch(
     }
   }
 
-  const restoredSnap = await matchStore.load(id);
+  const restoredSnap = await loadCompatibleSnapshot(matchStore, id, hostedRules);
   const matchTimeScale = sessionSpeed(restoredSnap?.clock, TIME_SCALE, requestedTimeScale);
   // Битва рождается только из снимка оркестратора: свежий мир под её номером был бы чужой партией.
   if (ava && !restoredSnap) throw new Error('E_NO_MATCH');
@@ -705,11 +704,8 @@ async function createHostedMatch(
       seats: networkSeatPlan(NETWORK_MODE, mapId),
     });
   if (AUTH && !restoredSnap) initialState = initializeOrdinaryArsenal(initialState, data);
-  if (!restoredSnap) initialState = withGoldActions(initialState, goldActions);
-  // Режим берётся ИЗ СОСТОЯНИЯ, а не из аргумента: у восстановленной партии аргумента
-  // нет (её поднимает `bootRoster` по списку из стора), и без этой строки рестарт
-  // молча вернул бы PvE-сессию к базовым правилам — ровно та «подмена правил под
-  // матчем», которую `resolveMatchConfig` отказывается допускать для чужого режима.
+  if (!restoredSnap) initialState = withGoldActions({ ...initialState, version: { ...hostedRules } }, goldActions);
+  // Restored sessions keep their persisted mode, including corporation battles.
   const sessionModeId = initialState.modeId;
   // A NET seat is not a bot: every seat here is claimable by a human, and the
   // server-side AI merely stands in for an empty chair (`humans` is the live truth).
@@ -1260,23 +1256,21 @@ const browserMeta = (room: MatchRoom): MatchMeta =>
     entryWindowMs: ENTRY_WINDOW_MS,
   });
 
-// Список партий на старте приходит из СТОРА, а не из `MATCHES=N`: `bootRoster` поднимает
-// всё, что стор считает живым, и засевает только пустой стор (иначе каждый рестарт
-// добавлял бы ещё N комнат). Без этого партия, созданная через `POST /matches`, жила бы
-// лишь до перезапуска процесса — id уникален, но поднять её было бы некому.
-// Битвы корпораций в этот список не входят: их поднимает не `bootRoster`, а свой путь ниже
-// (CORP-5) — иначе рестарт поднял бы битву обычной партией, с чужими правилами мест.
+// Restore the durable roster; only an empty ordinary roster may be seeded. Incompatible
+// sessions retain their IDs/snapshots and never fall through to newGame.
+// Corporation battles use their own seat rules through hostAvaMatch below.
 const storedMatchIds = await matchStore.ongoingMatchIds();
 const roster = bootRoster({ stored: storedMatchIds.filter((id) => !isAvaMatchId(id)), seedCount: MATCHES });
 for (const id of roster.raise) {
-  const h = await createHostedMatch(id);
+  const h = await skipIncompatibleMatch(() => createHostedMatch(id));
+  if (!h) continue;
   hosted.push(h);
   registry.register(h.room, browserMeta(h.room));
   if (!h.restored) await h.flush(); // засеянная партия тоже durable сразу, а не после хода
 }
 // Идущие битвы корпораций возвращаются битвами. Без учёток их некому играть — они ждут в
 // сторе запуска с AUTH.
-if (AUTH) for (const id of storedMatchIds.filter(isAvaMatchId)) await hostAvaMatch(id);
+if (AUTH) for (const id of storedMatchIds.filter(isAvaMatchId)) await skipIncompatibleMatch(() => hostAvaMatch(id));
 // Unopened archives stay in the metadata catalog. Retire unwatched terminal hosts
 // only after their final durable write; every remaining room still consumes capacity.
 let archiveSweeping = false;
@@ -1290,7 +1284,7 @@ const archiveSweep = setInterval(() => {
     .finally(() => { archiveSweeping = false; });
 }, 60_000);
 archiveSweep.unref();
-const matchIds = roster.raise;
+const matchIds = hosted.map((h) => h.id);
 const restoredCount = hosted.filter((h) => h.restored).length;
 /**
  * ADDR-1: поднять НОВУЮ партию по требованию, а не на старте процесса.
@@ -1939,7 +1933,7 @@ const onLan = shareIp !== null;
 const unreachableOnly = host === '0.0.0.0' && !onLan && addrs.length > 0;
 const localHttp = httpUrl.replace('0.0.0.0', 'localhost'); // 0.0.0.0 isn't openable
 const friendUrl = onLan ? `http://${shareIp}:${port}/` : null;
-const liveSeatIds = Object.keys(hosted[0]!.room.state.players);
+const liveSeatIds = Object.keys(hosted[0]?.room.state.players ?? {});
 const firstSeat = liveSeatIds[0] ?? 'p1';
 const lastSeat = liveSeatIds.at(-1) ?? firstSeat;
 
@@ -1971,7 +1965,7 @@ const lines = [
   TIME_SCALE > 1
     ? `  time   : ×${TIME_SCALE} fast-forward (1 real min ≈ ${(TIME_SCALE / 60).toFixed(1)} game-hours) — playtest mode`
     : '  time   : ×1 real-time (set TIME_SCALE=100 to fast-forward a playtest)',
-  `  matches: ${MATCHES} session${MATCHES > 1 ? 's' : ''} in this process (${matchIds.join(', ')}) — set MATCHES=N for more; all listed in the in-game browser`,
+  `  matches: ${matchIds.length} session${matchIds.length === 1 ? '' : 's'} in this process (${matchIds.join(', ')}) — MATCHES=N seeds an empty store only`,
   `  ai     : substitute bot takes an abandoned chair after ${(AI_GRACE_MS / 3_600_000).toFixed(1)}h offline (real time; set AI_GRACE_MS); a delegated Steward runs instantly`,
   `  join   : a NEW player may claim a free seat for ${(ENTRY_WINDOW_MS / 86_400_000).toFixed(1)} real days from a session's creation (set ENTRY_WINDOW_MS); a seated player reconnects any time`,
   `  map    : ${DEFAULT_MAP_ID} — ${NET_SEATS.length} claimable chairs; empty chairs are AI-driven`,
@@ -1991,8 +1985,8 @@ if (unreachableOnly) {
 // With ONE match listen() returns its full URL; with several it returns the base
 // prefix (the client appends /<matchId>) — the printed example always shows a full,
 // dialable URL for the first match.
-const rawWs = (MATCHES === 1 ? wsUrl : `${wsUrl}/${matchIds[0]}`).replace('0.0.0.0', 'localhost');
-lines.push(
+const rawWs = (matchIds.length === 1 ? wsUrl : `${wsUrl}/${matchIds[0]}`).replace('0.0.0.0', 'localhost');
+if (matchIds.length > 0) lines.push(
   '',
   SEAT_LOCK
     ? `  raw ws : ${rawWs}?nick=<name>  (seat lock on — ?player= is refused)`
