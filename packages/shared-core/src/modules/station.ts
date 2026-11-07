@@ -219,7 +219,8 @@ export const stationModule: GameModule = {
   // 1.1.0: постройки крепости прикрывают её орудия (FORT-5.16, замечание Codex на #1389).
   // 1.2.0: прикрытие — только отряду из одних орудий (находка Codex на #1393).
   // 1.3.0: крепость на развилке — новая точка постройки (FORT-6.1).
-  version: '1.4.0',
+  // 1.4.1: fortress deployment costs four times as much (480 metal before fittings).
+  version: '1.4.1',
   setup(api) {
     api.onAction('station.deploy', (action, h: HandlerContext) => {
       const { planetId, trail, modules } = action.payload as { planetId?: string; trail?: unknown; modules?: unknown };

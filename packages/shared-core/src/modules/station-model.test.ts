@@ -108,7 +108,7 @@ describe('separate fortress model', () => {
     const state = ok(kernel.applyAction(before, action('station.deploy', { planetId: 'A', modules: ['cannon'] }), ctx())).state;
     expect(state.planets.A).toEqual(before.planets.A);
     expect(state.planets[siteId]?.stationHost).toBe('A');
-    expect(state.players.p1?.resources.metal).toBe(860);
+    expect(state.players.p1?.resources.metal).toBe(500); // 1000 - 480 hull - 20 fitting
     const quarter = ok(kernel.advanceTo(state, ctx(1.5 * H))).state;
     const stack = quarter.fleets[bodyId]!.units[0]!;
     expect(stack.count).toBe(1);
@@ -132,7 +132,7 @@ describe('separate fortress model', () => {
     let state = built();
     state.fleets[bodyId]!.units[0]!.hp = 50;
     const quote = fortressRepairQuote(state, state.planets[siteId]!, data);
-    expect(quote).toMatchObject({ missingHp: 50, cost: { metal: 60 }, hours: 3 });
+    expect(quote).toMatchObject({ missingHp: 50, cost: { metal: 240 }, hours: 3 });
     expect(ok(kernel.advanceTo(state, ctx(7 * H))).state.fleets[bodyId]?.units[0]?.hp).toBe(50);
     state = ok(kernel.applyAction(state, action('station.repair', { planetId: siteId }), ctx(6 * H))).state;
     state = ok(kernel.advanceTo(state, ctx(7.5 * H))).state;
@@ -292,7 +292,7 @@ describe('separate fortress model', () => {
     const state = built();
     state.planets[siteId]!.fortress!.modules = ['cannon'];
     state.fleets[bodyId]!.units[0]!.hp = 50;
-    expect(fortressRepairQuote(state, state.planets[siteId]!, data).cost.metal).toBe(70);
+    expect(fortressRepairQuote(state, state.planets[siteId]!, data).cost.metal).toBe(250);
   });
 
   it.each([1, 24])('keeps readiness, refunds and the remaining delayed work consistent at speed ×%i', (speed) => {

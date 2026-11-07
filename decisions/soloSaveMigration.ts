@@ -504,6 +504,17 @@ export const FLEET_MERGE_ORDERS_SOLO_MIGRATION = {
   toDataHash: TECHNOLOGY_PRICES_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only price change: station 1.4.1 charges 480 metal for new deployments.
+ *  Existing worlds, already-paid assembly/repair orders and their clocks are retained. */
+export const FORTRESS_PRICE_SOLO_MIGRATION = {
+  fromRules: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toRules,
+  fromData: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toData,
+  fromDataHash: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toDataHash,
+  toRules: '199d8dd397071e',
+  toData: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toData,
+  toDataHash: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -548,6 +559,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   VICEROY_SOLO_MIGRATION,
   TECHNOLOGY_PRICES_SOLO_MIGRATION,
   FLEET_MERGE_ORDERS_SOLO_MIGRATION,
+  FORTRESS_PRICE_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
