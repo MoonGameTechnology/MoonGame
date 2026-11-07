@@ -773,17 +773,11 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #tech,#steward,#battlewin{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #tech.show,#steward.show,#battlewin.show{display:flex;}
-/* Окно построек — тот же каркас, но НИЖЕ кодекса (z46): тап по строке открывает
-   карточку здания, и она обязана лечь ПОВЕРХ окна, а не под ним. */
-#buildwin{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;padding:16px;
-  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
-#buildwin.show{display:flex;}
-#tech .twbox,#steward .twbox,#battlewin .twbox,#buildwin .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
+#tech .twbox,#steward .twbox,#battlewin .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
   box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
 .tw-close{width:28px;height:28px;border-radius:6px;}
 #techbody,#stewardbody,#battlewinbody,#herobody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
-#buildwinbody{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0;}
 /* heroes window: roster cards + abilities / skill tree / fittings */
 #herobody .hx-card{border:1px solid var(--line-hi);border-radius:10px;padding:11px 13px;margin-bottom:12px;background:rgba(53,214,230,.04);}
 #herobody .hx-card.dead{opacity:.55;border-style:dashed;}

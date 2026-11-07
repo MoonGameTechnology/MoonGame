@@ -45,6 +45,7 @@ import {
   FLEET_MERGE_ORDERS_SOLO_MIGRATION as fleetMergeOrders,
   FORTRESS_PRICE_SOLO_MIGRATION as fortressPrice,
   LONG_RANGE_OPTICS_SOLO_MIGRATION as longRangeOptics,
+  PRODUCTION_WORKBENCH_SOLO_MIGRATION as productionWorkbench,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -202,7 +203,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement, controlTech, viceroy, technologyPrices, fleetMergeOrders, fortressPrice, longRangeOptics]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement, controlTech, viceroy, technologyPrices, fleetMergeOrders, fortressPrice, longRangeOptics, productionWorkbench]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
@@ -713,4 +714,16 @@ describe('the viceroy catalogue and rules pair (0.1.80 → 0.1.81)', () => {
       } },
     });
   });
+});
+
+
+it('production migration preserves paid jobs, waiting order IDs and hero clocks', () => {
+  const before = oldSave();
+  before.state.version = { data: productionWorkbench.fromData, dataHash: productionWorkbench.fromDataHash, manifest: '1' };
+  before.state.planets.A!.buildQueue = [{ id: 20, playerId: 'p1', kind: 'unit', unit: 'militia', count: 2 }];
+  before.state.heroes = { h: { id: 'h', owner: 'p1', location: 'A', cooldowns: {}, mobilization: { target: 'A', startedAt: 100, readyAt: 999999 } } };
+  before.state.scheduled.push({ id: 'hero:old', seq: 21, type: 'hero.mobilization.complete', at: 999999, payload: { heroId: 'h', readyAt: 999999 } });
+  before.state.scheduleSeq = 22;
+  const raw = serializeSoloSave(before, productionWorkbench.fromRules);
+  expect(parseCompatibleSoloSave(raw, productionWorkbench.toRules)).toEqual(before);
 });

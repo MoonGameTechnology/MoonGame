@@ -49,6 +49,23 @@ export interface TrainingTourDeps {
   introduced?: (fleetId: string) => boolean;
 }
 
+const step = (
+  stage: TrainingStage,
+  id: string,
+  target: string | null,
+  advance: StepAdvance,
+  extra: Partial<SpotlightStep> = {},
+): SpotlightStep => ({
+  id: `${stage}.${id}`,
+  stage,
+  target,
+  copy: `training.guide.${stage}.${id}`,
+  advance,
+  collapsible: true,
+  holdClock: target !== null,
+  ...extra,
+});
+
 export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
   const { me, data, baseline: b, ui } = d;
   const state = (when: () => boolean): StepAdvance => ({ on: 'state', when });
@@ -56,22 +73,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
   const f = (role: TrainingFleetRole) => trainingFleet(d.world(), me, role);
   const has = (id: string) => owns(d.world(), me, id);
   const visible = (selector: string) => state(() => ui.visible(selector));
-  const step = (
-    stage: TrainingStage,
-    id: string,
-    target: string | null,
-    advance: StepAdvance,
-    extra: Partial<SpotlightStep> = {},
-  ): SpotlightStep => ({
-    id: `${stage}.${id}`,
-    stage,
-    target,
-    copy: `training.guide.${stage}.${id}`,
-    advance,
-    collapsible: true,
-    holdClock: target !== null,
-    ...extra,
-  });
+
   const world = (stage: TrainingStage, id: string, planet: string) =>
     step(
       stage,
@@ -130,8 +132,8 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     step(
       stage,
       id,
-      '#buildwin .tw-close',
-      state(() => !ui.visible('#buildwin.show')),
+      '#constructor .cn-close',
+      state(() => !ui.visible('#constructor.show')),
       { copy: 'training.guide.catalog-close' },
     );
   const at = (role: TrainingFleetRole, planet: string) =>
@@ -188,20 +190,20 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     ...(role === 'hero' ? [fleet(stage, `${id}-arrived-fleet`, role)] : []),
   ];
   const building = (stage: TrainingStage, id: string, type: string, upgrade = false) => [
-    step(stage, `${id}-catalog`, '[data-act="openbuild"]', visible('#buildwin.show [data-bwtab]'), {
+    step(stage, `${id}-catalog`, '[data-act="openbuild"]', visible('#constructor.show [data-bwtab]'), {
       copy: 'training.guide.build.catalog',
     }),
     step(
       stage,
       `${id}-all`,
-      '#buildwin [data-bwtab="*"]',
-      visible(`#buildwin [data-bw-${upgrade ? 'up' : 'go'}="${type}"]`),
+      '#constructor [data-bwtab="*"]',
+      visible(`#constructor [data-bw-${upgrade ? 'up' : 'go'}="${type}"]`),
       { copy: 'training.guide.build.all' },
     ),
     step(
       stage,
       `${id}-order`,
-      `#buildwin [data-bw-${upgrade ? 'up' : 'go'}="${type}"]`,
+      `#constructor [data-bw-${upgrade ? 'up' : 'go'}="${type}"]`,
       action(upgrade ? 'building.upgrade' : 'building.construct'),
       { copy: `training.guide.build.${type}` },
     ),
@@ -308,9 +310,10 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       'economy',
       'catalog',
       '[data-act="openunits"][data-arg="ships"]',
-      visible('#buildwin.show [data-unit-info="cruiser"]'),
+      visible('#constructor.show [data-cnhull="cruiser"]'),
     ),
-    step('economy', 'ship-order', '#buildwin [data-unit-go="cruiser"]', action('unit.build')),
+    step('economy', 'ship-select', '#constructor [data-cnhull="cruiser"]', visible('#constructor [data-cnhull="cruiser"].on'), { copy: 'onb.guide.build.units' }),
+    step('economy', 'ship-order', '#constructor [data-cnbuild]', action('unit.build')),
     close('economy', 'ship-close'),
     step(
       'economy',
@@ -535,12 +538,13 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       'finale',
       'catalog',
       '[data-act="openunits"][data-arg="ground"]',
-      visible('#buildwin.show [data-unit-go="heavy_infantry"]'),
+      visible('#constructor.show [data-cnhull="heavy_infantry"]'),
     ),
+    step('finale', 'recruit-select', '#constructor [data-cnhull="heavy_infantry"]', visible('#constructor [data-cnhull="heavy_infantry"].on'), { copy: 'onb.guide.build.units' }),
     step(
       'finale',
       'recruit',
-      '#buildwin [data-unit-go="heavy_infantry"]',
+      '#constructor [data-cnbuild]',
       state(() => trainingRecruits(d.world(), me) >= 8),
       { holdClock: false },
     ),

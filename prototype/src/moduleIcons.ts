@@ -1,3 +1,5 @@
+import { data } from './gameData';
+import { MODULE_PICTOGRAMS } from './modulePictograms';
 /**
  * Значки модулей и отсеков — общие для конструктора (`shipyard.ts`) и карточки корабля
  * (`shipCard.ts`): один и тот же модуль обязан выглядеть одинаково там, где его надевают,
@@ -42,5 +44,5 @@ export const MODULE_ICON: Record<string, string> = {
 };
 
 export function moduleIcon(id: string): string {
-  return MODULE_ICON[id] ?? '▪';
+  return MODULE_PICTOGRAMS[id] ? `<span class="module-pictogram slot-${data.modules[id]?.slot ?? 'utility'}">${MODULE_PICTOGRAMS[id]}${id.startsWith('void_shield_') ? `<small>${id.slice(12).toUpperCase()}</small>` : ''}</span>` : MODULE_ICON[id] ?? '▪';
 }

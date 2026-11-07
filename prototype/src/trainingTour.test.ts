@@ -21,7 +21,7 @@ const steps = (mobile = false) =>
 describe('пошаговый полигон Sector Zero', () => {
   it('teaches upgrading the seeded mine instead of ordering a duplicate', () => {
     const order = steps().find((s) => s.id === 'economy.mine-order')!;
-    expect(order.target).toBe('#buildwin [data-bw-up="mine"]');
+    expect(order.target).toBe('#constructor [data-bw-up="mine"]');
     const tour = new SpotlightTour([order], { locate: () => null, render: () => {} });
     tour.start();
     tour.notifyAction('building.construct');

@@ -31,7 +31,7 @@ export function findHealthyStack(
   const service = battles === undefined ? null : serviceKey(battles);
   return stacks.find(
     (s) =>
-      s.unit === unit &&
+      !s.heroId && s.unit === unit &&
       s.hp === undefined &&
       s.shieldHp === undefined &&
       loadoutKey(s.modules) === key &&
@@ -184,7 +184,7 @@ export function takeFromStacks(
     const move = Math.min(st.count, remaining);
     remaining -= move;
     const frac = move / st.count; // share of the pools that leaves with the taken ships
-    const t: UnitStack = { unit, count: move };
+    const t: UnitStack = { unit, count: move, ...(st.heroId ? { heroId: st.heroId } : {}) };
     if (st.hp !== undefined) {
       t.hp = st.hp * frac;
       st.hp -= t.hp; // source keeps the remainder — total pool conserved
@@ -230,7 +230,7 @@ export function mergeStacks(base: UnitStack[], add: UnitStack[]): UnitStack[] {
     const match = healthy
       ? out.find(
           (o) =>
-            o.unit === st.unit &&
+            o.unit === st.unit && o.heroId === st.heroId &&
             o.hp === undefined &&
             o.shieldHp === undefined &&
             o.armyGroup === st.armyGroup &&

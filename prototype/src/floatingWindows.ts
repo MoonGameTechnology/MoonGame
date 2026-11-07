@@ -5,7 +5,6 @@ import type { HoloPoint, HoloRect } from './holographicLayout';
 const WINDOWS = [
   ['holo-selection-window', '', '.phead,.holo-command-head,.chlabel'],
   ['tech', '.twbox', '.lw-head'],
-  ['buildwin', '.twbox', '.lw-head'],
   ['steward', '.twbox', '.lw-head'],
   ['scipick', '.twbox', '.lw-head'],
   ['logwin', '.lwbox', '.lw-head'],

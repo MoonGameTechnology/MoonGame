@@ -526,6 +526,17 @@ export const LONG_RANGE_OPTICS_SOLO_MIGRATION = {
   toDataHash: '134b32679b2ec3',
 } as const;
 
+/** Shared mobilization and selectable flagships. Existing paid jobs and clocks remain;
+ * legacy parallel ground jobs finish before another mobilization starts. New fields are optional. */
+export const PRODUCTION_WORKBENCH_SOLO_MIGRATION = {
+  fromRules: LONG_RANGE_OPTICS_SOLO_MIGRATION.toRules,
+  fromData: LONG_RANGE_OPTICS_SOLO_MIGRATION.toData,
+  fromDataHash: LONG_RANGE_OPTICS_SOLO_MIGRATION.toDataHash,
+  toRules: '1de9e10c071afd',
+  toData: LONG_RANGE_OPTICS_SOLO_MIGRATION.toData,
+  toDataHash: LONG_RANGE_OPTICS_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -572,6 +583,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   FLEET_MERGE_ORDERS_SOLO_MIGRATION,
   FORTRESS_PRICE_SOLO_MIGRATION,
   LONG_RANGE_OPTICS_SOLO_MIGRATION,
+  PRODUCTION_WORKBENCH_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

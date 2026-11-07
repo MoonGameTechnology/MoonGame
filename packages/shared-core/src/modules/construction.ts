@@ -1,3 +1,5 @@
+import { hasShipyard, hasGroundFacility, GROUND_FACILITY, unitYardLevelBlocker } from '../state/buildFacilities';
+export { hasShipyard, unitBuildSiteBlocker, unitYardLevelBlocker } from '../state/buildFacilities';
 import type { BuildUnitPayload, CompletePayload } from '../state/construction';
 import { constructionModuleSnapshot, completionModuleSnapshot } from '../util/arsenalLoadout';
 import type { StructureDamage } from '../util/structureDamage';
@@ -15,7 +17,7 @@ import type {
   ScheduledEvent,
   UnitStack,
 } from '../state/gameState';
-import type { BuildingDef, GameData, ResourceBag, UnitDef } from '../data/schemas';
+import type { GameData, ResourceBag } from '../data/schemas';
 import { buildingLevel, buildingMaxLevel } from '../data/schemas';
 import { isBombarded } from '../state/orbit';
 import { battleAt } from '../state/battle';
@@ -36,6 +38,7 @@ import {
   withBonusSlots,
 } from '../util/loadout';
 import { isInfected, worksFor } from '../util/infestation';
+import { mobilizationHead, mobilizationBusy, queuedHeroCount } from '../state/mobilization';
 import { isBuildLane, orderLane, UNIT_LANES, type BuildLane } from '../state/buildLane';
 import { buildingRepairQuote, stationBerth, FORTRESS_CORE, fortressAssemblyScale,
   fortressFleetId, refreshFortressBody } from '../state/fortress';
@@ -290,6 +293,7 @@ const QUEUE_RETRY_HOURS = 1;
 /** Идёт ли на мире стройка в этой полосе прямо сейчас. Неразборчивый `kind` считается
  *  полосой зданий — в сторону «занято», а не «свободно» (инвариант #4). */
 function laneBusy(h: HandlerContext, planetId: string, lane: BuildLane): boolean {
+  if (lane === 'mobilization') return mobilizationBusy(h.state, planetId, h.ctx.data);
   return h.state.scheduled.some((e) => {
     if (e.type !== 'construction.complete') return false;
     const p = e.payload as CompletePayload;
@@ -305,7 +309,7 @@ function enqueueOrder(
 ): string | null {
   const queue = planet.buildQueue ?? [];
   const lane = orderLane(h.ctx.data, order);
-  if (queue.filter((q) => orderLane(h.ctx.data, q) === lane).length >= MAX_BUILD_QUEUE) {
+  if (queue.filter((q) => orderLane(h.ctx.data, q) === lane).length + (lane === 'mobilization' ? queuedHeroCount(h.state, planet.id) : 0) >= MAX_BUILD_QUEUE) {
     return 'E_QUEUE_FULL';
   }
   // Личность из счётчика запланированных событий — чтобы `construction.cancel` брал
@@ -386,6 +390,7 @@ function suppressed(h: HandlerContext, planetId: string): 'E_BOMBARDED' | 'E_BAT
 }
 
 function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): void {
+  if (lane === 'infantry' || lane === 'vehicles') lane = 'mobilization';
   if (laneBusy(h, planet.id, lane)) return;
   if (suppressed(h, planet.id)) {
     // Узел не работает — не старт, а пауза. Но пауза с повтором: без него голова очереди,
@@ -395,6 +400,10 @@ function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): vo
     return;
   }
   for (;;) {
+    if (lane === 'mobilization' && mobilizationHead(h.state, planet.id, h.ctx.data)?.heroId) {
+      h.emit('hero.mobilization.pump', { planetId: planet.id, owner: planet.owner });
+      return;
+    }
     const queue = planet.buildQueue ?? [];
     const head = queue.find((q) => orderLane(h.ctx.data, q) === lane);
     if (!head) return;
@@ -450,108 +459,6 @@ function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): vo
 /** Полоса юнитов будит ВСЕ полосы юнитов (`UNIT_LANES`): мост с общей `units` BLD-1 в сейве. */
 function startNextAfter(h: HandlerContext, planet: Planet, lane: BuildLane): void {
   for (const l of lane === 'buildings' ? [lane] : UNIT_LANES) startNextQueued(h, planet, l);
-}
-
-/** Строительные способности здания — те, что гейтят `unit.build`. */
-type ConstructionCapability =
-  | 'enablesShipConstruction'
-  | 'enablesInfantryConstruction'
-  | 'enablesVehicleConstruction';
-
-/** Открыта ли способность у здания ЭТОГО уровня. База — флаг самого здания; дальше
- *  способность может открыть любой ПРОЙДЕННЫЙ апгрейд, и назад она не выключается
- *  (см. `BuildingLevelSchema`: «уровень открывает», а не «уровень умеет»).
- *
- *  Раньше здесь читался только базовый def, и это делало данные немой опечаткой:
- *  здание объявляет способность в апгрейдах — «второй уровень открывает», — а гейт
- *  этого не видел, и юнит оказывался непостроим вовсе. Та же ловушка сторожится для
- *  вместимости ангара (`shuttleBay`, SHU-1.1), которую читает `shuttleBayAt`. */
-function capabilityAt(def: BuildingDef, level: number, key: ConstructionCapability): boolean {
-  if (def[key]) return true;
-  for (let l = 2; l <= level; l++) {
-    if (def.upgrades[l - 2]?.[key]) return true;
-  }
-  return false;
-}
-
-/** True if some standing (undestroyed) building on the planet has the capability at
- *  its current level. */
-function hasCapability(planet: Planet, data: GameData, key: ConstructionCapability): boolean {
-  return planet.buildings.some((b) => {
-    if (b.hp <= 0) return false;
-    const def = data.buildings[b.type];
-    return def ? capabilityAt(def, b.level, key) : false;
-  });
-}
-
-/** The yard a space-domain hull needs to be laid down (shipyard/spaceport). Ground
- *  units never check this. Exported for the client's rally-point offer (RALLY-1): the
- *  button belongs to worlds that can lay down a hull, by the same rule. */
-export function hasShipyard(planet: Planet, data: GameData): boolean {
-  return hasCapability(planet, data, 'enablesShipConstruction');
-}
-
-/** Какой уровень верфи нужен корпусу этого класса (решение владельца 15). Класс не
- *  объявлен — корабль довольствуется любой верфью, как было до FORT-5.5. */
-const YARD_LEVEL_FOR: Record<string, number> = { light: 1, medium: 2, heavy: 3 };
-
-/** Самый большой СТАПЕЛЬ узла: максимальный уровень среди живых верфей. Максимум, а не
- *  сумма: две верфи первого уровня не собирают линкор — нужен один стапель нужного
- *  размера. (Ср. `shuttleBay`, где вместимость как раз СКЛАДЫВАЕТСЯ: причалов может быть
- *  много, а стапель для корпуса нужен один.) */
-function yardLevelAt(planet: Planet, data: GameData): number {
-  let best = 0;
-  for (const b of planet.buildings) {
-    if (b.hp <= 0) continue;
-    const def = data.buildings[b.type];
-    // Способность читается через `capabilityAt`, а НЕ через `buildingLevel`: разбор
-    // уровня отдаёт числовые поля, а флаги способностей в него не входят вовсе, и
-    // `buildingLevel(def, 1).enablesShipConstruction` молча равен `undefined`. На этом
-    // первая версия и попалась — лёгкий корпус не проходил на верфи первого уровня.
-    if (def && capabilityAt(def, b.level, 'enablesShipConstruction')) best = Math.max(best, b.level);
-  }
-  return best;
-}
-
-/** Здание, без которого наземный юнит не заложить: КАЗАРМЫ для пехоты, ЗАВОД для
- *  техники (ROS-1.1). Род войск живёт в данных (`UnitDef.kind`), поэтому новый род
- *  вводится юнитом и зданием, а не правкой этой функции. */
-const GROUND_FACILITY = {
-  infantry: { capability: 'enablesInfantryConstruction', code: 'E_NO_BARRACKS' },
-  vehicle: { capability: 'enablesVehicleConstruction', code: 'E_NO_FACTORY' },
-} as const satisfies Record<string, { capability: ConstructionCapability; code: string }>;
-
-function hasGroundFacility(planet: Planet, data: GameData, kind: UnitDef['kind']): boolean {
-  return hasCapability(planet, data, GROUND_FACILITY[kind].capability);
-}
-
-/**
- * ГДЕ ЭТОТ ЮНИТ ВООБЩЕ МОЖНО ЗАЛОЖИТЬ — тот же гейт зданий, что применяет `unit.build`,
- * вынесенный наружу чистой функцией. Возвращает код отказа или `null`, если мир годится.
- *
- * Экспортируется РАДИ ИНТЕРФЕЙСА (ROS-3.1):
- * экран «Производство» показывает список миров, где заказ пройдёт, и своя копия этих
- * правил разъехалась бы на первой же правке — игрок выбирал бы мир, на котором ядро
- * отвечает отказом. Спрашивать надо ту функцию, по которой ядро и решает.
- *
- * С SHU-5.1 гейт весь постоянный: космопорт держит сколько угодно челноков, и предела
- * «ангар полон», зависевшего бы от очереди заказов, больше нет.
- */
-export function unitBuildSiteBlocker(
-  planet: Planet,
-  def: UnitDef,
-  data: GameData,
-): 'E_NO_PORT' | 'E_NO_SHIPYARD' | 'E_NO_BARRACKS' | 'E_NO_FACTORY' | null {
-  if (def.traits.includes('shuttle')) {
-    return shuttleBayAt(planet, data) > 0 ? null : 'E_NO_PORT';
-  }
-  if (def.domain === 'space') {
-    return hasShipyard(planet, data) ? null : 'E_NO_SHIPYARD';
-  }
-  if (def.domain === 'ground') {
-    return hasGroundFacility(planet, data, def.kind) ? null : GROUND_FACILITY[def.kind].code;
-  }
-  return null;
 }
 
 function requireUnlocked(
@@ -884,7 +791,7 @@ export const constructionModule: GameModule = {
   // 1.12.0 combines paid module snapshots with immediate structure casualties.
   // 1.13.0: the requirement hook names the order's world; queued units re-ask it (BAL-19).
   // 1.14.0: a running unit build is parked when its world leaves control; resume re-asks (BAL-19).
-  version: '1.14.0',
+  version: '1.15.0',
   setup(api) {
     api.provideCapability<StructureDamage>('construction.impact', (h, id, amount, owner, covered) => {
       const planet = h.state.planets[id];
@@ -1158,12 +1065,8 @@ export const constructionModule: GameModule = {
       // `E_NO_SHIPYARD`: «верфи нет» и «верфь мала» игроку говорят разное — первое лечится
       // постройкой, второе прокачкой, и подменять их значило бы отправить его строить
       // вторую верфь там, где нужна та же, но выше.
-      if (!isShuttle && def.domain === 'space' && def.hullClass) {
-        const need = YARD_LEVEL_FOR[def.hullClass] ?? 1;
-        if (yardLevelAt(planet, h.ctx.data) < need) {
-          return h.reject('E_YARD_TOO_SMALL');
-        }
-      }
+      const yardBlock = unitYardLevelBlocker(planet, def, h.ctx.data);
+      if (yardBlock) return h.reject(yardBlock);
       // Наземный юнит идёт в СВОЁ здание: пехота в казармы, техника на завод
       // (ROS-1.1). Отказ называет недостающее здание, а не «наземное производство» —
       // игроку из кода отказа должно быть видно, что именно строить.
@@ -1223,7 +1126,7 @@ export const constructionModule: GameModule = {
         const valid = validateLoadout(payload.unit, hull, modules, h.ctx.data);
         if (!valid.ok) return h.reject(valid.code);
       }
-      if (laneBusy(h, planet.id, orderLane(h.ctx.data, { kind: 'unit', unit: payload.unit }))) {
+      if (laneBusy(h, planet.id, orderLane(h.ctx.data, { kind: 'unit', unit: payload.unit })) || (orderLane(h.ctx.data, { kind: 'unit', unit: payload.unit }) === 'mobilization' && mobilizationHead(h.state, planet.id, h.ctx.data))) {
         const code = enqueueOrder(h, planet, {
           kind: 'unit',
           playerId: action.playerId,
@@ -1299,6 +1202,7 @@ export const constructionModule: GameModule = {
           playerId: action.playerId,
           waiting: true,
         });
+        startNextAfter(h, planet, orderLane(h.ctx.data, waiting));
         return;
       }
       const event = h.state.scheduled.find(
@@ -1363,7 +1267,7 @@ export const constructionModule: GameModule = {
       // приостановленная стройка уже хранит свой прогресс и остаток цены отдельно
       // (`PausedConstructionSite`), и заводить ей второе место ожидания значило бы
       // держать одну сущность в двух списках. Игрок возобновит, когда полоса освободится.
-      if (laneBusy(h, planet.id, orderLane(h.ctx.data, site))) {
+      if (laneBusy(h, planet.id, orderLane(h.ctx.data, site)) || (orderLane(h.ctx.data, site) === 'mobilization' && mobilizationHead(h.state, planet.id, h.ctx.data))) {
         return h.reject('E_LANE_BUSY');
       }
       if (!canAfford(player.resources, site.remainingCost)) {
@@ -1429,7 +1333,7 @@ export const constructionModule: GameModule = {
       const planet = h.state.planets[p.planetId];
       if (!planet) return;
       if (p.lane === 'units') startNextAfter(h, planet, 'ships');
-      else startNextQueued(h, planet, isBuildLane(p.lane) ? p.lane : 'buildings');
+      else startNextQueued(h, planet, p.lane === 'infantry' || p.lane === 'vehicles' ? 'mobilization' : isBuildLane(p.lane) ? p.lane : 'buildings');
     });
 
     /**

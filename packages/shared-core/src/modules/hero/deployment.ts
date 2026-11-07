@@ -6,6 +6,10 @@ import { activeHeroCount, heroActiveCap } from '../../state/heroDeployment';
 import { isForkSite } from '../../state/forkSite';
 import { getStance, stanceToRelation } from '../../state/diplomacy';
 import { fleetForOrder } from '../../util/fleet';
+import { mobilizationBusy, mobilizationHead, queuedHeroCount } from '../../state/mobilization';
+import { orderLane } from '../../state/buildLane';
+import { battleAt } from '../../state/battle';
+import { isBombarded } from '../../state/orbit';
 import { matchHours } from '../../util/pricing';
 
 type Destination = { at: string; beside?: string } | { code: string };
@@ -64,6 +68,7 @@ export function registerHeroDeployment(api: ModuleSetupApi, bodies: DeploymentBo
     if (typeof heroId !== 'string') return;
     const hero = h.state.heroes?.[heroId];
     if (!hero || hero.alive || hero.mobilization) return;
+    if (!requirement(h, hero).allowed) return;
     const owner = hero.owner;
     if (activeHeroCount(h.state, owner) >= heroActiveCap(h.state, owner, h.ctx.data)) return;
     const owned = (id: PlanetId | undefined): id is PlanetId =>
@@ -96,11 +101,101 @@ export function registerHeroDeployment(api: ModuleSetupApi, bodies: DeploymentBo
       deploy(h, hero, target);
       return;
     }
+    if (h.state.planets[at]) {
+      const waiting =
+        (h.state.planets[at]!.buildQueue ?? []).filter(
+          (q) => orderLane(h.ctx.data, q) === 'mobilization',
+        ).length + queuedHeroCount(h.state, at);
+      if (waiting >= 5) return h.reject('E_QUEUE_FULL');
+      hero.mobilization = {
+        target: at,
+        startedAt: h.ctx.now,
+        readyAt: 0,
+        queued: true,
+        orderId: h.state.scheduleSeq++,
+      };
+      pump(h, at);
+    } else start(h, hero, at); // spawn_fleet retains its existing destination contract
+  });
+
+  function start(h: HandlerContext, hero: Hero, at: string): void {
     const hours = h.ctx.data.units[bodies.heroShipUnit(h, hero)]?.buildTimeHours || 10;
     const readyAt = h.ctx.now + hoursToMs(h.ctx, matchHours(h.state, hours));
     hero.mobilization = { target: at, startedAt: h.ctx.now, readyAt };
-    h.schedule(readyAt, 'hero.mobilization.complete', { heroId, readyAt });
-    h.emit('hero.mobilization.started', { owner: hero.owner, heroId, at, readyAt });
+    h.schedule(readyAt, 'hero.mobilization.complete', { heroId: hero.id, readyAt });
+    h.emit('hero.mobilization.started', { owner: hero.owner, heroId: hero.id, at, readyAt });
+  }
+  function retry(h: HandlerContext, planetId: string): void {
+    if (
+      !h.state.scheduled.some(
+        (e) =>
+          e.type === 'hero.mobilization.pump' &&
+          (e.payload as { planetId?: string }).planetId === planetId,
+      )
+    )
+      h.schedule(h.ctx.now + hoursToMs(h.ctx, 1), 'hero.mobilization.pump', { planetId });
+  }
+  function pump(h: HandlerContext, planetId: string): void {
+    const head = mobilizationHead(h.state, planetId, h.ctx.data);
+    if (!head) return;
+    if (mobilizationBusy(h.state, planetId, h.ctx.data)) {
+      retry(h, planetId);
+      return;
+    }
+    if (!head.heroId) {
+      h.emit('construction.queue.pump', { planetId, lane: 'mobilization' });
+      return;
+    }
+    const hero = h.state.heroes?.[head.heroId];
+    if (!hero?.mobilization?.queued) return;
+    const target = destination(h, hero, planetId);
+    if (
+      'code' in target ||
+      !requirement(h, hero).allowed ||
+      hero.alive === true ||
+      activeHeroCount(h.state, hero.owner) > heroActiveCap(h.state, hero.owner, h.ctx.data)
+    ) {
+      delete hero.mobilization;
+      h.emit('hero.mobilization.cancelled', { owner: hero.owner, heroId: hero.id });
+      pump(h, planetId);
+      return;
+    }
+    if (battleAt(h.state, planetId) || isBombarded(h.state, planetId, h.ctx.data)) {
+      retry(h, planetId);
+      return;
+    }
+    start(h, hero, planetId);
+  }
+  api.on('hero.mobilization.pump', (event, h) => {
+    const planetId = (event.payload as { planetId?: string })?.planetId;
+    if (typeof planetId === 'string') pump(h, planetId);
+  });
+  api.on('planet.captured', (event, h) => {
+    const planetId = (event.payload as { planetId?: string })?.planetId;
+    if (typeof planetId !== 'string') return;
+    for (const hero of Object.values(h.state.heroes ?? {})) {
+      if (hero.mobilization?.target !== planetId || !('code' in destination(h, hero, planetId)))
+        continue;
+      delete hero.mobilization;
+      h.state.scheduled = h.state.scheduled.filter(
+        (e) =>
+          e.type !== 'hero.mobilization.complete' ||
+          (e.payload as { heroId?: string }).heroId !== hero.id,
+      );
+      h.emit('hero.mobilization.cancelled', { owner: hero.owner, heroId: hero.id });
+    }
+    pump(h, planetId);
+  });
+  api.onAction('hero.mobilization.cancel', (action, h) => {
+    const heroId = (action.payload as { heroId?: string })?.heroId;
+    if (typeof heroId !== 'string') return h.reject('E_BAD_PAYLOAD');
+    const hero = h.state.heroes?.[heroId];
+    if (!hero || hero.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+    if (!hero.mobilization?.queued) return h.reject('E_FORBIDDEN');
+    const at = hero.mobilization.target;
+    delete hero.mobilization;
+    h.emit('hero.mobilization.cancelled', { owner: hero.owner, heroId });
+    pump(h, at);
   });
 
   api.on('hero.mobilization.complete', (event, h) => {
@@ -108,7 +203,25 @@ export function registerHeroDeployment(api: ModuleSetupApi, bodies: DeploymentBo
     if (typeof heroId !== 'string') return;
     const hero = h.state.heroes?.[heroId];
     const pending = hero?.mobilization;
-    if (!hero || !pending || pending.readyAt !== readyAt || h.ctx.now < pending.readyAt) return;
+    if (
+      !hero ||
+      !pending ||
+      pending.queued ||
+      pending.readyAt !== readyAt ||
+      h.ctx.now < pending.readyAt
+    )
+      return;
+    if (
+      h.state.planets[pending.target] &&
+      !('code' in destination(h, hero, pending.target)) &&
+      (battleAt(h.state, pending.target) || isBombarded(h.state, pending.target, h.ctx.data))
+    ) {
+      h.schedule(h.ctx.now + hoursToMs(h.ctx, 1), 'hero.mobilization.complete', {
+        heroId,
+        readyAt,
+      });
+      return;
+    }
     delete hero.mobilization;
     const target = destination(h, hero, pending.target);
     const required = requirement(h, hero);
@@ -121,8 +234,10 @@ export function registerHeroDeployment(api: ModuleSetupApi, bodies: DeploymentBo
       activeHeroCount(h.state, hero.owner) >= heroActiveCap(h.state, hero.owner, h.ctx.data)
     ) {
       h.emit('hero.mobilization.cancelled', { owner: hero.owner, heroId });
+      pump(h, pending.target);
       return;
     }
     deploy(h, hero, target);
+    pump(h, pending.target);
   });
 }

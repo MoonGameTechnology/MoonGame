@@ -96,9 +96,9 @@ export function buildFirstMatchTour(d: FirstMatchDeps): SpotlightStep[] {
   const fleet: SpotlightStep[] = [
     step('ships-tab', '[data-act="tab"][data-arg="ships"]', d.shipsTabOpen),
     step('catalog', '[data-act="openunits"][data-arg="ships"]', d.catalogOpen),
-    step('ship', '#buildwin [data-unit-info="frigate"] .bw-ih b', d.shipCardOpen),
+    step('ship', '#constructor [data-pw-info="unit:frigate"]', d.shipCardOpen),
     step('ship-order', '#codex [data-build="unit:frigate"]', d.shipOrdered, { inDialog: true }),
-    step('catalog-close', '#buildwin .tw-close', () => !d.catalogOpen()),
+    step('catalog-close', '#constructor .cn-close', () => !d.catalogOpen()),
     step('ship-wait', null, d.hasShip),
     step('fleet', null, d.fleetSelected, {
       selector: d.fleetSelector,

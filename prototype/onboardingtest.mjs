@@ -79,9 +79,9 @@ const controls = {
   'research-close': '#tech .tw-close',
   'ships-tab': '[data-act="tab"][data-arg="ships"]',
   catalog: '[data-act="openunits"][data-arg="ships"]',
-  ship: '#buildwin [data-unit-info="frigate"] .bw-ih b',
+  ship: '#constructor [data-pw-info="unit:frigate"]',
   'ship-order': '#codex [data-build="unit:frigate"]',
-  'catalog-close': '#buildwin .tw-close',
+  'catalog-close': '#constructor .cn-close',
   move: '[data-cmd="move"]',
   'course-confirm': '[data-cmd="mobile-send"]',
 };

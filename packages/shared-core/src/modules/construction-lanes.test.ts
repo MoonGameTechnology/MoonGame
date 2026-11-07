@@ -147,11 +147,11 @@ function activeUnits(s: GameState): string[] {
 }
 
 describe('BLD-2.1 — полоса юнита = его производственная постройка', () => {
-  it('корабль, челнок, пехота и техника — четыре разные полосы, стройка — пятая', () => {
+  it('ships and shuttles are independent; infantry and vehicles share mobilization', () => {
     expect(unitLane(data.units.cruiser)).toBe('ships');
     expect(unitLane(data.units.lifter)).toBe('shuttles');
-    expect(unitLane(data.units.trooper)).toBe('infantry');
-    expect(unitLane(data.units.tank)).toBe('vehicles');
+    expect(unitLane(data.units.trooper)).toBe('mobilization');
+    expect(unitLane(data.units.tank)).toBe('mobilization');
     expect(orderLane(data, { kind: 'upgrade' })).toBe('buildings');
     // Снятый из данных юнит всё равно получает определённую полосу.
     expect(orderLane(data, { kind: 'unit', unit: 'gone' })).toBe('ships');
@@ -162,8 +162,8 @@ describe('BLD-2.1 — полоса юнита = его производстве�
     const LANE_OF_BLOCKER = {
       E_NO_SHIPYARD: 'ships',
       E_NO_PORT: 'shuttles',
-      E_NO_BARRACKS: 'infantry',
-      E_NO_FACTORY: 'vehicles',
+      E_NO_BARRACKS: 'mobilization',
+      E_NO_FACTORY: 'mobilization',
     } as const;
     const empty: Planet = { ...planet('N', 'p1', []) };
     for (const [id, def] of Object.entries(real.units)) {
@@ -174,14 +174,14 @@ describe('BLD-2.1 — полоса юнита = его производстве�
 });
 
 describe('BLD-2.1 — пехота не ждёт корабль', () => {
-  it('юниты разных построек строятся одновременно и оплачиваются сразу', () => {
+  it('only active lanes are charged; the vehicle waits behind infantry', () => {
     const kernel = createKernel([constructionModule]);
     let s = stateWith(100);
     for (const u of ['cruiser', 'trooper', 'tank', 'lifter'])
       s = okApply(kernel.applyAction(s, build(u), ctx(0))).state;
-    expect(s.planets.A?.buildQueue).toBeUndefined();
-    expect(activeUnits(s)).toEqual(['cruiser', 'lifter', 'tank', 'trooper']);
-    expect(s.players.p1?.resources.metal).toBe(100 - 10 - 2 - 5 - 4);
+    expect(s.planets.A?.buildQueue?.map(q=>q.unit)).toEqual(['tank']);
+    expect(activeUnits(s)).toEqual(['cruiser', 'lifter', 'trooper']);
+    expect(s.players.p1?.resources.metal).toBe(100 - 10 - 2 - 4);
   });
 
   it('второй пехотинец ждёт первого, а верфь тем временем свободна', () => {

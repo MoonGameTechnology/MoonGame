@@ -972,6 +972,34 @@ const arriveModule: GameModule = {
 };
 
 describe('hero — fleet combat aura (+5%)', () => {
+  it.each(['alive', 'dead', 'missing', 'other-fleet', 'other-owner', 'destroyed'] as const)(
+    'custom flagship buffs its escorts only with a living bound hero: %s', (mode) => {
+      const kernel = createKernel([heroModule, combatModule, arriveModule]);
+      const s = createInitialState({ seed: 'aura', version: { data: '0.1.0', manifest: '1' } });
+      const count = mode === 'destroyed' ? 0 : 1;
+      const st: GameState = {
+        ...s,
+        players: { p1: player('p1'), p2: player('p2') },
+        planets: { P: planet('P', null, 0, 0, [], 'planet') },
+        heroes: mode === 'missing' ? {} : { commander: {
+          id: 'commander', owner: mode === 'other-owner' ? 'p2' : 'p1',
+          fleetId: mode === 'other-fleet' ? 'D' : 'A', alive: mode !== 'dead',
+          location: 'P', cooldowns: {}, flagship: 'warship',
+        } },
+        fleets: {
+          A: { id: 'A', owner: 'p1', location: 'P', movement: null, traits: [], units: [
+            { unit: 'warship', count: 1 }, { unit: 'warship', count, heroId: 'commander' },
+          ] },
+          D: { id: 'D', owner: 'p2', location: 'P', movement: null, traits: [], units: [{ unit: 'warship', count: 1 }] },
+        },
+      };
+      const started = okApply(kernel.applyAction(st, act('arrive', 'p1', { fleetId: 'A' }), ctx(0)));
+      const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR)));
+      const round = r.events.find(e => e.type === 'combat.round')?.payload as { dmgToDefender: number };
+      expect(round.dmgToDefender).toBeCloseTo(20 * (count + 1) * (mode === 'alive' ? 1.05 : 1), 10);
+    },
+  );
+
   it('a hero-carrying fleet hits 5% harder; a heroless fleet does not', () => {
     const kernel = createKernel([heroModule, combatModule, arriveModule]);
     const s = createInitialState({ seed: 'aura', version: { data: '0.1.0', manifest: '1' } });

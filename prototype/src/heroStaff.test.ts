@@ -696,7 +696,7 @@ describe('штаб героев — корабль: модули в той же 
     // `radar_module` разрешён только `picket_frigate` — на корпусе героя он должен
     // быть ВИДЕН и погашен: экран не врёт о том, что вообще существует.
     expect(html).toContain(t('hero.ship.wrong-hull'));
-    expect(html).toContain('hx-row dim');
+    expect(html).toMatch(/class="hx-row r-[a-z]+ dim"/);
   });
 
   it('герой в поле переоснащение не предлагает, и говорит почему', () => {

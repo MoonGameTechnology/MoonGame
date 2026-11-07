@@ -205,6 +205,21 @@ describe('флагман героя остаётся (правило 8, сооб
   const hero = (u: string) => u === 'hero';
   const slots = () => splitSlots([{ unit: 'cruiser', count: 2 }, { unit: 'hero', count: 1 }], [], hero);
 
+  it('separates a custom flagship from identical takeable escorts', () => {
+    const s = splitSlots([
+      { unit: 'frigate', count: 1, heroId: 'commander' },
+      { unit: 'frigate', count: 2 },
+    ]);
+    expect(s).toHaveLength(2);
+    expect(s[0]!.fixed).toBe(true);
+    expect(takeable(s[0]!)).toBe(0);
+    expect(s[1]!.key).toBe('ship:frigate|');
+    expect(takeable(s[1]!)).toBe(2);
+    expect(normalizeSlotTake({ [s[0]!.key]: 1, [s[1]!.key]: 2 }, s)).toEqual({
+      [s[0]!.key]: 0, [s[1]!.key]: 2,
+    });
+  });
+
   it('стек героя помечен неподвижным, прочие — нет', () => {
     const s = slots();
     expect(s.find((x) => x.unit === 'hero')?.fixed).toBe(true);
