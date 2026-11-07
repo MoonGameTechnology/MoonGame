@@ -34,9 +34,9 @@ describe('CI event deduplication', () => {
     },
   );
 
-  it('only the push copy of a merge-group branch is skipped, without an API call', async () => {
-    const f = fixture('push', 'refs/heads/gh-readonly-queue/main/pr-1');
-    expect(await runPolicy(f)).toBe(false);
+  it('a queue push keeps required checks even without merge_group delivery, without an API call', async () => {
+    const f = fixture('push', 'refs/heads/gh-readonly-queue/main/pr-1', [pr()]);
+    expect(await runPolicy(f)).toBe(true);
     expect(f.list).not.toHaveBeenCalled();
   });
 
@@ -98,7 +98,7 @@ describe('CI event deduplication', () => {
 });
 
 // These six names are the live main ruleset's required contexts. A skipped push
-// must use a DIFFERENT context so it cannot satisfy a required queue/PR check.
+// uses a different context. A queue push MUST run under the canonical names.
 const required = [
   'lint · typecheck · test · audit',
   'SAST patterns (Semgrep)',
@@ -111,16 +111,17 @@ const workflows = ['ci', 'security'].map((name) =>
   readFileSync(`.github/workflows/${name}.yml`, 'utf8'),
 );
 const guard =
-  "!cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false')";
+  "!cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false')";
 
 // The guards use the common JS/Actions subset (string comparisons and booleans).
 // Evaluate the actual YAML expression, not a separately reimplemented decision.
-const evaluate = (expression, event, output, cancelled = false) =>
+const evaluate = (expression, event, output, cancelled = false, ref = 'refs/heads/work') =>
   runInNewContext(expression.replaceAll('needs.run-policy', "needs['run-policy']"), {
-    github: { event_name: event },
+    github: { event_name: event, ref },
     needs: { 'run-policy': { outputs: { run: output } } },
     cancelled: () => cancelled,
     always: () => true,
+    startsWith: (value, prefix) => value.startsWith(prefix),
   });
 
 describe('workflow wiring and required-check isolation', () => {
@@ -147,24 +148,29 @@ describe('workflow wiring and required-check isolation', () => {
         expect(job).toContain('run-policy');
         if (job.includes('name:') && job.includes('summarize + report')) {
           expect(job).toContain(
-            "always() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false')",
+            "always() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false')",
           );
         } else expect(job).toContain(guard);
       }
     }
   });
 
-  it('push copies cannot emit any of the six required context names', () => {
+  it('ordinary branch push copies cannot emit any of the six required context names', () => {
     for (const name of required) {
       const line = workflows
         .join('\n')
         .split('\n')
         .find((s) => s.includes(` }}${name}`));
       expect(line).toBeDefined();
-      expect(line).toContain("${{ github.event_name == 'push' && 'Branch — ' || '' }}");
-      expect(line.replace("${{ github.event_name == 'push' && 'Branch — ' || '' }}", '')).toContain(
-        `name: ${name}`,
+      expect(line).toContain(
+        "${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}",
       );
+      expect(
+        line.replace(
+          "${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}",
+          '',
+        ),
+      ).toContain(`name: ${name}`);
     }
   });
 
@@ -187,6 +193,11 @@ describe('workflow wiring and required-check isolation', () => {
       expect(evaluate(condition, 'push', 'false')).toBe(false);
       expect(evaluate(condition, 'merge_group', 'true', true)).toBe(false);
       expect(required).not.toContain(evaluate(prefix, 'push') + name);
+      const queueRef = 'refs/heads/gh-readonly-queue/main/pr-2033';
+      for (const output of [undefined, '', 'false', 'true']) {
+        expect(evaluate(condition, 'push', output, false, queueRef)).toBe(true);
+        expect(evaluate(prefix, 'push', output, false, queueRef) + name).toBe(name);
+      }
     }
   });
 
@@ -196,6 +207,9 @@ describe('workflow wiring and required-check isolation', () => {
     expect(evaluate(condition, 'push', 'false')).toBe(false);
     expect(evaluate(condition, 'push', undefined)).toBe(true);
     expect(evaluate(condition, 'pull_request', 'false')).toBe(true);
+    expect(
+      evaluate(condition, 'push', 'false', false, 'refs/heads/gh-readonly-queue/main/pr-1'),
+    ).toBe(true);
   });
 
   it('routing only needs read permissions and uses pinned actions without persisting credentials', () => {

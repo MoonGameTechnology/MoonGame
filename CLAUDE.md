@@ -84,7 +84,8 @@ backlog'а, словарь статусов кирпичей + живость и
 (CI additionally runs an OSV-Scanner SCA pass over the lockfiles; `pnpm audit` is
 retired — npm shut down its audit endpoints, 2026-07). CI mirrors it on PRs, merge groups
 and pushes to branches without an open PR. A read-only `run-policy` skips duplicate push
-work for open PRs and queue branches; lookup failure runs checks. Push check names have
+work for open PRs; lookup failure runs checks. Queue pushes always run with canonical
+required names because GitHub may not deliver `merge_group`. Other push check names have
 a `Branch — ` prefix so skipped copies cannot satisfy required PR/queue contexts. Event
 triggers remain intact (AUD-9). A push to `main` itself is not re-run: the queue already
 tested that exact tree. `.github/workflows/ci.yml` runs the gate + audit against a

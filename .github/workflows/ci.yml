@@ -54,8 +54,8 @@ jobs:
 
   check:
     needs: run-policy
-    if: ${{ !cancelled() && (github.event_name != 'push' || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && 'Branch — ' || '' }}lint · typecheck · test · audit
+    if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
+    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}lint · typecheck · test · audit
     runs-on: ubuntu-24.04
 
     services:
