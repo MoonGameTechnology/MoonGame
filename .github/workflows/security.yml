@@ -1566,6 +1566,8 @@ jobs:
           name: security-report
           path: |
             security-report.md
+            security-report.json
+            reports/**/status-*.json
             reports/**/*.sarif
             reports/**/*.cdx.json
             reports/**/trufflehog.json

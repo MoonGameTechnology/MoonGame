@@ -36,7 +36,7 @@ export function productionQueueHtml(
         const duration = buildDurationHours(p, data, state) * HOUR;
         jobs.push({
           seq: -1,
-          html: `<div class="pw-job"><b>${esc(label)}</b>${liveTimerHtml(e.at, 'hms')}${cancel(`data-pw-cancel="${e.seq}"`)}<progress max="100" value="${barPct(e.at, duration, state.time)}"></progress></div>`,
+          html: `<div class="pw-job"><b>${esc(label)}</b>${liveTimerHtml(e.at, 'hms')}${cancel(`data-pw-cancel="${esc(String(e.seq))}"`)}<progress max="100" value="${barPct(e.at, duration, state.time)}"></progress></div>`,
         });
       }
       for (const q of state.planets[world]!.buildQueue ?? []) {
@@ -46,7 +46,7 @@ export function productionQueueHtml(
           : buildingName(data.buildings[q.building ?? '']?.name, q.building ?? '');
         jobs.push({
           seq: q.id,
-          html: `<div class="pw-job waiting"><span>${esc(label)}</span>${cancel(`data-pw-cancel="${q.id}"`)}</div>`,
+          html: `<div class="pw-job waiting"><span>${esc(label)}</span>${cancel(`data-pw-cancel="${esc(String(q.id))}"`)}</div>`,
         });
       }
       if (lane === 'mobilization')
@@ -65,7 +65,7 @@ export function productionQueueHtml(
             .filter((p) => orderLane(data, p) === lane)
             .map(
               (p) =>
-                `<button class="pw-paused" data-pw-resume="${p.id}">${t('side.conveyor.resume.title')} · ${esc(p.unit ? displayUnit(p.unit) : buildingName(data.buildings[p.building ?? '']?.name, p.building ?? ''))} · ${Math.round(p.progress * 100)}%</button>`,
+                `<button class="pw-paused" data-pw-resume="${esc(String(p.id))}">${t('side.conveyor.resume.title')} · ${esc(p.unit ? displayUnit(p.unit) : buildingName(data.buildings[p.building ?? '']?.name, p.building ?? ''))} · ${Math.round(p.progress * 100)}%</button>`,
             )
             .join('');
       return `<section class="pw-lane"><b>${t(key)}</b>${

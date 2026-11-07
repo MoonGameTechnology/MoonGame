@@ -254,6 +254,13 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     ),
     step(
       'hero',
+      'mobilization',
+      '#constructor .pw-main-tabs [data-ctab="infantry"]',
+      () => ui.visible('[data-ctab="heroes"]') || deployed(true),
+      { copy: 'production.mobilization' },
+    ),
+    step(
+      'hero',
       'heroes',
       '[data-ctab="heroes"]',
       () => ui.visible('[data-htab="ship"]') || deployed(true),
@@ -278,6 +285,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     ),
     step('hero', 'install', `[data-hinstall="${hero}"][data-mod="${GUIDE_HERO_MODULE}"]`, refitted),
     step('hero', 'deploy', `[data-hspawn="${hero}"]`, () => ui.intent('spawn') || deployed(true)),
+    close('hero', 'close'),
     step('hero', 'world', null, () => deployed(true), {
       anchor: () => ui.anchor(home),
       reveal: () => ui.show(home),

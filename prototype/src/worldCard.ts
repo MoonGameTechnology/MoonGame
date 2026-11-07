@@ -91,6 +91,8 @@ import { worldName } from './planetName';
 import { seatNick } from './seatNicks';
 import { isGroundUnit, planetSummary } from './planetSummary';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
+import { spyMenuHtml } from './spyMenu';
+export { toggleSpyMenu } from './spyMenu';
 import { spyOffer } from './spyOffer';
 import {
   mergeTargets,
@@ -447,9 +449,11 @@ export function unknownPlanetHtml(p: Planet): string {
     const spyReady = (op: SpyOp) => free && afford({ credits: SPY_COST[op] });
     const spyRow =
       mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
-        ? `<div class="row">${spyOddsHtml(p.id, mem.owner)}${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon'))}` +
-          HOSTILE_OPS.map((op) => btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), spyReady(op))).join('') +
-          `</div>`
+        ? `<div class="row">${spyMenuHtml(p.id, [
+            spyOddsHtml(p.id, mem.owner),
+            btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon')),
+            ...HOSTILE_OPS.map((op) => btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), spyReady(op))),
+          ]).join('')}</div>`
         : '';
     // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
     // растягивает три строки газетой на всю ширину (переработка окна мира, 2026-09-29).
@@ -552,25 +556,28 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
     const free = myAgents(s, ME).free > 0;
     const ready = (op: SpyOp) => free && afford({ credits: SPY_COST[op] });
     const spy = spyOffer(mine, !!p.owner, !!live, ready('recon'));
+    // Приказы шпионов копятся отдельно: больше одного — под кнопку «Шпионаж», шанс — первым (UIX-10.11).
+    const ops: string[] = [];
+    if (spy !== 'none') ops.push(spyOddsHtml(p.id, p.owner!));
     // SPY-13: a posted agent — its layers and «Отозвать» (`intelRowsHtml`).
-    if (spy === 'window' && live && live.layer !== undefined) out.push(...intelRowsHtml(live));
+    if (spy === 'window' && live && live.layer !== undefined) ops.push(...intelRowsHtml(live));
     else if (spy === 'window' && live) {
-      out.push(
+      ops.push(
         `<span class="pfact cyan">${t('side.world.spy-window')} ${t('side.world.spy-window.left', { left: liveTimerHtml(live.until) })}</span>`,
       );
     } else if (spy !== 'none') {
-      out.push(btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spy === 'buy'));
+      ops.push(btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spy === 'buy'));
     }
-    if (spy !== 'none') out.push(spyOddsHtml(p.id, p.owner!));
     if (spy !== 'none')
-      for (const op of HOSTILE_OPS) out.push(btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), ready(op)));
+      for (const op of HOSTILE_OPS) ops.push(btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), ready(op)));
+    // SPY-11: a guard for any owned world, your own too; posted or en route → «Отозвать».
+    const guard = myAgents(s, ME).away.some((a) => a.op === 'counter' && a.planetId === p.id);
+    if (p.owner && guard) ops.push(btn('spyrecall', '', t('side.scan.recall'), true));
+    else if (p.owner) ops.push(btn('spyplanet', 'counter', t('side.scan.counter', { c: SPY_COST.counter }), ready('counter')));
+    out.push(...spyMenuHtml(p.id, ops));
     // SPY-15: the owner sees its own world's economy sabotaged and for how long.
     if (mine && (p.disruptedUntil ?? 0) > s.time)
       out.push(`<span class="pfact">${t('side.world.disrupted', { left: liveTimerHtml(p.disruptedUntil!) })}</span>`);
-    // SPY-11: a guard for any owned world, your own too; posted or en route → «Отозвать».
-    const guard = myAgents(s, ME).away.some((a) => a.op === 'counter' && a.planetId === p.id);
-    if (p.owner && guard) out.push(btn('spyrecall', '', t('side.scan.recall'), true));
-    else if (p.owner) out.push(btn('spyplanet', 'counter', t('side.scan.counter', { c: SPY_COST.counter }), ready('counter')));
   }
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
 }

@@ -332,8 +332,25 @@ describe('действия мира', () => {
     expect(card('A')).toContain(`${act('holdpoint', 'off')} >`);
   });
 
+  it('приказы шпионов чужого мира — под кнопкой «Шпионаж», один приказ — без неё (UIX-10.11)', async () => {
+    const { m, card } = await boot();
+    const closed = card('N');
+    expect(closed).toContain(`${act('spymenu', 'N')} aria-expanded="false">${t('side.world.spy-menu')} ▸`);
+    expect(closed).not.toContain('data-act="spyplanet"');
+    expect(closed).not.toContain('spy-menu"');
+    m.toggleSpyMenu('N');
+    const open = card('N');
+    expect(open).toContain('aria-expanded="true"');
+    expect(open).toMatch(/<div class="spy-menu">.*data-act="spyplanet" data-arg="recon"/);
+    // Свой мир: одна «Контрразведка» — меню не нужно.
+    expect(card('A')).not.toContain('data-act="spymenu"');
+    m.toggleSpyMenu('N');
+    expect(card('N')).toBe(closed);
+  });
+
   it('разведка чужого мира — кнопкой, а открытое окно — отсчётом вместо неё', async () => {
-    const { env, card } = await boot();
+    const { env, m, card } = await boot();
+    m.toggleSpyMenu('N');
     expect(card('N')).toContain(act('spyplanet', 'recon'));
     expect(card('A')).not.toContain(act('spyplanet', 'recon'));
     expect(card('A')).toContain(act('spyplanet', 'counter')); // SPY-11: свой мир охраняют
@@ -347,7 +364,8 @@ describe('действия мира', () => {
   });
 
   it('саботаж и кража ресурсов — свои кнопки, и при открытом окне тоже (SPY-9)', async () => {
-    const { env, card } = await boot();
+    const { env, m, card } = await boot();
+    m.toggleSpyMenu('N');
     env.intel = [{ kind: 'planet', target: 'N', until: env.s.time + 3 * HOUR }];
     const html = card('N');
     expect(html).toContain(act('spyplanet', 'sabotage'));
@@ -369,7 +387,8 @@ describe('действия мира', () => {
 // кнопками под курсором (как «Штурм» на высадке, #1801). В разметке — срок, цифры ставит патч.
 describe('живые сроки не пересобирают лист', () => {
   it('окно разведки и саботаж своего мира: разметка та же, отсчёт идёт', async () => {
-    const { env, card } = await boot();
+    const { env, m, card } = await boot();
+    m.toggleSpyMenu('N');
     const t0 = env.s.time;
     env.intel = [{ kind: 'planet', target: 'N', until: t0 + 3 * HOUR }];
     env.s.planets.A!.disruptedUntil = t0 + 2 * HOUR;
@@ -598,8 +617,11 @@ describe('мир вне зрения', () => {
     expect(html).toContain('<b>Багровые</b>');
     expect(html).toContain('<b>5</b>');
     expect(html).toContain(`${buildingName(data.buildings.mine!.name, 'mine')} L1`);
-    expect(html).toContain(act('spyplanet', 'recon'));
-    expect(html).toContain(act('spyplanet', 'theft'));
+    expect(html).toContain(act('spymenu', 'N'));
+    m.toggleSpyMenu('N');
+    const opened = m.unknownPlanetHtml(env.s.planets.N!);
+    expect(opened).toContain(act('spyplanet', 'recon'));
+    expect(opened).toContain(act('spyplanet', 'theft'));
     env.memory.N = { owner: 'p1', garrison: 0, buildings: [] };
     const own = m.unknownPlanetHtml(env.s.planets.N!);
     expect(own).toContain(t('side.scan.no-buildings'));

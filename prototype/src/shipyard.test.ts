@@ -580,6 +580,28 @@ describe('верфь — окно', () => {
     expect(win.html()).toContain('×2');
   });
 
+  it.each(['boarding_translocation', 'diplomatic_landing'])('preserves map deployment targeting for %s', (ability) => {
+    const s = rich();
+    const hero = Object.values(s.heroes!).find(h => h.owner === 'p1')!;
+    hero.abilities = [ability];
+    const win = fakeWin();
+    const sent: Action[] = [];
+    let targetPicker = false;
+    const yard = initShipyard(hostOf({ root: () => win, state: () => s,
+      order: action => void sent.push(action),
+      heroClick: target => {
+        if (!target.closest('[data-hspawn]')) return null;
+        targetPicker = true;
+        return 'close';
+      },
+    }));
+    yard.open();
+    win.fire(click('[data-hspawn]', { hspawn: hero.id }));
+    expect(targetPicker).toBe(true);
+    expect(sent).toEqual([]);
+    expect(win.shown()).toBe(false);
+  });
+
   it('queue offers all idle lanes and renders actual production progress', () => {
     const s = rich();
     const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
@@ -590,6 +612,26 @@ describe('верфь — окно', () => {
     expect(html).toContain('class="pw-job"');
     expect(html).toContain('×3');
     expect(html).toContain('<progress');
+  });
+
+  it('queue escapes IDs even if a malformed snapshot contains strings in numeric fields', () => {
+    const s = rich();
+    const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
+    const after = applyOrder(s, buildShip('p1', home, 'cruiser', 1, []), s.time).state;
+    const event = after.scheduled.find((e) => e.type === 'construction.complete')!;
+    const injection = '"><img src=x onerror=alert(1)>';
+    event.seq = injection as unknown as number;
+    after.planets[home]!.buildQueue = [{
+      id: injection as unknown as number, kind: 'unit', playerId: 'p1', unit: 'cruiser', count: 1,
+    }];
+    after.planets[home]!.pausedConstruction = [{
+      id: injection as unknown as number, kind: 'unit', playerId: 'p1',
+      unit: 'cruiser', count: 1, progress: 0.5, remainingHours: 1, remainingCost: {},
+    }];
+    const html = productionQueueHtml(after, home);
+    expect(html).not.toContain('<img');
+    expect(html.match(/data-pw-cancel="&quot;&gt;&lt;img/g)).toHaveLength(2);
+    expect(html).toContain('data-pw-resume="&quot;&gt;&lt;img');
   });
 
   it('шаблон: сохранить заказ, собрать другой и вернуть шаблон одним нажатием', () => {

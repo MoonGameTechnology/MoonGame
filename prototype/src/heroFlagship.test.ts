@@ -46,6 +46,51 @@ describe('authoritative flagship selection', () => {
       ).error,
     ).toBe('E_HERO_UNIT');
   });
+  it.each([undefined, []])('splits ordinary escorts while keeping the flagship (%j)', (modules) => {
+    const { s, hero } = ready();
+    hero.flagship = 'frigate';
+    const pending = order(s, spawnHero('p1', hero.id, 'home_1'), s.time).state;
+    const deployed = advance(pending, pending.heroes![hero.id]!.mobilization!.readyAt).state;
+    const fleetId = deployed.heroes![hero.id]!.fleetId!;
+    deployed.fleets[fleetId]!.units.push({ unit: 'frigate', count: 2 });
+    const split = (count: number) => order(deployed, act('p1', 'fleet.split', {
+      fleetId, take: [{ unit: 'frigate', count, ...(modules ? { modules } : {}) }],
+    }), deployed.time);
+    for (const count of [1, 2]) {
+      const result = split(count);
+      expect(result.error).toBeUndefined();
+      expect(result.state.fleets[fleetId]!.units.find(st => st.heroId === hero.id)?.count).toBe(1);
+      expect(result.state.heroes![hero.id]!.fleetId).toBe(fleetId);
+      const detached = Object.values(result.state.fleets).find(f => !deployed.fleets[f.id])!;
+      expect(detached.units.reduce((sum, st) => sum + st.count, 0)).toBe(count);
+      expect(detached.units.every(st => !st.heroId)).toBe(true);
+    }
+    expect(split(3).error).toBe('E_HERO_UNIT');
+    const overlap = order(deployed, act('p1', 'fleet.split', { fleetId, take: [
+      { unit: 'frigate', count: 2 }, { unit: 'frigate', count: 1, modules: [] },
+    ] }), deployed.time);
+    expect(overlap.error).toBeTruthy();
+    expect(overlap.state).toEqual(deployed);
+  });
+  it('rechecks the selected hull technology before automatic respawn', () => {
+    const { s, hero } = ready();
+    s.players.p1!.technologies!.completed = [];
+    hero.alive = false;
+    hero.home = 'home_1';
+    const selected = order(s, act('p1', 'hero.flagship', {
+      heroId: hero.id, unit: 'heavy_cruiser', modules: [],
+    }), s.time);
+    expect(selected.error).toBeUndefined();
+    expect(order(selected.state, spawnHero('p1', hero.id, 'home_1'), s.time).error).toBe('E_TECH_LOCKED');
+    selected.state.scheduled.push({ id: 'test-respawn', at: s.time + 1, seq: selected.state.scheduleSeq++, type: 'hero.respawn', payload: { heroId: hero.id } });
+    const blocked = advance(selected.state, s.time + 1).state;
+    expect(blocked.heroes![hero.id]!.alive).toBe(false);
+    expect(blocked.heroes![hero.id]!.fleetId).toBeUndefined();
+    selected.state.players.p1!.technologies!.completed = Object.keys(data.technologies);
+    const allowed = advance(selected.state, s.time + 1).state;
+    expect(allowed.heroes![hero.id]!.alive).toBe(true);
+    expect(allowed.fleets[allowed.heroes![hero.id]!.fleetId!]!.units[0]!.unit).toBe('heavy_cruiser');
+  });
   it('rejects foreign hero, unowned hull, troop hull and injected fittings', () => {
     const { s, hero } = ready();
     const change = (playerId: string, unit: string, modules: string[] = []) =>

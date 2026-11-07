@@ -108,6 +108,7 @@ export interface SplitSlot {
 /** Стопка с лоадаутом — то, из чего состоит живой флот. */
 export interface LoadoutStackLike extends UnitStackLike {
   modules?: readonly string[];
+  heroId?: string;
 }
 
 /** Слоты флота: сначала корабли, затем десант; стеки с одинаковым «юнит+лоадаут»
@@ -120,8 +121,8 @@ export function splitSlots(
 ): SplitSlot[] {
   const out: SplitSlot[] = [];
   const at = new Map<string, SplitSlot>();
-  const add = (kind: 'ship' | 'landing', unit: string, count: number, modules?: readonly string[]) => {
-    const key = `${kind}:${unit}|${loadoutKey(modules)}`;
+  const add = (kind: 'ship' | 'landing', unit: string, count: number, modules?: readonly string[], heroId?: string) => {
+    const key = `${kind}:${unit}|${loadoutKey(modules)}${heroId ? `|hero:${heroId}` : ''}`;
     const seen = at.get(key);
     if (seen) {
       seen.have += count;
@@ -129,11 +130,11 @@ export function splitSlots(
     }
     const slot: SplitSlot = { key, unit, have: count, kind };
     if (modules && modules.length > 0) slot.modules = [...modules];
-    if (kind === 'ship' && fixed(unit)) slot.fixed = true;
+    if (kind === 'ship' && (heroId || fixed(unit))) slot.fixed = true;
     at.set(key, slot);
     out.push(slot);
   };
-  for (const st of units) add('ship', st.unit, st.count, st.modules);
+  for (const st of units) add('ship', st.unit, st.count, st.modules, st.heroId);
   for (const st of landing) add('landing', st.unit, st.count);
   return out;
 }

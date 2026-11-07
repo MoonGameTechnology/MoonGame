@@ -8,6 +8,7 @@ import {
 } from '../../decisions/actions';
 import type { YardHost, YardTab } from './shipyard';
 import type { BuildCategory } from './buildScreen';
+import { data } from './gameData';
 
 interface Navigation {
   planet: string;
@@ -38,6 +39,12 @@ export function productionClick(tg: HTMLElement, host: YardHost, nav: Navigation
   }
   const spawn = tg.closest<HTMLElement>('[data-hspawn]')?.dataset.hspawn;
   if (spawn && nav.planet) {
+    const hero = host.state().heroes?.[spawn];
+    const specialTarget = (hero?.abilities ?? []).some(id => {
+      const type = id ? data.heroAbilities[id]?.type : undefined;
+      return type === 'spawn_fleet' || type === 'spawn_allied';
+    });
+    if (specialTarget) return false; // heroStaff arms the existing map target picker.
     host.order(spawnHero(host.me(), spawn, nav.planet));
     nav.repaint();
     return true;

@@ -42,6 +42,12 @@ import { isMineFleet, isMissileFleet } from '../state/minefields';
 import { isVisibleTo } from '../state/visibility';
 import type { BattlePullIn } from './combat';
 
+/** Split selection addresses a hull and optional loadout; hero identity is checked separately. */
+function splitMatches(stack: UnitStack, unit: string, modules?: readonly string[]): boolean {
+  return stack.unit === unit &&
+    (modules === undefined || loadoutKey(stack.modules) === loadoutKey(modules));
+}
+
 export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',
   // 1.3.0: неподвижный отряд не сливается и не делится (находка Codex на #1393).
@@ -341,7 +347,7 @@ export const fleetOpsModule: GameModule = {
         // The hero flagship can't be peeled off by a split: the hero ENTITY is
         // bound to the source fleet by fleetId, and moving its UNIT without the
         // entity would orphan the binding.
-        if (h.ctx.data.units[t.unit]?.traits.includes('hero') || fleet.units.some(st => st.heroId && st.unit === t.unit && (modules === undefined || loadoutKey(st.modules) === loadoutKey(modules)))) {
+        if (h.ctx.data.units[t.unit]?.traits.includes('hero')) {
           return h.reject('E_HERO_UNIT');
         }
         const key = `${t.unit}\u0000${modules === undefined ? '*' : loadoutKey(modules)}`;
@@ -351,15 +357,14 @@ export const fleetOpsModule: GameModule = {
       }
       const have = (unit: string, modules?: readonly string[]) =>
         fleet.units
-          .filter(
-            (st) =>
-              st.unit === unit &&
-              (modules === undefined || loadoutKey(st.modules) === loadoutKey(modules)),
-          )
+          .filter(st => !st.heroId && splitMatches(st, unit, modules))
           .reduce((a, st) => a + st.count, 0);
       let takeTotal = 0;
       for (const w of want.values()) {
-        if (w.count > have(w.unit, w.modules)) return h.reject('E_NOT_ENOUGH');
+        if (w.count > have(w.unit, w.modules)) {
+          const touchesHero = fleet.units.some(st => st.heroId && splitMatches(st, w.unit, w.modules));
+          return h.reject(touchesHero ? 'E_HERO_UNIT' : 'E_NOT_ENOUGH');
+        }
         takeTotal += w.count;
       }
       const shipsTotal = fleet.units.reduce((a, st) => a + st.count, 0);
@@ -402,8 +407,7 @@ export const fleetOpsModule: GameModule = {
         let left = w.count;
         for (const st of keptShipsPreview) {
           if (left <= 0) break;
-          if (st.unit !== w.unit) continue;
-          if (w.modules !== undefined && loadoutKey(st.modules) !== loadoutKey(w.modules)) continue;
+          if (st.heroId || !splitMatches(st, w.unit, w.modules)) continue;
           const move = Math.min(st.count, left);
           st.count -= move;
           left -= move;
@@ -437,7 +441,7 @@ export const fleetOpsModule: GameModule = {
 
       let taken: UnitStack[] = [];
       for (const w of want.values()) {
-        taken = taken.concat(takeFromStacks(fleet.units, w.unit, w.count, w.modules));
+        taken = taken.concat(takeFromStacks(fleet.units.filter(st => !st.heroId), w.unit, w.count, w.modules));
       }
       fleet.units = fleet.units.filter((st) => st.count > 0);
       let takenLanding: UnitStack[] = [];

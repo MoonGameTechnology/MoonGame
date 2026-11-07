@@ -68,6 +68,7 @@ export function registerHeroDeployment(api: ModuleSetupApi, bodies: DeploymentBo
     if (typeof heroId !== 'string') return;
     const hero = h.state.heroes?.[heroId];
     if (!hero || hero.alive || hero.mobilization) return;
+    if (!requirement(h, hero).allowed) return;
     const owner = hero.owner;
     if (activeHeroCount(h.state, owner) >= heroActiveCap(h.state, owner, h.ctx.data)) return;
     const owned = (id: PlanetId | undefined): id is PlanetId =>

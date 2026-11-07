@@ -5067,6 +5067,7 @@ export const ru: Record<string, string> = {
   'side.world.rally.clear': 'Снять',
   'side.world.production': 'произв. {p}',
   'side.world.spy-window': '🕵 Окно разведки',
+  'side.world.spy-menu': '🕵 Шпионаж',
   'side.world.spy-window.left': 'ещё {left}',
   'side.world.spy-layer': '🕵 Разведка: слой {n} из 4',
   'side.world.disrupted': '📉 Подрыв экономики: добыча −25%, ещё {left}',
