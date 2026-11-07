@@ -185,19 +185,21 @@ try {
           await row.locator('.tdelta').fill('1');
           await row.locator('.tdelta').press('Tab');
           await row.locator('.tdelta').fill('2');
+          // The row mixes a wounded and a whole formation and takes only part: ask whom first.
           await menu.locator('[data-cmd="tok"]').click();
+          await menu.locator('[data-cmd="tfirst"][data-first="wounded"]').click();
           await page.locator('#troopswin').waitFor({ state: 'hidden' });
           const ordered = await page.evaluate(() => window.__armySelection.snapshot());
-          assert.deepEqual(ordered.loading.flatMap(c => c.sources), [{ group, count: 1 }, { group: before.garrison[2].armyGroup, count: 1 }]);
+          assert.deepEqual(ordered.loading.flatMap(c => c.sources), [{ group, count: 2 }]);
           assert.deepEqual(ordered.garrison, before.garrison);
           await page.evaluate(() => window.__armySelection.advance());
           const loaded = await page.evaluate(() => window.__armySelection.snapshot());
           assert.equal(loaded.landing.reduce((n,s) => n+s.count, 0), 2);
-          assert.equal(loaded.landing.reduce((n,s) => n+(s.hp ?? s.count*hp), 0), hp * 1.5);
+          assert.equal(loaded.landing.reduce((n,s) => n+(s.hp ?? s.count*hp), 0), hp);
           assert.equal(loaded.landing[0].battles, 3);
           assert.deepEqual(
             loaded.garrison.map((s) => s.count),
-            [4, 3, 3],
+            [4, 2, 4],
           );
           if (phone && !(await page.locator('[data-cmd="troops"]:visible').count()))
             await page.locator('[data-cmd="more"]:visible').first().click();
@@ -210,7 +212,7 @@ try {
           );
           await menu.locator('[data-cmd="tdirection"][data-direction="unload"]').click();
           const unload = menu.locator(`[data-troop-group="hold:${aboard}"]`);
-          assert.match(await unload.innerText(), /75%/);
+          assert.match(await unload.innerText(), /50%/);
           await unload.locator('[data-cmd="tstep"][data-n="-1"]').click();
           await menu.locator('[data-cmd="tok"]').click();
           const unloading = await page.evaluate(() => window.__armySelection.snapshot());
@@ -219,7 +221,7 @@ try {
           await page.evaluate(() => window.__armySelection.advance());
           const done = await page.evaluate(() => window.__armySelection.snapshot());
           assert.equal(done.landing[0].count, 1);
-          assert.equal(done.landing.reduce((n,s) => n+(s.hp ?? s.count*hp), 0), hp);
+          assert.equal(done.landing.reduce((n,s) => n+(s.hp ?? s.count*hp), 0), hp / 2);
           // The reported failure: heavy infantry below a long list of formations.
           const {heavyHp} = await page.evaluate(() => window.__armySelection.stage(true));
           await page.locator('#maploading').waitFor({ state: 'hidden' });
@@ -275,7 +277,7 @@ try {
           }
           assert.deepEqual(errors, []);
           console.log(
-            `PASS ${width}x${height} ${locale}: wounded veterans load/unload; heavy infantry reached by native scrolling, HP visible, quantity and confirmation work`,
+            `PASS ${width}x${height} ${locale}: wounded veterans boarded first on request, load/unload; heavy infantry reached by native scrolling, HP visible, quantity and confirmation work`,
           );
         });
       } finally {

@@ -358,7 +358,7 @@ export function onCommandClick(ev: Event): void {
     const ask = !!st && cmd === 'tok' && !!model?.askFirst;
     if (st && ask) st.asking = true;
     else if (st && inp && at && model) {
-      const { load, unload } = planOrders(model);
+      const { load, unload } = planOrders(model, first);
       // Both directions take an hour; only currently free bays can be reserved.
       for (const o of unload) playerOrder(unloadArmy(ME, st.fleetId, o.unit, o.count, o.group));
       // ALLY-LAND. Идущий наземный бой запирает ТОЛЬКО погрузку (ядро: `E_UNDER_ASSAULT`
