@@ -1,3 +1,4 @@
+import { createMatchRulesets, publicRules } from '../packages/server/src/rulesets/service';
 import { matchCreationAccess } from '../packages/server/src/matchCreationAccess';
 import { hostMatchSettings, withGoldActions } from '../packages/server/src/matchSettings';
 import { CorpMaterials } from '../packages/server/src/corpMaterials';
@@ -16,7 +17,7 @@ import { createMetaRewardDelivery } from '../packages/server/src/metaEconomyDeli
 import { commerceOffers } from '../packages/server/src/commerceCatalog';
 import { registerMetaCommerce } from '../packages/server/src/metaCommerce';
 import { loadAvaMaps, loadDropTables, loadStarterArsenal, MODULE_MANIFEST_VERSION } from '../packages/server/src/scenario';
-import { loadCompatibleSnapshot, matchRules, skipIncompatibleMatch } from '../packages/server/src/matchRules';
+import { skipIncompatibleMatch } from '../packages/server/src/matchRules';
 import { arsenalSnapshotOf, grantStarterArsenal } from '../packages/server/src/arsenal';
 import { initializeOrdinaryArsenal, syncAccountArsenal } from '../packages/server/src/mainGameArsenal';
 import { PostgresArsenalStore, type ArsenalStore } from '../packages/server/src/store';
@@ -67,8 +68,7 @@ import { MemoryBotRosterStore, PostgresBotRosterStore, type BotRosterStore, type
 import { botMatchLimit, startBotArrivals, botPopulationConfig, prepareBotPopulation, recoverBotMatch, recoverBotPopulation, settleBotMatch } from '../packages/server/src/botPopulation';
 import { StaggeredAi } from './src/aiScheduler';
 import { serverAiHeartbeat } from './src/serverAiClock';
-import { aiOrderSlices } from './src/aiOrderSlices';
-import { botAcceptsOffer, botBehaviorOrders, botStyle } from './src/botBehavior';
+import { botAcceptsOffer, botStyle } from './src/botBehavior';
 import { botSocialAvailable, createBotSocial } from '../packages/server/src/botSocial';
 import { botChatText } from '../scripts/botChatText';
 import type { Action, DomainEvent } from '../packages/shared-core/src/index';
@@ -96,7 +96,6 @@ import {
   sessionMeta,
   type MatchMeta,
   freeMatchId,
-  pveOrders,
   MetricsAggregator,
   DailyJsonl,
   analyticsActorFromEnv,
@@ -154,27 +153,21 @@ import {
 } from '../packages/server/src/index';
 import {
   newGame,
-  kernel,
   data,
   networkSeats,
   networkSeatPlan,
   networkStartsOf,
   parseNetworkMatchMode,
-  aiOrders,
   seatAiDecision,
   stewardActive,
   HOUR,
-  serverAutoAssaultActions,
-  serverAutoRetreatActions,
-  serverChainActions,
-  chainStamp,
   economySnapshot,
   approvalView,
 } from './src/game';
 import { ActionGate } from '../packages/action-layer/src/index';
 import { isValidActionPayload } from '../packages/shared-core/src/actions/payloadSchemas';
 import type { PlayerId } from '../packages/shared-core/src/index';
-import { MS_PER_DAY, SWARM_MEMORY_WINDOW } from '../packages/shared-core/src/index';
+import { MS_PER_DAY } from '../packages/shared-core/src/index';
 import { type Identity, registerMatchCapabilitiesApi } from '../packages/server/src/matchApi';
 import { admitSeat, seatClaim } from '../packages/server/src/joinSeat';
 import { expiredSeatClaims } from '../packages/server/src/seatExpiry';
@@ -435,6 +428,8 @@ if (DATABASE_URL) {
   metaEconomyStore = new MemoryMetaEconomyStore(memoryArsenal, memoryDrops, memoryMarket);
   pushStore = new MemoryPushStore();
 }
+const matchRulesets = await createMatchRulesets(matchStore);
+matchStore = matchRulesets.pinNewMatches(matchStore);
 metaMarket.setEconomy(metaEconomyStore);
 // UIX-4.4 (часть 1): ключи VAPID из окружения. Нет ключей — нет ни маршрута ключа, ни
 // рассылки: подписаться было бы нечем, слать некому.
@@ -642,7 +637,7 @@ const MAX_TIMER_MS = 60 * 60_000; // 1h cap, passed as the driver's maxDelayMs
  *  AI (with the BF-17 reconnect grace), the standing-order drivers, the debounced
  *  durable snapshot and the offline wakeup timer. Everything that used to be a
  *  module-level single-match global lives in this closure now, one set per match. */
-const hostedRules = matchRules(data, MODULE_MANIFEST_VERSION);
+
 interface HostedMatch {
   id: string;
   room: MatchRoom;
@@ -692,7 +687,11 @@ async function createHostedMatch(
     }
   }
 
-  const restoredSnap = await loadCompatibleSnapshot(matchStore, id, hostedRules);
+  const restoredSnap = await matchStore.load(id);
+  const runtime = restoredSnap ? await matchRulesets.resolve(restoredSnap) : matchRulesets.current;
+  const { kernel, data } = runtime;
+  if (!runtime.drivers) throw new Error('E_RULESET_UNSUPPORTED');
+  const drivers = runtime.drivers;
   const matchTimeScale = sessionSpeed(restoredSnap?.clock, TIME_SCALE, requestedTimeScale);
   // Битва рождается только из снимка оркестратора: свежий мир под её номером был бы чужой партией.
   if (ava && !restoredSnap) throw new Error('E_NO_MATCH');
@@ -704,16 +703,17 @@ async function createHostedMatch(
       seats: networkSeatPlan(NETWORK_MODE, mapId),
     });
   if (AUTH && !restoredSnap) initialState = initializeOrdinaryArsenal(initialState, data);
-  if (!restoredSnap) initialState = withGoldActions({ ...initialState, version: { ...hostedRules } }, goldActions);
+  if (!restoredSnap) initialState = withGoldActions(initialState, goldActions);
+  const ruleset = restoredSnap?.ruleset ?? matchRulesets.registry.bind(id, runtime, runtime.configFor(initialState));
+  if (!restoredSnap) initialState = { ...initialState, version: { ...ruleset.version } };
   // Restored sessions keep their persisted mode, including corporation battles.
-  const sessionModeId = initialState.modeId;
   // A NET seat is not a bot: every seat here is claimable by a human, and the
   // server-side AI merely stands in for an empty chair (`humans` is the live truth).
   // Strip the static `ai` branding newGame took from the seat config, or two humans
   // on DEFAULT_SETUP seats could never ally (E_BOT_ALLIANCE against seat p2 forever).
   // В битве корпораций пустые места сторон — боты оркестратора (`bot:<место>`): человеку
   // их не занять, и метка остаётся.
-  if (!ava) for (const seat of Object.values(initialState.players)) if (!seat.npc) delete seat.ai;
+  if (!ava && !restoredSnap) for (const seat of Object.values(initialState.players)) if (!seat.npc) delete seat.ai;
   // CORP-5: эти места всю битву играет ИИ хоста — есть кто-то в партии или нет.
   const avaBots = new Set(
     ava ? Object.values(initialState.players).filter((p) => p.ai && !p.npc).map((p) => p.id) : [],
@@ -811,7 +811,9 @@ async function createHostedMatch(
     id,
     initialState,
     kernel,
-    data,
+    data, projection: runtime.projection,
+    ruleset,
+    rulesCatalog: publicRules(runtime, initialState, ruleset.config),
     onChat: (message) => botSocial?.onMessage(message),
     serverChatAllowed: (seat) => botSeats.has(seat),
     now: () => Date.now(),
@@ -839,14 +841,10 @@ async function createHostedMatch(
     // аудита). Сетевой матч сложность у клиента не спрашивает — её решает сервер, и
     // сервер ставит обычный Рой (сторож `aiProfile.test.ts`).
     serverOrders: (state, seq) =>
-      pveOrders(state, data, { session: id, seq, memoryWindow: SWARM_MEMORY_WINDOW.weak }),
+      drivers.pve(state, seq, id),
     // The kernel context config must match what the local sim (and the HUD) promise:
     // without it victory falls back to its 600 default while the HUD counts to 450.
-    config: {
-      timeScale: 1,
-      ...(sessionModeId !== undefined ? { modeId: sessionModeId } : {}),
-      victory: victoryFor(initialState),
-    },
+    config: ruleset.config,
     initialCareer: restoredSnap?.career,
     initialMatchRewardProgress: restoredSnap?.matchRewardProgress,
     initialEconomyActivity: restoredSnap?.economyActivity,
@@ -904,6 +902,7 @@ async function createHostedMatch(
     async save() {
       const snapshot = {
         matchId: id,
+        ruleset,
         dataVersion: room.state.version?.data ?? 'proto',
         seq: room.sequence,
         status: room.state.match.status === 'ended' ? 'ended' as const : 'ongoing' as const,
@@ -1015,11 +1014,11 @@ async function createHostedMatch(
         try {
           const step = aiSchedule.step(room.state.time, Object.keys(room.state.players), aiPolicy,
             (seat, policy) => {
-              if (botSeats.has(seat)) return botBehaviorOrders(room.state, seat, botIdentities.get(seat)!.seed);
-              const plan = aiOrders(room.state, seat, postureOf(policy));
+              if (botSeats.has(seat)) return drivers.bot(room.state, seat, botIdentities.get(seat)!.seed);
+              const plan = drivers.ai(room.state, seat, postureOf(policy));
               // CORP-5: бот стороны подчиняется запретам битвы, как игрок, — войну между
               // сторонами открывает оркестратор, а не план ИИ.
-              return aiOrderSlices(ava ? avaBotOrders(plan) : plan);
+              return drivers.slices(ava ? avaBotOrders(plan) : plan);
             });
           if (!step.worked) return;
           const group = step.action ?? [];
@@ -1066,24 +1065,11 @@ async function createHostedMatch(
   // событием ядра, без драйвера.
   async function runServerStanding(): Promise<void> {
     if (!room.isStarted || room.state.match.status === 'ended') return;
-    // RETR-2 идёт ПЕРВЫМ: смысл приказа — выйти из боя до следующего раунда, а не
-    // после того, как флот отработает остальные намерения.
-    for (const r of serverAutoRetreatActions(room.state)) {
-      for (const act of r.actions) await room.submitServerAction(r.owner, act);
-    }
-    for (const a of serverAutoAssaultActions(room.state)) {
-      for (const act of a.actions) if (!(await room.submitServerAction(a.owner, act)).ok) break;
-    }
-    // CC-1: advance the authoritative order chains — stamp first (consume-on-issue),
-    // then the head step's orders; a rejected order is skipped, the chain moves on.
-    for (const c of serverChainActions(room.state, room.state.time)) {
-      if (c.patch) {
-        await room.submitServerAction(
-          c.owner,
-          chainStamp(c.owner, c.fleetId, c.patch.steps, c.patch.waitUntil),
-        );
+    for (const group of drivers.standing(() => room.state)) {
+      for (const action of group.actions) {
+        const result = await room.submitServerAction(action.playerId, action);
+        if (!result.ok && group.stopOnFailure) break;
       }
-      for (const act of c.actions) await room.submitServerAction(c.owner, act);
     }
   }
 
@@ -1207,16 +1193,17 @@ const hosted: HostedMatch[] = [];
 // а `kind` у всех трёх партий приезжал `undefined`.
 const archiveViews = new ArchiveRoomCache({
   store: matchStore, otherResidents: () => hosted.length, totalRoomLimit: HOST_ROOM_LIMIT,
-  viewer: (snapshot) => new MatchRoom({
+  viewer: async (snapshot) => {
+    const runtime = await matchRulesets.resolve(snapshot);
+    return new MatchRoom({
     id: snapshot.matchId, initialState: snapshot.state, initialSeq: snapshot.seq,
     initialCareer: snapshot.career, initialCreatedAt: snapshot.createdAt, initialEndedAt: snapshot.endedAt,
-    initialClock: snapshot.clock, initiallyStarted: true, kernel, data,
+    initialClock: snapshot.clock, initiallyStarted: true, kernel: runtime.kernel, data: runtime.data, projection: runtime.projection,
+    ruleset: snapshot.ruleset, rulesCatalog: publicRules(runtime, snapshot.state, snapshot.ruleset!.config),
     timeScale: snapshot.clock?.timeScale ?? 1,
-    config: { timeScale: snapshot.clock?.timeScale ?? 1,
-      ...(snapshot.state.modeId !== undefined ? { modeId: snapshot.state.modeId } : {}),
-      victory: victoryFor(snapshot.state) },
+    config: snapshot.ruleset!.config,
     hostFog: approvalView, singlePeerPerPlayer: true, emitStateHash: true,
-  }),
+  }); },
 });
 const registry = new MatchRegistry(accountStore, data, Date.now, {
   rooms: archiveViews,

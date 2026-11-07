@@ -83,6 +83,28 @@ function snap(matchId: string, seq: number, s: GameState): MatchSnapshot {
 // `uniq` decouples runs on the shared Postgres tables (ids must not collide).
 function matchStoreContract(name: string, make: () => MatchStore, uniq: (p: string) => string): void {
   describe(`MatchStore — ${name}`, () => {
+    it('keeps the first authenticated rules pin and rejects conflicting version or engine updates', async () => {
+      const store = make();
+      const matchId = uniq('immutable-rules');
+      const id = 'a'.repeat(64);
+      const version = { data: 't', dataHash: 'c'.repeat(14), manifest: `ruleset:${id}` };
+      const pin = { id, version, config: { timeScale: 1 }, signature: 'd'.repeat(64) };
+      const world = { ...state(), version };
+      const first = { ...snap(matchId, 1, world), ruleset: pin };
+      await store.save(first);
+      expect(await store.hasPinnedMatches?.()).toBe(true);
+      await store.save(snap(matchId, 2, world));
+      expect((await store.load(matchId))!.ruleset).toEqual(pin);
+      const otherId = 'b'.repeat(64);
+      const otherVersion = { ...version, manifest: `ruleset:${otherId}` };
+      await expect(Promise.resolve().then(() => store.save({ ...first, seq: 3,
+        state: { ...world, version: otherVersion }, ruleset: { ...pin, id: otherId, version: otherVersion } })))
+        .rejects.toThrow('E_RULESET_PIN_CONFLICT');
+      await expect(Promise.resolve().then(() => store.save(snap(matchId, 3, { ...world, version: { ...version, manifest: '104' } }))))
+        .rejects.toThrow('E_RULESET_PIN_CONFLICT');
+      expect((await store.load(matchId))!.seq).toBe(2);
+    });
+
     it('retains final reward evidence and policy through reloads and refuses stale overwrites', async () => {
       const store = make();
       const matchId = uniq('final-rewards');

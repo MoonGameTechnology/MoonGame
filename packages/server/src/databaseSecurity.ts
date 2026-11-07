@@ -1,3 +1,4 @@
+import { adoptRulesetFunction } from './rulesets/schema';
 import type { Pool, PoolClient } from 'pg';
 import { createHash, createHmac, pbkdf2Sync, randomBytes } from 'node:crypto';
 import { migrate, schemaFingerprint } from './store/postgres';
@@ -319,6 +320,7 @@ export async function provisionDatabase(pool: Pool, env: NodeJS.ProcessEnv): Pro
     for (const { relname } of existing) {
       await executeDdl(client, 'ALTER TABLE public.%I OWNER TO %I', [relname, OWNER]);
     }
+    await adoptRulesetFunction(client);
     await client.query('SET LOCAL ROLE vd_schema');
     await migrate(client);
     await recordSchema(client);

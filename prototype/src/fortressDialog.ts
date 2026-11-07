@@ -1,5 +1,6 @@
+import { fortressDeployPrice } from './matchRulesCatalog';
 import {
-  FORTRESS_BODY, FORTRESS_DEPLOY_COST, fortressLoadoutHull, issuedFortressModule,
+  FORTRESS_BODY, fortressLoadoutHull, issuedFortressModule,
   matchCost, matchHours, type Action, type GameState,
 } from '../../packages/shared-core/src/index';
 import { createLoadoutEditor, applyLoadoutAction } from '../../packages/client/src/loadoutEditor';
@@ -47,7 +48,7 @@ export function openFortressDialog(host: FortressDialogHost, province: string, t
       ...(arsenal ? { ownedModules: new Set(arsenal.modules), moduleStars: arsenal.stars, moduleRarity: arsenal.rarity } : {}),
     });
     if (!model.ok) return;
-    const price = { ...matchCost(state, FORTRESS_DEPLOY_COST) };
+    const price = { ...matchCost(state, fortressDeployPrice()) };
     for (const [key, value] of Object.entries(model.modulesCost)) price[key] = (price[key] ?? 0) + value;
     const block = host.probe(order());
     const palette = model.palette.filter((o) => o.installable || modules.includes(o.id)).map((o) => {

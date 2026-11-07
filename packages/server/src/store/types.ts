@@ -25,6 +25,8 @@ export interface EconomyObservation {
 }
 
 export interface MatchSnapshot {
+  /** Authenticated engine/data/config pin, independent of mutable host software. */
+  ruleset?: import('../rulesets/types').MatchRulesetBinding;
   matchRewardProgress?: import('../matchRewardProgress').MatchRewardProgress;
   career?: import('../playerCareer').CareerLedger;
   matchId: string;
@@ -47,6 +49,8 @@ export interface MatchSnapshot {
 /** Persistence for match state. Adapters: in-memory (dev/test) and Postgres (prod).
  *  All methods are async so the same interface fits a real database. */
 export interface MatchStore {
+  /** Required before creating a new signing key for durable storage. */
+  hasPinnedMatches?(): Promise<boolean>;
   /** Enforce archive status, real-time retention and byte budget before loading JSON. */
   loadArchive?(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null>;
   /** Lightweight catalog metadata, without retaining/cloning full worlds. */

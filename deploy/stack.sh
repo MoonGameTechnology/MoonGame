@@ -67,7 +67,7 @@ case "$VOID_IMAGE" in
     exit 1
     ;;
 esac
-export VOID_IMAGE
+export VOID_IMAGE STATE_DIR
 
 compose() {
   local files=(-f "$HERE/docker-compose.yml")

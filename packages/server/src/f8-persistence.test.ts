@@ -236,7 +236,7 @@ describe('F8 · the real loader wiring (serverWiring.createMatchLoader)', () => 
     const seed = createDevMatch(data, { now: () => 1000, time: 1000 });
     await store.save(snapshotOf(seed));
 
-    const load = createMatchLoader({ stores: { store, receiptStore }, data, now: () => 1000 });
+    const load = createMatchLoader({ unversionedTestHost: true, stores: { store, receiptStore }, data, now: () => 1000 });
     expect(await load('nope')).toBeNull(); // unknown id → no match, never a crash
 
     const loaded = (await load(MATCH))!;
@@ -272,7 +272,7 @@ describe('MP-4 · game-data integrity check on load', () => {
     expect(seed.state.version.dataHash).toBeTruthy(); // stamped at creation
 
     await store.save(snapshotOf(seed));
-    const load = createMatchLoader({ stores: { store, receiptStore }, data, now: () => 1000 });
+    const load = createMatchLoader({ unversionedTestHost: true, stores: { store, receiptStore }, data, now: () => 1000 });
     const loaded = await load(MATCH);
     expect(loaded).not.toBeNull();
     await loaded?.dispose();
@@ -289,7 +289,7 @@ describe('MP-4 · game-data integrity check on load', () => {
     });
 
     let flagged: string | undefined;
-    const load = createMatchLoader({
+    const load = createMatchLoader({ unversionedTestHost: true,
       stores: { store, receiptStore },
       data,
       now: () => 1000,
@@ -309,7 +309,7 @@ describe('MP-4 · game-data integrity check on load', () => {
     const { dataHash: _drop, ...versionWithoutHash } = snap.state.version;
     await store.save({ ...snap, state: { ...snap.state, version: versionWithoutHash } });
 
-    const load = createMatchLoader({ stores: { store, receiptStore }, data, now: () => 1000 });
+    const load = createMatchLoader({ unversionedTestHost: true, stores: { store, receiptStore }, data, now: () => 1000 });
     const loaded = await load(MATCH);
     if (Object.entries(LEGACY_MATCH_RULES).every(([key, value]) => seed.state.version[key as keyof typeof LEGACY_MATCH_RULES] === value)) {
       expect(loaded).not.toBeNull();
@@ -335,7 +335,7 @@ describe('invariant #6 · module-manifest check on load', () => {
     expect(seed.state.version.manifest).toBe(MODULE_MANIFEST_VERSION); // stamped at creation
 
     await store.save(snapshotOf(seed));
-    const load = createMatchLoader({ stores: { store, receiptStore }, data, now: () => 1000 });
+    const load = createMatchLoader({ unversionedTestHost: true, stores: { store, receiptStore }, data, now: () => 1000 });
     const loaded = await load(MATCH);
     expect(loaded).not.toBeNull();
     await loaded?.dispose();
@@ -352,7 +352,7 @@ describe('invariant #6 · module-manifest check on load', () => {
     });
 
     let flagged: string | undefined;
-    const load = createMatchLoader({
+    const load = createMatchLoader({ unversionedTestHost: true,
       stores: { store, receiptStore },
       data,
       now: () => 1000,
@@ -376,7 +376,7 @@ describe('invariant #6 · module-manifest check on load', () => {
     });
 
     let flagged: string | undefined;
-    const load = createMatchLoader({
+    const load = createMatchLoader({ unversionedTestHost: true,
       stores: { store, receiptStore },
       data,
       now: () => 1000,

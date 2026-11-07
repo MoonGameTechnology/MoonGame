@@ -71,7 +71,8 @@ RUN pnpm run prototype # bake dist/void-dominion{,-player}.html (player at /, de
 # Trivy found Go CVEs inside our production image, in
 # `node_modules/.pnpm/@typescript+typescript-linux-x64/.../tsc` (blocked PR #489). The
 # vulnerability was in a compiler that has no business being in production at all.
-RUN node prototype/bundle-netserver.mjs
+ARG GIT_SHA
+RUN GIT_SHA=${GIT_SHA} node prototype/bundle-netserver.mjs
 
 # Drop devDependencies from the tree that gets copied into the runtime stage: re-resolve
 # node_modules with --prod, which removes the root's toolchain (esbuild, typescript,
@@ -96,7 +97,7 @@ RUN CI=true pnpm --filter '!@void/backup-repository' install --prod --frozen-loc
 # Pre-create the dir the server writes at runtime so it exists (and, after the
 # COPY --chown below, is owned by the non-root user): playtest-logs/ (event JSONL).
 # packages/server/dist/ already exists — the bundle above lives there.
-RUN mkdir -p playtest-logs && chmod 0700 playtest-logs
+RUN mkdir -p playtest-logs ruleset-keys && chmod 0700 playtest-logs ruleset-keys
 
 # ---- Stage 2: runtime (distroless, no shell, non-root by default) ----
 # The :nonroot tag runs as uid 65532. Base is nodejs22-**debian13** (trixie): upstream
@@ -133,6 +134,9 @@ ENV PORT=8788
 # A bare docker run must not accidentally publish the unauthenticated dev harness.
 # Isolated smoke tests explicitly override PROD=0 and publish only on loopback.
 ENV PROD=1
+ENV RULESET_KEY_FILE=/app/ruleset-keys/key
+ENV RULESET_CACHE_DIR=/app/rulesets
+LABEL io.moongame.ruleset-format="1"
 # Node's embedded Mozilla roots still include a root removed by DSA-6572-1.
 # Use ONLY the patched OpenSSL store, rather than adding it to the bundled roots.
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt

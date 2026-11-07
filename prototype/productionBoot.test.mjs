@@ -7,9 +7,9 @@ import { createRequire } from 'node:module';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import { migrate, PostgresMatchStore } from '../packages/server/src/store';
-import { MODULE_MANIFEST_VERSION } from '../packages/server/src/scenario';
-import { LEGACY_MATCH_RULES, matchRules } from '../packages/server/src/matchRules';
-import { data } from './src/gameData';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const run = promisify(execFile);
 beforeAll(async () => {
@@ -36,7 +36,7 @@ it.each([undefined, 'unreachable'])('the actual production entry refuses incompl
   }
 });
 
-it.skipIf(!process.env.DATABASE_URL)('the production bundle pins fresh/legacy matches and isolates incompatible ordinary/AvA snapshots', async () => {
+it.skipIf(!process.env.DATABASE_URL)('the production bundle restores authenticated pins and quarantines unattested legacy or foreign snapshots', async () => {
   const { Pool } = createRequire(new URL('../packages/server/package.json', import.meta.url))('pg');
   const url = new URL(process.env.DATABASE_URL);
   if (!['localhost', '127.0.0.1'].includes(url.hostname) || !url.pathname.endsWith('_test')) {
@@ -48,6 +48,9 @@ it.skipIf(!process.env.DATABASE_URL)('the production bundle pins fresh/legacy ma
   url.pathname = `/${name}`;
   const pool = new Pool({ connectionString: url.href });
   const store = new PostgresMatchStore(pool);
+  const privateDir = await mkdtemp(join(tmpdir(), 'production-rules-'));
+  const keyFile = join(privateDir, 'key');
+  let selectedKey = keyFile;
   let server;
   let exited;
   let log = '';
@@ -60,7 +63,7 @@ it.skipIf(!process.env.DATABASE_URL)('the production bundle pins fresh/legacy ma
   const start = async () => {
     log = '';
     const env = { PATH: process.env.PATH, HOST: '127.0.0.1', PORT: '0', PROD: '0',
-      NODE_ENV: 'test', MATCHES: '1', DATABASE_URL: url.href, AUTH_JWT_SECRET: 'x'.repeat(64) };
+      NODE_ENV: 'test', MATCHES: '1', DATABASE_URL: url.href, RULESET_KEY_FILE: selectedKey, AUTH_JWT_SECRET: 'x'.repeat(64) };
     server = spawn(process.execPath, ['packages/server/dist/proto-server.mjs'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
     exited = once(server, 'exit');
     for (const stream of [server.stdout, server.stderr]) stream.on('data', chunk => { log += chunk; });
@@ -78,46 +81,39 @@ it.skipIf(!process.env.DATABASE_URL)('the production bundle pins fresh/legacy ma
     await stop();
     const [id] = await store.ongoingMatchIds();
     const fresh = await store.load(id);
-    const expected = matchRules(data, MODULE_MANIFEST_VERSION);
-    const canMigrate = Object.entries(LEGACY_MATCH_RULES).every(([key, value]) => expected[key] === value);
-    expect(fresh.state.version).toEqual(expected);
-    expect(fresh.dataVersion).toBe(expected.data);
-    const legacy = { ...fresh, matchId: 'legacy', dataVersion: '0.1.0',
+    expect(fresh.ruleset.id).toMatch(/^[a-f0-9]{64}$/);
+    expect(fresh.state.version).toEqual(fresh.ruleset.version);
+    expect(fresh.state.version.manifest).toBe(`ruleset:${fresh.ruleset.id}`);
+    expect(fresh.dataVersion).toBe(fresh.ruleset.version.data);
+    const { ruleset: _pin, ...unbound } = fresh;
+    const legacy = { ...unbound, matchId: 'legacy', dataVersion: '0.1.0',
       state: { ...fresh.state, version: { data: '0.1.0', manifest: '1' } } };
     await store.save(legacy);
-    await store.save({ ...fresh, matchId: 'ava-legacy', state: { ...fresh.state,
-      version: { ...expected, manifest: '1' } } });
-    const badIds = ['bad-data', 'bad-manifest', 'ava-bad'];
-    for (const bad of badIds) {
-      await store.save({ ...fresh, matchId: bad, state: { ...fresh.state, version: {
-        ...expected, ...(bad === 'bad-data' ? { dataHash: 'changed' } : { manifest: 'old' }),
-      } } });
-    }
+    await store.save({ ...unbound, matchId: 'ava-legacy', state: { ...fresh.state,
+      version: { ...fresh.state.version, manifest: '1' } } });
+    // Copying a structurally valid pin between matches does not forge its HMAC.
+    await store.save({ ...fresh, matchId: 'foreign-pin' });
+    const badIds = ['legacy', 'ava-legacy', 'foreign-pin'];
     const before = await Promise.all(badIds.map(bad => store.load(bad)));
     const base = await start();
     expect((await fetch(`${base}/auth/status`)).ok).toBe(true);
     for (const bad of badIds) expect(log).toContain(`match ${bad}: E_MATCH_RULES_MISMATCH`);
     expect(log).not.toContain(`match ${id}: E_MATCH_RULES_MISMATCH`);
-    expect(log.includes('match legacy: E_MATCH_RULES_MISMATCH')).toBe(!canMigrate);
-    expect(log.includes('match ava-legacy: E_MATCH_RULES_MISMATCH')).toBe(!canMigrate);
     await stop();
     expect(await Promise.all(badIds.map(bad => store.load(bad)))).toEqual(before);
-    expect((await store.load('legacy')).state.version).toEqual(canMigrate ? expected : legacy.state.version);
-    expect((await store.load('ava-legacy')).state.version).toEqual(canMigrate ? expected : { ...expected, manifest: '1' });
-    expect((await store.ongoingMatchIds()).sort()).toEqual([id, 'legacy', 'ava-legacy', ...badIds].sort());
-    // Even when EVERY saved match is incompatible the HTTP host stays available,
-    // and an empty registry must not erase/reseed the durable roster.
-    for (const savedId of await store.ongoingMatchIds()) {
-      const saved = await store.load(savedId);
-      await store.save({ ...saved, state: { ...saved.state, version: { ...expected, manifest: 'old' } } });
-    }
-    const allBefore = await pool.query('SELECT id, state, seq FROM matches ORDER BY id');
+    expect((await store.load(id)).ruleset).toEqual(fresh.ruleset);
+    expect((await store.ongoingMatchIds()).sort()).toEqual([id, ...badIds].sort());
+    // A wrong operator key cannot re-sign the stored matches or seed replacements.
+    // Every saved room remains quarantined while the HTTP host stays available.
+    selectedKey = join(privateDir, 'wrong-key');
+    await writeFile(selectedKey, Buffer.alloc(32, 42), { mode: 0o600 });
+    const allBefore = await pool.query('SELECT id, state, seq, ruleset FROM matches ORDER BY id');
     const emptyBase = await start();
     expect((await fetch(`${emptyBase}/auth/status`)).ok).toBe(true);
     expect(log).toContain('matches: 0 sessions');
     expect(log).not.toContain('/undefined');
     await stop();
-    expect((await pool.query('SELECT id, state, seq FROM matches ORDER BY id')).rows).toEqual(allBefore.rows);
+    expect((await pool.query('SELECT id, state, seq, ruleset FROM matches ORDER BY id')).rows).toEqual(allBefore.rows);
   } finally {
     await stop();
     await pool.end();
@@ -129,5 +125,6 @@ it.skipIf(!process.env.DATABASE_URL)('the production bundle pins fresh/legacy ma
     }, { timeout: 3000 }).toBe(0);
     await admin.query(`DROP DATABASE "${name}"`);
     await admin.end();
+    await rm(privateDir, { recursive: true, force: true });
   }
 }, 30_000);

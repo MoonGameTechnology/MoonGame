@@ -1,3 +1,5 @@
+import { useMatchCatalog } from './gameData';
+import { useNetworkRules } from './matchRulesCatalog';
 /**
  * Сетевой жизненный цикл — у одного владельца (REFM-216): дозвон {@link connect},
  * транспортный клиент места с его обработчиками, переподключение после обрыва, пинг и
@@ -242,6 +244,8 @@ function stopNetTimers(): void {
  *    не должен догнать игрока, когда тот снова сядет на это место.
  */
 export function leaveNetwork(): void {
+  useMatchCatalog();
+  useNetworkRules();
   userClosed = true;
   NET = false;
   netAdmitted = false;
@@ -299,6 +303,10 @@ function netClientFor(seat: string): MultiplayerClient {
       onHashCheck: (_seq, match) => {
         netDesync = !match;
         if (netDesync) netDesyncCount++;
+      },
+      onRuleset: (rules) => {
+        useMatchCatalog(rules);
+        useNetworkRules(rules);
       },
       onSnapshot: (snap) => {
         // Что значит этот снимок — `netWelcome.ts` (REFM-144): вход подтверждает первый
