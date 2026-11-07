@@ -72,6 +72,17 @@ SEC-39, снять размер и SHA-256 из `Packages.xz` каждой из 
 образа** distroless. Если она не ниже пина, удалить шаг подготовки и `COPY` вместе со
 скриптом и тестами.
 
+## Исправленная zlib1g поверх текущей базы (SEC-43)
+
+Схема та же, что у libssl3t64 выше: `deploy/runtime/prepare-zlib.mjs` получает
+`zlib1g=1:1.3.dfsg+really1.3.1-1+deb13u1` через подписанный индекс Debian, сверяет
+Package/Version/Architecture и распаковывает данные без maintainer scripts; `Dockerfile`
+копирует слой следом за libssl. Пин закрывает CVE-2026-76844 и CVE-2026-85091 (HIGH) и
+CVE-2026-27171 (MEDIUM), с которыми блокирующий `trivy image` упал 2026-11-07 у всех PR.
+Новейшая пересборка тега `nodejs22-debian13:nonroot` на ту дату (`sha256:8ad9cc93…`)
+по-прежнему несёт zlib1g `+b1`, поэтому бамп базы находки не закрывал. Версия закреплена
+в `ZLIB`; удалять слой по тому же правилу, что и libssl.
+
 ## Исправленное хранилище CA поверх текущей базы (DSA-6572-1)
 
 `deploy/runtime/prepare-ca.mjs` получает `ca-certificates=20250419+deb13u1` через
