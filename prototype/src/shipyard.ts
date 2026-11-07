@@ -34,7 +34,7 @@ import { effectChip, STAT_KEY } from './moduleEffect';
 import {
   effectiveStats,
   matchCost,
-  matchHours,
+  matchUnitHours,
   moduleAllowed,
   unitBuildSiteBlocker,
   type Action,
@@ -664,7 +664,7 @@ export function orderBarHtml(
     : `<div class="cn-noplace">${t('yard.no-place')}</div>`;
   return (
     `<div class="cn-order">` +
-    `<div class="cn-oprice">${priceHtml(total, res)}<span class="cn-otime" title="${t('yard.build-time')}">⏱ ${fmtDur(matchHours(state, orderHours(data, draft.hull, troop)))}</span></div>` +
+    `<div class="cn-oprice">${priceHtml(total, res)}<span class="cn-otime" title="${t('yard.build-time')}">⏱ ${fmtDur(matchUnitHours(state, orderHours(data, draft.hull, troop)))}</span></div>` +
     `<div class="cn-oworld">${where}</div>` +
     `<div class="cn-ogo"><div class="cn-step"><button data-cncount="-" ${draft.count <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${draft.count}</span><button data-cncount="+" ${draft.count >= MAX_COUNT ? 'disabled' : ''}>+</button></div>` +
     `<button class="cn-build btn-main" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build')}</button></div>` +

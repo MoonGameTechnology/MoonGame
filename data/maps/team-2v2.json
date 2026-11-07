@@ -1514,6 +1514,8 @@
       "credits": 3
     },
     "hours": 2,
+    "buildingHours": 3,
+    "unitHours": 2,
     "start": {
       "metal": 1.5,
       "microelectronics": 2,

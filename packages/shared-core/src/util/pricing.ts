@@ -17,7 +17,10 @@ import type { GameState, MatchPricing } from '../state/gameState';
 
 /** Множитель ресурса в этой партии; нет записи или поле битое ⇒ ×1. */
 function factor(table: Record<string, number> | undefined, res: string): number {
-  const f = table?.[res];
+  return validFactor(table?.[res]);
+}
+
+function validFactor(f: number | undefined): number {
   return f !== undefined && Number.isFinite(f) && f > 0 ? f : 1;
 }
 
@@ -79,8 +82,17 @@ export function matchUnitCost(
 
 /** Срок постройки или исследования в этой партии, в игровых часах. */
 export function matchHours(state: Pick<GameState, 'pricing'>, hours: number): number {
-  const f = state.pricing?.hours;
-  return f !== undefined && Number.isFinite(f) && f > 0 ? hours * f : hours;
+  return hours * validFactor(state.pricing?.hours);
+}
+
+/** Building construction, upgrades and repairs; research keeps only `hours`. */
+export function matchBuildingHours(state: Pick<GameState, 'pricing'>, hours: number): number {
+  return matchHours(state, hours) * validFactor(state.pricing?.buildingHours);
+}
+
+/** Unit production and hero mobilization; campaign maps have no extra multiplier. */
+export function matchUnitHours(state: Pick<GameState, 'pricing'>, hours: number): number {
+  return matchHours(state, hours) * validFactor(state.pricing?.unitHours);
 }
 
 /** Стартовый запас места в этой партии: строка × множитель `pricing.start`. */

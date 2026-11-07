@@ -105,6 +105,16 @@ describe('стройка — какая идёт сейчас', () => {
 });
 
 describe('стройка — сколько она длится', () => {
+  it.each([1, 2])('сохраняет старую полосу и принятый новый срок при множителе часов ×%i', (factor) => {
+    const match = { pricing: { hours: factor, buildingHours: 3, unitHours: 2 } };
+    const old = { at: 6 * factor * HOUR, seq: 1, payload: build() };
+    expect(progressPct(old, 3 * factor * HOUR, data, HOUR, match)).toBe(50);
+    const pinned = build({ durationHours: 18 * factor });
+    expect(buildDurationHours(pinned, data, match)).toBe(18 * factor);
+    expect(progressPct({ at: 18 * factor * HOUR, seq: 2, payload: pinned },
+      9 * factor * HOUR, data, HOUR, match)).toBe(50);
+  });
+
   it('юнит берёт своё время из данных', () => {
     expect(buildDurationHours(build({ kind: 'unit', unit: 'cruiser' }), data)).toBe(4);
   });

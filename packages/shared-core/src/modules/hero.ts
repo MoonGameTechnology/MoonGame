@@ -682,7 +682,7 @@ export const heroModule: GameModule = {
   // 4.6.0: чужая ракета (SM-3.7b) для `hero.spawn` — как отсутствующая цель (`E_NO_PLANET`).
   // 4.10.0 combines remembered loadouts with aura removal before the reply volley.
   // 4.11.0: a closing corridor hands the edge it added to a corridor still on it (BAL-19).
-  version: '4.11.0',
+  version: '4.11.1',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };

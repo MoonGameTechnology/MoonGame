@@ -26,7 +26,8 @@ import {
   buildingMaxLevel,
   matchCost,
   matchUnitCost,
-  matchHours,
+  matchBuildingHours,
+  matchUnitHours,
 } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
@@ -309,7 +310,7 @@ export function buildScreenHtml(
     const lv = nextLvl <= maxLvl ? buildingLevel(def, nextLvl) : null;
     const foot = lv
       ? `<div class="bw-foot"><span>${st.st === 'built' ? `<i class="bw-next">▲ ${t('build.level.next', { n: nextLvl })}</i> ` : ''}${cost(matchCost(state, lv.cost), res)}</span>` +
-        `<span class="bw-dur">${fmtDur(matchHours(state, lv.buildTimeHours))}</span></div>`
+        `<span class="bw-dur">${fmtDur(matchBuildingHours(state, lv.buildTimeHours))}</span></div>`
       : '';
     // Рамка строки — что с ней можно сделать: улучшаемое горит, как доступное к стройке.
     const look = tech
@@ -392,7 +393,7 @@ export function unitScreenHtml(
         `<div class="bw-item st-${tech ? 'tech' : locked ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
         (tech?.why ?? '') +
         `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>` +
-        `<div class="bw-foot"><span>${cost(matchUnitCost(state, def), res)}</span><span class="bw-dur">${fmtDur(matchHours(state, def.buildTimeHours))}</span></div></div>`
+        `<div class="bw-foot"><span>${cost(matchUnitCost(state, def), res)}</span><span class="bw-dur">${fmtDur(matchUnitHours(state, def.buildTimeHours))}</span></div></div>`
       );
     })
     .join('');
@@ -450,7 +451,7 @@ function landerRowHtml(
   const pick = troops
     .map((g) => {
       const short = probe(order(g)) !== null; // E_INSUFFICIENT: цена видна, кнопка серая
-      const hours = matchHours(state, orderHours(data, id, g));
+      const hours = matchUnitHours(state, orderHours(data, id, g));
       return (
         `<div class="bw-foot"><button class="bw-take btn-main" data-unit-go="${esc(id)}" data-unit-troop="${esc(g)}"${short ? ' disabled' : ''}>▷ ${unitIcon(g, data)} ${esc(displayUnit(g))}</button>` +
         `<span>${cost(landerCost(data, id, g, state), res)}</span><span class="bw-dur">${fmtDur(hours)}</span></div>`

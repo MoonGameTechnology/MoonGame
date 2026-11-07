@@ -3,6 +3,7 @@ import { constructionModuleSnapshot, completionModuleSnapshot } from '../util/ar
 import type { StructureDamage } from '../util/structureDamage';
 import { registerConstructionMaintenance } from './construction/maintenance';
 import { registerControlRecheck } from './construction/controlRecheck';
+import { scheduleCompletion } from './construction/schedule';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type {
   BuildingInstance,
@@ -24,8 +25,8 @@ import { allowedBuildings, isBuildable } from '../state/sectorKind';
 import type { Action } from '../action/types';
 import { hoursToMs } from '../action/types';
 import { canAfford, payCost, refundCost } from '../util/treasury';
-import { matchCost, matchUnitCost, matchHours } from '../util/pricing';
-import { buildProgress } from '../util/construction';
+import { matchCost, matchUnitCost, matchBuildingHours, matchUnitHours } from '../util/pricing';
+import { buildProgress, acceptedConstructionHours } from '../util/construction';
 import { isAllied, mitigationFactor, type DamageHookArgs } from '../util/combat';
 import { coverPoints, worldDamageReduction } from '../util/worldCover';
 import { addUnits } from '../util/stacks';
@@ -93,13 +94,13 @@ function orderSpec(
     const def = data.buildings[p.building];
     if (!def) return null;
     const level1 = buildingLevel(def, 1);
-    return { hours: matchHours(state, level1.buildTimeHours), cost: matchCost(state, level1.cost) };
+    return { hours: matchBuildingHours(state, level1.buildTimeHours), cost: matchCost(state, level1.cost) };
   }
   if (p.kind === 'upgrade' && typeof p.building === 'string' && typeof p.level === 'number') {
     const def = data.buildings[p.building];
     if (!def) return null;
     const next = buildingLevel(def, p.level);
-    return { hours: matchHours(state, next.buildTimeHours), cost: matchCost(state, next.cost) };
+    return { hours: matchBuildingHours(state, next.buildTimeHours), cost: matchCost(state, next.cost) };
   }
   if (p.kind === 'unit' && typeof p.unit === 'string' && typeof p.count === 'number') {
     const def = data.units[p.unit];
@@ -115,16 +116,9 @@ function orderSpec(
     if (p.troop !== undefined && !troop) return null;
     const perShip = troop ? sumBags(hull, matchUnitCost(state, troop)) : hull;
     const hours = troop ? Math.max(def.buildTimeHours, troop.buildTimeHours) : def.buildTimeHours;
-    return { hours: matchHours(state, hours), cost: scaleCost(perShip, p.count) };
+    return { hours: matchUnitHours(state, hours), cost: scaleCost(perShip, p.count) };
   }
   return null;
-}
-
-/** Schedules a build to finish after `hours`, scaled by the match timeScale
- *  exactly like every other real-time duration (GDD §3.1). */
-function scheduleCompletion(h: HandlerContext, hours: number, payload: CompletePayload): void {
-  if (payload.kind === 'unit') payload.moduleSnapshot ??= constructionModuleSnapshot(payload.modules, h.state.players[payload.playerId ?? '']?.arsenal);
-  h.schedule(h.ctx.now + hoursToMs(h.ctx, hours), 'construction.complete', payload);
 }
 
 /** True if a `construction.complete` of this `kind` for this planet+building is already
@@ -820,7 +814,8 @@ function parkActive(h: HandlerContext, planet: Planet, event: ScheduledEvent): b
   const player = playerId === undefined ? undefined : h.state.players[playerId];
   const spec = orderSpec(h.state, h.ctx.data, p);
   if (playerId === undefined || !player || !spec) return false;
-  const totalDurationMs = hoursToMs(h.ctx, spec.hours);
+  const acceptedHours = acceptedConstructionHours(h.state, h.ctx.data, p);
+  const totalDurationMs = hoursToMs(h.ctx, acceptedHours);
   const fortressWork = p.kind === 'upgrade' && p.building === FORTRESS_CORE ? planet.fortress?.assembly : undefined;
   const progress = fortressWork && p.level !== undefined
     ? Math.max(0, Math.min(1, fortressAssemblyScale(planet, h.ctx.now) - (p.level - 1)))
@@ -841,7 +836,7 @@ function parkActive(h: HandlerContext, planet: Planet, event: ScheduledEvent): b
     troop: p.troop,
     progress,
     remainingHours: fortressWork ? Math.max(0, fortressWork.doneAt - h.ctx.now) / hoursToMs(h.ctx, 1)
-      : spec.hours * (1 - progress),
+      : acceptedHours * (1 - progress),
     remainingCost: refund,
   };
   planet.pausedConstruction = [...(planet.pausedConstruction ?? []), site];
@@ -884,7 +879,7 @@ export const constructionModule: GameModule = {
   // 1.12.0 combines paid module snapshots with immediate structure casualties.
   // 1.13.0: the requirement hook names the order's world; queued units re-ask it (BAL-19).
   // 1.14.0: a running unit build is parked when its world leaves control; resume re-asks (BAL-19).
-  version: '1.14.0',
+  version: '1.14.1',
   setup(api) {
     api.provideCapability<StructureDamage>('construction.impact', (h, id, amount, owner, covered) => {
       const planet = h.state.planets[id];
@@ -908,7 +903,7 @@ export const constructionModule: GameModule = {
       const cost = matchCost(h.state, quote.cost);
       if (!canAfford(player.resources, cost)) return h.reject('E_INSUFFICIENT');
       payCost(player.resources, cost);
-      const hours = matchHours(h.state, quote.hours);
+      const hours = matchBuildingHours(h.state, quote.hours);
       const doneAt = h.ctx.now + hoursToMs(h.ctx, hours);
       instance.repair = { owner: action.playerId, remainingHp: quote.missingHp,
         hpPerHour: quote.missingHp / hours, doneAt };
@@ -1028,7 +1023,7 @@ export const constructionModule: GameModule = {
         return h.reject('E_INSUFFICIENT');
       }
       payCost(player.resources, cost);
-      scheduleCompletion(h, matchHours(h.state, level1.buildTimeHours), {
+      scheduleCompletion(h, matchBuildingHours(h.state, level1.buildTimeHours), {
         kind: 'building',
         planetId: planet.id,
         playerId: action.playerId,
@@ -1097,7 +1092,7 @@ export const constructionModule: GameModule = {
         return h.reject('E_INSUFFICIENT');
       }
       payCost(player.resources, cost);
-      scheduleCompletion(h, matchHours(h.state, next.buildTimeHours), {
+      scheduleCompletion(h, matchBuildingHours(h.state, next.buildTimeHours), {
         kind: 'upgrade',
         planetId: planet.id,
         playerId: action.playerId,
@@ -1371,6 +1366,7 @@ export const constructionModule: GameModule = {
       }
       payCost(player.resources, site.remainingCost);
       planet.pausedConstruction = paused.filter((s) => s.id !== payload.id);
+      const fullHours = site.progress < 1 ? site.remainingHours / (1 - site.progress) : 0;
       scheduleCompletion(h, site.remainingHours, {
         kind: site.kind,
         planetId: planet.id,
@@ -1382,7 +1378,7 @@ export const constructionModule: GameModule = {
         modules: site.modules,
         moduleSnapshot: site.moduleSnapshot,
         troop: site.troop,
-      });
+      }, fullHours);
       h.emit('construction.resumed', {
         planetId: planet.id,
         id: payload.id,

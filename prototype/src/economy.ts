@@ -18,7 +18,7 @@ import {
   BROWNOUT,
   buildProgress,
   thresholdRamp,
-  matchHours,
+  acceptedConstructionHours,
   matchCost,
   matchUnitCost,
   loadoutCost,
@@ -219,6 +219,7 @@ export function netIncome(
     // upkeep is charged on an unfinished building either, so no brownout applies here.
     for (const event of sites.get(p.id) ?? []) {
       const cp = event.payload as {
+        durationHours?: number;
         kind?: 'building' | 'unit' | 'upgrade';
         building?: string;
         level?: number;
@@ -228,7 +229,7 @@ export function netIncome(
         if (!def) continue;
         const level1 = buildingLevel(def, 1);
         const ramp = thresholdRamp(
-          buildProgress(state.time, event.at, matchHours(state, level1.buildTimeHours) * HOUR),
+          buildProgress(state.time, event.at, acceptedConstructionHours(state, data, cp) * HOUR),
         );
         if (ramp <= 0) continue;
         for (const res of Object.keys(level1.produces)) {
@@ -247,7 +248,7 @@ export function netIncome(
         const current = buildingLevel(def, instance.level);
         const target = buildingLevel(def, cp.level);
         const ramp = thresholdRamp(
-          buildProgress(state.time, event.at, matchHours(state, target.buildTimeHours) * HOUR),
+          buildProgress(state.time, event.at, acceptedConstructionHours(state, data, cp) * HOUR),
         );
         if (ramp <= 0) continue;
         const resources = new Set([

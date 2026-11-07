@@ -10,7 +10,7 @@ export { playablePlayerIds } from './state/playableSeats';
 export { Rng, seedRng, type RngState } from './rng/rng';
 
 // Цены партии (основная игра дороже каталога, резолюция владельца 2026-10-18)
-export { matchCost, matchUnitCost, matchHours, matchStart } from './util/pricing';
+export { matchCost, matchUnitCost, matchHours, matchBuildingHours, matchUnitHours, matchStart } from './util/pricing';
 
 // State model
 export {
@@ -616,7 +616,7 @@ export {
   type InstallFailure,
 } from './util/fitting';
 export { requireOwnedIdleFleet, nextFleetSeq, type IdleFleet, type FleetSeqState } from './util/fleet';
-export { buildProgress, thresholdRamp } from './util/construction';
+export { buildProgress, thresholdRamp, acceptedConstructionHours } from './util/construction';
 export { knownSkillNodes, nodeInnateTo } from './util/heroSkills';
 export {
   buildRecap,

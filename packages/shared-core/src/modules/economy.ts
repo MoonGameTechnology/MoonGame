@@ -1,13 +1,12 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { GameState, Planet, UnitStack } from '../state/gameState';
-import { matchHours } from '../util/pricing';
 import type { GameData, ResourceBag } from '../data/schemas';
 import { buildingLevel } from '../data/schemas';
 import { bombardedPlanets } from '../state/orbit';
 import { battleLocations } from '../state/battle';
 import type { Context } from '../action/types';
 import { hoursToMs, timeScaleOf } from '../action/types';
-import { buildProgress, thresholdRamp } from '../util/construction';
+import { buildProgress, thresholdRamp, acceptedConstructionHours } from '../util/construction';
 import { MS_PER_HOUR, MS_PER_DAY } from '../util/time';
 import { feedsOnBiomass, isInfected } from '../util/infestation';
 
@@ -15,6 +14,7 @@ import { feedsOnBiomass, isInfected } from '../util/infestation';
  *  the construction module (modules never import each other), so it re-declares just
  *  the fields it needs off the shared, plain-data `scheduled` queue. */
 interface ConstructionPayload {
+  durationHours?: number;
   kind?: 'building' | 'unit' | 'upgrade';
   planetId?: string;
   building?: string;
@@ -117,7 +117,7 @@ function rampsOn(
       const def = data.buildings[p.building];
       if (!def) continue;
       const level1 = buildingLevel(def, 1);
-      add(level1.produces, event.at, hoursToMs(ctx, matchHours(pricing, level1.buildTimeHours)));
+      add(level1.produces, event.at, hoursToMs(ctx, acceptedConstructionHours(pricing, data, p)));
     } else if (p.kind === 'upgrade' && typeof p.building === 'string' && typeof p.level === 'number') {
       const def = data.buildings[p.building];
       const instance = planet.buildings.find((b) => b.type === p.building);
@@ -129,7 +129,7 @@ function rampsOn(
       for (const res of resources) {
         delta[res] = (target.produces[res] ?? 0) - (current.produces[res] ?? 0);
       }
-      add(delta, event.at, hoursToMs(ctx, matchHours(pricing, target.buildTimeHours)));
+      add(delta, event.at, hoursToMs(ctx, acceptedConstructionHours(pricing, data, p)));
     }
   }
   return out;
@@ -314,7 +314,7 @@ export const economyModule: GameModule = {
   // 1.3.0: a construction ramp is settled by Simpson's rule, exact under a share that
   // changes with time (замечание Codex на #1996).
   // 1.4.0: хук `economy.unitUpkeep` — множитель содержания войск владельца (BAL-19).
-  version: '1.4.0',
+  version: '1.4.1',
   setup(api) {
     api.on('time.advanced', (event, h) => {
       const { from, to } = event.payload as { from: number; to: number };
