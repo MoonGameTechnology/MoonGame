@@ -96,7 +96,8 @@ if [ "$3" = "rev-parse" ]; then echo "${branch}"; fi`,
     `echo "docker[VOID_IMAGE=\${VOID_IMAGE:-}] $*" >> "$LOG"
 case "$*" in
   *" ps -q server"*) echo "container-1" ;;
-  inspect*) echo "sha256:prev-image" ;;
+  inspect*) echo "sha256:1111111111111111111111111111111111111111111111111111111111111111" ;;
+  image\\ inspect*) case "$*" in *"{{.Id}}"*) echo "sha256:2222222222222222222222222222222222222222222222222222222222222222" ;; esac ;;
   *config\\ --images*) echo "moongame-server:local" ;;
 esac`,
   );
@@ -185,6 +186,29 @@ describe('deploy/update.sh — сборка из исходников', () => {
     expect(log.match(/^systemctl restart moongame$/gm)).toHaveLength(1);
   });
 
+  it('archives both local immutable image IDs around rebuilding before restart', async () => {
+    const sb = sandbox();
+    writeFileSync(join(sb.deploy, 'ruleset-cache.mjs'), String.raw`import {appendFileSync} from 'node:fs'; appendFileSync(process.env.LOG, 'archive ' + process.argv.slice(2).join(' ') + '\n');`);
+    expect((await runUpdate(sb)).code).toBe(0);
+    const log = sb.readLog();
+    const old = log.indexOf(`archive --local sha256:${'1'.repeat(64)} ${sb.repo}`);
+    const next = log.indexOf(`archive --local sha256:${'2'.repeat(64)} ${sb.repo}`);
+    const build = log.indexOf(' build');
+    expect(old).toBeGreaterThan(-1);
+    expect(old).toBeLessThan(build);
+    expect(next).toBeGreaterThan(build);
+    expect(next).toBeLessThan(log.indexOf('systemctl restart'));
+  });
+
+  it('refuses to restart if the new local capsule cannot be archived', async () => {
+    const sb = sandbox();
+    writeFileSync(join(sb.deploy, 'ruleset-cache.mjs'), `if(process.argv[3] === 'sha256:${'2'.repeat(64)}')process.exit(1);`);
+    const res = await runUpdate(sb);
+    expect(res.code).toBe(1);
+    expect(res.stderr).toContain('E_RULESET_CACHE');
+    expect(sb.readLog()).not.toContain('systemctl restart');
+  });
+
   it('BRANCH из окружения перебивает текущую ветку', async () => {
     const sb = sandbox({ branch: 'playtest' });
     await runUpdate(sb, { BRANCH: 'main' });
@@ -199,7 +223,7 @@ describe('deploy/update.sh — сборка из исходников', () => {
 
     expect(res.code).toBe(1);
     const log = sb.readLog();
-    expect(log).toContain('docker[VOID_IMAGE=] tag sha256:prev-image moongame-server:local');
+    expect(log).toContain('docker[VOID_IMAGE=] tag sha256:1111111111111111111111111111111111111111111111111111111111111111 moongame-server:local');
     expect(log.match(/^systemctl restart moongame$/gm)).toHaveLength(2);
   });
 });
