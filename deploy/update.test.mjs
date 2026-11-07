@@ -208,13 +208,13 @@ describe('deploy/update.sh — путь подписанного образа', 
   it('refuses missing recovery readiness before pull/migration/restart, preserving configuration', async () => {
     const before = 'PROD=1\nDB_AUTO_MIGRATE=0\nDB_REQUIRE_LEAST_PRIVILEGE=1\n';
     const sb = sandbox({ serverEnv: before });
-    const res = await runUpdate(sb, { PROD: '1', VOID_IMAGE: 'ghcr.io/x/y@sha256:deadbeef' });
+    const res = await runUpdate(sb, { PROD: '1', VOID_IMAGE: 'ghcr.io/x/y@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd' });
     expect(res.code).toBe(1);
     expect(res.stderr).toContain('E_DEPLOY_BACKUP_CHECK');
     expect(sb.readLog()).not.toMatch(/docker\[|systemctl/);
     expect(sb.readEnvFile()).toBe(before);
   });
-  const IMAGE = 'ghcr.io/moongametechnology/moongame@sha256:deadbeef';
+  const IMAGE = 'ghcr.io/moongametechnology/moongame@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
 
   it('непроверенная подпись → сервер не тронут', async () => {
     const sb = sandbox({ verifyExit: 1 });
@@ -225,6 +225,17 @@ describe('deploy/update.sh — путь подписанного образа', 
     expect(log).toContain(`verify-image ${IMAGE}`);
     expect(log).not.toContain('docker[');
     expect(log).not.toContain('systemctl');
+  });
+
+  it('archives a signed capsule in the git-clone cache before restarting', async () => {
+    const sb = sandbox();
+    writeFileSync(join(sb.deploy, 'ruleset-cache.mjs'), String.raw`import {appendFileSync} from 'node:fs'; appendFileSync(process.env.LOG, 'archive ' + process.argv.slice(2).join(' ') + '\n');`);
+    const res = await runUpdate(sb, { VOID_IMAGE: IMAGE });
+    expect(res.code, res.stderr).toBe(0);
+    const log = sb.readLog();
+    const archive = log.indexOf(`archive ${IMAGE} ${sb.repo}`);
+    expect(archive).toBeGreaterThan(log.indexOf(`verify-image ${IMAGE}`));
+    expect(archive).toBeLessThan(log.indexOf(`docker[VOID_IMAGE=${IMAGE}] compose`));
   });
 
   it('подпись подтверждена → образ поднят и записан как последний хороший', async () => {
@@ -255,7 +266,7 @@ describe('deploy/update.sh — путь подписанного образа', 
 });
 
 describe('deploy/update.sh — миграция схемы при DB_AUTO_MIGRATE=0 (SE-3.1)', () => {
-  const IMAGE = 'ghcr.io/moongametechnology/moongame@sha256:deadbeef';
+  const IMAGE = 'ghcr.io/moongametechnology/moongame@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
   const MIGRATE = 'database-admin.mjs migrate';
 
   it('по умолчанию мигратор не запускается: схему меняет сам сервер', async () => {
@@ -435,7 +446,7 @@ describe('update.sh — добор недостающих ключей server.en
   it('добирает ключи и на пути подписанного образа (рекомендованном)', async () => {
     // Иначе OPS-2 чинил бы только менее безопасную сборку из исходников.
     const sb = sandbox({ serverEnv: '# пусто\n' });
-    await runUpdate(sb, { VOID_IMAGE: 'ghcr.io/x/y@sha256:deadbeef' });
+    await runUpdate(sb, { VOID_IMAGE: 'ghcr.io/x/y@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd' });
     const env = sb.readEnvFile();
     expect(env).toMatch(/^TIME_SCALE=100$/m);
     expect(env).toMatch(/^AUTH_JWT_SECRET=[0-9a-f]{64}$/m);
@@ -447,7 +458,7 @@ describe('update.sh — добор недостающих ключей server.en
     // вошли бы прежним способом — дописанный секрет переводит сервер на аккаунты.
     const before = '# старая установка\nPORT=8788\n';
     const sb = sandbox({ serverEnv: before, healthFailFirst: 99 });
-    await runUpdate(sb, { VOID_IMAGE: 'ghcr.io/x/y@sha256:deadbeef' });
+    await runUpdate(sb, { VOID_IMAGE: 'ghcr.io/x/y@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd' });
     expect(sb.readEnvFile()).toBe(before);
   });
 

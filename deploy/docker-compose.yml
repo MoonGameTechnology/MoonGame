@@ -171,7 +171,10 @@ services:
       - void-logs:/app/playtest-logs
       - void-ruleset-keys:/app/ruleset-keys
       # The signed-image deploy agent alone writes the immutable capsule cache.
-      - ${STATE_DIR:-..}/rulesets:/app/rulesets:ro
+      - type: bind
+        source: ${STATE_DIR:-..}/rulesets
+        target: /app/rulesets
+        read_only: true
       # TLS certs (RS-5.1): host ./certs → /certs (read-only). Drop a Let's Encrypt
       # privkey.pem + fullchain.pem here and set TLS_KEY_FILE=/certs/privkey.pem
       # TLS_CERT_FILE=/certs/fullchain.pem above. Harmless (empty) when TLS is off.

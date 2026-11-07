@@ -14,12 +14,13 @@ import type { RulesetDrivers } from '../packages/server/src/rulesets/types';
 export const drivers: RulesetDrivers = {
   ai: aiOrders, bot: botBehaviorOrders, slices: aiOrderSlices,
   pve: (state, seq, session) => pveOrders(state, data, { seq, session, memoryWindow: SWARM_MEMORY_WINDOW.weak }),
-  standing(state: GameState) {
-    const groups = [...serverAutoRetreatActions(state), ...serverAutoAssaultActions(state)].map(item => ({ actions: item.actions, stopOnFailure: true }));
-    for (const chain of serverChainActions(state, state.time)) {
-      groups.push({ stopOnFailure: false, actions: [...(chain.patch ? [chainStamp(chain.owner, chain.fleetId, chain.patch.steps, chain.patch.waitUntil)] : []), ...chain.actions] });
+  *standing(state: () => GameState) {
+    // Resume each phase after the host has applied the preceding phase's orders.
+    for (const item of serverAutoRetreatActions(state())) yield { actions: item.actions, stopOnFailure: false };
+    for (const item of serverAutoAssaultActions(state())) yield { actions: item.actions, stopOnFailure: true };
+    for (const chain of serverChainActions(state(), state().time)) {
+      yield { stopOnFailure: false, actions: [...(chain.patch ? [chainStamp(chain.owner, chain.fleetId, chain.patch.steps, chain.patch.waitUntil)] : []), ...chain.actions] };
     }
-    return groups;
   },
   canonicalStanding: (state, probe) => standingOrderTickActions(state, data, probe),
 };

@@ -45,7 +45,7 @@ export interface RulesetDrivers {
   bot(state: GameState, seat: string, seed: number): import('@void/shared-core').Action[][];
   slices(actions: import('@void/shared-core').Action[]): import('@void/shared-core').Action[][];
   pve(state: GameState, seq: number, session: string): import('@void/shared-core').Action[];
-  standing(state: GameState): Array<{ actions: import('@void/shared-core').Action[]; stopOnFailure: boolean }>;
+  standing(state: () => GameState): Iterable<{ actions: import('@void/shared-core').Action[]; stopOnFailure: boolean }>;
   canonicalStanding(state: GameState, probe: (state: GameState, actions: readonly import('@void/shared-core').Action[]) => string | null): Array<{ playerId: string; action: import('@void/shared-core').Action }>;
 }
 

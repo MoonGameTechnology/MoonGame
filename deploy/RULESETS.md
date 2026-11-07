@@ -9,7 +9,9 @@
 Подписанный image содержит `packages/server/dist/current-ruleset.mjs` и `.json`.
 `update.sh` после `verify-image.sh` вызывает `ruleset-cache.mjs`: он проверяет digest
 байтов и источник image, сохраняет пакет в `$STATE_DIR/rulesets` и не исполняет код.
-Пакет архивируется до миграции и запуска Game. Файлы root:root 0444, каталог 0755;
+Пакет архивируется до миграции и запуска Game. Для подписанного обновления из git-клона
+без `STATE_DIR` используется `<repo>/rulesets`, соответствующий mount Compose.
+Файлы root:root 0444, каталог 0755;
 права устанавливаются явно, включая системный `UMask=0077`.
 
 Compose подключает этот каталог к `/app/rulesets:ro`. Отдельный постоянный том
@@ -149,10 +151,10 @@ export function configFor(state:Pick<GameState,'mapId'|'modeId'>):MatchConfig {
 export const drivers={
   ai:aiOrders,bot:botBehaviorOrders,slices:aiOrderSlices,
   pve:(state:GameState,seq:number,session:string)=>pveOrders(state,data,{seq,session,memoryWindow:SWARM_MEMORY_WINDOW.weak}),
-  standing(state:GameState){
-    const groups=[...serverAutoRetreatActions(state),...serverAutoAssaultActions(state)].map(i=>({actions:i.actions,stopOnFailure:true}));
-    for(const c of serverChainActions(state,state.time))groups.push({stopOnFailure:false,actions:[...(c.patch?[chainStamp(c.owner,c.fleetId,c.patch.steps,c.patch.waitUntil)]:[]),...c.actions]});
-    return groups;
+  *standing(state:()=>GameState){
+    for(const i of serverAutoRetreatActions(state()))yield {actions:i.actions,stopOnFailure:false};
+    for(const i of serverAutoAssaultActions(state()))yield {actions:i.actions,stopOnFailure:true};
+    for(const c of serverChainActions(state(),state().time))yield {stopOnFailure:false,actions:[...(c.patch?[chainStamp(c.owner,c.fleetId,c.patch.steps,c.patch.waitUntil)]:[]),...c.actions]};
   },
   canonicalStanding:(state:GameState,probe:Parameters<typeof standingOrderTickActions>[2])=>standingOrderTickActions(state,data,probe),
 };

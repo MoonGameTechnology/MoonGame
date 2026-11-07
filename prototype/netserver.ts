@@ -1065,7 +1065,7 @@ async function createHostedMatch(
   // событием ядра, без драйвера.
   async function runServerStanding(): Promise<void> {
     if (!room.isStarted || room.state.match.status === 'ended') return;
-    for (const group of drivers.standing(room.state)) {
+    for (const group of drivers.standing(() => room.state)) {
       for (const action of group.actions) {
         const result = await room.submitServerAction(action.playerId, action);
         if (!result.ok && group.stopOnFailure) break;
