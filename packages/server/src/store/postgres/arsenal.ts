@@ -1,6 +1,7 @@
+/** Postgres: арсенал игрока и выпавшая добыча (SLIM-5). */
 import type { Pool } from 'pg';
+import type { DropStore, ArsenalStore, OwnedArsenalItem } from '../types';
 import type { ArsenalItem } from '@void/shared-core';
-import type { ArsenalStore, OwnedArsenalItem } from './types';
 
 interface ArsenalRow {
   item_id: string;
@@ -140,5 +141,82 @@ export class PostgresArsenalStore implements ArsenalStore {
     const row = await this.get(itemId);
     if (!row) return null;
     return { durability: undefined }; // exists, but a blueprint — nothing to wear
+  }
+}
+
+export class PostgresDropStore implements DropStore {
+  constructor(private readonly pool: Pool) {}
+
+  async claim(matchId: string, accountId: string): Promise<boolean> {
+    // ON CONFLICT DO NOTHING + rowCount IS the exactly-once gate: only the first
+    // inserter of the (match, account) pair proceeds to roll.
+    const r = await this.pool.query(
+      `INSERT INTO drop_claims (match_id, account_id) VALUES ($1, $2)
+       ON CONFLICT DO NOTHING`,
+      [matchId, accountId],
+    );
+    return (r.rowCount ?? 0) > 0;
+  }
+
+  async pityOf(accountId: string): Promise<number> {
+    const r = await this.pool.query<{ pity: number }>(
+      `SELECT pity FROM drop_meta WHERE account_id = $1`,
+      [accountId],
+    );
+    return r.rows[0]?.pity ?? 0;
+  }
+
+  async setPity(accountId: string, value: number): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO drop_meta (account_id, pity) VALUES ($1, $2)
+       ON CONFLICT (account_id) DO UPDATE SET pity = $2`,
+      [accountId, value],
+    );
+  }
+
+  async stepPity(accountId: string, hit: boolean, pityAfter: number): Promise<number> {
+    // The row lock is the atomicity: a second award pass for the same account waits
+    // here and then reads the streak this one wrote, never the one it is replacing.
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO drop_meta (account_id) VALUES ($1) ON CONFLICT (account_id) DO NOTHING`,
+        [accountId],
+      );
+      const r = await client.query<{ pity: number }>(
+        `SELECT pity FROM drop_meta WHERE account_id = $1 FOR UPDATE`,
+        [accountId],
+      );
+      const pity = r.rows[0]?.pity ?? 0;
+      await client.query(`UPDATE drop_meta SET pity = $2 WHERE account_id = $1`, [
+        accountId,
+        hit || pity + 1 >= pityAfter ? 0 : pity + 1,
+      ]);
+      await client.query('COMMIT');
+      return pity;
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async addShards(accountId: string, delta: number): Promise<void> {
+    // Atomic increment — two concurrent battle credits both land.
+    await this.pool.query(
+      `INSERT INTO drop_meta (account_id, shards) VALUES ($1, $2)
+       ON CONFLICT (account_id) DO UPDATE SET shards = drop_meta.shards + $2`,
+      [accountId, delta],
+    );
+  }
+
+  async shardsOf(accountId: string): Promise<number> {
+    const r = await this.pool.query<{ shards: number }>(
+      `SELECT shards FROM drop_meta WHERE account_id = $1`,
+      [accountId],
+    );
+    return r.rows[0]?.shards ?? 0;
   }
 }
