@@ -4521,6 +4521,7 @@ export const de: Record<string, string> = {
   'side.world.rally.clear': 'Löschen',
   'side.world.production': 'Produktion {p}',
   'side.world.spy-window': '🕵 Aufklärungsfenster',
+  'side.world.spy-menu': '🕵 Spionage',
   'side.world.spy-window.left': 'noch {left}',
   'side.world.vp': 'Siegpunkte',
   'speed.exit': 'Zum Hauptmenü',
