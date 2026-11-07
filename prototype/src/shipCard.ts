@@ -41,6 +41,7 @@ const STAT_LABEL: Record<string, string> = {
   hullRepair: 'loadout.stat.hull-repair',
   speed: 'loadout.stat.speed',
   radarRange: 'loadout.stat.radar',
+  sightRange: 'loadout.stat.sight',
   cargoCapacity: 'loadout.stat.cargo',
   pointDefense: 'shipcard.stat.pd',
   siegeDamage: 'loadout.stat.siege',

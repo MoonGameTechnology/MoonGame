@@ -592,6 +592,10 @@
 .pfact i.up{color:var(--up);}
 .pfact i.dn{color:var(--dn);}
 .pacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-left:auto;}
+/* Раскрытое меню «Шпионаж» (UIX-10.11): своя строка ряда действий с отступом под кнопкой. */
+.spy-menu{flex:1 0 100%;display:flex;flex-direction:column;align-items:stretch;gap:6px;margin-top:6px;padding-left:8px;border-left:2px solid var(--line);}
+.spy-menu>.b{text-align:left;white-space:nowrap;}
+.spy-menu>.pfact{align-self:flex-start;}
 /* Выход мира — «/ч» один раз, в конце строки, а не у каждого ресурса. */
 .pfact .rcost:not(:last-child) .rc-per{display:none;}
 /* Липкие вкладки заходят вверх на 13px (чтобы закрыть отступ листа при прокрутке) и под

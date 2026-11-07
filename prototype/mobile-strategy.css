@@ -168,6 +168,17 @@ body.mobile-ui #constructor :is(.cn-bn, .cn-mn, .cn-hn, .cn-bd) {
 body.mobile-ui #constructor .cn-bay > :nth-child(2) {
   min-width: 0;
 }
+/* Модуль с описанием: описание уходит строкой под имя, а не сжимает имя до буквы в строке. */
+body.mobile-ui #constructor .cn-bay:has(.cn-bd p) {
+  flex-wrap: wrap;
+}
+body.mobile-ui #constructor .cn-bay:has(.cn-bd p) > :nth-child(2) {
+  flex: 1 1 0;
+}
+body.mobile-ui #constructor .cn-bd:has(p) {
+  flex-basis: 100%;
+  margin-left: 0;
+}
 body.mobile-ui #constructor .cn-step button {
   width: 44px;
   height: 44px;

@@ -123,6 +123,35 @@
       ]
     }
   },
+  "long_range_optics": {
+    "name": "Long-Range Optics",
+    "description": "module.long-range-optics.desc",
+    "rarity": "simple",
+    "rarityBonus": {
+      "unique": {
+        "hp": 3
+      },
+      "mythic": {
+        "speed": 0.5
+      },
+      "legendary": {
+        "sightRange": 10
+      }
+    },
+    "slot": "utility",
+    "tag": "horizontal",
+    "effects": {
+      "stats": {
+        "sightRange": 20
+      }
+    },
+    "cost": {
+      "metal": 50
+    },
+    "allowed": {
+      "domain": "space"
+    }
+  },
   "ion_engine": {
     "name": "Ion Engine",
     "rarity": "simple",

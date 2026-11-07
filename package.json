@@ -11,6 +11,7 @@
   },
   "scripts": {
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
+    "tools:setup": "node scripts/setup-agent-tools.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

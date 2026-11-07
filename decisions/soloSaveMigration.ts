@@ -515,15 +515,26 @@ export const FORTRESS_PRICE_SOLO_MIGRATION = {
   toDataHash: FLEET_MERGE_ORDERS_SOLO_MIGRATION.toDataHash,
 } as const;
 
-/** Rules-only category timing for new main-game maps. Campaign and saved
- *  match pricing, accepted schedules, assembly and paid repair budgets stay intact. */
-export const BUILD_PRODUCTION_TIMES_SOLO_MIGRATION = {
+/** Long-range optics: a new utility module (+20 fleet direct sight). The catalogue
+ *  only GAINS an entry; saved fleets, loadouts and clocks keep their shape. */
+export const LONG_RANGE_OPTICS_SOLO_MIGRATION = {
   fromRules: FORTRESS_PRICE_SOLO_MIGRATION.toRules,
   fromData: FORTRESS_PRICE_SOLO_MIGRATION.toData,
   fromDataHash: FORTRESS_PRICE_SOLO_MIGRATION.toDataHash,
-  toRules: '04e8551b308555',
-  toData: FORTRESS_PRICE_SOLO_MIGRATION.toData,
-  toDataHash: FORTRESS_PRICE_SOLO_MIGRATION.toDataHash,
+  toRules: '0c2693b7ff4f82',
+  toData: '0.1.83',
+  toDataHash: '134b32679b2ec3',
+} as const;
+
+/** Rules-only category timing for new main-game maps. Campaign and saved
+ *  match pricing, accepted schedules, assembly and paid repair budgets stay intact. */
+export const BUILD_PRODUCTION_TIMES_SOLO_MIGRATION = {
+  fromRules: LONG_RANGE_OPTICS_SOLO_MIGRATION.toRules,
+  fromData: LONG_RANGE_OPTICS_SOLO_MIGRATION.toData,
+  fromDataHash: LONG_RANGE_OPTICS_SOLO_MIGRATION.toDataHash,
+  toRules: '192cdb256faf0b',
+  toData: LONG_RANGE_OPTICS_SOLO_MIGRATION.toData,
+  toDataHash: LONG_RANGE_OPTICS_SOLO_MIGRATION.toDataHash,
 } as const;
 
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
@@ -571,6 +582,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   TECHNOLOGY_PRICES_SOLO_MIGRATION,
   FLEET_MERGE_ORDERS_SOLO_MIGRATION,
   FORTRESS_PRICE_SOLO_MIGRATION,
+  LONG_RANGE_OPTICS_SOLO_MIGRATION,
   BUILD_PRODUCTION_TIMES_SOLO_MIGRATION,
 ];
 

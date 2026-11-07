@@ -1,0 +1,28 @@
+{
+  "host": "Codex CLI 0.163.0 (Linux)",
+  "ponytail": {
+    "repository": "https://github.com/DietrichGebert/ponytail.git",
+    "revision": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+    "version": "5.3.3",
+    "settings": { "defaultMode": "full" }
+  },
+  "sl-ui-library": {
+    "repository": "https://github.com/SLtowl/sl-ui-library.git",
+    "revision": "0eeabb0a8ecbbfb8b592f74aa63cf634bdf565da",
+    "version": "1.2.4",
+    "usage": "Select individual HTML/CSS/JS components; no full catalog in the game bundle",
+    "updates": false
+  },
+  "zaebal": {
+    "repository": "https://github.com/howdeploy/Z.A.E.B.A.L.git",
+    "revision": "84f0cb26ffac63cea54cc5693a8fe7c3068eac60",
+    "settings": {
+      "auto_trigger": false,
+      "manual_trigger": true,
+      "early_review": false,
+      "auditor": "none",
+      "audit_levels": [],
+      "allow_unsafe_auditor": false
+    }
+  }
+}

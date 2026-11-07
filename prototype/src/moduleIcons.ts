@@ -30,6 +30,7 @@ export const MODULE_ICON: Record<string, string> = {
   ion_engine: '🚀',
   radar_module: '📡',
   compact_radar: '📡',
+  long_range_optics: '🔭',
   cargo_bay: '📦',
   repair_bay: '🔧',
   siege_platform: '💥',

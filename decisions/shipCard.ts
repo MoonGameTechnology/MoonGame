@@ -84,6 +84,7 @@ export const SHIP_CARD_STATS = [
   'fleetHullRepair',
   'speed',
   'radarRange',
+  'sightRange',
   'cargoCapacity',
   'pointDefense',
   'siegeDamage',

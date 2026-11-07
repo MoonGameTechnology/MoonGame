@@ -15,6 +15,7 @@
   { "kind": "module", "defId": "repair_bay" },
   { "kind": "module", "defId": "radar_module" },
   { "kind": "module", "defId": "compact_radar" },
+  { "kind": "module", "defId": "long_range_optics" },
   { "kind": "module", "defId": "ion_engine" },
   { "kind": "module", "defId": "ablative_plating" },
   { "kind": "module", "defId": "point_defense_array" },

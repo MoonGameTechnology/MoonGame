@@ -513,7 +513,8 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `wsServer.ts` | `WsServer` | WebSocket/HTTP, server requestId и audit context |
 | `securityAudit.ts` / `dailyJsonl.ts` | `SecurityAudit`, `DailyJsonl` | v2 auth/input/mutation/lifecycle, HMAC, bounded persistent journals/heartbeat/loss |
 | `accountErasureWorker.ts` | `eraseAccountLogs` | offline actor/target scrub, включая security incidents |
-| `serverWiring.ts` | wiring | сборка сервера: manifest check, dataHash |
+| `serverWiring.ts` | wiring | восстановление комнаты, persistence и clock driver |
+| `matchRules.ts` | `loadCompatibleSnapshot`, `matchRules` | оба хоста: версии/хэш, фиксированная миграция старых снимков, изоляция несовместимых партий |
 | `serverConfig.ts` | `ServerConfig`, `configFromEnv`, `checkProductionReadiness` | конфигурация из env (`GATE`, `ALLOWED_ORIGINS`…); `PROD=1` не стартует без секретов и TLS |
 | `rateLimit.ts` | `slidingWindowIpLimiter` | rate limiting |
 | `arsenal.ts` | `StarterArsenalTemplate`, `validateStarterArsenal` | ARS-2 starter arsenal |

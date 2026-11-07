@@ -1008,8 +1008,8 @@ export interface GameVersion {
    *  non-cryptographic. Stamped once at creation and persisted verbatim; a match
    *  LOADER re-hashes the currently-deployed bundle and refuses to resume on a
    *  mismatch ("подмена бандла меняет правила"). Optional: snapshots persisted
-   *  before this field existed carry none and skip the check (graceful
-   *  degradation, not a crash — matches the module system's own discipline). */
+   *  before this field existed carry none; server loaders may pin them only
+   *  through an explicit, fixed legacy-rules migration baseline. */
   dataHash?: string;
 }
 

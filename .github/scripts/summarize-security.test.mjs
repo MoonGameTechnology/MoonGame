@@ -23,12 +23,15 @@ const workflow = readFileSync(join(root, '.github/workflows/security.yml'), 'utf
 const summarizer = readFileSync(join(root, '.github/scripts/summarize-security.mjs'), 'utf8');
 
 /** Ключи реестра доверия — ровно то, что таблица обязана подтвердить. */
-const expectedKeys = () => [...summarizer.matchAll(/^\s*\{?\s*key: '([a-z0-9-]+)'/gm)].map((m) => m[1]);
+const expectedKeys = () =>
+  [...summarizer.matchAll(/^\s*\{?\s*key: '([a-z0-9-]+)'/gm)].map((m) => m[1]);
 
 /** Идентификаторы джоб: записи первого уровня ПОСЛЕ `jobs:` (до него на той же
  *  глубине лежат ключи `on:` — `push`, `schedule`, — и они джобами не являются). */
 const jobIds = () =>
-  [...workflow.slice(workflow.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):$/gm)].map((m) => m[1]);
+  [...workflow.slice(workflow.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):$/gm)].map(
+    (m) => m[1],
+  );
 
 /** Список `needs` джобы `report` — то, что реально удерживает сборку отчёта. */
 const reportNeeds = () => {
@@ -118,6 +121,29 @@ describe('отчёт безопасности: новые находки про�
     execFileSync(process.execPath, args, { env: { ...process.env, GITHUB_REF_NAME: 'feat/x' } });
     return readFileSync(join(dir, 'out.md'), 'utf8');
   };
+
+  it('JSON хранит полный список, включая результаты за пределами топ-30', async () => {
+    const { mkdtempSync, writeFileSync: write } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { execFileSync } = await import('node:child_process');
+    const dir = mkdtempSync(join(tmpdir(), 'sec-json-'));
+    write(
+      join(dir, 'trivy.sarif'),
+      sarif(Array.from({ length: 45 }, (_, n) => [`CVE-${n}`, 'image', 1])),
+    );
+    execFileSync(process.execPath, [
+      join(root, '.github/scripts/summarize-security.mjs'),
+      dir,
+      join(dir, 'report.md'),
+    ]);
+    const report = JSON.parse(readFileSync(join(dir, 'report.json'), 'utf8'));
+    expect(report.source).toBe('scanner-run');
+    expect(report.findings).toHaveLength(45);
+    expect(report.totals.error).toBe(45);
+    expect(report.scanConfirmation.find((s) => s.key === 'trivy-image').state).toBe('bad');
+    expect(workflow).toContain('security-report.json');
+    expect(workflow).toContain('reports/**/status-*.json');
+  });
 
   it('в таблице только новое, известное — числом; сдвиг строки не делает находку новой', async () => {
     const md = await run(
