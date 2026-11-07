@@ -176,6 +176,18 @@ try {
     await page.locator('#constructor [data-cnbuild]').click();
     assert.equal(await page.locator('#constructor .pw-queues[open]').count(), 0);
     assert.ok(await page.locator('#constructor .pw-job').count());
+    // Repeating an equipped order after switching tabs must reopen its exact draft.
+    await page.locator('#constructor [data-cnhull="frigate"]').click();
+    const repeatedModule = await page.locator('#constructor [data-cnmod]').first().getAttribute('data-cnmod');
+    await page.locator('#constructor [data-cnmod]').first().click();
+    await page.locator('#constructor [data-cnbuild]').click();
+    await page.locator('#constructor [data-ctab="infantry"]').first().click();
+    await page.locator('#constructor [data-cnagain]').click();
+    assert.ok(await page.locator('#constructor.pw-fitting-open').count());
+    assert.equal(await page.locator('#constructor .cn-bay.filled [data-cnrm]').getAttribute('data-cnrm'), repeatedModule);
+    assert.ok(await page.locator('#constructor [data-cnbuild]').isVisible());
+    await page.locator('#constructor [data-cnbuild]').click();
+    assert.equal(await page.locator('#constructor.pw-fitting-open').count(), 0);
     await page.locator('#constructor [data-ctab="infantry"]').first().click();
     await page.locator('#constructor [data-cnhull="militia"]').click();
     for (let n = 1; n < 4; n++) await page.locator('#constructor [data-cncount="+"]').click();

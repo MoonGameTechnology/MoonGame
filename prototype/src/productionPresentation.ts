@@ -60,11 +60,7 @@ export function presentProduction(root: HTMLElement): void {
   if (stats) { const summary = stats.querySelector('summary'); if (summary) { summary.setAttribute('aria-label', t('yard.stats')); summary.innerHTML = INFO_ICON; } root.querySelector('.pw-fitting-dialog > header .btn-x')?.before(stats); }
   const body = root.querySelector('.pw-fitting-body');
   const card = body?.querySelector('.cn-card');
-  if (card) {
-    const bays = card.querySelectorAll('.cn-bay');
-    if (bays.length) card.insertAdjacentHTML('beforeend', `<div class="pw-fit-caption"><span>${t('production.fitting')}</span><span>${t('production.fitting-slots', { u: card.querySelectorAll('.cn-bay.filled').length, n: bays.length })}</span></div>`);
-    card.insertAdjacentHTML('afterend', `<div class="pw-fitting-tools"><button data-cntplsave>${t('yard.tpl.save')}</button><button data-cntpl>${t('yard.tpl.title')}</button></div>`);
-  }
+  if (card) appendFittingControls(card);
   const paletteHeading = root.querySelector('.pw-fitting-body .cn-ph');
   const slotName = card?.querySelector('.cn-bay.sel .cn-bt')?.textContent;
   if (paletteHeading && slotName) paletteHeading.textContent = slotName;
@@ -187,7 +183,7 @@ export function presentProduction(root: HTMLElement): void {
       root.classList.remove('pw-fitting-open');
       event.stopImmediatePropagation();
       root.querySelector<HTMLElement>('.cn-hbtn.on')?.focus();
-    } else if (target.closest('.cn-hbtn,[data-cntpluse]')) {
+    } else if (target.closest('.cn-hbtn,[data-cntpluse],[data-cnagain]')) {
       positions.delete(root);
       focused.delete(root);
       root.classList.add('pw-fitting-open');
@@ -250,4 +246,31 @@ function compareHardwareStats(root: HTMLElement): void {
     node.classList.toggle('pw-worse', delta < 0);
   }
   previousHardware.set(root, { hero, values, changes });
+}
+
+/** Labels are text nodes: translations and slot counts never enter an HTML sink. */
+function appendFittingControls(card: Element): void {
+  const doc = card.ownerDocument;
+  const bays = card.querySelectorAll('.cn-bay');
+  if (bays.length) {
+    const caption = doc.createElement('div');
+    caption.className = 'pw-fit-caption';
+    for (const label of [t('production.fitting'), t('production.fitting-slots', {
+      u: card.querySelectorAll('.cn-bay.filled').length, n: bays.length,
+    })]) {
+      const span = doc.createElement('span');
+      span.textContent = label;
+      caption.append(span);
+    }
+    card.append(caption);
+  }
+  const controls = doc.createElement('div');
+  controls.className = 'pw-fitting-tools';
+  for (const [attribute, label] of [['data-cntplsave', 'yard.tpl.save'], ['data-cntpl', 'yard.tpl.title']] as const) {
+    const button = doc.createElement('button');
+    button.setAttribute(attribute, '');
+    button.textContent = t(label);
+    controls.append(button);
+  }
+  card.after(controls);
 }
