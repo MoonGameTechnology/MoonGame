@@ -1,3 +1,4 @@
+import { productionHeroLayout, skillInformation, moduleInformation, productionHeroEquipment, productionHardwareEmpty } from './productionHeroLayout';
 import { effectChip } from './moduleEffect';
 import { canInstall } from '../../packages/shared-core/src/util/fitting';
 import { heroPictogram } from './heroPictograms';
@@ -40,7 +41,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
-import { esc, cost, fmtHrs } from './format';
+import { esc, cost, fmtHrs, displayUnit } from './format';
 import { liveTimerHtml } from './liveTimers';
 import {
   castHeroAbility,
@@ -157,16 +158,6 @@ export const HERO_CASTABLE = new Set([
 // real branch skill-tree with prereq connectors and per-node states, and a tap-to-open
 // dossier that shows what a node grants BEFORE you buy it.
 
-/** The pane's tabs. A GRID of four pills (2×2), not a strip of equal flex cells: at a
- *  quarter of a phone's width «Способности» had no room and the row read as one grey
- *  smear. `icon` is what makes the grid scannable — same shape as the corp cabinet's. */
-export const HERO_TABS: Array<{ key: HeroTab; label: string; icon: string }> = [
-  { key: 'overview', label: 'hero.hq.tab.overview', icon: '◈' },
-  { key: 'tree', label: 'hero.hq.tab.tree', icon: '⋔' },
-  { key: 'abilities', label: 'hero.hq.tab.abilities', icon: '✦' },
-  { key: 'ship', label: 'hero.hq.tab.ship', icon: '▣' },
-];
-
 /** Human short labels for a passive's hook (what the bonus actually does). */
 const HERO_HOOK_RU: Record<string, string> = {
   'fleet.speed': 'hero.hook.fleet-speed',
@@ -196,7 +187,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
   const fleet = !dead && hero.fleetId !== undefined ? state.fleets[hero.fleetId] : undefined;
 
   // selector chips (one focused hero at a time)
-  let chips = `<div class="hx-chips">`;
+  let chips = `<header class="pw-catalog-heading"><h2>${t('production.catalog.heroes')}</h2><span>${t('hero.hq.deployed-count', { a: active, c: cap })}</span></header><div class="hx-chips">`; let statusLabel = '';
   for (const h of mine) {
     const d = h.archetype !== undefined ? data.heroes[h.archetype] : undefined;
     const dep = h.alive !== false && h.fleetId && state.fleets[h.fleetId];
@@ -204,12 +195,13 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
       h.mobilization
         ? h.mobilization.queued ? t('build.state.waiting') : t('hero.hq.mobilizing', { time: liveTimerHtml(h.mobilization.readyAt, 'hms') })
         : h.alive === false ? t('hero.hq.dead') : dep ? t('hero.hq.deployed') : t('hero.hq.reserve');
+    if (h.id === hero.id) statusLabel = st;
     chips +=
       `<button class="hx-chip g-${heroGradeKey(h.grade)}${h.id === hero.id ? ' sel' : ''}${d?.branch === 'psionic' ? ' ps' : ''}" data-hsel="${h.id}">` +
-      `${heroPortraitHtml(h.archetype)}${esc(heroDisplayName(h))}` +
+      `${heroPortraitHtml(h.archetype)}<span class="hx-cname" title="${esc(heroDisplayName(h))}">${esc(heroDisplayName(h))}</span>` +
       `<span class="hx-cst${dep ? ' on' : ''}">${st}</span></button>`;
   }
-  chips += `<span class="hx-cap">${t('hero.hq.deployed-count', { a: active, c: cap })}</span></div>`;
+  chips += `</div>`;
   if (state.techRules?.ruleset === 'main' && cap < HERO_ACTIVE_CAP)
     chips += `<div class="hx-note">${t('hero.hq.slot-research')}</div>`;
 
@@ -225,52 +217,29 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     : fleet
       ? `<span class="hx-dep">⚓ ${esc(typeof fleet.location === 'string' ? fleet.location : t('hero.hq.enroute'))}</span>`
       : `<button class="hx-btn btn-main" data-hspawn="${hero.id}" ${active >= cap ? 'disabled' : ''}>${esc(deployLabel)}</button>`;
-  const bonuses = activePassivesOf(hero)
-    .map((p) => `<span class="hx-trait">${esc(heroPassiveLine(p))}</span>`)
-    .join('');
-  const bays = heroBaysOf(hero);
-  const slots = bays.weapon + bays.defense + bays.utility + (data.units[heroHullOf(hero)]?.slots.universal ?? 0);
-  const used = (hero.modules ?? []).length;
-  const fitPips =
-    slots > 0
-      ? `<span class="hx-trait">${t('hero.hq.modules')} <span class="hx-pips">${'●'.repeat(used)}${'○'.repeat(Math.max(0, slots - used))}</span></span>`
-      : '';
+  const summary = `<div class="pw-hero-stats"><div><small>${t('production.flagship')}</small><b>${esc(displayUnit(heroHullOf(hero)))}</b></div><div><small>${t('production.abilities')}</small><b>${wornOf(hero).length} / ${skillSlotsOf(hero)}</b></div><div><small>${t('production.status')}</small><b>${statusLabel}</b></div></div>`;
   const portrait = heroPortraitHtml(hero.archetype);
   const gradeKey = heroGradeKey(hero.grade);
   const ident =
     `<div class="hx-ident g-${gradeKey}${def?.branch === 'psionic' ? ' ps' : ''}">` +
-    `<div class="hx-irow">${portrait}<span class="hx-name">♔ ${esc(heroDisplayName(hero))}</span>` +
+    `<div class="hx-irow">${portrait}<span class="hx-name">${esc(heroDisplayName(hero))}</span>` +
     // Редкость подписана СЛОВОМ, а не только цветом обводки: цветом одним нельзя —
     // его не различит дальтоник и не передаст скриншот в оттенках серого.
     `<span class="hx-tag hx-gtag">${esc(t(HERO_GRADE_KEY[gradeKey] ?? 'hero.grade.common'))}</span>` +
     (def?.branch
       ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>`
       : '') +
-    `<span class="hx-dstat">${deploy}</span></div>` +
-    (bonuses || fitPips ? `<div class="hx-traits">${bonuses}${fitPips}</div>` : '') +
+    `<span class="hx-role">${esc(tData(def?.name ?? ''))}</span><span class="pw-hero-status">${statusLabel}</span></div>` +
+    (def?.description ? `<p class="pw-hero-description">${esc(t(def.description))}</p>` : '') +
     `</div>`;
 
-  // tabs
-  const tabs =
-    `<div class="hx-tabs">` +
-    HERO_TABS.map(
-      ({ key, label, icon }) =>
-        `<button class="hx-tab${view.tab === key ? ' on' : ''}" data-htab="${key}">` +
-        `<i>${icon}</i>${t(label)}</button>`,
-    ).join('') +
-    `</div>`;
 
-  const body =
-    view.tab === 'tree'
-      ? heroTreeHtml(hero, res)
-      : view.tab === 'abilities'
-        ? heroAbilitiesHtml(hero, state.time)
-        : view.tab === 'ship'
-          ? heroFlagshipHtml(state, hero, view.flagship) + heroShipHtml(hero, state.players[hero.owner]?.arsenal)
-          : heroOverviewHtml(hero, state.time, fleet);
+  const body = view.tab === 'tree' ? heroTreeHtml(hero, res)
+    : view.tab === 'ship' ? heroFlagshipHtml(state, hero, view.flagship) + heroShipHtml(hero, state.players[hero.owner]?.arsenal) : '';
+
 
   const dossier = view.dossier ? heroDossierHtml(hero, view.dossier, res) : '';
-  return chips + ident + tabs + `<div class="hx-view">${body}</div>` + dossier;
+  return productionHeroLayout(chips, ident + summary, heroAbilitiesHtml(hero, state.time, view.tab === 'abilities'), view.tab, body, heroOverviewHtml(hero, state.time, fleet), dossier, deploy);
 }
 
 /**
@@ -447,14 +416,13 @@ function wornOf(hero: HeroInst): string[] {
  *  · spawn-markers are perks, not slots: they ride in the pool and cost nothing to
  *    carry, because `hero.spawn` reads them from what the hero OWNS.
  */
-function heroAbilitiesHtml(hero: HeroInst, now: number): string {
+function heroAbilitiesHtml(hero: HeroInst, now: number, poolOpen = false): string {
   const dead = hero.alive === false;
   // Slots hold abilities AND slotted passives (PVR-6.16): one list, one budget.
   const owned = [
     ...(hero.abilities ?? []).filter((a): a is string => a !== null && !!data.heroAbilities[a]),
     ...(hero.passives ?? []).filter((p) => !!slottedPassive(p)),
   ];
-  if (!owned.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
   const worn = wornOf(hero).filter((a) => !!data.heroAbilities[a] || !!slottedPassive(a));
   const slots = skillSlotsOf(hero);
   const free = Math.max(0, slots - worn.length);
@@ -467,9 +435,9 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
       // A worn passive has nothing to cast: it simply acts while it sits here.
       bays.push(
         `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${heroPictogram('passives', ab)}${esc(tData(pd.name))}</span>` +
-          `<div class="hx-note">${esc(t(pd.description ?? ''))}</div></div>` +
+          `${skillInformation(tData(pd.name), t(pd.description ?? ''))}</div>` +
           `<div class="hx-bayact"><span class="hx-badge on">${t('hero.tree.passive')}</span>` +
-          `<button class="hx-btn btn-quiet" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
+          `<button class="pw-skill-remove btn-x" aria-label="${t('hero.slot.remove')}" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>×</button>` +
           `</div></div>`,
       );
       continue;
@@ -477,26 +445,27 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
     const ad = data.heroAbilities[ab]!;
     // Срок кулдауна — живой узел (`liveTimers.ts`): цифры в разметке пересобирали бы окно.
     const cdAt = hero.cooldowns?.[heroCdKey(ad.type)] ?? 0;
-    const cast =
-      cdAt > now
+    const cast = cdAt > now
         ? `<span class="hx-badge cd">${t('hero.abil.cooldown', { h: liveTimerHtml(cdAt, 'hrs') })}</span>`
+        : !hero.fleetId ? `<span class="hx-badge">${t('production.after-mobilization')}</span>`
         : HERO_CASTABLE.has(ad.type)
           ? `<button class="hx-btn btn-second" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
           : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;
     bays.push(
       `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${heroPictogram('abilities', ab)}${esc(tData(ad.name))}</span>` +
-        `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>` +
+        `${skillInformation(tData(ad.name), t(ad.description ?? ''))}</div>` +
         `<div class="hx-bayact">${cast}` +
-        `<button class="hx-btn btn-quiet" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
+        `<button class="pw-skill-remove btn-x" aria-label="${t('hero.slot.remove')}" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>×</button>` +
         `</div></div>`,
     );
   }
   for (let i = 0; i < free; i += 1) {
-    bays.push(`<div class="hx-bay off">${t('hero.slot.empty')}</div>`);
+    bays.push(`<button class="hx-bay off" data-htab="abilities">${t('hero.slot.empty')}</button>`);
   }
 
   // --- пул: чем владеет, но не носит ----------------------------------------
-  const pool = owned.filter((ab) => !worn.includes(ab));
+  const perks = owned.filter(ab => data.heroAbilities[ab]?.type.startsWith('spawn_'));
+  const pool = owned.filter((ab) => !worn.includes(ab) && !perks.includes(ab));
   let poolHtml = '';
   for (const ab of pool) {
     const pd = slottedPassive(ab);
@@ -508,7 +477,7 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
       poolHtml +=
         `<div class="hx-row${free > 0 ? '' : ' dim'}"><div class="hx-grow">` +
         `<span class="hx-an">${heroPictogram('passives', ab)}${esc(tData(pd.name))}</span>` +
-        `<div class="hx-note">${esc(t(pd.description ?? ''))}</div><span class="hx-badge">${t('hero.tree.passive')}</span></div>${action}</div>`;
+        `${skillInformation(tData(pd.name), t(pd.description ?? ''))}<span class="hx-badge">${t('hero.tree.passive')}</span></div>${action}</div>`;
       continue;
     }
     const ad = data.heroAbilities[ab]!;
@@ -522,13 +491,14 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
     poolHtml +=
       `<div class="hx-row${perk || free > 0 ? '' : ' dim'}"><div class="hx-grow">` +
       `<span class="hx-an">${heroPictogram('abilities', ab)}${esc(tData(ad.name))}</span>` +
-      `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>${action}</div>`;
+      `${skillInformation(tData(ad.name), t(ad.description ?? ''))}</div>${action}</div>`;
   }
 
   return (
-    `<div class="hx-h">${t('hero.slot.head', { u: worn.length, n: slots })}</div>` +
+    `<div class="hx-h pw-ability-heading"><b>${t('production.abilities')}</b><span>${t('hero.slot.head', { u: worn.length, n: slots })}</span></div>` +
     `<div class="hx-bays ha-ability-grid">${bays.join('')}</div>` +
-    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div><div class="ha-ability-grid">${poolHtml}</div>` : '')
+    perks.map(ab => `<div class="pw-hero-perk">${heroPictogram('abilities', ab)}<span><b>${esc(tData(data.heroAbilities[ab]!.name))}</b><small>${t('hero.abil.deploy-perk')}</small></span>${skillInformation(tData(data.heroAbilities[ab]!.name), t(data.heroAbilities[ab]!.description ?? ''))}</div>`).join('') +
+    `<details class="pw-hero-pool"${poolOpen ? ' open' : ''}><summary>${t('hero.slot.pool')}</summary><div class="ha-ability-grid">${poolHtml || `<p>${t('hero.abil.empty')}</p><button class="hx-tab" data-htab="tree">${t('production.hero-development')} ›</button>`}</div></details>`
   );
 }
 
@@ -581,10 +551,10 @@ function heroShipHtml(hero: HeroInst, arsenal?: { modules: string[]; stars?: Rec
     const md = data.modules[mid]!;
     const off = deployed
       ? `<span class="hx-badge">${t('hero.ship.deployed')}</span>`
-      : `<button class="hx-btn btn-quiet" data-huninstall="${hero.id}" data-mod="${mid}">${t('hero.slot.remove')}</button>`;
+      : `<button class="pw-hardware-remove btn-x" aria-label="${t('hero.slot.remove')}" data-huninstall="${hero.id}" data-mod="${mid}">×</button>`;
     rows.push(
-      `<div class="hx-bay on r-${esc(hero.moduleSnapshot?.rarity[mid] ?? arsenal?.rarity?.[mid] ?? md.rarity ?? 'simple')}"><div class="hx-grow"><span class="hx-an">${moduleIcon(mid)}${esc(tData(md.name))}</span>` +
-        `<div class="hx-note">${moduleLine(mid)}</div></div>` +
+      `<div class="hx-bay on pw-hardware-slot r-${esc(hero.moduleSnapshot?.rarity[mid] ?? arsenal?.rarity?.[mid] ?? md.rarity ?? 'simple')}" data-pw-installed-hero="${esc(hero.id)}" data-pw-installed-module="${esc(mid)}" data-pw-hardware-slot="${md.slot}" role="button" tabindex="0"><div class="hx-grow"><span class="hx-an">${moduleIcon(mid)}${esc(tData(md.name))}</span>` +
+        `${moduleInformation(tData(md.name), moduleLine(mid))}</div>` +
         `<div class="hx-bayact"><span class="hx-g pa">${t(BAY_KEY[md.slot])}</span>${off}</div></div>`,
     );
   }
@@ -592,18 +562,17 @@ function heroShipHtml(hero: HeroInst, arsenal?: { modules: string[]; stars?: Rec
   // оружейная ячейка, а игрок держит в руках двигатель.
   for (const c of ['weapon', 'defense', 'utility'] as ShipSlotType[])
     for (let i = 0; i < free(c); i += 1)
-      rows.push(`<div class="hx-bay off">${t('hero.ship.empty', { k: t(BAY_KEY[c]) })}</div>`);
+      rows.push(productionHardwareEmpty(c, t(BAY_KEY[c]), deployed));
 
   const overflow = Object.keys(bays).reduce((n,c) => n + Math.max(0,used[c as ShipSlotType] - bays[c as ShipSlotType]),0);
-  for (let i = overflow; i < (hullDef?.slots.universal ?? 0); i++) rows.push(`<div class="hx-bay off">${t('hero.ship.empty', { k: t('yard.slot.universal') })}</div>`);
+  for (let i = overflow; i < (hullDef?.slots.universal ?? 0); i++) rows.push(productionHardwareEmpty('universal', t('yard.slot.universal'), deployed));
 
   let poolHtml = '';
   for (const [mid, md] of Object.entries(data.modules)) {
-    if (installed.includes(mid)) continue;
     const allowed = hullDef !== undefined && moduleAllowed(hull, hullDef, md);
     const owned = !arsenal || arsenal.modules.includes(mid);
     const fits = owned && allowed && canInstall({ item: id => data.modules[id], category: m => m.slot, capacity: c => bays[c as ShipSlotType], wildcard: hullDef?.slots.universal, allowed: m => !!hullDef && moduleAllowed(hull,hullDef,m) }, installed, mid).ok;
-    const action = !owned ? `<span class="hx-badge">${t('err.not-owned')}</span>` : !allowed
+    const action = installed.includes(mid) ? `<span class="hx-badge on">${t('production.module-installed')}</span>` : !owned ? `<span class="hx-badge">${t('err.not-owned')}</span>` : !allowed
       ? `<span class="hx-badge">${t('hero.ship.wrong-hull')}</span>`
       : deployed
         ? `<span class="hx-badge">${t('hero.ship.deployed')}</span>`
@@ -611,18 +580,14 @@ function heroShipHtml(hero: HeroInst, arsenal?: { modules: string[]; stars?: Rec
           ? `<button class="hx-btn btn-second" data-hinstall="${hero.id}" data-mod="${mid}">${t('hero.slot.equip')}</button>`
           : `<span class="hx-badge">${t('hero.ship.no-bay')}</span>`;
     poolHtml +=
-      `<div class="hx-row r-${esc(arsenal?.rarity?.[mid] ?? md.rarity ?? 'simple')}${fits && !deployed ? '' : ' dim'}"><div class="hx-grow">` +
+      `<div class="hx-row pw-hardware-option r-${esc(arsenal?.rarity?.[mid] ?? md.rarity ?? 'simple')}${fits && !deployed ? '' : ' dim'}" data-slot="${md.slot}"><div class="hx-grow">` +
       `<span class="hx-an">${moduleIcon(mid)}${esc(tData(md.name))}</span>` +
-      `<div class="hx-note">${moduleLine(mid)}</div></div>` +
+      `${moduleInformation(tData(md.name), moduleLine(mid))}</div>` +
       `<span class="hx-g pa">${t(BAY_KEY[md.slot])}</span>${action}</div>`;
   }
 
-  return (
-    `<div class="hx-h">${t('hero.ship.slots', { u: installed.length, n: total })}</div>` +
-    (deployed ? `<div class="hx-note">${t('hero.ship.refit-docked')}</div>` : '') +
-    `<div class="hx-bays">${rows.join('')}</div>` +
-    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div><div class="ha-ability-grid">${poolHtml}</div>` : '')
-  );
+  const caption = t('hero.ship.slots', { u: installed.length, n: total }) + (deployed ? ` · ${t('hero.ship.refit-docked')}` : '');
+  return productionHeroEquipment(hero, hull, rows.join(''), poolHtml, caption);
 }
 
 /** The overview tab — archetype line, a stat strip (abilities / tree progress / ship bays)
@@ -759,7 +724,7 @@ export function initHeroStaff(host: HeroStaffHost): {
   click: (target: HTMLElement) => 'repaint' | 'close' | null;
   focus: (heroId: string) => boolean;
 } {
-  let view: HeroView = { sel: null, tab: 'tree', dossier: null };
+  let view: HeroView = { sel: null, tab: 'overview', dossier: null };
   let previous: HeroInst[] | null = null;
   let previousMatch = '';
   let previousTime = 0;
@@ -802,7 +767,7 @@ export function initHeroStaff(host: HeroStaffHost): {
     }
     const htab = (tg.closest('[data-htab]') as HTMLElement | null)?.dataset.htab;
     if (htab) {
-      view = { ...view, tab: htab as HeroTab, dossier: null };
+      view = { ...view, tab: view.tab === htab && htab !== 'abilities' ? 'overview' : htab as HeroTab, dossier: null };
       return 'repaint';
     }
     const nodeBtn = tg.closest('[data-hnode]') as HTMLElement | null;

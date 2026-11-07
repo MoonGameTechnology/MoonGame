@@ -3089,7 +3089,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'trader', isOpen: () => trader.isOpen(), close: () => trader.close() }, // z47 торговец экспедиции
   { id: 'ally', isOpen: () => allyScreen.isOpen(), close: () => allyScreen.close() }, // z47 связь с союзником
   { id: 'codex', isOpen: () => shown('codex'), close: closeCodex }, // z48
-  { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Производство»
+  { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.back() }, // z47 «Производство»
   // «Постройки» стоят НИЖЕ кодекса (z45): карточка здания открывается поверх окна,
   // и Back обязан сначала закрыть её, а уже потом само окно.
   // Двухступенчатый Back режима «Приказ» (CHAIN-UX): сперва меню точки…

@@ -1,6 +1,10 @@
+import { saveNamedTemplate } from './productionTemplateDialog';
+import { holoIcon } from './holographicIcons';
+import { productionCatalogHeading, productionCatalogTile } from './productionCatalog';
+import { closeProductionOverlay, fittingSheet, presentProduction, rememberProductionDetails, productionOrderHtml } from './productionPresentation';
 import { productionQueueHtml } from './productionQueueView';
-import { netIncome, completedUnitSpend } from './economy';
-import { resLine } from './format';
+import { completedUnitSpend } from './economy';
+import { productionIncomeHtml } from './productionIncome';
 import { productionClick } from './productionInteraction';
 /**
  * «ПРОИЗВОДСТВО» — the unified in-match order screen (CON-1, LARS-4, REFM-13, ROS-3.1).
@@ -31,7 +35,6 @@ import { productionClick } from './productionInteraction';
  * touches the DOM, through explicit hooks instead of `main.ts`'s module-level state.
  */
 import { buildScreenHtml, type BuildCategory } from './buildScreen';
-import { productionInfoButton, productionRequirementsHtml } from './productionRequirementsView';
 import { splitSupport } from '../../decisions/supportShips';
 import { moduleGroups } from '../../decisions/moduleGroups';
 import type { SlotCallout } from '../../decisions/slotCallouts';
@@ -63,7 +66,6 @@ import { originOf } from './arsenal';
 import { originLabel } from './arsenalScreen';
 import { buildShip } from '../../decisions/actions';
 import {
-  addTemplate,
   fitTemplate,
   parseTemplates,
   removeTemplate,
@@ -267,6 +269,7 @@ export interface YardView {
   troops?: readonly string[];
   block?: string | null;
   blockText?: string;
+  section?: YardTab;
 }
 
 /** The loadout constructor pane for a family of hulls (ships or shuttles) — same
@@ -297,12 +300,7 @@ export function loadoutPaneHtml(
   });
   if (!ed.ok) return `<div class="cn-soon">${t('yard.hull.unavailable')}</div>`;
   const m: LoadoutModel = ed;
-  const hulls = ownedHulls
-    .map((h) => {
-      const art = catalogPortraitHtml('u', h, data, 'thumb');
-      return `<div class="pw-hull-tile"><button class="cn-hbtn${art ? ' with-art' : ''}${h === draft.hull ? ' on' : ''}" data-cnhull="${h}">${art || unitIconHtml(h, data, view.youColor, 18)} <span>${esc(displayUnit(h))}</span></button>${productionInfoButton('unit', h)}${productionRequirementsHtml(state, me, draft.planet, 'unit', h)}</div>`;
-    })
-    .join('');
+  const hulls = [...ownedHulls].sort((a,b) => data.units[a]!.buildTimeHours - data.units[b]!.buildTimeHours || a.localeCompare(b)).map(h => productionCatalogTile(state, me, draft.planet, h, draft.hull)).join('');
   // Открытый отсек (шаг 3 переделки окна): справа — его модули, а не весь каталог.
   const sel = selectedBay(m.slots, draft.slot);
   const portrait = catalogPortraitHtml('u', draft.hull, data);
@@ -327,12 +325,12 @@ export function loadoutPaneHtml(
               .join(' ') + (md.description ? `<p>${esc(t(md.description))}</p>` : '')
           : '';
         return (
-          `<div class="cn-bay filled${on} r-${sl.rarity ?? 'simple'}" data-cnsel="${i}"><div class="cn-bic">${moduleIcon(sl.moduleId)}</div>` +
-          `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}${bought}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${originTagHtml(view.arsenalItems, sl.moduleId)}</div>${moduleGradeHtml(sl.rarity ?? 'simple', sl.star ?? 0)}</div><div class="cn-bd">${eff}</div>${on ? `<button class="cn-tx btn-x" data-cnrm="${sl.moduleId}" aria-label="${t('yard.module.take-off')}">✕</button>` : ''}</div>`
+          `<div class="cn-bay filled${on} r-${sl.rarity ?? 'simple'}" data-cnsel="${i}" role="button" tabindex="0"><div class="cn-bic">${moduleIcon(sl.moduleId)}</div>` +
+          `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}${bought}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${originTagHtml(view.arsenalItems, sl.moduleId)}</div>${moduleGradeHtml(sl.rarity ?? 'simple', sl.star ?? 0)}</div><div class="cn-bd">${eff}</div><button class="cn-tx btn-x" data-cnrm="${sl.moduleId}" aria-label="${t('yard.module.take-off')}">✕</button></div>`
         );
       }
       return (
-        `<div class="cn-bay empty${on}" data-cnsel="${i}"><div class="cn-bic">${SLOT_ICON[sl.type] ?? '＋'}</div>` +
+        `<div class="cn-bay empty${on}" data-cnsel="${i}" role="button" tabindex="0"><div class="cn-bic">${holoIcon('plus-circle')}</div>` +
         `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}${bought}</div><div class="cn-bn">${t('yard.slot.empty')}</div></div></div>`
       );
     })
@@ -343,7 +341,7 @@ export function loadoutPaneHtml(
       .join(' ');
     if (o.installable) {
       return (
-        `<button class="cn-mod r-${o.rarity}" data-cnmod="${o.id}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
+        `<button class="cn-mod r-${o.rarity}${o.id === m.slots[sel]?.moduleId ? ' on' : ''}" data-cnmod="${o.id}" aria-pressed="${o.id === m.slots[sel]?.moduleId}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
         `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span>${moduleGradeHtml(o.rarity, o.star)}<span class="cn-me">${eff}</span><span class="cn-mc">${priceHtml(o.cost)}</span></button>`
       );
     }
@@ -382,7 +380,7 @@ export function loadoutPaneHtml(
     // списке отсеков, здесь он не выбор.
     const option = new Map(
       (pick.ok ? pick.palette : [])
-        .filter((o) => o.id !== cur && o.code !== 'E_DUP_MODULE')
+        .filter((o) => o.code !== 'E_DUP_MODULE')
         .map((o) => [o.id, o] as const),
     );
     const fitDef = data.units[m.unit];
@@ -449,15 +447,15 @@ export function loadoutPaneHtml(
           .join('')}</select></div>`
       : `<div class="cn-noplace">${t('yard.troop.none')}</div>`;
   const stats =
-    `<div class="cn-side"><div class="cn-ph">${m.hasSlots ? t('yard.cost.with-modules') : t('yard.stats')}</div>${bars}${damage}${troopRow}` +
+    `<details class="cn-side pw-fit-stats"><summary>${t('yard.stats')}</summary>${bars}${damage}` +
     (m.hasSlots ? `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div>` : '') +
-    `</div>`;
+    `</details>${troopRow}`;
   // Раскладка (шаг 3): на ПК три колонки — корпуса, корабль с характеристиками, модули
   // отсека; на телефоне одна колонка в том же порядке, модули сразу под артом. Корпус без
   // отсеков — без колонки модулей.
   const card = `<div class="cn-card${m.hasSlots ? ' with-tiles' : ''}">${hullCard}<div class="pw-bays">${bays}</div></div>`;
   const slotCol = panel ? `<div class="cn-slot">${panel}</div>` : '';
-  return `<div class="cn-grid ${slotCol ? 'cn-g3' : 'cn-g2'}"><div class="cn-hulls">${hulls}</div>${card}${slotCol}${stats}</div>`;
+  return `<div class="cn-grid ${data.units[draft.hull]?.domain === 'ground' ? 'pw-ground' : ''} ${slotCol ? 'cn-g3' : 'cn-g2'}"><div class="cn-hulls">${productionCatalogHeading(view.section)}${hulls}</div>${fittingSheet(card + slotCol + stats, displayUnit(draft.hull), hullDef?.domain === 'ground')}</div>`;
 }
 
 /**
@@ -612,16 +610,12 @@ export function orderBarHtml(
         )
         .join('')}</select>${queue ? `<span class="cn-oq">${queue}</span>` : ''}`
     : `<div class="cn-noplace">${t('yard.no-place')}</div>`;
-  return (
-    `<div class="cn-order">` +
-
-    (view.block ? `<span class="pw-order-block">${esc(view.blockText ?? '')}</span>` : '') +
-    `<div class="cn-oprice">${priceHtml(total, res)}<span class="cn-otime" title="${t('yard.build-time')}">⏱ ${fmtDur(matchUnitHours(state, orderHours(data, draft.hull, troop)))}</span></div>` +
-    `<div class="cn-oworld">${worlds.length ? queue : where}</div>` +
-    `<div class="cn-ogo"><div class="cn-step"><button data-cncount="-" ${draft.count <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${draft.count}</span><button data-cncount="+" ${draft.count >= MAX_COUNT ? 'disabled' : ''}>+</button></div>` +
-    `<button class="cn-build btn-main" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build')}</button></div>` +
-    `</div>`
-  );
+  return productionOrderHtml({
+    count: draft.count, max: MAX_COUNT, world: draft.planet,
+    worldName: draft.planet ? worldName(state, draft.planet) : t('yard.no-place'),
+    price: priceHtml(total, res), time: fmtDur(matchUnitHours(state, orderHours(data, draft.hull, troop))),
+    queue, where: worlds.length ? '' : where, affordable, canBuild, block: view.block ? view.blockText ?? '' : '',
+  });
 }
 
 /** The window chrome: title, close, the tabs, whichever pane is open and, under it, the
@@ -637,7 +631,7 @@ export function yardBoxHtml(
   const tabBtn = (k: YardTab, label: string, active = tab === k): string =>
     `<button class="cn-tab${active ? ' on' : ''}" data-ctab="${k}">${t(label)}</button>`;
   return (
-    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b><button data-pw-queue aria-label="${t('production.queue')}">☷</button>${again}${tab === 'heroes' || tab === 'buildings' ? '' : templateToggleHtml(templates !== '')}<button class="cn-close btn-x">✕</button></div>` +
+    `<div class="cnbox"><div class="cn-head"><b>${holoIcon('hammer')}${t('production.title')}</b><button data-pw-queue aria-label="${t('production.queue')}">${holoIcon('stack')}</button>${again}<button class="cn-close btn-x">✕</button></div>` +
     `<div class="cn-tabs pw-main-tabs">${tabBtn('buildings', 'production.buildings')}${tabBtn('ships', 'yard.title', ['ships','support','squads'].includes(tab))}${tabBtn('infantry', 'production.mobilization', ['infantry','vehicles','heroes'].includes(tab))}</div>` +
     (tab === 'buildings' ? '' : `<div class="cn-tabs pw-subtabs">${YARD_TABS.filter(([k]) => ['infantry','vehicles','heroes'].includes(tab) ? ['infantry','vehicles','heroes'].includes(k) : ['ships','support','squads'].includes(k)).map(([k,l]) => tabBtn(k,l)).join('')}</div>`) +
     templates +
@@ -650,13 +644,6 @@ const TEMPLATE_TABS = YARD_TABS.map(([k]) => k).filter((k) => k !== 'heroes' && 
 /** Ключ хранилища шаблонов: они общие для всех партий на этом устройстве. */
 export const TEMPLATES_KEY = 'vd.yard.templates.v1';
 
-function templateToggleHtml(open: boolean): string {
-  const label = t('yard.tpl.title');
-  return (
-    `<button class="cn-tplbtn btn-quiet${open ? ' on' : ''}" data-cntpl aria-expanded="${open}" aria-label="${label}" title="${label}">` +
-    `<span aria-hidden="true">▤</span><span class="cn-tpl-k"> ${label}</span></button>`
-  );
-}
 
 /** Шаблон заказа из черновика окна. */
 export function templateOf(tab: YardTab, draft: YardDraft): BuildTemplate {
@@ -679,7 +666,7 @@ export function templatesPaneHtml(
   me: string,
   list: readonly BuildTemplate[],
   current: BuildTemplate | null,
-  color: string,
+  _color: string,
   lane?: YardTab,
 ): string {
   const snap = state.players[me]?.arsenal;
@@ -688,12 +675,13 @@ export function templatesPaneHtml(
       if (lane && unitLane(data.units[tpl.hull]) !== unitLane(data.units[hullsOfTab(lane)[0]!])) return '';
       const ok = fitTemplate(tpl, hullsOfTab(tpl.tab as YardTab), data, snap) !== null;
       const mods = tpl.modules.map((m) => `<span class="cn-tpm" title="${esc(tData(data.modules[m]?.name ?? m))}">${moduleIcon(m)}</span>`).join('');
-      const name = `${esc(displayUnit(tpl.hull))} ×${tpl.count}`;
+      const hull = `${esc(displayUnit(tpl.hull))} ×${tpl.count}`;
+      const name = tpl.name ? `<b>${esc(tpl.name)}</b><small>${hull}</small>` : hull;
       const price = priceHtml(completedUnitSpend(state, { unit: tpl.hull, count: tpl.count, modules: tpl.modules, troop: tpl.troop }), state.players[me]?.resources);
       const on = current !== null && sameTemplate(tpl, current);
       return (
         `<div class="cn-tplrow${on ? ' on' : ''}"><button class="cn-tpluse" data-cntpluse="${i}" ${ok ? '' : `disabled title="${t('yard.tpl.unavailable')}"`}>` +
-        `${unitIconHtml(tpl.hull, data, color, 16)}<span class="cn-tpn">${name}${price}</span><span class="cn-tpms">${mods}</span></button>` +
+        `${catalogPortraitHtml('u', tpl.hull, data, 'thumb')}<span class="cn-tpn">${name}${price}</span><span class="cn-tpms">${mods}</span></button>` +
         `<button class="cn-tpldel btn-x" data-cntpldel="${i}" aria-label="${t('yard.tpl.delete')}" title="${t('yard.tpl.delete')}">✕</button></div>`
       );
     })
@@ -777,7 +765,7 @@ export interface YardHost {
 /** Wire the window up: tabs, hull picking, fitting modules, the order. Call once at
  *  boot (it attaches the window's delegates); `open()` is what the rail button calls. */
 
-function orderView(host: YardHost, draft: YardDraft, hulls: string[], troopsFor: (d: YardDraft) => string[] | undefined): { draft: YardDraft; body: string; order: string } {
+function orderView(host: YardHost, draft: YardDraft, hulls: string[], troopsFor: (d: YardDraft) => string[] | undefined, section: YardTab): { draft: YardDraft; body: string; order: string } {
   draft = normalizeDraft(host.state(), host.me(), draft, hulls);
   const troops = troopsFor(draft);
   // Боец, которого на этом мире больше нельзя посадить, сменяется первым годным —
@@ -790,19 +778,15 @@ function orderView(host: YardHost, draft: YardDraft, hulls: string[], troopsFor:
     block: host.probe?.(buildShip(host.me(), draft.planet, draft.hull, draft.count, draft.modules, draft.troop)),
     ...(troops ? { troops } : {}),
   };
-  const presentation = { ...view, blockText: view.block ? host.errText(view.block) : '' };
+  const presentation = { ...view, section, blockText: view.block ? host.errText(view.block) : '' };
   const body = productionWorldSelect(host.state(), host.me(), draft.planet) + loadoutPaneHtml(host.state(), host.me(), draft, hulls, presentation);
   const order = orderBarHtml(host.state(), host.me(), draft, hulls, presentation);
   return { draft, body, order };
 }
 
-export function initShipyard(host: YardHost): {
-  open: (nextTab?: YardTab, world?: string, building?: string) => void;
-  refreshHeroes: () => void;
-  refreshQueue: () => void;
-  render: () => void;
-  close: () => void;
-} {
+function productionAvailability(host: YardHost): string { return JSON.stringify([host.state().players[host.me()]?.resources, host.state().players[host.me()]?.technologies, host.state().players[host.me()]?.arsenal, Object.values(host.state().planets).filter(p => p.owner === host.me()).map(p => [p.id,p.buildings])]); }
+
+export function initShipyard(host: YardHost) {
   let tab: YardTab = 'ships';
   let category: BuildCategory | null = null;
   let renderedHeroBody = '';
@@ -818,7 +802,6 @@ export function initShipyard(host: YardHost): {
   const saveTemplates = (): void => writeRaw(TEMPLATES_KEY, JSON.stringify(templates));
   let queuePainted = '';
   let lastAvailability = '';
-  const availability = () => JSON.stringify([host.state().players[host.me()]?.resources, host.state().players[host.me()]?.technologies, host.state().players[host.me()]?.arsenal, Object.values(host.state().planets).filter(p => p.owner === host.me()).map(p => [p.id,p.buildings])]);
   function queueHtml(): string {
     queuePainted = productionQueueHtml(host.state(), draft.planet);
     return queuePainted;
@@ -834,16 +817,16 @@ export function initShipyard(host: YardHost): {
       host.probe!(buildShip(host.me(), d.planet, d.hull, 1, d.modules, g)),
     );
   };
-  const close = (): void => host.root().classList.remove('show');
+  const close = (): void => host.root().classList.remove('show', 'pw-fitting-open');
 
   function paint(): void {
-    lastAvailability = availability();
+    lastAvailability = productionAvailability(host);
     let body: string;
     let order = '';
     if (tab === 'buildings') {
       const worlds = productionWorlds(host.state(), host.me());
       if (!worlds.some(p => p.id === draft.planet)) draft.planet = worlds[0]?.id ?? '';
-      body = buildScreenHtml(host.state(), host.me(), draft.planet, a => host.probe ? host.probe(a) : 'E_FORBIDDEN', () => false, host.errText, undefined, category);
+      body = buildScreenHtml(host.state(), host.me(), draft.planet, a => host.probe ? host.probe(a) : 'E_FORBIDDEN', () => false, host.errText, undefined, category, true);
       body = productionWorldSelect(host.state(), host.me(), draft.planet) + body;
     } else if (tab === 'heroes') {
       const worlds = productionWorlds(host.state(), host.me());
@@ -851,9 +834,9 @@ export function initShipyard(host: YardHost): {
       renderedHeroBody = host.heroPaneHtml();
       body = productionWorldSelect(host.state(), host.me(), draft.planet) + renderedHeroBody;
     } else {
-      ({ draft, body, order } = orderView(host, draft, hullsOf(), troopsFor));
+      ({ draft, body, order } = orderView(host, draft, hullsOf(), troopsFor, tab));
     }
-    if (draft.planet) body = `<div class="pw-income">${t('production.planet-income')}${resLine(netIncome(host.state(), host.me(), undefined, draft.planet), { sign: true, per: 'h' })}</div>` + body;
+    if (draft.planet) body = productionIncomeHtml(host.state(), host.me(), draft.planet) + body;
     // Перерисовка не сбрасывает прокрутку: поставил модуль внизу списка — там и остался.
     const keep =
       paintedTab === tab ? (host.root().querySelector('#constructorbody')?.scrollTop ?? 0) : 0;
@@ -861,7 +844,7 @@ export function initShipyard(host: YardHost): {
       tplOpen && tab !== 'heroes' && tab !== 'buildings'
         ? templatesPaneHtml(host.state(), host.me(), templates, templateOf(tab, draft), host.youColor(), tab)
         : '';
-    const opened = Array.from(host.root().querySelectorAll('details')).map(d => d.open);
+    const restoreDetails = rememberProductionDetails(host.root());
     host.root().innerHTML = yardBoxHtml(
       tab,
       body,
@@ -870,11 +853,11 @@ export function initShipyard(host: YardHost): {
       queueHtml(),
       tplPane,
     );
-    if (paintedTab === tab) host.root().querySelectorAll('details').forEach((d,i) => { d.open = opened[i] ?? d.open; });
+    if (paintedTab === tab) restoreDetails();
     const scroller = host.root().querySelector('#constructorbody');
-    if (scroller && keep) scroller.scrollTop = keep;
     paintedTab = tab;
-    patchLiveTimers(host.root(), host.state().time); // сроки героев (`liveTimers.ts`)
+    presentProduction(host.root()); patchLiveTimers(host.root(), host.state().time);
+    if (scroller && keep) scroller.scrollTop = keep;
   }
 
   /** The loadout editor for the current order over `modules` — the core-validated model. */
@@ -890,7 +873,7 @@ export function initShipyard(host: YardHost): {
   }
 
   /** Модуль из колонки открытого отсека. В занятом отсеке он меняет надетый и встаёт на его
-   *  место; потом открывается следующий пустой отсек, а когда пустых нет — отсек с ним. */
+   *  место; выбранный отсек остаётся открытым для сравнения и замены. */
   function pick(moduleId: string): void {
     const res = host.state().players[host.me()]?.resources ?? {};
     const ed = editorFor(draft.modules);
@@ -911,9 +894,8 @@ export function initShipyard(host: YardHost): {
     const modules = swap ? draft.modules.map((id) => (id === cur ? moduleId : id)) : r.modules;
     const after = editorFor(modules);
     const slots = after.ok ? after.slots : [];
-    const full = slots.every((sl) => sl.moduleId);
     const at = slots.findIndex((sl) => sl.moduleId === moduleId);
-    draft = { ...draft, modules, slot: full && at >= 0 ? at : undefined, unfit: false };
+    draft = { ...draft, modules, slot: at >= 0 ? at : undefined, unfit: false };
   }
 
   /** Снять модуль: открытым остаётся освободившийся отсек. Отсеки одного типа сдвигаются
@@ -999,12 +981,12 @@ export function initShipyard(host: YardHost): {
       return;
     }
     if (tg.closest('[data-cntplsave]')) {
-      const r = addTemplate(templates, templateOf(tab, draft));
+      const r = saveNamedTemplate(host.root(), templates, templateOf(tab, draft));
       if (r.ok) {
         templates = r.list;
         saveTemplates();
+        paint();
       }
-      paint();
       return;
     }
     if (productionClick(tg, host, {
@@ -1085,7 +1067,7 @@ export function initShipyard(host: YardHost): {
         if (sent === false) return;
         host.note(t('yard.ordered', { n: String(draft.count), hull: displayUnit(draft.hull) }));
         last = { tab, draft: { ...draft, slot: undefined, unfit: false } };
-        paint(); // очередь мира и нехватка в полосе — уже с этим заказом
+        host.root().classList.remove('pw-fitting-open'); paint(); // заказ принят — вернуться в каталог
       }
     }
   });
@@ -1105,7 +1087,7 @@ export function initShipyard(host: YardHost): {
   });
 
   return {
-    open: (nextTab, world, building) => {
+    open: (nextTab?: YardTab, world?: string, building?: string) => {
       if (world) draft.planet = world;
       if (nextTab) tab = nextTab;
       const prepared = host.preparedModules?.(draft.hull);
@@ -1136,13 +1118,14 @@ export function initShipyard(host: YardHost): {
     },
     refreshQueue: () => {
       if (heroScrolling || !host.root().classList.contains('show')) return;
-      if (tab !== 'heroes' && (tab === 'buildings' || availability() !== lastAvailability)) { paint(); return; }
+      if (tab !== 'heroes' && (tab === 'buildings' || productionAvailability(host) !== lastAvailability)) { paint(); return; }
       const el = host.root().querySelector('#cn-queue');
       if (!el) return;
       const before = queuePainted;
       const html = queueHtml();
       if (html !== before) { const open = el.querySelector('details')?.open; el.innerHTML = html; const details = el.querySelector('details'); if (details && open !== undefined) details.open = open; }
     },
+    back: () => { if (!closeProductionOverlay(host.root())) close(); },
     render: paint,
     close,
   };

@@ -36,6 +36,7 @@ const SHEETS: Record<string, string> = {
   'holographic.css': read('../holographic.css'),
   'mobile-console.css': read('../mobile-console.css'),
   'mobile-strategy.css': read('../mobile-strategy.css'),
+  'production-presentation.css': read('../production-presentation.css'),
 };
 const STYLES = ['btn-main', 'btn-second', 'btn-quiet'];
 
@@ -331,7 +332,7 @@ describe('три стиля кнопок (UIX-11.1)', () => {
     expect(main).toEqual(['mkgo', 'hspawn', 'hskill', 'corpact', 'corpact']);
     expect(src).toContain('class="cbtn2 btn-main" data-corpact="create"');
     expect(src).toContain('class="cbtn2 wide btn-main" data-corpact="build"');
-    expect(src).toMatch(/class="hx-btn btn-quiet" data-hunequip=/);
+    expect(src).toMatch(/class="pw-skill-remove btn-x"[^>]* data-hunequip=/);
     expect(src).toContain('class="mk-btn btn-second danger" data-mkcancel=');
   });
 

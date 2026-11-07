@@ -22,8 +22,11 @@ import { moduleAllowed, type GameData } from '../packages/shared-core/src/index'
 export const MAX_TEMPLATES = 12;
 /** Граница числа машин — та же, что у степпера заказа. */
 export const MAX_TEMPLATE_COUNT = 20;
+export const MAX_TEMPLATE_NAME = 40;
 
 export interface BuildTemplate {
+  /** Optional for saved templates from older clients. */
+  name?: string;
   /** Вкладка окна, на которой собран заказ. */
   tab: string;
   hull: string;
@@ -43,6 +46,14 @@ export function sameTemplate(a: BuildTemplate, b: BuildTemplate): boolean {
     a.modules.every((id, i) => id === b.modules[i])
   );
 }
+
+const templateName = (raw: string): string =>
+  raw
+    .replace(/\p{Cc}/gu, ' ')
+    .trim()
+    .slice(0, MAX_TEMPLATE_NAME);
+const sameName = (a: BuildTemplate, b: BuildTemplate): boolean =>
+  !!a.name && !!b.name && a.name.toLowerCase() === b.name.toLowerCase();
 
 const clampCount = (n: unknown): number =>
   typeof n === 'number' && Number.isFinite(n)
@@ -70,24 +81,32 @@ export function parseTemplates(
     if (typeof r.tab !== 'string' || !tabs.includes(r.tab)) continue;
     if (typeof r.hull !== 'string' || !Object.hasOwn(data.units, r.hull)) continue;
     const modules = Array.isArray(r.modules)
-      ? r.modules.filter((m): m is string => typeof m === 'string' && Object.hasOwn(data.modules, m))
+      ? r.modules.filter(
+          (m): m is string => typeof m === 'string' && Object.hasOwn(data.modules, m),
+        )
       : [];
     const tpl: BuildTemplate = { tab: r.tab, hull: r.hull, modules, count: clampCount(r.count) };
+    if (typeof r.name === 'string' && templateName(r.name)) tpl.name = templateName(r.name);
     if (typeof r.troop === 'string' && Object.hasOwn(data.units, r.troop)) tpl.troop = r.troop;
-    if (!out.some((t) => sameTemplate(t, tpl))) out.push(tpl);
+    if (!out.some((t) => sameTemplate(t, tpl) || sameName(t, tpl))) out.push(tpl);
   }
   return out;
 }
 
 export type AddTemplateResult =
-  | { ok: true; list: BuildTemplate[] }
-  | { ok: false; reason: 'duplicate' | 'full' };
+  { ok: true; list: BuildTemplate[] } | { ok: false; reason: 'duplicate' | 'full' | 'name' };
 
 /** Новый шаблон встаёт ПЕРВЫМ: только что сохранённое ищут глазами сверху. */
 export function addTemplate(list: readonly BuildTemplate[], tpl: BuildTemplate): AddTemplateResult {
+  const name = tpl.name === undefined ? undefined : templateName(tpl.name);
+  if (name !== undefined && (!name || list.some((t) => sameName(t, { ...tpl, name }))))
+    return { ok: false, reason: 'name' };
   if (list.some((t) => sameTemplate(t, tpl))) return { ok: false, reason: 'duplicate' };
   if (list.length >= MAX_TEMPLATES) return { ok: false, reason: 'full' };
-  return { ok: true, list: [{ ...tpl, modules: [...tpl.modules] }, ...list] };
+  return {
+    ok: true,
+    list: [{ ...tpl, ...(name === undefined ? {} : { name }), modules: [...tpl.modules] }, ...list],
+  };
 }
 
 export function removeTemplate(list: readonly BuildTemplate[], index: number): BuildTemplate[] {
@@ -111,7 +130,9 @@ export function fitTemplate(
   if (def.domain === 'space' && owned && !owned.hulls.includes(tpl.hull)) return null;
   const modules = tpl.modules.filter((id) => {
     const m = data.modules[id];
-    return m !== undefined && moduleAllowed(tpl.hull, def, m) && (!owned || owned.modules.includes(id));
+    return (
+      m !== undefined && moduleAllowed(tpl.hull, def, m) && (!owned || owned.modules.includes(id))
+    );
   });
   return { ...tpl, modules };
 }

@@ -132,6 +132,7 @@ export function netIncome(
   playerId: string,
   planets: readonly Planet[] = recordValues(state.planets),
   onlyPlanet?: string,
+  upkeep?: Record<string, number>,
 ): Record<string, number> {
   const out: Record<string, number> = {};
   const arrears = state.players[playerId]?.arrears ?? [];
@@ -212,8 +213,11 @@ export function netIncome(
         else out[res] = (out[res] ?? 0) + v;
       }
       // …and its running cost (daily → hourly), same drain the settlement applies.
-      for (const res of Object.keys(level.upkeep))
-        out[res] = (out[res] ?? 0) - (level.upkeep[res] ?? 0) / 24;
+      for (const res of Object.keys(level.upkeep)) {
+        const spent = (level.upkeep[res] ?? 0) / 24;
+        out[res] = (out[res] ?? 0) - spent;
+        if (upkeep) upkeep[res] = (upkeep[res] ?? 0) + spent;
+      }
     }
     // Constructions in progress (≥50% built) chip in a partial/delta share too —
     // mirrors economy.ts's ramp rule (`rampsOn`). Point-evaluated (not
@@ -315,8 +319,11 @@ export function netIncome(
     for (const st of stacks) {
       const def = data.units[st.unit];
       if (!def) continue;
-      for (const res of Object.keys(def.upkeep))
-        out[res] = (out[res] ?? 0) - ((def.upkeep[res] ?? 0) * st.count * unitShare) / 24;
+      for (const res of Object.keys(def.upkeep)) {
+        const spent = ((def.upkeep[res] ?? 0) * st.count * unitShare) / 24;
+        out[res] = (out[res] ?? 0) - spent;
+        if (upkeep) upkeep[res] = (upkeep[res] ?? 0) + spent;
+      }
     }
   };
   for (const f of recordValues(state.fleets))

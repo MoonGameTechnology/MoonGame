@@ -70,6 +70,7 @@ export function trainingTourUi(h: TrainingDomHost): TrainingTourUi {
   };
   return {
     mobile: h.mobile,
+    productionCount: () => Number(document.querySelector('#constructor .cn-sv')?.textContent ?? 1),
     visible,
     selectedWorld: () => selPlanet,
     selectedFleet: () => selFleet,

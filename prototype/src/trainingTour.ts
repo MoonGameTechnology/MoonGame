@@ -30,6 +30,7 @@ import type { Rect, SpotlightStep, StepAdvance } from './spotlight';
 export interface TrainingTourUi {
   mobile: boolean;
   visible(selector: string): boolean;
+  productionCount?(): number;
   selectedWorld(): string | null;
   selectedFleet(): string | null;
   intent(kind: string): boolean;
@@ -312,7 +313,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       '[data-act="openunits"][data-arg="ships"]',
       visible('#constructor.show [data-cnhull="cruiser"]'),
     ),
-    step('economy', 'ship-select', '#constructor [data-cnhull="cruiser"]', visible('#constructor [data-cnhull="cruiser"].on'), { copy: 'onb.guide.build.units' }),
+    step('economy', 'ship-select', '#constructor [data-cnhull="cruiser"]', visible('#constructor.pw-fitting-open [data-cnhull="cruiser"].on'), { copy: 'onb.guide.build.units' }),
     step('economy', 'ship-order', '#constructor [data-cnbuild]', action('unit.build')),
     close('economy', 'ship-close'),
     step(
@@ -540,7 +541,8 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       '[data-act="openunits"][data-arg="ground"]',
       visible('#constructor.show [data-cnhull="heavy_infantry"]'),
     ),
-    step('finale', 'recruit-select', '#constructor [data-cnhull="heavy_infantry"]', visible('#constructor [data-cnhull="heavy_infantry"].on'), { copy: 'onb.guide.build.units' }),
+    step('finale', 'recruit-select', '#constructor [data-cnhull="heavy_infantry"]', visible('#constructor.pw-fitting-open [data-cnhull="heavy_infantry"].on'), { copy: 'onb.guide.build.units' }),
+    trainingRecruitQuantity(d),
     step(
       'finale',
       'recruit',
@@ -568,4 +570,15 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       state(() => trainingWon(d.world(), me)),
     ),
   ];
+}
+
+function trainingRecruitQuantity(d: TrainingTourDeps): SpotlightStep {
+  const remaining = () => Math.max(1, 8 - trainingRecruits(d.world(), d.me));
+  const count = () => d.ui.productionCount?.() ?? 1;
+  return step('finale', 'recruit-quantity', null, {
+    on: 'state', when: () => trainingRecruits(d.world(), d.me) >= 8 || count() === remaining(),
+  }, {
+    holdClock: true,
+    selector: () => `#constructor [data-cncount="${count() < remaining() ? '+' : '-'}"]`,
+  });
 }

@@ -11,7 +11,6 @@ import { countdownHMS, fmtHrs } from './format';
 import { liveText } from './liveTimers.fixture';
 import { HOUR } from './time';
 import {
-  HERO_TABS,
   ownHeroes,
   normalizeHeroView,
   initHeroStaff,
@@ -171,6 +170,12 @@ describe('штаб героев — словарь способностей', ()
   });
 });
 
+function treePanel(): string {
+  const staff = initHeroStaff(hostOf());
+  staff.click(click('[data-htab]', { htab: 'tree' }));
+  return staff.paneHtml();
+}
+
 describe('штаб героев — разметка панели', () => {
   it('portrait opens the matching personal dossier and refuses a foreign hero', () => {
     const s = staffed();
@@ -181,7 +186,8 @@ describe('штаб героев — разметка панели', () => {
     expect(html).toContain('Личное досье');
     expect(html).toContain('исследовательской станции');
     expect(html).toContain('hero-portrait');
-    expect(html).toContain('data-hcast=');
+    expect(html).not.toContain('data-hcast=');
+    expect(html).toContain(t('production.after-mobilization'));
     expect(staff.focus('hero:p2:1')).toBe(false);
     expect(staff.paneHtml()).toContain('Лира Сейн');
   });
@@ -225,7 +231,7 @@ describe('штаб героев — разметка панели', () => {
 
   /** Текст внутри `.hx-name` — шапка досье, единственное место, где героя НАЗЫВАЮТ. */
   const identName = (html: string): string =>
-    html.match(/<span class="hx-name">♔ ([^<]*)<\/span>/)?.[1] ?? '';
+    html.match(/<span class="hx-name">([^<]*)<\/span>/)?.[1] ?? '';
 
   it('ШАПКА досье называет роту переводом, а не ключом локали', () => {
     // `hero:p1:2` носит в состоянии `HeroLoadout.name` — то есть КЛЮЧ
@@ -249,9 +255,13 @@ describe('штаб героев — разметка панели', () => {
     expect(identName(initHeroStaff(hostOf({ state: () => s })).paneHtml())).toBe('Вульфакс');
   });
 
-  it('вкладка «Дерево» открыта по умолчанию и показывает узлы', () => {
-    const html = initHeroStaff(hostOf()).paneHtml();
-    expect(html).toContain('hx-tree');
+  it('развитие свёрнуто по умолчанию, открывается и закрывается без смены героя', () => {
+    const staff = initHeroStaff(hostOf());
+    expect(staff.paneHtml()).not.toContain('hx-tree');
+    staff.click(click('[data-htab]', { htab: 'tree' }));
+    expect(staff.paneHtml()).toContain('hx-tree');
+    staff.click(click('[data-htab]', { htab: 'tree' }));
+    expect(staff.paneHtml()).not.toContain('hx-tree');
   });
 
   /** Подпись узла дерева — СПРОШЕННАЯ ТАК ЖЕ, КАК ЕЁ БЕРЁТ РЕНДЕР (CONV-12c).
@@ -266,7 +276,7 @@ describe('штаб героев — разметка панели', () => {
     // весь каталог, а не только доступное — запертый узел показывается с замком и
     // рассказывает в досье, чего ему не хватает. Сторож держит именно это: добавили
     // узел в данные — он обязан появиться игроку, а не потеряться в UI.
-    const html = initHeroStaff(hostOf()).paneHtml();
+    const html = treePanel();
     for (const node of ['neural_lace', 'overclocked_helm', 'corridor_sustained', 'corridor_open']) {
       expect(html, node).toContain(treeName(node));
     }
@@ -277,7 +287,7 @@ describe('штаб героев — разметка панели', () => {
     // Психионная лестница — близнец коридорной (PSI-ЛЕСТНИЦА): «Разведка» растёт до
     // «Слабых мест», затем до «Манёвренности». Чужая ветка рисуется приглушённой рейкой,
     // поэтому все её узлы обязаны быть на экране у ЛЮБОГО героя, а не только у психионика.
-    const html = initHeroStaff(hostOf()).paneHtml();
+    const html = treePanel();
     const order = ['void_attunement', 'psi_veil', 'psi_weak_points', 'psi_evasion'].map((k) =>
       html.indexOf(treeName(k)),
     );
@@ -290,7 +300,7 @@ describe('штаб героев — разметка панели', () => {
     // последним. Причина — сортировка по ЧИСЛУ родителей: у всей цепочки коридора его
     // по одному, дальше вступал алфавит (`corridor_open` < `corridor_sustained` <
     // `overclocked_helm`). Теперь порядок задаёт ГЛУБИНА цепочки.
-    const html = initHeroStaff(hostOf()).paneHtml();
+    const html = treePanel();
     const order = ['neural_lace', 'overclocked_helm', 'corridor_sustained', 'corridor_open'].map(
       (k) => html.indexOf(treeName(k)),
     );
@@ -328,14 +338,13 @@ describe('штаб героев — разметка панели', () => {
     expect(ship).toContain('hx-tab on');
   });
 
-  it('у каждой вкладки штаба своя иконка и локализованная подпись', () => {
-    for (const tab of HERO_TABS) {
-      expect(tab.label, tab.key).toMatch(/^hero\.hq\.tab\./);
-      expect(t(tab.label), tab.key).not.toContain('hero.hq.tab');
-      expect(tab.icon, tab.key).not.toBe('');
-    }
-    expect(new Set(HERO_TABS.map((x) => x.icon)).size).toBe(HERO_TABS.length);
-    expect(initHeroStaff(hostOf()).paneHtml()).toContain('<i>\u22d4</i>'); // «Дерево»
+  it('развитие и корабль имеют понятные подписи и изначально свёрнуты', () => {
+    const html = initHeroStaff(hostOf()).paneHtml();
+    expect(html).toContain(t('production.hero-development'));
+    expect(html).toContain(t('production.hero-ship'));
+    expect(html).toContain('data-htab="tree" aria-expanded="false"');
+    expect(html).toContain('data-htab="ship" aria-expanded="false"');
+    expect(html).not.toContain('class="hx-tabs"');
   });
 
   it('палитра редкости в CSS — ПОСИМВОЛЬНАЯ копия `HERO_GRADE_COLORS`', () => {
@@ -386,7 +395,7 @@ describe('штаб героев — врождённый узел (AUD-22)', () 
   };
 
   it('у Командира «Сонастройка» и «Пси-вуаль» изучены, а узел за ними открыт', () => {
-    const html = initHeroStaff(hostOf()).paneHtml(); // главный герой места — Командир
+    const html = treePanel(); // главный герой места — Командир
     for (const id of ['void_attunement', 'psi_veil']) {
       expect(nodeHead(html, id), id).toContain('hx-node owned');
       expect(nodeHead(html, id), id).not.toContain('data-hnode');
@@ -413,7 +422,7 @@ describe('штаб героев — имена узлов в списке тре
   const treeName = (id: string): string => tData(data.heroSkillTrees[id]!.name);
 
   it('под запертым узлом требование названо по-русски', () => {
-    const html = initHeroStaff(hostOf()).paneHtml();
+    const html = treePanel();
     // `overclocked_helm` заперт на старте и требует ровно `neural_lace`.
     const needs = [...html.matchAll(/<span class="hx-st">([^<]*)<\/span>/g)]
       .map((m) => m[1]!)
@@ -696,7 +705,7 @@ describe('штаб героев — корабль: модули в той же 
     // `radar_module` разрешён только `picket_frigate` — на корпусе героя он должен
     // быть ВИДЕН и погашен: экран не врёт о том, что вообще существует.
     expect(html).toContain(t('hero.ship.wrong-hull'));
-    expect(html).toMatch(/class="hx-row r-[a-z]+ dim"/);
+    expect(html).toMatch(/class="hx-row pw-hardware-option r-[a-z]+ dim"/);
   });
 
   it('герой в поле переоснащение не предлагает, и говорит почему', () => {
@@ -730,7 +739,7 @@ describe('штаб героев — живые сроки', () => {
     const s = staffed();
     const staff = initHeroStaff(hostOf({ state: () => s }));
     staff.focus('hero:p1:2');
-    const ab = /data-hcast="hero:p1:2" data-ab="([^"]+)"/.exec(staff.paneHtml())![1]!;
+    const ab = /data-hunequip="hero:p1:2" data-ab="([^"]+)"/.exec(staff.paneHtml())![1]!;
     const hero = s.heroes!['hero:p1:2']!;
     hero.cooldowns = { ...hero.cooldowns, [heroCdKey(data.heroAbilities[ab]!.type)]: s.time + 5 * HOUR };
     s.heroes!['hero:p1:1']!.mobilization = { target: 'x', startedAt: s.time, readyAt: s.time + 2 * HOUR };

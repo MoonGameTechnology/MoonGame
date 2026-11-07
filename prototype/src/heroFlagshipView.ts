@@ -5,7 +5,7 @@ import {
 import {
   heroModuleSlots,
   effectiveStats,
-  matchHours,
+  matchUnitHours,
   moduleAllowed,
   type GameState,
   type Hero,
@@ -42,12 +42,8 @@ export function retainedHeroModules(hero: Hero, unit: string): string[] {
   return kept;
 }
 
-export function heroFlagshipHtml(state: GameState, hero: Hero, wanted?: string): string {
-  const current = heroFlagshipUnit(hero, data);
-  const choices = heroFlagshipChoices(state, hero, data);
-  const selected = wanted && choices.includes(wanted) ? wanted : current;
-  const stats = (id: string) =>
-    effectiveStats(
+export function heroFlagshipStats(hero: Hero, id: string) {
+  return effectiveStats(
       data.units[id]!,
       {
         modules: retainedHeroModules(hero, id),
@@ -56,13 +52,20 @@ export function heroFlagshipHtml(state: GameState, hero: Hero, wanted?: string):
       },
       data,
     );
+}
+
+export function heroFlagshipHtml(state: GameState, hero: Hero, wanted?: string): string {
+  const current = heroFlagshipUnit(hero, data);
+  const choices = heroFlagshipChoices(state, hero, data);
+  const selected = wanted && choices.includes(wanted) ? wanted : current;
+  const stats = (id: string) => heroFlagshipStats(hero, id);
   const reference = stats(selected);
   const readOnly = !!hero.mobilization || !!hero.fleetId;
   const statKeys = {
     hp: 'production.stat.hp',
     attack: 'production.stat.attack',
-    defense: 'production.stat.defense',
-    speed: 'production.stat.speed',
+    defense: 'production.stat.defense-short',
+    speed: 'production.stat.speed-short',
   };
   const stat = (id: string, key: 'hp' | 'attack' | 'defense' | 'speed') => {
     const value = stats(id)[key] ?? 0;
@@ -70,12 +73,12 @@ export function heroFlagshipHtml(state: GameState, hero: Hero, wanted?: string):
     return `<span class="${delta > 0 ? 'pw-better' : delta < 0 ? 'pw-worse' : ''}">${value}</span>`;
   };
   const lost = (hero.modules?.length ?? 0) - retainedHeroModules(hero, selected).length;
-  return `<details class="pw-section" open><summary>${t('production.flagship')}</summary><div class="pw-flagships">${choices
+  return `<details class="pw-section pw-flagship-picker" data-hero="${esc(hero.id)}" data-current-hull="${esc(current)}"><summary><span class="pw-flagship-current">${catalogPortraitHtml('u', current, data)}<span><b>${esc(displayUnit(current))}</b><small>${t('yard.slots.count', { n: Object.values(heroModuleSlots(hero, current, data)).reduce((a,b) => a+b, 0) + (data.units[current]!.slots.universal ?? 0) })}</small></span></span><span class="pw-flagship-picker-title">${t('production.flagship-picker')}</span></summary><p class="pw-flagship-subtitle">${t('production.flagship-stats-note')}</p><div class="pw-flagships">${choices
     .map(
       (id) =>
-        `<div class="pw-hull-tile"><button class="pw-flagship ${id === selected ? 'on' : ''}" data-hflagship="${esc(id)}"${readOnly ? ' disabled' : ''}>${catalogPortraitHtml('u', id, data, 'thumb')}<b>${esc(displayUnit(id))}</b><div class="pw-compare">${(['hp', 'attack', 'defense', 'speed'] as const).map((k) => `<span>${t(statKeys[k])} ${stat(id, k)}</span>`).join('')}</div><small>${t('yard.slots.count', { n: Object.values(heroModuleSlots(hero, id, data)).reduce((a, b) => a + b, 0) + (data.units[id]!.slots.universal ?? 0) })} · ${fmtDur(matchHours(state, data.units[id]!.buildTimeHours))}</small></button>${productionInfoButton('unit', id)}</div>`,
+        `<div class="pw-hull-tile"><button class="pw-flagship ${id === selected ? 'on' : ''}" data-hflagship="${esc(id)}"${readOnly ? ' disabled' : ''}>${catalogPortraitHtml('u', id, data)}<b>${esc(displayUnit(id))}</b><div class="pw-compare">${(['hp', 'attack', 'defense', 'speed'] as const).map((k) => `<span>${t(statKeys[k])} ${stat(id, k)}</span>`).join('')}</div><small>${t('yard.slots.count', { n: Object.values(heroModuleSlots(hero, id, data)).reduce((a, b) => a + b, 0) + (data.units[id]!.slots.universal ?? 0) })} · ${fmtDur(matchUnitHours(state, data.units[id]!.buildTimeHours))}</small><span class="pw-flagship-choice">${t(id === selected ? 'production.selected' : 'production.choose')}</span></button>${productionInfoButton('unit', id)}</div>`,
     )
     .join(
       '',
-    )}</div>${lost ? `<div class="pw-order-block">${t('production.flagship-removes', { n: lost })}</div>` : ''}<button class="btn-main" data-hflagapply="${esc(hero.id)}" data-hull="${esc(selected)}"${readOnly || current === selected ? ' disabled' : ''}>${t('production.flagship-apply')}</button></details>`;
+    )}</div>${lost ? `<div class="pw-order-block">${t('production.flagship-removes', { n: lost })}</div>` : ''}<footer class="pw-flagship-footer"><button class="btn-main" data-hflagapply="${esc(hero.id)}" data-hull="${esc(selected)}"${readOnly || current === selected ? ' disabled' : ''}>${t('production.flagship-apply')}</button></footer></details>`;
 }

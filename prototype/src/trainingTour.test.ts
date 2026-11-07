@@ -19,6 +19,40 @@ const steps = (mobile = false) =>
   });
 
 describe('пошаговый полигон Sector Zero', () => {
+  it('opens fitting even when the catalog hull is already selected', () => {
+    const ui = trainingUiFixture();
+    let fitting = false;
+    ui.visible = selector => !selector.includes('.pw-fitting-open') || fitting;
+    const all = buildTrainingTour({ world, me: 'p1', data,
+      baseline: trainingBaseline(world(), 'p1', data), ui });
+    for (const id of ['economy.ship-select', 'finale.recruit-select']) {
+      const selection = all.find(s => s.id === id)!;
+      expect(selection.advance.on === 'state' && selection.advance.when()).toBe(false);
+    }
+    fitting = true;
+    for (const id of ['economy.ship-select', 'finale.recruit-select']) {
+      const selection = all.find(s => s.id === id)!;
+      expect(selection.advance.on === 'state' && selection.advance.when()).toBe(true);
+    }
+  });
+  it('sets one batch of missing recruits before the order closes fitting', () => {
+    const s = world();
+    s.planets.base!.garrison = [];
+    const ui = trainingUiFixture();
+    let count = 1;
+    ui.productionCount = () => count;
+    const quantity = buildTrainingTour({ world: () => s, me: 'p1', data,
+      baseline: trainingBaseline(s, 'p1', data), ui })
+      .find(step => step.id === 'finale.recruit-quantity')!;
+    expect(quantity.selector?.()).toContain('data-cncount="+"');
+    expect(quantity.advance.on === 'state' && quantity.advance.when()).toBe(false);
+    count = 8;
+    expect(quantity.advance.on === 'state' && quantity.advance.when()).toBe(true);
+    count = 9;
+    expect(quantity.selector?.()).toContain('data-cncount="-"');
+    expect(quantity.advance.on === 'state' && quantity.advance.when()).toBe(false);
+  });
+
   it('teaches upgrading the seeded mine instead of ordering a duplicate', () => {
     const order = steps().find((s) => s.id === 'economy.mine-order')!;
     expect(order.target).toBe('#constructor [data-bw-up="mine"]');

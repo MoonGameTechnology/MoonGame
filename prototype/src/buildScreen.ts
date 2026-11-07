@@ -1,3 +1,4 @@
+import { productionBuildingRow } from './productionBuildingRow';
 /**
  * BUILD-1 — окно построек мира (макет владельца): полноэкранный список зданий,
  * сгруппированный категориями, каждая строка — имя (у построенного с уровнем
@@ -251,6 +252,7 @@ export function buildScreenHtml(
   lockText: (code: string) => string,
   dossierBody?: (id: string, level: number) => string,
   activeCat: BuildCategory | null = null,
+  compact = false,
 ): string {
   const p = state.planets[planetId];
   if (!p) return '';
@@ -312,7 +314,7 @@ export function buildScreenHtml(
     const fx = st.st === 'built' && lv && Object.keys(lv.produces ?? {}).length
       ? `${resLine(buildingLevel(def, st.level).produces, { per: 'h' })} → <span class="pw-better">${resLine(lv.produces, { per: 'h' })}</span>` : currentFx;
     const foot = lv
-      ? `<div class="bw-foot"><span>${st.st === 'built' ? `<i class="bw-next">▲ ${t('build.level.next', { n: nextLvl })}</i> ` : ''}${cost(matchCost(state, lv.cost), res)}</span>` +
+      ? `<div class="bw-foot"><span>${st.st === 'built' ? `<i class="bw-next">▲ ${t('build.level.next', { n: nextLvl })}</i> ` : ''}${cost(matchCost(state, lv.cost), compact ? undefined : res)}</span>` +
         `<span class="bw-dur">${fmtDur(matchBuildingHours(state, lv.buildTimeHours))}</span></div>`
       : '';
     // Рамка строки — что с ней можно сделать: улучшаемое горит, как доступное к стройке.
@@ -325,7 +327,7 @@ export function buildScreenHtml(
           : st.up.up === 'max'
             ? 'built'
             : st.up.up;
-    const row =
+    const row = compact ? productionBuildingRow(state, planetId, id, st.st === 'built' ? st.level : 0, Math.min(nextLvl, maxLvl), name, right, foot, productionRequirementsHtml(state, me, planetId, 'building', id), p.buildings.filter(b => b.type === id).map(b => buildingRepairHtml(state, me, planetId, b, probe)).join('')) :
       `<div class="bw-item st-${look}"${p.fortress && id === 'starfort' ? '' : ` data-bw="${id}"`}>` +
       `<div class="bw-ih"><span class="bw-ic">${BUILD_ICON[id] ?? '▣'}</span><b>${name}</b>${right}${productionInfoButton('building', id)}</div>` +
       productionRequirementsHtml(state, me, planetId, 'building', id) +
@@ -357,10 +359,11 @@ export function buildScreenHtml(
     const rows = groups.get(c.key);
     if (!rows?.length) continue; // пустую категорию не рисуем — заголовок без строк лжёт
     if (activeCat !== null && c.key !== activeCat) continue; // чужая вкладка скрыта
-    if (activeCat === null) list += `<div class="bw-cath">${t(c.label)}</div>`; // «все» — с заголовками
+    if (activeCat === null && !compact) list += `<div class="bw-cath">${t(c.label)}</div>`; // «все» — с заголовками
     list += rows.join('');
   }
-  return head + `<div class="bw-scroll"><div class="bw-list">${tabs}${list}</div></div>`;
+  const title = `<header class="pw-catalog-heading"><h2>${t('production.catalog.buildings')}</h2><span>${t('build.head.built', { n: p.buildings.filter(b => !p.fortress || b.type !== 'starfort').length })}</span></header>`;
+  return (compact ? '' : head) + `<div class="bw-scroll"><div class="bw-list">${tabs}${compact ? title : ''}${list}</div></div>`;
 }
 
 export type UnitCatalogTab = 'ground' | 'ships' | 'shuttle';
