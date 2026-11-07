@@ -1,3 +1,7 @@
+import { productionQueueHtml } from './productionQueueView';
+import { netIncome, completedUnitSpend } from './economy';
+import { resLine } from './format';
+import { productionClick } from './productionInteraction';
 /**
  * «ПРОИЗВОДСТВО» — the unified in-match order screen (CON-1, LARS-4, REFM-13, ROS-3.1).
  *
@@ -26,9 +30,11 @@
  * (`YardDraft`) normalised by a pure `normalizeDraft`; only `initShipyard(host)`
  * touches the DOM, through explicit hooks instead of `main.ts`'s module-level state.
  */
+import { buildScreenHtml, type BuildCategory } from './buildScreen';
+import { productionInfoButton, productionRequirementsHtml } from './productionRequirementsView';
 import { splitSupport } from '../../decisions/supportShips';
 import { moduleGroups } from '../../decisions/moduleGroups';
-import { slotCallouts, type SlotCallout } from '../../decisions/slotCallouts';
+import type { SlotCallout } from '../../decisions/slotCallouts';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
 import { effectChip, STAT_KEY } from './moduleEffect';
 import {
@@ -37,6 +43,7 @@ import {
   matchUnitHours,
   moduleAllowed,
   unitBuildSiteBlocker,
+  unitLane,
   type Action,
   type ArsenalItem,
   type GameState,
@@ -45,11 +52,11 @@ import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { esc, displayUnit, cost as priceHtml, fmtDur, fmtEta } from './format';
 import { patchLiveTimers } from './liveTimers';
-import { hoursLeft, progressPct, unitLaneOrders } from './buildProgress';
+import { hoursLeft, unitLaneOrders } from './buildProgress';
 import { HOUR } from './time';
 import { motionOn } from './graphicsPrefs';
 import { unitIconHtml } from './icons';
-import { catalogPortraitHtml, portraitArt } from './shipArt';
+import { catalogPortraitHtml } from './shipArt';
 import { SECTOR_TYPES } from './map';
 import { worldName } from './planetName';
 import { originOf } from './arsenal';
@@ -82,11 +89,12 @@ import {
   type LoadoutEditorResult,
 } from '../../packages/client/src/loadoutEditor';
 
-export type YardTab = 'ships' | 'support' | 'squads' | 'infantry' | 'vehicles' | 'heroes';
+export type YardTab = 'buildings' | 'ships' | 'support' | 'squads' | 'infantry' | 'vehicles' | 'heroes';
 
 /** Порядок вкладок — заказ владельца дословно: Корабли · Челноки · Пехота · Техника ·
  *  Герои. Наземные посередине, а не в конце: они дешевле и заказываются чаще. */
 const YARD_TABS: [YardTab, string][] = [
+  ['buildings', 'production.buildings'],
   ['ships', 'yard.tab.ships'],
   // ROS-SUP-1: корабли не для линии боя — своя вкладка; признак в данных (`support`).
   ['support', 'yard.tab.support'],
@@ -96,23 +104,8 @@ const YARD_TABS: [YardTab, string][] = [
   ['heroes', 'yard.tab.heroes'],
 ];
 
-/** Buildable space hulls the «Корабли» pane fits; shuttle/carrier hulls → «Челноки». */
-export const YARD_HULLS = [
-  'cruiser',
-  'heavy_cruiser',
-  'scout',
-  'frigate',
-  'picket_frigate',
-  // ROS-3.2: «Шаттл» — КОРАБЛЬ, который возит челноки, а не челнок. Он заказывается
-  // среди кораблей, как и всякий корпус со своей линией боя.
-  'shuttle_carrier',
-];
-export const YARD_SQUAD_HULLS = ['interceptor', 'bomber', 'heavy_striker', 'landing_shuttle'];
-
-/** Наземный ростер экрана — тот же набор, что предлагает панель мира. РАЗДЕЛЯЕТ его по
- *  вкладкам не второй список, а ДАННЫЕ (`UnitDef.kind`, ROS-1.1): новый род войск или
- *  переезд корпуса из пехоты в технику решается юнитом, а не правкой интерфейса. */
-export const YARD_GROUND_HULLS = ['militia', 'heavy_infantry', 'special_forces', 'tank'];
+import { YARD_HULLS, YARD_SQUAD_HULLS, YARD_GROUND_HULLS } from './productionRoster';
+export { YARD_HULLS, YARD_SQUAD_HULLS, YARD_GROUND_HULLS } from './productionRoster';
 
 export function groundHullsOf(kind: 'infantry' | 'vehicle'): string[] {
   return YARD_GROUND_HULLS.filter((id) => data.units[id]?.kind === kind);
@@ -222,7 +215,7 @@ export function originTagHtml(items: readonly ArsenalItem[], defId: string): str
  *  unrestricted, mirroring the core's own degradation. */
 export function ownedHullsOf(state: GameState, me: string, hullList: string[]): string[] {
   const snap = state.players[me]?.arsenal;
-  return snap ? hullList.filter((h) => snap.hulls.includes(h)) : hullList;
+  return snap ? hullList.filter((h) => data.units[h]?.domain === 'ground' || snap.hulls.includes(h)) : hullList;
 }
 
 /**
@@ -253,7 +246,7 @@ export function normalizeDraft(
   draft: YardDraft,
   hullList: string[],
 ): YardDraft {
-  const owned = ownedHullsOf(state, me, hullList);
+  const owned = hullList;
   const next = { ...draft, modules: [...draft.modules] };
   if (owned.length && !owned.includes(next.hull)) {
     next.hull = owned[0]!;
@@ -261,7 +254,7 @@ export function normalizeDraft(
   }
   // Мир проверяется ПОД ВЫБРАННЫЙ КОРПУС: переключение вкладки меняет и требование к
   // зданию, и годный мир вместе с ним (казармы вместо верфи — уже другой список).
-  const worlds = buildSites(state, me, next.hull);
+  const worlds = productionWorlds(state, me);
   if (!next.planet || !worlds.some((p) => p.id === next.planet)) next.planet = worlds[0]?.id ?? '';
   return next;
 }
@@ -272,6 +265,8 @@ export interface YardView {
   arsenalItems: readonly ArsenalItem[];
   /** Кого ядро примет бойцом десантного челнока на мире черновика (SHU-5.2). */
   troops?: readonly string[];
+  block?: string | null;
+  blockText?: string;
 }
 
 /** The loadout constructor pane for a family of hulls (ships or shuttles) — same
@@ -285,7 +280,7 @@ export function loadoutPaneHtml(
   view: YardView,
 ): string {
   const snap = state.players[me]?.arsenal;
-  const ownedHulls = ownedHullsOf(state, me, hullList);
+  const ownedHulls = hullList;
   const ownedModules = snap ? new Set(snap.modules) : undefined;
   if (!ownedHulls.length) return `<div class="cn-soon">${t('yard.hull.none')}</div>`;
   const res = state.players[me]?.resources ?? {};
@@ -305,18 +300,13 @@ export function loadoutPaneHtml(
   const hulls = ownedHulls
     .map((h) => {
       const art = catalogPortraitHtml('u', h, data, 'thumb');
-      return `<button class="cn-hbtn${art ? ' with-art' : ''}${h === draft.hull ? ' on' : ''}" data-cnhull="${h}">${art || unitIconHtml(h, data, view.youColor, 18)} <span>${esc(displayUnit(h))}</span></button>`;
+      return `<div class="pw-hull-tile"><button class="cn-hbtn${art ? ' with-art' : ''}${h === draft.hull ? ' on' : ''}" data-cnhull="${h}">${art || unitIconHtml(h, data, view.youColor, 18)} <span>${esc(displayUnit(h))}</span></button>${productionInfoButton('unit', h)}${productionRequirementsHtml(state, me, draft.planet, 'unit', h)}</div>`;
     })
     .join('');
   // Открытый отсек (шаг 3 переделки окна): справа — его модули, а не весь каталог.
   const sel = selectedBay(m.slots, draft.slot);
   const portrait = catalogPortraitHtml('u', draft.hull, data);
-  // Слоты-выноски (шаг 2 переделки окна): точка на корпусе, плитка рядом, линия между ними.
-  // Нет точек у этого арта — отсеки остаются только списком под карточкой.
-  const callouts = portrait ? slotCallouts(portraitArt('u', draft.hull, data)?.key, m.slots) : null;
-  const art = callouts
-    ? `<div class="cn-art">${portrait}${slotLayerHtml(m.slots, callouts, sel, undefined, (sl) => `data-cnrm="${sl.moduleId}"`)}</div>`
-    : portrait;
+  const art = portrait ? `<div class="cn-art">${portrait}</div>` : '';
   const slotsLine = slotCountText(m.slots);
   const hullCard =
     `<div class="cn-hull${portrait ? ' with-art' : ''}">${art}<div class="cn-hull-info"><div class="cn-hic">${unitIconHtml(draft.hull, data, view.youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(draft.hull))}</div>` +
@@ -337,8 +327,8 @@ export function loadoutPaneHtml(
               .join(' ') + (md.description ? `<p>${esc(t(md.description))}</p>` : '')
           : '';
         return (
-          `<div class="cn-bay filled${on}" data-cnsel="${i}"><div class="cn-bic">${moduleIcon(sl.moduleId)}</div>` +
-          `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}${bought}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${originTagHtml(view.arsenalItems, sl.moduleId)}</div>${moduleGradeHtml(sl.rarity ?? 'simple', sl.star ?? 0)}</div><div class="cn-bd">${eff}</div></div>`
+          `<div class="cn-bay filled${on} r-${sl.rarity ?? 'simple'}" data-cnsel="${i}"><div class="cn-bic">${moduleIcon(sl.moduleId)}</div>` +
+          `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}${bought}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${originTagHtml(view.arsenalItems, sl.moduleId)}</div>${moduleGradeHtml(sl.rarity ?? 'simple', sl.star ?? 0)}</div><div class="cn-bd">${eff}</div>${on ? `<button class="cn-tx btn-x" data-cnrm="${sl.moduleId}" aria-label="${t('yard.module.take-off')}">✕</button>` : ''}</div>`
         );
       }
       return (
@@ -421,7 +411,6 @@ export function loadoutPaneHtml(
       : '';
     panel =
       `<div class="cn-sh"><div class="cn-ph"><span aria-hidden="true">${SLOT_ICON[bay.type] ?? '＋'}</span> ${t('yard.modules.for-slot', { s: t(SLOT_KEY[bay.type] ?? bay.type) })}</div>` +
-      (cur && !callouts ? `<button class="cn-rm btn-second" data-cnrm="${cur}">${t('yard.module.take-off')}</button>` : '') +
       `</div><div class="cn-pal">${fitting || `<div class="cn-none">${t('yard.modules.none')}</div>`}</div>${fold}${liveNote}`;
   }
   // stats: live preview of the fitted hull
@@ -466,7 +455,7 @@ export function loadoutPaneHtml(
   // Раскладка (шаг 3): на ПК три колонки — корпуса, корабль с характеристиками, модули
   // отсека; на телефоне одна колонка в том же порядке, модули сразу под артом. Корпус без
   // отсеков — без колонки модулей.
-  const card = `<div class="cn-card${callouts ? ' with-tiles' : ''}">${hullCard}${bays}</div>`;
+  const card = `<div class="cn-card${m.hasSlots ? ' with-tiles' : ''}">${hullCard}<div class="pw-bays">${bays}</div></div>`;
   const slotCol = panel ? `<div class="cn-slot">${panel}</div>` : '';
   return `<div class="cn-grid ${slotCol ? 'cn-g3' : 'cn-g2'}"><div class="cn-hulls">${hulls}</div>${card}${slotCol}${stats}</div>`;
 }
@@ -482,53 +471,12 @@ export function unitLaneAhead(
   unit: string,
 ): { count: number; nextInHours: number } | null {
   const { active, queued } = unitLaneOrders(state, planetId, unit, data);
-  const count = (active ? 1 : 0) + queued.length;
+  const heroes = unitLane(data.units[unit]) === 'mobilization'
+    ? Object.values(state.heroes ?? {}).flatMap(h => h.mobilization?.target === planetId ? [h.mobilization] : []) : [];
+  const count = (active ? 1 : 0) + queued.length + heroes.length;
   if (count === 0) return null;
-  return { count, nextInHours: active ? hoursLeft(active.at, state.time, HOUR) : 0 };
-}
-
-/**
- * Очередь юнитов мира над телом окна (заказ владельца 2026-10-17: «нажимаю построить, и
- * непонятно, прожалось или нет»). Идущий заказ — с остатком и полосой, ждущие — следом,
- * в порядке ядра. Пустая строка — очереди нет, и полосы нет вовсе (пустую панель окно не
- * рисует). `fresh` — подсветить последний заказ: он только что встал.
- */
-export function yardQueueHtml(
-  state: GameState,
-  planetId: string,
-  unit: string,
-  color: string,
-  fresh = false,
-): string {
-  if (!planetId) return '';
-  const { active, queued } = unitLaneOrders(state, planetId, unit, data);
-  const items: string[] = [];
-  const chip = (unit: string, count: number, tail: string, extra = ''): string => {
-    const label = `${displayUnit(unit)} ×${count}`;
-    return (
-      `<span class="cn-qi${extra}" title="${esc(label)}">${unitIconHtml(unit, data, color, 16)}` +
-      `<b>×${count}</b>${tail}</span>`
-    );
-  };
-  if (active?.payload.unit) {
-    const pct = Math.round(progressPct(active, state.time, data, HOUR, state));
-    const eta = fmtEta(hoursLeft(active.at, state.time, HOUR));
-    items.push(
-      chip(
-        active.payload.unit,
-        active.payload.count ?? 1,
-        `<span class="cn-qt">${eta}</span><span class="cn-qbar" style="width:${pct}%"></span>`,
-        ' run',
-      ),
-    );
-  }
-  for (const q of queued) if (q.unit) items.push(chip(q.unit, q.count ?? 1, ''));
-  if (!items.length) return '';
-  if (fresh) items[items.length - 1] = items[items.length - 1]!.replace('class="cn-qi', 'class="cn-qi fresh');
-  return (
-    `<div class="cn-queue" role="status"><span class="cn-qh">${t('yard.queue.title', { w: esc(worldName(state, planetId)) })}</span>` +
-    `<div class="cn-qlist">${items.join('')}</div></div>`
-  );
+  const nextAt = active?.at ?? heroes.find(h => !h.queued)?.readyAt;
+  return { count, nextInHours: nextAt === undefined ? 0 : hoursLeft(nextAt, state.time, HOUR) };
 }
 
 /** Подпись под корпусом: сколько у него слотов и сколько из них куплено звёздами корабля. Корпус
@@ -622,7 +570,7 @@ export function orderBarHtml(
   hullList: string[],
   view: YardView,
 ): string {
-  if (!ownedHullsOf(state, me, hullList).length) return '';
+  if (!hullList.length) return '';
   const snap = state.players[me]?.arsenal;
   const res = state.players[me]?.resources ?? {};
   const ed = createLoadoutEditor(draft.hull, data, res, {
@@ -641,8 +589,10 @@ export function orderBarHtml(
   for (const [r, n] of Object.entries((troop && matchCost(state, data.units[troop]?.cost)) || {}))
     total[r] = (total[r] ?? 0) + n * ed.count;
   const affordable = Object.entries(total).every(([r, n]) => (res[r] ?? 0) >= n);
-  const canBuild = affordable && draft.planet !== '' && (!lander || troop !== undefined);
-  const worlds = buildSites(state, me, draft.hull);
+  const site = state.planets[draft.planet];
+  const siteBlocked = !site || !!unitBuildSiteBlocker(site, data.units[draft.hull]!, data);
+  const canBuild = !siteBlocked && !view.block && affordable && draft.planet !== '' && (!lander || troop !== undefined);
+  const worlds = productionWorlds(state, me);
   const ahead = draft.planet ? unitLaneAhead(state, draft.planet, draft.hull) : null;
   // Пустая очередь — обычный случай и не подписывается («Начнётся сразу» снято, UIX-10.8):
   // строка появляется, только когда перед заказом кто-то есть.
@@ -664,8 +614,10 @@ export function orderBarHtml(
     : `<div class="cn-noplace">${t('yard.no-place')}</div>`;
   return (
     `<div class="cn-order">` +
+
+    (view.block ? `<span class="pw-order-block">${esc(view.blockText ?? '')}</span>` : '') +
     `<div class="cn-oprice">${priceHtml(total, res)}<span class="cn-otime" title="${t('yard.build-time')}">⏱ ${fmtDur(matchUnitHours(state, orderHours(data, draft.hull, troop)))}</span></div>` +
-    `<div class="cn-oworld">${where}</div>` +
+    `<div class="cn-oworld">${worlds.length ? queue : where}</div>` +
     `<div class="cn-ogo"><div class="cn-step"><button data-cncount="-" ${draft.count <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${draft.count}</span><button data-cncount="+" ${draft.count >= MAX_COUNT ? 'disabled' : ''}>+</button></div>` +
     `<button class="cn-build btn-main" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build')}</button></div>` +
     `</div>`
@@ -682,19 +634,19 @@ export function yardBoxHtml(
   queue = '',
   templates = '',
 ): string {
-  const tabBtn = (k: YardTab, label: string): string =>
-    `<button class="cn-tab${tab === k ? ' on' : ''}" data-ctab="${k}">${t(label)}</button>`;
+  const tabBtn = (k: YardTab, label: string, active = tab === k): string =>
+    `<button class="cn-tab${active ? ' on' : ''}" data-ctab="${k}">${t(label)}</button>`;
   return (
-    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b>${again}${tab === 'heroes' ? '' : templateToggleHtml(templates !== '')}<button class="cn-close btn-x">✕</button></div>` +
-    `<div class="cn-tabs">${YARD_TABS.map(([k, l]) => tabBtn(k, l)).join('')}</div>` +
+    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b><button data-pw-queue aria-label="${t('production.queue')}">☷</button>${again}${tab === 'heroes' || tab === 'buildings' ? '' : templateToggleHtml(templates !== '')}<button class="cn-close btn-x">✕</button></div>` +
+    `<div class="cn-tabs pw-main-tabs">${tabBtn('buildings', 'production.buildings')}${tabBtn('ships', 'yard.title', ['ships','support','squads'].includes(tab))}${tabBtn('infantry', 'production.mobilization', ['infantry','vehicles','heroes'].includes(tab))}</div>` +
+    (tab === 'buildings' ? '' : `<div class="cn-tabs pw-subtabs">${YARD_TABS.filter(([k]) => ['infantry','vehicles','heroes'].includes(tab) ? ['infantry','vehicles','heroes'].includes(k) : ['ships','support','squads'].includes(k)).map(([k,l]) => tabBtn(k,l)).join('')}</div>`) +
     templates +
-    `<div id="cn-queue">${queue}</div>` +
-    `<div id="constructorbody">${body}</div>${order}</div>`
+    `<div id="constructorbody"><div class="pw-content">${body}</div><aside id="cn-queue">${queue}</aside></div>${order}</div>`
   );
 }
 
 /** Вкладки, на которых собирается заказ, — у них и бывают шаблоны. */
-const TEMPLATE_TABS = YARD_TABS.map(([k]) => k).filter((k) => k !== 'heroes');
+const TEMPLATE_TABS = YARD_TABS.map(([k]) => k).filter((k) => k !== 'heroes' && k !== 'buildings');
 /** Ключ хранилища шаблонов: они общие для всех партий на этом устройстве. */
 export const TEMPLATES_KEY = 'vd.yard.templates.v1';
 
@@ -728,17 +680,20 @@ export function templatesPaneHtml(
   list: readonly BuildTemplate[],
   current: BuildTemplate | null,
   color: string,
+  lane?: YardTab,
 ): string {
   const snap = state.players[me]?.arsenal;
   const rows = list
     .map((tpl, i) => {
+      if (lane && unitLane(data.units[tpl.hull]) !== unitLane(data.units[hullsOfTab(lane)[0]!])) return '';
       const ok = fitTemplate(tpl, hullsOfTab(tpl.tab as YardTab), data, snap) !== null;
       const mods = tpl.modules.map((m) => `<span class="cn-tpm" title="${esc(tData(data.modules[m]?.name ?? m))}">${moduleIcon(m)}</span>`).join('');
       const name = `${esc(displayUnit(tpl.hull))} ×${tpl.count}`;
+      const price = priceHtml(completedUnitSpend(state, { unit: tpl.hull, count: tpl.count, modules: tpl.modules, troop: tpl.troop }), state.players[me]?.resources);
       const on = current !== null && sameTemplate(tpl, current);
       return (
         `<div class="cn-tplrow${on ? ' on' : ''}"><button class="cn-tpluse" data-cntpluse="${i}" ${ok ? '' : `disabled title="${t('yard.tpl.unavailable')}"`}>` +
-        `${unitIconHtml(tpl.hull, data, color, 16)}<span class="cn-tpn">${name}</span><span class="cn-tpms">${mods}</span></button>` +
+        `${unitIconHtml(tpl.hull, data, color, 16)}<span class="cn-tpn">${name}${price}</span><span class="cn-tpms">${mods}</span></button>` +
         `<button class="cn-tpldel btn-x" data-cntpldel="${i}" aria-label="${t('yard.tpl.delete')}" title="${t('yard.tpl.delete')}">✕</button></div>`
       );
     })
@@ -808,6 +763,8 @@ export interface YardHost {
   preparedModules?(hull: string): string[] | undefined;
   /** Fired when the window opens — the host shows its just-in-time intro card here. */
   onOpen(): void;
+  openTech?(id: string): void;
+  openInfo?(key: string, world: string): void;
   /** The «Герои» pane, still owned by the host (its own brick). */
   heroPaneHtml(): string;
   /** Fired when the «Герои» tab is picked — the host's hero intro card. */
@@ -819,14 +776,35 @@ export interface YardHost {
 
 /** Wire the window up: tabs, hull picking, fitting modules, the order. Call once at
  *  boot (it attaches the window's delegates); `open()` is what the rail button calls. */
+
+function orderView(host: YardHost, draft: YardDraft, hulls: string[], troopsFor: (d: YardDraft) => string[] | undefined): { draft: YardDraft; body: string; order: string } {
+  draft = normalizeDraft(host.state(), host.me(), draft, hulls);
+  const troops = troopsFor(draft);
+  // Боец, которого на этом мире больше нельзя посадить, сменяется первым годным —
+  // тем же правилом, каким `normalizeDraft` возвращает на землю мир и корпус.
+  if (troops && !(draft.troop && troops.includes(draft.troop)))
+    draft = { ...draft, troop: troops[0] };
+  const view = {
+    youColor: host.youColor(),
+    arsenalItems: host.arsenalItems(),
+    block: host.probe?.(buildShip(host.me(), draft.planet, draft.hull, draft.count, draft.modules, draft.troop)),
+    ...(troops ? { troops } : {}),
+  };
+  const presentation = { ...view, blockText: view.block ? host.errText(view.block) : '' };
+  const body = productionWorldSelect(host.state(), host.me(), draft.planet) + loadoutPaneHtml(host.state(), host.me(), draft, hulls, presentation);
+  const order = orderBarHtml(host.state(), host.me(), draft, hulls, presentation);
+  return { draft, body, order };
+}
+
 export function initShipyard(host: YardHost): {
-  open: (nextTab?: YardTab) => void;
+  open: (nextTab?: YardTab, world?: string, building?: string) => void;
   refreshHeroes: () => void;
   refreshQueue: () => void;
   render: () => void;
   close: () => void;
 } {
   let tab: YardTab = 'ships';
+  let category: BuildCategory | null = null;
   let renderedHeroBody = '';
   let heroScrolling = false;
   let heroScrollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -835,25 +813,14 @@ export function initShipyard(host: YardHost): {
   let paintedTab: YardTab | null = null;
   /** Последний заказ за эту партию — для «Как в прошлый раз». */
   let last: LastOrder | null = null;
-  /** Открыта ли панель шаблонов. */
   let tplOpen = false;
   let templates: BuildTemplate[] = parseTemplates(readRaw(TEMPLATES_KEY), data, TEMPLATE_TABS);
   const saveTemplates = (): void => writeRaw(TEMPLATES_KEY, JSON.stringify(templates));
-  /** Очередь, нарисованная в полосе: мир и число заказов — по ним видно, что заказ встал. */
-  let queueSig = { planet: '', n: 0 };
-  /** Что сейчас стоит в полосе (своя строка: `innerHTML` браузер сериализует иначе). */
   let queuePainted = '';
-  const queueCount = (planetId: string): number =>
-    (unitLaneOrders(host.state(), planetId, draft.hull, data).active ? 1 : 0) +
-    unitLaneOrders(host.state(), planetId, draft.hull, data).queued.length;
-  /** Полоса очереди мира черновика; заказ, прибавившийся на том же мире, подсвечен. */
+  let lastAvailability = '';
+  const availability = () => JSON.stringify([host.state().players[host.me()]?.resources, host.state().players[host.me()]?.technologies, host.state().players[host.me()]?.arsenal, Object.values(host.state().planets).filter(p => p.owner === host.me()).map(p => [p.id,p.buildings])]);
   function queueHtml(): string {
-    if (tab === 'heroes') return '';
-    const n = draft.planet ? queueCount(draft.planet) : 0;
-    // Подсветка — один раз, на той отрисовке, где заказ впервые виден.
-    const fresh = draft.planet === queueSig.planet && n > queueSig.n;
-    queueSig = { planet: draft.planet, n };
-    queuePainted = yardQueueHtml(host.state(), draft.planet, draft.hull, host.youColor(), fresh);
+    queuePainted = productionQueueHtml(host.state(), draft.planet);
     return queuePainted;
   }
 
@@ -870,33 +837,31 @@ export function initShipyard(host: YardHost): {
   const close = (): void => host.root().classList.remove('show');
 
   function paint(): void {
+    lastAvailability = availability();
     let body: string;
     let order = '';
-    if (tab === 'heroes') {
-      body = host.heroPaneHtml();
-      renderedHeroBody = body;
+    if (tab === 'buildings') {
+      const worlds = productionWorlds(host.state(), host.me());
+      if (!worlds.some(p => p.id === draft.planet)) draft.planet = worlds[0]?.id ?? '';
+      body = buildScreenHtml(host.state(), host.me(), draft.planet, a => host.probe ? host.probe(a) : 'E_FORBIDDEN', () => false, host.errText, undefined, category);
+      body = productionWorldSelect(host.state(), host.me(), draft.planet) + body;
+    } else if (tab === 'heroes') {
+      const worlds = productionWorlds(host.state(), host.me());
+      if (!worlds.some(p => p.id === draft.planet)) draft.planet = worlds[0]?.id ?? '';
+      renderedHeroBody = host.heroPaneHtml();
+      body = productionWorldSelect(host.state(), host.me(), draft.planet) + renderedHeroBody;
     } else {
-      draft = normalizeDraft(host.state(), host.me(), draft, hullsOf());
-      const troops = troopsFor(draft);
-      // Боец, которого на этом мире больше нельзя посадить, сменяется первым годным —
-      // тем же правилом, каким `normalizeDraft` возвращает на землю мир и корпус.
-      if (troops && !(draft.troop && troops.includes(draft.troop)))
-        draft = { ...draft, troop: troops[0] };
-      const view = {
-        youColor: host.youColor(),
-        arsenalItems: host.arsenalItems(),
-        ...(troops ? { troops } : {}),
-      };
-      body = loadoutPaneHtml(host.state(), host.me(), draft, hullsOf(), view);
-      order = orderBarHtml(host.state(), host.me(), draft, hullsOf(), view);
+      ({ draft, body, order } = orderView(host, draft, hullsOf(), troopsFor));
     }
+    if (draft.planet) body = `<div class="pw-income">${t('production.planet-income')}${resLine(netIncome(host.state(), host.me(), undefined, draft.planet), { sign: true, per: 'h' })}</div>` + body;
     // Перерисовка не сбрасывает прокрутку: поставил модуль внизу списка — там и остался.
     const keep =
       paintedTab === tab ? (host.root().querySelector('#constructorbody')?.scrollTop ?? 0) : 0;
     const tplPane =
-      tplOpen && tab !== 'heroes'
-        ? templatesPaneHtml(host.state(), host.me(), templates, templateOf(tab, draft), host.youColor())
+      tplOpen && tab !== 'heroes' && tab !== 'buildings'
+        ? templatesPaneHtml(host.state(), host.me(), templates, templateOf(tab, draft), host.youColor(), tab)
         : '';
+    const opened = Array.from(host.root().querySelectorAll('details')).map(d => d.open);
     host.root().innerHTML = yardBoxHtml(
       tab,
       body,
@@ -905,6 +870,7 @@ export function initShipyard(host: YardHost): {
       queueHtml(),
       tplPane,
     );
+    if (paintedTab === tab) host.root().querySelectorAll('details').forEach((d,i) => { d.open = opened[i] ?? d.open; });
     const scroller = host.root().querySelector('#constructorbody');
     if (scroller && keep) scroller.scrollTop = keep;
     paintedTab = tab;
@@ -973,7 +939,7 @@ export function initShipyard(host: YardHost): {
   host.root().addEventListener(
     'scroll',
     () => {
-      if (tab !== 'heroes' || !host.root().classList.contains('show')) return;
+      if (!host.root().classList.contains('show')) return;
       heroScrolling = true;
       if (heroScrollTimer !== null) clearTimeout(heroScrollTimer);
       heroScrollTimer = setTimeout(() => {
@@ -990,6 +956,7 @@ export function initShipyard(host: YardHost): {
       close();
       return;
     }
+    if (tg.closest('[data-pw-queue]')) { host.root().querySelector('#cn-queue')?.scrollIntoView({ block: 'nearest' }); return; }
     if (last && tg.closest('[data-cnagain]')) {
       tab = last.tab;
       draft = { ...last.draft };
@@ -1040,6 +1007,11 @@ export function initShipyard(host: YardHost): {
       paint();
       return;
     }
+    if (productionClick(tg, host, {
+      planet: draft.planet, repaint: paint,
+      open: (next, templates = false, building) => { tab = next; tplOpen = templates; category = null; paint(); if (building) anchorBuilding(host.root(), building); },
+      category: value => { category = value; },
+    })) return;
     const nextTab = (tg.closest('.cn-tab') as HTMLElement | null)?.dataset.ctab;
     if (nextTab) {
       tab = nextTab as YardTab;
@@ -1066,16 +1038,16 @@ export function initShipyard(host: YardHost): {
         ?.scrollIntoView({ block: 'nearest', behavior: motionOn() ? 'smooth' : 'auto' });
       return;
     }
+    const rm = (tg.closest('[data-cnrm]') as HTMLElement | null)?.dataset.cnrm;
+    if (rm) {
+      takeOff(rm);
+      paint();
+      return;
+    }
     // Плитка на арте или строка отсека открывает отсек: рядом встают его модули.
     const sel = (tg.closest('[data-cnsel]') as HTMLElement | null)?.dataset.cnsel;
     if (sel !== undefined) {
       draft = { ...draft, slot: Number(sel), unfit: false };
-      paint();
-      return;
-    }
-    const rm = (tg.closest('[data-cnrm]') as HTMLElement | null)?.dataset.cnrm;
-    if (rm) {
-      takeOff(rm);
       paint();
       return;
     }
@@ -1104,9 +1076,11 @@ export function initShipyard(host: YardHost): {
     if (tg.closest('[data-cnbuild]')) {
       if (draft.planet) {
         const troop = isLander(data.units[draft.hull]) ? draft.troop : undefined;
-        const sent = host.order(
-          buildShip(host.me(), draft.planet, draft.hull, draft.count, draft.modules, troop),
-        );
+        const action = buildShip(host.me(), draft.planet, draft.hull, draft.count, draft.modules, troop);
+        const planet = host.state().planets[draft.planet];
+        const block = host.probe?.(action) ?? (planet ? unitBuildSiteBlocker(planet, data.units[draft.hull]!, data) : 'E_NO_PLANET');
+        if (block) { host.note(host.errText(block)); return; }
+        const sent = host.order(action);
         // Отказ ядра хозяин уже назвал; «заказано» рядом с ним читалось бы как успех.
         if (sent === false) return;
         host.note(t('yard.ordered', { n: String(draft.count), hull: displayUnit(draft.hull) }));
@@ -1131,13 +1105,15 @@ export function initShipyard(host: YardHost): {
   });
 
   return {
-    open: (nextTab) => {
+    open: (nextTab, world, building) => {
+      if (world) draft.planet = world;
       if (nextTab) tab = nextTab;
       const prepared = host.preparedModules?.(draft.hull);
       if (prepared) draft = { ...draft, modules: [...prepared] };
       host.root().classList.add('show');
       paint();
       host.onOpen();
+      if (building) anchorBuilding(host.root(), building);
     },
     refreshHeroes: () => {
       if (tab !== 'heroes' || !host.root().classList.contains('show')) return;
@@ -1159,14 +1135,28 @@ export function initShipyard(host: YardHost): {
       }
     },
     refreshQueue: () => {
-      if (tab === 'heroes' || !host.root().classList.contains('show')) return;
+      if (heroScrolling || !host.root().classList.contains('show')) return;
+      if (tab !== 'heroes' && (tab === 'buildings' || availability() !== lastAvailability)) { paint(); return; }
       const el = host.root().querySelector('#cn-queue');
       if (!el) return;
       const before = queuePainted;
       const html = queueHtml();
-      if (html !== before) el.innerHTML = html;
+      if (html !== before) { const open = el.querySelector('details')?.open; el.innerHTML = html; const details = el.querySelector('details'); if (details && open !== undefined) details.open = open; }
     },
     render: paint,
     close,
   };
+}
+
+/** Include owned worlds with unmet requirements so the player can resolve them here. */
+function productionWorlds(state: GameState, me: string) {
+  return Object.values(state.planets).filter(p => p.owner === me && SECTOR_TYPES[p.kind ?? '']?.buildable);
+}
+function productionWorldSelect(state: GameState, me: string, selected: string): string {
+  return `<select id="cn-planet" class="cn-plan" aria-label="${t('yard.where')}">${productionWorlds(state, me).map(p => `<option value="${esc(p.id)}"${p.id === selected ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`).join('')}</select>`;
+}
+function anchorBuilding(root: HTMLElement, id: string): void {
+  const target = Array.from(root.querySelectorAll<HTMLElement>('[data-bw]')).find(el => el.dataset.bw === id);
+  target?.classList.add('pw-anchor');
+  target?.scrollIntoView({ block: 'center' });
 }

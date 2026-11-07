@@ -206,8 +206,8 @@ describe('guided first match: every chapter is playable by real orders', () => {
     s = until(s, (x) => x.planets[GUIDE_ASSAULT]!.owner === ME);
     tour.refresh();
     expect(result?.completed).toBe(true);
-    // Slower main-game construction keeps the lesson within five game days:
-    // at the unchanged ×300 tutorial speed, that is at most 24 real minutes.
-    expect((s.time - start) / HOUR).toBeLessThan(120);
+    // Category timers plus shared mobilization keep the lesson within six game days:
+    // at the unchanged ×300 tutorial speed, that is less than 29 real minutes.
+    expect((s.time - start) / HOUR).toBeLessThan(144);
   });
 });

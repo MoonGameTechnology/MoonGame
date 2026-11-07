@@ -207,7 +207,7 @@ import {
 import {
   initWorldCard,
 } from './worldCard';
-import { buildRoster } from './planetTabs';
+import { PRODUCTION_UNITS } from './productionRoster';
 import { tileLock, type TileLock } from './catalogTile';
 import { mountAccountDeletion, mountPrivacyLinks } from './accountDeletion';
 import { initMissionPanel } from './missionPanel';
@@ -313,13 +313,13 @@ import {
 } from './icons';
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
-import { buildingDossier, createDossiers } from './dossiers';
+import { createDossiers } from './dossiers';
 // ARS-5 — arsenal witryna: the hub tab itself (`arsenalScreen.ts`, REFM-5 —
 // `initArsenal(hooks)` owns its cache and markup); the pure model is `arsenal.ts`.
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
 // TT-3.1 — экран дерева технологий (REFM-9).
 import { initTechTree } from './techTree';
-import { initBuildScreen } from './buildScreen';
+
 import type { MetaMatchRewardsView } from '../../packages/protocol/src/metaEconomyView';
 import { initEndScreen, type MatchEnd } from './endScreen';
 // Хаб, его вкладки, прокачка и профиль (REFM-220).
@@ -365,7 +365,7 @@ import { reframePresentation } from './holographicLayout';
 import { initMarket } from './marketScreen';
 import { linkedAlly } from '../../decisions/allyPanel';
 import { extractionCandidates } from '../../decisions/chapterChain';
-import { captiveLoad, extractionStart, repairBuilding } from '../../decisions/actions';
+import { captiveLoad, extractionStart } from '../../decisions/actions';
 import { captiveCandidates } from '../../decisions/captive';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
 import { initChat } from './chatWindow';
@@ -416,7 +416,7 @@ import { initCmdBar, invalidateCmdBar, renderCmdBar } from './cmdBar';
 import { initTroopsWindow } from './troopsWindow';
 import { flushPinch, initMapInput, selectionBox, tapByTouch } from './mapInput';
 import { chainMode, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer } from './chainComposer';
-import { activeConstruction, coreQueue, enqueueBuild, initWorldQueries, progressPct } from './worldQueries';
+import { activeConstruction, coreQueue, initWorldQueries, progressPct } from './worldQueries';
 import { flushStrayLosses, handleEvents, initEventFeed, killStats, logLines, logVersion, note, toast } from './eventFeed';
 import { eventLogHtml } from './eventLogView';
 import { tickScoutNews } from './scoutNews';
@@ -471,7 +471,7 @@ import { trainingTourUi } from './trainingTourDom';
 import { trainingBaseline } from '../../decisions/trainingStages';
 // Справка (ONB-3/4/5) — у владельца `helpCenter.ts` (REFM-221): справочник и его поиск,
 // карточка корабля, вводные к механикам, сводка «пока вас не было».
-import { initHelpCenter, maybeIntro, openCodex, openShipCard } from './helpCenter';
+import { initHelpCenter, maybeIntro, openCodex, closeCodex, openShipCard } from './helpCenter';
 import { HOLD_TIP_MS, holdTipPos, movedTooFar } from './tipPlacement';
 import {
   IDLE,
@@ -602,27 +602,6 @@ const DEV_UI = ((): boolean => {
 })();
 let MAP = LEGACY_MAP;
 let SCORE_LIMIT = LEGACY_SCORE_LIMIT;
-// H4-REVERT: наземные юниты вернулись в общий конвейер. Пока их поднимала мобилизация
-// дивизии, этот массив был чисто космическим — и снос дивизий без этой строки оставил
-// бы игрока вовсе без сухопутных войск, то есть без второй фазы захвата мира.
-// Панель уже раскладывает их по своим полкам (`groundBuilds` / `shipBuilds` /
-// `wingBuilds` фильтруют этот же список), так что достаточно их сюда вписать.
-const BUILD_UNITS = [
-  'frigate',
-  'cruiser',
-  'heavy_cruiser',
-  'scout',
-  'picket_frigate',
-  'shuttle_carrier',
-  'interceptor',
-  'bomber',
-  'heavy_striker',
-  'landing_shuttle',
-  'militia',
-  'heavy_infantry',
-  'special_forces',
-  'tank',
-];
 // A small glyph per province KIND, drawn above each province so its type reads at a
 // glance (planet / asteroid / nebula / wreck-field / storm / …). Text glyphs only.
 let ME = 'p1';
@@ -1646,7 +1625,7 @@ initWorldCard({
   me: () => ME,
   names: () => NAME,
   planetTab: () => planetTab,
-  buildUnits: () => BUILD_UNITS,
+  buildUnits: () => PRODUCTION_UNITS,
   devUi: () => DEV_UI,
   sectorOf: (id) => SECTOR_OF[id],
   sectorType: sectorTypeOf,
@@ -1851,7 +1830,7 @@ initHelpCenter({
   callsign: () => nickInput.value.trim(),
   loadMeta,
   inMatch,
-  codexHtml: (kind, id, level) => codexHtml(kind, id, level),
+  codexHtml,
   buildingLocked,
   fleetTitle: fleetTitleOf,
   sectorZeroToolsHidden,
@@ -2346,34 +2325,10 @@ const techTree = initTechTree({
 document.getElementById('rail-pings')?.addEventListener('click', () => pings?.togglePanel());
 document.getElementById('rail-tech')?.addEventListener('click', () => techTree.open());
 
-// --- BUILD-1: окно построек мира ---------------------------------------------
-// Само окно живёт в `buildScreen.ts`; здесь только его хуки. Ручка `#buildwin`
-// остаётся: её держат реестр слоёв Android-Back и живая перерисовка кадра.
-const buildWinEl = $('buildwin');
-const buildWin = initBuildScreen({
-  root: () => buildWinEl,
-  body: () => $('buildwinbody'),
-  state: () => s,
-  me: () => ME,
-  probe: (a) => canOrder(s, a),
-  // Локальная соло-очередь: ядро о ней не знает, buildingLocked — знает.
-  localQueued: (pid, id) =>
-    coreQueue(pid, 'buildings').some((q) => q.building === id),
-  build: (pid, id) => enqueueBuild(pid, { kind: 'building', id, count: 1 }),
-  upgrade: (pid, id) => enqueueBuild(pid, { kind: 'upgrade', id, count: 1 }),
-  repair: (pid, id, uid) => { playerOrder(repairBuilding(ME, pid, id, uid)); },
-  // Юнитные вкладки окна стройки (BUILD-2): тот же путь, которым их строила боковая
-  // панель, — ростер по вкладке, заказ через ту же очередь, карточка через тот же кодекс.
-  // Новой логики здесь нет и быть не должно: окно переехало, правила остались.
-  unitIds: (tab) => buildRoster(tab, BUILD_UNITS, data),
-  buildUnit: (pid, id, troop) =>
-    enqueueBuild(pid, { kind: 'unit', id, count: 1, ...(troop !== undefined ? { troop } : {}) }),
-  openUnitInfo: (id) => openCodex(`u:${id}`),
-  openInfo: (id) => openCodex(`b:${id}`),
-  lockText: errText,
-  openTech: (id) => techTree.open(id),
-  dossierBody: (id, level) => buildingDossier(id, level)?.body ?? '',
-});
+// World-card entry points reuse the same production workspace and world context.
+const buildWin = {
+  open: (pid: string, units?: import('./buildScreen').UnitCatalogTab) => shipyard.open(units === 'ground' ? 'infantry' : units === 'shuttle' ? 'squads' : units === 'ships' ? 'ships' : 'buildings', pid),
+};
 
 
 // --- steward («Хранитель»): hand the seat to the AI while you sleep ----------
@@ -2384,7 +2339,6 @@ const buildWin = initBuildScreen({
 const stewWin = $('steward');
 let lastStewAt = 0;
 let lastBattleWinAt = 0;
-let lastBuildAt = 0;
 let lastIntelAt = 0; // throttle for the live intel-window timers (диплом. вкладка «Шпионаж»)
 const steward = __SECTOR_ZERO_ONLY__
   ? null
@@ -2527,6 +2481,8 @@ const shipyard = initShipyard({
   arsenalItems: () => arsenal?.items() ?? [],
   preparedModules: (hull) => isSectorZeroRun() ? [...(runShipLoadouts[hull] ?? [])] : undefined,
   onOpen: () => maybeIntro('constructor'),
+  openTech: id => techTree.open(id),
+  openInfo: (key, world) => openCodex(key, world),
   // The «Герои» pane: the hero roster/штаб lives in `heroStaff.ts` (REFM-14) — the
   // yard only asks it for markup and hands its clicks over.
   heroPaneHtml: heroStaff.paneHtml,
@@ -3132,11 +3088,10 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'market', isOpen: () => marketWin.classList.contains('show'), close: () => marketWin.classList.remove('show') }, // z47
   { id: 'trader', isOpen: () => trader.isOpen(), close: () => trader.close() }, // z47 торговец экспедиции
   { id: 'ally', isOpen: () => allyScreen.isOpen(), close: () => allyScreen.close() }, // z47 связь с союзником
+  { id: 'codex', isOpen: () => shown('codex'), close: closeCodex }, // z48
   { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Производство»
-  { id: 'codex', isOpen: () => shown('codex'), close: () => hide('codex') }, // z46
   // «Постройки» стоят НИЖЕ кодекса (z45): карточка здания открывается поверх окна,
   // и Back обязан сначала закрыть её, а уже потом само окно.
-  { id: 'buildwin', isOpen: () => buildWinEl.classList.contains('show'), close: () => buildWinEl.classList.remove('show') }, // z45 «Постройки»
   // Двухступенчатый Back режима «Приказ» (CHAIN-UX): сперва меню точки…
   {
     id: 'tgted',
@@ -3804,10 +3759,7 @@ function frame(nowReal: number, nativeGap: number) {
     techTree.repaint();
   }
   // Keep the build window live while open (a finished build flips its row), throttled.
-  if (repaintDue(buildWin.isOpen(), nowReal, lastBuildAt, PROGRESS_MS)) {
-    lastBuildAt = nowReal;
-    buildWin.repaint();
-  }
+
   // Keep the steward window live while open (countdown to control returning), throttled.
   if (steward && repaintDue(steward.isOpen(), nowReal, lastStewAt, PROGRESS_MS)) {
     lastStewAt = nowReal;

@@ -461,6 +461,11 @@ export const unlockHeroSkill = (playerId: string, heroId: string, node: string) 
   act(playerId, 'hero.skill.unlock', { heroId, node });
 /** Install an ordinary ship module into one of the hero ship's typed bays (HPR-1.5.2).
  *  Only outside the field — the core refuses a deployed hero (`E_HERO_DEPLOYED`). */
+export const selectHeroFlagship = (playerId: string, heroId: string, unit: string, modules: string[]) =>
+  act(playerId, 'hero.flagship', { heroId, unit, modules });
+export const cancelHeroMobilization = (playerId: string, heroId: string) =>
+  act(playerId, 'hero.mobilization.cancel', { heroId });
+
 export const installHeroModule = (playerId: string, heroId: string, moduleId: string) =>
   act(playerId, 'hero.install', { heroId, moduleId });
 /** Take a module back out of its bay — the hero keeps owning it, the ship just flies без него. */

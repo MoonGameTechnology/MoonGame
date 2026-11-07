@@ -30,12 +30,7 @@
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#swarm-dossier,#scipick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#pirate-intro,#playercard,
   #settings,#warprompt,#abandon,#pushask,#diplo,#coalwin,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
-  #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
-  /* #buildwin («Здания → Построить») в этом списке не было: окно ехало 1×, пока
-     весь остальной интерфейс шёл в 1.5× — игрок видел мелкий чужой шрифт ровно в
-     одном окне. Его коробка (.twbox) при этом уже была подогнана под ПК ниже, что
-     и маскировало пропажу. Соседи по разметке (#tech, #steward) тут с самого начала. */
-  #buildwin{zoom:var(--pcz,1.5);}
+  #hub,#emblempick,#corp,#setup,#testmode,#sandbox{zoom:var(--pcz,1.5);}
   /* vw/vh compensations (base values ÷ 1.5 — see the note above) */
   #toasts{max-width:min(61vw,520px);}
   /* rail tool list: cap at ~7 items and scroll; the sticky ▲/▾ ticks (not buttons)
@@ -73,7 +68,7 @@
   .dp-convo{height:min(41vh,440px);}
   #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
-  #tech .twbox,#steward .twbox,#buildwin .twbox{width:53.4vw;max-height:54.5vh;}
+  #tech .twbox,#steward .twbox{width:53.4vw;max-height:54.5vh;}
   #scipick .twbox{width:53.4vw;max-height:58.5vh;}
   /* Persistent intelligence stays beside the map and never intercepts map input
      outside its own box. Its height follows the desktop HUD's actual zoom. */

@@ -46,6 +46,8 @@ export const ACTION_TYPES = new Set([
   'hero.ability',
   'hero.equip',
   'hero.install',
+  'hero.flagship',
+  'hero.mobilization.cancel',
   'hero.skill.unlock',
   'hero.spawn',
   'hero.unequip',

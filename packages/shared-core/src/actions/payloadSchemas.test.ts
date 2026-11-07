@@ -20,6 +20,8 @@ const CLIENT_ACTION_TYPES = [
   'army.load',
   'army.unload',
   'hero.ability',
+  'hero.flagship',
+  'hero.mobilization.cancel',
   'hero.spawn',
   'hero.skill.unlock',
   'hero.equip',

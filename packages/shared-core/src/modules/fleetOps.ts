@@ -42,6 +42,12 @@ import { isMineFleet, isMissileFleet } from '../state/minefields';
 import { isVisibleTo } from '../state/visibility';
 import type { BattlePullIn } from './combat';
 
+/** Split selection addresses a hull and optional loadout; hero identity is checked separately. */
+function splitMatches(stack: UnitStack, unit: string, modules?: readonly string[]): boolean {
+  return stack.unit === unit &&
+    (modules === undefined || loadoutKey(stack.modules) === loadoutKey(modules));
+}
+
 export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',
   // 1.3.0: неподвижный отряд не сливается и не делится (находка Codex на #1393).
@@ -63,7 +69,7 @@ export const fleetOpsModule: GameModule = {
   // 1.14.0: высадка, отменённая вылетом (`assault.cancelled`), тоже решает слияние, которое
   //         она приостановила.
   // 1.14.1: merged fleets retain bombardment, its reload clock and auto-assault.
-  version: '1.14.1',
+  version: '1.15.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -351,15 +357,14 @@ export const fleetOpsModule: GameModule = {
       }
       const have = (unit: string, modules?: readonly string[]) =>
         fleet.units
-          .filter(
-            (st) =>
-              st.unit === unit &&
-              (modules === undefined || loadoutKey(st.modules) === loadoutKey(modules)),
-          )
+          .filter(st => !st.heroId && splitMatches(st, unit, modules))
           .reduce((a, st) => a + st.count, 0);
       let takeTotal = 0;
       for (const w of want.values()) {
-        if (w.count > have(w.unit, w.modules)) return h.reject('E_NOT_ENOUGH');
+        if (w.count > have(w.unit, w.modules)) {
+          const touchesHero = fleet.units.some(st => st.heroId && splitMatches(st, w.unit, w.modules));
+          return h.reject(touchesHero ? 'E_HERO_UNIT' : 'E_NOT_ENOUGH');
+        }
         takeTotal += w.count;
       }
       const shipsTotal = fleet.units.reduce((a, st) => a + st.count, 0);
@@ -402,8 +407,7 @@ export const fleetOpsModule: GameModule = {
         let left = w.count;
         for (const st of keptShipsPreview) {
           if (left <= 0) break;
-          if (st.unit !== w.unit) continue;
-          if (w.modules !== undefined && loadoutKey(st.modules) !== loadoutKey(w.modules)) continue;
+          if (st.heroId || !splitMatches(st, w.unit, w.modules)) continue;
           const move = Math.min(st.count, left);
           st.count -= move;
           left -= move;
@@ -437,7 +441,7 @@ export const fleetOpsModule: GameModule = {
 
       let taken: UnitStack[] = [];
       for (const w of want.values()) {
-        taken = taken.concat(takeFromStacks(fleet.units, w.unit, w.count, w.modules));
+        taken = taken.concat(takeFromStacks(fleet.units.filter(st => !st.heroId), w.unit, w.count, w.modules));
       }
       fleet.units = fleet.units.filter((st) => st.count > 0);
       let takenLanding: UnitStack[] = [];
