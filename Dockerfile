@@ -54,6 +54,9 @@ RUN node deploy/runtime/prepare-libc.mjs /runtime-libc
 # Same for libssl3t64 deb13u2 (SEC-42): apt fetches the pinned deb13u3 and accepts it only
 # against Debian's signed index (this digest-pinned builder's keyring); no package scripts run.
 RUN node deploy/runtime/prepare-libssl.mjs /runtime-libssl
+# Same for zlib1g +b1 (SEC-43): the pinned deb13u1 fixes CVE-2026-76844/85091 (HIGH) and
+# CVE-2026-27171 (MEDIUM), accepted only against Debian's signed index; no package scripts run.
+RUN node deploy/runtime/prepare-zlib.mjs /runtime-zlib
 # DSA-6572-1 removes compromised roots. Rebuild the bundle from Debian's signed,
 # version-pinned archive; do not inherit the builder's extra/local trust anchors.
 RUN node deploy/runtime/prepare-ca.mjs /runtime-ca
@@ -115,11 +118,14 @@ RUN mkdir -p playtest-logs ruleset-keys && chmod 0700 playtest-logs ruleset-keys
 # openssl CVEs, two HIGH), verified by apt against Debian's signed index instead of a repo
 # hash. On 2026-09-30 the tag already pointed at a rebuild (sha256:5ef534d3…) with libc6
 # deb13u4 but still libssl3t64 deb13u2 — a bump alone would not have closed them.
+# SEC-43 overlays zlib1g 1:1.3.dfsg+really1.3.1-1+deb13u1 the same way: the tag's newest
+# rebuild (sha256:8ad9cc93…, checked 2026-11-07) still ships zlib1g +b1.
 # On a base bump, compare actual package versions and remove each overlay once upstream
 # includes its fix; a scan with old suppressions cannot establish that a CVE was fixed.
 FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:4e4fb0ce55fd73901600796ef079a9490369d2515d7da31633a91608c82ca13b AS runtime
 COPY --from=build /runtime-libc/ /
 COPY --from=build /runtime-libssl/ /
+COPY --from=build /runtime-zlib/ /
 COPY --from=build /runtime-ca/ /
 # Bring the app (source + prod-only node_modules + baked HTML + the pre-built server
 # bundle) and hand the tree to the non-root user so the one runtime write left
