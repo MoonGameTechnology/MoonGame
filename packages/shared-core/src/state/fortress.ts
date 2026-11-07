@@ -8,7 +8,7 @@ export const FORTRESS_CORE = 'starfort';
 export const FORTRESS_BODY = 'fortress_guns';
 export const FORTRESS_FLEET_PREFIX = 'fleet:station:';
 export const FORTRESS_INTERNAL_SHARE = 0.2;
-export const FORTRESS_DEPLOY_COST: ResourceBag = { metal: 120 };
+export const FORTRESS_DEPLOY_COST: ResourceBag = { metal: 480 };
 
 /** Reserve one weapon and one defense bay for the installed battery/shield buildings. */
 export function fortressLoadoutHull(data: GameData): UnitDef | undefined {

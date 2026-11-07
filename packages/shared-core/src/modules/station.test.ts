@@ -104,7 +104,7 @@ describe('station — космическая крепость на захвач�
     const v = r.state.planets.V!;
     expect(v.kind).toBe('void_station');
     expect(v.owner).toBe('p1'); // владелец не менялся — он и ставил
-    expect(r.state.players.p1?.resources.metal).toBe(500 - 120); // STATION_COST
+    expect(r.state.players.p1?.resources.metal).toBe(500 - 480); // STATION_COST
     expect(r.events.map((e) => e.type)).toContain('station.deployed');
   });
 
@@ -151,9 +151,9 @@ describe('station — космическая крепость на захвач�
     expect(errCode(kernel.applyAction(st, deploy('ZZ'), ctx()))).toBe('E_NO_PLANET');
   });
 
-  it('отбивает, когда казна не тянет', () => {
+  it.each([120, 479])('отбивает, когда казна не тянет: %i металла', (metal) => {
     const st = world();
-    st.players.p1 = player('p1', 50); // < 120
+    st.players.p1 = player('p1', metal);
     expect(errCode(kernel.applyAction(st, deploy('V'), ctx()))).toBe('E_INSUFFICIENT');
   });
 

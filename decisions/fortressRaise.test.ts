@@ -94,7 +94,7 @@ describe('FORT-0.2 — кнопка и редьюсер решают ОДИНА�
     const cases: Array<[string, string | null, number]> = [];
     for (const kind of ['asteroid', 'nebula', 'planet', 'void_station', 'empty']) {
       for (const owner of ['p1', 'p2', null]) {
-        for (const metal of [500, 10]) cases.push([kind, owner, metal]);
+        for (const metal of [10, 120, 479, 480, 500]) cases.push([kind, owner, metal]);
       }
     }
     for (const [kind, owner, metal] of cases) {
@@ -133,7 +133,7 @@ describe('FORT-5.1 — крепость надо изучить (сообщен�
     expect(kinds.length).toBeGreaterThan(0);
     for (const kind of kinds) {
       for (const owner of ['p1', 'p2', null]) {
-        for (const metal of [5000, 10]) {
+        for (const metal of [10, 120, 479, 480, 5000]) {
           for (const completed of [[], [locks[0]!]]) {
             const base = createInitialState({ seed: 'f', version: { data: real.version, manifest: '1' } });
             const st: GameState = {
@@ -218,7 +218,7 @@ describe('FORT-6.1 — кнопка крепости на РАЗВИЛКЕ и р
   it('ни одного расклада, где кнопка и ядро расходятся', () => {
     for (const owner of ['p1', 'p2', null]) {
       for (const site of [undefined, null, 'p1', 'p2']) {
-        for (const metal of [5000, 10]) {
+        for (const metal of [10, 120, 479, 480, 5000]) {
           for (const completed of [[], [locks[0]!]]) {
             const st = world(owner, site, metal, completed);
             const decision = forkFortressRaise(st.planets.B, st.planets[SITE], 'p1', st.players.p1!.resources, real, completed);
