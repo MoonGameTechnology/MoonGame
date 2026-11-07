@@ -1221,8 +1221,11 @@ coarse ≈ fine на полном стеке), `delta` (`applyDelta∘diffState 
 Порядок и ограничения — [ранбук развёртывания](../deploy/README.md).
 
 **CI** — разбор в [security/pipeline.md](security/pipeline.md):
-- `ci.yml` (push не в `main`, PR, очередь): гейт, OSV-Scanner, загрузка бандла и основные UI-сценарии
+- `ci.yml` (PR, очередь, ветки без PR): гейт, OSV-Scanner, загрузка бандла и основные UI-сценарии
   блокируют; `perf` и часть дополнительных смоуков остаются неблокирующими.
+  В CI и security `run-policy` пропускает push-дубль только у PR без конфликтов с тем же SHA.
+  Неизвестное состояние или ошибка API сохраняют проверки. Push очереди выполняет required-проверки,
+  даже без `merge_group`; остальные push-контексты `Branch — …` отделены от required.
 - `security.yml`: 16 сканеров и сводка с полным JSON и сентинелами в артефакте; блокируют
   Semgrep, Gitleaks, OSV, Trivy fs/image; крон. `security-alerts.yml` отдельно экспортирует
   открытые алерты панели GitHub с правами только на чтение; ошибка API не считается нулём.
