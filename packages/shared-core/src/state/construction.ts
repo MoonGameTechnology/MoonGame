@@ -13,6 +13,8 @@ export interface BuildUnitPayload {
 /** Payload of the internal `construction.complete` schedule (we author it, so
  *  it is well-formed; the handler still guards types and is fail-secure). */
 export interface CompletePayload {
+  /** Accepted full duration, with match pricing applied; retained on pause/resume. */
+  durationHours?: number;
   kind?: 'building' | 'unit' | 'upgrade';
   planetId?: string;
   playerId?: string;

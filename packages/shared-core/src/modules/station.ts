@@ -5,7 +5,7 @@ import { buildingLevel, type ResourceBag } from '../data/schemas';
 import type { Planet, PlayerId, UnitStack } from '../state/gameState';
 import { effectiveStats, loadoutCost, validateLoadout } from '../util/loadout';
 import { canAfford, payCost } from '../util/treasury';
-import { matchCost, matchHours } from '../util/pricing';
+import { matchCost, matchBuildingHours } from '../util/pricing';
 import type { DamageHookArgs } from '../util/combat';
 import { coverPoints, worldDamageReduction } from '../util/worldCover';
 import { isCapturable, isStationable } from '../state/sectorKind';
@@ -220,7 +220,7 @@ export const stationModule: GameModule = {
   // 1.2.0: прикрытие — только отряду из одних орудий (находка Codex на #1393).
   // 1.3.0: крепость на развилке — новая точка постройки (FORT-6.1).
   // 1.4.1: fortress deployment costs four times as much (480 metal before fittings).
-  version: '1.4.1',
+  version: '1.4.2',
   setup(api) {
     api.onAction('station.deploy', (action, h: HandlerContext) => {
       const { planetId, trail, modules } = action.payload as { planetId?: string; trail?: unknown; modules?: unknown };
@@ -304,7 +304,7 @@ export const stationModule: GameModule = {
           ...(anchor ? { fork: anchor } : { stationHost: planetId }),
           fortress: { level: 1, modules: [...chosen], assembly: { from: 0, to: 1,
             startedAt: h.ctx.now,
-            doneAt: h.ctx.now + hoursToMs(h.ctx, matchHours(h.state, core.buildTimeHours)),
+            doneAt: h.ctx.now + hoursToMs(h.ctx, matchBuildingHours(h.state, core.buildTimeHours)),
           } },
         };
         h.state.planets[siteId] = fresh;

@@ -28,7 +28,8 @@ import {
   buildingMaxLevel,
   matchCost,
   matchUnitCost,
-  matchHours,
+  matchBuildingHours,
+  matchUnitHours,
   thresholdRamp,
   signatureSize,
   TURNED_HOURS,
@@ -681,7 +682,7 @@ export function createDossiers(host: DossierHost): {
       // которого платит ядро, — buildingLevel сводит их одинаково).
       const rows = [
         cxRow(t('codex.row.cost'), resourceComparisonHtml(matchCost(host.state(), lv.cost), matchCost(host.state(), ref.cost), undefined, true)),
-        cxRow(t('codex.row.build-time'), comparisonHtml(lv.buildTimeHours ?? 0, ref.buildTimeHours ?? 0, t('codex.value.hours', { n: matchHours(host.state(), lv.buildTimeHours ?? 0) }), true)),
+        cxRow(t('codex.row.build-time'), comparisonHtml(matchBuildingHours(host.state(), lv.buildTimeHours ?? 0), matchBuildingHours(host.state(), ref.buildTimeHours ?? 0), t('codex.value.hours', { n: matchBuildingHours(host.state(), lv.buildTimeHours ?? 0) }), true)),
         cxRow(t('codex.row.hp'), comparisonHtml(lv.hp ?? 0, ref.hp ?? 0)),
       ];
       // Ресурс — иконкой и цветом (UI-RES2): карточка читается так же, как ценник
@@ -745,7 +746,7 @@ export function createDossiers(host: DossierHost): {
     const st = def.stats;
     const rows = [
       cxRow(t('codex.row.cost'), cost(matchUnitCost(host.state(), def), treasury())),
-      cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: matchHours(host.state(), def.buildTimeHours ?? 0) })),
+      cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: matchUnitHours(host.state(), def.buildTimeHours ?? 0) })),
       cxRow(t('codex.row.atk-def'), `${st.attack ?? 0} / ${st.defense ?? 0}`),
       cxRow(t('codex.row.hull'), String(st.hp ?? 0)),
     ];

@@ -4,7 +4,7 @@ import { hoursToMs, timeScaleOf } from '../../action/types';
 import { MS_PER_HOUR } from '../../util/time';
 import { addUnits } from '../../util/stacks';
 import { effectiveStats } from '../../util/loadout';
-import { matchCost, matchHours } from '../../util/pricing';
+import { matchCost, matchBuildingHours } from '../../util/pricing';
 import { canAfford, payCost } from '../../util/treasury';
 import { forkSiteInBattle } from '../../state/forkSite';
 import { FORTRESS_BODY, FORTRESS_CORE, fortressFleetId, fortressRepairQuote,
@@ -50,7 +50,7 @@ export function registerFortressLifecycle(api: ModuleSetupApi): void {
     const cost = matchCost(h.state, quote.cost);
     if (!player || !canAfford(player.resources, cost)) return h.reject('E_INSUFFICIENT');
     payCost(player.resources, cost);
-    const hours = matchHours(h.state, quote.hours);
+    const hours = matchBuildingHours(h.state, quote.hours);
     const doneAt = h.ctx.now + hoursToMs(h.ctx, hours);
     site.fortress.repair = { owner: action.playerId, remainingHp: quote.missingHp, hpPerHour: quote.missingHp / hours, doneAt };
     h.schedule(doneAt, 'station.repair.complete', { planetId: site.id });

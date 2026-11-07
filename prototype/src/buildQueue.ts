@@ -30,6 +30,8 @@ export interface QueuedBuild {
 /** The payload of a scheduled `construction.complete` event, as the UI reads it —
  *  every field optional because it arrives from state, not from a typed builder. */
 export interface ConstructionPayload {
+  durationHours?: number;
+  troop?: string;
   kind?: 'building' | 'unit' | 'upgrade';
   planetId?: string;
   building?: string;
