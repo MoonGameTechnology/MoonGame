@@ -168,7 +168,8 @@ data. You should not need to touch the kernel.
   ceilings are today's sizes. Don't add to a monster: put new code in its own module. Raising a
   ceiling is an explicit budget edit with the reason in the PR body; when code shrinks by 100+
   lines (functions: 50+), lower the ceiling in the same PR. Tests, `.d.ts` and locale files are
-  not measured.
+  not measured. A function already on the budget list is cut when a feature touches it, in that
+  same PR (SLIM-6), not in a separate refactoring campaign.
 
 ## Локализация — читай ДО того, как напишешь игроку хоть одно слово
 
