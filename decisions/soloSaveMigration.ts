@@ -548,6 +548,17 @@ export const BUILD_PRODUCTION_TIMES_SOLO_MIGRATION = {
   toDataHash: PRODUCTION_WORKBENCH_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Data 0.1.84: research catalogue ×3 of the original (was ×10) and new main maps build ×2
+ *  (was ×3). Saved pricing, paid research and accepted work keep their terms. */
+export const PACE_RELIEF_SOLO_MIGRATION = {
+  fromRules: BUILD_PRODUCTION_TIMES_SOLO_MIGRATION.toRules,
+  fromData: BUILD_PRODUCTION_TIMES_SOLO_MIGRATION.toData,
+  fromDataHash: BUILD_PRODUCTION_TIMES_SOLO_MIGRATION.toDataHash,
+  toRules: '0d0fe0f3664984',
+  toData: '0.1.84',
+  toDataHash: '0d3235ac256571',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -596,6 +607,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   LONG_RANGE_OPTICS_SOLO_MIGRATION,
   PRODUCTION_WORKBENCH_SOLO_MIGRATION,
   BUILD_PRODUCTION_TIMES_SOLO_MIGRATION,
+  PACE_RELIEF_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
