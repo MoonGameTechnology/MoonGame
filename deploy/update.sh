@@ -210,6 +210,9 @@ if [ -n "${VOID_IMAGE:-}" ]; then
   echo "[*] Забираем образ и поднимаем на нём стек..."
   docker pull "$VOID_IMAGE"
   if [ "$TLS" = 1 ]; then docker pull "$VOID_CADDY_IMAGE"; fi
+  if [ -n "$STATE_DIR" ] && ! node "$DEPLOY_DIR/ruleset-cache.mjs" "$VOID_IMAGE" "$STATE_DIR"; then
+    echo E_RULESET_CACHE >&2; restore_env; exit 1
+  fi
   if ! migrate_db "$VOID_IMAGE"; then
     echo "[✗] Миграция не прошла — обновление ОТМЕНЕНО, сервер не тронут." >&2
     restore_env

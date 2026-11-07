@@ -1,3 +1,7 @@
+import { currentProjection, type RulesetProjection } from './rulesets/projection';
+import { roomConfiguration } from './rulesets/roomConfig';
+import type { MatchRulesetBinding } from './rulesets/types';
+import type { MatchRulesCatalog } from '@void/protocol';
 import { sanitizeChatText } from '@void/protocol';
 import { randomBytes } from 'node:crypto';
 import { roomRejectionEvent, type SecurityAudit } from './securityAudit';
@@ -20,17 +24,8 @@ import type {
 } from '@void/shared-core';
 import {
   CLIENT_ACTION_TYPES,
-  coalitionWallNow,
   diffState,
-  effectiveVictoryRules,
-  flashBattles,
-  getStance,
   hashState,
-  identifiedNodes,
-  inVisionBloc,
-  resolveMatchConfig,
-  Rejection,
-  visibleView,
 } from '@void/shared-core';
 import type { AcceptedAction, ActionGate } from '@void/action-layer';
 import type { ClientPerfMessage } from '@void/protocol';
@@ -78,6 +73,9 @@ export interface RoomPeer {
 export interface MatchRoomOptions {
   id: string;
   initialState: GameState;
+  ruleset?: MatchRulesetBinding;
+  rulesCatalog?: MatchRulesCatalog;
+  projection?: RulesetProjection;
   kernel: Kernel;
   data: GameData;
   config?: Context['config'];
@@ -554,6 +552,9 @@ export const PUBLIC_EVENTS: ReadonlySet<string> = new Set(['espionage.exposed'])
 export class MatchRoom {
   readonly id: string;
 
+  readonly ruleset?: MatchRulesetBinding;
+  private readonly rulesCatalog?: MatchRulesCatalog;
+  private readonly projection: RulesetProjection;
   private readonly kernel: Kernel;
   private readonly data: GameData;
   private readonly config: Context['config'];
@@ -709,19 +710,13 @@ export class MatchRoom {
       (options.matchRewardPolicy && options.initialSeq === undefined && options.initialState.match.status !== 'ended'
         ? { policy: options.matchRewardPolicy, players: {} } : undefined));
     this.serverOrders = options.serverOrders;
-    // PVE-0.2 — the mode is consumed HERE, once, and never again: `config` is private
-    // and readonly, so a resolved match has nothing left to swap mid-flight (GDD §2,
-    // «режим фиксируется при старте»). Putting it in the constructor rather than in
-    // one factory is deliberate — every path that can raise a room (createDevMatch,
-    // the prototype host, tests) goes through this line, so an unknown mode cannot
-    // slip in through a path someone forgot to guard. An unknown mode is fatal by
-    // design: a room that believes it runs PvE waves while the engine applies the
-    // base rules is worse than a room that refuses to exist (fail-secure, A10).
-    const resolved = resolveMatchConfig(options.data, options.config ?? { timeScale: 1 });
-    if (!resolved.ok) {
-      throw new Rejection(resolved.code);
-    }
-    this.config = resolved.config;
+    // A pinned world retains its native defaults. Only unpinned local harnesses
+    // resolve against the currently linked core; network hosts always supply a pin.
+    const rules = roomConfiguration(options);
+    this.config = rules.config;
+    this.ruleset = rules.ruleset;
+    this.rulesCatalog = options.rulesCatalog;
+    this.projection = options.projection ?? currentProjection;
     this.now = options.now ?? (() => Date.now());
     this.createdAt = options.initialCreatedAt ?? this.now();
     this.endedAtValue = options.initialState.match.status === 'ended'
@@ -791,7 +786,7 @@ export class MatchRoom {
     // default in prod defeated the claim. Tests and dev harnesses override
     // explicitly when they need deterministic-off (e.g. snapshot replay).
     this.emitStateHash = options.emitStateHash ?? process.env.NODE_ENV === 'production';
-    this.hostFog = options.hostFog;
+    this.hostFog = options.hostFog ?? this.projection.hostFog;
     this.singlePeerPerPlayer = options.singlePeerPerPlayer ?? false;
     // Enforce the metrics invariant (docs/metrics-roadmap): an observer is PURE
     // telemetry and must NEVER feed back into the room. Wrap it once here so a
@@ -989,7 +984,7 @@ export class MatchRoom {
   /** Public rules from the same resolver the victory evaluator uses, including
    *  effective defaults. The fresh allowlisted copy keeps the pinned config private. */
   get victoryRules(): VictoryRules {
-    return effectiveVictoryRules(this.config);
+    return this.projection.effectiveVictoryRules(this.config);
   }
 
   get state(): GameState {
@@ -1146,6 +1141,7 @@ export class MatchRoom {
     this.lastVisible.set(playerId, view.base);
     this.send(peer, {
       type: 'welcome',
+      ...(this.rulesCatalog ? { ruleset: this.rulesCatalog } : {}),
       matchId: this.id,
       playerId,
       seq: this.wireSeqOf(playerId),
@@ -1188,7 +1184,7 @@ export class MatchRoom {
     remembered: string[];
     identified: Set<string>;
   } {
-    const { view, identified } = visibleView(state, playerId, this.data);
+    const { view, identified } = this.projection.visibleView(state, playerId, this.data);
     const { signatures, remembered, ...core } = view;
     const base = this.hostFog ? this.hostFog(core as GameState, playerId) : (core as GameState);
     return { base, signatures, remembered, identified };
@@ -1974,7 +1970,7 @@ export class MatchRoom {
     return (
       !!state.coalitionClock &&
       (state.coalitionClock.timeScale !== clock.timeScale ||
-        Math.abs(coalitionWallNow(state, clock.gameTime) - clock.wallTime) > 0.001)
+        Math.abs(this.projection.coalitionWallNow(state, clock.gameTime) - clock.wallTime) > 0.001)
     );
   }
 
@@ -2201,6 +2197,7 @@ export class MatchRoom {
     return {
       matchId: this.id,
       dataVersion: state.version.data,
+      ...(this.ruleset ? { ruleset: this.ruleset } : {}),
       seq,
       status: state.match.status === 'ended' ? 'ended' : 'ongoing',
       createdAt: this.createdAt,
@@ -2500,7 +2497,7 @@ export class MatchRoom {
     // Бои, которые начались и кончились в этом же пакете: в состоянии их нет ни кадром
     // раньше, ни сейчас, и аудиторию им дают только их же события (замечание Codex на
     // #1408 — первый залп скрытого перехвата добивал флот, и стороны не узнавали о бое).
-    const flash = flashBattles(events, this.stateValue);
+    const flash = this.projection.flashBattles(events, this.stateValue);
     const deltaBytes: Record<PlayerId, number> = {};
     for (const [playerId, playerPeers] of this.peers) {
       // Broadcast is BEST-EFFORT and per-player isolated: computing one player's fogged
@@ -2519,7 +2516,7 @@ export class MatchRoom {
           ...Object.keys(view.base.battles),
         ]);
         for (const [id, owners] of flash)
-          if (inVisionBloc(this.stateValue, playerId, owners)) battles.add(id);
+          if (this.projection.inVisionBloc(this.stateValue, playerId, owners)) battles.add(id);
         const visibleEvents = events.filter((e) =>
           this.eventVisibleTo(e, playerId, identify, battles),
         ).map((event) => {
@@ -2666,7 +2663,7 @@ export class MatchRoom {
     if (a === b) return true;
     const ta = this.teams[a];
     if (ta !== undefined && ta === this.teams[b]) return true;
-    return getStance(this.stateValue, a, b) === 'alliance';
+    return this.projection.getStance(this.stateValue, a, b) === 'alliance';
   }
 
   /** A ping is visible to its owner and the owner's allies; never to enemies. The
@@ -2726,7 +2723,7 @@ export class MatchRoom {
     // Node anchors must reference a real planet the owner can currently identify —
     // you can't pin a precise marker on a world you've never scouted. Point anchors
     // ({x,y}) are always allowed; they reveal nothing hidden.
-    const seen = identifiedNodes(this.stateValue, playerId, this.data);
+    const seen = this.projection.identifiedNodes(this.stateValue, playerId, this.data);
     for (const anchor of [draft.target, draft.to]) {
       if (!anchor || anchor.node === undefined) continue;
       if (!this.stateValue.planets[anchor.node]) {

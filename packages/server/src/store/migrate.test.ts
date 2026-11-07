@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { migrate } from './postgres';
+import { RULESET_SCHEMA } from '../rulesets/schema';
 
 /** A pool whose schema statement fails with `errors[n]` on the n-th attempt. */
 function fakePool(errors: Array<{ code?: string; message: string }>) {
@@ -15,6 +16,7 @@ function fakePool(errors: Array<{ code?: string; message: string }>) {
     query: async (sql: string) => {
       if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') log.push(sql);
       else if (sql.startsWith('SELECT pg_advisory_xact_lock')) log.push('lock');
+      else if (sql === RULESET_SCHEMA) log.push('rules');
       else if (sql.startsWith('SELECT id,login FROM users')) return { rows: [] };
       else {
         log.push('schema');
@@ -43,6 +45,7 @@ describe('migrate', () => {
       'BEGIN',
       'lock',
       'schema',
+      'rules',
       'COMMIT',
       'release',
     ]);

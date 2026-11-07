@@ -20,7 +20,7 @@ export function archiveExpired(snapshot: MatchSnapshot, now: number): boolean {
 interface ArchiveEntry { room: MatchRoom; usedAt: number }
 export interface ArchiveRoomCacheOptions {
   store: MatchStore;
-  viewer(snapshot: MatchSnapshot): MatchRoom;
+  viewer(snapshot: MatchSnapshot): MatchRoom | Promise<MatchRoom>;
   /** Includes live/terminal hosted rooms and slots reserved by in-flight creation. */
   otherResidents(): number;
   totalRoomLimit: number;
@@ -115,7 +115,7 @@ export class ArchiveRoomCache implements RoomRegistry {
     const snapshot = await this.options.store.loadArchive?.(id, this.now() - MATCH_ARCHIVE_MS, this.maxStateBytes);
     if (!snapshot || snapshot.status !== 'ended' || snapshot.state.match.status !== 'ended' ||
       archiveExpired(snapshot, this.now()) || archiveStateBytes(snapshot.state) > this.maxStateBytes) return undefined;
-    const room = this.options.viewer(snapshot);
+    const room = await this.options.viewer(snapshot);
     if (room.id !== id || room.state.match.status !== 'ended') throw new Error('E_ARCHIVE_STATE');
     this.rooms.set(id, { room, usedAt: this.now() });
     return this.get(id);

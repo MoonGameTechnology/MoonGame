@@ -233,6 +233,7 @@ export function snapshotOf(room: MatchRoom): MatchSnapshot {
   return {
     matchId: room.id,
     dataVersion: state.version.data,
+    ...(room.ruleset ? { ruleset: room.ruleset } : {}),
     seq: room.sequence,
     status: state.match.status,
     createdAt: room.createdAt,

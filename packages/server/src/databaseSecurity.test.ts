@@ -240,6 +240,7 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
       'CREATE TABLE public.forbidden(id int)',
       'ALTER TABLE users ADD COLUMN forbidden int',
       'DROP TABLE users',
+      'DROP FUNCTION public.protect_match_ruleset()',
       'TRUNCATE users',
       'CREATE SCHEMA forbidden',
       'CREATE TEMP TABLE forbidden(id int)',
@@ -261,6 +262,7 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
     expect(new Set(rows.map((r: { tableowner: string }) => r.tableowner))).toEqual(
       new Set(['vd_schema']),
     );
+    expect((await migration.query("SELECT pg_get_userbyid(proowner) AS owner FROM pg_proc WHERE oid='public.protect_match_ruleset()'::regprocedure")).rows[0].owner).toBe('vd_schema');
     expect((await migration.query('SELECT current_user AS name')).rows[0].name).toBe(migrator);
     const runtime = connect(app, pass);
     await runtime.query(

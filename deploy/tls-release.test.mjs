@@ -14,6 +14,9 @@ function fixture() {
   const state = join(dir, 'state'), bin = join(dir, 'bin'), release = join(dir, 'deploy');
   for (const p of [state, bin, release]) mkdirSync(p);
   for (const f of ['stack.sh', 'release-state.sh', 'production-preflight.sh']) cpSync(join(DEPLOY, f), join(release, f));
+  cpSync(join(DEPLOY, 'ruleset-cache.mjs'), join(release, 'ruleset-cache.mjs'));
+  mkdirSync(join(release, 'observability'));
+  cpSync(join(DEPLOY, 'observability/main-module.mjs'), join(release, 'observability/main-module.mjs'));
   for (const f of ['docker-compose.yml','docker-compose.release.yml','docker-compose.tls.yml','docker-compose.release-tls.yml']) writeFileSync(join(release, f),'# stub\n');
   writeFileSync(join(state,'server.env'),'DOMAIN=play.example.com\nPROD=0\nSERVER_BIND=127.0.0.1\nCOMPOSE_EXTRA_FILE='+join(state,'policy.yml')+'\n');
   writeFileSync(join(state,'policy.yml'),'# fixed host policy\n');

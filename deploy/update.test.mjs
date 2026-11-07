@@ -71,6 +71,9 @@ function sandbox({
   writeFileSync(join(deploy, 'production-preflight.sh'),
     readFileSync(join(DEPLOY_DIR, 'production-preflight.sh'), 'utf8').replaceAll('/var/lib/moongame', root));
   writeFileSync(join(deploy, 'release-state.sh'), readFileSync(join(DEPLOY_DIR, 'release-state.sh')));
+  writeFileSync(join(deploy, 'ruleset-cache.mjs'), readFileSync(join(DEPLOY_DIR, 'ruleset-cache.mjs')));
+  mkdirSync(join(deploy, 'observability'));
+  writeFileSync(join(deploy, 'observability/main-module.mjs'), readFileSync(join(DEPLOY_DIR, 'observability/main-module.mjs')));
   for (const f of ['docker-compose.yml', 'docker-compose.release.yml']) {
     writeFileSync(join(deploy, f), '# stub\n');
   }

@@ -1,3 +1,5 @@
+import type { MatchRow } from './matchRow';
+import { RULESET_SCHEMA } from '../rulesets/schema';
 export { PostgresArsenalStore } from './postgresArsenal';
 import { scopedPool } from '../corporateScopedPool';
 import { challengeOf, resultOf, type ChallengeRow, type ResultRow } from './avaRows';
@@ -673,12 +675,13 @@ const SCHEMA_SQL = `
   `;
 
 export const schemaFingerprint = (): string =>
-  createHash('sha256').update(SCHEMA_SQL).digest('hex');
+  createHash('sha256').update(SCHEMA_SQL).update('\0').update(RULESET_SCHEMA).digest('hex');
 
 export async function migrate(pool: Pool | PoolClient): Promise<void> {
   // Boot/admin callers already own their client's transaction and migration lock.
   if ('release' in pool) {
     await pool.query(SCHEMA_SQL);
+    await pool.query(RULESET_SCHEMA);
     await backfillLoginSkeletons(pool);
     return;
   }
@@ -692,6 +695,7 @@ export async function migrate(pool: Pool | PoolClient): Promise<void> {
       await client.query('BEGIN');
       await client.query('SELECT pg_advisory_xact_lock(144731, 31)');
       await client.query(SCHEMA_SQL);
+      await client.query(RULESET_SCHEMA);
       await backfillLoginSkeletons(client);
       await client.query('COMMIT');
       return;
@@ -705,22 +709,13 @@ export async function migrate(pool: Pool | PoolClient): Promise<void> {
   }
 }
 
-interface MatchRow {
-  id: string;
-  data_version: string;
-  seq: number;
-  status: string;
-  state: MatchSnapshot['state'];
-  clock: MatchSnapshot['clock'] | null;
-  economy_observations: MatchSnapshot['economyObservations'] | null;
-  economy_activity: MatchSnapshot['economyActivity'] | null;
-  career: MatchSnapshot['career'] | null;
-  match_reward_progress: MatchSnapshot['matchRewardProgress'] | null;
-  created_at: Date;
-  ended_at: Date | null;
-}
+
 
 export class PostgresMatchStore implements MatchStore {
+  async hasPinnedMatches(): Promise<boolean> {
+    const result = await this.pool.query<{ found: boolean }>('SELECT EXISTS(SELECT 1 FROM matches WHERE ruleset IS NOT NULL) AS found');
+    return result.rows[0]!.found;
+  }
   async economyMatchIds(after = '', limit = 100): Promise<string[]> {
     const size = Number.isSafeInteger(limit) ? Math.min(100, Math.max(1, limit)) : 100;
     const result = await this.pool.query<{ id: string }>(
@@ -746,7 +741,7 @@ export class PostgresMatchStore implements MatchStore {
 
   async load(matchId: string): Promise<MatchSnapshot | null> {
     const r = await this.pool.query<MatchRow>(
-      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, match_reward_progress, created_at, ended_at FROM matches WHERE id = $1`,
+      `SELECT id, data_version, seq, status, state, clock, ruleset, economy_observations, economy_activity, career, match_reward_progress, created_at, ended_at FROM matches WHERE id = $1`,
       [matchId],
     );
     const row = r.rows[0];
@@ -755,7 +750,7 @@ export class PostgresMatchStore implements MatchStore {
 
   async loadArchive(matchId: string, since: number, maxBytes: number): Promise<MatchSnapshot | null> {
     const r = await this.pool.query<MatchRow>(
-      `SELECT id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, match_reward_progress, created_at, ended_at
+      `SELECT id, data_version, seq, status, state, clock, ruleset, economy_observations, economy_activity, career, match_reward_progress, created_at, ended_at
        FROM matches WHERE id=$1 AND status='ended' AND ended_at>$2 AND archive_state_bytes<=$3`,
       [matchId, new Date(since), maxBytes],
     );
@@ -777,6 +772,7 @@ export class PostgresMatchStore implements MatchStore {
       ...(row.ended_at ? { endedAt: row.ended_at.getTime() } : {}),
       ...(row.career ? { career: row.career } : {}),
       ...(row.match_reward_progress ? { matchRewardProgress: row.match_reward_progress } : {}),
+      ...(row.ruleset ? { ruleset: row.ruleset } : {}),
       state: row.state, // pg parses jsonb → JS object
       ...(row.clock ? { clock: row.clock } : {}),
       ...(row.economy_observations ? { economyObservations: row.economy_observations } : {}),
@@ -814,14 +810,15 @@ export class PostgresMatchStore implements MatchStore {
     // Optimistic by seq: only overwrite when our snapshot is at least as new as the
     // stored one (the WHERE on the upsert path drops a stale late write).
     const result = await query.query(
-      `INSERT INTO matches (id, data_version, seq, status, state, clock, economy_observations, economy_activity, career, ended_at, created_at, archive_meta, archive_state_bytes, match_reward_progress, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $10::jsonb, $11, COALESCE($12, now()), $13::jsonb, $14, $15::jsonb, now())
+      `INSERT INTO matches (id, data_version, seq, status, state, clock, ruleset, economy_observations, economy_activity, career, ended_at, created_at, archive_meta, archive_state_bytes, match_reward_progress, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $16::jsonb, $7::jsonb, $8::jsonb, $10::jsonb, $11, COALESCE($12, now()), $13::jsonb, $14, $15::jsonb, now())
        ON CONFLICT (id) DO UPDATE SET
          data_version = EXCLUDED.data_version,
          seq          = EXCLUDED.seq,
          status       = EXCLUDED.status,
          state        = EXCLUDED.state,
          clock        = EXCLUDED.clock,
+         ruleset      = COALESCE(matches.ruleset, EXCLUDED.ruleset),
          career       = EXCLUDED.career,
          match_reward_progress = COALESCE(EXCLUDED.match_reward_progress, matches.match_reward_progress),
          ended_at     = COALESCE(matches.ended_at, EXCLUDED.ended_at),
@@ -879,6 +876,7 @@ export class PostgresMatchStore implements MatchStore {
         snapshot.status === 'ended' ? JSON.stringify(archiveMetadataOf(snapshot)) : null,
         snapshot.status === 'ended' ? archiveStateBytes(snapshot.state) : null,
         snapshot.matchRewardProgress ? JSON.stringify(snapshot.matchRewardProgress) : null,
+        snapshot.ruleset ? JSON.stringify(snapshot.ruleset) : null,
       ],
     );
     return result.rowCount === 1;

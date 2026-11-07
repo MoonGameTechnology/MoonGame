@@ -30,6 +30,9 @@ BEGIN
     REVOKE ALL ON public.account_deletions FROM vd_runtime;
     GRANT SELECT, INSERT ON public.account_deletions TO vd_runtime;
   END IF;
+  IF to_regprocedure('public.protect_match_ruleset()') IS NOT NULL THEN
+    ALTER FUNCTION public.protect_match_ruleset() OWNER TO vd_schema;
+  END IF;
   ALTER TABLE public.vd_schema_revision OWNER TO vd_schema;
   GRANT SELECT ON public.vd_schema_revision TO vd_runtime;
   FOR item IN SELECT s.relname FROM pg_class s JOIN pg_namespace n ON n.oid=s.relnamespace

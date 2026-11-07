@@ -1,3 +1,4 @@
+import { createPinnedStores } from './rulesets/persistence';
 import { matchCreationAccess } from './matchCreationAccess';
 import { CorpMaterials } from './corpMaterials';
 import { registerCorpMaterialsApi } from './corpMaterialsApi';
@@ -32,7 +33,7 @@ import { commerceOffers } from './commerceCatalog';
 import { registerMetaCommerce } from './metaCommerce';
 import { initializeOrdinaryArsenal, syncAccountArsenal } from './mainGameArsenal';
 import { createMultiplayerServer, tlsFromEnv, wsLimitsFromEnv } from './wsServer';
-import { createStores, snapshotOf } from './persistence';
+import { snapshotOf } from './persistence';
 import { admitSeat, seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { isMetricsReaderRequest, metricsReaderTokenFromEnv, operatorTokenFromEnv } from './operatorAccess';
@@ -148,7 +149,7 @@ const data = loadShippedData();
 const starterArsenal = loadStarterArsenal(data);
 // ARS-4: the F2P drop loop — chances/pool/pity/salvage are data, validated at boot.
 const dropTables = loadDropTables(data);
-const stores = await createStores();
+const { stores, matchRulesets } = await createPinnedStores();
 const metaCatalog = loadMetaEconomyCatalog(data);
 let refreshGrantedArsenal: (accountId: string) => Promise<void> = async () => {};
 const metaEconomy = new MetaEconomy({ moduleData: data, store: stores.metaEconomy, catalog: metaCatalog, catalogHistory: loadMetaEconomyCatalogHistory(data), dropTables, now: Date.now,
@@ -185,7 +186,7 @@ const securityAudit = securityAuditFromEnv(process.env);
 // The registry's match loader — the persist/observe/driver wiring lives in
 // serverWiring.ts so tests exercise the real composition, not a mirror of it.
 const loadMatch = createMatchLoader({
-  stores,
+  stores, rulesets: matchRulesets,
   data,
   securityAudit,
   careerAccounts: async (matchId) => {

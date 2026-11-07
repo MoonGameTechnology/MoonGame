@@ -528,6 +528,10 @@ export interface DevMatchOptions {
   /** Ruleset for this match (time scale + victory conditions). Defaults in `MatchRoom`
    *  to `{ timeScale: 1 }`; the match browser shows it as the match's "rules". */
   config?: MatchConfig;
+  kernel?: import('@void/shared-core').Kernel;
+  projection?: import('./rulesets/projection').RulesetProjection;
+  ruleset?: import('./rulesets/types').MatchRulesetBinding;
+  rulesCatalog?: import('@void/protocol').MatchRulesCatalog;
   /** Map identity stamped on the seeded state (`GameState.mapId`). The dev scenario
    *  builds its own nexus layout regardless — this only names it, so a test can seat
    *  two matches on distinguishable maps the way the hosts do. Absent ⇒ unnamed. */
@@ -550,6 +554,7 @@ export interface DevMatchOptions {
   initiallyStarted?: boolean;
   /** The persisted anchor of such a clock (see `MatchRoom.initialClock`). */
   initialClock?: MatchSnapshot['clock'];
+  timeScale?: number;
   initialCreatedAt?: number;
   initialEndedAt?: number;
   initialCareer?: MatchSnapshot['career'];
@@ -688,7 +693,10 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
   return new MatchRoom({
     id: options.id ?? 'dev',
     initialState: state,
-    kernel: createKernel(DEV_MODULES),
+    kernel: options.kernel ?? createKernel(DEV_MODULES),
+    ruleset: options.ruleset,
+    projection: options.projection,
+    rulesCatalog: options.rulesCatalog,
     data,
     now: options.now,
     observe: options.observe,
@@ -696,6 +704,7 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
     record: options.record,
     initialReceipts: options.initialReceipts,
     initialSeq: options.initialSeq,
+    timeScale: options.timeScale,
     initialCareer: options.initialCareer,
     initialMatchRewardProgress: options.initialMatchRewardProgress,
     initialEconomyActivity: options.initialEconomyActivity,
