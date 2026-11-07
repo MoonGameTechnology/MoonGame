@@ -82,10 +82,13 @@ backlog'а, словарь статусов кирпичей + живость и
 роадмапах (общий индекс) — исполняемая
 часть правила «verify docs against reality»)
 (CI additionally runs an OSV-Scanner SCA pass over the lockfiles; `pnpm audit` is
-retired — npm shut down its audit endpoints, 2026-07). CI mirrors it on every work-branch
-push, PR and merge-queue run (a push to `main` itself is not re-run: the queue already
-tested that exact tree): `.github/workflows/ci.yml` runs the gate + audit against a service
-Postgres (so the durable-store tests run too), `.github/workflows/security.yml` runs a diverse
+retired — npm shut down its audit endpoints, 2026-07). CI mirrors it on PRs, merge groups
+and pushes to branches without an open PR. A read-only `run-policy` skips duplicate push
+work for open PRs and queue branches; lookup failure runs checks. Push check names have
+a `Branch — ` prefix so skipped copies cannot satisfy required PR/queue contexts. Event
+triggers remain intact (AUD-9). A push to `main` itself is not re-run: the queue already
+tested that exact tree. `.github/workflows/ci.yml` runs the gate + audit against a
+service Postgres (so the durable-store tests run too), `.github/workflows/security.yml` runs a diverse
 scanner set (Semgrep, CodeQL, Trivy, OSV, Gitleaks, TruffleHog, zizmor) — on the same events
 **and weekly on `main`**, since a pinned prod image outlives the CVE feeds that scanned
 it — `.github/workflows/android.yml` builds the Android APK, and

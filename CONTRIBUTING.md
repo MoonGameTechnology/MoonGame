@@ -365,6 +365,13 @@ pnpm run ui:shot -- --screen match --phone --locale en --out /tmp/match.png
    - **Не бери `Vuln — third-party prod images (Trivy image)`** — он помечен
      `report — informational`, там CVE сторонних образов прода: репозиторий запрётся
      до апстрим-обновления caddy/postgres, которое от нас не зависит.
+
+   `Branch — …` — контексты раннего push-прогона, их не добавляют в required. Для PR и
+   `merge_group` имена выше сохраняются. В `ci.yml` и `security.yml` короткое read-only
+   задание `run-policy` пропускает тяжёлый push-дубль открытого PR или ветки очереди;
+   без PR и при ошибке API проверки выполняются. Триггеры и разделение concurrency
+   по событию сохраняются; подробности — [пайплайн](docs/security/pipeline.md#запуск).
+
 4. **Merge queue** (Require merge queue в том же ruleset'е). Раньше тут стояло
    «необязательно» — это устарело: очередь стала обязательной частью схемы, потому что
    на неё завязана авто-постановка (п. 5). Очередь собирает временную ветку «свежий
