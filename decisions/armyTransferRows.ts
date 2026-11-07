@@ -14,7 +14,9 @@ import {
 
 import { moduleValueKey, serviceKey } from '../packages/shared-core/src/util/stacks';
 
-export interface ArmyTransferSource { group: string; count: number }
+/** `wounded` — the formation is below full health; it lets a merged row honour the
+ *  player's «wounded / healthy first» choice instead of a blind proportional split. */
+export interface ArmyTransferSource { group: string; count: number; wounded?: boolean }
 
 export interface ArmyGroupDetails {
   transferSources?: ArmyTransferSource[];
@@ -61,10 +63,15 @@ export function armyTransferRows(state: GameState, fleet: Fleet, mine: boolean, 
         0,
       );
       const maximum = stack.count * Math.max(1, effectiveStats(def, stack, data).hp ?? 1);
+      const hurt = (stack.hp ?? maximum) < maximum;
       return [
         {
           mergeKey: JSON.stringify([stack.unit, moduleValueKey(stack), serviceKey(stack.battles), stack.stationScale ?? null]),
-          transferSources: stack.armyGroup ? [{ group: stack.armyGroup, count: available }] : [],
+          transferSources: stack.armyGroup
+            ? [{ group: stack.armyGroup, count: available, ...(hurt ? { wounded: true } : {}) }]
+            : [],
+          // Free units of wounded formations: the menu asks whom to board first from it.
+          wounded: hurt && side === 'garrison' ? available : 0,
           key: `${side}:${stack.armyGroup ?? `pending:${index}`}`,
           group: stack.armyGroup,
           side,
@@ -94,6 +101,7 @@ export function armyTransferRows(state: GameState, fleet: Fleet, mine: boolean, 
       existing.battles = (existing.battles * before + row.battles * added) / (before + added);
       for (const field of ['garrison', 'garrisonAll', 'hold', 'holdAll', 'reserved', 'queued', 'hp', 'maxHp'] as const)
         existing[field] += row[field];
+      existing.wounded += row.wounded;
       existing.prepared &&= row.prepared;
       existing.transferSources.push(...row.transferSources);
       existing.health = Math.max(0, Math.min(100, Math.round(1000 * existing.hp / existing.maxHp) / 10));
@@ -122,8 +130,22 @@ export function hasPlannedArmyLoad(
 
 
 /** Integer, proportional selection across original formations. Largest remainders
- * get the remaining seats; ties retain source order. No HP is rewritten. */
-export function splitArmyTransferSources(sources: readonly ArmyTransferSource[], requested: number): ArmyTransferSource[] {
+ * get the remaining seats; ties retain source order. No HP is rewritten.
+ * With `first`, the preferred formations (wounded or whole) are drained before the
+ * others, proportionally within each class. */
+export function splitArmyTransferSources(
+  sources: readonly ArmyTransferSource[],
+  requested: number,
+  first?: 'wounded' | 'healthy',
+): ArmyTransferSource[] {
+  if (first) {
+    const preferred = sources.filter((s) => !!s.wounded === (first === 'wounded'));
+    const others = sources.filter((s) => !!s.wounded !== (first === 'wounded'));
+    const head = splitArmyTransferSources(preferred, requested);
+    const taken = head.reduce((n, s) => n + s.count, 0);
+    const tail = Number.isFinite(requested) ? splitArmyTransferSources(others, Math.floor(requested) - taken) : [];
+    return [...head, ...tail];
+  }
   const available = sources.reduce((n, source) => n + source.count, 0);
   if (!Number.isFinite(requested) || available <= 0) return [];
   const count = Math.max(0, Math.min(available, Math.floor(requested)));
