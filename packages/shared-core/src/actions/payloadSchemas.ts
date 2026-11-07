@@ -57,6 +57,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // AUD-18: `hero.move` и `planet.annihilate` сняты — у них нет схемы, значит шлюз их не
   // примет. Второй был живым обходом: аннигилировал миры героем без этой способности.
   'hero.ability': z.object({ heroId: id, abilityId: id, target: id.optional() }),
+  'hero.mobilization.cancel': z.object({ heroId: id }),
+  'hero.flagship': z.object({ heroId: id, unit: id, modules: z.array(id).max(32) }),
   'hero.spawn': z.object({ heroId: id, at: id }),
   'hero.skill.unlock': z.object({ heroId: id, node: id }),
   'hero.equip': z.object({ heroId: id, abilityId: id }),

@@ -1,0 +1,28 @@
+Preview module icons: unmodified Phosphor duotone SVG assets.
+Source commit: 2b75f3ad12b420c9504ef05df8d2564a28f8500e
+https://github.com/phosphor-icons/core
+MIT license: PHOSPHOR-LICENSE.txt
+Mapping:
+{
+  "targeting_array": "crosshair-simple",
+  "intercept_turret": "crosshair",
+  "shield_booster": "shield-plus",
+  "ablative_plating": "wall",
+  "point_defense_array": "shield-check",
+  "rocket_mine_layer": "rocket-launch",
+  "cloak_field": "ghost",
+  "void_shield_i": "shield-chevron",
+  "void_shield_ii": "shield-chevron",
+  "void_shield_iii": "shield-chevron",
+  "ion_engine": "rocket",
+  "radar_module": "broadcast",
+  "compact_radar": "wifi-high",
+  "cargo_bay": "package",
+  "repair_bay": "wrench",
+  "siege_platform": "meteor",
+  "tractor_beam": "magnet",
+  "salvage_rig": "recycle",
+  "repair_tender": "toolbox",
+  "mine_layer": "bomb",
+  "swarm_brood_chamber": "dna"
+}

@@ -1,3 +1,4 @@
+import { productionQueueHtml } from './productionQueueView';
 /**
  * Карточка мира (REFM-223): что боковая панель показывает о месте на карте. Известный мир —
  * шапка с фактами и действиями и четыре вкладки (земля, орбита, эскадра, постройки) с
@@ -782,9 +783,8 @@ export function planetPanelHtml(p: Planet): string {
         game.garrisonTiles(p.owner, ground),
     );
     if (mine) {
-      // У каждой производственной постройки своя очередь (BLD-2.1): на земле это казармы
-      // и завод, и у каждой свой конвейер под своим именем.
-      cols.push(laneConveyors(p.id, ['infantry', 'vehicles']) + unitCatalogButton('ground'));
+      // The same shared mobilization preview as the workspace, including waiting heroes.
+      cols.push(productionQueueHtml(s, p.id, { lane: 'mobilization', readOnly: true }) + unitCatalogButton('ground'));
     }
     if (!pcUi()) {
       cols.push(`<div class="hint">${t('dossier.tab.ground.desc')}</div>`);

@@ -1,3 +1,10 @@
+import { effectChip } from './moduleEffect';
+import { canInstall } from '../../packages/shared-core/src/util/fitting';
+import { heroPictogram } from './heroPictograms';
+import { moduleIcon } from './moduleIcons';
+import { heroFlagshipHtml, retainedHeroModules } from './heroFlagshipView';
+import { selectHeroFlagship } from '../../decisions/actions';
+import { heroFlagshipUnit } from '../../packages/shared-core/src/state/heroFlagship';
 /**
  * «Штаб героев» — the hero pane of the Верфь (STAFF-1, REFM-14).
  *
@@ -58,6 +65,7 @@ type Bag = Record<string, number>;
  *  node dossier is pinned («node:<id>»). Client-only view state. */
 export interface HeroView {
   sel: string | null;
+  flagship?: string;
   tab: HeroTab;
   dossier: string | null;
 }
@@ -194,7 +202,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     const dep = h.alive !== false && h.fleetId && state.fleets[h.fleetId];
     const st =
       h.mobilization
-        ? t('hero.hq.mobilizing', { time: liveTimerHtml(h.mobilization.readyAt, 'hms') })
+        ? h.mobilization.queued ? t('build.state.waiting') : t('hero.hq.mobilizing', { time: liveTimerHtml(h.mobilization.readyAt, 'hms') })
         : h.alive === false ? t('hero.hq.dead') : dep ? t('hero.hq.deployed') : t('hero.hq.reserve');
     chips +=
       `<button class="hx-chip g-${heroGradeKey(h.grade)}${h.id === hero.id ? ' sel' : ''}${d?.branch === 'psionic' ? ' ps' : ''}" data-hsel="${h.id}">` +
@@ -207,10 +215,10 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
 
   // identity header — name, branch, deploy state, aggregated build bonuses
   const mobilizing = hero.mobilization
-    ? t('hero.hq.mobilizing', { time: liveTimerHtml(hero.mobilization.readyAt, 'hms') })
+    ? hero.mobilization.queued ? t('build.state.waiting') : t('hero.hq.mobilizing', { time: liveTimerHtml(hero.mobilization.readyAt, 'hms') })
     : null;
   const deployLabel = state.techRules?.ruleset === 'main'
-    ? t('hero.hq.mobilize', { h: fmtHrs(matchHours(state, data.units[def?.ship.unit ?? 'hero']?.buildTimeHours || 10)) })
+    ? t('hero.hq.mobilize', { h: fmtHrs(matchHours(state, data.units[heroHullOf(hero)]?.buildTimeHours || 10)) })
     : t('hero.hq.deploy');
   const deploy = mobilizing ? `<span class="hx-note">${mobilizing}</span>` : dead && (state.techRules?.ruleset !== 'main' || (hero.cooldowns.respawn ?? 0) > state.time)
     ? `<span class="hx-dead">${t('hero.hq.dead')}</span>`
@@ -221,7 +229,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     .map((p) => `<span class="hx-trait">${esc(heroPassiveLine(p))}</span>`)
     .join('');
   const bays = heroBaysOf(hero);
-  const slots = bays.weapon + bays.defense + bays.utility;
+  const slots = bays.weapon + bays.defense + bays.utility + (data.units[heroHullOf(hero)]?.slots.universal ?? 0);
   const used = (hero.modules ?? []).length;
   const fitPips =
     slots > 0
@@ -258,7 +266,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
       : view.tab === 'abilities'
         ? heroAbilitiesHtml(hero, state.time)
         : view.tab === 'ship'
-          ? heroShipHtml(hero)
+          ? heroFlagshipHtml(state, hero, view.flagship) + heroShipHtml(hero, state.players[hero.owner]?.arsenal)
           : heroOverviewHtml(hero, state.time, fleet);
 
   const dossier = view.dossier ? heroDossierHtml(hero, view.dossier, res) : '';
@@ -374,7 +382,7 @@ function heroTreeHtml(hero: HeroInst, res: Bag): string {
           : '';
       const tap = rail.own && !owned ? ` data-hnode="${nid}"` : '';
       html +=
-        `<button type="button" class="${cls}"${tap}${tap ? '' : ' disabled'}>${conn}<div class="hx-nn"><span class="hx-crest">${crest}</span>${esc(tData(nd.name))}</div>` +
+        `<button type="button" class="${cls}"${tap}${tap ? '' : ' disabled'}>${conn}<div class="hx-nn"><span class="hx-crest">${crest}</span>${heroPictogram('skills', nid)}${esc(tData(nd.name))}</div>` +
         `<div class="hx-nd">${esc(t(nd.description ?? ''))}</div>` +
         `<div class="hx-nf">${grant}${foot}</div></button>`;
     }
@@ -392,11 +400,7 @@ function skillSlotsOf(hero: HeroInst): number {
 }
 
 /** The hull the hero's ship is made of — mirrors the core's `heroShipUnit`. */
-function heroHullOf(hero: HeroInst): string {
-  return (
-    (hero.archetype !== undefined ? data.heroes[hero.archetype]?.ship.unit : undefined) ?? 'hero'
-  );
-}
+function heroHullOf(hero: HeroInst): string { return heroFlagshipUnit(hero, data); }
 
 /** Module bays of the hero's ship — the core's own `heroModuleSlots`, not a copy: the
  *  hull's typed slots, the grade's bonus (§0.38 — only the main hero has one) and the
@@ -462,9 +466,9 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
     if (pd) {
       // A worn passive has nothing to cast: it simply acts while it sits here.
       bays.push(
-        `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(tData(pd.name))}</span>` +
+        `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${heroPictogram('passives', ab)}${esc(tData(pd.name))}</span>` +
           `<div class="hx-note">${esc(t(pd.description ?? ''))}</div></div>` +
-          `<div class="hx-bayact"><span class="hx-badge on">${t('hero.stat.active')}</span>` +
+          `<div class="hx-bayact"><span class="hx-badge on">${t('hero.tree.passive')}</span>` +
           `<button class="hx-btn btn-quiet" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
           `</div></div>`,
       );
@@ -480,7 +484,7 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
           ? `<button class="hx-btn btn-second" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
           : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;
     bays.push(
-      `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(tData(ad.name))}</span>` +
+      `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${heroPictogram('abilities', ab)}${esc(tData(ad.name))}</span>` +
         `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>` +
         `<div class="hx-bayact">${cast}` +
         `<button class="hx-btn btn-quiet" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
@@ -503,8 +507,8 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
           : `<span class="hx-badge">${t('hero.slot.full')}</span>`;
       poolHtml +=
         `<div class="hx-row${free > 0 ? '' : ' dim'}"><div class="hx-grow">` +
-        `<span class="hx-an">${esc(tData(pd.name))}</span>` +
-        `<div class="hx-note">${esc(t(pd.description ?? ''))}</div></div>${action}</div>`;
+        `<span class="hx-an">${heroPictogram('passives', ab)}${esc(tData(pd.name))}</span>` +
+        `<div class="hx-note">${esc(t(pd.description ?? ''))}</div><span class="hx-badge">${t('hero.tree.passive')}</span></div>${action}</div>`;
       continue;
     }
     const ad = data.heroAbilities[ab]!;
@@ -517,7 +521,7 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
         : `<span class="hx-badge">${t('hero.slot.full')}</span>`;
     poolHtml +=
       `<div class="hx-row${perk || free > 0 ? '' : ' dim'}"><div class="hx-grow">` +
-      `<span class="hx-an">${esc(tData(ad.name))}</span>` +
+      `<span class="hx-an">${heroPictogram('abilities', ab)}${esc(tData(ad.name))}</span>` +
       `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>${action}</div>`;
   }
 
@@ -543,7 +547,7 @@ function moduleLine(id: string): string {
   const md = data.modules[id];
   if (!md) return '';
   return Object.entries(md.effects.stats)
-    .map(([k, v]) => `${tData(k)} ${v > 0 ? '+' : ''}${v}`)
+    .map(([k, v]) => effectChip(k, v))
     .join(' · ');
 }
 
@@ -561,14 +565,14 @@ function moduleLine(id: string): string {
  *    with the reason, because the core refuses it (`E_HERO_DEPLOYED`) and a button that
  *    only ever fails is worse than no button.
  */
-function heroShipHtml(hero: HeroInst): string {
+function heroShipHtml(hero: HeroInst, arsenal?: { modules: string[]; stars?: Record<string, number>; rarity?: Record<string, string> }): string {
   const bays = heroBaysOf(hero);
-  const total = bays.weapon + bays.defense + bays.utility;
+  const total = bays.weapon + bays.defense + bays.utility + (data.units[heroHullOf(hero)]?.slots.universal ?? 0);
   if (total <= 0) return `<div class="hx-note">${t('hero.ship.none')}</div>`;
   const hull = heroHullOf(hero);
   const hullDef = data.units[hull];
   const installed = (hero.modules ?? []).filter((m) => !!data.modules[m]);
-  const deployed = hero.fleetId !== undefined;
+  const deployed = hero.fleetId !== undefined || hero.mobilization !== undefined;
   const used = slotUsage(installed, data);
   const free = (c: ShipSlotType): number => Math.max(0, bays[c] - used[c]);
 
@@ -579,8 +583,8 @@ function heroShipHtml(hero: HeroInst): string {
       ? `<span class="hx-badge">${t('hero.ship.deployed')}</span>`
       : `<button class="hx-btn btn-quiet" data-huninstall="${hero.id}" data-mod="${mid}">${t('hero.slot.remove')}</button>`;
     rows.push(
-      `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(tData(md.name))}</span>` +
-        `<div class="hx-note">${esc(moduleLine(mid))}</div></div>` +
+      `<div class="hx-bay on r-${esc(hero.moduleSnapshot?.rarity[mid] ?? arsenal?.rarity?.[mid] ?? md.rarity ?? 'simple')}"><div class="hx-grow"><span class="hx-an">${moduleIcon(mid)}${esc(tData(md.name))}</span>` +
+        `<div class="hx-note">${moduleLine(mid)}</div></div>` +
         `<div class="hx-bayact"><span class="hx-g pa">${t(BAY_KEY[md.slot])}</span>${off}</div></div>`,
     );
   }
@@ -590,12 +594,16 @@ function heroShipHtml(hero: HeroInst): string {
     for (let i = 0; i < free(c); i += 1)
       rows.push(`<div class="hx-bay off">${t('hero.ship.empty', { k: t(BAY_KEY[c]) })}</div>`);
 
+  const overflow = Object.keys(bays).reduce((n,c) => n + Math.max(0,used[c as ShipSlotType] - bays[c as ShipSlotType]),0);
+  for (let i = overflow; i < (hullDef?.slots.universal ?? 0); i++) rows.push(`<div class="hx-bay off">${t('hero.ship.empty', { k: t('yard.slot.universal') })}</div>`);
+
   let poolHtml = '';
   for (const [mid, md] of Object.entries(data.modules)) {
     if (installed.includes(mid)) continue;
     const allowed = hullDef !== undefined && moduleAllowed(hull, hullDef, md);
-    const fits = allowed && free(md.slot) > 0;
-    const action = !allowed
+    const owned = !arsenal || arsenal.modules.includes(mid);
+    const fits = owned && allowed && canInstall({ item: id => data.modules[id], category: m => m.slot, capacity: c => bays[c as ShipSlotType], wildcard: hullDef?.slots.universal, allowed: m => !!hullDef && moduleAllowed(hull,hullDef,m) }, installed, mid).ok;
+    const action = !owned ? `<span class="hx-badge">${t('err.not-owned')}</span>` : !allowed
       ? `<span class="hx-badge">${t('hero.ship.wrong-hull')}</span>`
       : deployed
         ? `<span class="hx-badge">${t('hero.ship.deployed')}</span>`
@@ -603,9 +611,9 @@ function heroShipHtml(hero: HeroInst): string {
           ? `<button class="hx-btn btn-second" data-hinstall="${hero.id}" data-mod="${mid}">${t('hero.slot.equip')}</button>`
           : `<span class="hx-badge">${t('hero.ship.no-bay')}</span>`;
     poolHtml +=
-      `<div class="hx-row${fits && !deployed ? '' : ' dim'}"><div class="hx-grow">` +
-      `<span class="hx-an">${esc(tData(md.name))}</span>` +
-      `<div class="hx-note">${esc(moduleLine(mid))}</div></div>` +
+      `<div class="hx-row r-${esc(arsenal?.rarity?.[mid] ?? md.rarity ?? 'simple')}${fits && !deployed ? '' : ' dim'}"><div class="hx-grow">` +
+      `<span class="hx-an">${moduleIcon(mid)}${esc(tData(md.name))}</span>` +
+      `<div class="hx-note">${moduleLine(mid)}</div></div>` +
       `<span class="hx-g pa">${t(BAY_KEY[md.slot])}</span>${action}</div>`;
   }
 
@@ -650,7 +658,7 @@ function heroOverviewHtml(hero: HeroInst, now: number, fleet?: GameState['fleets
   const bonuses = activePassivesOf(hero)
     .map(
       (p) =>
-        `<div class="hx-row"><span class="hx-grow hx-an">${esc(heroPassiveLine(p))}</span><span class="hx-badge on">${t('hero.stat.active')}</span></div>`,
+        `<div class="hx-row"><span class="hx-grow hx-an">${esc(heroPassiveLine(p))}</span><span class="hx-badge on">${t('hero.tree.passive')}</span></div>`,
     )
     .join('');
   if (bonuses) html += `<div class="hx-h">${t('hero.stat.bonuses')}</div>${bonuses}`;
@@ -780,7 +788,16 @@ export function initHeroStaff(host: HeroStaffHost): {
     // STAFF-1 view state: focus a hero / switch tab / open-close the node dossier.
     const selBtn = tg.closest('[data-hsel]') as HTMLElement | null;
     if (selBtn) {
-      view = { ...view, sel: selBtn.dataset.hsel!, dossier: null };
+      view = { ...view, sel: selBtn.dataset.hsel!, dossier: null, flagship: undefined };
+      return 'repaint';
+    }
+    const selectedHull = tg.closest<HTMLElement>('[data-hflagship]')?.dataset.hflagship;
+    if (selectedHull) { view = { ...view, flagship: selectedHull }; return 'repaint'; }
+    const hullApply = tg.closest<HTMLElement>('[data-hflagapply]');
+    if (hullApply) {
+      const hero = host.state().heroes?.[hullApply.dataset.hflagapply!];
+      const unit = hullApply.dataset.hull;
+      if (hero && unit) host.order(selectHeroFlagship(host.me(), hero.id, unit, retainedHeroModules(hero, unit)));
       return 'repaint';
     }
     const htab = (tg.closest('[data-htab]') as HTMLElement | null)?.dataset.htab;

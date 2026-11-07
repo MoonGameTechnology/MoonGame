@@ -4,6 +4,26 @@
 // untranslated string shows up in Russian rather than as a raw key. The locale
 // guard in prototype/src/i18n.test.ts fails on any key present in ru.ts but not here.
 export const en: Record<string, string> = {
+  "production.blueprint-required": "Hull blueprint required in the arsenal",
+  "production.queue": "Queues",
+  "production.planet-income": "Planet income",
+
+  "production.flagship": "Flagship",
+  "production.flagship-removes": "Incompatible modules to remove: {n}",
+  "production.flagship-apply": "Apply hull",
+  "production.stat.hp": "HP",
+  "production.stat.attack": "Attack",
+  "production.stat.defense": "Defense",
+  "production.stat.speed": "Speed",
+
+  "production.features": "Features",
+  "production.info": "Full details",
+  "production.requires-building": "Required: {name}, lv. {n}",
+  "production.no-facility-here": "No suitable facility on this world",
+  "production.unlocks": "Unlocks production",
+  "production.mobilization": "Mobilization",
+  "production.buildings": "Buildings",
+
   'privacy.close': 'Close privacy policy',
   "account.delete.title": "Delete account",
   "account.delete.warning": "Your account, profile and personal progress will be deleted. Shared match results will be de-identified. Sign-in will be disabled after confirmation. See the privacy policy for processing and backup retention periods.",
@@ -1362,7 +1382,6 @@ export const en: Record<string, string> = {
   'codex.row.world-mitigation': 'Damage to the world',
   'codex.row.hp': 'Structure HP',
   'codex.row.hull': 'Hull',
-  'codex.row.levels': 'Tiers',
   'codex.row.produces': 'Produces',
   'codex.row.radar-level': 'Radar level',
   'codex.row.radar-detects': 'Detects',
@@ -1425,7 +1444,6 @@ export const en: Record<string, string> = {
     'Fleets and buildings cost a daily fee. Mine income minus upkeep = your net balance; go negative and the treasury drains.',
   'codex.term.upkeep.title': 'Upkeep',
   'codex.value.hours': '{n} h',
-  'codex.value.levels-upgradable': '{n} (upgradeable)',
   'codex.value.per-level': '{n} / level',
 
   // --- comms — Меню связи: ростер сессии, одобрение ботов, окна интела, предложения.
@@ -3072,13 +3090,11 @@ export const en: Record<string, string> = {
   'threat.incoming': '⚠ An enemy is heading for {node}: arrival in {dur}',
 
   // --- yard — «Верфь»: корпус и модули, конструктор дивизий, стоимость и заказ.
-  'win.build.title': 'Production',
   'yard.again': 'Same as last time',
   'yard.arsenal.note': '⚡ Live arsenal: anything bought during the match appears here right away.',
   'yard.build-time': 'Build time',
   'yard.queue.ahead': '{n} {n|order|orders} ahead, next done in {eta}',
   'yard.queue.waiting': '{n} {n|order|orders} ahead',
-  'yard.queue.title': 'Queue · {w}',
   'yard.tpl.title': 'Templates',
   'yard.tpl.empty': 'No templates. Set up an order and save it.',
   'yard.tpl.save': 'Save current',
@@ -3549,7 +3565,6 @@ export const en: Record<string, string> = {
   'hero.ship.slots': 'Bays · {u}/{n}',
   'hero.ship.wrong-hull': 'Not for this hull',
   'hero.stat.abilities': 'abilities',
-  'hero.stat.active': 'Active',
   'hero.stat.bonuses': 'Current bonuses',
   'hero.stat.modules': 'modules',
   'hero.stat.tree-nodes': 'tree nodes',

@@ -44,7 +44,11 @@ describe('OBS-1.1 bounded Game metrics boundary', () => {
     expect(REJECT_CODES.size).toBeLessThanOrEqual(64);
     const gate = new URL('../../packages/action-layer/src/', import.meta.url);
     const gateFiles = (await readdir(gate)).filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'));
-    const codeSources = [...sources, ...await Promise.all(gateFiles.map((file) => readFile(new URL(file, gate), 'utf8')))].join('\n');
+    // Canonical requirement gates can live in neutral state helpers shared with clients.
+    const shared = new URL('../../packages/shared-core/src/state/', import.meta.url);
+    const sharedFiles = (await readdir(shared)).filter(file => file.endsWith('.ts') && !file.endsWith('.test.ts'));
+    const sharedSources = await Promise.all(sharedFiles.map(file => readFile(new URL(file, shared), 'utf8')));
+    const codeSources = [...sources, ...sharedSources, ...await Promise.all(gateFiles.map((file) => readFile(new URL(file, gate), 'utf8')))].join('\n');
     const codes = new Set([...codeSources.matchAll(/['"](E_[A-Z_]+)['"]/g)].map((match) => match[1]));
     expect([...REJECT_CODES].filter((code) => !codes.has(code))).toEqual([]);
   });

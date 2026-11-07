@@ -47,8 +47,9 @@ import { buildRecap } from './recap';
 import { catalogPortraitHtml } from './shipArt';
 import { shipCardHtml } from './shipCard';
 import { invalidatePanel, renderPanel } from './sidePanel';
-import { techNeed } from '../../decisions/techNeed';
-import { techOfferLabel, techWhyHtml } from './techOffer';
+import { PRODUCTION_UNITS } from './productionRoster';
+import { refusalText } from '../../decisions/refusalText';
+import { productionRequirementsHtml, productionUnlocksHtml } from './productionRequirementsView';
 import { enqueueBuild, myRes } from './worldQueries';
 
 /** Что справке нужно от игры. Мир, позывной, мета, досье и забег — в `main.ts`. */
@@ -64,7 +65,7 @@ export interface HelpCenterHost {
   /** Идёт партия, а не меню. */
   inMatch(): boolean;
   /** Разметка статьи справочника: вид (`b`/`u`), id и уровень здания. */
-  codexHtml(kind: string, id: string, level: number): string;
+  codexHtml(kind: string, id: string, level: number, referenceLevel?: number): string;
   /** Почему новый заказ здания отбит; `null` — заказать можно. */
   buildingLocked(planetId: string, id: string): TileLock;
   /** Имя флота для карточки корабля. */
@@ -114,28 +115,43 @@ export function openShipCard(fleetId: string, index: number): void {
 
 /** Выбранный мир партии для справочника. Из хаба — никакого: после выхода из партии
  *  `selPlanet` остаётся от неё, и карточка предложила бы строить в скрытой партии. */
-export function codexWorld(): string | null {
-  return document.body.classList.contains('hub-open') ? null : selPlanet;
+let productionWorld: string | null = null;
+let activeCodexKey = '';
+const codexTrail: string[] = [];
+let researchReturn: { key: string; world: string | null; trail: string[] } | null = null;
+export function closeCodex(): void {
+  const previous = codexTrail.pop();
+  if (previous) openCodex(previous);
+  else { document.getElementById('codex')?.classList.remove('show'); productionWorld = null; }
 }
-export function openCodex(key: string): void {
+export function codexWorld(): string | null {
+  return document.body.classList.contains('hub-open') ? null : productionWorld ?? selPlanet;
+}
+export function openCodex(key: string, world?: string): void {
+  if (world !== undefined) { productionWorld = world; codexTrail.length = 0; }
+  else if (!document.getElementById('codex')?.classList.contains('show')) { productionWorld = null; codexTrail.length = 0; }
+  const previousKey = world === undefined && document.getElementById('codex')?.classList.contains('show') ? activeCodexKey : '';
+  activeCodexKey = key;
   const [kind, id, lvl] = key.split(':');
   const el = document.getElementById('codex');
   if (!el || !kind || !id) return;
   // BUILD-1: карточка здания листает уровни (`b:id:уровень`). Без уровня в ключе
   // показывается ТЕКУЩИЙ построенный на выбранном мире (если есть) — владелец
   // открывает свою постройку и видит её, а не абстрактный первый уровень.
-  const world = codexWorld();
+  const cardWorld = codexWorld();
   const builtLvl =
-    kind === 'b' && world
-      ? live().planets[world]?.buildings.find((b) => b.type === id)?.level
+    kind === 'b' && cardWorld
+      ? live().planets[cardWorld]?.buildings.find((b) => b.type === id)?.level
       : undefined;
   const level = Number(lvl) || builtLvl || 1;
-  el.innerHTML = `<div class="cxbox">${game.codexHtml(kind, id, level)}${codexBuildBtn(kind, id, level)}<button class="cx-close">${t('codex.close')}</button></div>`;
+  const requirements = cardWorld && (kind === 'b' || kind === 'u') ? productionRequirementsHtml(live(), me(), cardWorld, kind === 'b' ? 'building' : 'unit', id) : '';
+  const unlocks = kind === 'b' && cardWorld ? productionUnlocksHtml(live(), cardWorld, id, PRODUCTION_UNITS) : '';
+  el.innerHTML = `<div class="cxbox">${requirements}${game.codexHtml(kind, id, level, previousKey.startsWith(`b:${id}:`) ? Number(previousKey.split(':')[2]) : builtLvl ?? level)}${unlocks}${codexBuildBtn(kind, id)}<button class="cx-close">${t('codex.close')}</button></div>`;
   el.classList.add('show');
 }
 /** A "Build here" action inside the codex when the selected province can raise this
  *  thing — so the codex doubles as the build menu (tap a build tile → specs → build). */
-function codexBuildBtn(kind: string, id: string, level = 1): string {
+function codexBuildBtn(kind: string, id: string): string {
   const world = codexWorld();
   const p = world ? live().planets[world] : null;
   if (!p || p.owner !== me()) return ''; // only when you're looking at one of your worlds
@@ -149,7 +165,7 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
       const max = def ? buildingMaxLevel(def) : 1;
       if (inst.level >= max) return '';
       const code = canOrder(live(), upgradeBuilding(me(), p.id, id));
-      if (code !== null && code !== 'E_INSUFFICIENT') return '';
+      if (code !== null) return `<div class="pw-order-block">${esc(refusalText(code))}</div>`;
       const c = def ? matchCost(live(), buildingLevel(def, inst.level + 1).cost) : undefined;
       return `<button class="cx-build" data-cx-upg="${id}"${code ? ' disabled' : ''}>${t('side.build.upgrade', { c: '' })}${cost(c, myRes())}</button>`;
     }
@@ -158,29 +174,16 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
     // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
     // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
     if (!buildable || game.buildingLocked(p.id, id)) return '';
-    const offer = codexTechOffer(p.id, 'building', id);
-    if (offer) return offer;
-    if (level > 1) return ''; // листаешь будущие уровни — строится всё равно первый
+    const code = canOrder(live(), buildBuilding(me(), p.id, id));
+    if (code) return `<div class="pw-order-block">${esc(refusalText(code))}</div>`;
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(matchCost(live(), data.buildings[id]?.cost), myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
-    const offer = codexTechOffer(p.id, 'unit', id);
-    if (offer) return offer;
+    const code = canOrder(live(), buildUnit(me(), p.id, id, 1));
+    if (code) return `<div class="pw-order-block">${esc(refusalText(code))}</div>`;
     return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16, live().players[me()]?.faction)} ${t('codex.build-here')} · ${cost(matchUnitCost(live(), data.units[id]), myRes())}</button>`;
   }
   return '';
-}
-
-/** Заперто технологией — вместо «Построить здесь», которое ядро отбило бы безымянным «нужна
- *  технология», карточка называет её и ведёт в досье: тот же путь, что у строки окна стройки
- *  (`techOffer.ts`). Решает отказ ядра на настоящий приказ; иная причина — пустая строка. */
-function codexTechOffer(planetId: string, kind: 'unit' | 'building', id: string): string {
-  const order =
-    kind === 'unit' ? buildUnit(me(), planetId, id, 1) : buildBuilding(me(), planetId, id);
-  if (canOrder(live(), order) !== 'E_TECH_LOCKED') return '';
-  const need = techNeed(live(), me(), data, kind, id);
-  if (!need) return '';
-  return `${techWhyHtml(need)}<button class="cx-build" data-cx-tech="${esc(need.offer)}">${techOfferLabel(need)}</button>`;
 }
 
 // --- ONB-4 codex/help hub: searchable index over the article corpus ----------
@@ -415,6 +418,15 @@ export function initHelpCenter(host: HelpCenterHost): void {
     }, 500);
   });
 
+  const technologyWindow = document.getElementById('tech');
+  if (technologyWindow && typeof MutationObserver !== 'undefined') {
+    new MutationObserver(() => {
+      if (technologyWindow.classList.contains('show') || !researchReturn) return;
+      const previous = researchReturn; researchReturn = null;
+      if (game.inMatch()) { openCodex(previous.key, previous.world ?? undefined); codexTrail.push(...previous.trail); }
+    }).observe(technologyWindow, { attributes: true, attributeFilter: ['class'] });
+  }
+
   // Codex popup: full specs for a building/ship tile, with a contextual "Build here"
   // button. Tiles live in the build menu + fleet panel now (no global HUD strip).
   const codexEl = document.getElementById('codex');
@@ -435,7 +447,13 @@ export function initHelpCenter(host: HelpCenterHost): void {
       // BUILD-1: листалка уровней в карточке здания — перерисовка той же карточки.
       const blvl = (tg.closest('[data-cx-blvl]') as HTMLElement | null)?.dataset.cxBlvl;
       if (blvl) {
+        const box = codexEl.querySelector('.cxbox');
+        const scroll = box?.scrollTop ?? 0;
+        const sections = Array.from(codexEl.querySelectorAll('details')).map(d => d.open);
         openCodex(`b:${blvl}`);
+        codexEl.querySelectorAll('details').forEach((d, i) => { d.open = sections[i] ?? d.open; });
+        const after = codexEl.querySelector('.cxbox');
+        if (after) after.scrollTop = scroll;
         return;
       }
       // «Улучшить» из карточки: хостовый путь заказа (сеть → приказ, соло → очередь);
@@ -450,8 +468,10 @@ export function initHelpCenter(host: HelpCenterHost): void {
       }
       // «Исследовать» запертой карточки: карточка закрывается (её кнопка не живая и после
       // начала исследования соврала бы), окно технологий открывается на нужном досье.
-      const tech = (tg.closest('[data-cx-tech]') as HTMLElement | null)?.dataset.cxTech;
+      const techEl = tg.closest<HTMLElement>('[data-cx-tech],[data-pw-tech],[data-bw-tech]');
+      const tech = techEl?.dataset.cxTech ?? techEl?.dataset.pwTech ?? techEl?.dataset.bwTech;
       if (tech) {
+        researchReturn = { key: activeCodexKey, world, trail: [...codexTrail] };
         codexEl.classList.remove('show');
         game.openTech(tech);
         return;
@@ -462,7 +482,16 @@ export function initHelpCenter(host: HelpCenterHost): void {
         openCodex(deep);
         return;
       }
-      if (tg.id === 'codex' || tg.classList.contains('cx-close')) codexEl.classList.remove('show');
+      const facility = tg.closest<HTMLElement>('[data-pw-building]');
+      const info = tg.closest<HTMLElement>('[data-pw-info]')?.dataset.pwInfo;
+      if (facility?.dataset.pwBuilding || info) {
+        codexTrail.push(activeCodexKey);
+        openCodex(facility ? `b:${facility.dataset.pwBuilding}:${facility.dataset.pwLevel}` : info!.replace('unit:', 'u:').replace('building:', 'b:'));
+        return;
+      }
+      if (tg.id === 'codex' || tg.classList.contains('cx-close')) {
+        closeCodex();
+      }
     });
   }
 }

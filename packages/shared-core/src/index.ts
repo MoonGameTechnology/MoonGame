@@ -695,7 +695,7 @@ export {
   controlLimitBonus,
   armyUpkeepSurcharge,
 } from './modules/technology';
-export { constructionModule, hasShipyard, unitBuildSiteBlocker } from './modules/construction';
+export { constructionModule, hasShipyard, unitBuildSiteBlocker, unitYardLevelBlocker } from './modules/construction';
 export { coverPoints, worldDamageReduction } from './util/worldCover';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule, STATION_COST, STATION_CORE } from './modules/station';

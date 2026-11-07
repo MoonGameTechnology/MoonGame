@@ -271,7 +271,7 @@ export function startGuidedMatch(): void {
             true,
         researchDone,
         shipsTabOpen: () => selPlanet === home && planetTab === 'ships',
-        catalogOpen: () => windowEl('buildwin').classList.contains('show'),
+        catalogOpen: () => windowEl('constructor').classList.contains('show'),
         shipCardOpen: () => dossier('[data-build="unit:frigate"]'),
         shipOrdered: () =>
           hasShip() ||

@@ -60,6 +60,24 @@ export interface OperationDeps {
 
 type Stage = 'market' | 'hero' | 'ground' | 'aviation' | 'landing' | 'assault';
 
+const step = (
+  stage: Stage,
+  id: string,
+  target: string | null,
+  when: () => boolean,
+  extra: Partial<SpotlightStep> = {},
+): SpotlightStep => ({
+  id: `${stage}.${id}`,
+  stage,
+  stageTitle: `onb.stage.${stage}`,
+  target,
+  copy: `onb.guide.${stage}.${id}`,
+  advance: { on: 'state', when },
+  collapsible: true,
+  gate: target !== null,
+  ...extra,
+});
+
 export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
   const { me, home, ui } = d;
   const w = d.world;
@@ -69,23 +87,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
   const hero = guideHero(w(), me)?.id ?? '';
   // Militia already in the home garrison do not count as trained in the lesson.
   const militia = guideTroopsHome(w(), home);
-  const step = (
-    stage: Stage,
-    id: string,
-    target: string | null,
-    when: () => boolean,
-    extra: Partial<SpotlightStep> = {},
-  ): SpotlightStep => ({
-    id: `${stage}.${id}`,
-    stage,
-    stageTitle: `onb.stage.${stage}`,
-    target,
-    copy: `onb.guide.${stage}.${id}`,
-    advance: { on: 'state', when },
-    collapsible: true,
-    gate: target !== null,
-    ...extra,
-  });
+
   const phone = (s: SpotlightStep): SpotlightStep[] => (ui.mobile ? [s] : []);
   // A window that is not on the player's phone bar lives under «More».
   const more = (stage: Stage, item: string) =>
@@ -128,7 +130,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       { copy: `onb.guide.tab.${name}` },
     );
   const close = (stage: Stage, id: string) =>
-    step(stage, id, '#buildwin .tw-close', () => !ui.visible('#buildwin.show'), {
+    step(stage, id, '#constructor .cn-close', () => !ui.visible('#constructor.show'), {
       copy: 'onb.guide.build.close',
     });
   const building = (stage: Stage, type: string) => [
@@ -136,18 +138,18 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       stage,
       `${type}-catalog`,
       '[data-act="openbuild"]',
-      () => ui.visible('#buildwin.show [data-bwtab]') || guideBuildingOrdered(w(), home, me, type),
+      () => ui.visible('#constructor.show [data-bwtab]') || guideBuildingOrdered(w(), home, me, type),
       { copy: 'onb.guide.build.catalog' },
     ),
     step(
       stage,
       `${type}-all`,
-      '#buildwin [data-bwtab="*"]',
+      '#constructor [data-bwtab="*"]',
       () =>
-        ui.visible(`#buildwin [data-bw-go="${type}"]`) || guideBuildingOrdered(w(), home, me, type),
+        ui.visible(`#constructor [data-bw-go="${type}"]`) || guideBuildingOrdered(w(), home, me, type),
       { copy: 'onb.guide.build.all' },
     ),
-    step(stage, type, `#buildwin [data-bw-go="${type}"]`, () =>
+    step(stage, type, `#constructor [data-bw-go="${type}"]`, () =>
       guideBuildingOrdered(w(), home, me, type),
     ),
     close(stage, `${type}-close`),
@@ -158,10 +160,11 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       stage,
       `${unit}-catalog`,
       `[data-act="openunits"][data-arg="${catalog}"]`,
-      () => ui.visible(`#buildwin.show [data-unit-go="${unit}"]`) || enough(),
+      () => ui.visible(`#constructor.show [data-cnhull="${unit}"]`) || enough(),
       { copy: 'onb.guide.build.units' },
     ),
-    step(stage, unit, `#buildwin [data-unit-go="${unit}"]`, enough),
+    step(stage, `${unit}-select`, `#constructor [data-cnhull="${unit}"]`, () => ui.visible(`#constructor [data-cnhull="${unit}"].on`) || enough(), { copy: 'onb.guide.build.units' }),
+    step(stage, unit, '#constructor [data-cnbuild]', enough),
     close(stage, `${unit}-close`),
   ];
   const heroShip = (stage: Stage) => [

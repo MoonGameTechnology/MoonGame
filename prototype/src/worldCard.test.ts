@@ -455,11 +455,11 @@ describe('вкладки', () => {
     const mine = card('A', 'ground');
     expect(rec.tiles.at(-1)).toEqual(['p1', [{ unit: 'militia', count: 3 }]]);
     expect(mine).toContain('<i class="tiles">p1:militia×3</i>');
-    expect(mine).toContain(t('side.conveyor.lane.infantry'));
+    expect(mine).toContain(t('production.mobilization'));
     expect(mine).toContain(act('openunits', 'ground'));
     const foe = card('N', 'ground');
     expect(foe).toContain('<i class="tiles">p2:militia×4</i>');
-    expect(foe).not.toContain(t('side.conveyor.lane.infantry'));
+    expect(foe).not.toContain(t('production.mobilization'));
     expect(foe).not.toContain('data-act="openunits"');
   });
 
@@ -747,7 +747,7 @@ describe('стык с main.ts', () => {
     for (const hook of [
       'world: () => s,',
       'planetTab: () => planetTab,',
-      'buildUnits: () => BUILD_UNITS,',
+      'buildUnits: () => PRODUCTION_UNITS,',
       'devUi: () => DEV_UI,',
       'sectorOf: (id) => SECTOR_OF[id],',
       'sectorType: sectorTypeOf,',

@@ -63,7 +63,7 @@ export const fleetOpsModule: GameModule = {
   // 1.14.0: высадка, отменённая вылетом (`assault.cancelled`), тоже решает слияние, которое
   //         она приостановила.
   // 1.14.1: merged fleets retain bombardment, its reload clock and auto-assault.
-  version: '1.14.1',
+  version: '1.15.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -341,7 +341,7 @@ export const fleetOpsModule: GameModule = {
         // The hero flagship can't be peeled off by a split: the hero ENTITY is
         // bound to the source fleet by fleetId, and moving its UNIT without the
         // entity would orphan the binding.
-        if (h.ctx.data.units[t.unit]?.traits.includes('hero')) {
+        if (h.ctx.data.units[t.unit]?.traits.includes('hero') || fleet.units.some(st => st.heroId && st.unit === t.unit && (modules === undefined || loadoutKey(st.modules) === loadoutKey(modules)))) {
           return h.reject('E_HERO_UNIT');
         }
         const key = `${t.unit}\u0000${modules === undefined ? '*' : loadoutKey(modules)}`;

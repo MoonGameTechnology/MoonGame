@@ -241,7 +241,7 @@ describe('REFM-221 · справка — справочник', () => {
     ] as const) {
       help.openCodex(key);
       const html = env.els.get('codex')!.innerHTML;
-      expect(html, key).toContain(`data-cx-tech="${tech}"`);
+      expect(html, key).toContain(`data-bw-tech="${tech}"`);
       expect(html, key).toContain('bw-why');
       expect(html, key).not.toContain('data-build=');
     }
@@ -249,7 +249,7 @@ describe('REFM-221 · справка — справочник', () => {
     help.openCodex('u:scout');
     expect(env.els.get('codex')!.innerHTML).toContain('data-build="unit:scout"');
     help.openCodex('u:frigate');
-    env.els.get('codex')!.fire('click', hit({ '[data-cx-tech]': { dataset: { cxTech: 'frigate_design' } } }));
+    env.els.get('codex')!.fire('click', hit({ '[data-cx-tech],[data-pw-tech],[data-bw-tech]': { dataset: { bwTech: 'frigate_design' } } }));
     expect(env.calls).toEqual(['tech:frigate_design']);
     expect(shown('codex')).toBe(false);
   });

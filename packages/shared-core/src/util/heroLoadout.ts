@@ -4,7 +4,7 @@ import { starsOf, rarityOf } from './stacks';
 import { constructionModuleSnapshot } from './arsenalLoadout';
 
 export function heroShipStack(h: HandlerContext, hero: Hero, unit: string): UnitStack {
-  const stack: UnitStack = { unit, count: 1 };
+  const stack: UnitStack = { unit, count: 1, ...(hero.flagship ? { heroId: hero.id } : {}) };
   const mods = hero.modules;
   if (mods !== undefined && mods.length > 0) {
     stack.modules = [...mods];

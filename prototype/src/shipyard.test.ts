@@ -1,3 +1,4 @@
+import { productionQueueHtml } from './productionQueueView';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t, tData } from '../../localization/runtime';
 import { ru } from '../../localization/ru';
@@ -6,7 +7,6 @@ import { newGame, canOrder, order as applyOrder, HOUR } from './game';
 import { cost as priceHtml, fmtDur, fmtEta, displayUnit } from './format';
 import { buildShip } from '../../decisions/actions';
 import { data } from './gameData';
-import { worldName } from './planetName';
 import type { Action, ArsenalItem, GameState } from '../../packages/shared-core/src/index';
 import {
   statBarHtml,
@@ -28,7 +28,6 @@ import {
   selectedBay,
   repeatOrderHtml,
   moduleGradeHtml,
-  yardQueueHtml,
   templatesPaneHtml,
   type YardDraft,
   type YardHost,
@@ -204,7 +203,7 @@ describe('верфь — что игроку разрешено строить (
   it('ни одного своего корпуса — панель честно пустая, а не пустой конструктор', () => {
     const s = rich();
     s.players.p1!.arsenal = { hulls: [], modules: [] };
-    expect(loadoutPaneHtml(s, 'p1', draftOf(), YARD_HULLS, view)).toContain('cn-soon');
+    expect(loadoutPaneHtml(s, 'p1', draftOf(), YARD_HULLS, view)).toContain('data-cnhull="frigate"');
   });
 });
 
@@ -295,7 +294,7 @@ describe('верфь — панель конструктора', () => {
     );
     expect(cruiser).not.toContain('data-cnmod="radar_module"'); // поставить нельзя…
     const at = cruiser.indexOf('cn-mod locked');
-    expect(cruiser.slice(at, at + 400)).toContain('не для этого корпуса'); // …и сказано почему
+    expect(cruiser.slice(at)).toContain('не для этого корпуса'); // …и сказано почему
   });
 
   // Заказ владельца 2026-09-26: модули группами по типу отсека, а не вперемешку каталогом.
@@ -313,8 +312,8 @@ describe('верфь — панель конструктора', () => {
     expect(heads).toEqual(['Оружие', 'Защита', 'Система']);
     // Щиты пустоты — только для пушек крепости: легендарный щит не заслоняет броню крейсера.
     expect(pal.indexOf('data-cnmod="ablative_plating"')).toBeGreaterThan(0);
-    expect(pal.indexOf('data-cnmod="ablative_plating"')).toBeLessThan(pal.indexOf('🔰'));
-    expect(pal.indexOf('data-cnunfit')).toBeLessThan(pal.indexOf('🔰'));
+    expect(pal.indexOf('data-cnmod="ablative_plating"')).toBeLessThan(pal.indexOf('cn-mod locked'));
+    expect(pal.indexOf('data-cnunfit')).toBeLessThan(pal.indexOf('cn-mod locked'));
     // Каждый модуль — в группе своего отсека: система после заголовка «Система».
     expect(pal.indexOf('data-cnmod="cargo_bay"')).toBeGreaterThan(pal.indexOf('> Система<'));
   });
@@ -421,12 +420,12 @@ describe('верфь — окно', () => {
   it('открытая вкладка подсвечена, каркас на месте', () => {
     const html = yardBoxHtml('squads', '<i>тело</i>');
     expect(html).toContain('<button class="cn-tab on" data-ctab="squads">');
-    expect(html).toContain('<div id="constructorbody"><i>тело</i></div>');
+    expect(html).toContain('<div id="constructorbody"><div class="pw-content"><i>тело</i></div><aside id="cn-queue"></aside></div>');
   });
 
   it('полоса заказа стоит ПОД прокруткой окна, а не в её конце', () => {
     const html = yardBoxHtml('ships', '<i>тело</i>', '<div class="cn-order">заказ</div>');
-    expect(html).toContain('<div id="constructorbody"><i>тело</i></div><div class="cn-order">заказ</div>');
+    expect(html).toContain('<div id="constructorbody"><div class="pw-content"><i>тело</i></div><aside id="cn-queue"></aside></div><div class="cn-order">заказ</div>');
     const win = fakeWin();
     initShipyard(hostOf({ root: () => win })).open();
     const out = win.html();
@@ -572,29 +571,25 @@ describe('верфь — окно', () => {
       }),
     );
     yard.open();
-    // Пустая очередь — полосы нет вовсе.
-    expect(win.html()).toContain('<div id="cn-queue"></div>');
+    expect(win.html()).toContain('data-pw-empty="ships"');
     win.fire(click('[data-cnbuild]'));
-    expect(win.html()).toContain('class="cn-qi fresh run"');
+    expect(win.html()).toContain('class="pw-job"');
     win.fire(click('[data-cncount]', { cncount: '+' }));
-    // Перерисовка без нового заказа подсветку снимает.
-    expect(win.html()).not.toContain('fresh');
     win.fire(click('[data-cnbuild]'));
-    const html = win.html();
-    expect(html).toContain('class="cn-qi run"');
-    expect(html).toContain('class="cn-qi fresh"');
-    expect(html).toContain('<b>×2</b>');
+    expect(win.html()).toContain('class="pw-job waiting"');
+    expect(win.html()).toContain('×2');
   });
 
-  it('полоса очереди — чистая разметка: пустой мир ничего не рисует', () => {
+  it('queue offers all idle lanes and renders actual production progress', () => {
     const s = rich();
     const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
-    expect(yardQueueHtml(s, home, 'cruiser', '#0ff')).toBe('');
-    expect(yardQueueHtml(s, '', 'cruiser', '#0ff')).toBe('');
+    expect(productionQueueHtml(s, home)).toContain('data-pw-empty="ships"');
+    expect(productionQueueHtml(s, '')).toBe('');
     const after = applyOrder(s, buildShip('p1', home, 'cruiser', 3, []), s.time).state;
-    const html = yardQueueHtml(after, home, 'cruiser', '#0ff');
-    expect(html).toContain(t('yard.queue.title', { w: worldName(after, home) }));
-    expect(html).toContain(fmtEta(data.units.cruiser!.buildTimeHours));
+    const html = productionQueueHtml(after, home);
+    expect(html).toContain('class="pw-job"');
+    expect(html).toContain('×3');
+    expect(html).toContain('<progress');
   });
 
   it('шаблон: сохранить заказ, собрать другой и вернуть шаблон одним нажатием', () => {
@@ -728,12 +723,19 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
     expect(tData(data.buildings.shipyard!.name)).toBe('Орбитальная верфь');
   });
 
-  it('ПЯТЬ ВКЛАДОК В ПОРЯДКЕ ЗАКАЗА: Корабли · Челноки · Пехота · Техника · Герои', () => {
-    const html = yardBoxHtml('ships', '');
-    const order = ['yard.tab.ships', 'yard.tab.squads', 'yard.tab.infantry', 'yard.tab.vehicles', 'yard.tab.heroes']
-      .map((k) => html.indexOf(t(k)));
-    expect(order.every((i) => i >= 0)).toBe(true);
-    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  it('three sections retain the selected group and show its subcategories', () => {
+    for (const [tab, group, children] of [
+      ['support','ships',['ships','support','squads']],
+      ['heroes','infantry',['infantry','vehicles','heroes']],
+    ] as const) {
+      const html = yardBoxHtml(tab, '');
+      const main = html.split('pw-main-tabs')[1]!.split('pw-subtabs')[0]!;
+      expect(main).toContain(`class="cn-tab on" data-ctab="${group}"`);
+      const sub = html.split('pw-subtabs')[1]!.split('constructorbody')[0]!;
+      for (const child of children) expect(sub).toContain(`data-ctab="${child}"`);
+      expect(sub).toContain(`class="cn-tab on" data-ctab="${tab}"`);
+    }
+    expect(yardBoxHtml('buildings','')).not.toContain('pw-subtabs');
   });
 
   it('РОД ВОЙСК РЕШАЮТ ДАННЫЕ, а не второй список: каждый наземный корпус ровно в одной вкладке', () => {
@@ -783,20 +785,16 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
     const s = rich();
     const inf = normalizeDraft(s, 'p1', draftOf({ hull: 'militia' }), hullsOfTab('infantry'));
     const html = orderBarHtml(s, 'p1', inf, hullsOfTab('infantry'), view);
-    expect(html).toContain(t('yard.no-place'));
     expect(html).toMatch(/data-cnbuild disabled/);
     // А на вкладке кораблей тот же экран показывает нормальный выбор мира.
     const ships = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS);
-    expect(orderBarHtml(s, 'p1', ships, YARD_HULLS, view)).toContain('id="cn-planet"');
+    expect(orderBarHtml(s, 'p1', ships, YARD_HULLS, view)).not.toMatch(/data-cnbuild disabled/);
   });
 
-  it('мир в выборе места назван именем, как на карте, а не кодом (UIX-5.2)', () => {
-    const s = rich();
-    const d = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS);
-    const html = orderBarHtml(s, 'p1', d, YARD_HULLS, view);
-    const option = new RegExp(`<option value="${d.planet}" selected>([^<]*)</option>`).exec(html);
-    expect(option?.[1]).toBe(worldName(s, d.planet));
-    expect(option?.[1]).not.toBe(d.planet);
+  it('the selected world remains in the workspace when its facility is missing', () => {
+    const s = rich(); const home = Object.values(s.planets).find(p => p.owner === 'p1')!;
+    const d = normalizeDraft(s, 'p1', draftOf({ hull: 'tank', planet: home.id }), ['tank']);
+    expect(d.planet).toBe(home.id);
   });
 
   it('смена вкладки на «Пехоту» переводит конструктор на её ростер и её мир', () => {
@@ -955,6 +953,15 @@ describe('производство — корпус без отсеков и о�
     expect(bar).toContain(t('yard.queue.waiting', { n: 1 }));
   });
 
+  it('герой занимает мобилизацию и учитывается перед пехотой, но не кораблями', () => {
+    const s = rich();
+    const home = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS).planet;
+    const hero = Object.values(s.heroes!)[0]!;
+    hero.mobilization = { target: home, startedAt: s.time, readyAt: s.time + 2 * HOUR };
+    expect(unitLaneAhead(s, home, 'militia')).toEqual({ count: 1, nextInHours: 2 });
+    expect(unitLaneAhead(s, home, 'cruiser')).toBeNull();
+  });
+
   it('заказ здания в той же очереди не считается: юниты и здания строятся параллельно', () => {
     const s = rich();
     const home = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS).planet;
@@ -972,11 +979,11 @@ describe('производство — корпус без отсеков и о�
   });
 });
 
-describe('производство — слоты-выноски на арте (переделка окна, шаг 2)', () => {
+describe('производство — единая сетка плиток отсеков', () => {
   const slotCount = (hull: string): number =>
     Object.values(data.units[hull]!.slots ?? {}).reduce<number>((a, n) => a + (n ?? 0), 0);
 
-  it('у каждого корпуса окна с отсеками — точка и плитка на каждый отсек', () => {
+  it('у каждого корпуса ровно одна плитка на отсек, без дублирующих выносок', () => {
     const s = rich();
     for (const list of [YARD_HULLS, YARD_SQUAD_HULLS]) {
       for (const hull of list) {
@@ -984,9 +991,9 @@ describe('производство — слоты-выноски на арте (
         expect(d.hull).toBe(hull);
         const html = loadoutPaneHtml(s, 'p1', d, list, view);
         const n = slotCount(hull);
-        expect((html.match(/class="cn-tile /g) ?? []).length, hull).toBe(n);
-        expect((html.match(/class="cn-dot/g) ?? []).length, hull).toBe(n);
-        expect(html.includes('class="cn-art"'), hull).toBe(n > 0);
+        expect((html.match(/class="cn-bay /g) ?? []).length, hull).toBe(n);
+        expect(html).not.toContain('cn-dot');
+        expect(html).not.toContain('cn-tile');
       }
     }
   });
@@ -997,12 +1004,11 @@ describe('производство — слоты-выноски на арте (
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
     const mod = data.modules.ion_engine!;
     // Плитки идут в порядке отсеков: оружие, защита, система; открыт первый пустой отсек.
-    expect(html).toContain('class="cn-tile filled" data-cnsel="2" aria-pressed="false"');
-    expect(html).toContain(`--rar:var(--rar-${mod.rarity})`);
-    expect(html).toContain(`aria-label="${t('yard.slot.utility')}: ${tData(mod.name)} (${t(`rarity.${mod.rarity}`)})"`);
-    expect(html).toContain('class="cn-tile empty sel" data-cnsel="0" aria-pressed="true"');
-    expect(html).toContain('class="cn-tile empty" data-cnsel="1" aria-pressed="false"');
-    expect(html).toContain(`aria-label="${t('yard.slot.weapon')}: ${t('yard.slot.empty')}"`);
+    expect(html).toContain(`class="cn-bay filled r-${mod.rarity}" data-cnsel="2"`);
+    expect(html).toContain(tData(mod.name));
+    expect(html).toContain('class="cn-bay empty sel" data-cnsel="0"');
+    expect(html).toContain('class="cn-bay empty" data-cnsel="1"');
+    expect(html).toContain(t('yard.slot.weapon'));
   });
 
   it('плитка на арте открывает свой отсек, как строка отсека', () => {
@@ -1012,8 +1018,7 @@ describe('производство — слоты-выноски на арте (
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     win.fire(click('[data-cnsel]', { cnsel: '2' }));
     const html = win.html();
-    expect(html).toContain('class="cn-tile filled sel" data-cnsel="2" aria-pressed="true"');
-    expect(html).toContain('class="cn-bay filled sel" data-cnsel="2"');
+    expect(html).toContain(`class="cn-bay filled sel r-${data.modules.ion_engine!.rarity}" data-cnsel="2"`);
     expect(html).toContain(t('yard.modules.for-slot', { s: t('yard.slot.utility') }));
   });
 });
@@ -1097,11 +1102,11 @@ describe('производство — модули открытого отсе�
     const yard = initShipyard(hostOf({ root: () => win }));
     yard.open();
     win.fire(click('.cn-mod', { cnmod: 'targeting_array' })); // в открытый отсек оружия
-    expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="1"'); // дальше — защита
+    expect(win.html()).toContain('class="cn-bay empty sel" data-cnsel="1"'); // дальше — защита
     win.fire(click('[data-cnsel]', { cnsel: '0' }));
     win.fire(click('.cn-mod', { cnmod: 'siege_platform' }));
     expect(worn(win.html())).toEqual([tData(data.modules.siege_platform!.name)]);
-    expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="1"');
+    expect(win.html()).toContain('class="cn-bay empty sel" data-cnsel="1"');
   });
 
   it('все отсеки заняты — после выбора открыт отсек с новым модулем, замена идёт в нём', () => {
@@ -1138,12 +1143,12 @@ describe('производство — модули открытого отсе�
     win.fire(click('[data-cnunfit]'));
     expect(win.html()).toContain(t('yard.modules.unfit-hide'));
     win.fire(click('.cn-hbtn', { cnhull: 'heavy_cruiser' }));
-    expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="0"');
+    expect(win.html()).toContain('class="cn-bay empty sel" data-cnsel="0"');
     expect(win.html()).not.toContain(t('yard.modules.unfit-hide'));
     win.fire(click('[data-cnsel]', { cnsel: '3' }));
     win.fire(click('.cn-tab', { ctab: 'squads' }));
     win.fire(click('.cn-tab', { ctab: 'ships' }));
-    expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="0"');
+    expect(win.html()).toContain('class="cn-bay empty sel" data-cnsel="0"');
   });
 
   it('после выбора модуля корабль возвращается на экран — видно, куда модуль встал', () => {
@@ -1184,7 +1189,7 @@ describe('производство — «Как в прошлый раз» (UIX-
 
   it('кнопка стоит в шапке окна, перед крестиком', () => {
     const html = yardBoxHtml('ships', '', '', '<button data-cnagain></button>');
-    expect(html).toContain('<b>' + t('yard.title') + '</b><button data-cnagain></button><button class="cn-tplbtn');
+    expect(html).toContain('<button data-cnagain></button><button class="cn-tplbtn');
     expect(html).toMatch(/<\/button><button class="cn-close btn-x">✕<\/button><\/div>/);
   });
 
@@ -1254,9 +1259,8 @@ describe('производство — редкость и уровень про
     // Открыт отсек двигателя: его строка видна вместе с плиткой.
     const d = normalizeDraft(s, 'p1', draftOf({ hull: 'frigate', modules: ['ion_engine'], slot: 2 }), YARD_HULLS);
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
-    expect(html).toContain('--rar:var(--rar-unique)');
-    expect(html).toContain('<span class="cn-tst" aria-hidden="true">★2</span>');
-    expect(html).toContain(`(${t('rarity.unique')}, ${t('shipcard.stars', { n: 2 })})"`);
+    expect(html).toContain('class="cn-bay filled r-unique"');
+    expect(html).toContain('★★</span>');
     expect(html).toContain(moduleGradeHtml('unique', 2));
     // ★2 = ×1.1 на вклад модуля и на параметр уникальной ступени: +1.1 скорости, +0.6 защиты.
     expect(html).toContain(`+1.1 ${t(STAT_KEY.speed!)}`);

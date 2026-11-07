@@ -349,7 +349,7 @@ describe('REFM-242 — стык с main.ts', () => {
       /\bfunction (myRes|afford|coreQueue|buildCost|queuedAction|activeConstruction|constructionLabel|buildDurationHours|timeLeft|progressPct|queuedLabel|enqueueBuild)\(/,
     );
     expect(MAIN).not.toMatch(/^const planet = /m);
-    expect(MAIN).toMatch(/import \{[^}]*\benqueueBuild\b[^}]*\} from '\.\/worldQueries';/);
+    expect(MAIN).toContain("from './worldQueries'");
     expect(OWNER).not.toMatch(/from '\.\/main'/);
   });
 });

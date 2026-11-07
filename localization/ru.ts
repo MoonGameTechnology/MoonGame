@@ -7,6 +7,26 @@
 // НЕ добавляй сюда русский текст, который уже лежит в коде строкой — сначала
 // заведи ключ, потом замени строку в коде на t('ключ').
 export const ru: Record<string, string> = {
+  "production.blueprint-required": "Нужен чертёж корпуса в арсенале",
+  "production.queue": "Очереди",
+  "production.planet-income": "Доход планеты",
+
+  "production.flagship": "Флагман",
+  "production.flagship-removes": "Будут сняты несовместимые модули: {n}",
+  "production.flagship-apply": "Применить корпус",
+  "production.stat.hp": "HP",
+  "production.stat.attack": "Атака",
+  "production.stat.defense": "Защита",
+  "production.stat.speed": "Скорость",
+
+  "production.features": "Особенности",
+  "production.info": "Полная информация",
+  "production.requires-building": "Нужно: {name}, ур. {n}",
+  "production.no-facility-here": "На этом мире нет подходящей площадки",
+  "production.unlocks": "Открывает производство",
+  "production.mobilization": "Мобилизация",
+  "production.buildings": "Постройки",
+
   'privacy.close': 'Закрыть политику',
   "account.delete.title": "Удалить аккаунт",
   "account.delete.warning": "Будут удалены аккаунт, профиль и личный прогресс. Общие результаты матчей будут обезличены. После подтверждения вход станет недоступен. Сроки обработки и хранения резервных копий указаны в политике.",
@@ -1371,7 +1391,6 @@ export const ru: Record<string, string> = {
   'codex.row.world-mitigation': 'Урон по миру',
   'codex.row.hp': 'Прочность',
   'codex.row.hull': 'Корпус',
-  'codex.row.levels': 'Уровней',
   'codex.row.produces': 'Производит',
   'codex.row.radar-level': 'Уровень радара',
   'codex.row.radar-detects': 'Обнаруживает',
@@ -1434,7 +1453,6 @@ export const ru: Record<string, string> = {
     'Флоты и здания требуют ежедневной платы. Доход от металлодобычи минус содержание = чистый баланс; уйдёте в минус — казна опустеет.',
   'codex.term.upkeep.title': 'Содержание',
   'codex.value.hours': '{n} ч',
-  'codex.value.levels-upgradable': '{n} (улучшаемо)',
   'codex.value.per-level': '{n} / уровень',
 
   // --- comms — Меню связи: ростер сессии, одобрение ботов, окна интела, предложения.
@@ -3079,13 +3097,11 @@ export const ru: Record<string, string> = {
   'threat.incoming': '⚠ {node}: враг на подходе, прибытие через {dur}',
 
   // --- yard — «Верфь»: корпус и модули, конструктор дивизий, стоимость и заказ.
-  'win.build.title': 'Производство',
   'yard.again': 'Как в прошлый раз',
   'yard.arsenal.note': '⚡ Арсенал живой: докупленное в матче появляется здесь сразу.',
   'yard.build-time': 'Время постройки',
   'yard.queue.ahead': 'Впереди {n} {n|заказ|заказа|заказов}, ближайший готов через {eta}',
   'yard.queue.waiting': 'Впереди {n} {n|заказ|заказа|заказов}',
-  'yard.queue.title': 'Очередь · {w}',
   'yard.tpl.title': 'Шаблоны',
   'yard.tpl.empty': 'Шаблонов нет. Соберите заказ и сохраните его.',
   'yard.tpl.save': 'Сохранить текущий',
@@ -3558,7 +3574,6 @@ export const ru: Record<string, string> = {
   'hero.ship.slots': 'Отсеки · {u}/{n}',
   'hero.ship.wrong-hull': 'Не для этого корпуса',
   'hero.stat.abilities': 'способностей',
-  'hero.stat.active': 'Актив',
   'hero.stat.bonuses': 'Текущие бонусы',
   'hero.stat.modules': 'модулей',
   'hero.stat.tree-nodes': 'узлов дерева',

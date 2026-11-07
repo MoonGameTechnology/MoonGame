@@ -38,6 +38,19 @@ describe('building economy — the prototype resource loop', () => {
     expect(flow.food ?? 0).toBeLessThan((type.baseOutput.food ?? 0) * mult);
   });
 
+  it('planet income partitions the empire flow without changing civic diminishing returns', () => {
+    const s = newGame();
+    s.fleets = {};
+    const worlds = Object.values(s.planets).filter(p=>p.owner==='p1');
+    const neutral = Object.values(s.planets).find(p=>!p.owner && p.kind==='planet');
+    if (neutral) { neutral.owner='p1'; worlds.push(neutral); }
+    const sum: Record<string,number> = {};
+    for (const p of worlds) for (const [k,v] of Object.entries(netIncome(s,'p1',undefined,p.id))) sum[k]=(sum[k]??0)+v;
+    const total=netIncome(s,'p1');
+    for (const k of new Set([...Object.keys(total),...Object.keys(sum)])) expect(sum[k]??0).toBeCloseTo(total[k]??0,8);
+    expect(netIncome(s,'p1',undefined,'missing')).toEqual({});
+  });
+
   it('netIncome reads the worlds list the frame hands it (W7): same flow, no own walk', () => {
     const s = newGame();
     const list = Object.values(s.planets);
