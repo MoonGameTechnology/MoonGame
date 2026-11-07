@@ -399,6 +399,28 @@ L.push(
 );
 
 writeFileSync(outFile, L.join('\n'));
+// Complete inventory for API/assistant readers; the PR's top-30 table is presentation only.
+const jsonFile = outFile.endsWith('.md') ? outFile.slice(0, -3) + '.json' : outFile + '.json';
+writeFileSync(
+  jsonFile,
+  JSON.stringify(
+    {
+      schemaVersion: 1,
+      source: 'scanner-run',
+      generatedAt: new Date().toISOString(),
+      commit: process.env.GITHUB_SHA ?? '',
+      ref,
+      runUrl,
+      totals,
+      suppressedCount,
+      baselineAvailable: hasBaseline,
+      scanConfirmation: confirm.map(({ key, state }) => ({ key, state })),
+      findings,
+    },
+    null,
+    2,
+  ) + '\n',
+);
 process.stdout.write(L.join('\n') + '\n');
 
 // --- полный список находок в ЛОГ (не в комментарий) ---------------------------

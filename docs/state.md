@@ -6,8 +6,8 @@
 > Прежний полный текст с историей правок — [архив до 2026-10-19](archive/state-2026-10-19.md).
 
 **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check).
-**Последний полный прогон на базе `85f8f222`: 15 441 тест прошёл**
-(6 skip; 1250 файлов прошли, 3 skip; PostgreSQL 16, после сборки прототипа).
+**Последний полный прогон на базе `a4feb628`: 15 444 теста прошли**
+(13 skip; 1252 файла прошли, 3 skip; PostgreSQL 16, до сборки прототипа).
 После сборки Яндекс-архив проверяется по готовым файлам: 13 375 КБ при внутреннем потолке 16 МиБ;
 без сборки семь проверок его состава пропускаются.
 CI и merge queue повторно проверяют текущую main вместе с PR.
@@ -1206,7 +1206,9 @@ coarse ≈ fine на полном стеке), `delta` (`applyDelta∘diffState 
 **CI** — разбор в [security/pipeline.md](security/pipeline.md):
 - `ci.yml` (push не в `main`, PR, очередь): гейт, OSV-Scanner, загрузка бандла и основные UI-сценарии
   блокируют; `perf` и часть дополнительных смоуков остаются неблокирующими.
-- `security.yml`: 16 сканеров и сводка, блокируют Semgrep, Gitleaks, OSV, Trivy fs/image; крон.
+- `security.yml`: 16 сканеров и сводка с полным JSON и сентинелами в артефакте; блокируют
+  Semgrep, Gitleaks, OSV, Trivy fs/image; крон. `security-alerts.yml` отдельно экспортирует
+  открытые алерты панели GitHub с правами только на чтение; ошибка API не считается нулём.
 - `image.yml` (push в `main`): образы сервера и Caddy → проверки → GHCR → подпись cosign.
 - `automerge.yml`: зелёный PR сам встаёт в merge queue — руками не включать.
 - `pages.yml`: GitHub Pages с `main`; `android.yml`: два APK, dev и player.
