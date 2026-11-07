@@ -99,7 +99,7 @@ function click(sel: string, dataset: Record<string, string> = {}): unknown {
 
 /** Имена модулей, надетых в отсеки, — по строкам отсеков под карточкой корпуса. */
 function worn(html: string): string[] {
-  return [...html.matchAll(/class="cn-bay filled[^"]*" data-cnsel="\d+">.*?class="cn-bn">([^<]+)/g)].map((x) => x[1]!);
+  return [...html.matchAll(/class="cn-bay filled[^"]*" data-cnsel="\d+"[^>]*>.*?class="cn-bn">([^<]+)/g)].map((x) => x[1]!);
 }
 
 function hostOf(over: Partial<YardHost> = {}): YardHost {
@@ -259,13 +259,13 @@ describe('верфь — панель конструктора', () => {
     expect(bar).toContain('data-cnbuild');
   });
 
-  it('поставленный модуль занимает отсек, а снимается крестиком у открытой плитки', () => {
+  it('поставленный модуль снимается крестиком независимо от выбранного отсека', () => {
     const d = normalizeDraft(s, 'p1', draftOf({ modules: ['ion_engine'] }), YARD_HULLS);
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
     expect(worn(html)).toEqual([tData(data.modules.ion_engine!.name)]);
-    expect(html).not.toContain('data-cnrm'); // открыт первый пустой отсек — оружие
+    expect(html).toContain('data-cnrm="ion_engine"'); // крестик есть и у невыбранного отсека
     const open = loadoutPaneHtml(s, 'p1', { ...d, slot: 2 }, YARD_HULLS, view);
-    // Один крестик — у плитки открытого отсека; текстовой кнопки над модулями при плитках нет.
+    // Один установленный модуль — один крестик; текстовой копии действия нет.
     expect(open.match(/data-cnrm=/g)).toHaveLength(1);
     expect(open).toMatch(/<button class="cn-tx btn-x" data-cnrm="ion_engine"[^>]*>✕<\/button>/);
     expect(open).not.toContain('cn-rm');
@@ -384,8 +384,8 @@ describe('верфь — панель конструктора', () => {
     const one = orderBarHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf(), YARD_HULLS), YARD_HULLS, view);
     const five = orderBarHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf({ count: 5 }), YARD_HULLS), YARD_HULLS, view);
     const hours = fmtDur(data.units.cruiser!.buildTimeHours);
-    expect(one).toContain(`⏱ ${hours}`);
-    expect(five).toContain(`⏱ ${hours}`);
+    expect(one).toContain(`class="cn-otime">${hours}`);
+    expect(five).toContain(`class="cn-otime">${hours}`);
   });
 
   it('шаг количества упирается в границы — «−» на единице выключен', () => {
@@ -662,7 +662,7 @@ describe('верфь — окно', () => {
       unit: 'cruiser', count: 1, progress: 0.5, remainingHours: 1, remainingCost: {},
     }];
     const html = productionQueueHtml(after, home);
-    expect(html).not.toContain('<img');
+    expect(html).not.toContain('<img src=x');
     expect(html.match(/data-pw-cancel="&quot;&gt;&lt;img/g)).toHaveLength(2);
     expect(html).toContain('data-pw-resume="&quot;&gt;&lt;img');
   });
@@ -932,7 +932,7 @@ describe('верфь — десантный челнок с бойцом (SHU-5.
     const bar = orderBarHtml(s, 'p1', d, YARD_SQUAD_HULLS, lander);
     expect(bar).toContain(priceHtml(total, s.players.p1!.resources));
     const hours = Math.max(data.units.landing_shuttle!.buildTimeHours, data.units.militia!.buildTimeHours);
-    expect(bar).toContain(`⏱ ${fmtDur(hours)}`);
+    expect(bar).toContain(`class="cn-otime">${fmtDur(hours)}`);
     expect(bar).not.toMatch(/data-cnbuild disabled/);
   });
 
@@ -1143,7 +1143,7 @@ describe('производство — модули открытого отсе�
   it('цена модуля — значками ресурсов, как любая цена, а не словами (UIX-10.8)', () => {
     const html = pane({ hull: 'frigate', modules: ['cargo_bay', 'ion_engine'], slot: 3 });
     for (const id of offered(html)) {
-      const card = new RegExp(`data-cnmod="${id}">(.*?)</button>`).exec(html)?.[1] ?? '';
+      const card = new RegExp(`data-cnmod="${id}"[^>]*>(.*?)</button>`).exec(html)?.[1] ?? '';
       expect(card).toContain(`<span class="cn-mc">${priceHtml(data.modules[id]!.cost)}</span>`);
     }
     expect(html).not.toContain('металла');
@@ -1152,7 +1152,7 @@ describe('производство — модули открытого отсе�
   it('у отсека и окна нет хвостов-подсказок: «пусто», «Итог с модулями» (UIX-10.8)', () => {
     const html = pane({});
     expect(t('yard.slot.empty')).toBe('пусто');
-    expect(html).toContain(`<div class="cn-ph">${t('yard.cost.with-modules')}</div>`);
+    expect(html).toContain(`<details class="cn-side pw-fit-stats"><summary>${t('yard.stats')}</summary>`);
     expect(html).not.toContain(' — ');
   });
 
@@ -1163,25 +1163,26 @@ describe('производство — модули открытого отсе�
     expect(html).toContain(`class="cn-none">${t('yard.modules.none')}<`);
   });
 
-  it('три колонки — корпуса, корабль, модули отсека; у корпуса без отсеков две', () => {
+  it('каталог и отдельное окно оснащения сохраняют все элементы заказа', () => {
     expect(pane({})).toMatch(
-      /^<div class="cn-grid cn-g3"><div class="cn-hulls">.*<div class="cn-card with-tiles">.*<div class="cn-slot">.*<div class="cn-side">/,
+      /^<div class="cn-grid {2}cn-g3"><div class="cn-hulls">.*role="dialog".*<div class="cn-card with-tiles">.*<div class="cn-slot">.*<details class="cn-side pw-fit-stats">/,
     );
     const html = loadoutPaneHtml(s, 'p1', draftOf({ hull: 'militia' }), ['militia'], view);
-    expect(html).toMatch(/^<div class="cn-grid cn-g2">/);
+    expect(html).toMatch(/^<div class="cn-grid pw-ground cn-g2">/);
     expect(html).not.toContain('cn-slot');
   });
 
-  it('модуль в занятом отсеке встаёт на место прежнего, затем открыт следующий пустой', () => {
+  it('установка и замена сохраняют выбранный отсек и выделение установленного модуля', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
     yard.open();
     win.fire(click('.cn-mod', { cnmod: 'targeting_array' })); // в открытый отсек оружия
-    expect(win.html()).toContain('class="cn-bay empty sel" data-cnsel="1"'); // дальше — защита
+    expect(win.html()).toContain('class="cn-bay filled sel r-unique" data-cnsel="0"');
+    expect(win.html()).toContain('data-cnmod="targeting_array" aria-pressed="true"');
     win.fire(click('[data-cnsel]', { cnsel: '0' }));
     win.fire(click('.cn-mod', { cnmod: 'siege_platform' }));
     expect(worn(win.html())).toEqual([tData(data.modules.siege_platform!.name)]);
-    expect(win.html()).toContain('class="cn-bay empty sel" data-cnsel="1"');
+    expect(win.html()).toContain('data-cnmod="siege_platform" aria-pressed="true"');
   });
 
   it('все отсеки заняты — после выбора открыт отсек с новым модулем, замена идёт в нём', () => {
@@ -1202,7 +1203,10 @@ describe('производство — модули открытого отсе�
     const yard = initShipyard(hostOf({ root: () => win }));
     yard.open();
     win.fire(click('.cn-hbtn', { cnhull: 'frigate' }));
-    for (const id of ['cargo_bay', 'ion_engine', 'repair_bay']) win.fire(click('.cn-mod', { cnmod: id }));
+    for (const [index, id] of ['cargo_bay', 'ion_engine', 'repair_bay'].entries()) {
+      win.fire(click('[data-cnsel]', { cnsel: String(index + 1) }));
+      win.fire(click('.cn-mod', { cnmod: id }));
+    }
     win.fire(click('[data-cnsel]', { cnsel: '1' }));
     win.fire(click('[data-cnrm]', { cnrm: 'cargo_bay' }));
     // Системы сдвинулись: двигатель и ремонт в отсеках 1–2, пуст и открыт третий.
@@ -1264,7 +1268,7 @@ describe('производство — «Как в прошлый раз» (UIX-
 
   it('кнопка стоит в шапке окна, перед крестиком', () => {
     const html = yardBoxHtml('ships', '', '', '<button data-cnagain></button>');
-    expect(html).toContain('<button data-cnagain></button><button class="cn-tplbtn');
+    expect(html).toContain('<button data-cnagain></button><button class="cn-close');
     expect(html).toMatch(/<\/button><button class="cn-close btn-x">✕<\/button><\/div>/);
   });
 
@@ -1304,7 +1308,7 @@ describe('производство — редкость и уровень про
     return s;
   }
   const card = (html: string, id: string): string =>
-    html.match(new RegExp(`<button class="cn-mod[^"]*" data-cnmod="${id}">.*?</button>`))?.[0] ?? '';
+    html.match(new RegExp(`<button class="cn-mod[^"]*" data-cnmod="${id}"[^>]*>.*?</button>`))?.[0] ?? '';
 
   it('ступень — словом её цветом, звёзды — только горящие', () => {
     expect(moduleGradeHtml('unique', 0)).toBe(`<span class="cn-mr r-unique"><span class="cn-rw">${t('rarity.unique')}</span></span>`);

@@ -299,6 +299,8 @@ export function initFloatingWindows() {
       viewport = { width, height };
       viewZoom = zoom;
       for (const entry of entries) {
+        // A short viewport needs the production workspace to use its whole surface.
+        if ((entry.id === 'constructor' || entry.id === 'tech' || entry.id === 'codex') && height <= 500) { restore(entry); entry.visible = false; continue; }
         const node = entry.box ? entry.root.querySelector<HTMLElement>(entry.box) : entry.root;
         const visible = entry.root.classList.contains('show') ||
           (!!entry.root.style.display && entry.root.style.display !== 'none');

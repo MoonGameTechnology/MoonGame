@@ -31,6 +31,7 @@ const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url
 const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
 const mobileConsoleCss = readFileSync(new URL('./mobile-console.css', import.meta.url), 'utf8');
 const heroCardsCss = readFileSync(new URL('./hero-cards.css', import.meta.url), 'utf8');
+const productionPresentationCss = readFileSync(new URL('./production-presentation.css', import.meta.url), 'utf8');
 const shipArtCss = readFileSync(new URL('./ship-art.css', import.meta.url), 'utf8');
 const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
@@ -135,7 +136,7 @@ const css = `\n${GAME_SHEETS.map(
 /** Все листы одной строкой: платформенная цель пишет их файлом, остальные — инлайном. */
 const allCss = () =>
   `${cursorCss()}\n${heatPointers(
-    `${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}`,
+    `${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}\n${productionPresentationCss}`,
   )}`;
 
 /**

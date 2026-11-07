@@ -220,15 +220,13 @@ try {
               // A target the guide is still scrolling out from under a panel's edge can
               // miss the first press; a step that has not moved is pressed again.
               for (let attempt = 0; attempt < 3; attempt++) {
-                // Four militia: the order button is pressed four times.
-                for (let n = step === 'ground.militia' && attempt === 0 ? 4 : 1; n > 0; n--) {
+                {
                   const rect = await settledRing(page);
                   assert.ok(rect && rect.width > 0, `missing target for ${step}`);
                   // A real pointer event at the highlighted target, including canvas objects.
                   if (mode === 'phone')
                     await page.touchscreen.tap(rect.x + rect.width / 2, rect.y + rect.height / 2);
                   else await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
-                  if (n > 1) await page.waitForTimeout(150);
                 }
                 if (await stepMoved(page, step, 4000)) break;
               }

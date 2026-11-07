@@ -36,6 +36,7 @@ import type { Rect, SpotlightStep } from './spotlight';
 export interface OperationUi {
   mobile: boolean;
   visible(selector: string): boolean;
+  productionCount?(): number;
   selectedWorld(): string | null;
   selectedFleet(): string | null;
   /** Screen state the next step depends on: `details` (phone sheet open), `tab:<name>`,
@@ -77,6 +78,14 @@ const step = (
   gate: target !== null,
   ...extra,
 });
+
+function productionQuantity(stage: Stage, unit: string, wanted: number, enough: () => boolean, ui: OperationUi): SpotlightStep {
+  return step(stage, `${unit}-quantity`, null, () => (ui.productionCount?.() ?? 1) === wanted || enough(), {
+    selector: () => `#constructor [data-cncount="${(ui.productionCount?.() ?? 1) < wanted ? '+' : '-'}"]`,
+    gate: true,
+    copy: wanted === GUIDE_TROOPS ? 'onb.guide.ground.quantity' : 'onb.guide.aviation.quantity',
+  });
+}
 
 export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
   const { me, home, ui } = d;
@@ -163,8 +172,10 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       () => ui.visible(`#constructor.show [data-cnhull="${unit}"]`) || enough(),
       { copy: 'onb.guide.build.units' },
     ),
-    step(stage, `${unit}-select`, `#constructor [data-cnhull="${unit}"]`, () => ui.visible(`#constructor [data-cnhull="${unit}"].on`) || enough(), { copy: 'onb.guide.build.units' }),
+    step(stage, `${unit}-select`, `#constructor [data-cnhull="${unit}"]`, () => ui.visible(`#constructor.pw-fitting-open [data-cnhull="${unit}"].on`) || enough(), { copy: 'onb.guide.build.units' }),
+    productionQuantity(stage, unit, stage === 'ground' ? GUIDE_TROOPS : 1, enough, ui),
     step(stage, unit, '#constructor [data-cnbuild]', enough),
+    step(stage, `${unit}-fitting-close`, '#constructor [data-pw-fit-close]', () => !ui.visible('#constructor.pw-fitting-open') || !ui.visible('#constructor.show'), { copy: 'onb.guide.build.close' }),
     close(stage, `${unit}-close`),
   ];
   const heroShip = (stage: Stage) => [
@@ -275,15 +286,18 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       'hero',
       'ship',
       '[data-htab="ship"]',
-      () => ui.visible(`[data-huninstall="${hero}"]`) || refitted() || deployed(true),
+      () => ui.visible('.pw-hero-equipment > summary') || refitted() || deployed(true),
     ),
+    step('hero', 'equipment', '.pw-hero-equipment > summary', () => ui.visible('.pw-hero-equipment[open]') || refitted() || deployed(true), { copy: 'onb.guide.hero.equipment' }),
     step(
       'hero',
       'remove',
       `[data-huninstall="${hero}"][data-mod="${GUIDE_HERO_START_MODULE}"]`,
       () => guideHeroModules(w(), me).length < GUIDE_HERO_START_MODULES.length || refitted(),
     ),
+    step('hero', 'utility-slot', '.pw-hardware-slot.off[data-pw-hardware-slot="utility"]', () => ui.visible(`[data-hinstall="${hero}"][data-mod="${GUIDE_HERO_MODULE}"]`) || refitted(), { copy: 'onb.guide.hero.utility-slot' }),
     step('hero', 'install', `[data-hinstall="${hero}"][data-mod="${GUIDE_HERO_MODULE}"]`, refitted),
+    step('hero', 'equipment-close', '.pw-hero-equipment[open] > summary', () => !ui.visible('.pw-hero-equipment[open]') || deployed(true), { copy: 'onb.guide.hero.equipment-close' }),
     step('hero', 'deploy', `[data-hspawn="${hero}"]`, () => ui.intent('spawn') || deployed(true)),
     close('hero', 'close'),
     step('hero', 'world', null, () => deployed(true), {

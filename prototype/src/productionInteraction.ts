@@ -18,6 +18,8 @@ interface Navigation {
 }
 /** Shared workspace actions; the host still sends every mutation through the existing gate. */
 export function productionClick(tg: HTMLElement, host: YardHost, nav: Navigation): boolean {
+  const income = tg.closest<HTMLElement>('[data-pw-income]')?.dataset.pwIncome;
+  if (income) { host.openInfo?.(`income:${income}`, income); return true; }
   const empty = tg.closest<HTMLElement>('[data-pw-empty]')?.dataset.pwEmpty;
   if (empty) {
     nav.open(empty as YardTab, empty === 'ships' || empty === 'squads');

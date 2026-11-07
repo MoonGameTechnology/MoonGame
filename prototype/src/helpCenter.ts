@@ -1,3 +1,6 @@
+import { productionIncomeCard } from './productionIncome';
+import { presentProductionDossier } from './productionDossierPresentation';
+import { worldName } from './planetName';
 /**
  * Хозяин справки (REFM-221): карточка корабля и справочник с кнопками «Построить здесь» и
  * «Улучшить», поиск по статьям (ONB-4), вводные к механикам при первом касании (ONB-3) и
@@ -110,6 +113,7 @@ export function openShipCard(fleetId: string, index: number): void {
     },
   );
   el.innerHTML = `<div class="cxbox sc-box">${html}<button class="cx-close">${t('codex.close')}</button></div>`;
+  el.classList.remove('pw-entity-card');
   el.classList.add('show');
 }
 
@@ -118,16 +122,26 @@ export function openShipCard(fleetId: string, index: number): void {
 let productionWorld: string | null = null;
 let activeCodexKey = '';
 const codexTrail: string[] = [];
+const codexViews = new Map<string, { scroll: number; sections: boolean[] }>();
+function rememberCodexView(): void {
+  const el = document.getElementById('codex');
+  if (!el?.classList.contains('show') || !activeCodexKey) return;
+  codexViews.set(`${codexWorld()}:${activeCodexKey}`, {
+    scroll: (el.querySelector('.pw-dossier-body') ?? el.querySelector('.cxbox'))?.scrollTop ?? 0,
+    sections: Array.from(el.querySelectorAll('details')).map(d => d.open),
+  });
+}
 let researchReturn: { key: string; world: string | null; trail: string[] } | null = null;
 export function closeCodex(): void {
   const previous = codexTrail.pop();
   if (previous) openCodex(previous);
-  else { document.getElementById('codex')?.classList.remove('show'); productionWorld = null; }
+  else { document.getElementById('codex')?.classList.remove('show'); productionWorld = null; codexViews.clear(); }
 }
 export function codexWorld(): string | null {
   return document.body.classList.contains('hub-open') ? null : productionWorld ?? selPlanet;
 }
 export function openCodex(key: string, world?: string): void {
+  rememberCodexView();
   if (world !== undefined) { productionWorld = world; codexTrail.length = 0; }
   else if (!document.getElementById('codex')?.classList.contains('show')) { productionWorld = null; codexTrail.length = 0; }
   const previousKey = world === undefined && document.getElementById('codex')?.classList.contains('show') ? activeCodexKey : '';
@@ -146,8 +160,16 @@ export function openCodex(key: string, world?: string): void {
   const level = Number(lvl) || builtLvl || 1;
   const requirements = cardWorld && (kind === 'b' || kind === 'u') ? productionRequirementsHtml(live(), me(), cardWorld, kind === 'b' ? 'building' : 'unit', id) : '';
   const unlocks = kind === 'b' && cardWorld ? productionUnlocksHtml(live(), cardWorld, id, PRODUCTION_UNITS) : '';
-  el.innerHTML = `<div class="cxbox">${requirements}${game.codexHtml(kind, id, level, previousKey.startsWith(`b:${id}:`) ? Number(previousKey.split(':')[2]) : builtLvl ?? level)}${unlocks}${codexBuildBtn(kind, id)}<button class="cx-close">${t('codex.close')}</button></div>`;
+  el.innerHTML = `<div class="cxbox">${requirements}${kind === 'income' ? productionIncomeCard(live(), me(), cardWorld ?? id) : game.codexHtml(kind, id, level, previousKey.startsWith(`b:${id}:`) ? Number(previousKey.split(':')[2]) : builtLvl ?? level)}${unlocks}${codexBuildBtn(kind, id)}<button class="cx-close">${t('codex.close')}</button></div>`;
   el.classList.add('show');
+  el.querySelector<HTMLElement>('button,summary')?.focus({ preventScroll: true });
+  presentProductionDossier(el, kind, id, cardWorld ? worldName(live(), cardWorld) : '');
+  const saved = codexViews.get(`${codexWorld()}:${key}`);
+  if (saved) {
+    el.querySelectorAll('details').forEach((d,i) => { d.open = saved.sections[i] ?? d.open; });
+    const box = el.querySelector('.pw-dossier-body') ?? el.querySelector('.cxbox');
+    if (box) box.scrollTop = saved.scroll;
+  }
 }
 /** A "Build here" action inside the codex when the selected province can raise this
  *  thing — so the codex doubles as the build menu (tap a build tile → specs → build). */
@@ -471,6 +493,7 @@ export function initHelpCenter(host: HelpCenterHost): void {
       const techEl = tg.closest<HTMLElement>('[data-cx-tech],[data-pw-tech],[data-bw-tech]');
       const tech = techEl?.dataset.cxTech ?? techEl?.dataset.pwTech ?? techEl?.dataset.bwTech;
       if (tech) {
+        rememberCodexView();
         researchReturn = { key: activeCodexKey, world, trail: [...codexTrail] };
         codexEl.classList.remove('show');
         game.openTech(tech);
@@ -482,6 +505,8 @@ export function initHelpCenter(host: HelpCenterHost): void {
         openCodex(deep);
         return;
       }
+      const income = tg.closest<HTMLElement>('[data-pw-income]')?.dataset.pwIncome;
+      if (income) { codexTrail.push(activeCodexKey); openCodex(`income:${income}`); return; }
       const facility = tg.closest<HTMLElement>('[data-pw-building]');
       const info = tg.closest<HTMLElement>('[data-pw-info]')?.dataset.pwInfo;
       if (facility?.dataset.pwBuilding || info) {
@@ -489,7 +514,7 @@ export function initHelpCenter(host: HelpCenterHost): void {
         openCodex(facility ? `b:${facility.dataset.pwBuilding}:${facility.dataset.pwLevel}` : info!.replace('unit:', 'u:').replace('building:', 'b:'));
         return;
       }
-      if (tg.id === 'codex' || tg.classList.contains('cx-close')) {
+      if (tg.id === 'codex' || tg.closest('.cx-close')) {
         closeCodex();
       }
     });

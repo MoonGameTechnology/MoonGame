@@ -6,6 +6,22 @@ import { SpotlightTour, type TourResult } from './spotlight';
 const host = { locate: () => ({ left: 20, top: 20, width: 100, height: 40 }), render: () => {} };
 
 describe('guided first match', () => {
+  it('sets the batch quantity before ordering and resets it for aviation', () => {
+    const { deps } = firstMatchFixture();
+    let count = 1;
+    deps.operation.ui.productionCount = () => count;
+    const steps = buildFirstMatchTour(deps);
+    const ground = steps.find(s => s.id === 'ground.militia-quantity')!;
+    const wing = steps.find(s => s.id === 'aviation.bomber-quantity')!;
+    expect(ground.selector?.()).toContain('data-cncount="+"');
+    expect(ground.advance?.on === 'state' && ground.advance.when()).toBe(false);
+    count = 4;
+    expect(ground.advance?.on === 'state' && ground.advance.when()).toBe(true);
+    expect(wing.selector?.()).toContain('data-cncount="-"');
+    expect(wing.advance?.on === 'state' && wing.advance.when()).toBe(false);
+    count = 1;
+    expect(wing.advance?.on === 'state' && wing.advance.when()).toBe(true);
+  });
   it('returns to the buildings tab when a previous lesson left the fleet tab selected', () => {
     const { deps, facts } = firstMatchFixture();
     facts.homeOpened = true;

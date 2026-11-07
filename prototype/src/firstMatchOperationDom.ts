@@ -46,6 +46,7 @@ export function operationUi(h: OperationDomHost): OperationUi {
   return {
     mobile: h.mobile,
     visible,
+    productionCount: () => Number(document.querySelector('#constructor .cn-sv')?.textContent ?? 1),
     selectedWorld: () => selPlanet,
     selectedFleet: () => selFleet,
     heroSelector: () => {

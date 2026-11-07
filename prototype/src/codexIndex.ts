@@ -40,6 +40,8 @@ export interface GlossaryArticle {
 
 /** The genre's hard concepts as one-screen articles — the "learn the term" layer. */
 export const GLOSSARY: GlossaryArticle[] = [
+  { id: 'signature', titleKey: 'codex.row.signature', bodyKey: 'production.term.signature', tags: ['signature', 'сигнатура', 'заметность'] },
+  { id: 'radar', titleKey: 'codex.row.radar', bodyKey: 'production.term.radar', tags: ['radar', 'радар', 'обнаружение'] },
   {
     id: 'async',
     titleKey: 'codex.term.async.title',

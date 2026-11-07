@@ -23,6 +23,11 @@ class El {
   innerHTML = '';
   oninput: (() => void) | null = null;
   value = '';
+  readonly articleBox = { scrollTop: 0 };
+  querySelector(selector: string): { scrollTop: number } | null {
+    return selector === '.cxbox' ? this.articleBox : null;
+  }
+  querySelectorAll(): HTMLDetailsElement[] { return []; }
   readonly listeners: Array<[string, Listener]> = [];
   private readonly classes = new Set<string>();
   readonly classList = {
