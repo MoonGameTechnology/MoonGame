@@ -1,7 +1,10 @@
 # CLAUDE.md
 
-Guidance for working in this repository. Read `docs/` for the full design;
-this file is the short, operational version plus the non-obvious invariants.
+Guidance for working in this repository. This file is loaded into every session, so it holds
+only the invariants and the non-obvious traps; the step-by-step rituals live in skills
+(`.claude/skills/`, table in `CONTRIBUTING.md`). Where code lives and what actually runs —
+`CODE-MAP.md`; what is already built — `docs/state.md`; how to find the rest — «Fast
+navigation» in `AGENTS.md`.
 
 ## Язык общения
 
@@ -22,47 +25,26 @@ not by rewriting logic.
 
 Monorepo (pnpm workspaces):
 
-- `packages/shared-core` — the deterministic, data-driven simulation. Built first,
-  in isolation (no server, no DB, no network) — the foundation the rest builds on.
-- `packages/action-layer` — the action gate in front of the reducer (Stage 2, done):
-  envelope validation → per-type zod payload schemas → session authorization →
-  idempotency receipts → strict per-session `clientSeq` sequence gate; stable `E_*` codes.
-- `packages/server` — authoritative server (Stage 3; the critical path to an online session
-  is closed). `MatchRoom` (advance → applyAction → **per-player fog deltas**),
-  durable+bounded+rate-limited receipts, strict commit-before-broadcast persistence over a
-  Postgres match/receipt store, a **v1 offline scheduler** (`clockDriver.ts`), a
-  **multi-match registry** with hibernation (`LazyRoomRegistry`) and a match-browser
-  read-model (`GET /matches`), JWT join-token auth + Origin allowlist (`auth.ts`), and the
-  `@void/action-layer` gate — auth/gate switched by env (`AUTH_JWT_SECRET`, `GATE=1`,
-  `ALLOWED_ORIGINS`). Hosted by `packages/server/src/main.ts`; the prototype host
-  (`prototype/netserver.ts`) carries the same slice and is what players actually reach: the
-  Docker image runs it as `packages/server/dist/proto-server.mjs`. Not yet: OIDC identity,
-  multi-process scale (pg-boss). (`MultiplayerClient` already sends `action.v1` envelopes.)
-- `packages/client` — client (Stage 4). Direction is a **PWA-first web client** (TWA Android +
-  Capacitor iOS), not React Native — see `docs/cross-platform-roadmap.md` (decision record). Holds
-  the `MultiplayerClient` transport adapter plus framework-agnostic view-models + theme tokens
-  (`welcomeScreen.ts` — welcome screen; `matchHud.ts` — status bar / fleet selection / battle
-  panel; `theme.ts`). **Поток MIG закрыл два прежних пробела** (сверено 2026-09-15): MIG-2 дал
-  пакету собственный вход — `session.ts` делает `POST /auth/login`, обзор партий и занятие
-  места, так что ссылка `?join=` с готовым ws-адресом больше не единственная дверь; MIG-3 дал
-  недостающую половину HUD — `hudView.ts` рисует то, что `matchHud.ts` только описывал
-  (модель проецирует, рендер рисует, и `matchHud` по-прежнему не знает про DOM). Играбельным
-  для игроков остаётся `prototype/`, но разрыв уже не «HUD впереди». `mobile/` — тонкая
-  обёртка Capacitor (APK).
-- `packages/protocol` — the wire contract between server and client, declared ONCE and imported
-  by both (NETA2-4). Each side used to hand-write its own copy; a type-only parity test caught
-  the drift but could not remove the mirror. The client depends on this package and NOT on
-  `@void/server`, so no server code reaches the browser bundle — it imports types only, and the
-  runtime half (`parseClientMessage`/`serializeServerMessage`) tree-shakes away.
+- `packages/shared-core` — the deterministic, data-driven simulation (no server, DB or
+  network) — the foundation the rest builds on.
+- `packages/action-layer` — the action gate in front of the reducer: envelope validation →
+  per-type zod payload schemas → session authorization → idempotency receipts → strict
+  per-session `clientSeq`; stable `E_*` codes.
+- `packages/server` — the authoritative server (`MatchRoom`, Postgres store, offline
+  scheduler, JWT auth; switched by env `AUTH_JWT_SECRET`, `GATE=1`, `ALLOWED_ORIGINS`).
+  Players actually reach the prototype host `prototype/netserver.ts`, which carries the same
+  slice: the Docker image runs it as `packages/server/dist/proto-server.mjs`.
+- `packages/client` — the PWA-first client meant to replace the prototype (decision record:
+  `docs/cross-platform-roadmap.md`). Players still play `prototype/`. `mobile/` — the thin
+  Capacitor wrapper (APK).
+- `packages/protocol` — the server↔client wire contract, declared ONCE (NETA2-4). The client
+  imports it and never `@void/server`, so no server code reaches the browser bundle.
 - `decisions/` — **корневая папка, НЕ пакет**: чистые решения, общие обоим клиентам
-  (`decisions/README.md`). «Что показать вместо списка», «куда вести игрока после отказа»,
-  «можно ли нажимать кнопку» — чистая функция + типы + тест рядом, ни DOM, ни сети, ни
-  таймеров. Устроена как `/localization`: лежит в корне, оба клиента импортируют
-  относительным путём, настраивать сборку не надо. Сегодня в ней больше двухсот модулей, их
-  импортируют больше сотни файлов `prototype/src` и семь — `packages/client` (без тестов, сверено 2026-10-24). **Заводя клиентское решение, клади его СЮДА,
-  а не внутрь `prototype/src`** — поток REFM вынес больше сотни таких решений внутрь
-  прототипа, и каждое улучшало ровно тот клиент, который планируется заменить. Правила
-  МИРА сюда не кладут: они в `packages/shared-core`.
+  («что показать вместо списка», «можно ли нажимать кнопку»): чистая функция + типы + тест
+  рядом, без DOM, сети и таймеров (`decisions/README.md`). Клиенты импортируют её
+  относительным путём, как `/localization`. **Заводя клиентское решение, клади его СЮДА, а
+  не внутрь `prototype/src`**: решение внутри прототипа улучшает ровно тот клиент, который
+  планируется заменить. Правила МИРА сюда не кладут: они в `packages/shared-core`.
 - `data/` — game content as JSON. `docs/` — design docs.
 
 ## Commands
@@ -76,29 +58,13 @@ pnpm run typecheck    # tsc --noEmit, all packages
 pnpm run format       # Prettier --write
 ```
 
-Run the gate locally before committing — `pnpm run check` = lint + typecheck + test +
-docs-check (`scripts/docs-check.mjs`: целостность `.md`-ссылок в docs/, словарь зон
-backlog'а, словарь статусов кирпичей + живость их блокировок `🔒(ID)` в бэклоге И в
-роадмапах (общий индекс) — исполняемая
-часть правила «verify docs against reality»)
-(CI additionally runs an OSV-Scanner SCA pass over the lockfiles; `pnpm audit` is
-retired — npm shut down its audit endpoints, 2026-07). CI mirrors it on PRs, merge groups
-and pushes to branches without an open PR. A read-only `run-policy` skips duplicate push
-work only when an open PR is mergeable and its head matches the pushed SHA. Conflicts,
-unknown mergeability and lookup failures keep branch checks. Queue pushes run with canonical
-required names because GitHub may not deliver `merge_group`. The six required jobs get
-a `Branch — ` prefix on ordinary pushes so skipped copies cannot satisfy required contexts;
-other jobs keep plain names (a skipped job's name expression is shown raw). Event
-triggers remain intact (AUD-9). A push to `main` itself is not re-run: the queue already
-tested that exact tree. `.github/workflows/ci.yml` runs the gate + audit against a
-service Postgres (so the durable-store tests run too), `.github/workflows/security.yml` runs a diverse
-scanner set (Semgrep, CodeQL, Trivy, OSV, Gitleaks, TruffleHog, zizmor) — on the same events
-**and weekly on `main`**, since a pinned prod image outlives the CVE feeds that scanned
-it — `.github/workflows/android.yml` builds the Android APK, and
-`.github/workflows/image.yml` publishes the prod image (build → blocking Trivy → GHCR →
-keyless cosign signature over the digest; the deploy side verifies it with
-`deploy/verify-image.sh` before starting — see `docs/security/pipeline.md`). `main` is protected — changes land
-via PR with green CI (see `CONTRIBUTING.md`); keep the gate green before pushing.
+`pnpm run check` is the gate CI mirrors. Its docs-check (`scripts/docs-check.mjs`) is the
+executable part of «verify docs against reality»: `.md` links in `docs/`, backlog zones,
+brick statuses, live `🔒(ID)` blockers and the generated indexes. `main` is protected:
+changes land via PR with green required checks and the merge queue. Workflows in
+`.github/workflows/`: `ci.yml` (the gate against a service Postgres), `security.yml` (the
+scanners), `image.yml` (the signed prod image), `android.yml` (the APK). Required checks and
+the queue — `CONTRIBUTING.md`; scanners and image signing — `docs/security/pipeline.md`.
 
 ## Non-negotiable invariants
 
@@ -106,7 +72,8 @@ These come straight from the design docs. Breaking them is a bug, not a style ch
 
 1. **Determinism.** `shared-core` is a pure function: same `(state, action, context)`
    → same result. No `Math.random()` and no `Date.now()` anywhere in the core — use
-   the seeded `Rng` and take time via `Context.now`. ESLint enforces this in
+   the seeded `Rng` and take time via `Context.now`; implementation-approximated `Math.*`
+   (`sin`, `exp`, `pow`…) is banned too. ESLint enforces this in
    `packages/shared-core/src/**` (non-test). The RNG stream is locked by a golden
    test (`rng.test.ts`); if you intentionally change the algorithm, update the golden
    values, and understand it invalidates replays of existing matches.
@@ -126,9 +93,10 @@ These come straight from the design docs. Breaking them is a bug, not a style ch
 5. **Server-authority.** The client sends intent, never state. Validation/authorization/
    idempotency live in the action layer (`@void/action-layer`, wired in front of the reducer
    on gated servers); the core reducer assumes an action already cleared those gates.
-6. **Determinism of module order.** Module execution order = their order in the array
-   passed to `createKernel`, recorded in `kernel.manifest` and versioned per match.
-   Don't introduce order-dependent behavior that isn't driven by that fixed order.
+6. **Determinism of module order.** Module execution order = their order in the one list
+   `GAME_MODULES` (`packages/shared-core/src/gameModules.ts`) passed to `createKernel`,
+   recorded in `kernel.manifest` and versioned per match. Don't introduce order-dependent
+   behavior that isn't driven by that fixed order.
 
 ## Architecture quick map
 
@@ -149,7 +117,8 @@ duration), `hook`, `capability`, and `reject`. A scheduled event whose handler t
 dead-lettered (dropped, recorded in `failures`) so the timeline never gets stuck.
 
 New game mechanic = new module (subscribe to events + register hooks) + maybe new JSON
-data. You should not need to touch the kernel.
+data. You should not need to touch the kernel. Skills: `new-module` (module list, manifest
+version, old saves), `add-game-content` (data).
 
 ## Toolchain notes / gotchas
 
@@ -160,8 +129,8 @@ data. You should not need to touch the kernel.
   no-`Date` discipline is enforced by ESLint, not by withholding the types. Don't import
   Node built-ins from non-test `shared-core/src` files.
 - Game data is split into `data/*.json` fragments + `data/manifest.json` (version).
-  A loader composes them into one bundle and runs `parseGameData` (see
-  `schemas.test.ts` for the exact composition). All external data is validated before
+  `composeGameDataBundle` (`packages/shared-core/src/data/loadGameData.ts`) composes them
+  into one bundle that goes through `parseGameData`. All external data is validated before
   it reaches the core (A05/A08).
 - Tests live next to source as `*.test.ts`. The root `vitest.config.ts` discovers them.
 - **Size guard** (`scripts/codeSize.test.ts`, brick SLIM-1): a source file over 1000 lines or a
@@ -174,15 +143,12 @@ data. You should not need to touch the kernel.
 
 ## Локализация — читай ДО того, как напишешь игроку хоть одно слово
 
-**Правило: в коде нет человекочитаемого текста. В коде есть КЛЮЧ.** Весь текст,
-который видит игрок, живёт в корневой папке `/localization` — одна локаль = один файл
-(`ru.ts`, `en.ts`, дальше `de.ts` и т.д.), плоская карта `ключ → текст`. Рантайм ОДИН
-на прототип и клиент — `localization/core.ts`; своей копии `t()` не заводи. Тексты в него
-ПОДКЛЮЧАЮТСЯ (`registerMessages`): прототип импортирует `localization/runtime.ts` и
-получает все языки сразу, клиент грузит РОВНО ОДНУ локаль на старте (LOC-6); архив
-площадки — тоже одну, файлом (`YAG-1.1d`: сборка подменяет `runtime` на `core`).
-Подробный порядок работы (куда писать, что ловит каждый тест гейта, частые ловушки) —
-скилл `localization` (`.claude/skills/localization/SKILL.md`).
+**Правило: в коде нет человекочитаемого текста. В коде есть КЛЮЧ.** Весь текст, который
+видит игрок, живёт в корневой папке `/localization`: одна локаль = один файл (`ru.ts` —
+источник, `en.ts`, `de.ts`, `pl.ts`, `es.ts`), плоская карта `ключ → текст`. Рантайм один
+на прототип и клиент — `localization/core.ts`; своей копии `t()` не заводи. Порядок работы,
+канон формулировок и что ловит каждый тест гейта — скилл `localization`: он нужен на ЛЮБУЮ
+задачу, где игрок что-то читает, даже если слово «локализация» не прозвучало.
 
 ```ts
 t('err.no-capacity')            // → «трюм полон» / “the hold is full”
@@ -191,68 +157,22 @@ t('side.world.fleet-ships', { n: 5 })  // '{n} {n|корабль|корабля|
 tData('Metal Mine')             // ИМЯ игровых данных → ключ data.metal-mine
 ```
 
-- **Слово при числе — формами в строке локали** (`{n|корабль|корабля|кораблей}`, русскому
-  три формы, английскому две; выбирает `Intl.PluralRules`), а не одной: «{n} кораблей» —
-  это «1 кораблей» у игрока. Подробно — §2 скилла `localization`.
-- **Формат ключа:** `домен.сущность.аспект`. Точки — иерархия, kebab-case внутри
-  сегмента: `err.no-capacity`, `data.metal-mine`, `hero.ability.corridor.desc`.
-- **Русский — источник.** Нет ключа в выбранной локали → показывается русский текст
-  (честно и заметно), нет нигде → показывается сам ключ (значит, опечатка).
-- **Новый текст = сначала ключ в `ru.ts` + `en.ts`, потом `t('ключ')` в коде.** Не
-  «напишу пока по-русски, переведу потом»: гейт (`prototype/src/i18n.test.ts`) роняет
-  сборку на ключе, которого нет в обеих локалях.
-- **Статичная разметка** (`build.mjs`): узел ПУСТ, ключ стоит в ЗНАЧЕНИИ атрибута —
-  `<b data-i18n="hub.play"></b>`, аналогично `data-i18n-title/-ph/-aria`. Текст
-  приходит только из локали, поэтому разъехаться с ней он не может.
-- **Новый язык:** положить `/localization/<код>.ts` той же формы и дописать его в
-  `LocaleId`/`LOCALE_IDS`/`LOCALE_LABEL` (`/localization/index.ts`), в `LOCALE_SOURCES`
-  (`/localization/bundles.ts`) и в карту чанков `packages/client/src/locale.ts`. Больше
-  ничего: расхождение этих списков валит гейт. Переводить всё сразу не обязательно —
-  фолбэк на русский запекается в файл языка на сборке клиента.
-- Комментарии в коде — не локализуются: они для разработчика, а не для игрока.
-
-**Канон формулировок (резолюция владельца 2026-09-21, кирпич TXT-0.1): функциональный
-текст несёт только нужную информацию.** Описание кнопки, способности, характеристики —
-это справка, а не проза: лишние предложения работают визуальным шумом, и суть в них
-тонет. Шесть правил: (1) есть у эффекта число, радиус, длительность — назови их в тексте,
-если карточка не показывает их своей таблицей (в досье кораблей и зданий числа держит
-таблица, резолюция 2026-10-08, кирпич TXT-8);
-(2) `.desc`, пересказывающий свой `.name`, удаляется, а не переписывается; (3) очевидное
-следствие не объясняется («ведь голод беспощаден»), неочевидное правило — объясняется;
-(4) никаких «Здесь вы можете…» там, где игрок уже стоит перед кнопкой; (5) лор допустим
-как ОДИН оборот перед числом, но не вместо числа; (6) без пояснительных хвостов после тире:
-простая короткая фраза («При дефиците энергии постройки работают в половину силы»,
-резолюция владельца 2026-10-02). Эталон не надо выдумывать — он в
-репозитории: `err.*` (26 симв.), `cmd.*.hint` (50), `tech.node.*.desc` (58 у 30 узлов из
-35, «Войска связи: единая картина боя. +8% к радиусу радаров.»). Разбор с цифрами и порядок чистки
-существующих доменов — блок TXT в `docs/backlog.md`; подробный канон — §3 скилла
-`localization`. **Канон обязателен для НОВОГО текста и не мандат переписывать старый
-попутно** — правило хирургических правок сильнее.
-
-**Переходного периода больше нет (`LOC-2` закрыт).** Исторически msgid'ом была сама
-русская строка (`t('трюм полон')`), и её держал мост `/localization/legacy/`. Мост
-снят: `t()`/`tData()` принимают ТОЛЬКО ключ, русский литерал в них не переведётся —
-он доедет до игрока как есть. Это держит гейт (`prototype/src/i18n.test.ts`, тест
-«в коде нет русского текста»), так что случайно вернуть старую форму не выйдет.
-
-Отдельно про **имена игровых ДАННЫХ**: они остаются английскими (`name: 'Metal Mine'`),
-потому что `tData()` строит из имени слаг `dataKey()`, а тот вырезает всё, кроме
-`[a-z0-9]`. Русское имя схлопнется в ключ `data.` — перевод станет недостижим, и игрок
-на любой локали увидит исходную строку. Русский текст такого имени живёт в `data.*`.
-
-**Ловушка `packages/server`: там нет `t()`/`/localization` вообще.** Сервер — не клиент,
-у него нет доступа к локали игрока. Если серверный код формирует текст, который увидит
-игрок (push-уведомление, письмо, будущий email-дайджест), НЕЛЬЗЯ синтезировать прозу на
-сервере («N событий», склонения и т.п.) — это либо русский текст напрямую в код (нарушает
-правило выше), либо текст без локали получателя (неверная локаль для не-RU игрока). Разрешено
-только: (а) переиспользовать уже локализованный текст, пришедший ОТТУДА, где он был
-локализован клиентом/действием под конкретного игрока (пример: `push.ts`'s
-`digestPushPayload` берёт заголовок из `RecapItem.text` — уже локализованная строка, а не
-изобретает свою), либо (б) чисто структурное/числовое форматирование без слов (`+3`, а не
-«ещё 3 события»). Поймал на себе именно эту ошибку при ONB-5 (см. PR #434) — писал
-русскую прозу с ручным склонением прямо в `push.ts` и вычистил до коммита. Перед тем как
-писать текст в любом файле `packages/server/src/**`, спроси себя: «а АНГЛОГОВОРЯЩИЙ игрок
-это увидит?» — если да и текста нет в `/localization`, это баг.
+- **Новый текст = сначала ключ в `ru.ts` + `en.ts`, потом `t('ключ')` в коде.** Гейт
+  (`prototype/src/i18n.test.ts`) роняет сборку на ключе, которого нет в обеих локалях, и на
+  русском литерале внутри `t()`: такая строка доехала бы до игрока как есть.
+- **Формат ключа:** `домен.сущность.аспект`, kebab-case внутри сегмента.
+- **Слово при числе — формами в строке локали** (`{n|корабль|корабля|кораблей}`), а не
+  одной: «{n} кораблей» — это «1 кораблей» у игрока.
+- **Имена игровых ДАННЫХ остаются английскими** (`name: 'Metal Mine'`), русский текст —
+  ключом `data.*`: `dataKey()` вырезает всё, кроме `[a-z0-9]`, и русское имя схлопнется в
+  недостижимый ключ `data.`.
+- **Канон формулировок** (резолюция владельца 2026-09-21, TXT-0.1): функциональный текст
+  несёт только нужную информацию — число, радиус, длительность, а не прозу. Обязателен для
+  НОВОГО текста и не мандат переписывать старый попутно. Шесть правил и эталоны — §3 скилла.
+- **В `packages/server` нет `t()` и `/localization`.** Текст, который увидит игрок
+  (push, письмо), сервер не сочиняет: только строка, уже локализованная под этого игрока,
+  числа без слов (`+3`, а не «ещё 3 события») или ключ, который адаптер хоста в `scripts/`
+  переводит на язык получателя. Подробно — §5 скилла.
 
 ## Working agreements
 
@@ -268,30 +188,14 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
   doc is gated on checking it against the actual code/behaviour first: read the source,
   run the gate, confirm names / counts / signatures. Never document from memory or
   assumption; if a claim can't be verified against the codebase, don't write it.
-- Run `pnpm run check` before committing; keep CI green.
 - When you finish a roadmap milestone, update the "Статус реализации" section in
   `docs/roadmap.md`.
-- On any request to push/publish/create a PR, first follow `.claude/skills/publish-pr/SKILL.md`.
-  It is the canonical path for hosted publication and includes the Git Data API fallback for
-  local-only commits and binary assets such as PNG/WebP.
-- Development happens on a feature branch. For remote publication, do **not** assume the
-  shell's `git push` is authenticated just because fetch works. In hosted agent sessions,
-  prefer the connected GitHub API/app when it has write access. If terminal push gets one auth
-  failure, do not retry it or bounce back and forth between transports. If the GitHub MCP itself
-  returns a transport/session error such as `Invalid MCP request metadata`, do not retry that
-  connector and do not attempt Git Data fallback through the same MCP. Follow `publish-pr` and
-  use at most one genuinely independent write transport; otherwise stop with a recovery checkpoint.
-- **Final sync before PR:** when the implementation is complete, refresh the current `main`
-  again immediately before publication. If the task branch is behind/diverged, integrate fresh
-  `main` first (normally rebase the short-lived branch), resolve conflicts, then re-run checks
-  that the integration could invalidate. Never knowingly open a PR from a stale branch. If the
-  owner explicitly requested no checks, still sync/compare but do not add extra test runs.
-- Before opening a PR, verify the remote head exists, is ahead of current `main`, and has no
-  existing open PR to reuse. Keep the PR draft while more edits are expected.
-- **Do not manually enable generic auto-merge or enqueue normal PRs.** This repository's
-  `.github/workflows/automerge.yml` automatically puts eligible ready PRs into the merge queue
-  after required checks. A queued head branch cannot be updated; if a post-queue fix is needed,
-  dequeue first or report the blocker. See `docs/pr-merge-rule.md`.
+- **Publication.** On any request to push/publish/create a PR, follow the `publish-pr`
+  skill: one write transport (in hosted sessions the connected GitHub API/app; after one
+  auth or MCP transport failure, no retry), a final sync with fresh `main` right before the
+  PR, the preflight, a draft while edits are expected. **Never enable generic auto-merge or
+  enqueue a normal PR by hand**: `.github/workflows/automerge.yml` queues eligible ready PRs
+  after required checks, and a queued branch is frozen (`docs/pr-merge-rule.md`).
 - **Subscribe to every PR you open, right after opening it** (`subscribe_pr_activity`),
   and stay on it until it is merged or closed. Owning a PR means driving it to green:
   on a CI failure either push a fix or reply in the thread with the concrete blocker —
@@ -304,7 +208,7 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
   keep PRs small and single-zone, get the gate green, PR back to `main`. Full regimen
   is in `CONTRIBUTING.md`. The assignable task list ("кирпичики", one brick ≈ one PR ≈
   one session) is `docs/backlog.md` — take a brick scoped to one package/module so
-  parallel work can't collide.
+  parallel work can't collide (skill `brick`).
 
 ## Behavioral guidelines
 
