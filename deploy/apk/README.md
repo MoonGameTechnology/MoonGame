@@ -85,6 +85,13 @@ APK примут только после ручной установки сбо�
 См. [правила окружений GitHub](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
 
 Host `publish.mjs` каждые5мин опрашивает только фиксированные GitHub release URLs.
+`version.json` и APK скачиваются через GitHub Release Assets API по положительным
+целым ID из одного снимка релиза, с `Accept: application/octet-stream`. Ожидаемые
+`browser_download_url` по-прежнему проверяются на точный репозиторий, канал и имя;
+произвольные URL из ответа не используются. Это исключает смешивание файлов при
+смене rolling tag и зависимость от кеша/504 его browser download-ссылок. Авторизация
+GitHub и новые секреты на VPS не нужны.
+
 HTTPS redirects ограничены GitHub/CDN allowlist, JSON≤64KiB/metadata≤32KiB,
 APK≤128MiB, timeout90s на скачивание. До switch проверяются подпись манифеста, SHA-256,
 подпись apksigner, package name и обе Android версии. Публикуется ровно подписанный
