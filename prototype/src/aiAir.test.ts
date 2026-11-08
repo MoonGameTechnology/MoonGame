@@ -627,19 +627,35 @@ describe('ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ — высадка с но�
     expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
   });
 
-  it('ПРАВИЛО №3 — под ВРАЖЕСКИМ ФЛОТОМ высадка не идёт', () => {
-    const { s, foe } = staged();
-    withIntel(s, foe.id, [{ unit: 'militia', count: 1 }]);
+  const guard = (s: GameState, at: string): void => {
     s.fleets.p1_guard = {
       id: 'p1_guard',
       owner: 'p1',
-      location: foe.id,
+      location: at,
       movement: null,
       units: [{ unit: 'cruiser', count: 2 }],
       traits: [],
       battleId: null,
     } as GameState['fleets'][string];
+  };
+
+  it('ПРАВИЛО №3 — под ВИДИМЫМ вражеским флотом высадка не идёт', () => {
+    const { s, foe } = staged();
+    withIntel(s, foe.id, [{ unit: 'militia', count: 1 }]);
+    guard(s, foe.id);
+    // Окно агента над миром показывает и флоты на его орбите.
+    s.intel = { p2: [{ kind: 'planet', target: foe.id, until: s.time + 3_600_000 }] };
     expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
+  });
+
+  it('ПРАВИЛО №1 и для флотов: НЕВИДИМЫЙ флот бот не учитывает, как не заметил бы игрок', () => {
+    // ponytail-аудит 2026-11-08: бот видел флоты в слепой зоне и под маскировкой.
+    const { s, foe } = staged();
+    withIntel(s, foe.id, [{ unit: 'militia', count: 1 }]);
+    guard(s, foe.id);
+    const strike = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');
+    expect(strike).toHaveLength(1);
+    expect((strike[0]!.payload as { targetPlanetId?: string }).targetPlanetId).toBe(foe.id);
   });
 
   it('ПРАВИЛО №2 — над миром уже стоит СВОЙ флот: берём штурмом, челноки не тратим', () => {
