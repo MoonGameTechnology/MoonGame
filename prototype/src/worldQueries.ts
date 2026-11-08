@@ -147,7 +147,7 @@ export function queuedLabel(q: QueuedBuild): string {
  * Теперь очередь одна и она в ядре (`Planet.buildQueue`): и сервер, и локальный
  * редьюсер прототипа исполняют одно правило, а клиент её только ПОКАЗЫВАЕТ.
  */
-export function enqueueBuild(planetId: string, order: QueuedBuild): void {
+export function enqueueBuild(planetId: string, order: QueuedBuild): boolean {
   // Одна точка опоры против дубля одноэкземплярного здания: плитка, кодекс и любой
   // будущий вход проходят здесь, и серые плитки остаются чистой косметикой.
   if (order.kind === 'building' && game.buildingLocked(planetId, order.id)) {
@@ -159,15 +159,17 @@ export function enqueueBuild(planetId: string, order: QueuedBuild): void {
             : 'E_ALREADY_QUEUED',
         ),
     );
-    return;
+    return false;
   }
   // Тост «в очередь» — ПРЕДСКАЗАНИЕ клиента: полоса занята, значит ядро поставит заказ
   // в ряд, а не начнёт его. Держать это предсказание можно ровно потому, что оно
   // косметическое: правду показывает панель конвейера, которая читает состояние, и
   // следующий снимок её поправит. Раньше тост был только в соло — в сети локальной
   // очереди не было вовсе, и тап не отвечал игроку ничем.
-  if (activeConstruction(planetId, orderLane(data, { kind: order.kind, unit: order.id }))) {
+  const queued = !!activeConstruction(planetId, orderLane(data, { kind: order.kind, unit: order.id }));
+  if (!game.playerOrder(queuedAction(planetId, order))) return false;
+  if (queued) {
     game.note(t('queue.added', { what: queuedLabel(order), at: game.placeName(planetId) }));
   }
-  game.playerOrder(queuedAction(planetId, order));
+  return true;
 }

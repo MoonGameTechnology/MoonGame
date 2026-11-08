@@ -30,8 +30,9 @@ export function productionCatalogTile(state: GameState, me: string, world: strin
     (!ground && arsenal !== undefined && !arsenal.hulls.includes(id)) ||
     Object.entries(price).some(([key, n]) => n > (resources[key] ?? 0));
   const action = `<button class="cn-hbtn${id === selected ? ' on' : ''}" data-cnhull="${esc(id)}"${blocked ? ' disabled' : ''}>${t(ground ? 'production.hire' : 'production.equip')}</button>`;
+  const requirements = productionRequirementsHtml(state, me, world, 'unit', id);
   const quote = `<div class="pw-catalog-quote">${cost(price)}<small>${fmtDur(matchUnitHours(state, unit.buildTimeHours))}</small></div>`;
   return `<article class="pw-hull-tile pw-catalog-tile${ground ? ' pw-ground-card' : ''}">${ground
     ? `<div class="pw-ground-identity">${art}<span>${title}<small>${t('production.stat.hp')} ${unit.stats.hp}</small></span></div><div class="pw-catalog-actions">${quote}${action}${productionInfoButton('unit', id)}</div>`
-    : `${art}${title}${quote}<div class="pw-catalog-actions">${action}${productionInfoButton('unit', id)}</div>`}${productionRequirementsHtml(state, me, world, 'unit', id)}</article>`;
+    : `<div class="pw-catalog-visual">${art}${requirements}</div>${title}${quote}<div class="pw-catalog-actions">${action}${productionInfoButton('unit', id)}</div>`}${ground ? requirements : ''}</article>`;
 }

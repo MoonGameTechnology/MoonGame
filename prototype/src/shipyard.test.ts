@@ -621,6 +621,7 @@ describe('верфь — окно', () => {
     const win = fakeWin();
     const details = { open: false };
     let queueHtml = '';
+    const stock = { innerHTML: '' };
     const queue = {
       get innerHTML() { return queueHtml; },
       set innerHTML(html: string) { queueHtml = html; details.open = true; },
@@ -629,12 +630,13 @@ describe('верфь — окно', () => {
     const yard = initShipyard(hostOf({ root: () => win, state: () => s }));
     yard.open('heroes', home);
     const originalPane = win.innerHTML;
-    win.querySelector = ((selector: string) => selector === '#cn-queue' ? queue : null) as typeof win.querySelector;
+    win.querySelector = ((selector: string) => selector === '#cn-queue' ? queue : selector === '.pw-stock' ? stock : null) as typeof win.querySelector;
     // The hero HTML is unchanged when an unrelated order finishes; resources can change too.
     s.scheduled = s.scheduled.filter(e => e.type !== 'construction.complete');
     s.players.p1!.resources.metal = 8000;
     yard.refreshHeroes();
     yard.refreshQueue();
+    expect(stock.innerHTML).toContain('8000');
     expect(queueHtml).toContain('data-pw-empty="ships"');
     expect(details.open).toBe(false);
     expect(win.innerHTML).toBe(originalPane);
