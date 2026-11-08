@@ -86,8 +86,9 @@ retired — npm shut down its audit endpoints, 2026-07). CI mirrors it on PRs, m
 and pushes to branches without an open PR. A read-only `run-policy` skips duplicate push
 work only when an open PR is mergeable and its head matches the pushed SHA. Conflicts,
 unknown mergeability and lookup failures keep branch checks. Queue pushes run with canonical
-required names because GitHub may not deliver `merge_group`. Other push check names have
-a `Branch — ` prefix so skipped copies cannot satisfy required PR/queue contexts. Event
+required names because GitHub may not deliver `merge_group`. The six required jobs get
+a `Branch — ` prefix on ordinary pushes so skipped copies cannot satisfy required contexts;
+other jobs keep plain names (a skipped job's name expression is shown raw). Event
 triggers remain intact (AUD-9). A push to `main` itself is not re-run: the queue already
 tested that exact tree. `.github/workflows/ci.yml` runs the gate + audit against a
 service Postgres (so the durable-store tests run too), `.github/workflows/security.yml` runs a diverse

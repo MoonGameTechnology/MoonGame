@@ -201,7 +201,7 @@ jobs:
   codeql:
     needs: run-policy
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}SAST dataflow (CodeQL)
+    name: SAST dataflow (CodeQL)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -300,7 +300,7 @@ jobs:
   trufflehog:
     needs: run-policy
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}Secrets — history + verify (TruffleHog)
+    name: Secrets — history + verify (TruffleHog)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -553,7 +553,7 @@ jobs:
   trivy-caddy:
     needs: run-policy
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}Vuln — наш образ Caddy (Trivy image)
+    name: Vuln — наш образ Caddy (Trivy image)
     # SEC-31. Caddy мы теперь собираем сами (`deploy/caddy/Dockerfile`): апстримный образ
     # не пересобирали с 2026-06-22, а его Go-бинарь несёт 13 stdlib-находок, которые
     # закрываются одной сменой тулчейна. Джоба делает три вещи: собирает образ (сборка
@@ -652,7 +652,7 @@ jobs:
   trivy-deps:
     needs: run-policy
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}Vuln — third-party prod images (Trivy image)
+    name: Vuln — third-party prod images (Trivy image)
     # SEC-11: `trivy-image` above scans OUR image only. Production runs more containers
     # nobody was scanning — their refs are READ OUT OF THE COMPOSE FILES here (not a
     # second hardcoded list), so a digest bump in deploy/ can't drift away from what CI
@@ -842,7 +842,7 @@ jobs:
   kics:
     needs: run-policy
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}IaC — Docker Compose (KICS)
+    name: IaC — Docker Compose (KICS)
     # ЗАЧЕМ ОТДЕЛЬНЫЙ ДВИЖОК. У Trivy misconfig НЕТ формата Docker Compose (он умеет
     # Dockerfile/k8s/terraform/cloudformation/helm/ARM), поэтому рантайм-постура прода —
     # привилегии, лимиты, дефолты паролей, healthcheck'и в `deploy/docker-compose*.yml` —
@@ -1040,7 +1040,7 @@ jobs:
 
   dependency-review:
     needs: run-policy
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}SCA — что вносит ЭТОТ PR (Dependency Review)
+    name: SCA — что вносит ЭТОТ PR (Dependency Review)
     # ЧЕМ ОТЛИЧАЕТСЯ ОТ OSV. Блокирующий `osv` смотрит на lockfile ЦЕЛИКОМ и отвечает
     # «в проекте есть уязвимая зависимость». Это действие диффает граф зависимостей базы
     # и головы и отвечает на другой вопрос — «уязвимость приехала ИМЕННО В ЭТОМ PR».
@@ -1110,7 +1110,7 @@ jobs:
 
   dependency-check:
     needs: run-policy
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}SCA — NVD/CPE (OWASP Dependency-Check)
+    name: SCA — NVD/CPE (OWASP Dependency-Check)
     # SEC-15. A SECOND SCA engine over the same dependencies, deliberately different from
     # OSV/Trivy: those resolve advisories by package identity (GHSA/OSV records keyed to an
     # ecosystem name), this one matches CPEs straight out of the NVD feed. Different
@@ -1234,7 +1234,7 @@ jobs:
   dast-zap:
     needs: run-policy
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}DAST — running server (ZAP baseline)
+    name: DAST — running server (ZAP baseline)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1367,7 +1367,7 @@ jobs:
   sbom:
     needs: run-policy
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}SBOM — files (Syft / CycloneDX)
+    name: SBOM — files (Syft / CycloneDX)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1401,7 +1401,7 @@ jobs:
   zizmor:
     needs: run-policy
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}Workflow security (zizmor)
+    name: Workflow security (zizmor)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1442,7 +1442,7 @@ jobs:
 
   scorecard:
     needs: run-policy
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}Repo posture (OpenSSF Scorecard)
+    name: Repo posture (OpenSSF Scorecard)
     runs-on: ubuntu-latest
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') && (github.ref == 'refs/heads/main') }}
     permissions:
@@ -1490,7 +1490,7 @@ jobs:
   actionlint:
     needs: run-policy
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}Workflow correctness (actionlint)
+    name: Workflow correctness (actionlint)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -1522,7 +1522,7 @@ jobs:
   shellcheck:
     needs: run-policy
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}Shell scripts (ShellCheck)
+    name: Shell scripts (ShellCheck)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -1554,7 +1554,7 @@ jobs:
   hadolint:
     needs: run-policy
     if: ${{ !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/heads/gh-readonly-queue/') || needs.run-policy.outputs.run != 'false') }}
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}Dockerfile practices (Hadolint)
+    name: Dockerfile practices (Hadolint)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -1584,7 +1584,7 @@ jobs:
           category: hadolint
 
   report:
-    name: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') && 'Branch — ' || '' }}summarize + report
+    name: summarize + report
     # Все сканеры реестра EXPECTED должны входить в needs; run-policy только выбирает запуск.
     # Реестр задан в summarize-security.mjs. Джоба, которой
     # тут нет, не удерживает `report` — а он забирает артефакты БЕЗ `name`, то есть только
