@@ -246,6 +246,33 @@ describe('interaction — владелец выбора (REFM-208)', () => {
     expect(I.selStrike).toBeNull();
   });
 
+  // Концепт «Управление эскадрой»: эскадра на стоянке — свой выбор, и после взлёта он едет
+  // за ней на её вылет.
+  it('a parked squadron is its own pick and follows its squadron into the air', () => {
+    I.pickFleets(['my1'], mine);
+    I.pickSquadron('sq1');
+    expect(I.selSquadron).toBe('sq1');
+    expect(I.selFleet).toBeNull();
+    expect(I.hasSelection()).toBe(true);
+    const port = { w1: { hangar: [{ id: 'sq1' }] } };
+    I.pruneSelection({}, 'p1', [], port);
+    expect(I.selSquadron).toBe('sq1');
+    // В трюме носителя — тоже стоянка.
+    I.pruneSelection({ c1: { owner: 'p1', hangar: [{ id: 'sq1' }] } }, 'p1', [], {});
+    expect(I.selSquadron).toBe('sq1');
+    // Взлетела: выбор переехал на вылет.
+    I.pruneSelection({}, 'p1', [{ id: 'st9', squadronId: 'sq1' }], {});
+    expect(I.selSquadron).toBeNull();
+    expect(I.selStrike).toBe('st9');
+    // Пропала совсем — выбора нет.
+    I.pickSquadron('sq2');
+    I.pruneSelection({}, 'p1', [], {});
+    expect(I.hasSelection()).toBe(false);
+    I.pickSquadron('sq1');
+    I.pickWorld('w1');
+    expect(I.selSquadron).toBeNull();
+  });
+
   // Правило 16: выбор забывают смена матча, пустое выделение и ✕, остальные поводы его держат.
   it('a reason forgets the whole selection exactly when the table says so', () => {
     for (const reason of Object.keys(DISARMED_BY) as Reason[])
@@ -309,7 +336,8 @@ describe('проводка в main.ts (REFM-207, REFM-208)', () => {
     const sheet = readFileSync(new URL('./sidePanel.ts', import.meta.url), 'utf8');
     expect(sheet.split('hasSelection: hasSelection(),').length - 1).toBe(1);
     expect(count("{ id: 'side', isOpen: hasSelection,")).toBe(1);
-    for (const src of [main, sheet]) expect(src).not.toMatch(/selPlanet !== null \|\| selFleets\.size > 0/);
+    for (const src of [main, sheet])
+      expect(src).not.toMatch(/selPlanet !== null \|\| selFleets\.size > 0/);
   });
 
   // Ход локального мира и снимок сервера чистят выбор одним вызовом: у снимка была своя
@@ -317,9 +345,11 @@ describe('проводка в main.ts (REFM-207, REFM-208)', () => {
   it('the local world and the server snapshot prune the selection with one call', () => {
     // Шаг локального мира живёт у конвейера приказа (`orderPipeline.ts`, REFM-240).
     const pipe = readFileSync(new URL('./orderPipeline.ts', import.meta.url), 'utf8');
-    expect(count('pruneSelection(s.fleets, ME, s.strikes);')).toBe(1);
+    expect(count('pruneSelection(s.fleets, ME, s.strikes, s.planets);')).toBe(1);
     expect(
-      pipe.match(/pruneSelection\(out\.state\.fleets, game\.me\(\), out\.state\.strikes\);/g),
+      pipe.match(
+        /pruneSelection\(out\.state\.fleets, game\.me\(\), out\.state\.strikes, out\.state\.planets\);/g,
+      ),
     ).toHaveLength(1);
     expect(main).not.toMatch(/\b(keepFocus|keepGroup|refSurvives|pruneGroup)\(/);
   });

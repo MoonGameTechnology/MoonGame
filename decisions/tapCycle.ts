@@ -36,8 +36,9 @@
 
 /** Что оказалось выбрано под тапом. */
 export interface TapPick {
-  /** `strike` — своя эскадра в воздухе; `id` у неё — id вылета (правило 7). */
-  kind: 'strike' | 'fleet' | 'planet';
+  /** `strike` — своя эскадра в воздухе; `id` у неё — id вылета (правило 7).
+   *  `squadron` — своя эскадра на стоянке, из значка ангара (`hangarBadge.ts`). */
+  kind: 'strike' | 'squadron' | 'fleet' | 'planet';
   id: string;
 }
 

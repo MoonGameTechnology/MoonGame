@@ -103,7 +103,7 @@ export function apply(out: StepOut) {
   // Что теряет силу вместе с флотом — владелец выбора (`interaction.ts`, REFM-208) по
   // правилам `selectionPrune.ts`: одиночная ссылка спрашивает только «существует ли», а
   // группа чистится дважды — живые И свои. Тот же вызов стоит в снимке сервера.
-  pruneSelection(out.state.fleets, game.me(), out.state.strikes);
+  pruneSelection(out.state.fleets, game.me(), out.state.strikes, out.state.planets);
   // Режим «Приказ»: пропавшие флоты выбрасываются покадрово в renderChainBar; здесь
   // достаточно ничего не делать — режим сам гаснет, когда fleetIds опустеет.
   game.handleEvents(out.events);

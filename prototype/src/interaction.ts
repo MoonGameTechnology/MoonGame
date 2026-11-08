@@ -129,6 +129,10 @@ export let selFork: { province: string; trail: number } | null = null;
 /** Своя эскадра В ВОЗДУХЕ (SHU-6.14) — id вылета: адрес её приказов. Исключает флоты, мир
  *  и развилку: у неё своя карточка. */
 export let selStrike: string | null = null;
+/** Своя эскадра НА СТОЯНКЕ — в порту мира или в трюме носителя (концепт «Управление
+ *  эскадрой», 2026-11-08): id эскадры. Исключает флоты, мир, развилку и вылет — у неё своя
+ *  карточка. Взлетела — выбор переезжает на её вылет (`pruneSelection`). */
+export let selSquadron: string | null = null;
 /** Группа своих флотов: рамка, Ctrl-клик, набор. */
 export let selFleets: ReadonlySet<string> = new Set();
 /** UI-14. ЧУЖОЙ флот, который игрок тапнул, чтобы посмотреть. Держится ОТДЕЛЬНО от
@@ -230,6 +234,7 @@ export function disarmForCommand(cmd: string | undefined, phone: boolean): void 
 function forget(): void {
   selFleet = null;
   selStrike = null;
+  selSquadron = null;
   selPlanet = null;
   selFork = null;
   selFleets = new Set();
@@ -251,6 +256,7 @@ export function pickFleets(ids: readonly string[], mine: (id: string) => boolean
   selFleet = sel.single;
   inspectFleet = sel.inspect;
   selStrike = null;
+  selSquadron = null;
   selPlanet = null;
   selFork = null;
   mobileDraft = null;
@@ -264,6 +270,7 @@ export function pickFleets(ids: readonly string[], mine: (id: string) => boolean
 export function pickWorld(id: string): void {
   selPlanet = id;
   selStrike = null;
+  selSquadron = null;
   selFork = null;
   selFleet = null;
   selFleets = new Set();
@@ -273,6 +280,7 @@ export function pickWorld(id: string): void {
 export function pickFork(fork: { province: string; trail: number }): void {
   selFork = fork;
   selStrike = null;
+  selSquadron = null;
   selPlanet = null;
   selFleet = null;
   selFleets = new Set();
@@ -285,6 +293,20 @@ export function pickFork(fork: { province: string; trail: number }): void {
  */
 export function pickStrike(id: string): void {
   selStrike = id;
+  selSquadron = null;
+  selFleet = null;
+  selFleets = new Set();
+  inspectFleet = null;
+  selPlanet = null;
+  selFork = null;
+  mobileDraft = null;
+  mobileChoices = [];
+}
+
+/** Выбрать свою эскадру на стоянке: гаснет всё остальное, как при выборе эскадры в воздухе. */
+export function pickSquadron(id: string): void {
+  selSquadron = id;
+  selStrike = null;
   selFleet = null;
   selFleets = new Set();
   inspectFleet = null;
@@ -307,7 +329,8 @@ export function hasSelection(): boolean {
     inspectFleet !== null ||
     selPlanet !== null ||
     selFork !== null ||
-    selStrike !== null
+    selStrike !== null ||
+    selSquadron !== null
   );
 }
 
@@ -325,11 +348,24 @@ export function deselectFleets(): void {
  * Выбранная эскадра в воздухе — пока жив её вылет.
  */
 export function pruneSelection(
-  fleets: Readonly<Record<string, { readonly owner: string } | undefined>>,
+  fleets: Readonly<
+    Record<
+      string,
+      { readonly owner: string; readonly hangar?: readonly { readonly id: string }[] } | undefined
+    >
+  >,
   me: string,
-  strikes: readonly { readonly id: string }[] = [],
+  strikes: readonly { readonly id: string; readonly squadronId?: string }[] = [],
+  planets: Readonly<Record<string, { readonly hangar?: readonly { readonly id: string }[] }>> = {},
 ): void {
   const exists = (id: string): boolean => !!fleets[id];
+  // Эскадра на стоянке и в воздухе — один юнит: взлетела — выбор едет за ней на её вылет,
+  // пропала совсем (слита, сбита) — карточке не о ком рассказывать.
+  if (selSquadron !== null && !parked(selSquadron, fleets, planets)) {
+    const id = selSquadron;
+    selSquadron = null;
+    selStrike = strikes.find((st) => st.squadronId === id)?.id ?? null;
+  }
   // Эскадра села или сбита — вылета больше нет, и карточке не о ком рассказывать.
   if (!refSurvives(selStrike, (id) => strikes.some((st) => st.id === id))) selStrike = null;
   if (!refSurvives(selFleet, exists)) selFleet = null;
@@ -337,6 +373,17 @@ export function pruneSelection(
   if (splitState && !refSurvives(splitState.fleetId, exists)) drop('splitState');
   if (troopsPlan && !refSurvives(troopsPlan.fleetId, exists)) drop('troopsPlan');
   selFleets = pruneGroup(selFleets, (id) => fleets[id]?.owner, me);
+}
+
+/** Стоит ли эскадра в каком-нибудь ангаре — порта или носителя. */
+function parked(
+  id: string,
+  fleets: Readonly<Record<string, { readonly hangar?: readonly { readonly id: string }[] } | undefined>>,
+  planets: Readonly<Record<string, { readonly hangar?: readonly { readonly id: string }[] }>>,
+): boolean {
+  const holds = (host: { readonly hangar?: readonly { readonly id: string }[] } | undefined) =>
+    (host?.hangar ?? []).some((sq) => sq.id === id);
+  return Object.values(planets).some(holds) || Object.values(fleets).some(holds);
 }
 
 /** Телефон: поставить цель приказа на подтверждение, `null` — снять. */

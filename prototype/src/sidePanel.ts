@@ -105,6 +105,7 @@ import {
   heroSpawnAim,
   merging,
   pickMode,
+  pickSquadron,
   pickWorld,
   rallyAim,
   retreatAim,
@@ -112,6 +113,7 @@ import {
   selFleets,
   selFork,
   selPlanet,
+  selSquadron,
   selStrike,
   splitState,
   squadMerge,
@@ -127,6 +129,7 @@ import { afterRebuild, FORGOTTEN, keepScroll, panelChanged } from './panelCache'
 import { pickPanel } from './panelSelect';
 import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { saveSectorProgress, sectorProgress } from './sectorProfile';
+import { parkedSquadronHtml, squadronTransfer } from './squadronCardView';
 import { isSectorZeroRun } from './sectorRun';
 import { opensNow } from './sheetLift';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
@@ -252,6 +255,12 @@ function panelHtml(): string {
   // Эскадра в воздухе (SHU-6.14): села или сбита — вылета нет, и панель идёт дальше.
   const aloft = selStrike ? ownStrike(selStrike) : null;
   if (aloft) return aloftPanelHtml(aloft);
+  // Эскадра на стоянке (концепт «Управление эскадрой»): улетела или пропала — панель идёт
+  // дальше, выбор чистит `pruneSelection`.
+  const parked = selSquadron
+    ? parkedSquadronHtml(selSquadron, { world: s, me: game.me() })
+    : null;
+  if (parked) return parked;
   // Приоритет претендентов и отсев мёртвых ссылок — в `panelSelect.ts` (REFM-39):
   // устаревший выбор флота проваливается на мир, а не запирает панель пустотой.
   const pick = pickPanel(
@@ -809,8 +818,17 @@ function onSideClick(ev: MouseEvent): void {
   } else if (act === 'wingmergeto') {
     const from = squadMerge?.from;
     const found = from ? squadronAt(from) : null;
-    if (from && found) playerOrder(mergeSquadron(ME, found.base, from, arg));
+    // Выбранная эскадра слита — карточка переходит на ту, в которую её слили.
+    if (from && found && playerOrder(mergeSquadron(ME, found.base, from, arg)) && selSquadron)
+      pickSquadron(arg);
     drop('squadMerge');
+  } else if (act === 'sqpick') {
+    // Имя эскадры в карточке соседки или в списке — выделить её саму.
+    pickSquadron(arg);
+  } else if (act === 'sqload' || act === 'squnload') {
+    // Перегрузить ЭТУ эскадру (карточка эскадры): порт → носитель у причала или обратно.
+    const order = squadronTransfer(s, ME, arg, act === 'sqload');
+    if (order) playerOrder(order);
   } else if (act === 'wingload' || act === 'wingunload') {
     // Что именно перегружать — `hangarPanel.ts` (`transferPick`): первый живой стек
     // источника, столько, сколько влезет в приёмник. Кнопки нет, если брать нечего,
