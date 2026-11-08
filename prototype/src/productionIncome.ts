@@ -30,7 +30,13 @@ export function productionIncomeCard(state: GameState, me: string, world: string
 }
 
 /** Account stock, separate from this planet's production rates. */
-export function productionStockHtml(state: GameState, me: string): string {
+export function productionStockHtml(state: GameState, me: string, contentsOnly = false): string {
   const stock = state.players[me]?.resources ?? {};
-  return `<div class="pw-stock">${data.resources.filter(r => r !== 'biomass' || feedsOnBiomass(state, me, data) || !!stock[r]).map(r => resChip(r, stock[r] ?? 0)).join('')}</div>`;
+  const contents = data.resources.filter(r => r !== 'biomass' || feedsOnBiomass(state, me, data) || !!stock[r]).map(r => resChip(r, stock[r] ?? 0)).join('');
+  return contentsOnly ? contents : `<div class="pw-stock">${contents}</div>`;
+}
+
+export function refreshProductionStock(root: HTMLElement, state: GameState, me: string): void {
+  const stock = root.querySelector('.pw-stock');
+  if (stock) stock.innerHTML = productionStockHtml(state, me, true);
 }

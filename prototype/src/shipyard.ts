@@ -4,7 +4,7 @@ import { productionCatalogHeading, productionCatalogTile } from './productionCat
 import { closeProductionOverlay, fittingSheet, presentProduction, rememberProductionDetails, productionOrderHtml } from './productionPresentation';
 import { productionQueueHtml } from './productionQueueView';
 import { completedUnitSpend } from './economy';
-import { productionIncomeHtml, productionStockHtml } from './productionIncome';
+import { productionIncomeHtml, productionStockHtml, refreshProductionStock } from './productionIncome';
 import { productionClick } from './productionInteraction';
 /**
  * «ПРОИЗВОДСТВО» — the unified in-match order screen (CON-1, LARS-4, REFM-13, ROS-3.1).
@@ -1100,6 +1100,7 @@ export function initShipyard(host: YardHost) {
     },
     refreshHeroes: () => {
       if (tab !== 'heroes' || !host.root().classList.contains('show')) return;
+      refreshProductionStock(host.root(), host.state(), host.me());
       // Do not even build the expensive hero HTML while touch/inertial scrolling is active.
       // The next 1s host tick catches up after the 180ms idle guard expires.
       if (heroScrolling) return;
@@ -1118,7 +1119,9 @@ export function initShipyard(host: YardHost) {
       }
     },
     refreshQueue: () => {
-      if (heroScrolling || !host.root().classList.contains('show')) return;
+      if (!host.root().classList.contains('show')) return;
+      refreshProductionStock(host.root(), host.state(), host.me());
+      if (heroScrolling) return;
       if (tab !== 'heroes' && (tab === 'buildings' || productionAvailability(host) !== lastAvailability)) { paint(); return; }
       const el = host.root().querySelector('#cn-queue');
       if (!el) return;
