@@ -23,6 +23,10 @@ export interface Snapshot {
   buildings: Array<{ type: string; level: number }>;
   /** Last identified physical environment; absent on older saved snapshots. */
   environment?: { kind?: string; terrain?: string };
+  /** Когда мир последний раз был опознан (время мира, мс): окно «i» пишет «разведка Nч
+   *  назад» (UIX-10.12). Нет у снимков, снятых без времени: память с сервера после
+   *  перезагрузки и снимки, сохранённые раньше. */
+  at?: number;
 }
 
 /** Снимок мира на момент опознания — копия, живое состояние за ним не тянется. */
@@ -39,8 +43,9 @@ export function snapshotOf(p: Planet): Snapshot {
 export interface ScanMemory {
   /** Записать снимки опознанных узлов. Радарные сюда попадать не должны. Узел, чей
    *  нынешний снимок снят с этого же объекта мира, заново не снимается: мир не правят на
-   *  месте, а заменяют, и тот же объект — тот же снимок. */
-  remember(identify: Iterable<string>, planets: Record<string, Planet | undefined>): void;
+   *  месте, а заменяют, и тот же объект — тот же снимок. `at` — время опознания: оно
+   *  обновляется и у неизменного снимка, ведь мир видели и сейчас. */
+  remember(identify: Iterable<string>, planets: Record<string, Planet | undefined>, at?: number): void;
   /** Мир правили на месте (песочница): следующая запись снимает опознанные узлы заново,
    *  даже с того же объекта. */
   retake(): void;
@@ -69,14 +74,19 @@ export function createScanMemory(): ScanMemory {
   let taken = new WeakMap<Planet, Snapshot>();
   let version = 0;
   return {
-    remember(identify, planets) {
+    remember(identify, planets, at) {
       version++;
       for (const id of identify) {
         const p = planets[id];
         if (!p) continue;
         const prev = seen.get(id);
-        if (prev !== undefined && taken.get(p) === prev) continue;
+        if (prev !== undefined && taken.get(p) === prev) {
+          if (at !== undefined) prev.at = at;
+          continue;
+        }
         const snap = snapshotOf(p);
+        const when = at ?? prev?.at;
+        if (when !== undefined) snap.at = when;
         seen.set(id, snap);
         taken.set(p, snap);
       }

@@ -34,7 +34,7 @@ const first = (mouse: boolean): SpotlightStep[] =>
     homeOpened: () => false,
     cardLayout: () => !mouse,
     panelOpen: () => false,
-    shipsTabOpen: () => false,
+    shipListOpen: () => false,
     capturedWorld: () => false,
     operation: operationFixture(!mouse),
   });

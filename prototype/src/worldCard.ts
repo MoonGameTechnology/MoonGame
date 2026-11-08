@@ -1,15 +1,15 @@
-import { productionQueueHtml } from './productionQueueView';
 /**
  * Карточка мира (REFM-223): что боковая панель показывает о месте на карте. Известный мир —
- * шапка с фактами и действиями и четыре вкладки (земля, орбита, эскадра, постройки) с
- * очередью стройки; мир вне зрения — память последнего скана или «нет телеметрии»; развилка
+ * окно «i», только сведения (UIX-10.12): строка статуса со шпионажем, доход, оборона,
+ * гарнизон, свёрнутые постройки и эскадра (`planetDossierView.ts`); стройка и приказы мира
+ * — в окне «Построить»; мир вне зрения — память последнего скана или «нет телеметрии»; развилка
  * тропы — с кнопкой крепости. Здесь же ангар: секция порта и трюма с карточками эскадр и
  * строками патрулей. Её рисует и карточка флота, поэтому секция экспортируется.
  *
  * Правила того, ЧТО показать, живут в чистых модулях рядом (`planetTabs.ts`, `hangarPanel.ts`,
  * `squadronPanel.ts`, `conveyorView.ts`, `catalogTile.ts`, `spyOffer.ts`) и в решениях
  * `decisions/` (`worldFacts`, `worldOrders`, `rallyPoint`, `fortressRaise`); здесь только
- * разметка. Мир на экране, своё место, имена, открытая вкладка, плитки гарнизона и карта
+ * разметка. Мир на экране, своё место, имена, плитки гарнизона и карта
  * узлов живут в `main.ts`; модуль получает их хуками {@link initWorldCard}: импорт оттуда был
  * бы циклом.
  */
@@ -27,13 +27,8 @@ import {
   capitalOf,
   orderLane,
   forkSiteId,
-  stationSiteId,
   hasShipyard,
-  isForkSite,
-  isInhabited,
-  MAX_STEWARD_HOLD_POINTS,
   planetDevelopment,
-  rallyPointOf,
   uncontrolledPlanets,
   integrationShare,
   isIntegrating,
@@ -42,15 +37,13 @@ import { isMineFleet } from '../../packages/shared-core/src/state/minefields';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
 import { t, tData } from '../../localization/runtime';
 import { buildsAnything } from '../../decisions/buildGate';
-import { forkFortressRaise, fortressRaise } from '../../decisions/fortressRaise';
+import { forkFortressRaise } from '../../decisions/fortressRaise';
 import { basePatrols, patrolMarks } from '../../decisions/patrolMarks';
-import { rallyOffer, type RallyOffer } from '../../decisions/rallyPoint';
 import { espionageShown, toolShown, victoryPointsShown } from '../../decisions/sectorZeroTools';
 import { medalBadges } from '../../decisions/unitMedals';
-import { worldFacts } from '../../decisions/worldFacts';
+import { worldFacts, type WorldFact } from '../../decisions/worldFacts';
 import { intelLayers } from '../../decisions/intelLayers';
 import { knownBureau, oddsPct, spyOdds } from '../../decisions/spyOdds';
-import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import type { BuildLane } from './buildQueue';
 import { shownProductionLanes } from '../../decisions/productionLanes';
@@ -61,7 +54,7 @@ import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { controlLimitOf } from './economy';
 import { buildingName, cost, displayUnit, esc, resLine } from './format';
 import { data } from './gameData';
-import { canOrder, ctx } from './game';
+import { canOrder } from './game';
 import { fortressStatusHtml, fortressServicesHtml } from './fortressView';
 import { pcUi } from './graphicsPrefs';
 import {
@@ -84,7 +77,6 @@ import {
   actionButton,
   cardHeader as kitCardHeader,
   pcols,
-  tabButton as kitTabButton,
   unitRows as kitUnitRows,
 } from './panelKit';
 import { worldName } from './planetName';
@@ -101,7 +93,6 @@ import {
   SQUADRON_KIND_KEY,
   type SquadronCard,
 } from './squadronPanel';
-import { stewardTechDone } from './stewardScreen';
 import { HOUR } from './time';
 import {
   activeConstruction,
@@ -113,11 +104,17 @@ import {
   myRes,
 } from './worldQueries';
 import { worldFactHtml } from './worldFactView';
+import { foldHtml } from './dossierFolds';
+import {
+  buildingsFoldHtml,
+  defenseHtml,
+  garrisonGridHtml,
+  incomeBandHtml,
+  scanAgeHtml,
+  scanGarrisonHtml,
+} from './planetDossierView';
 
-/** Вкладка карточки мира. */
-export type PlanetTab = 'ground' | 'ships' | 'shuttle' | 'buildings';
-
-/** Что карточке нужно от игры. Мир, место, вкладка, плитки и карта узлов — в `main.ts`. */
+/** Что карточке нужно от игры. Мир, место, плитки и карта узлов — в `main.ts`. */
 export interface WorldCardHost {
   /** Мир на экране. */
   world(): GameState;
@@ -125,8 +122,6 @@ export interface WorldCardHost {
   me(): string;
   /** Имена держав по месту. */
   names(): Record<string, string>;
-  /** Открытая вкладка карточки мира. */
-  planetTab(): PlanetTab;
   /** Юниты, которые строит прототип: из них берётся ростер вкладки. */
   buildUnits(): readonly string[];
   /** Режим отладки (`?dev`): в подзаголовке мира виден код узла. */
@@ -135,10 +130,10 @@ export interface WorldCardHost {
   sectorOf(id: string): string | undefined;
   /** Тип сектора узла; `undefined` — узел не на карте. */
   sectorType(id: string): SectorType | undefined;
-  /** Плитки гарнизона мира — те же, что у состава флота. */
-  garrisonTiles(owner: string | null, stacks: UnitStack[]): string;
   /** Скрыты ли мультиплеерные инструменты: идёт забег Sector Zero. */
   sectorZeroToolsHidden(): boolean;
+  /** Радар мира: дальность засечки и круг опознания (`mapRadar.ts`); 0 — радара нет. */
+  radar(p: Planet): { reach: number; identify: number };
 }
 
 let game: WorldCardHost;
@@ -171,10 +166,6 @@ function cardHeader(
     ...(titleAct ? { titleAct } : {}),
     ...(badge ? { badge } : {}),
   });
-}
-
-function tabButton(tab: PlanetTab, label: string, count: number, desc?: string): string {
-  return kitTabButton(tab, label, count, game.planetTab() === tab, desc);
 }
 
 /**
@@ -435,39 +426,40 @@ export function unknownPlanetHtml(p: Planet): string {
   const mem = memory.get(p.id);
   const ping = pingRowHtml();
   if (mem) {
-    const icons =
-      mem.buildings
-        .map(
-          (b) =>
-            `${BUILD_ICON[b.type] ?? '▪'} ${esc(buildingName(data.buildings[b.type]?.name, b.type))} L${b.level}`,
-        )
-        .join(', ') || t('side.scan.no-buildings');
+    // Мир в тумане показан последним снимком разведки (UIX-10.12) в том же порядке, что и
+    // видимый: строка статуса (ник хозяина, возраст снимка, шпионаж), гарнизон, постройки.
     // Espionage from memory: an agent goes to the WORLD itself (SPY-8), not to its
     // owner — if the world changed hands, the kernel targets whoever holds it now.
     // В забеге Sector Zero шпионажа нет и здесь (`espionageShown`).
     const free = myAgents(game.world(), ME).free > 0;
     const spyReady = (op: SpyOp) => free && afford({ credits: SPY_COST[op] });
-    const spyRow =
-      mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
-        ? `<div class="row">${spyMenuHtml(p.id, [
-            spyOddsHtml(p.id, mem.owner),
-            btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon')),
-            ...HOSTILE_OPS.map((op) => btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), spyReady(op))),
-          ]).join('')}</div>`
-        : '';
-    // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
-    // растягивает три строки газетой на всю ширину (переработка окна мира, 2026-09-29).
+    const acts: string[] = [];
+    if (mem.owner && mem.owner !== ME) {
+      const name = seatNick(mem.owner) ?? NAME[mem.owner] ?? mem.owner;
+      acts.push(btn('seat', mem.owner, t('side.world.owner', { name }), true));
+    }
+    if (toolShown('pings', sectorZeroToolsHidden()))
+      acts.push(btn('ping', '', t('side.world.ping'), true));
+    if (mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden()))
+      acts.push(
+        ...spyMenuHtml(p.id, [
+          spyOddsHtml(p.id, mem.owner),
+          btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon')),
+          ...HOSTILE_OPS.map((op) =>
+            btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), spyReady(op)),
+          ),
+        ]),
+      );
+    // Возраст снимка (правило 4 `decisions/planetDossier.ts`); снимок без времени — словами.
+    const age = scanAgeHtml(mem.at, game.world().time);
+    const neutral = mem.owner ? '' : `<span class="pfact">${esc(t('side.neutral'))}</span>`;
+    const stale = age ? '' : `<div class="row dim">${t('side.scan.stale')}</div>`;
     return (
       cardHeader(ownerColor(mem.owner), placeName(p.id), t('side.scan.title')) +
-      `<div class="pscan">` +
-      `<div class="row dim">${t('side.scan.stale')}</div>` +
-      `<div class="row">${t('side.scan.owner')}: <b>${esc(mem.owner ? NAME[mem.owner] ?? mem.owner : t('side.neutral'))}</b></div>` +
-      `<div class="row">${t('side.scan.garrison')}: <b>${mem.garrison}</b></div>` +
-      `<div class="row">${t('side.scan.buildings')}: ${icons}</div>` +
-      spyRow +
-      `<div class="hint">${t('side.scan.hint')}</div>` +
-      ping +
-      `</div>`
+      `<div class="pfacts">${age}${neutral}${acts.length ? `<div class="pacts">${acts.join('')}</div>` : ''}</div>` +
+      stale +
+      scanGarrisonHtml(mem.garrison) +
+      buildingsFoldHtml(mem.buildings)
     );
   }
   // A province a ship has crossed into shows its type, and only that (`surveyed`).
@@ -490,10 +482,10 @@ export function unknownPlanetHtml(p: Planet): string {
 }
 
 /**
- * Действия с миром в его шапке: сделать столицей, точка удержания, «Пинг», разведка.
- * ЧТО предлагать, решают `worldOrders.ts` и `spyOffer.ts` (REFM-91/92), здесь только
- * кнопки. На телефоне «Пинг», «Построить» и ник хозяина стоят в нижней полосе листа, и в шапке
- * их прячет CSS: кнопки остаются в разметке, потому что полоса листа показывается по их наличию.
+ * Действия в строке статуса мира: ник хозяина, «Пинг», разведка. Столица, точка удержания и
+ * точка сбора — приказы миру, они в окне «Построить» (`worldOrdersPane.ts`, UIX-10.12).
+ * ЧТО предлагать, решает `spyOffer.ts` (REFM-92), здесь только кнопки. На телефоне «Пинг»,
+ * «Построить» и ник хозяина стоят в нижней полосе листа, и в шапке их прячет CSS: кнопки остаются в разметке, потому что полоса листа показывается по их наличию.
  */
 function worldActionsHtml(p: Planet, mine: boolean): string {
   const s = game.world();
@@ -508,41 +500,9 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   // Телефон поднимает «Построить» в нижнюю полосу листа, рядом с «Пингом», чтобы строить без
   // раскрытия листа; полоса показывается по наличию этой кнопки (UIX-10.10).
   if (!pcUi() && mine && buildsAnything(p, data, feedsOnBiomass(s, ME, data)))
-    out.push(`<button class="b btn-second" data-act="openbuild">▣ ${t('side.build.open')}</button>`);
-  // Столица — здесь возрождаются герои и меняют модули (Phase C).
-  if (capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(data, p),
-    !!ctx(s.time, s).config?.victory?.capitalCapture) === 'designate')
-    out.push(btn('capital', '', t('side.world.make-capital'), true));
-  // Hold point (ST-2.1): a standing order for the Steward — the anchor is never
-  // auto-evacuated and gets reinforced under threat. Same tech gate as delegation.
-  // Лимит ГАСИТ кнопку, но не прячет её, а снять точку можно всегда — иначе игрок,
-  // исчерпавший лимит, запрётся: ни поставить новую, ни убрать старую (правило 6).
-  const points = s.players[ME]?.stewardHoldPoints ?? [];
-  // Крепость на развилке — не мир: точкой удержания её ядро не принимает (`steward` 1.1.0),
-  // но старую точку на ней снять можно.
-  const hold = holdOffer(
-    mine,
-    stewardTechDone(s, ME),
-    points.includes(p.id),
-    points.length,
-    MAX_STEWARD_HOLD_POINTS,
-    !isForkSite(p),
-  );
-  if (hold === 'clear') {
     out.push(
-      `<span class="pfact cyan">🚩 ${t('side.world.hold.title')}</span>` +
-        btn('holdpoint', 'off', t('side.world.hold.clear'), true),
+      `<button class="b btn-second" data-act="openbuild">▣ ${t('side.build.open')}</button>`,
     );
-  } else if (hold !== 'none') {
-    out.push(
-      btn(
-        'holdpoint',
-        'on',
-        pcUi() ? t('side.world.hold') : t('side.world.hold.set'),
-        hold === 'set',
-      ),
-    );
-  }
   // Tactical ping — mark this province and share it (coalition chat, or a player's DM).
   if (toolShown('pings', sectorZeroToolsHidden()))
     out.push(btn('ping', '', t('side.world.ping'), true));
@@ -647,22 +607,6 @@ function intelRowsHtml(grant: IntelGrant): string[] {
   return rows;
 }
 
-/** Точка сбора мира-верфи (RALLY-1): цель и «Сменить»/«Снять», либо «Задать». Что
- *  предлагать — `decisions/rallyPoint.ts`; цель берётся у ядра (`rallyPointOf`). */
-function rallySectionHtml(planetId: string, offer: Exclude<RallyOffer, 'none'>): string {
-  const s = game.world();
-  const ME = game.me();
-  const to = rallyPointOf(s, ME, planetId);
-  const row =
-    offer === 'change' && to
-      ? `<b>${esc(t('side.world.rally.to', { w: placeName(to) }))}</b>` +
-        btn('rally', 'pick', t('side.world.rally.change'), true) +
-        btn('rally', 'off', t('side.world.rally.clear'), true)
-      : `<b class="dim">${esc(t('side.world.rally.none'))}</b>` +
-        btn('rally', 'pick', t('side.world.rally.set'), true);
-  return `<div class="sec">${t('side.world.rally')}</div><div class="asset-row">${row}</div>`;
-}
-
 /** Доход ПОСТРОЕННОГО здания за час — готовой разметкой; у недоходного пусто. Цифра
  *  считается тем же `buildingLevel`, что и строка «производит» в карточке кодекса:
  *  список и карточка обязаны называть одно число, иначе список врёт про доход. */
@@ -705,9 +649,7 @@ export function planetPanelHtml(p: Planet): string {
   const facets = [
     ...new Set([kindName, ptName, sec].filter((n): n is string => !!n).map((n) => tData(n))),
   ];
-  // Разбор гарнизона по вкладкам и их счётчики — в `planetTabs.ts` (REFM-41), там же
-  // правило «вкладка флота считает и орбиту»: построенное само уходит в космос.
-  const { ground, ships } = garrisonByTab(p.garrison, data);
+  // Счёт машин ангара — тот же, что у прежней вкладки «Эскадра» (`planetTabs.ts`, REFM-41).
   const here = Object.values(s.fleets).filter((f) => f.location === p.id && !isMineFleet(f, data));
   const counts = tabCounts(p, data, here);
   // Имя мира — то же, что в подписи на карте и в журнале; код узла («C0R2», «home_a») в
@@ -762,188 +704,71 @@ export function planetPanelHtml(p: Planet): string {
     mitigation: sm.mitigation,
     baseOutput: sm.baseOutput,
   });
-  const factsRow = facts.map(worldFactHtml).join('') + worldActionsHtml(p, mine);
+  // ОКНО «i» — ТОЛЬКО СВЕДЕНИЯ (UIX-10.12, заказ владельца 2026-11-08): стройка, очереди,
+  // конвейеры и приказы мира живут в окне «Построить», здесь — что о мире известно. Укрытие
+  // и тип мира встают строкой «Защита», выход своего мира — полосой дохода.
+  const inDefense = (f: WorldFact) => f.kind === 'cover' || f.kind === 'type';
+  const status = facts.filter((f) => !inDefense(f) && !(mine && f.kind === 'output'));
+  const factsRow = status.map(worldFactHtml).join('') + worldActionsHtml(p, mine);
   // Пустой строки нет: без фактов и действий шапка кончается своей чертой.
   if (factsRow) h += `<div class="pfacts">${factsRow}</div>`;
-
-  h += `<div class="ptabs">${tabButton('ground', t('side.tab.ground'), counts.ground, 'tab:ground')}${tabButton(
-    'ships',
-    t('side.tab.fleet'),
-    counts.ships,
-    'tab:ships',
-  )}${tabButton('shuttle', t('side.tab.wings'), counts.shuttle, 'tab:shuttle')}${tabButton('buildings', t('side.tab.buildings'), counts.buildings, 'tab:buildings')}</div>`;
-
-  // Tab content is split into self-contained blocks; on desktop they flow into
-  // side-by-side columns (filling the wide panel), on phones they stack vertically.
-  const cols: string[] = [];
-  if (game.planetTab() === 'ground') {
-    // Состав ЗЕМЛИ — плитками на ВСЕХ раскладках, как состав флота (заказ владельца
-    // 2026-09-25): полоска и числа корпуса видны сразу. Прежние плитки ПК давали только
-    // иконку и число, и имя приходилось угадывать — теперь у наземной плитки есть подпись.
-    // ECON-1: голодный гарнизон — владелец мира в food-arrears теряет 25% на земле.
-    const starving = showsStarving(p.owner === ME, ground.length, s.players[ME]?.arrears)
-      ? `<div class="row" style="color:var(--red)">🍽 ${t('side.fleet.hunger')}</div>`
-      : '';
-    cols.push(
-      `<div class="sec">${t('side.ground.units')}</div>` +
-        starving +
-        game.garrisonTiles(p.owner, ground),
-    );
-    if (mine) {
-      // The same shared mobilization preview as the workspace, including waiting heroes.
-      cols.push(productionQueueHtml(s, p.id, { lane: 'mobilization', readOnly: true }) + unitCatalogButton('ground'));
-    }
-    if (!pcUi()) {
-      cols.push(`<div class="hint">${t('dossier.tab.ground.desc')}</div>`);
-    }
-  } else if (game.planetTab() === 'ships') {
-    // Вкладка флота — это ОРБИТА (владелец 2026-09-26: «гарнизон — только наземный юнит»).
-    // Построенный корабль сам уходит в сборный флот (`autoRally`), поэтому кораблей на
-    // самой планете обычно нет, и строка о них появляется, только когда они есть. Орбита
-    // показывается ВСЕГДА, даже пустая, — как состав земли и здания: скрытая секция
-    // читается как поломка панели, и пустота говорит о себе словами.
-    let orbit = `<div class="sec">${t('side.world.fleets')}</div>`;
-    if (!here.length) orbit += `<div class="row dim">${esc(t('side.none'))}</div>`;
-    for (const f of here) {
-      const fShips = sumUnits(f.units);
-      const tr = sumUnits(f.landing ?? []);
-      const sel = f.owner === ME ? btn('selfleet', f.id, t('side.garrison.select'), true) : '';
-      orbit += `<div class="asset-row" data-desc="fleet" style="color:${ownerColor(f.owner)}"><span class="bicon">▲</span><b>${t('side.world.fleet-ships', { n: fShips })}${tr ? ' ' + t('side.garrison.plus-troops', { n: tr }) : ''}</b>${sel}</div>`;
-    }
-    cols.push(orbit);
-    if (ships.length) {
-      cols.push(
-        `<div class="sec">${t('side.garrison.ships')}</div>` + game.garrisonTiles(p.owner, ships),
-      );
-    }
-    // RALLY-1: куда сами летят корабли, построенные здесь. Стоит у очереди кораблей —
-    // это настройка выпуска мира, а не одного заказа.
-    const rally = rallyOffer(mine, hasShipyard(p, data), rallyPointOf(s, ME, p.id) !== null);
-    if (rally !== 'none') cols.push(rallySectionHtml(p.id, rally));
-    if (mine) {
-      cols.push(laneConveyors(p.id, ['ships']) + unitCatalogButton('ships'));
-    }
-    // Подсказки вкладки на телефоне нет (UIX-10.6): она пересказывала заголовки орбиты и
-    // очереди над ней. Её текст остался досье вкладки по наведению на ПК ('tab:ships').
-  } else if (game.planetTab() === 'shuttle') {
-    // SHU-3.1 — АНГАР ПОРТА, а не гарнизон. Раньше здесь стоял `wing` — гарнизон,
-    // отфильтрованный по трейту `shuttle`, — и вкладка была гарантированно пустой:
-    // челнок с SHU-1.1 в гарнизоне не бывает никогда, он лежит в `planet.hangar`.
-    // Игрок платил за машины и не мог их ни увидеть, ни применить.
-    const port = planetHangar(p, data);
-    if (hasHangar(port)) {
-      cols.push(hangarSectionHtml(port, p.id, mine));
-      // ПЕРЕГРУЗКА ПРЕДЛАГАЕТСЯ И ОТСЮДА (правило 5 в `hangarPanel.ts`). Найдено в живой
-      // игре: у игрока был «Шаттл», а кнопок он не нашёл — они стояли только на панели
-      // флота-носителя, тогда как челноки он видит и строит здесь. Приказ тот же
-      // (`wingload`/`wingunload` адресуют ФЛОТ), поэтому обработчик не тронут.
-      const ship = mine ? dockedCarrier(Object.values(s.fleets), p.id, ME, data) : null;
-      const offer = transferOffer(port, ship ? fleetHangar(ship, data, s) : null, {
-        docked: true, // `dockedCarrier` уже спросил про стоянку, бой и чужой флот
-        mine: true,
-      });
-      if (ship && (offer.load || offer.unload)) {
-        cols.push(
-          `<div class="row">` +
-            (offer.load ? btn('wingload', ship.id, t('side.wing.load'), true) : '') +
-            (offer.unload ? btn('wingunload', ship.id, t('side.wing.unload'), true) : '') +
-            `</div>`,
-        );
-      }
-    } else {
-      // Порта нет — говорим об этом прямо. Пустой список читался бы как «челноков нет»,
-      // хотя их тут негде и держать.
-      // Заголовка «Эскадра в порту» нет: он повторял имя вкладки (UIX-10.6).
-      cols.push(`<div class="row dim">${t('side.wing.no-port')}</div>`);
-    }
-    if (mine) {
-      cols.push(laneConveyors(p.id, ['shuttles']) + unitCatalogButton('shuttle'));
-    }
-    if (!pcUi()) {
-      // PC carries this in the ЭСКАДРА tab's hover dossier ('tab:shuttle').
-      // Подпись кнопки подставляется ключом, а не переписывается литералом: прошлая
-      // редакция этой подсказки звала «🛩 Запустить челноки» — кнопку, которой не стало
-      // ещё в SHU-3.1, и разъехалась молча.
-      cols.push(
-        `<div class="hint">${t('side.wing.garrison.hint', { b: t('side.wing.strike') })}</div>`,
-      );
-    }
-  } else {
-    // Сначала то, что СТОИТ на мире, потом очередь стройки — как на вкладках юнитов. Очередь
-    // есть только у своего мира: у чужого вместо неё стояла строка «телеметрия недоступна»,
-    // целый блок о том, чего не видно.
-    // Заголовка «Здания» нет: он повторял вкладку прямо над списком (UIX-10.6).
-    let blds = p.buildings.length === 0 ? `<div class="row dim">${t('side.none')}</div>` : '';
-    // BUILD-1 (макет владельца): построенное — ИКОНКАМИ со значком уровня. Тап
-    // открывает карточку кодекса с листалкой уровней и кнопкой «Улучшить» —
-    // описание, апгрейд и «что даст следующий уровень» переехали туда из строк.
-    if (p.buildings.length) {
-      // Разметку строки собирает `catalogTile.ts` — там же решения подачи: список идёт
-      // СТОЛБИКОМ (строка на здание), имя подписано (иконка одна на вопрос «что это» не
-      // отвечает) и уровень показан ВСЕГДА, коротким `L1`, а не галочкой.
-      const tiles = p.buildings
-        .map((b) =>
-          builtTileHtml({
-            type: b.type,
-            level: b.level,
-            icon: BUILD_ICON[b.type] ?? '▪',
-            name: buildingName(data.buildings[b.type]?.name, b.type),
-            // Доход ТЕКУЩЕГО уровня — тем же `resLine`, что и в кодексе: игрок решает,
-            // что строить дальше, по цифре дохода, и раньше шёл за ней в карточку по
-            // одной постройке за тап (`catalogTile.ts`, правило 4).
-            income: incomeOf(b.type, b.level),
-          }),
-        )
-        .join('');
-      blds += `<div class="blist">${tiles}</div>`;
-    }
-    // Каталог непостроенного больше не живёт плитками в панели — его показывает
-    // полноэкранное окно построек. Кнопка есть только там, где строить можно
-    // (свой мир И каталог что-то здесь предлагает — CMD-VIS: нет приказа — нет кнопки).
-    if (mine && buildsAnything(p, data, feedsOnBiomass(s, ME, data))) {
-      blds += `<button class="bw-open btn-main" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
-    }
-    // FORT-0.2: КОСМИЧЕСКАЯ КРЕПОСТЬ. Правило кнопки — `decisions/fortressRaise.ts`, то же
-    // самое, каким решает редьюсер (сверено тестом по всем раскладам): здесь только
-    // отрисовка. Стоит РЯДОМ с «Постройками», а не вместо: на астероидах и мёртвом мире
-    // осмысленно и то и другое — добывающая станция ИЛИ крепость со своим ростером.
-    const fortress = fortressRaise(
-      p,
-      ME,
-      s.players[ME]?.resources ?? {},
-      data,
-      s.players[ME]?.technologies?.completed ?? [],
-      s,
-    );
-    const attached = s.planets[stationSiteId(p.id)];
-    if (attached?.fortress) blds += `<button class="bw-open btn-second" data-act="openstation" data-arg="${esc(attached.id)}">◈ ${t('fortress.open')}</button>`;
-    if (fortress.show) {
-      const off = fortress.enabled ? '' : ' disabled';
-      // Цена — фишками `resLine` (это РАЗМЕТКА со значками). Экранировать её нельзя: игрок
-      // видел сырой `<span class="rcost">…<svg…>` вместо цены (сообщение владельца
-      // 2026-09-24: «непонятный текст там»).
-      blds +=
-        `<button class="bw-open btn-second" data-act="fortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
-        ` <span class="dim">${resLine(fortress.cost)}</span></button>`;
-      // Не изучена — говорим, ЧТО изучить, и ведём туда: кнопка раньше горела, а ядро
-      // отвечало безымянным «нужна технология».
-      if (fortress.blocked === 'tech') {
-        const names = fortress.needs
-          .map((id) => `«${tData(data.technologies[id]?.name ?? id)}»`)
-          .join(t('side.fortress.or'));
-        // Кнопка открывает сразу досье первой из них — как у запертых юнитов и зданий.
-        blds +=
-          `<div class="fort-why">${esc(t('side.fortress.needs-tech', { tech: names }))}</div>` +
-          `<button class="bw-open btn-quiet" data-act="opentech" data-arg="${esc(fortress.needs[0] ?? '')}">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
-      }
-    }
-    cols.push(blds);
-    if (mine)
-      cols.push(
-        `<div class="sec">${t('side.build.conveyor')}</div>` + conveyorHtml(p.id, 'buildings'),
+  if (mine) h += incomeBandHtml(s, ME, p.id);
+  // ECON-1: голодный гарнизон — владелец мира в food-arrears теряет 25% на земле.
+  const { ground } = garrisonByTab(p.garrison, data);
+  const starving = showsStarving(mine, ground.length, s.players[ME]?.arrears)
+    ? `<div class="row" style="color:var(--red)">🍽 ${t('side.fleet.hunger')}</div>`
+    : '';
+  const cover = facts.filter(inDefense).map(worldFactHtml).join(' ');
+  h += pcols([
+    defenseHtml(game.radar(p), ME, cover, here, (f) => sumUnits(f.units)),
+    garrisonGridHtml(p.garrison, starving),
+  ]);
+  h += buildingsFoldHtml(p.buildings, incomeOf);
+  // Эскадра порта (SHU-3.1) — свёрнутым блоком, вместе с приказами звеньев: вылет — дело
+  // эскадры, а не стройки мира, и окна «Построить» у него нет.
+  const port = planetHangar(p, data);
+  // Пустой порт без носителя, которому есть что выгрузить, — блока нет: показывать нечего.
+  if (hasHangar(port)) {
+    const wing = wingTransfer(p, port, mine);
+    if (counts.shuttle > 0 || wing.offer.unload)
+      h += foldHtml('wing', t('side.tab.wings'), counts.shuttle, () =>
+        wingBodyHtml(p, port, mine, wing),
       );
   }
-  return h + pcols(cols);
+  // ПК: вход в окно «Построить» — внизу карточки; телефон держит его в нижней полосе листа.
+  if (pcUi() && mine && buildsAnything(p, data, feedsOnBiomass(s, ME, data)))
+    h += `<button class="bw-open btn-main" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
+  return h;
+}
+
+/** Тело блока эскадры: ангар порта и перегрузка с носителя на стоянке. */
+function wingBodyHtml(
+  p: Planet,
+  port: HangarView,
+  mine: boolean,
+  { ship, offer } = wingTransfer(p, port, mine),
+): string {
+  // ПЕРЕГРУЗКА ПРЕДЛАГАЕТСЯ И ОТСЮДА (правило 5 в `hangarPanel.ts`): челноки игрок видит
+  // здесь, и кнопки только на панели носителя он не находил.
+  const transfer =
+    ship && (offer.load || offer.unload)
+      ? `<div class="row">` +
+        (offer.load ? btn('wingload', ship.id, t('side.wing.load'), true) : '') +
+        (offer.unload ? btn('wingunload', ship.id, t('side.wing.unload'), true) : '') +
+        `</div>`
+      : '';
+  return hangarSectionHtml(port, p.id, mine) + transfer;
+}
+
+/** Носитель у причала и что можно перегрузить между ним и портом. */
+function wingTransfer(p: Planet, port: HangarView, mine: boolean) {
+  const s = game.world();
+  const ship = mine ? dockedCarrier(Object.values(s.fleets), p.id, game.me(), data) : null;
+  const offer = transferOffer(port, ship ? fleetHangar(ship, data, s) : null, {
+    docked: true, // `dockedCarrier` уже спросил про стоянку, бой и чужой флот
+    mine: true,
+  });
+  return { ship, offer };
 }
 
 /**

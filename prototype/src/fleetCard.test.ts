@@ -161,13 +161,12 @@ async function boot(over: Record<string, unknown> = {}) {
     world: () => env.s,
     me: () => 'p1',
     names: () => env.names,
-    planetTab: () => 'buildings',
     buildUnits: () => [],
     devUi: () => false,
     sectorOf: () => undefined,
     sectorType: (id) => env.types[id],
-    garrisonTiles: m.garrisonTilesHtml,
     sectorZeroToolsHidden: () => false,
+    radar: () => ({ reach: 0, identify: 0 }),
   });
   m.initFleetCard({
     world: () => env.s,
@@ -673,14 +672,6 @@ describe('карточка группы', () => {
 });
 
 describe('плитки и надбавки', () => {
-  it('гарнизон — плитки в справочник, пустой называется словами', async () => {
-    const { m } = await boot();
-    expect(m.garrisonTilesHtml('p1', [{ unit: 'militia', count: 2 }])).toContain(
-      'data-codex="u:militia"',
-    );
-    expect(m.garrisonTilesHtml('p1', [])).toContain(t('side.none'));
-  });
-
   it('пустой или неизвестный стек плитки не даёт', async () => {
     const { m } = await boot();
     expect(m.unitTileHtml({ unit: 'cruiser', count: 0 }, 'p1', '')).toBe('');
@@ -1113,7 +1104,6 @@ describe('стык с main.ts', () => {
   it('панель зовёт карточки модуля', () => {
     expect(PANEL).toContain("if (pick.kind === 'group') return taskGroupPanelHtml(pick.fleets);");
     expect(PANEL).toContain("if (pick.kind === 'fleet') return fleetPanelHtml(pick.fleet);");
-    expect(MAIN).toContain('garrisonTiles: garrisonTilesHtml,');
     expect(PANEL).toContain('if (aloft) return aloftPanelHtml(aloft);');
   });
 

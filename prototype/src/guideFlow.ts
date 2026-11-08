@@ -62,7 +62,8 @@ import {
 } from './onboarding';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 import { buildSetupConfig, prepareGuidedSetup } from './setupScreen';
-import { invalidatePanel, planetTab, renderPanel, setPlanetTab } from './sidePanel';
+import { invalidatePanel, renderPanel } from './sidePanel';
+import { isDossierOpen } from './dossierFolds';
 import { refreshHubDoor } from './soloCheckpoint';
 import type { Rect, TourResult } from './spotlight';
 import { type RunningTour, startTour } from './spotlightDom';
@@ -251,7 +252,7 @@ export function startGuidedMatch(): void {
         homeOpened: () => selPlanet === home,
         cardLayout: () => game.mobile(),
         panelOpen: () => game.panelExpanded(),
-        buildingsTabOpen: () => selPlanet === home && planetTab === 'buildings',
+        foldOpen: (key) => isDossierOpen(key) && selPlanet === home,
         mineCardOpen: () => dossier('[data-cx-upg="mine"]'),
         mineOrdered: () =>
           mineImproved() ||
@@ -270,8 +271,10 @@ export function startGuidedMatch(): void {
           live().players[me()]?.technologies?.active?.some((r) => r.technology === GUIDE_TECH) ===
             true,
         researchDone,
-        shipsTabOpen: () => selPlanet === home && planetTab === 'ships',
         catalogOpen: () => windowEl('constructor').classList.contains('show'),
+        shipListOpen: () =>
+          windowEl('constructor').classList.contains('show') &&
+          !!windowEl('constructor').querySelector('[data-pw-info="unit:frigate"]'),
         shipCardOpen: () => dossier('[data-build="unit:frigate"]'),
         shipOrdered: () =>
           hasShip() ||
@@ -297,7 +300,6 @@ export function startGuidedMatch(): void {
         showFleet: () => {
           focusWorld(home);
           pickWorld(home);
-          setPlanetTab('ships');
           invalidatePanel();
           renderPanel();
           if (game.mobile() && !game.panelExpanded())
@@ -318,8 +320,6 @@ export function startGuidedMatch(): void {
             expanded: () =>
               game.sheetExpanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`),
             collapse: () => game.collapseSheet(),
-            tab: () => planetTab,
-            ships: () => setPlanetTab('ships'),
             market: (good) => game.openMarket(good),
             // Synchronize the phone selection before Show expands its sheet.
             render: () => {

@@ -25,8 +25,6 @@ interface TrainingDomHost {
   mobile: boolean;
   expanded(): boolean;
   collapse(): void;
-  tab(): string;
-  ships(): void;
   render(): void;
 }
 
@@ -98,7 +96,6 @@ export function trainingTourUi(h: TrainingDomHost): TrainingTourUi {
         if (f.location) {
           focusWorld(f.location);
           pickWorld(f.location);
-          h.ships();
         } else pickFleets([f.id], (id) => h.world().fleets[id]?.owner === h.me());
         h.render();
         details();
@@ -109,7 +106,6 @@ export function trainingTourUi(h: TrainingDomHost): TrainingTourUi {
     },
     intent: (kind) => {
       if (kind === 'details') return h.expanded();
-      if (kind.startsWith('tab:')) return h.tab() === kind.slice(4);
       if (kind === 'move') return aiming;
       if (kind === 'merge') return merging;
       if (kind === 'merge-confirm')

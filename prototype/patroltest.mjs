@@ -53,10 +53,11 @@ window.__patrolTest = {
       home.hangar = deck;
       delete home.sortie;
       pickWorld(home.id);
-      // Вкладка «Эскадрильи» — тапом, как у игрока: вкладка листа — состояние листа (REFM-225).
+      // Блок «Эскадра» окна «i» — тапом, как у игрока (UIX-10.12); раскрытый не сворачиваем.
       invalidatePanel();
       renderPanel();
-      side.querySelector('[data-act="tab"][data-arg="shuttle"]').click();
+      const wing = side.querySelector('[data-act="dossier"][data-arg="wing"]');
+      if (wing.getAttribute('aria-expanded') !== 'true') wing.click();
     } else {
       const f = Object.values(s.fleets).find((x) => x.owner === ME && x.location);
       f.units = [{ unit: 'shuttle_carrier', count: 1 }];

@@ -61,6 +61,9 @@ export interface OperationDeps {
 
 type Stage = 'market' | 'hero' | 'ground' | 'aviation' | 'landing' | 'assault';
 
+/** «Построить» мира: кнопка карточки на ПК или её копия в нижней полосе листа телефона. */
+const BUILD_OPEN = '[data-act="openbuild"], [data-lift="openbuild"]';
+
 const step = (
   stage: Stage,
   id: string,
@@ -130,14 +133,6 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     }),
     ...details(stage, 'details'),
   ];
-  const tab = (stage: Stage, name: string) =>
-    step(
-      stage,
-      `tab-${name}`,
-      `[data-act="tab"][data-arg="${name}"]`,
-      () => ui.selectedWorld() === home && ui.intent(`tab:${name}`),
-      { copy: `onb.guide.tab.${name}` },
-    );
   const close = (stage: Stage, id: string) =>
     step(stage, id, '#constructor .cn-close', () => !ui.visible('#constructor.show'), {
       copy: 'onb.guide.build.close',
@@ -146,7 +141,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     step(
       stage,
       `${type}-catalog`,
-      '[data-act="openbuild"]',
+      BUILD_OPEN,
       () => ui.visible('#constructor.show [data-bwtab]') || guideBuildingOrdered(w(), home, me, type),
       { copy: 'onb.guide.build.catalog' },
     ),
@@ -164,14 +159,13 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     close(stage, `${type}-close`),
     step(stage, `${type}-wait`, null, () => guideBuilt(w(), home, type)),
   ];
-  const units = (stage: Stage, catalog: string, unit: string, enough: () => boolean) => [
-    step(
-      stage,
-      `${unit}-catalog`,
-      `[data-act="openunits"][data-arg="${catalog}"]`,
-      () => ui.visible(`#constructor.show [data-cnhull="${unit}"]`) || enough(),
-      { copy: 'onb.guide.build.units' },
-    ),
+  // Юниты заказывают в окне «Построить» (UIX-10.12): открыть окно, затем его раздел, а
+  // челнок живёт ещё и в подразделе «Шаттлы».
+  const listed = (unit: string) => ui.visible(`#constructor.show [data-cnhull="${unit}"]`);
+  const units = (stage: Stage, yard: 'infantry' | 'squads', unit: string, enough: () => boolean) => [
+    step(stage, `${unit}-yard`, BUILD_OPEN, () => ui.visible('#constructor.show') || enough(), { copy: 'onb.guide.build.yard' }),
+    step(stage, `${unit}-catalog`, `#constructor .pw-main-tabs [data-ctab="${yard === 'squads' ? 'ships' : 'infantry'}"]`, () => listed(unit) || (yard === 'squads' && ui.visible('#constructor [data-ctab="squads"]')) || enough(), { copy: yard === 'squads' ? 'onb.guide.yard.ships' : 'onb.guide.yard.infantry' }),
+    ...(yard === 'squads' ? [step(stage, `${unit}-squads`, '#constructor [data-ctab="squads"]', () => listed(unit) || enough(), { copy: 'onb.guide.yard.squads' })] : []),
     step(stage, `${unit}-select`, `#constructor [data-cnhull="${unit}"]`, () => ui.visible(`#constructor.pw-fitting-open [data-cnhull="${unit}"].on`) || enough(), { copy: 'onb.guide.build.units' }),
     productionQuantity(stage, unit, stage === 'ground' ? GUIDE_TROOPS : 1, enough, ui),
     step(stage, unit, '#constructor [data-cnbuild]', enough),
@@ -308,24 +302,22 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
 
     // Barracks, then militia from them.
     ...homeWorld('ground'),
-    tab('ground', 'buildings'),
     ...building('ground', 'barracks'),
-    tab('ground', 'ground'),
-    ...units('ground', 'ground', GUIDE_TROOP, trained),
+    ...units('ground', 'infantry', GUIDE_TROOP, trained),
     step('ground', 'troops-wait', null, troopsReady),
 
     // A spaceport, a bomber, and the bomber aboard the hero ship.
     ...homeWorld('aviation'),
-    tab('aviation', 'buildings'),
     ...building('aviation', 'spaceport'),
-    tab('aviation', 'shuttle'),
-    ...units('aviation', 'shuttle', GUIDE_WING, wingOrdered),
+    ...units('aviation', 'squads', GUIDE_WING, wingOrdered),
     step(
       'aviation',
       'wing-wait',
       null,
       () => guideWingsHome(w(), home) + guideWingsAboard(w(), me) > 0 && deployed(),
     ),
+    // Приказы эскадры — в её свёрнутом блоке окна «i» (UIX-10.12).
+    step('aviation', 'wing-open', '[data-act="dossier"][data-arg="wing"]', () => ui.visible('[data-act="wingload"]') || guideWingsAboard(w(), me) > 0, { copy: 'onb.guide.wing.open' }),
     step('aviation', 'load', '[data-act="wingload"]', () => guideWingsAboard(w(), me) > 0),
 
     // Troops into the hold, then the flight.

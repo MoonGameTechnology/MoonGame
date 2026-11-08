@@ -1,13 +1,13 @@
 /**
  * Карточка мира (REFM-223) — прямой тест владельца.
  *
- * Карточка рисует известный мир (шапка, вкладки, очереди стройки), мир вне зрения (память
- * скана или «нет телеметрии»), развилку тропы и ангар с карточками эскадр, а мир, место,
- * имена, открытую вкладку и плитки гарнизона берёт у игры хуками. Здесь проверено то, что
- * текстом не проверить: какая вкладка открыта и что на ней, кому видны очередь, каталог и
- * окно построек, что помнит туман, какие двери закрыты в забеге Sector Zero и как карточки
- * эскадр меняют кнопки под взведённое слияние. Каждый тест — свежая загрузка модуля над своим
- * миром. В конце — стык с `main.ts`.
+ * Карточка рисует известный мир (окно «i», только сведения: UIX-10.12), мир вне зрения
+ * (память скана или «нет телеметрии»), развилку тропы и ангар с карточками эскадр, а мир,
+ * место и имена берёт у игры хуками. Здесь проверено то, что текстом не проверить: чего в «i»
+ * больше нет (очередей, каталогов, приказов мира), что свёрнуто и что раскрывается, кому
+ * видны доход и «Построить», что помнит туман, какие двери закрыты в забеге Sector Zero и как
+ * карточки эскадр меняют кнопки под взведённое слияние. Каждый тест — свежая загрузка модуля
+ * над своим миром. В конце — стык с `main.ts`.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -31,7 +31,6 @@ import type { SectorType } from './map';
 import { worldName } from './planetName';
 import type { Snapshot } from './scanMemory';
 import { HOUR } from './time';
-import type { PlanetTab } from './worldCard';
 
 // Под Node нет языка браузера: рантайм свалился бы в EN, и подписи разъехались бы с ожиданиями.
 beforeAll(() => setLocale('ru'));
@@ -118,7 +117,7 @@ async function boot(over: Record<string, unknown> = {}) {
   const env = {
     s: world(),
     names: { p1: 'Орион', p2: 'Багровые' } as Record<string, string>,
-    tab: 'buildings' as PlanetTab,
+    radar: {} as Record<string, number>,
     units: ['cruiser', 'militia', 'interceptor'] as readonly string[],
     dev: false,
     kinds: {} as Record<string, string>,
@@ -133,7 +132,6 @@ async function boot(over: Record<string, unknown> = {}) {
     relocate: false,
     ...over,
   };
-  const rec = { tiles: [] as Array<[string | null, UnitStack[]]> };
 
   // Окна, прицелы, туман и выбор тянут холст и окно браузера — подменены: карточка берёт у них
   // только эти флаги.
@@ -173,23 +171,18 @@ async function boot(over: Record<string, unknown> = {}) {
     world: () => env.s,
     me: () => 'p1',
     names: () => env.names,
-    planetTab: () => env.tab,
     buildUnits: () => env.units,
     devUi: () => env.dev,
     sectorOf: (id) => env.kinds[id],
     sectorType: (id) => env.types[id],
-    garrisonTiles: (owner, stacks) => {
-      rec.tiles.push([owner, stacks]);
-      return `<i class="tiles">${owner}:${stacks.map((x) => `${x.unit}×${x.count}`).join(',')}</i>`;
-    },
     sectorZeroToolsHidden: () => env.hidden,
+    radar: (p) => ({ reach: env.radar[p.id] ?? 0, identify: (env.radar[p.id] ?? 0) / 2 }),
   });
-  /** Карточка известного мира на открытой вкладке. */
-  const card = (id: string, tab: PlanetTab = env.tab): string => {
-    env.tab = tab;
-    return m.planetPanelHtml(env.s.planets[id]!);
-  };
-  return { m, env, rec, card };
+  /** Свёрнутые блоки «i» — тот же экземпляр модуля, что у карточки. */
+  const folds = await import('./dossierFolds');
+  /** Карточка известного мира. */
+  const card = (id: string): string => m.planetPanelHtml(env.s.planets[id]!);
+  return { m, env, folds, card };
 }
 
 /** Подзаголовок шапки: всё, что стоит в `<span>` рядом с именем. */
@@ -242,13 +235,15 @@ describe('шапка известного мира', () => {
     expect(card('Z')).not.toContain('data-act="seat"');
   });
 
-  it('телефон кладёт «Построить» в действия своего мира, ПК — нет (UIX-10.10)', async () => {
+  it('«Построить»: телефон кладёт его в действия своего мира, ПК — вниз карточки (UIX-10.10)', async () => {
     const { env, card } = await boot({ pc: false });
     const pacts = (html: string) => /<div class="pacts">.*?<\/div>/.exec(html)?.[0] ?? '';
-    expect(pacts(card('A', 'ground'))).toContain('data-act="openbuild"');
-    expect(pacts(card('N', 'ground'))).not.toContain('data-act="openbuild"');
+    expect(pacts(card('A'))).toContain('data-act="openbuild"');
+    expect(card('N')).not.toContain('data-act="openbuild"');
     env.pc = true;
-    expect(pacts(card('A', 'ground'))).not.toContain('data-act="openbuild"');
+    expect(pacts(card('A'))).not.toContain('data-act="openbuild"');
+    expect(card('A')).toMatch(/<button class="bw-open btn-main" data-act="openbuild">[^<]+<\/button>$/);
+    expect(card('N')).not.toContain('data-act="openbuild"');
   });
 
   it('род узла — тип сектора с карты, без него — сырой род, без обоих не пишется', async () => {
@@ -313,23 +308,13 @@ describe('шапка известного мира', () => {
 });
 
 describe('действия мира', () => {
-  it('столицу предлагают на своём мире, кроме самой столицы, и не на чужом', async () => {
-    const { card } = await boot();
-    expect(card('A')).toContain(act('capital', ''));
-    expect(card('C')).not.toContain(act('capital', ''));
-    expect(card('N')).not.toContain(act('capital', ''));
-  });
-
-  it('точка удержания — с изученным Хранителем; лимит гасит кнопку, а снять можно всегда', async () => {
-    const { env, card } = await boot();
-    expect(card('A')).not.toContain('data-act="holdpoint"');
-    env.stewardTech = true;
-    expect(card('A')).toContain(`${act('holdpoint', 'on')} >`);
-    expect(card('N')).not.toContain('data-act="holdpoint"');
-    env.s.players.p1!.stewardHoldPoints = ['C', 'Z'];
-    expect(card('A')).toContain(`${act('holdpoint', 'on')} disabled>`);
-    env.s.players.p1!.stewardHoldPoints = ['A', 'C'];
-    expect(card('A')).toContain(`${act('holdpoint', 'off')} >`);
+  it('столица и точка удержания — не в «i»: это приказы мира окна «Построить» (UIX-10.12)', async () => {
+    const { env, card } = await boot({ stewardTech: true });
+    env.s.players.p1!.stewardHoldPoints = ['A'];
+    for (const id of ['A', 'C', 'N']) {
+      expect(card(id)).not.toContain('data-act="capital"');
+      expect(card(id)).not.toContain('data-act="holdpoint"');
+    }
   });
 
   it('приказы шпионов чужого мира — под кнопкой «Шпионаж», один приказ — без неё (UIX-10.11)', async () => {
@@ -443,157 +428,78 @@ describe('живые сроки не пересобирают лист', () => {
   });
 });
 
-describe('вкладки', () => {
-  it('открытая вкладка подсвечена, у каждой — счётчик', async () => {
+describe('окно «i» — только сведения (UIX-10.12)', () => {
+  it('вкладок, очередей, каталогов и приказов мира в нём нет', async () => {
+    const { env, card } = await boot({ stewardTech: true });
+    env.s.planets.A!.buildQueue = [{ id: 11, kind: 'unit', playerId: 'p1', unit: 'cruiser', count: 2 }];
+    const html = card('A');
+    for (const gone of ['data-act="tab"', 'data-act="openunits"', 'data-act="rally"', 'data-act="fortress"', 'class="conveyor"', 'data-act="dequeue"'])
+      expect(html, gone).not.toContain(gone);
+  });
+
+  it('полоса дохода — только у своего мира, тап открывает разбор «откуда»', async () => {
     const { card } = await boot();
-    const html = card('A', 'ships');
-    expect(html).toContain(`<button class="ptab on" ${act('tab', 'ships')}`);
-    expect(html).toContain(`<button class="ptab" ${act('tab', 'ground')}`);
-    expect(html).toMatch(/data-arg="ground" data-desc="tab:ground">[^<]+<b>3<\/b>/);
+    expect(card('A')).toContain('<button class="dband" data-codex="income:A">');
+    expect(card('A')).toContain(t('side.dossier.income.why'));
+    expect(card('N')).not.toContain('class="dband"');
   });
 
-  it('ноль на вкладке не пишется: пустую видно по отсутствию числа (UIX-10.6)', async () => {
-    const { card } = await boot();
-    const html = card('Z', 'ships');
-    for (const tab of ['ground', 'ships', 'shuttle', 'buildings'])
-      expect(html).toMatch(new RegExp(`data-arg="${tab}" data-desc="tab:${tab}">[^<]+</button>`));
-  });
-
-  it('под вкладкой нет заголовка с её же именем (UIX-10.6)', async () => {
-    const { card } = await boot();
-    expect(card('A', 'buildings')).not.toContain(
-      `<div class="sec">${t('side.tab.buildings')}</div>`,
-    );
-    expect(card('Z', 'shuttle')).toContain(
-      `<div class="block"><div class="row dim">${t('side.wing.no-port')}</div></div>`,
-    );
-  });
-
-  it('земля: плитки гарнизона рисует игра, очередь и каталог юнитов — только своему миру', async () => {
-    const { rec, card } = await boot();
-    const mine = card('A', 'ground');
-    expect(rec.tiles.at(-1)).toEqual(['p1', [{ unit: 'militia', count: 3 }]]);
-    expect(mine).toContain('<i class="tiles">p1:militia×3</i>');
-    expect(mine).toContain(t('production.mobilization'));
-    expect(mine).toContain(act('openunits', 'ground'));
-    const foe = card('N', 'ground');
-    expect(foe).toContain('<i class="tiles">p2:militia×4</i>');
-    expect(foe).not.toContain(t('production.mobilization'));
-    expect(foe).not.toContain('data-act="openunits"');
-  });
-
-  it('каталог юнитов открывается только там, где ростер игры что-то предлагает', async () => {
-    const { env, card } = await boot({ units: ['cruiser'] });
-    expect(card('A', 'ground')).not.toContain('data-act="openunits"');
-    expect(card('A', 'ships')).toContain(act('openunits', 'ships'));
-    env.units = [];
-    expect(card('A', 'ships')).not.toContain('data-act="openunits"');
-  });
-
-  it('подсказка вкладки — только на телефоне: на ПК она в досье по наведению', async () => {
+  it('оборона: радар с кругом опознания, свой флот на орбите — кнопкой выбора', async () => {
     const { env, card } = await boot();
-    expect(card('A', 'ground')).not.toContain(t('dossier.tab.ground.desc'));
-    env.pc = false;
-    expect(card('A', 'ground')).toContain(t('dossier.tab.ground.desc'));
-    // У «Флота» её нет и на телефоне: она пересказывала заголовки орбиты и очереди (UIX-10.6).
-    expect(card('A', 'ships')).not.toContain(t('dossier.tab.ships.desc'));
-  });
-
-  it('орбита: флоты у мира, свой — с кнопкой выбора; корабли гарнизона — плитками', async () => {
-    const { rec, card } = await boot();
-    const html = card('A', 'ships');
-    expect(html).toContain(t('side.world.fleet-ships', { n: 2 }));
+    expect(card('A')).not.toContain(t('side.dossier.radar'));
+    env.radar.A = 330;
+    const html = card('A');
+    expect(html).toContain(t('side.dossier.radar.v', { d: 330, i: 165 }));
     expect(html).toContain(act('selfleet', 'F1'));
     expect(html).not.toContain(act('selfleet', 'F2'));
-    expect(rec.tiles.at(-1)).toEqual(['p1', [{ unit: 'cruiser', count: 1 }]]);
+    expect(html).toContain(t('side.world.fleet-ships', { n: 2 }));
+    expect(card('Z')).not.toContain(t('side.world.fleets'));
   });
 
-  it('пустая орбита говорит словами, а не пропадает', async () => {
+  it('гарнизон сеткой: число отряда, полоска здоровья и тап в досье юнита', async () => {
     const { card } = await boot();
-    const html = card('Z', 'ships');
-    expect(html).toContain(
-      `<div class="sec">${t('side.world.fleets')}</div><div class="row dim">${t('side.none')}</div>`,
-    );
+    const html = card('A');
+    expect(html).toContain(`${t('side.dossier.garrison')} <b>4</b>`);
+    expect(html).toMatch(/data-codex="u:militia"[^>]*><span class="dunit-t"><span>[^<]+<\/span><b>×3<\/b>/);
+    expect(html).toContain('<span class="dhp full">');
+    expect(card('Z')).toContain(`${t('side.dossier.garrison')} <b>0</b>`);
   });
 
-  it('эскадра без порта прямо говорит, что держать её негде', async () => {
-    const { card } = await boot();
-    expect(card('Z', 'shuttle')).toContain(t('side.wing.no-port'));
-    expect(card('A', 'shuttle')).not.toContain(t('side.wing.no-port'));
+  it('постройки свёрнуты, и каждая группа раскрывается отдельно; доход — на фишке', async () => {
+    const { folds, card } = await boot();
+    const mine = buildingName(data.buildings.mine!.name, 'mine');
+    const income = resLine(buildingLevel(data.buildings.mine!, 2).produces, { per: 'h' });
+    expect(income).not.toBe('');
+    expect(card('A')).toContain(`${act('dossier', 'buildings')} aria-expanded="false"><span>${t('side.tab.buildings')}</span><b>2</b>`);
+    expect(card('A')).not.toContain(mine);
+    folds.toggleDossierBlock('buildings');
+    expect(card('A')).toContain(act('dossier', 'grp:economy'));
+    expect(card('A')).not.toContain(mine);
+    folds.toggleDossierBlock('grp:economy');
+    expect(card('A')).toContain(`data-codex="b:mine:2"`);
+    expect(card('A')).toContain(income);
+    // Пустой группы и пустого блока нет.
+    expect(card('A')).not.toContain(act('dossier', 'grp:defense'));
+    expect(card('N')).not.toContain(act('dossier', 'buildings'));
+  });
+
+  it('эскадра порта — свёрнутым блоком с приказами внутри; без порта блока нет', async () => {
+    const { folds, card } = await boot();
+    expect(card('A')).toContain(act('dossier', 'wing'));
+    expect(card('A')).not.toContain('data-act="wingstrike"');
+    folds.toggleDossierBlock('wing');
+    expect(card('A')).toContain('data-act="wingstrike"');
+    expect(card('Z')).not.toContain(act('dossier', 'wing'));
   });
 
   it('единственный свой носитель у мира: перегрузка адресует флот, а не мир', async () => {
-    const { env, card } = await boot();
+    const { env, folds, card } = await boot();
+    folds.toggleDossierBlock('wing');
     // Трюм есть и у крейсеров F1: два кандидата — и кнопок нет, кому грузить, не угадывают.
     env.s.fleets.K = fleet('K', 'p1', 'A', [{ unit: 'shuttle_carrier', count: 1 }]);
-    expect(card('A', 'shuttle')).not.toContain('data-act="wingload"');
+    expect(card('A')).not.toContain('data-act="wingload"');
     delete env.s.fleets.F1;
-    expect(card('A', 'shuttle')).toContain(act('wingload', 'K'));
-  });
-
-  it('постройки: доход уровня у плитки, окно построек — только своему миру', async () => {
-    const { card } = await boot();
-    const mine = card('A', 'buildings');
-    const income = resLine(buildingLevel(data.buildings.mine!, 2).produces, { per: 'h' });
-    expect(income).not.toBe('');
-    expect(mine).toContain(income);
-    expect(mine).toContain(buildingName(data.buildings.mine!.name, 'mine'));
-    expect(mine).toContain('data-act="openbuild"');
-    expect(mine).toContain(t('side.build.conveyor'));
-    const foe = card('N', 'buildings');
-    expect(foe).toContain(t('side.none'));
-    expect(foe).not.toContain('data-act="openbuild"');
-    expect(foe).not.toContain(t('side.build.conveyor'));
-  });
-});
-
-describe('очередь стройки', () => {
-  it('подписи очереди и приостановленных строек остаются текстом (CWE-79)', async () => {
-    const { env, card } = await boot({ pc: false });
-    const payload = '<img src=x onerror="alert(1)">';
-    const a = env.s.planets.A!;
-    a.buildQueue = [{ id: 11, kind: 'unit', playerId: 'p1', unit: payload, count: 2 }];
-    a.pausedConstruction = [
-      {
-        id: 7,
-        kind: 'unit',
-        playerId: 'p1',
-        unit: payload,
-        count: 1,
-        progress: 0.5,
-        remainingHours: 2,
-        remainingCost: {},
-      },
-    ];
-    // Неизвестный юнит ядро ведёт полосой кораблей (`unitLane`) — там его и ищем.
-    const html = card('A', 'ships');
-    expect(html).not.toContain(payload);
-    expect(html).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
-  });
-
-  it('ждущий заказ и пауза стоят на своей полосе', async () => {
-    const { env, card } = await boot();
-    const a = env.s.planets.A!;
-    a.buildQueue = [{ id: 11, kind: 'unit', playerId: 'p1', unit: 'cruiser', count: 2 }];
-    a.pausedConstruction = [
-      {
-        id: 7,
-        kind: 'building',
-        playerId: 'p1',
-        building: 'farm',
-        progress: 0.5,
-        remainingHours: 2,
-        remainingCost: {},
-      },
-    ];
-    // Крейсер — полоса верфи (BLD-2.1): он на вкладке флота, а не в очереди пехоты.
-    expect(card('A', 'ground')).not.toContain(act('dequeue', '11'));
-    const units = card('A', 'ships');
-    expect(units).toContain(act('dequeue', '11'));
-    expect(units).not.toContain(act('resumebuild', '7'));
-    const blds = card('A', 'buildings');
-    expect(blds).toContain(act('resumebuild', '7'));
-    expect(blds).not.toContain(act('dequeue', '11'));
+    expect(card('A')).toContain(act('wingload', 'K'));
   });
 });
 
@@ -603,20 +509,29 @@ describe('мир вне зрения', () => {
     const payload = '<img src=x onerror="alert(1)">';
     env.names.p2 = payload;
     env.memory.N = { owner: 'p2', garrison: 5, buildings: [{ type: payload, level: 1 }] };
+    const folds = await import('./dossierFolds');
+    folds.toggleDossierBlock('buildings');
+    folds.toggleDossierBlock('grp:infra');
     const html = m.unknownPlanetHtml(env.s.planets.N!);
     expect(html).not.toContain(payload);
     expect(html).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
     expect(html).toContain('L1');
   });
 
-  it('память скана: владелец, гарнизон, постройки и разведка чужого мира', async () => {
-    const { env, m } = await boot();
+  it('память скана: ник хозяина, гарнизон без состава, постройки и разведка чужого мира', async () => {
+    const { env, m, folds } = await boot();
     env.memory.N = { owner: 'p2', garrison: 5, buildings: [{ type: 'mine', level: 1 }] };
+    folds.toggleDossierBlock('buildings');
+    folds.toggleDossierBlock('grp:economy');
     const html = m.unknownPlanetHtml(env.s.planets.N!);
     expect(html).toContain(t('side.scan.stale'));
-    expect(html).toContain('<b>Багровые</b>');
-    expect(html).toContain('<b>5</b>');
-    expect(html).toContain(`${buildingName(data.buildings.mine!.name, 'mine')} L1`);
+    expect(html).toContain(`${act('seat', 'p2')} >${t('side.world.owner', { name: 'Багровые' })}</button>`);
+    expect(html).toContain(`${t('side.dossier.garrison')} <b>≈5</b>`);
+    expect(html).toContain(t('side.scan.garrison.hidden'));
+    expect(html).toContain(buildingName(data.buildings.mine!.name, 'mine'));
+    expect(html).toContain('data-codex="b:mine:1"');
+    // Доход чужой постройки разведка не знает.
+    expect(html).not.toContain('class="inc"');
     expect(html).toContain(act('spymenu', 'N'));
     m.toggleSpyMenu('N');
     const opened = m.unknownPlanetHtml(env.s.planets.N!);
@@ -624,8 +539,18 @@ describe('мир вне зрения', () => {
     expect(opened).toContain(act('spyplanet', 'theft'));
     env.memory.N = { owner: 'p1', garrison: 0, buildings: [] };
     const own = m.unknownPlanetHtml(env.s.planets.N!);
-    expect(own).toContain(t('side.scan.no-buildings'));
+    expect(own).not.toContain(act('dossier', 'buildings'));
     expect(own).not.toContain('data-act="spyplanet"');
+  });
+
+  it('снимок со временем называет свой возраст вместо строки «мог устареть»', async () => {
+    const { env, m } = await boot();
+    env.memory.N = { owner: 'p2', garrison: 5, buildings: [], at: env.s.time - 3.5 * HOUR };
+    const html = m.unknownPlanetHtml(env.s.planets.N!);
+    expect(html).toContain(t('side.scan.age', { n: 3 }));
+    expect(html).not.toContain(t('side.scan.stale'));
+    env.memory.N!.at = env.s.time - 0.2 * HOUR;
+    expect(m.unknownPlanetHtml(env.s.planets.N!)).toContain(t('side.scan.age.fresh'));
   });
 
   it('без памяти — «нет телеметрии», с пингом', async () => {
@@ -647,7 +572,7 @@ describe('мир вне зрения', () => {
     const html = m.unknownPlanetHtml(env.s.planets.Z!);
     expect(html).toContain(t('side.notelemetry.title'));
     expect(html).toContain(tData(SECTOR_TYPES.graveyard!.name));
-    expect(html).not.toContain(t('side.scan.owner'));
+    expect(html).not.toContain('data-act="seat"');
   });
 
   it('в забеге Sector Zero память скана не предлагает разведку', async () => {
@@ -768,12 +693,10 @@ describe('стык с main.ts', () => {
     expect(MAIN.match(/\ninitWorldCard\(\{/g)).toHaveLength(1);
     for (const hook of [
       'world: () => s,',
-      'planetTab: () => planetTab,',
       'buildUnits: () => PRODUCTION_UNITS,',
       'devUi: () => DEV_UI,',
       'sectorOf: (id) => SECTOR_OF[id],',
       'sectorType: sectorTypeOf,',
-      'garrisonTiles: garrisonTilesHtml,',
     ]) {
       expect(MAIN).toContain(hook);
     }

@@ -214,7 +214,6 @@ describe('dossiers — маршрутизация objDossier', () => {
 
   it('ключи-чипы отдают свои статьи', () => {
     expect(objDossier('fleet')?.name).toBeTruthy();
-    expect(objDossier('tab:ground')?.name).toBeTruthy();
   });
 
   it('статьи снесённых дивизий не воскресают', () => {

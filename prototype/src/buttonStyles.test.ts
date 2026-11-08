@@ -255,12 +255,13 @@ describe('три стиля кнопок (UIX-11.1)', () => {
       'openunits:btn-main',
       'openbuild:btn-main',
       'openbuild:btn-main',
-      'openstation:btn-second',
-      'fortress:btn-second',
-      'opentech:btn-quiet',
       'forkfortress:btn-main',
       'opentech:btn-quiet',
     ]);
+    // Крепость мира и путь в науку переехали в окно «Построить» (UIX-10.12) с теми же стилями.
+    const orders = read('./worldOrdersPane.ts');
+    expect(orders).toContain("style = 'btn-second'");
+    expect(orders).toMatch(/orderButton\(\s*'opentech'[\s\S]*?'btn-quiet'/);
     expect(actionButton('ping', '', 'Метка', true)).toContain('class="b btn-second"');
   });
 

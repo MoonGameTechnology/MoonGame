@@ -85,10 +85,11 @@ window.__relocateTest = {
       from = { kind: 'planet', id: home.id };
       dest = { kind: 'fleet', id: carrier.id };
       pickWorld(home.id);
-      // Вкладка «Эскадрильи» — тапом, как у игрока: вкладка листа — состояние листа (REFM-225).
+      // Блок «Эскадра» окна «i» — тапом, как у игрока (UIX-10.12); раскрытый не сворачиваем.
       invalidatePanel();
       renderPanel();
-      side.querySelector('[data-act="tab"][data-arg="shuttle"]').click();
+      const wing = side.querySelector('[data-act="dossier"][data-arg="wing"]');
+      if (wing.getAttribute('aria-expanded') !== 'true') wing.click();
     } else {
       near.owner = ME;
       port(near);

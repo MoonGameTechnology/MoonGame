@@ -432,7 +432,7 @@ for (const [kind, id] of Object.entries(mod.exports.cards())) {
   mod.exports.selectCard(kind, id);
   if (kind === 'planet') {
     // Окно мира (переработка 2026-09-29): второго режима «Сводка» у мира нет — всё её
-    // уникальное стоит в шапке (`.pfacts`), а числа состава живут только на вкладках.
+    // уникальное стоит в шапке (`.pfacts`) и в сведениях окна «i» (UIX-10.12).
     assert.doesNotMatch(sideEl.innerHTML, /data-act="(?:planetinfo|fleetinfo)"/, 'planet: no summary mode');
     assert.ok(sideEl.innerHTML.includes('class="pfacts"'), 'planet: facts under the name');
     assert.ok(!sideEl.innerHTML.includes('class="pstats"'), 'planet: no second row of counters');
@@ -488,15 +488,13 @@ assert.equal(retreated.movement?.destination ?? retreated.movement?.to, retreatT
 battleScene.restore();
 console.log('Battle badge and targeted retreat OK');
 console.log('Card navigation OK — planet, own fleet and inspected foreign fleet');
-// Unit catalogs live in the production window, like the buildings one (BUILD-1): the
-// tab offers a single entry, and it must open THAT tab's roster, not the buildings list.
+// The world «i» card only informs (UIX-10.12): no tabs, no unit catalogs, no second list.
+// Its one way into production is «Build», and it opens the production window.
 mod.exports.selectCard('planet', mod.exports.cards().planet);
-clickSide({ act: 'tab', arg: 'ships' });
-assert.ok(sideEl.innerHTML.includes('data-act="openunits"'), 'a unit tab offers its catalog');
-assert.ok(!sideEl.innerHTML.includes('data-codex="u:'), 'the panel no longer carries a second catalog');
-clickSide({ act: 'openunits', arg: 'ships' });
+assert.ok(!sideEl.innerHTML.includes('data-act="tab"'), 'the world card has no tabs');
+assert.ok(!sideEl.innerHTML.includes('data-act="openunits"'), 'the world card carries no unit catalog');
+clickSide({ act: 'openbuild' });
 assert.ok(getEl('constructor').classList.contains('show'), 'the entry opens the production window');
-assert.ok(getEl('constructor').innerHTML.includes('data-cnhull='), 'units, not buildings');
 for (const handle of (listeners.get(getEl('constructor')) ?? {}).click ?? [])
   handle({ target: getEl('constructor') });
 console.log('Unit production entry OK');

@@ -50,6 +50,9 @@ export interface TrainingTourDeps {
   introduced?: (fleetId: string) => boolean;
 }
 
+/** «Построить» мира: кнопка карточки на ПК или её копия в нижней полосе листа телефона. */
+const BUILD_OPEN = '[data-act="openbuild"], [data-lift="openbuild"]';
+
 const step = (
   stage: TrainingStage,
   id: string,
@@ -121,14 +124,20 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
           }),
         ]
       : [];
-  const tab = (stage: TrainingStage, id: string, name: string) =>
+  // Юниты заказывают в окне «Построить» (UIX-10.12): «i» мира только сообщает, вкладок
+  // с каталогами в нём нет. Шаг открывает окно, второй — его раздел.
+  const yard = (stage: TrainingStage, id: string, main: 'ships' | 'infantry', unit: string) => [
+    step(stage, `${id}-yard`, BUILD_OPEN, visible('#constructor.show'), {
+      copy: 'onb.guide.build.yard',
+    }),
     step(
       stage,
       id,
-      `[data-act="tab"][data-arg="${name}"]`,
-      state(() => ui.intent(`tab:${name}`)),
-      { copy: `training.guide.tab.${name}` },
-    );
+      `#constructor .pw-main-tabs [data-ctab="${main}"]`,
+      visible(`#constructor.show [data-cnhull="${unit}"]`),
+      { copy: `onb.guide.yard.${main}` },
+    ),
+  ];
   const close = (stage: TrainingStage, id: string) =>
     step(
       stage,
@@ -191,7 +200,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     ...(role === 'hero' ? [fleet(stage, `${id}-arrived-fleet`, role)] : []),
   ];
   const building = (stage: TrainingStage, id: string, type: string, upgrade = false) => [
-    step(stage, `${id}-catalog`, '[data-act="openbuild"]', visible('#constructor.show [data-bwtab]'), {
+    step(stage, `${id}-catalog`, BUILD_OPEN, visible('#constructor.show [data-bwtab]'), {
       copy: 'training.guide.build.catalog',
     }),
     step(
@@ -294,11 +303,9 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
   return [
     world('prep', 'base', 'base'),
     ...details('prep', 'details'),
-    tab('prep', 'ships', 'ships'),
     fleet('prep', 'fleet', 'hero'),
     world('economy', 'base', 'base'),
     ...details('economy', 'details'),
-    tab('economy', 'buildings', 'buildings'),
     ...building('economy', 'mine', 'mine', true),
     step(
       'economy',
@@ -306,13 +313,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       null,
       state(() => productionGrew(d.world(), me, b, data)),
     ),
-    tab('economy', 'ships', 'ships'),
-    step(
-      'economy',
-      'catalog',
-      '[data-act="openunits"][data-arg="ships"]',
-      visible('#constructor.show [data-cnhull="cruiser"]'),
-    ),
+    ...yard('economy', 'catalog', 'ships', 'cruiser'),
     step('economy', 'ship-select', '#constructor [data-cnhull="cruiser"]', visible('#constructor.pw-fitting-open [data-cnhull="cruiser"].on'), { copy: 'onb.guide.build.units' }),
     step('economy', 'ship-order', '#constructor [data-cnbuild]', action('unit.build')),
     close('economy', 'ship-close'),
@@ -508,7 +509,6 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     ...assault('assault', 'outpost', 'outpost'),
     world('fortify', 'outpost', 'outpost'),
     ...details('fortify', 'details'),
-    tab('fortify', 'buildings', 'buildings'),
     ...building('fortify', 'fort', 'fort'),
     ...building('fortify', 'defense', 'orbital_aa'),
     step(
@@ -534,13 +534,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     ...route('finale', 'rally-hero', 'hero', 'base', () => at('hero', 'base')),
     world('finale', 'base', 'base'),
     ...details('finale', 'details'),
-    tab('finale', 'ground', 'ground'),
-    step(
-      'finale',
-      'catalog',
-      '[data-act="openunits"][data-arg="ground"]',
-      visible('#constructor.show [data-cnhull="heavy_infantry"]'),
-    ),
+    ...yard('finale', 'catalog', 'infantry', 'heavy_infantry'),
     step('finale', 'recruit-select', '#constructor [data-cnhull="heavy_infantry"]', visible('#constructor.pw-fitting-open [data-cnhull="heavy_infantry"].on'), { copy: 'onb.guide.build.units' }),
     trainingRecruitQuantity(d),
     step(
