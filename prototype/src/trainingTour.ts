@@ -35,6 +35,10 @@ export interface TrainingTourUi {
   selectedFleet(): string | null;
   intent(kind: string): boolean;
   anchor(target: string): Rect | null;
+  /** The hangar badge of a world or a carrier (`spot` is its id), as drawn this frame. */
+  hangar(spot: string): Rect | null;
+  /** The squadron picked on the map, if any. */
+  selectedSquadron(): string | null;
   fleetSelector(role: TrainingFleetRole): string | null;
   /** Camera/panel navigation only: never an order or a change to the game state. */
   show(target: string): void;
@@ -454,57 +458,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     // Шаг подсвечивает полосу корпуса и ждёт, пока она подрастёт, — часы идут.
     step('retreat', 'repair', '[data-stat="hull"]', state(mending), { holdClock: false }),
     fleet('carrier', 'select', 'carrier'),
-    step(
-      'carrier',
-      'move',
-      '[data-cmd="move"]',
-      state(() => ui.intent('move')),
-    ),
-    step(
-      'carrier',
-      'position',
-      null,
-      state(() => ui.intent('carrier-course')),
-      {
-        holdClock: true,
-        anchor: () => ui.anchor('carrier-edge'),
-        reveal: () => ui.show('carrier-edge'),
-      },
-    ),
-    ...(ui.mobile
-      ? [
-          step(
-            'carrier',
-            'send',
-            '[data-cmd="mobile-send"]',
-            state(() => !!f('carrier')?.movement || !!f('carrier')?.edge),
-          ),
-        ]
-      : []),
-    step(
-      'carrier',
-      'arrive',
-      null,
-      state(() => !!f('carrier')?.edge && !f('carrier')?.movement),
-    ),
-    ...details('carrier', 'details'),
-    step(
-      'carrier',
-      'strike-open',
-      '[data-act="wingstrike"]',
-      state(() => ui.intent('strike')),
-    ),
-    step('carrier', 'strike', null, action('shuttle.strike'), {
-      holdClock: true,
-      anchor: () => ui.anchor('outpost'),
-      reveal: () => ui.show('outpost'),
-    }),
-    step(
-      'carrier',
-      'home',
-      null,
-      state(() => squadronHome(d.world(), me)),
-    ),
+    ...carrierStrikeSteps(d, details),
     ...troops('assault', 'load', 2),
     ...assault('assault', 'outpost', 'outpost'),
     world('fortify', 'outpost', 'outpost'),
@@ -563,6 +517,80 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       null,
       state(() => trainingWon(d.world(), me)),
     ),
+  ];
+}
+
+/**
+ * «Носитель»: курс к точке на трассе, остановка, эскадра в трюме — значком ангара у плашки
+ * носителя (UIX-10.14), удар по посту и возвращение эскадры. Вынесено из `buildTrainingTour`
+ * (SLIM-6: функция из бюджета режется, когда её трогает фича).
+ */
+function carrierStrikeSteps(
+  d: TrainingTourDeps,
+  details: (stage: TrainingStage, id: string) => SpotlightStep[],
+): SpotlightStep[] {
+  const { me, ui } = d;
+  const state = (when: () => boolean): StepAdvance => ({ on: 'state', when });
+  const action = (type: string): StepAdvance => ({ on: 'action', type });
+  const f = (role: TrainingFleetRole) => trainingFleet(d.world(), me, role);
+  return [
+  step(
+    'carrier',
+    'move',
+    '[data-cmd="move"]',
+    state(() => ui.intent('move')),
+  ),
+  step(
+    'carrier',
+    'position',
+    null,
+    state(() => ui.intent('carrier-course')),
+    {
+      holdClock: true,
+      anchor: () => ui.anchor('carrier-edge'),
+      reveal: () => ui.show('carrier-edge'),
+    },
+  ),
+  ...(ui.mobile
+    ? [
+        step(
+          'carrier',
+          'send',
+          '[data-cmd="mobile-send"]',
+          state(() => !!f('carrier')?.movement || !!f('carrier')?.edge),
+        ),
+      ]
+    : []),
+  step(
+    'carrier',
+    'arrive',
+    null,
+    state(() => !!f('carrier')?.edge && !f('carrier')?.movement),
+  ),
+  // Эскадра в трюме выбирается значком ангара у плашки носителя (UIX-10.14).
+  step('carrier', 'wing', null, state(() => !!ui.selectedSquadron() || ui.intent('strike')), {
+    holdClock: true,
+    anchor: () => ui.hangar(f('carrier')?.id ?? ''),
+    reveal: () => ui.show('carrier-edge'),
+  }),
+  ...details('carrier', 'details'),
+  step(
+    'carrier',
+    'strike-open',
+    '[data-act="wingstrike"]',
+    state(() => ui.intent('strike')),
+  ),
+  step('carrier', 'strike', null, action('shuttle.strike'), {
+    holdClock: true,
+    anchor: () => ui.anchor('outpost'),
+    reveal: () => ui.show('outpost'),
+  }),
+  step(
+    'carrier',
+    'home',
+    null,
+    state(() => squadronHome(d.world(), me)),
+  ),
   ];
 }
 

@@ -40,7 +40,7 @@
     "prototype/netserver.ts::createHostedMatch": 540,
     "prototype/sectorzerotest.mjs::withDiagnostics(…)": 528,
     "packages/shared-core/src/modules/fleetOps.ts::fleetOpsModule.setup": 518,
-    "prototype/src/trainingTour.ts::buildTrainingTour": 516,
+    "prototype/src/trainingTour.ts::buildTrainingTour": 445,
     "prototype/src/mapInput.ts::selectAt": 353,
     "packages/shared-core/src/modules/espionage.ts::espionageModule.setup": 472,
     "packages/shared-core/src/state/visibility.ts::project": 458,

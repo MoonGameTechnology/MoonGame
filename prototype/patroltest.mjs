@@ -5,10 +5,11 @@
  *
  * Правила патруля покрыты в ядре (`shuttlePatrol.test.ts`, `shuttleHold.test.ts`), метки —
  * в `decisions/patrolMarks.test.ts`. Здесь вопрос другой — «игрок может поставить и снять
- * патруль»: кнопка у эскадры, тап по точке карты кладёт в состояние патруль, панель базы
- * показывает его остаток и «Вернуть», и «Вернуть» разворачивает эскадру домой.
+ * патруль»: кнопка в карточке эскадры, тап по точке карты кладёт в состояние патруль,
+ * выбор едет за эскадрой на её вылет, и его карточка показывает «Вернуть», которое
+ * разворачивает эскадру домой. Приказы эскадре живут только в её карточках (UIX-10.14).
  *
- * SHU-6.6 — «Держать патруль»: переключатель в строке патруля ставит и снимает удержание,
+ * SHU-6.6 — «Держать патруль»: переключатель в карточке патруля ставит и снимает удержание,
  * удерживаемый патруль после посадки встаёт снова без единого нажатия, а эскадру, которая
  * ждёт дома с удержанием, карточка отпускает своей кнопкой.
  *
@@ -36,10 +37,12 @@ const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
 import { hpOfLevel as __hpOfLevel } from './game';
 // Метки патрулей — у решения: с REFM-223 \`main.ts\` их не импортирует.
 import { patrolMarks as __patrolMarks } from '../../decisions/patrolMarks';
+import { pickSquadron as __pickSquadron, pickStrike as __pickStrike } from './interaction';
+let __base = null;
 window.__patrolTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // База — свой мир с целым портом или свой «Носитель» у него; в ангаре два перехватчика.
-  // База выбрана и стоит в центре экрана. Ждать постройки на живой карте значило бы
+  // Эскадра выделена (как тапом по значку ангара), база стоит в центре экрана. Ждать постройки на живой карте значило бы
   // проверять экономику, а не кнопку.
   prepare: (kind) => {
     speed = 0;
@@ -52,12 +55,7 @@ window.__patrolTest = {
       home.buildings.push({ type: 'spaceport', level: 1, hp: __hpOfLevel('spaceport', 1) });
       home.hangar = deck;
       delete home.sortie;
-      pickWorld(home.id);
-      // Блок «Эскадра» окна «i» — тапом, как у игрока (UIX-10.12); раскрытый не сворачиваем.
-      invalidatePanel();
-      renderPanel();
-      const wing = side.querySelector('[data-act="dossier"][data-arg="wing"]');
-      if (wing.getAttribute('aria-expanded') !== 'true') wing.click();
+      __base = { planet: home.id };
     } else {
       const f = Object.values(s.fleets).find((x) => x.owner === ME && x.location);
       f.units = [{ unit: 'shuttle_carrier', count: 1 }];
@@ -67,8 +65,9 @@ window.__patrolTest = {
       f.movement = null;
       f.battleId = null;
       id = f.id;
-      setFleetSelection([f.id]);
+      __base = { fleet: f.id };
     }
+    __pickSquadron(deck[0].id);
     invalidatePanel();
     renderPanel();
     // Центруем ПОСЛЕ панели: открытая панель сужает поле карты, и центр считается от него.
@@ -77,7 +76,19 @@ window.__patrolTest = {
   },
   armed: () => strikeAim,
   // Где база сейчас: у мира — его точка, у корабля — живая позиция флота.
-  base: () => (selFleet ? fleetPos(s.fleets[selFleet]) : s.planets[selPlanet].position),
+  base: () => (__base.fleet ? fleetPos(s.fleets[__base.fleet]) : s.planets[__base.planet].position),
+  // Выделить вылет или эскадру — как тап по ним на карте или по значку ангара.
+  pickStrike: (id) => {
+    __pickStrike(id);
+    invalidatePanel();
+    renderPanel();
+  },
+  pickSquadron: (id) => {
+    __pickSquadron(id);
+    invalidatePanel();
+    renderPanel();
+  },
+  selStrike: () => selStrike,
   // Точка страницы в dx мировых единиц восточнее базы: внутри круга удара перехватчика.
   near: (dx) => {
     const p = window.__patrolTest.base();
@@ -187,8 +198,16 @@ try {
         await page.waitForFunction(() => window.__patrolTest.prepared());
         const id = await page.evaluate((k) => window.__patrolTest.prepare(k), kind);
         const base = kind === 'port' ? { kind: 'planet', id } : { kind: 'fleet', id };
-        // Телефон показывает сначала короткую карточку; ангар живёт в подробностях.
-        if (phone) await page.locator('#mobile-sheet .mobile-info').tap();
+        // Телефон показывает сначала короткую карточку; кнопки живут в подробностях.
+        const open = async (locator) => {
+          // Новый выбор сворачивает лист в своём кадре: смотреть на экран — после него.
+          await frame();
+          if (phone && !(await locator.isVisible()))
+            await page.locator('#mobile-sheet .mobile-info').tap();
+          await locator.waitFor({ state: 'visible' });
+          return locator;
+        };
+        await open(page.locator('[data-act="wingpatrol"]'));
 
         // Кнопка у эскадры, и она ВЗВОДИТ прицел патруля, а не удар.
         await press(page.locator('[data-act="wingpatrol"]'));
@@ -218,22 +237,23 @@ try {
         assert.ok(Math.abs(flight.to.y - pos.y) < 3, `точка там, куда тапнули (${flight.to.y})`);
         assert.equal(await page.evaluate(() => window.__patrolTest.armed()), null, 'прицел погас');
 
-        // Повис — у метки есть отсчёт, у базы строка патруля и «Вернуть».
+        // Выбор уехал за эскадрой на её вылет.
+        assert.equal(await page.evaluate(() => window.__patrolTest.selStrike()), flight.id);
+        // Повис — у метки есть отсчёт, в карточке вылета «Вернуть».
         await page.evaluate(() => window.__patrolTest.arrive());
         const [mark] = await page.evaluate(() => window.__patrolTest.marks());
         assert.equal(mark?.active, true, 'патруль висит над точкой');
         assert.ok((mark?.leftMs ?? 0) > 0, 'отсчёт идёт');
-        await page.locator(`[data-act="wingrecall"][data-arg="${flight.id}"]`).waitFor({
-          state: 'visible',
-        });
+        await open(page.locator(`[data-act="wingrecall"][data-arg="${flight.id}"]`));
         if (process.env.PATROL_SHOTS) {
           const shot = `${process.env.PATROL_SHOTS}/patrol-${kind}-${viewport.width}.png`;
           await page.screenshot({ path: shot });
         }
 
-        // «Держать патруль» (SHU-6.6) — переключатель в той же строке: ставит и снимает.
-        const keep = page.locator(`[data-act="wingkeep"][data-arg="${flight.id}"]`);
-        const held = async () => (await page.evaluate(() => window.__patrolTest.patrols()))[0]?.hold;
+        // «Держать патруль» (SHU-6.6) — переключатель в той же карточке: ставит и снимает.
+        const keep = await open(page.locator(`[data-act="wingkeep"][data-arg="${flight.id}"]`));
+        const held = async () =>
+          (await page.evaluate(() => window.__patrolTest.patrols()))[0]?.hold;
         await press(keep);
         assert.equal(await held(), true, 'патруль держится');
         await press(keep);
@@ -250,8 +270,10 @@ try {
         assert.equal(again.hold, true, 'и держится дальше');
         assert.deepEqual(again.base, base);
 
-        // «Вернуть» разворачивает эскадру домой, снимает удержание, и строка уходит из панели.
-        const recall = page.locator(`[data-act="wingrecall"][data-arg="${again.id}"]`);
+        // Новый вылет — новый выбор: игрок тапает его на карте.
+        await page.evaluate((id) => window.__patrolTest.pickStrike(id), again.id);
+        // «Вернуть» разворачивает эскадру домой, снимает удержание, и кнопка уходит из панели.
+        const recall = await open(page.locator(`[data-act="wingrecall"][data-arg="${again.id}"]`));
         await press(recall);
         const [back] = await page.evaluate(() => window.__patrolTest.patrols());
         assert.equal(back?.leg, 'back', 'патруль повернул домой');
@@ -263,7 +285,8 @@ try {
         await page.evaluate((id) => window.__patrolTest.leg(id), back.id);
         const sqId = await page.evaluate((k) => window.__patrolTest.squadron(k), kind);
         await page.evaluate((q) => window.__patrolTest.holdAtHome(q), sqId);
-        const release = page.locator(`[data-act="wingrelease"][data-arg="${sqId}"]`);
+        await page.evaluate((q) => window.__patrolTest.pickSquadron(q), sqId);
+        const release = await open(page.locator(`[data-act="wingrelease"][data-arg="${sqId}"]`));
         await press(release);
         assert.equal(
           await page.evaluate((q) => window.__patrolTest.homeHold(q), sqId),
@@ -295,7 +318,9 @@ try {
       );
       if (process.env.PATROL_SHOTS) {
         await page.waitForTimeout(300);
-        await page.screenshot({ path: `${process.env.PATROL_SHOTS}/patrol-foreign-${viewport.width}.png` });
+        await page.screenshot({
+          path: `${process.env.PATROL_SHOTS}/patrol-foreign-${viewport.width}.png`,
+        });
       }
     });
     console.log(`Foreign patrol ${viewport.width}px passed.`);

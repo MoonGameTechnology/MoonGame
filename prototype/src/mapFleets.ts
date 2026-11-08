@@ -226,6 +226,13 @@ export function drawBattleTracers(now: number): void {
   }
 }
 
+/** Плашки флотов этого кадра — где их нарисовали. Рядом с плашкой своего носителя встаёт
+ *  значок его ангара (`mapHangars.ts`). */
+let holdBoxes = new Map<string, { x: number; y: number; w: number; h: number }>();
+export function fleetBadgeBox(id: string): { x: number; y: number; w: number; h: number } | null {
+  return holdBoxes.get(id) ?? null;
+}
+
 /** Флоты: светящиеся корпуса на кольце орбиты (стоящие) или вдоль дороги, и портреты героев. */
 export function drawFleets(now: number, lod: MapLod): void {
   const s = game.world();
@@ -235,6 +242,7 @@ export function drawFleets(now: number, lod: MapLod): void {
   // Portraits are resolved only from our own roster, even in full-state solo games.
   const heroesByFleet = mapHeroes(s, ME);
   heroPortraitHits = [];
+  holdBoxes = new Map();
   // fleets — glowing chevrons on their orbit ring (stationed) or along the lane
   cx.textAlign = 'center';
   // One save for the fleet layer, none per fleet: every save leaves ~0.8 KB on the browser's
@@ -341,7 +349,8 @@ export function drawFleets(now: number, lod: MapLod): void {
     // Крепость — одно сооружение: счёт «×N» у неё читался бы как N крепостей.
     const emplacement = isEmplacementFleet(f, data);
     if (detail === 0) {
-      if (!emplacement) drawFleetHoldBadge(cx, A, null, ships, [], false, col, fleetVeteranGrade(f.units, data));
+      if (!emplacement)
+        holdBoxes.set(f.id, drawFleetHoldBadge(cx, A, null, ships, [], false, col, fleetVeteranGrade(f.units, data)));
       // selection still reads on the schematic view; the rest of the kit is gone
       if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 12, now);
       continue;
@@ -405,13 +414,13 @@ export function drawFleets(now: number, lod: MapLod): void {
     // Own hold occupancy is read from the snapshot; foreign manifests stay private.
     // The badge remains horizontal and outside the orbit even as heading changes.
     const dock = !f.movement && f.location ? s.planets[f.location] : null;
-    if (!emplacement) drawFleetHoldBadge(
+    if (!emplacement) holdBoxes.set(f.id, drawFleetHoldBadge(
       cx, A, heroesByFleet.has(f.id) ? null : dock ? world(dock.position) : null, ships,
       f.owner === ME ? fleetHolds(f, data, fleetAloftPlaces(s, f, data)) : [],
       selFleet === f.id || selFleets.has(f.id) || lod.scale >= 1.9,
       col,
       fleetVeteranGrade(f.units, data),
-    );
+    ));
 
     cx.globalAlpha = 1; // end of the per-fleet LOD cross-fade
   }

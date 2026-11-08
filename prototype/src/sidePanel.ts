@@ -106,6 +106,7 @@ import {
   merging,
   pickMode,
   pickSquadron,
+  pickStrike,
   pickWorld,
   rallyAim,
   retreatAim,
@@ -823,8 +824,11 @@ function onSideClick(ev: MouseEvent): void {
       pickSquadron(arg);
     drop('squadMerge');
   } else if (act === 'sqpick') {
-    // Имя эскадры в карточке соседки или в списке — выделить её саму.
+    // Имя эскадры в карточке соседки, в «i» мира или в трюме носителя — выделить её саму.
     pickSquadron(arg);
+  } else if (act === 'strikepick') {
+    // Имя патруля у базы — выделить эскадру в воздухе: её приказы в её карточке.
+    pickStrike(arg);
   } else if (act === 'sqload' || act === 'squnload') {
     // Перегрузить ЭТУ эскадру (карточка эскадры): порт → носитель у причала или обратно.
     const order = squadronTransfer(s, ME, arg, act === 'sqload');

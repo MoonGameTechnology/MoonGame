@@ -7,6 +7,8 @@ export const trainingUiFixture = (mobile = false): TrainingTourUi => ({
   selectedFleet: () => null,
   intent: () => false,
   anchor: () => null,
+  hangar: () => null,
+  selectedSquadron: () => null,
   fleetSelector: () => null,
   show: () => {},
 });

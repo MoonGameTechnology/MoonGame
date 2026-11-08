@@ -725,19 +725,10 @@ function fleetHangarHtml(f: Fleet, compact: boolean): string {
   if (!hasHangar(hold)) return '';
   const idle =
     hold.aloft === 0 && !hold.sortie && squadronCards(hold, { mine: true, data }).length === 0;
-  let h =
-    compact && idle
-      ? `<div class="row dim fc-hangar">${esc(t('side.wing.empty'))}</div>`
-      : hangarSectionHtml(hold, f.id, true);
-  const offer = fleetWingOffer(f, hold);
-  if (offer.load || offer.unload) {
-    h +=
-      `<div class="row">` +
-      (offer.load ? btn('wingload', f.id, t('side.wing.load'), true) : '') +
-      (offer.unload ? btn('wingunload', f.id, t('side.wing.unload'), true) : '') +
-      `</div>`;
-  }
-  return h;
+  // Перегрузка порт ⇄ трюм — в карточке самой эскадры (UIX-10.14): имя в секции её выделяет.
+  return compact && idle
+    ? `<div class="row dim fc-hangar">${esc(t('side.wing.empty'))}</div>`
+    : hangarSectionHtml(hold, f.id, true);
 }
 
 /** Перегрузка челноков между носителем и портом под ним. Предлагается, только когда

@@ -2263,7 +2263,7 @@ initMatchLifecycle({
         baseline,
         ui: trainingTourUi({
           world: () => s, me: () => ME, mobile: MOBILE,
-          expanded: () => mobileHud.expanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`), collapse: () => mobileHud.collapse(),
+          expanded: () => mobileHud.expanded(selSquadron ? `sq:${selSquadron}` : selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`), collapse: () => mobileHud.collapse(),
           // Synchronize the phone selection before Show expands its sheet.
           render: () => { invalidatePanel(); renderPanel(); updateMobileHud(); },
         }),
