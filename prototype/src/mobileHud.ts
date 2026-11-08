@@ -15,7 +15,7 @@ export function mobileOrderBar(title: string, target: string | null, picking = f
     `<div class="mobile-order-copy"><b>${esc(title)}</b><span>${esc(
       picking ? t('hud.mobile.pick-hint') : t('hud.mobile.target-hint'),
     )}</span>${picking ? '' : `<strong>${esc(target ?? t('hud.mobile.target-none'))}</strong>`}</div>` +
-    `<button data-cmd="mobile-cancel" class="btn-second">${esc(t('hud.mobile.cancel'))}</button>` +
+    `<button data-cmd="mobile-cancel" class="btn-second warning">${esc(t('hud.mobile.cancel'))}</button>` +
     `<button data-cmd="${picking ? 'pick' : 'mobile-send'}" class="btn-main"${!picking && !target ? ' disabled' : ''}>${esc(picking ? t('hud.mobile.ready') : t('hud.mobile.send'))}</button>`
   );
 }

@@ -14,7 +14,7 @@ export function skinIcon(name: HoloIcon, fallback: string): string {
 
 const COMMAND_ICONS: Record<string, HoloIcon> = {
   move: 'arrow-bend-up-right',
-  engage: 'crosshair',
+  engage: 'lightning',
   attack: 'sword',
   target: 'path',
   cast: 'sparkle',

@@ -461,7 +461,7 @@ body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #cmdbar .chlabel .chhint{color:var(--dim);font-style:normal;}
 #cmdbar .chlabel .chwarn{color:var(--amber,#f5cf6b);cursor:help;}
 /* Вид кнопок ряда — один из трёх стилей (.btn-main/.btn-second/.btn-quiet, UIX-11.1), вместе с
-   состояниями: включённый режим (.on), красный «Стоп» (.danger), серая кнопка с причиной
+   состояниями: включённый режим (.on), красная «Атака» (.danger), жёлтая отмена (.warning), серая кнопка с причиной
    (aria-disabled — нажатие объясняет запрет). Здесь только размер и раскладка. */
 #cmdbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   min-width:48px;height:44px;padding:4px 7px;font-size:var(--fs-caption);border-radius:9px;}

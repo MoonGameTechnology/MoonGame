@@ -414,13 +414,11 @@ export function renderCmdBar(): void {
   let html =
     `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
     cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
-    // ATK-1: «Атака» — всегда, как «Курс». Цель у неё ФЛОТ, а не мир (в отличие от
-    // ШТУРМА ниже), поэтому и кнопка отдельная, и прицел отдельный. Значок — прицел ✛, как
-    // на ПК (`crosshair`): молния ⚡ — это скорость и «Ускорить» (UIX-5.3).
-    cmdBtn('engage', '✛', t('cmd.engage'), engageAim ? 'on' : '', false, t('cmd.engage.hint')) +
+    // «Атака» targets fleets; its red lightning is shared by both skins.
+    cmdBtn('engage', '⚡', t('cmd.engage'), engageAim ? 'danger on' : 'danger', false, t('cmd.engage.hint')) +
     // В консоли «Способность» — третья в первом ряду, как на макете владельца.
     (consoleOn ? castBtn : '') +
-    (shown.stop ? cmdBtn('stop', '■', t('cmd.stop'), 'danger', false, t('cmd.stop.hint')) : '') +
+    (shown.stop ? cmdBtn('stop', '■', t('cmd.stop'), 'warning', false, t('cmd.stop.hint')) : '') +
     (shown.assault
       ? cmdBtn(
           'attack',

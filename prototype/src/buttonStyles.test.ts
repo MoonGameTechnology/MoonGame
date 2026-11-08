@@ -186,7 +186,7 @@ describe('три стиля кнопок (UIX-11.1)', () => {
       .map((m) => m[0])
       .filter((tag) => !STYLES.some((c) => new RegExp(`class="[^"]*\\b${c}\\b`).test(tag)));
 
-  it('полоска «Приказ»: «Отправить» — главная, «Отмена» — вторичная красная', () => {
+  it('полоска «Приказ»: «Отправить» — главная, «Отмена» — вторичная жёлтая', () => {
     const html = chainStripHtml({
       fleets: 1,
       count: 2,
@@ -199,7 +199,7 @@ describe('три стиля кнопок (UIX-11.1)', () => {
     });
     expect(unstyled(html)).toEqual([]);
     expect(html).toMatch(/data-cmd="chsend" class="btn-main"/);
-    expect(html).toMatch(/data-cmd="chexit" class="btn-second danger"/);
+    expect(html).toMatch(/data-cmd="chexit" class="btn-second warning"/);
   });
 
   it('приказ на телефоне: «Отправить» — главная, «Отмена» — вторичная', () => {
