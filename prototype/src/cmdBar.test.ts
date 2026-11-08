@@ -331,6 +331,64 @@ describe('REFM-226 — что ряд показывает выделению', (
     expect(cmds()).not.toContain('bombard');
   });
 
+  it('в сети наличие команды в старом пакете правил не обещает бомбардировку любой точки', async () => {
+    const { cb, env, fleet, home, foe, select, patch, cmds, buttons } = await boot();
+    const { useNetworkRules } = await import('./matchRulesCatalog');
+    const { canOrder, bombardFleet } = await import('./game');
+    env.world = {...env.world, diplomacy: {'p1|p2': 'war'}};
+    useNetworkRules({id: 'a'.repeat(64), data, version: env.world.version,
+      config: {timeScale: 1}, actions: ['fleet.bombard']});
+    select(fleet.id);
+    // The network probe checks support only; the command bar must check the scene.
+    expect(canOrder(env.world, bombardFleet('p1', fleet.id, true))).toBeNull();
+    cb.renderCmdBar();
+    expect(cmds()).not.toContain('bombard');
+    const check = (change: Partial<Fleet>, shown: boolean) => {
+      patch(fleet.id, { ...fleet, battleId: undefined, assaultLanding: undefined, bombarding: false,
+        location: foe.id, orbit: 'near', ...change });
+      cb.renderCmdBar();
+      expect(cmds().includes('bombard')).toBe(shown);
+    };
+    check({}, true);
+    check({location: home.id}, false);
+    check({location: null}, false);
+    check({location: 'missing'}, false);
+    check({orbit: undefined}, false);
+    check({movement: {from: home.id, to: foe.id, departedAt: 0, arrivesAt: 1000}}, false);
+    check({battleId: 'battle'}, false);
+    check({assaultLanding: {planetId: foe.id, startAt: 0, doneAt: 1000}}, false);
+    check({units: []}, false);
+    check({units: [{unit: 'cruiser', count: 0}]}, false);
+    for (const stance of ['peace', 'pact', 'alliance', 'war'] as const) {
+      env.world = {...env.world, diplomacy: {'p1|p2': stance}};
+      check({}, stance === 'war');
+    }
+    for (const kind of ['asteroid', 'void_station', 'planet']) {
+      env.world = {...env.world, planets: {...env.world.planets,
+        [foe.id]: {...env.world.planets[foe.id]!, kind, owner: null}}};
+      check({}, kind === 'planet');
+    }
+    // A stale active order can still be cancelled after capture or peace.
+    env.world = {...env.world, planets: {...env.world.planets,
+      [foe.id]: {...env.world.planets[foe.id]!, owner: 'p1'}}};
+    check({bombarding: true}, true);
+    expect(buttons().find(b => b.cmd === 'bombard')?.on).toBe(true);
+    // The UI follows that match's historical catalogue, rather than today's kinds.
+    const {data: liveData, useMatchCatalog} = await import('./gameData');
+    const {hashGameDataBundle} = await import('../../packages/shared-core/src/index');
+    const historical = structuredClone(liveData);
+    historical.sectorKinds.void_station!.bombardable = true;
+    const id = 'a'.repeat(64);
+    useMatchCatalog({id, data: historical, config: {timeScale: 1}, actions: ['fleet.bombard'],
+      version: {data: historical.version, dataHash: hashGameDataBundle(historical), manifest: `ruleset:${id}`}});
+    env.world = {...env.world, planets: {...env.world.planets,
+      [foe.id]: {...env.world.planets[foe.id]!, kind: 'void_station', owner: 'p2'}}};
+    check({}, true);
+    useMatchCatalog();
+    check({}, false);
+    useNetworkRules();
+  });
+
   it('☰ раскрывает стоячие приказы; подсвечено то, что стоит на всей группе', async () => {
     const { cb, go, inter, env, fleet, select, cmds, buttons } = await boot();
     const { RETREAT_THRESHOLDS } = await import('./game');

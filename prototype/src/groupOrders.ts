@@ -29,6 +29,7 @@ import {
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { t } from '../../localization/runtime';
 import { assaultSteps } from '../../decisions/assaultOrder';
+import { bombardCommandAvailable } from '../../decisions/bombardCommand';
 import { afterLoadSteps, splitByLoading, type DeferredOrder } from '../../decisions/loadingOrders';
 import { mergePlan } from '../../decisions/mergeOrders';
 import { refusalText as errText } from '../../decisions/refusalText';
@@ -376,10 +377,7 @@ export function bombardFleetsFor(fleetIds: readonly string[], on: boolean): stri
   return livingFleets(fleetIds)
     .filter(
       (f) =>
-        !!f.bombarding !== on &&
-        !!f.location &&
-        !f.movement &&
-        !f.battleId &&
+        bombardCommandAvailable(s, f, ME, data, on) &&
         canOrder(s, bombardFleet(ME, f.id, on)) === null,
     )
     .map((f) => f.id);

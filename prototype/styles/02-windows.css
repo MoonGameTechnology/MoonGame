@@ -681,8 +681,10 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .btn-second.on{border-color:var(--sf-accent);background:var(--sf-sel);color:var(--sf-hi);
   box-shadow:inset 0 -2px 0 var(--sf-accent);}
 .btn-main.on{background:var(--sf-primary-hi);box-shadow:inset 0 -2px 0 var(--sf-hi),var(--sf-glow);}
-/* Красный — состояние, а не четвёртый стиль: приказ, который обрывает начатое. */
+/* Command accents: red attack, amber cancellation. */
 .btn-second.danger{border-color:color-mix(in srgb,var(--red) 45%,transparent);color:var(--red);}
+.btn-second.danger.on{box-shadow:inset 0 -2px 0 var(--red);}
+.btn-second.warning{border-color:color-mix(in srgb,var(--amber) 65%,transparent);color:var(--amber);}
 :is(.btn-main,.btn-second,.btn-quiet):is(:disabled,[aria-disabled="true"]){border-color:var(--sf-edge);
   background:var(--sf-card-off);color:var(--sf-dim);box-shadow:none;opacity:.6;cursor:not-allowed;}
 .btn-quiet:is(:disabled,[aria-disabled="true"]){border-color:transparent;background:none;}
