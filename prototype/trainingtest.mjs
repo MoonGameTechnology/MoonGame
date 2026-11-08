@@ -16,11 +16,11 @@ window.__captureTutorial = () => {
   };
 };
 const trainingUiTest = () => trainingTourUi({world:()=>s,me:()=>ME,mobile:MOBILE,
-  expanded:()=>mobileHud.expanded(selPlanet ? 'planet:'+selPlanet : 'fleet:'+selFleet),collapse:()=>mobileHud.collapse(),tab:()=>planetTab,ships:()=>{setPlanetTab('ships');},
+  expanded:()=>mobileHud.expanded(selPlanet ? 'planet:'+selPlanet : 'fleet:'+selFleet),collapse:()=>mobileHud.collapse(),
   render:()=>{invalidatePanel();renderPanel();updateMobileHud();}});
 window.__trainingTest = {
   advance: hours => apply(advance(s,s.time+hours*3600000)),
-  facts: () => ({state:s,selected:selFleet,selectedWorld:selPlanet,aiming:trainingUiTest().intent('move'),pickedTarget:trainingUiTest().intent('picked:target'),paused:!!activeTour?.holdsClock,tab:planetTab,
+  facts: () => ({state:s,selected:selFleet,selectedWorld:selPlanet,aiming:trainingUiTest().intent('move'),pickedTarget:trainingUiTest().intent('picked:target'),paused:!!activeTour?.holdsClock,
     rewards:{research:sectorProgress.research,warrants:sectorProgress.warrants,sovereigns:sectorProgress.sovereigns,
       nextAttempt:sectorProgress.nextAttempt,settledThrough:sectorProgress.settledThrough}}),
   current: () => {

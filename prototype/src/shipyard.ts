@@ -5,6 +5,7 @@ import { closeProductionOverlay, fittingSheet, presentProduction, rememberProduc
 import { productionQueueHtml } from './productionQueueView';
 import { completedUnitSpend } from './economy';
 import { productionIncomeHtml, productionStockHtml, refreshProductionStock } from './productionIncome';
+import { worldOrdersHtml } from './worldOrdersPane';
 import { productionClick } from './productionInteraction';
 /**
  * «ПРОИЗВОДСТВО» — the unified in-match order screen (CON-1, LARS-4, REFM-13, ROS-3.1).
@@ -784,7 +785,7 @@ function orderView(host: YardHost, draft: YardDraft, hulls: string[], troopsFor:
   return { draft, body, order };
 }
 
-function productionAvailability(host: YardHost): string { return JSON.stringify([host.state().players[host.me()]?.resources, host.state().players[host.me()]?.technologies, host.state().players[host.me()]?.arsenal, Object.values(host.state().planets).filter(p => p.owner === host.me()).map(p => [p.id,p.buildings])]); }
+function productionAvailability(host: YardHost): string { const pl = host.state().players[host.me()]; return JSON.stringify([pl?.resources, pl?.technologies, pl?.arsenal, host.state().capital?.[host.me()], pl?.stewardHoldPoints, host.state().rallyPoints?.[host.me()], Object.values(host.state().planets).filter(p => p.owner === host.me()).map(p => [p.id,p.buildings])]); }
 
 export function initShipyard(host: YardHost) {
   let tab: YardTab = 'ships';
@@ -1140,7 +1141,7 @@ function productionWorlds(state: GameState, me: string) {
   return Object.values(state.planets).filter(p => p.owner === me && SECTOR_TYPES[p.kind ?? '']?.buildable);
 }
 function productionWorldSelect(state: GameState, me: string, selected: string): string {
-  return `<select id="cn-planet" class="cn-plan" aria-label="${t('yard.where')}">${productionWorlds(state, me).map(p => `<option value="${esc(p.id)}"${p.id === selected ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`).join('')}</select>`;
+  return `<select id="cn-planet" class="cn-plan" aria-label="${t('yard.where')}">${productionWorlds(state, me).map(p => `<option value="${esc(p.id)}"${p.id === selected ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`).join('')}</select>` + worldOrdersHtml(state, me, selected);
 }
 function anchorBuilding(root: HTMLElement, id: string): void {
   const target = Array.from(root.querySelectorAll<HTMLElement>('[data-bw]')).find(el => el.dataset.bw === id);

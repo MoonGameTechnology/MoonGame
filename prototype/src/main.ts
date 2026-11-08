@@ -138,7 +138,6 @@ import { initTermTips } from './termTip';
 import {
   closeStatPop,
   fleetLandShown,
-  garrisonTilesHtml,
   initFleetCard,
   initStatPop,
   statPopOpen,
@@ -197,12 +196,11 @@ import {
   initSidePanel,
   invalidatePanel,
   openDossier,
-  planetTab,
-  setPlanetTab,
   renderPanel,
   renderSplitDialog,
   revealMobileSelection,
   splitAwait,
+  worldOrder,
 } from './sidePanel';
 import {
   initWorldCard,
@@ -394,7 +392,7 @@ import {
 import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, setView, world, worldDist } from './mapCamera';
 import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, restoreFogMemory, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
-import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, radarSweepSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
+import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, IDENTIFY_REACH_FRACTION, initMapRadar, netSignatures, planetRadar, radarSweepSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder } from './orderPipeline';
 import {
   forceIntroduced,
@@ -1619,18 +1617,17 @@ function renderMap(now: number) {
 // --- side panel --------------------------------------------------------------
 
 // Карточка мира, ангар и карточки эскадр — у владельца, `worldCard.ts` (REFM-223). Отсюда —
-// то, что принадлежит игре: мир, место, имена, открытая вкладка, плитки гарнизона и карта узлов.
+// то, что принадлежит игре: мир, место, имена, карта узлов и радар мира.
 initWorldCard({
   world: () => s,
   me: () => ME,
   names: () => NAME,
-  planetTab: () => planetTab,
   buildUnits: () => PRODUCTION_UNITS,
   devUi: () => DEV_UI,
   sectorOf: (id) => SECTOR_OF[id],
   sectorType: sectorTypeOf,
-  garrisonTiles: garrisonTilesHtml,
   sectorZeroToolsHidden,
+  radar: (p) => { const reach = planetRadar(p); return { reach, identify: reach * IDENTIFY_REACH_FRACTION }; },
 });
 
 // Карточка флота, группы, мин и ракеты, плитки юнитов — у владельца, `fleetCard.ts` (REFM-224).
@@ -2244,8 +2241,7 @@ initMatchLifecycle({
         baseline,
         ui: trainingTourUi({
           world: () => s, me: () => ME, mobile: MOBILE,
-          expanded: () => mobileHud.expanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`), collapse: () => mobileHud.collapse(), tab: () => planetTab,
-          ships: () => { setPlanetTab('ships'); },
+          expanded: () => mobileHud.expanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`), collapse: () => mobileHud.collapse(),
           // Synchronize the phone selection before Show expands its sheet.
           render: () => { invalidatePanel(); renderPanel(); updateMobileHud(); },
         }),
@@ -2490,6 +2486,17 @@ const shipyard = initShipyard({
   heroClick: heroStaff.click,
 });
 document.getElementById('rail-constructor')?.addEventListener('click', () => shipyard.open());
+// Приказы мира в окне «Построить» (UIX-10.12, `worldOrdersPane.ts`): мир — выбранный списком
+// окна. Выбор цели на карте, крепость и переход к ней закрывают окно, остальное его обновляет.
+constructorWin.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-wo]');
+  if (!b || b.disabled) return;
+  const { wo = '', arg = '', pid = '' } = b.dataset;
+  if (wo === 'opentech') techTree.open(arg || undefined);
+  else if (!worldOrder(wo, arg, pid)) return;
+  if (wo === 'fortress' || wo === 'openstation' || (wo === 'rally' && arg !== 'off')) shipyard.close();
+  else shipyard.render();
+});
 
 // Экран подключения — у владельца, `connectScreen.ts` (REFM-247): узлы экрана, показ, адрес и
 // позывной по умолчанию, разбор адреса, вход в обозреватель и такт активности игрока.

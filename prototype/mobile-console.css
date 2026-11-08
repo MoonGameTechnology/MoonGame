@@ -175,10 +175,6 @@ body.mobile-ui #mobile-sheet #side .pfact {
 body.mobile-ui #mobile-sheet #side .sec {
   margin: 10px 0 5px;
 }
-/* Ряд действий листа — от левого края: иначе кнопка «Шпионаж» прыгала бы влево при раскрытии. */
-body.mobile-ui #mobile-sheet #side .pacts {
-  margin-left: 0;
-}
 body.mobile-ui #mobile-sheet #side .pacts [data-act='ping'],
 body.mobile-ui #mobile-sheet #side .pacts [data-act='openbuild'],
 body.mobile-ui #mobile-sheet #side .pacts [data-act='seat'] {

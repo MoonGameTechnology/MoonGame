@@ -102,7 +102,7 @@ describe('guided first match: every chapter is playable by real orders', () => {
       visible: (selector) => !selector.includes('.show'),
       selectedWorld: () => HOME,
       selectedFleet: () => guideHeroFleet(s, ME)?.id ?? null,
-      intent: (kind) => kind === 'details' || kind.startsWith('tab:'),
+      intent: (kind) => kind === 'details',
       anchor: () => null,
       heroSelector: () => null,
       show: () => {},
@@ -147,10 +147,10 @@ describe('guided first match: every chapter is playable by real orders', () => {
     s = act(s, 'building.construct', { planetId: HOME, building: 'barracks' });
     expect(at()).toBe('ground.barracks-wait');
     s = until(s, (x) => guideBuilt(x, HOME, 'barracks'));
-    expect(at()).toBe('ground.militia-catalog');
+    expect(at()).toBe('ground.militia-yard');
     const militia = guideTroopsHome(s, HOME);
     s = act(s, 'unit.build', { planetId: HOME, unit: GUIDE_TROOP, count: GUIDE_TROOPS - 1 });
-    expect(at()).toBe('ground.militia-catalog'); // one short
+    expect(at()).toBe('ground.militia-yard'); // one short
     s = act(s, 'unit.build', { planetId: HOME, unit: GUIDE_TROOP });
     expect(at()).toBe('ground.troops-wait');
     s = until(s, (x) => guideTroopsHome(x, HOME) >= militia + GUIDE_TROOPS);
@@ -159,7 +159,7 @@ describe('guided first match: every chapter is playable by real orders', () => {
     expect(at()).toBe('aviation.spaceport-catalog');
     s = act(s, 'building.construct', { planetId: HOME, building: 'spaceport' });
     s = until(s, (x) => guideBuilt(x, HOME, 'spaceport'));
-    expect(at()).toBe('aviation.bomber-catalog');
+    expect(at()).toBe('aviation.bomber-yard');
     s = act(s, 'unit.build', { planetId: HOME, unit: GUIDE_WING });
     expect(at()).toBe('aviation.wing-wait');
     s = until(s, (x) => guideWingsHome(x, HOME) > 0 && !!guideHeroFleet(x, ME));

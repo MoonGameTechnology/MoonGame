@@ -596,6 +596,47 @@
 .spy-menu{flex:1 0 100%;display:flex;flex-direction:column;align-items:stretch;gap:6px;margin-top:6px;padding-left:8px;border-left:2px solid var(--line);}
 .spy-menu>.b{text-align:left;white-space:nowrap;}
 .spy-menu>.pfact{align-self:flex-start;}
+/* Окно «i» мира — только сведения (UIX-10.12): полоса дохода, строки обороны, гарнизон
+   сеткой, свёрнутые постройки и эскадра. Снимок разведки называет свой возраст пунктиром. */
+.pfact.old{color:var(--dim);border-style:dashed;}
+.dband{display:flex;flex-direction:column;gap:4px;width:100%;margin:2px 0 8px;padding:6px 8px 7px;border:1px solid var(--line);
+  border-radius:6px;background:rgba(53,214,230,.04);color:var(--ink);font:inherit;text-align:left;cursor:pointer;}
+.dband-t{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:var(--fs-caption);color:var(--dim);}
+.dband-more{display:inline-flex;align-items:center;gap:4px;color:var(--cyan);}
+.dband-more svg{width:14px;height:14px;}
+.dband-r{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;font-weight:700;font-variant-numeric:tabular-nums;}
+.dband .rc-per,.dchip .rc-per{display:none;}
+.dsec{margin:4px 0 8px;}
+.dsec-t{font-size:var(--fs-caption);color:var(--dim);border-bottom:1px solid var(--line);padding-bottom:3px;margin-bottom:5px;}
+.dsec-t b{color:var(--ink);margin-left:4px;}
+.drow{display:flex;align-items:baseline;gap:8px;margin:3px 0;font-size:var(--fs-body);line-height:1.35;}
+.drow .k{flex:none;width:64px;color:var(--dim);font-size:var(--fs-caption);}
+.drow .v{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;}
+.dlink{background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+.dunits{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;}
+.dunit{display:flex;flex-direction:column;gap:3px;min-width:0;padding:0;background:none;border:0;color:inherit;font:inherit;
+  text-align:left;cursor:pointer;}
+.dunit-t{display:flex;justify-content:space-between;gap:6px;font-size:var(--fs-body);}
+.dunit-t span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dunit-t b{font-variant-numeric:tabular-nums;font-weight:600;}
+.dhp{height:4px;border-radius:2px;background:rgba(53,214,230,.15);overflow:hidden;}
+.dhp i{display:block;height:100%;background:var(--grn);}
+.dhp.hurt i{background:var(--amber);}
+.dhp.low i{background:var(--red);}
+.dfold{margin:6px 0;}
+.dfold-h{display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:6px;
+  background:rgba(53,214,230,.04);color:var(--ink);font:inherit;font-size:var(--fs-body);text-align:left;cursor:pointer;}
+.dfold-h b{color:var(--dim);font-weight:600;font-variant-numeric:tabular-nums;}
+.dfold-h i{margin-left:auto;font-style:normal;color:var(--cyan);}
+.dfold.on>.dfold-h{border-color:var(--cyan-dim);}
+.dfold-b{padding:6px 0 0 8px;}
+.dfold-b .dfold{margin:0 0 5px;}
+.dchips{display:flex;flex-wrap:wrap;gap:5px;}
+.dchip{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border:1px solid var(--line);border-radius:6px;
+  background:rgba(2,9,13,.55);color:var(--ink);font:inherit;font-size:var(--fs-caption);white-space:nowrap;cursor:pointer;}
+.dchip .lv{color:var(--cyan);font-weight:600;}
+/* Приказы мира в окне «Построить» (UIX-10.12): столица, точки удержания и сбора, крепость. */
+.pw-orders{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0;}
 /* Выход мира — «/ч» один раз, в конце строки, а не у каждого ресурса. */
 .pfact .rcost:not(:last-child) .rc-per{display:none;}
 /* Липкие вкладки заходят вверх на 13px (чтобы закрыть отступ листа при прокрутке) и под

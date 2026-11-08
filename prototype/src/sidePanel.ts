@@ -6,7 +6,7 @@
  *
  * Лист собирается каждый кадр, а DOM трогается, только когда разметка поменялась: кэш
  * `lastPanelHtml` живёт здесь, и чужие зоны сбивают его дверью {@link invalidatePanel}, а не
- * присваиванием. Модуль — хозяин трёх состояний листа: вкладки мира `planetTab`, сводки армии
+ * присваиванием. Модуль — хозяин двух состояний листа: сводки армии
  * `fleetInfoFor` и раскола, который ждёт события (`splitAwait`, его гасит лента дверью
  * {@link endSplitAwait}); снаружи их только читают. Сами карточки рисуют их владельцы
  * (`worldCard.ts`, `fleetCard.ts`). Мир, своё место, раскладку, выбор, эскадры и вылеты,
@@ -133,7 +133,8 @@ import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { splitOne } from './squadronPanel';
 import { cursorTipPos } from './tipPlacement';
 import { arrivalHours } from './travelEta';
-import { forkPanelHtml, planetPanelHtml, type PlanetTab, toggleSpyMenu, unknownPlanetHtml } from './worldCard';
+import { forkPanelHtml, planetPanelHtml, toggleSpyMenu, unknownPlanetHtml } from './worldCard';
+import { toggleDossierBlock } from './dossierFolds';
 import { enqueueBuild, timeLeft } from './worldQueries';
 import { openFortressDialog } from './fortressDialog';
 
@@ -196,11 +197,6 @@ let objTipEl: HTMLElement | null = null;
 /** Чей раскол ждёт события, чтобы выделить отделённую часть (`splitSelectTarget`). */
 export let splitAwait: string | null = null;
 let hoverObj: string | null = null; // side-panel object under the pointer (data-desc key)
-export let planetTab: PlanetTab = 'buildings';
-/** Открыть вкладку мира снаружи — гид обучения ведёт игрока к кораблям (TRN-7). */
-export function setPlanetTab(tab: PlanetTab): void {
-  planetTab = tab;
-}
 // Bytro-карточка: тап по имени флота открывает сводку армии — какой флот сейчас
 // в режиме сводки (другой флот в панели → обычная карточка сама собой).
 export let fleetInfoFor: string | null = null;
@@ -601,6 +597,35 @@ function onSideKeydown(ev: KeyboardEvent): void {
   ev.preventDefault();
   toggleStatPop(stat as ConsoleStat);
 }
+/** Приказы мира, которые живут в окне «Построить» (UIX-10.12, `worldOrdersPane.ts`). */
+const WORLD_ORDERS = new Set(['capital', 'holdpoint', 'rally', 'fortress', 'openstation']);
+
+/**
+ * Приказ миру `pid` — из окна «Построить», где мир выбирают его списком, или из боковой
+ * панели. `false` — такого приказа нет.
+ */
+export function worldOrder(act: string, arg: string, pid: string): boolean {
+  const ME = game.me();
+  if (act === 'capital') playerOrder(designateCapital(ME, pid));
+  else if (act === 'holdpoint') playerOrder(setHoldPoint(ME, pid, arg === 'on'));
+  else if (act === 'rally') {
+    // RALLY-1: «Задать»/«Сменить» взводят выбор цели на карте, «Снять» — сразу приказ.
+    if (arg === 'off') playerOrder(setRallyPoint(ME, pid, null));
+    else {
+      arm('rallyAim', pid);
+      note(t('hint.rally-pick'));
+    }
+  } else if (act === 'fortress') {
+    openFortressDialog({ state: () => game.world(), me: () => game.me(),
+      probe: (order) => canOrder(game.world(), order), order: playerOrder,
+      placed: () => pickWorld(stationSiteId(pid)),
+    }, pid);
+  } else if (act === 'openstation') pickWorld(arg);
+  else return false;
+  invalidatePanel();
+  renderPanel();
+  return true;
+}
 function onSideClick(ev: MouseEvent): void {
   const s = game.world();
   const ME = game.me();
@@ -628,9 +653,9 @@ function onSideClick(ev: MouseEvent): void {
     if (MOBILE) {
       const key =
         (ev.target as HTMLElement).closest<HTMLElement>('[data-desc]')?.dataset.desc ?? null;
-      // stat:/tab: dossiers exist for the PC hover tooltip only — the mobile tap
+      // stat: dossiers exist for the PC hover tooltip only — the mobile tap
       // behaviour stays exactly as it was before they were added.
-      if (key !== null && !key.startsWith('stat:') && !key.startsWith('tab:')) {
+      if (key !== null && !key.startsWith('stat:')) {
         openDossier(key);
       }
     }
@@ -660,10 +685,6 @@ function onSideClick(ev: MouseEvent): void {
     deselectFleets();
   } else if (act === 'selfleet') {
     setFleetSelection([arg]);
-  } else if (act === 'tab') {
-    if (arg === 'ground' || arg === 'ships' || arg === 'shuttle' || arg === 'buildings') {
-      planetTab = arg;
-    }
   } else if (act === 'openbuild') {
     game.buildWin().open(selPlanet!);
   } else if (act === 'openunits') {
@@ -671,12 +692,10 @@ function onSideClick(ev: MouseEvent): void {
     // сужаем строку до ростера, который окно умеет показывать.
     if (selPlanet && (arg === 'ground' || arg === 'ships' || arg === 'shuttle'))
       game.buildWin().open(selPlanet, arg);
-  } else if (act === 'fortress') {
-    const province = selPlanet;
-    if (province) openFortressDialog({ state: () => game.world(), me: () => game.me(),
-      probe: (order) => canOrder(game.world(), order), order: playerOrder,
-      placed: () => pickWorld(stationSiteId(province)),
-    }, province);
+  } else if (selPlanet && WORLD_ORDERS.has(act ?? '')) {
+    worldOrder(act!, arg, selPlanet);
+  } else if (act === 'dossier') {
+    if (arg) toggleDossierBlock(arg);
   } else if (act === 'forkfortress') {
     // Крепость на развилке (FORT-6.1): встала — выбираем её саму, как мир, чтобы сразу
     // было видно ядро, постройки и кнопку стройки. Отказ оставляет карточку развилки.
@@ -685,8 +704,6 @@ function onSideClick(ev: MouseEvent): void {
       probe: (order) => canOrder(game.world(), order), order: playerOrder,
       placed: () => pickWorld(forkSiteId(fork.province, fork.trail)),
     }, fork.province, fork.trail);
-  } else if (act === 'openstation') {
-    pickWorld(arg);
   } else if (act === 'repairfortress') {
     playerOrder(repairStation(ME, arg));
   } else if (act === 'opentech') {
@@ -824,17 +841,6 @@ function onSideClick(ev: MouseEvent): void {
     if (arg) toggleSpyMenu(arg);
   } else if (act === 'spyrecall') {
     playerOrder(recallSpy(ME, selPlanet!, arg === 'recon' ? 'recon' : undefined));
-  } else if (act === 'capital') {
-    playerOrder(designateCapital(ME, selPlanet!));
-  } else if (act === 'holdpoint') {
-    playerOrder(setHoldPoint(ME, selPlanet!, arg === 'on'));
-  } else if (act === 'rally') {
-    // RALLY-1: «Задать»/«Сменить» взводят выбор цели на карте, «Снять» — сразу приказ.
-    if (arg === 'off') playerOrder(setRallyPoint(ME, selPlanet!, null));
-    else {
-      arm('rallyAim', selPlanet!);
-      note(t('hint.rally-pick'));
-    }
   } else if (act === 'ping') {
     game.pings()?.openMenu();
   } else if (act === 'seat') {

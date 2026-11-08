@@ -850,24 +850,19 @@ describe('REFM-225 — досье по наведению и по тапу', () 
     }
   });
 
-  it('телефон не наводит: тап по строке открывает то же досье, а параметры и вкладки — нет', async () => {
+  it('телефон не наводит: тап по строке открывает то же досье, а параметры — нет', async () => {
     const { inter, env, page, t, home, show, node, press } = await boot();
     const { hl } = await import('./format');
     env.mobile = true;
-    env.dossiers = { 'b:metal_mine:3': MINE, 'stat:atk': METAL, 'tab:ships': METAL };
+    env.dossiers = { 'b:metal_mine:3': MINE, 'stat:atk': METAL };
     inter.pickWorld(home.id);
-    show(
-      rows +
-        '<div data-desc="stat:atk"><span class="atk"></span></div>' +
-        '<div data-desc="tab:ships"><span class="tab"></span></div>',
-    );
+    show(rows + '<div data-desc="stat:atk"><span class="atk"></span></div>');
     fire(page.side, 'pointermove', node('.mine'));
     expect([page.objtip.writes, node('#pdesc').innerHTML]).toEqual([
       0,
       `<div class="pd-empty">${t('dossier.hint')}</div>`,
     ]);
     press('.atk');
-    press('.tab');
     expect(page.codex.writes).toBe(0);
     press('.mine');
     expect(page.codex.innerHTML).toBe(
@@ -1034,21 +1029,25 @@ describe('REFM-225 — нажатия по листу', () => {
     expect(env.sent).toEqual([]);
   });
 
-  it('вкладка мира — только одна из четырёх известных', async () => {
-    const { sp, inter, home, show, press } = await boot();
+  it('свёрнутый блок окна «i» раскрывается и сворачивается тем же тапом (UIX-10.12)', async () => {
+    const { inter, home, show, press } = await boot();
+    const folds = await import('./dossierFolds');
     inter.pickWorld(home.id);
-    expect(sp.planetTab).toBe('buildings');
-    for (const [arg, want] of [
-      ['ground', 'ground'],
-      ['bogus', 'ground'],
-      ['ships', 'ships'],
-      ['shuttle', 'shuttle'],
-      ['buildings', 'buildings'],
-    ] as const) {
-      show(button('tab', arg));
-      press('[data-act="tab"]');
-      expect(sp.planetTab, arg).toBe(want);
+    for (const want of [true, false]) {
+      show(button('dossier', 'grp:economy'));
+      press('[data-act="dossier"]');
+      expect(folds.isDossierOpen('grp:economy')).toBe(want);
     }
+  });
+
+  it('приказ мира из окна «Построить» уходит выбранному там миру, а не выделенному', async () => {
+    const { sp, game, inter, env, home, orders } = await boot();
+    inter.pickWorld(home.id);
+    env.sent.length = 0;
+    expect(sp.worldOrder('capital', '', 'other')).toBe(true);
+    expect(sp.worldOrder('holdpoint', 'on', 'other')).toBe(true);
+    expect(sp.worldOrder('bogus', '', 'other')).toBe(false);
+    expect(orders()).toEqual([bare(game.designateCapital('p1', 'other')), bare(game.setHoldPoint('p1', 'other', true))]);
   });
 
   it('стройка и найм встают в очередь выбранного мира', async () => {

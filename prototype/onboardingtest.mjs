@@ -67,7 +67,8 @@ const shots = new Set([
   'assault.capture',
 ]);
 const controls = {
-  'buildings-tab': '[data-act="tab"][data-arg="buildings"]',
+  'buildings-open': '[data-act="dossier"][data-arg="buildings"]',
+  'economy-open': '[data-act="dossier"][data-arg="grp:economy"]',
   details: '#mobile-sheet [data-mobile="details"]',
   mine: '[data-codex^="b:mine:"]',
   'mine-order': '#codex [data-cx-upg="mine"]',
@@ -77,8 +78,8 @@ const controls = {
   'research-tab': '#tech [data-ttab="space"]',
   research: '#tech [data-go="frigate_design"]',
   'research-close': '#tech .tw-close',
-  'ships-tab': '[data-act="tab"][data-arg="ships"]',
-  catalog: '[data-act="openunits"][data-arg="ships"]',
+  yard: '[data-act="openbuild"], [data-lift="openbuild"]',
+  'yard-ships': '#constructor .pw-main-tabs [data-ctab="ships"]',
   ship: '#constructor [data-pw-info="unit:frigate"]',
   'ship-order': '#codex [data-build="unit:frigate"]',
   'catalog-close': '#constructor .cn-close',

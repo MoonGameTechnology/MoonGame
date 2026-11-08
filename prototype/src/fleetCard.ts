@@ -364,15 +364,6 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[], named = false): string {
     .join('');
   return tiles ? `<div class="ptiles">${tiles}</div>` : '';
 }
-/** Гарнизон мира — теми же плитками, что состав флота (заказ владельца 2026-09-25): тап —
- *  досье юнита, как у прежней строки. Пустой гарнизон называется словами, а не пропадает. */
-export function garrisonTilesHtml(owner: string | null, stacks: UnitStack[]): string {
-  const tiles = stacks.map((u) => unitTileHtml(u, owner, `data-codex="u:${esc(u.unit)}"`)).join('');
-  return tiles
-    ? `<div class="ptiles">${tiles}</div>`
-    : `<div class="row dim">${esc(t('side.none'))}</div>`;
-}
-
 /** Сводка армии (тап по имени в шапке карточки): состав по архетипам, боевой вес
  *  с капом, пулы корпуса/щита, скорость с активными множителями, трюм, радар,
  *  содержание. Обратно — тем же тапом по имени или кнопкой «назад». */

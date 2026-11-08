@@ -24,8 +24,6 @@ interface OperationDomHost {
   mobile: boolean;
   expanded(): boolean;
   collapse(): void;
-  tab(): string;
-  ships(): void;
   market(good: string): void;
   render(): void;
 }
@@ -73,7 +71,6 @@ export function operationUi(h: OperationDomHost): OperationUi {
         if (f.location) {
           focusWorld(f.location);
           pickWorld(f.location);
-          h.ships();
         } else pickFleets([f.id], (id) => h.world().fleets[id]?.owner === h.me());
         h.render();
         details();
@@ -92,7 +89,6 @@ export function operationUi(h: OperationDomHost): OperationUi {
     },
     intent: (kind) => {
       if (kind === 'details') return h.expanded();
-      if (kind.startsWith('tab:')) return h.tab() === kind.slice(4);
       if (kind === 'spawn') return heroSpawnAim !== null;
       if (kind === 'move') return aiming;
       if (kind === 'strike') return strikeAim !== null;
