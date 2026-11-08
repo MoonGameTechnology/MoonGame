@@ -24,6 +24,7 @@
 /** Что выбрал тап. */
 export type Picked =
   | { kind: 'strike'; id: string }
+  | { kind: 'squadron'; id: string }
   | { kind: 'fleet'; id: string }
   | { kind: 'planet'; id: string };
 
@@ -35,6 +36,8 @@ export type PickEffect =
   | { kind: 'fleet'; id: string }
   /** Выделить свою эскадру в воздухе (правило 2а). */
   | { kind: 'strike'; id: string }
+  /** Выделить свою эскадру на стоянке — как эскадру в воздухе (правило 2а). */
+  | { kind: 'squadron'; id: string }
   /** Выбрать мир: флоты гаснут, намерения — нет (правило 3). */
   | { kind: 'planet'; id: string };
 

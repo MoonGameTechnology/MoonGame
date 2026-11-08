@@ -119,6 +119,7 @@ import {
 import {
 } from './unitGlyphs';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
+import { drawHangarBadges, initMapHangars } from './mapHangars';
 import { worldName } from './planetName';
 // «Производство» — экран заказа (REFM-13, ROS-3.1): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
@@ -505,6 +506,8 @@ import {
   selFleets,
   selPlanet,
   selStrike,
+  selSquadron,
+  pickSquadron,
   splitState,
   stageDraft,
   strikeAim,
@@ -789,7 +792,7 @@ initNetSession({
     if (changedMap && plan.fanfare) defaultView();
     // Та же чистка выбора, что после хода локального мира (REFM-208): `s` заменён здесь
     // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
-    pruneSelection(s.fleets, ME, s.strikes);
+    pruneSelection(s.fleets, ME, s.strikes, s.planets);
     invalidatePanel();
     syncCoalitions(); // чужая правка коалиции приходит дельтой без события
   },
@@ -891,14 +894,15 @@ const holographic = initHolographicUi({
     side.querySelector<HTMLElement>('[data-act="fleetinfo"]')?.click();
   },
   selectionKey: () =>
-    (selStrike ? `strike:${selStrike}` : '') || selectedFleetIds().join('|') || panelFleet() || selPlanet || '',
+    (selStrike ? `strike:${selStrike}` : '') || (selSquadron ? `sq:${selSquadron}` : '') || selectedFleetIds().join('|') || panelFleet() || selPlanet || '',
   selectionAnchor: () => {
     const fid = panelFleet();
     const fleet = fid && s.fleets[fid];
     const planet = selPlanet && s.planets[selPlanet];
     // Эскадра в воздухе (SHU-6.14) — её значок на трассе: нить окна идёт к нему.
     const aloft = selStrike ? strikeWorldPos(selStrike) : null;
-    const at = aloft ? world(aloft) : fleet ? fleetAnchor(fleet) : planet ? world(planet.position) : null;
+    const parked = selSquadron ? squadronSpotPx(selSquadron) : null;
+    const at = aloft ? world(aloft) : parked ?? (fleet ? fleetAnchor(fleet) : planet ? world(planet.position) : null);
     return at ? toScreen(at, canvas.getBoundingClientRect(), VW, VH) : null;
   },
 });
@@ -930,8 +934,8 @@ const mobileHud = initMobileHud({
 /** Выбор с карточки телефона — строкой списка или вкладкой «Флот» / «Мир». */
 function choosePhonePick(pick: TapPick): void {
   if (pick.kind === 'fleet') setFleetSelection([pick.id]);
-  else if (pick.kind === 'strike') {
-    pickStrike(pick.id);
+  else if (pick.kind === 'strike' || pick.kind === 'squadron') {
+    (pick.kind === 'strike' ? pickStrike : pickSquadron)(pick.id);
     invalidatePanel();
   } else {
     clearSelection();
@@ -1397,6 +1401,7 @@ initMapOverlays({
   aa: () => perWorld('aa', () => aaRings(s, data, ME, known, worldPlanets())),
   aimSquadron,
 });
+initMapHangars({ world: () => s, me: () => ME, ctx: () => cx });
 
 // Прицелы и цели — путь к цели, цели «Атаки» и «Штурма», круги каста и патруля, базы
 // перелёта — живут в `mapAim.ts` (REFM-233, часть 2). Мир, кадр, узлы карты, раскладку,
@@ -1590,6 +1595,7 @@ function renderMap(now: number) {
   drawOrbitRings(now, detail); // кольцо орбиты у мира со стоящим флотом
   drawBattleTracers(now); // трассы огня между строями боя
   drawFleets(now, lod); // флоты: корпус доминанта, счёт, трюм, рамка выбора, портреты героев
+  drawHangarBadges(lod); // «◇ N» под своей базой с эскадрами: тап выделяет эскадру
   drawRadarContacts(now); // swept enemy signatures — last-known ghosts until repainted
 
   // 7. Верхний слой: рамка выделения, метки, цели, радиусы и прицелы.
@@ -1660,6 +1666,18 @@ function squadronBase(id: string): { planetId: string } | { fleetId: string } | 
     if ((f.hangar ?? []).some((q) => q.id === id)) return { fleetId: f.id };
   }
   return null;
+}
+
+/** Точка базы эскадры на экране: мир — его узел, носитель — его значок. */
+function squadronSpotPx(id: string): { x: number; y: number } | null {
+  const base = squadronBase(id);
+  if (!base) return null;
+  if ('planetId' in base) {
+    const p = s.planets[base.planetId];
+    return p ? world(p.position) : null;
+  }
+  const f = s.fleets[base.fleetId];
+  return f ? fleetAnchor(f) : null;
 }
 
 /** Эскадра по id — вместе с базой, на которой она стоит. */
@@ -1841,6 +1859,8 @@ function updateMobileHud(): void {
   const inspectable = f && fleetSeen(f);
   const key = selStrike
     ? `strike:${selStrike}`
+    : selSquadron
+    ? `sq:${selSquadron}`
     : selPlanet && s.planets[selPlanet]
       ? `planet:${selPlanet}`
       : inspectable
@@ -1853,6 +1873,8 @@ function updateMobileHud(): void {
       const st = ownStrike(pick.id);
       if (!st) continue;
       choices.push({ ...pick, title: strikeTitle(st), sub: t('side.aloft.sub') });
+    } else if (pick.kind === 'squadron') {
+      choices.push({ ...pick, title: `${t('fleet.kind.shuttles')} «${fleetCallsign(pick.id)}»`, sub: t('side.squad.pick') });
     } else if (pick.kind === 'fleet') {
       const f = s.fleets[pick.id];
       if (!f || !fleetSeen(f)) continue;
@@ -1867,7 +1889,7 @@ function updateMobileHud(): void {
     !!mobileOrderKind() || pickMode || !!chainMode,
     cmdMore,
     choices,
-    selStrike ? null : (cardTabs()?.active ?? null),
+    selStrike || selSquadron ? null : (cardTabs()?.active ?? null),
   );
 }
 
