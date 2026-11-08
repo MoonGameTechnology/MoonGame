@@ -243,6 +243,19 @@ describe('economy module — building upkeep + arrears brownout (building econom
     expect(r.state.players.p1?.resources.metal).toBeCloseTo(20, 5); // the mine is untouched
   });
 
+  it('a building billed in ANOTHER resource keeps full output under the arrears', () => {
+    // Found by a mutation-testing pilot: the brownout rule matched any building with
+    // upkeep, not only the consumers of the short resource, and no test noticed.
+    const kernel = createKernel([economyModule]);
+    const st = stateWith({
+      players: [player('p1', { energy: 0, credits: 1000 })],
+      planets: [planet('a', 'p1', ['reactor'])],
+    });
+    st.players.p1!.arrears = ['energy']; // the reactor pays in credits, not energy
+    const r = okAdvance(kernel.advanceTo(st, ctx3(2 * HOUR)));
+    expect(r.state.players.p1?.resources.energy).toBeCloseTo(10, 5); // 5/h × 2h, full rate
+  });
+
   it('the brownout lifts once the bill is paid in full again', () => {
     const kernel = createKernel([economyModule]);
     const st = stateWith({
