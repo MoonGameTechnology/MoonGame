@@ -517,6 +517,39 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     ]);
   });
 
+  it('ДВЕ СТРОКИ НА ОДИН ПОВРЕЖДЁННЫЙ СТЕК: вторая не уносит пустой стек с NaN-корпусом', () => {
+    // «Любой лоадаут» опустошает повреждённый фиттованный стек, следом строка «этот
+    // лоадаут» проходит по нему же: доля пула 0 / 0 = NaN уезжала в новый флот стеком
+    // из нуля кораблей (найдено тестом-свойством в util/stacks.property.test.ts).
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet('F1', [
+          { unit: 'cruiser', count: 2, modules: ['plating'], hp: 70 },
+          { unit: 'cruiser', count: 3 },
+          { unit: 'cruiser', count: 1, modules: ['plating'] },
+        ]),
+      ],
+    });
+    const r = okApply(
+      kernel.applyAction(
+        s,
+        split('F1', [
+          { unit: 'cruiser', count: 2 },
+          { unit: 'cruiser', count: 1, modules: ['plating'] },
+        ]),
+        ctx,
+      ),
+    );
+    const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
+    expect(r.state.fleets[newId]?.units).toEqual([
+      { unit: 'cruiser', count: 2, hp: 70, modules: ['plating'] },
+      { unit: 'cruiser', count: 1, modules: ['plating'] },
+    ]);
+    expect(r.state.fleets.F1?.units).toEqual([{ unit: 'cruiser', count: 3 }]);
+  });
+
   it('ПУСТОЙ ЛОАДАУТ — ТОЖЕ АДРЕС: `modules: []` уводит голые, не трогая фиттованные', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
