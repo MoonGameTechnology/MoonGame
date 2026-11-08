@@ -48,6 +48,9 @@ export function closeProductionOverlay(root: HTMLElement): boolean {
 export function presentProduction(root: HTMLElement): void {
   if (root.nodeType !== 1) return;
   root.classList.add('pw-production');
+  const stock = root.querySelector('.pw-stock');
+  const heading = root.querySelector('.cn-head > b');
+  if (stock && heading) heading.replaceWith(stock);
   wireTemplateDialogs(root);
   compareHardwareStats(root);
   const footer = root.querySelector('.pw-fitting-footer');

@@ -4,7 +4,7 @@ import { productionCatalogHeading, productionCatalogTile } from './productionCat
 import { closeProductionOverlay, fittingSheet, presentProduction, rememberProductionDetails, productionOrderHtml } from './productionPresentation';
 import { productionQueueHtml } from './productionQueueView';
 import { completedUnitSpend } from './economy';
-import { productionIncomeHtml } from './productionIncome';
+import { productionIncomeHtml, productionStockHtml } from './productionIncome';
 import { productionClick } from './productionInteraction';
 /**
  * «ПРОИЗВОДСТВО» — the unified in-match order screen (CON-1, LARS-4, REFM-13, ROS-3.1).
@@ -836,6 +836,7 @@ export function initShipyard(host: YardHost) {
     } else {
       ({ draft, body, order } = orderView(host, draft, hullsOf(), troopsFor, tab));
     }
+    body = productionStockHtml(host.state(), host.me()) + body;
     if (draft.planet) body = productionIncomeHtml(host.state(), host.me(), draft.planet) + body;
     // Перерисовка не сбрасывает прокрутку: поставил модуль внизу списка — там и остался.
     const keep =

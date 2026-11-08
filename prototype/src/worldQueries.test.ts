@@ -79,6 +79,7 @@ function host(world: GameState, opts: { me?: string; lock?: TileLock } = {}) {
     lock: opts.lock ?? null,
     notes: [] as string[],
     orders: [] as Action[],
+    accepted: true,
   };
   initWorldQueries({
     world: () => h.world,
@@ -87,7 +88,7 @@ function host(world: GameState, opts: { me?: string; lock?: TileLock } = {}) {
     placeName: (id) => `«${id}»`,
     playerOrder: (a) => {
       h.orders.push(a);
-      return true;
+      return h.accepted;
     },
     buildingLocked: () => h.lock,
   });
@@ -259,6 +260,16 @@ describe('REFM-242 — подписи стройки', () => {
 });
 
 describe('REFM-242 — заказ стройки', () => {
+  it('does not announce a queued order rejected by the host', () => {
+    const start = newGame();
+    const pid = home(start);
+    const h = host(after(start, upgradeBuilding('p1', pid, 'mine')));
+    h.accepted = false;
+    expect(enqueueBuild(pid, { kind: 'upgrade', id: 'radar', count: 1 })).toBe(false);
+    expect(h.orders).toHaveLength(1);
+    expect(h.notes).toEqual([]);
+  });
+
   it('свободная полоса: заказ уходит приказом своего места, тоста нет', () => {
     const s = newGame();
     const h = host(s);
