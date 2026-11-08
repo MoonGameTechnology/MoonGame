@@ -24,37 +24,27 @@ semgrep, gitleaks, osv, trivy-fs, trivy-image валят джобу на люб�
 Инструмент, который решает, пускать ли код в `main`, не должен приезжать по изменяемой
 ссылке.
 
-## Текущая карта пинов (сверь перед работой — она устаревает)
+## Текущая карта пинов
 
-Пинены по дайджесту: `semgrep/semgrep` (два вызова в джобе `semgrep`),
-`trufflesecurity/trufflehog`, `ghcr.io/zaproxy/zaproxy` (джоба `dast-zap`),
-`ghcr.io/zizmorcore/zizmor`.
+Все образы сканеров в `security.yml` уже пинены по дайджесту, тег-пинов не осталось.
+Источник правды — таблица статусов в `docs/security/image-pinning.md` (образ, версия, где
+используется, сколько вызовов бампить вместе). Предмет месячной работы — **пересъём
+дайджеста того же тега**: если он изменился, тег перетегировали (см. ниже). Дата
+последнего рефреша — строка `#   - Last updated: YYYY-MM` в шапке `security.yml`.
 
-Остались по тегу — **это и есть предмет работы**:
-
-| Образ                        | Тег        | Где в `security.yml`             |
-| ---------------------------- | ---------- | -------------------------------- |
-| `zricethezav/gitleaks`       | `v8.18.4`  | джоба `gitleaks`                 |
-| `ghcr.io/google/osv-scanner` | `v1.9.1`   | джоба `osv`                      |
-| `aquasec/trivy`              | `0.58.2`   | джобы `trivy-fs` и `trivy-image` |
-| `anchore/syft`               | `v1.20.0`  | джобы `trivy-image` и `sbom`     |
-
-Над каждым таким шагом стоит TODO-комментарий «Update to sha256 digest — run:
-./.github/scripts/update-image-digests.sh». Такой же TODO висит в `dast-zap`, хотя ZAP
-уже пинен по дайджесту — комментарий протух, удали его заодно.
-
-Таблица в `docs/security/image-pinning.md` тоже отстала: в ней нет строки про
-`ghcr.io/zaproxy/zaproxy`. Приведи её в порядок в том же PR — правило «reconcile, don't
-append» из `CLAUDE.md` требует чинить устаревшее утверждение, а не жить рядом с ним.
+`aquasec/trivy` используется не только в `security.yml`, но и в гейте перед пушем обеих
+джоб `image.yml` — бампить вместе, иначе пины разъедутся (это сказано в той же таблице).
 
 ## Что реально делает скрипт
 
 `.github/scripts/update-image-digests.sh` (bash, `set -e`, запускать из корня репо):
 
 1. Копирует `.github/workflows/security.yml` во временный файл.
-2. Идёт по **захардкоженному** списку из четырёх пар «образ → тег» (те самые четыре
-   строки таблицы выше). Если ты бампишь версию сканера — теги правятся и в скрипте, и в
-   workflow, иначе замена просто не найдёт строку.
+2. Идёт по **захардкоженному** списку из четырёх пар «образ → тег» (gitleaks, osv-scanner,
+   trivy, syft) и ищет в workflow строку `image:tag`. Таких строк в `security.yml` больше
+   нет (всё уже `@sha256:`), поэтому для рефреша скрипт ничего не заменит: снимай дайджесты
+   рецептами ниже и подставляй руками. Скрипт полезен, только если сканер переводят на
+   новый тег.
 3. Для каждого образа `get_digest` пробует по очереди: `docker pull` + `docker inspect
 --format='{{index .RepoDigests 0}}'`; если докера нет — `skopeo inspect`; если и его
    нет, а образ из `ghcr.io` — безтокенный `curl` к `ghcr.io/v2/.../manifests/TAG`.
@@ -101,8 +91,8 @@ curl -sI "https://ghcr.io/v2/$IMG/manifests/$TAG" -H "Authorization: Bearer $T" 
   -H "Accept: application/vnd.oci.image.index.v1+json" | grep -i docker-content-digest
 ```
 
-Два подвоха: без `Authorization` `ghcr.io/v2` отдаёт `401` (то есть «Способ 3» из
-`image-pinning.md` в текущем виде не работает), а `.config.digest` из тела манифеста —
+Два подвоха: без `Authorization` `ghcr.io/v2` отдаёт `401` (поэтому безтокенная ветка
+скрипта не работает), а `.config.digest` из тела манифеста —
 дайджест конфиг-блоба, **не** тот, что подставляется после `@sha256:`. Пинится дайджест
 манифеста: заголовок `Docker-Content-Digest` или `docker inspect .RepoDigests`.
 
@@ -115,9 +105,8 @@ curl -sI "https://ghcr.io/v2/$IMG/manifests/$TAG" -H "Authorization: Bearer $T" 
 1. Ветка от свежего `main` (`CONTRIBUTING.md`: одна задача → одна ветка → один PR, зона
    `[sec]`).
 2. Снять дайджесты (скриптом или рецептами выше) и подставить `image@sha256:...`.
-3. Убрать отработавшие TODO-комментарии над изменёнными шагами и протухший TODO в
-   `dast-zap`; обновить `#   - Last updated: YYYY-MM` в шапке `security.yml`.
-4. Обновить таблицу статусов и, если правил методы, разделы способов в
+3. Обновить `#   - Last updated: YYYY-MM` в шапке `security.yml`.
+4. Обновить таблицу дайджестов и, если правил методы, разделы способов в
    `docs/security/image-pinning.md`.
 5. `pnpm run check` (lint + typecheck + test + docs-check). YAML он не валидирует, но
    `docs-check` проверит ссылки в тронутых `.md` — гейт должен остаться зелёным.

@@ -75,7 +75,11 @@
 | `sync-state-doc` | привести `docs/state.md` в соответствие с кодом |
 | `determinism-audit` · `balance-analysis` · `render-profile` · `security-triage` | четыре тяжёлые задачи из списка выше |
 | `playtest-report` · `refresh-scanner-digests` | периодика: журнал плейтеста, ежемесячный ре-пин образов |
+| `brainstorming` | разбор механики до кода: что уже есть, какие развилки отдать владельцу |
+| `frontend-design` · `mobile-game-feel` | вид экранов вне карты; отклик карты на телефоне |
+| `infra-audit` | read-only аудит развёрнутого стенда |
 | `thermo-nuclear-code-quality-review` | максимально жёсткий разбор качества структуры диффа (только явным вызовом) |
+| `ponytail-review` · `ponytail-audit` · `property-based-testing` · `mutation-testing` · `diagnosing-bugs` · `systematic-debugging` · `verification-before-completion` · `improve-codebase-architecture` · `codebase-design` · `domain-modeling` · `grilling` · `handoff` | сторонние скиллы (ponytail, Trail of Bits, Мэтт Покок, Superpowers) |
 
 Последний — внешний скилл из [`cursor/plugins`](https://github.com/cursor/plugins/blob/main/cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md),
 скопированный в репозиторий как есть плюс местная секция «Как это ложится на Void Dominion»
@@ -84,6 +88,11 @@
 ставится и не запускается, так что правило «без неприпиннутого внешнего кода» выше не
 нарушено. У него `disable-model-invocation: true` — сам он не включается, только
 `/thermo-nuclear-code-quality-review`.
+
+Сторонние скиллы из последней строки — копии апстрима как есть: источник и версия
+записаны комментарием в начале их файла скилла, лицензия лежит рядом (`LICENSE`). Руками их не
+правят: обновление — новой копией из апстрима. Инварианты из `CLAUDE.md` они не
+отменяют.
 
 Claude Code подхватывает их сам; можно позвать и явно — `/brick`, `/new-module`, ….
 Скилл — это **инструкция, а не гарантия**: `.claude/` исключён из `docs-check`
