@@ -94,6 +94,19 @@ describe('verified atomic site publication',()=>{
   it('drops unknown remote metadata rather than publishing secrets',()=>expect(validateManifest({...manifest(),extra:'secret'},'player')).not.toHaveProperty('extra'));
 });
 describe('bounded upstream transport',()=>{
+  it('requests binary asset API responses and keeps JSON headers for release discovery',async()=>{
+    const calls=[];
+    const fetchImpl=async(url,options)=>{
+      calls.push({url,accept:options.headers.Accept});
+      return calls.length===1
+        ? new Response(null,{status:302,headers:{location:'https://release-assets.githubusercontent.com/test'}})
+        : new Response(bytes);
+    };
+    await download('https://api.github.com/repos/MoonGameTechnology/MoonGame/releases/assets/101',1024,{fetchImpl});
+    expect(calls.map(x=>x.accept)).toEqual(['application/octet-stream','application/octet-stream']);
+    await download('https://api.github.com/repos/MoonGameTechnology/MoonGame/releases/tags/player',1024,{fetchImpl});
+    expect(calls.at(-1).accept).toBe('application/vnd.github+json');
+  });
   it('does not follow asset redirects to arbitrary hosts',async()=>{
     let calls=0;
     await expect(download('https://github.com/x',100,{fetchImpl:async()=>{calls++;return new Response(null,{status:302,headers:{location:'https://evil.test/a.apk'}});}})).rejects.toThrow('E_APK_SOURCE');
@@ -105,6 +118,55 @@ describe('bounded upstream transport',()=>{
   it('streams allowed HTTPS files and calculates exact SHA-256',async()=>{
     const r=await download('https://github.com/x',1024,{fetchImpl:async()=>new Response(bytes)});
     expect(r.sha256).toBe(sha);expect(r.body).toEqual(bytes);
+  });
+});
+
+describe('immutable release snapshot transport',()=>{
+  const repo='https://api.github.com/repos/MoonGameTechnology/MoonGame';
+  const release=(lane='player')=>({tag_name:lane,assets:[
+    {id:101,name:'version.json',browser_download_url:`https://github.com/MoonGameTechnology/MoonGame/releases/download/${lane}/version.json`},
+    {id:102,name:`void-dominion-${lane}.apk`,browser_download_url:`https://github.com/MoonGameTechnology/MoonGame/releases/download/${lane}/void-dominion-${lane}.apk`},
+  ]});
+  it.each(['alpha','player'])('publishes %s using the selected IDs even when rolling-tag downloads are unavailable',async lane=>{
+    const root=await mkdtemp(join(tmpdir(),'apk-assets-'));const calls=[];
+    try {
+      const m=manifest(2,lane);
+      const get=async(url,limit,options)=>{
+        calls.push(url);
+        if(url===`${repo}/releases/tags/${lane}`)return {body:Buffer.from(JSON.stringify(release(lane)))};
+        if(url===`${repo}/releases/assets/101`)return {body:Buffer.from(JSON.stringify(signed(m)))};
+        if(url===`${repo}/releases/assets/102`)return acquire(options.destination);
+        throw Error('E_ROLLING_URL_UNAVAILABLE');
+      };
+      let verified=0;
+      expect(await syncLane(root,lane,{get,publicKey,statfsImpl:async()=>({bavail:8*1024**3,bsize:1}),verify:async(path,value)=>{
+        expect(await readFile(path)).toEqual(bytes);expect(value).toEqual(m);verified++;
+      }})).toBe(true);
+      expect(verified).toBe(1);
+      expect(calls).toEqual([`${repo}/releases/tags/${lane}`,`${repo}/releases/assets/101`,`${repo}/releases/assets/102`]);
+      expect(await readlink(join(root,lane,'current'))).toBe('2-deadbee');
+    }finally {await rm(root,{recursive:true,force:true});}
+  });
+  it.each([0,-1,1.5,'101',null,Number.MAX_SAFE_INTEGER+1])('rejects invalid asset id %s before acquiring files',async id=>{
+    const root=await mkdtemp(join(tmpdir(),'apk-bad-id-'));
+    try {
+      const data=release();data.assets[0].id=id;let calls=0;
+      await expect(syncLane(root,'player',{publicKey,get:async()=>{calls++;return {body:Buffer.from(JSON.stringify(data))};}})).rejects.toThrow('E_APK_RELEASE');
+      expect(calls).toBe(1);expect(await readdir(root)).toEqual([]);
+    }finally {await rm(root,{recursive:true,force:true});}
+  });
+  it('refuses asset substitution and preserves current when metadata cannot be downloaded',async()=>{
+    const root=await mkdtemp(join(tmpdir(),'apk-source-fail-'));
+    try {
+      await installRelease({root,lane:'player',signed:signed(),publicKey,acquire,verify,checkSpace:false});
+      const data=release();data.assets[1].browser_download_url='https://evil.test/app.apk';
+      await expect(syncLane(root,'player',{publicKey,get:async()=>({body:Buffer.from(JSON.stringify(data))})})).rejects.toThrow('E_APK_RELEASE');
+      await expect(syncLane(root,'player',{publicKey,get:async url=>{
+        if(url===`${repo}/releases/tags/player`)return {body:Buffer.from(JSON.stringify(release()))};
+        throw Error('E_APK_SOURCE');
+      }})).rejects.toThrow('E_APK_SOURCE');
+      expect(await readlink(join(root,'player/current'))).toBe('1-deadbee');
+    }finally {await rm(root,{recursive:true,force:true});}
   });
 });
 it('renders a public CORS/no-cache file-only ingress with stable aliases',()=>{
