@@ -138,7 +138,8 @@ describe('merged fleet standing orders', () => {
     expect(merged.fleets.A).toBeUndefined();
     expect(!!merged.fleets.S!.bombarding).toBe(modes.fromBombard || modes.intoBombard);
     if (modes.fromBombard || modes.intoBombard)
-      expect(merged.fleets.S!.bombardNextAt).toBe(modes.fromBombard ? HOUR : 2 * HOUR);
+      // Of two live clocks the later stays: ships that just fired never fire early.
+      expect(merged.fleets.S!.bombardNextAt).toBe(modes.intoBombard ? 2 * HOUR : HOUR);
     expect(!!merged.autoAssault?.S).toBe(modes.fromAuto || modes.intoAuto);
     expect(merged.autoAssault?.A).toBeUndefined();
     expect(merged.autoAssault?.other).toBe(true);
@@ -170,18 +171,18 @@ describe('merged fleet standing orders', () => {
     expect(advance(merged, HOUR - 1).events.some((e) => e.type === 'planet.bombarded')).toBe(false);
   });
 
-  it('combines two clocks into one without an immediate or duplicate volley', () => {
+  it('combines two clocks into the later one without an early or duplicate volley', () => {
     const state = world();
     Object.assign(state.fleets.A!, { bombarding: true, bombardNextAt: HOUR });
     Object.assign(state.fleets.S!, { bombarding: true, bombardNextAt: 1.5 * HOUR });
     const merged = act(state, 'fleet.merge', { from: 'A', into: 'S' });
-    const before = advance(merged, HOUR - 1);
+    const before = advance(merged, 1.5 * HOUR - 1);
     expect(before.events.filter((e) => e.type === 'planet.bombarded')).toHaveLength(0);
-    const volley = advance(before.state, HOUR);
+    const volley = advance(before.state, 1.5 * HOUR);
     expect(volley.events.filter((e) => e.type === 'planet.bombarded')).toHaveLength(1);
-    expect(volley.state.fleets.S!.bombardNextAt).toBe(2 * HOUR);
+    expect(volley.state.fleets.S!.bombardNextAt).toBe(2.5 * HOUR);
     expect(
-      advance(volley.state, 1.5 * HOUR).events.filter((e) => e.type === 'planet.bombarded'),
+      advance(volley.state, 2.5 * HOUR - 1).events.filter((e) => e.type === 'planet.bombarded'),
     ).toHaveLength(0);
   });
 
@@ -239,10 +240,13 @@ describe('merged fleet standing orders', () => {
     expect(count(merged.fleets.C!.units)).toBe(9);
     expect(count(merged.fleets.C!.landing)).toBe(6);
     expect(merged.autoAssault).toEqual({ C: true });
-    expect(merged.fleets.C!.bombardNextAt).toBe(HOUR);
+    expect(merged.fleets.C!.bombardNextAt).toBe(2 * HOUR);
     expect(advance(merged, HOUR).events.filter((e) => e.type === 'planet.bombarded')).toHaveLength(
-      1,
+      0,
     );
+    expect(
+      advance(merged, 2 * HOUR).events.filter((e) => e.type === 'planet.bombarded'),
+    ).toHaveLength(1);
   });
 
   it('a long offline span and small steps keep the same merged bombardment clock and damage', () => {
@@ -259,8 +263,8 @@ describe('merged fleet standing orders', () => {
       volleys += step.events.filter((e) => e.type === 'planet.bombarded').length;
     }
     expect(short).toEqual(long.state);
-    expect(volleys).toBe(4);
-    expect(long.events.filter((e) => e.type === 'planet.bombarded')).toHaveLength(4);
+    expect(volleys).toBe(3); // at 1.5, 2.5 and 3.5 hours
+    expect(long.events.filter((e) => e.type === 'planet.bombarded')).toHaveLength(3);
   });
 
   it.each(['foreign', 'battle', 'landing', 'elsewhere', 'self', 'missing'] as const)(

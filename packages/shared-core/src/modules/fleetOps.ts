@@ -36,7 +36,7 @@ import { shipsEngaged } from '../state/battle';
 import { isHostile, ownFleet } from '../util/combat';
 import { fleetForOrder, garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
 import { sumUnitStat, takeFromStacks, loadoutKey } from '../util/stacks';
-import { emplacedFleet, fuseFleets } from '../util/fleetMerge';
+import { emplacedFleet, fuseFleets, inheritFleetClocks } from '../util/fleetMerge';
 import { hangarSize, strikesReserved } from '../state/shuttle';
 import { isMineFleet, isMissileFleet } from '../state/minefields';
 import { isVisibleTo } from '../state/visibility';
@@ -69,7 +69,9 @@ export const fleetOpsModule: GameModule = {
   // 1.14.0: высадка, отменённая вылетом (`assault.cancelled`), тоже решает слияние, которое
   //         она приостановила.
   // 1.14.1: merged fleets retain bombardment, its reload clock and auto-assault.
-  version: '1.15.0',
+  // 1.15.1: раскол и слияние сохраняют часы кораблей (задержку щитов, перезарядку ПРО,
+  //         срыв поля); из двух сроков залпа обстрела остаётся поздний.
+  version: '1.15.1',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -480,6 +482,7 @@ export const fleetOpsModule: GameModule = {
         ...(fleet.edge ? { edge: { ...fleet.edge } } : {}),
         ...(fleet.orbit ? { orbit: fleet.orbit } : {}),
       };
+      inheritFleetClocks(h, h.state.fleets[id]!, fleet);
       if (movement) {
         h.schedule(movement.arrivesAt, 'fleet.arrival', {
           fleetId: id,

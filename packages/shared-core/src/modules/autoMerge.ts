@@ -43,7 +43,8 @@ function idleAt(h: HandlerContext, f: Fleet, at: string): boolean {
 export const autoMergeModule: GameModule = {
   id: 'auto-merge',
   // 1.0.1: merged fleets retain bombardment and auto-assault orders.
-  version: '1.0.1',
+  // 1.0.2: слияние сохраняет часы кораблей и поздний срок залпа (`inheritFleetClocks`).
+  version: '1.0.2',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
