@@ -81,7 +81,7 @@ export function matchMapEdges(map: MatchMap, data?: GameData): MapEdges {
       ? (data.sectors[sec.terrain]?.maxLinks ?? Number.POSITIVE_INFINITY)
       : Number.POSITIVE_INFINITY;
   };
-  const plan = sealPlan(mosaicBorders(seeds), budgetOf, ids);
+  const plan = sealPlan(mosaicBorders(seeds, map.edge), budgetOf, ids);
   return {
     paths: plan.open.map((b) => [b.a, b.b] as [string, string]),
     sealed: plan.sealed.map((b) => [b.a, b.b] as [string, string]),
@@ -710,7 +710,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       ]),
     ),
     lanes: edges.paths,
-    borders: edges.derived ? mosaicBorderSegments(mosaicSeedsOf(map)) : [],
+    borders: edges.derived ? mosaicBorderSegments(mosaicSeedsOf(map), map.edge) : [],
     corridorsOf: (terrain) => (terrain ? data.sectors[terrain]?.corridors : undefined),
   });
 
@@ -886,6 +886,9 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     // step's clone (ROADS-7, `shareRoadNetwork`).
     planets: shareRoadNetwork(planets),
     fleets,
+    // The edge the lanes above were derived with: every renderer clips the mosaic by the
+    // same edge, and a save from before the map took the hull keeps its rectangle.
+    ...(map.edge ? { mapEdge: map.edge } : {}),
     ...(diplomacy ? { diplomacy } : {}),
     ...(contacted ? { missionFacts: { contacted } } : {}),
     ...(operation ? { operation } : {}),

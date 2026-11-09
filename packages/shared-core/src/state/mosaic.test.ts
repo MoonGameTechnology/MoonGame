@@ -8,7 +8,9 @@ import {
   clipHalfPlaneTagged,
   mosaicBorderSegments,
   mosaicBorders,
+  mosaicClip,
   mosaicFrame,
+  mosaicOutline,
   sealPlan,
   type MosaicBorder,
   type MosaicSeed,
@@ -270,6 +272,78 @@ describe('mosaic — быстрый счёт совпадает с опреде�
       const borders = mosaicBorders(seeds);
       const budgetOf = (id: string): number => budget.get(id)!;
       expect(sealPlan(borders, budgetOf, ids)).toEqual(plainSealPlan(borders, budgetOf, ids));
+    }
+  });
+});
+
+/** Круглая «карта»: кольцо из 24 центров и плотная середина — как большая FFA в малом. */
+function disc(): MosaicSeed[] {
+  const out: MosaicSeed[] = [];
+  // Точки окружности без тригонометрии: рациональная параметризация (1−t², 2t)/(1+t²).
+  for (let k = -12; k < 12; k++) {
+    const t = k / 6;
+    out.push({
+      id: `r${k + 12}`,
+      x: (1000 * (1 - t * t)) / (1 + t * t),
+      y: (2000 * t) / (1 + t * t),
+      size: 1,
+    });
+  }
+  for (let x = -600; x <= 600; x += 300)
+    for (let y = -600; y <= 600; y += 300)
+      if (x * x + y * y < 700 * 700) out.push({ id: `c${x}_${y}`, x, y, size: 1 });
+  return out;
+}
+
+describe('край карты — прямоугольник или обод (`mosaicClip`)', () => {
+  it('без `edge` край — прежний прямоугольник: уже выпущенные карты не меняются', () => {
+    const f = mosaicFrame(RING);
+    expect(mosaicClip(RING)).toEqual([
+      [f.x0, f.y0],
+      [f.x1, f.y0],
+      [f.x1, f.y1],
+      [f.x0, f.y1],
+    ]);
+    expect(mosaicBorders(RING, undefined)).toEqual(mosaicBorders(RING));
+  });
+
+  it('обод выпуклый, держит каждый центр внутри и обходится в той же стороне, что рамка', () => {
+    const seeds = disc();
+    const edge = mosaicOutline(seeds);
+    expect(edge.length).toBeGreaterThan(8);
+    for (let i = 0; i < edge.length; i++) {
+      const a = edge[i]!;
+      const b = edge[(i + 1) % edge.length]!;
+      const c = edge[(i + 2) % edge.length]!;
+      // выпуклость: все повороты в одну сторону
+      expect((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])).toBeGreaterThan(0);
+      // каждый центр строго внутри, с запасом не меньше пола отступа
+      for (const s of seeds) {
+        const len = Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2);
+        expect(((b[0] - a[0]) * (s.y - a[1]) - (b[1] - a[1]) * (s.x - a[0])) / len).toBeGreaterThan(
+          30,
+        );
+      }
+    }
+    expect(mosaicOutline(seeds)).toEqual(edge); // детерминизм
+    expect(mosaicOutline([])).toEqual([]);
+  });
+
+  it('на круглой карте крайние провинции больше не тянутся в углы рамки', () => {
+    const seeds = disc();
+    const longest = (edge?: 'hull'): number =>
+      Math.max(...mosaicBorderSegments(seeds, edge).map((b) => b.length));
+    // Обод отрезает длинные «клинья»: самая длинная граница короче, чем у рамки.
+    expect(longest('hull')).toBeLessThan(longest() * 0.7);
+    // И ни одна граница не уходит за обод.
+    const edge = mosaicOutline(seeds);
+    const inside = (x: number, y: number): boolean =>
+      edge.every((a, i) => {
+        const b = edge[(i + 1) % edge.length]!;
+        return (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]) >= -1e-6;
+      });
+    for (const b of mosaicBorderSegments(seeds, 'hull')) {
+      expect(inside(b.p[0], b.p[1]) && inside(b.q[0], b.q[1])).toBe(true);
     }
   });
 });

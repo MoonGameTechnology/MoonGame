@@ -146,7 +146,7 @@ export function clipHalfPlaneTagged(
 
 /** The clip frame: the province bounding box plus padding, in world units. Outside it the
  *  map simply ends — without a frame the outermost cells run to infinity and every pair of
- *  them would "border" each other out in the void. */
+ *  them would "border" each other out in the void. The default edge; see {@link mosaicClip}. */
 export function mosaicFrame(seeds: readonly MosaicSeed[]): {
   x0: number;
   y0: number;
@@ -168,20 +168,118 @@ export function mosaicFrame(seeds: readonly MosaicSeed[]): {
   return { x0: x0 - pad, y0: y0 - pad, x1: x1 + pad, y1: y1 + pad };
 }
 
+/** How a map ends (`MatchMap.edge`, pinned into `GameState.mapEdge`): absent — the
+ *  padded bounding rectangle ({@link mosaicFrame}); `'hull'` — the padded convex hull of
+ *  the centres ({@link mosaicOutline}). Opt-in per map, because the edge decides which
+ *  rim worlds border each other: switching an already published map would move its lanes
+ *  (and the chapters' tuned lanes), so a map takes the hull only when its author says so. */
+export type MapEdge = 'hull';
+
+/** The clip polygon of the mosaic, in world units — the ONE place the core and every
+ *  renderer get it from, so the drawn cells and the derived lanes are the same mosaic. */
+export function mosaicClip(
+  seeds: ReadonlyArray<{ x: number; y: number }>,
+  edge?: MapEdge,
+): Array<[number, number]> {
+  if (edge === 'hull') return mosaicOutline(seeds);
+  const f = mosaicFrame(seeds.map((s) => ({ id: '', x: s.x, y: s.y, size: 1 })));
+  return [
+    [f.x0, f.y0],
+    [f.x1, f.y0],
+    [f.x1, f.y1],
+    [f.x0, f.y1],
+  ];
+}
+
+/** cos 45°: the octagon around each rim centre, as a literal — no `Math.cos` in the core. */
+const DIAG = 0.7071067811865476;
+
+/** Share of the median nearest-neighbour spacing the map edge stands off its rim centres:
+ *  about the half-width of an inner cell, so a rim province is as big as its inland
+ *  neighbours instead of running out into the void. */
+export const OUTLINE_PAD_RATIO = 0.6;
+
+/** Convex hull (Andrew's monotone chain), in the winding of the old frame rectangle:
+ *  `(b-a)×(p-a) ≥ 0` for every point `p` inside. Collinear points are dropped. */
+function convexHull(points: ReadonlyArray<readonly [number, number]>): Array<[number, number]> {
+  const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (
+    o: readonly [number, number],
+    a: readonly [number, number],
+    b: readonly [number, number],
+  ): number => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = (list: ReadonlyArray<readonly [number, number]>): Array<[number, number]> => {
+    const out: Array<[number, number]> = [];
+    for (const p of list) {
+      while (out.length >= 2 && cross(out[out.length - 2]!, out[out.length - 1]!, p) <= 0)
+        out.pop();
+      out.push([p[0], p[1]]);
+    }
+    out.pop();
+    return out;
+  };
+  return [...half(sorted), ...half([...sorted].reverse())];
+}
+
+/**
+ * The `'hull'` edge: the convex hull of the province centres, pushed out by a padding.
+ *
+ * Why it exists: on a round map the bounding RECTANGLE leaves its four corners to the rim
+ * provinces. They stretch into long empty wedges, their borders run out as long parallel
+ * lines across the void, and rim worlds that are not neighbours meet out there and get a
+ * lane through the emptiness. A convex edge hugs the map, so a rim cell ends about as far
+ * beyond its centre as an inland cell does. Convex, so every cell stays one piece.
+ *
+ * The padding is {@link OUTLINE_PAD_RATIO} of the median nearest-neighbour spacing
+ * (floored at {@link CLIP_PAD_MIN}); each rim centre contributes an octagon of that radius.
+ * Only `+ - * /` and `Math.sqrt`, so the edge is bit-stable across machines.
+ */
+export function mosaicOutline(
+  seeds: ReadonlyArray<{ x: number; y: number }>,
+): Array<[number, number]> {
+  if (seeds.length === 0) return [];
+  const near: number[] = [];
+  for (let i = 0; i < seeds.length; i++) {
+    let best = Infinity;
+    for (let j = 0; j < seeds.length; j++) {
+      if (j === i) continue;
+      const dx = seeds[i]!.x - seeds[j]!.x;
+      const dy = seeds[i]!.y - seeds[j]!.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > 0 && d2 < best) best = d2;
+    }
+    if (Number.isFinite(best)) near.push(best);
+  }
+  near.sort((a, b) => a - b);
+  const spacing = near.length ? Math.sqrt(near[near.length >> 1]!) : 0;
+  const pad = Math.max(CLIP_PAD_MIN, spacing * OUTLINE_PAD_RATIO);
+  const d = pad * DIAG;
+  const rim = convexHull(seeds.map((s) => [s.x, s.y] as const));
+  const ring: Array<[number, number]> = [];
+  for (const [x, y] of rim.length ? rim : [[seeds[0]!.x, seeds[0]!.y] as [number, number]]) {
+    ring.push(
+      [x + pad, y],
+      [x + d, y + d],
+      [x, y + pad],
+      [x - d, y + d],
+      [x - pad, y],
+      [x - d, y - d],
+      [x, y - pad],
+      [x + d, y - d],
+    );
+  }
+  return convexHull(ring);
+}
+
 /** One province's cell from already-clamped sites: the clipped polygon plus, per edge,
  *  the neighbour index (≥0) or {@link BOUNDARY}. */
 function cellOf(
   sites: ReadonlyArray<{ x: number; y: number; w: number }>,
-  frame: { x0: number; y0: number; x1: number; y1: number },
+  outline: ReadonlyArray<readonly [number, number]>,
   i: number,
 ): { poly: Array<[number, number]>; tags: number[] } {
-  let poly: Array<[number, number]> = [
-    [frame.x0, frame.y0],
-    [frame.x1, frame.y0],
-    [frame.x1, frame.y1],
-    [frame.x0, frame.y1],
-  ];
-  let tags: number[] = [BOUNDARY, BOUNDARY, BOUNDARY, BOUNDARY];
+  let poly: Array<[number, number]> = outline.map(([x, y]) => [x, y]);
+  let tags: number[] = outline.map(() => BOUNDARY);
   const si = sites[i]!;
   const wi = si.w;
   // How far the cell still reaches from its own site. A half-plane that holds the whole
@@ -232,19 +330,22 @@ export interface MosaicBorderSegment extends MosaicBorder {
  * contact the edge can survive in one cell and be clipped away in the other, and taking
  * only one side would silently drop that border.
  */
-export function mosaicBorders(seeds: readonly MosaicSeed[]): MosaicBorder[] {
-  return mosaicBorderSegments(seeds).map(({ a, b, length }) => ({ a, b, length }));
+export function mosaicBorders(seeds: readonly MosaicSeed[], edge?: MapEdge): MosaicBorder[] {
+  return mosaicBorderSegments(seeds, edge).map(({ a, b, length }) => ({ a, b, length }));
 }
 
 /** {@link mosaicBorders} with each border's edge kept — the ONE loop both read, so the
  *  borders a lane is derived from and the edge its road crosses cannot disagree. */
-export function mosaicBorderSegments(seeds: readonly MosaicSeed[]): MosaicBorderSegment[] {
+export function mosaicBorderSegments(
+  seeds: readonly MosaicSeed[],
+  edge?: MapEdge,
+): MosaicBorderSegment[] {
   const longest = new Map<string, { length: number; p: [number, number]; q: [number, number] }>();
-  const frame = mosaicFrame(seeds);
+  const outline = mosaicClip(seeds, edge);
   const sites = seeds.map((s) => ({ x: s.x, y: s.y, w: s.size * SEED_WEIGHT }));
   clampPowerWeights(sites); // same capping the renderer applies — one mosaic, not two
   for (let i = 0; i < seeds.length; i++) {
-    const cell = cellOf(sites, frame, i);
+    const cell = cellOf(sites, outline, i);
     for (let k = 0; k < cell.poly.length; k++) {
       const t = cell.tags[k]!;
       if (t < 0) continue;
