@@ -10,6 +10,17 @@ import {
 } from './harnessKit.mjs';
 const site = await serve(await instrumentedGame(`
 window.__productionBroke = () => { s.players[ME].resources = Object.fromEntries(data.resources.map(id => [id, 0])); shipyard.render(); };
+window.__productionPickerScene = () => {
+  const second = Object.values(s.planets).find(p => p.owner !== ME && p.kind === 'planet');
+  second.owner = ME;
+  shipyard.render();
+};
+window.__productionResourceTick = () => {
+  const player = s.players[ME];
+  s = {...s, players: {...s.players, [ME]: {...player,
+    resources: {...player.resources, credits: (player.resources.credits ?? 0) + 123}}}};
+  shipyard.refreshHeroes(); shipyard.refreshQueue();
+};
 window.__productionFixture = (ready = true) => {
   s.players[ME].resources = Object.fromEntries(data.resources.map(id => [id, 90000]));
   s.players[ME].technologies = { completed: Object.keys(data.technologies) };
@@ -204,6 +215,34 @@ try {
       await page.screenshot({
         path: `${process.env.VOID_PRODUCTION_SHOTS}/production-${width}-${locale}.png`,
       });
+    // Keep the picker fixture isolated from the catalog/fitting regression above.
+    await page.evaluate(() => window.__productionPickerScene());
+    for (const tab of ['ships', 'buildings', 'heroes']) {
+      if (tab === 'heroes') await page.locator('#constructor [data-ctab="infantry"]').first().click();
+      await page.locator(`#constructor [data-ctab="${tab}"]`).first().click();
+      const picker = page.locator('#constructor #cn-planet');
+      const selected = await picker.inputValue();
+      const before = await page.locator('#constructor .pw-stock').innerText();
+      await picker.focus();
+      await page.evaluate(() => {
+        window.__productionPicker = document.querySelector('#constructor #cn-planet');
+        for (let i = 0; i < 3; i++) window.__productionResourceTick();
+      });
+      assert.equal(await page.evaluate(() => window.__productionPicker.isConnected &&
+        document.activeElement === window.__productionPicker), true, `${tab}: resource tick dismissed the picker`);
+      assert.equal(await picker.inputValue(), selected);
+      assert.notEqual(await page.locator('#constructor .pw-stock').innerText(), before);
+      await page.locator('#constructor .cn-close').focus();
+      await page.evaluate(() => window.__productionResourceTick());
+      if (tab !== 'heroes') assert.equal(await page.evaluate(() => window.__productionPicker.isConnected), false,
+        `${tab}: deferred repaint did not resume after blur`);
+      // A deliberate change repaints immediately and keeps the chosen world on later ticks.
+      await picker.selectOption({ index: 1 });
+      const chosen = await picker.inputValue();
+      await page.evaluate(() => window.__productionResourceTick());
+      assert.equal(await picker.inputValue(), chosen);
+      await picker.selectOption({ index: 0 });
+    }
     results.push({ width, height, locale });
     await page.close();
   }

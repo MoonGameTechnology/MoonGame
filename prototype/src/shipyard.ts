@@ -2,9 +2,9 @@ import { saveNamedTemplate } from './productionTemplateDialog';
 import { holoIcon } from './holographicIcons';
 import { productionCatalogHeading, productionCatalogTile } from './productionCatalog';
 import { closeProductionOverlay, fittingSheet, presentProduction, rememberProductionDetails, productionOrderHtml } from './productionPresentation';
-import { productionQueueHtml } from './productionQueueView';
+import { initProductionRefresh } from './productionRefresh';
 import { completedUnitSpend } from './economy';
-import { productionIncomeHtml, productionStockHtml, refreshProductionStock } from './productionIncome';
+import { productionIncomeHtml, productionStockHtml } from './productionIncome';
 import { worldOrdersHtml } from './worldOrdersPane';
 import { productionClick } from './productionInteraction';
 /**
@@ -785,14 +785,10 @@ function orderView(host: YardHost, draft: YardDraft, hulls: string[], troopsFor:
   return { draft, body, order };
 }
 
-function productionAvailability(host: YardHost): string { const pl = host.state().players[host.me()]; return JSON.stringify([pl?.resources, pl?.technologies, pl?.arsenal, host.state().capital?.[host.me()], pl?.stewardHoldPoints, host.state().rallyPoints?.[host.me()], Object.values(host.state().planets).filter(p => p.owner === host.me()).map(p => [p.id,p.buildings])]); }
-
 export function initShipyard(host: YardHost) {
   let tab: YardTab = 'ships';
   let category: BuildCategory | null = null;
   let renderedHeroBody = '';
-  let heroScrolling = false;
-  let heroScrollTimer: ReturnType<typeof setTimeout> | null = null;
   let draft: YardDraft = { hull: YARD_HULLS[0]!, modules: [], count: 1, planet: '' };
   /** Вкладка последней отрисовки: прокрутка переживает перерисовку только внутри вкладки. */
   let paintedTab: YardTab | null = null;
@@ -801,12 +797,10 @@ export function initShipyard(host: YardHost) {
   let tplOpen = false;
   let templates: BuildTemplate[] = parseTemplates(readRaw(TEMPLATES_KEY), data, TEMPLATE_TABS);
   const saveTemplates = (): void => writeRaw(TEMPLATES_KEY, JSON.stringify(templates));
-  let queuePainted = '';
-  let lastAvailability = '';
-  function queueHtml(): string {
-    queuePainted = productionQueueHtml(host.state(), draft.planet);
-    return queuePainted;
-  }
+  const refresh = initProductionRefresh({
+    ...host, tab: () => tab, planet: () => draft.planet,
+    renderedHeroBody: () => renderedHeroBody, paint,
+  });
 
   const hullsOf = (): string[] => hullsOfTab(tab);
   /** Бойцы десантного челнока для черновика (SHU-5.2); `undefined` — корпус не десантный. */
@@ -821,7 +815,7 @@ export function initShipyard(host: YardHost) {
   const close = (): void => host.root().classList.remove('show', 'pw-fitting-open');
 
   function paint(): void {
-    lastAvailability = productionAvailability(host);
+    refresh.painted();
     let body: string;
     let order = '';
     if (tab === 'buildings') {
@@ -852,7 +846,7 @@ export function initShipyard(host: YardHost) {
       body,
       order,
       repeatOrderHtml(last, tab, draft),
-      queueHtml(),
+      refresh.queueHtml(),
       tplPane,
     );
     if (paintedTab === tab) restoreDetails();
@@ -915,24 +909,6 @@ export function initShipyard(host: YardHost) {
     const freed = r.slots.findIndex((sl) => !sl.moduleId && sl.type === type);
     draft = { ...draft, modules: r.modules, slot: freed < 0 ? undefined : freed };
   }
-
-  // Mobile dossier scrolling must stay compositor-cheap. The periodic hero refresh
-  // rebuilds the whole pane when cooldown/time-derived markup changes; doing that while
-  // a finger is actively scrolling causes visible jank and can stall slower phones.
-  // Scroll does not bubble, so listen in capture on the stable window root.
-  host.root().addEventListener(
-    'scroll',
-    () => {
-      if (!host.root().classList.contains('show')) return;
-      heroScrolling = true;
-      if (heroScrollTimer !== null) clearTimeout(heroScrollTimer);
-      heroScrollTimer = setTimeout(() => {
-        heroScrolling = false;
-        heroScrollTimer = null;
-      }, 180);
-    },
-    true,
-  );
 
   host.root().addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
@@ -1099,37 +1075,8 @@ export function initShipyard(host: YardHost) {
       host.onOpen();
       if (building) anchorBuilding(host.root(), building);
     },
-    refreshHeroes: () => {
-      if (tab !== 'heroes' || !host.root().classList.contains('show')) return;
-      refreshProductionStock(host.root(), host.state(), host.me());
-      // Do not even build the expensive hero HTML while touch/inertial scrolling is active.
-      // The next 1s host tick catches up after the 180ms idle guard expires.
-      if (heroScrolling) return;
-      if (host.heroPaneHtml() === renderedHeroBody) return patchLiveTimers(host.root(), host.state().time);
-      const scroll = host.root().querySelector('#constructorbody')?.scrollTop ?? 0;
-      const focused = document.activeElement as HTMLElement | null;
-      const focusAttrs = focused && host.root().contains(focused)
-        ? Array.from(focused.attributes).filter((a) => a.name.startsWith('data-h'))
-          .map((a) => [a.name, a.value] as const) : [];
-      paint();
-      const box = host.root().querySelector('#constructorbody');
-      if (box) box.scrollTop = scroll;
-      if (focusAttrs.length) {
-        Array.from(host.root().querySelectorAll<HTMLElement>('button')).find((el) =>
-          focusAttrs.every(([name, value]) => el.getAttribute(name) === value))?.focus({ preventScroll: true });
-      }
-    },
-    refreshQueue: () => {
-      if (!host.root().classList.contains('show')) return;
-      refreshProductionStock(host.root(), host.state(), host.me());
-      if (heroScrolling) return;
-      if (tab !== 'heroes' && (tab === 'buildings' || productionAvailability(host) !== lastAvailability)) { paint(); return; }
-      const el = host.root().querySelector('#cn-queue');
-      if (!el) return;
-      const before = queuePainted;
-      const html = queueHtml();
-      if (html !== before) { const open = el.querySelector('details')?.open; el.innerHTML = html; const details = el.querySelector('details'); if (details && open !== undefined) details.open = open; }
-    },
+    refreshHeroes: refresh.refreshHeroes,
+    refreshQueue: refresh.refreshQueue,
     back: () => { if (!closeProductionOverlay(host.root())) close(); },
     render: paint,
     close,

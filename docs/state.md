@@ -7,9 +7,9 @@
 > [до 2026-10-19](archive/state-2026-10-19.md), [до 2026-11-09](archive/state-2026-11-09.md).
 
 **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check).
-**Последний полный локальный прогон: 15 390 тестов прошли**
-(243 skip; 1269 файлов прошли, 10 skip; на основе `main` `8abbbbbb`,
-без сборки прототипа и без PostgreSQL). CI и merge queue проверяют PR вместе с `main`.
+**Последний полный локальный прогон: 15 409 тестов прошли**
+(236 skip; 1272 файла прошли, 10 skip; на основе `main` `c2c28fc4`,
+с готовой сборкой прототипа, без PostgreSQL). CI и merge queue проверяют PR вместе с `main`.
 
 **Быстрый старт сессии** (только указатели, факты живут в секциях):
 
@@ -392,6 +392,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - «Производство» (`shipyard.ts`): постройки, корабли, мобилизация, шаблоны сборок
   (`decisions/buildTemplates.ts`), требования — `decisions/productionRequirements.ts`
   ([production-workbench.md](production-workbench.md)). «Герои» — `heroStaff.ts`.
+  Обновления (`productionRefresh.ts`) сохраняют список планет и фокус при начислении
+  ресурсов; запас, очередь и таймеры обновляются без замены списка.
 - Флот: погрузка и высадка — `troopsWindow.ts` (`decisions/armyTransferRows.ts`), плашки и дуги
   перевозки на карте (`decisions/troopTransferTimers.ts`, `mapTransfers.ts`), цепочка приказов
   `chainPlanner.ts`, шаттлы — `hangarPanel.ts`, `squadronPanel.ts`.
