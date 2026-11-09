@@ -12,6 +12,7 @@
  * взведено слияние, имя становится «сюда».
  */
 import type { Action, GameState, Planet } from '../../packages/shared-core/src/index';
+import { hasMissiles } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { parkedState } from '../../decisions/hangarBadge';
 import { fleetCallsign } from './fleetName';
@@ -72,7 +73,8 @@ function statusLine(spot: Spot, deps: SquadronCardDeps, missiles: boolean): stri
       : t('side.squad.hold', { name: fleetCallsign(spot.fleetId) });
   const st = parkedState(spot.view.blocked, spot.view.sortie);
   // Ракетам топливо порта не нужно: им важно одно — не в бою ли база.
-  if (missiles) return `${where} · ${t(st.kind === 'busy' ? 'side.squad.busy' : 'side.missile.ready')}`;
+  if (missiles)
+    return `${where} · ${t(st.kind === 'busy' ? 'side.squad.busy' : 'side.missile.ready')}`;
   const state =
     st.kind === 'busy'
       ? t('side.squad.busy')
@@ -90,7 +92,11 @@ function statusLine(spot: Spot, deps: SquadronCardDeps, missiles: boolean): stri
  *  `null` — такой эскадры на стоянке нет. Её же читает список «◇ Авиация». */
 export function parkedStatusText(id: string, deps: SquadronCardDeps): string | null {
   const spot = spotOf(deps.world, deps.me, id);
-  return spot ? statusLine(spot, deps) : null;
+  if (!spot) return null;
+  const hangar =
+    spot.kind === 'port' ? spot.planet.hangar : deps.world.fleets[spot.fleetId]?.hangar;
+  const sq = hangar?.find((q) => q.id === id);
+  return statusLine(spot, deps, !!sq && hasMissiles(sq, data));
 }
 
 /** Перегрузка ЭТОЙ эскадры между портом и стоящим у мира своим носителем. Ядро возит
@@ -142,7 +148,9 @@ export function parkedSquadronHtml(id: string, deps: SquadronCardDeps): string |
   const salvo = Math.min(12, card.machines);
   const buttons =
     (launch ? btn('msllaunch', card.id, t('side.missile.launch'), true) : '') +
-    (launch && salvo > 1 ? btn('mslsalvo', card.id, t('side.missile.salvo', { n: salvo }), true) : '') +
+    (launch && salvo > 1
+      ? btn('mslsalvo', card.id, t('side.missile.salvo', { n: salvo }), true)
+      : '') +
     (ready ? btn('wingstrike', card.id, t('side.wing.strike'), true) : '') +
     (ready && card.canPatrol ? btn('wingpatrol', card.id, t('side.wing.patrol'), true) : '') +
     (ready && card.canRelocate ? btn('wingrelocate', card.id, t('side.wing.relocate'), true) : '') +
