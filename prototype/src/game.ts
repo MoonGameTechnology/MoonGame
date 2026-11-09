@@ -165,7 +165,6 @@ export {
 export { approvalView } from './botFavour';
 
 // --- heroes + capital --------------------------------------------------------
-export { heroRosterOf } from './heroes';
 export { capitalOf } from '../../packages/shared-core/src/index';
 export { hasShipyard, rallyPointOf } from '../../packages/shared-core/src/index';
 // RETR-2: ступени авто-отхода закрыты списком в ЯДРЕ — интерфейс обходит его по кругу,
