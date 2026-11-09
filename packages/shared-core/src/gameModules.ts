@@ -50,6 +50,7 @@ import { traderModule } from './modules/trader';
 import { loadoutEffectsModule } from './modules/loadoutEffects';
 import { minefieldModule } from './modules/minefield';
 import { rocketMinesModule } from './modules/rocketMines';
+import { missilesModule } from './modules/missiles';
 import { rendezvousModule } from './modules/rendezvous';
 import { extractionModule } from './modules/extraction';
 import { operationModule } from './modules/operation';
@@ -187,6 +188,10 @@ export const GAME_MODULES: GameModule[] = [
   // Маскировочное поле (SM-4.3): только отмечает срыв поля по бою, обстрелу и вылету
   // шаттлов. Хуков нет, свои поводы; перед автослиянием, как и прочие поздние слушатели.
   cloakFieldModule,
+  // Ракеты из ангара (missiles-roadmap, 2026-11-09): только своё действие `missile.launch`,
+  // ни хуков, ни подписок; полёт и попадание ведёт `rocketMines`. Перед автослиянием, как
+  // и прочие поздние.
+  missilesModule,
   // Автослияние на прибытии (заказ владельца 2026-10-03): долетевший флот вливается в свой,
   // стоящий в узле. В САМЫЙ КОНЕЦ: прибытие сначала слышат все (бой, захват, мины, союзник,
   // архив), и только потом флот исчезает в стоявшем.

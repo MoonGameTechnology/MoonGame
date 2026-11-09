@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.84'); // Research prices ×3 of the original catalogue (was ×10); main maps build ×2.
+    expect(data.version).toBe('0.1.85'); // Research prices ×3 of the original catalogue (was ×10); main maps build ×2.
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -413,6 +413,7 @@ describe('game data schema (docs/architecture.md §2)', () => {
       'fiscal_administration → building:tax_office',
       'flagship_command → unit:hero',
       'frigate_design → unit:frigate',
+      'guidance_arrays → unit:cruise_missile',
       'heavy_cruiser_design → unit:heavy_cruiser',
       'heavy_infantry_training → unit:heavy_infantry',
       'interceptor_design → unit:interceptor',

@@ -60,6 +60,7 @@ const CLIENT_ACTION_TYPES = [
   'captive.load',
   'ally.order',
   'ally.cancel',
+  'missile.launch',
   // REL-2 — the prototype-host intents (the netserver runs the prototype's kernel):
   'market.take',
   'fleet.launch',
@@ -150,6 +151,7 @@ describe('SV-1.2 · action payload schemas', () => {
       ['market.take', { id: 'lot:1', amount: 2 }],
       ['market.take', { id: 'lot:1' }], // amount optional (fill the whole lot)
       ['market.cancel', { id: 'lot:1' }], // the prototype book cancels by `id`
+      ['missile.launch', { planetId: 'A', squadronId: 'sq:p:1', targetFleetId: 'f1', count: 3 }],
       ['fleet.launch', { planetId: 'p1' }],
       ['fleet.merge', { from: 'f1', into: 'f2' }],
       ['fleet.split', { fleetId: 'f1', take: [{ unit: 'interceptor', count: 2 }] }],

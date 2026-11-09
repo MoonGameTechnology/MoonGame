@@ -650,6 +650,41 @@
       "utility": 0
     }
   },
+  "cruise_missile": {
+    "name": "Cruise Missile",
+    "faction": "neutral",
+    "domain": "space",
+    "stats": {
+      "attack": 0,
+      "defense": 0,
+      "speed": 240,
+      "hp": 12,
+      "strikeRange": 240,
+      "cargoSize": 1
+    },
+    "line": "front",
+    "traits": [
+      "shuttle",
+      "missile"
+    ],
+    "signature": 13,
+    "cost": {
+      "metal": 60,
+      "credits": 40,
+      "microelectronics": 20
+    },
+    "buildTimeHours": 2,
+    "upkeep": {},
+    "warhead": {
+      "damage": 100,
+      "blastRadius": 12
+    },
+    "slots": {
+      "weapon": 0,
+      "defense": 0,
+      "utility": 0
+    }
+  },
   "garrison": {
     "name": "Garrison",
     "faction": "neutral",

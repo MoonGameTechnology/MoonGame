@@ -58,7 +58,7 @@ export function sortieSpec(
   host: { hangar?: Squadron[] },
   data: GameData,
 ): { maxFuel: number; rearmRounds: number } {
-  const st = hangarMachines(host).find((s) => s.count > 0);
+  const st = hangarMachines(host).find((s) => s.count > 0 && !isMissileStack(s, data));
   const u = st ? data.units[st.unit]?.stats : undefined;
   return {
     maxFuel: Math.max(0, Math.floor(u?.fuel ?? 0)),
@@ -119,6 +119,7 @@ export function fleetHasShuttle(f: Fleet | undefined, data: GameData): boolean {
 export function shuttleStrikeRange(host: { hangar?: Squadron[] }, data: GameData): number {
   let r = 0;
   for (const st of hangarMachines(host)) {
+    if (isMissileStack(st, data)) continue; // дальность ракеты — свой круг, не круг вылета
     r = Math.max(r, data.units[st.unit]?.stats.strikeRange ?? 0);
   }
   return r;
@@ -258,6 +259,19 @@ export function hangarMachines(host: { hangar?: Squadron[] }): UnitStack[] {
     for (const st of sq.units) if (st.count > 0) out.push(st);
   }
   return out;
+}
+
+/** Ракета ли это в ангаре (missiles-roadmap, решение владельца 2026-11-09): ракеты стоят в
+ *  порту и трюме эскадрами, как челноки, но не вылетают на удар, патруль и перелёт, а
+ *  пускаются (`missile.launch`). Топливо и перезарядка базы — от челноков, не от ракет. */
+export function isMissileStack(st: Pick<UnitStack, 'unit'>, data: GameData): boolean {
+  return data.units[st.unit]?.traits.includes('missile') ?? false;
+}
+
+/** Есть ли в эскадре ракета: такую эскадру не поднять ни на удар, ни на патруль, ни на
+ *  перелёт, и с челноками её не свести. */
+export function hasMissiles(sq: Pick<Squadron, 'units'>, data: GameData): boolean {
+  return sq.units.some((st) => st.count > 0 && isMissileStack(st, data));
 }
 
 /** Сколько машин в эскадре. */

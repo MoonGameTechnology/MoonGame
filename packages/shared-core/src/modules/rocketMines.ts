@@ -1,7 +1,7 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { GameData, RocketMineDef } from '../data/schemas';
 import type { Fleet } from '../state/gameState';
-import { hoursToMs, travelSpeedFactorOf } from '../action/types';
+import { hoursToMs } from '../action/types';
 import {
   emptyOrdnance,
   inRadius,
@@ -28,7 +28,15 @@ import { distance } from '../state/route';
 import { getStance } from '../state/diplomacy';
 import { sightCircles, type SightCircle } from '../state/visibility';
 import { detectSignals, fleetSignalStrength, type SignalEmitter } from '../state/radarSignals';
-import { nextFleetSeq, requireOwnedUnengagedFleet } from '../util/fleet';
+import { requireOwnedUnengagedFleet } from '../util/fleet';
+import {
+  guidedAim,
+  missileFlightStep,
+  retargetMissile,
+  scheduleMissileStep,
+  spawnMissile,
+} from '../util/missileFlight';
+import { wearStructures } from '../util/structureDamage';
 import { effectiveStats } from '../util/loadout';
 import { applyDamageToSide, hookedDamage, removeIfWiped } from '../util/combat';
 import {
@@ -41,14 +49,16 @@ import {
 import { canAfford, payCost } from '../util/treasury';
 import { recordValues } from '../util/records';
 
-/** Radar returns coordinates only. No hidden fleet ID is stored in a missile. */
+/** Точка цели и флот под ней. Флот нужен только наведению (решение владельца 2026-11-09)
+ *  и хозяину мины не проецируется: радар отдаёт ему одни координаты. Ложная цель флота
+ *  не имеет, и ракета идёт в её точку. */
 function targetPoint(
   h: HandlerContext,
   mine: Fleet,
   position: { x: number; y: number },
   def: RocketMineDef,
   mode: RocketMineMode,
-): { x: number; y: number } | null {
+): { x: number; y: number; fleetId?: string } | null {
   // Круги зрения владельца собираются, только когда в радаре кто-то есть: хук `time.stop`
   // спрашивает мину о каждой минуте, а пустой радар — обычный ответ.
   let circles: SightCircle[] | null = null;
@@ -58,6 +68,7 @@ function targetPoint(
       inRadius(at, c, c.identify),
     );
   const emitters: SignalEmitter[] = [];
+  const sources: { x: number; y: number; id: string }[] = [];
   const confirmed: { x: number; y: number; id: string }[] = [];
   for (const fleet of recordValues(h.state.fleets)) {
     if (fleet.owner === mine.owner) continue; // свой отряд целью не бывает (стойка «союз»)
@@ -75,20 +86,22 @@ function targetPoint(
     if (known && stance !== 'war') continue;
     if (mode === 'confirmed') {
       if (known) confirmed.push({ ...at, id: fleet.id });
-    } else
+    } else {
+      sources.push({ x: at.x, y: at.y, id: fleet.id });
       emitters.push({
         ...at,
         location,
         inTransit: true,
         strength: fleetSignalStrength(fleet, h.ctx.data),
       });
+    }
   }
   if (mode === 'confirmed') {
     confirmed.sort(
       (a, b) => distance(a, position) - distance(b, position) || (a.id < b.id ? -1 : 1),
     );
     const p = confirmed[0];
-    return p ? { x: p.x, y: p.y } : null;
+    return p ? { x: p.x, y: p.y, fleetId: p.id } : null;
   }
   // A false radar signal can lure the permissive mode; direct sight unmasks it.
   for (const hero of Object.values(h.state.heroes ?? {})) {
@@ -109,7 +122,13 @@ function targetPoint(
       return p ? [p] : [];
     })
     .sort((a, b) => distance(a, position) - distance(b, position) || a.x - b.x || a.y - b.y);
-  return points[0] ?? null;
+  const point = points[0];
+  if (!point) return null;
+  // Отметка стоит ровно на флоте, который её дал (`detectSignals` берёт его позицию).
+  const under = sources
+    .filter((f) => f.x === point.x && f.y === point.y)
+    .sort((a, b) => (a.id < b.id ? -1 : 1))[0];
+  return under ? { x: point.x, y: point.y, fleetId: under.id } : { x: point.x, y: point.y };
 }
 
 /** The hull of the missile this layer would launch. Zero means point defense has nothing
@@ -142,6 +161,7 @@ function missileFleet(h: HandlerContext, id: string): Fleet | null {
 function endMissile(h: HandlerContext, missile: Fleet): void {
   delete h.state.fleets[missile.id];
   if (h.state.ordnance?.warheads) delete h.state.ordnance.warheads[missile.id];
+  if (h.state.ordnance?.guidance) delete h.state.ordnance.guidance[missile.id];
   h.emit('fleet.destroyed', { fleetId: missile.id, owner: missile.owner, spent: true });
 }
 
@@ -164,27 +184,22 @@ function scan(h: HandlerContext, mine: Fleet): void {
   if (target) {
     // Remove first: a repeated timer/mode action cannot fire this mine a second time.
     liftMine(h, mine);
-    const travel = distance(position, target) / (def.speed * travelSpeedFactorOf(h.ctx));
-    const arrivesAt =
-      h.ctx.now + Math.max(1, Math.ceil(hoursToMs(h.ctx, Math.max(def.minFlightHours, travel))));
-    // The missile is a fleet without orders (SM-3.7b): it flies straight to the signal's point
-    // and passes the ordinary fog. Its id names no owner; its warhead stays with the owner.
-    const missile: Fleet = {
-      id: `fleet:missile:${h.ctx.now}:${nextFleetSeq(h.state)}`,
+    // The missile is a fleet without orders (SM-3.7b) and passes the ordinary fog. Its id
+    // names no owner; its warhead stays with the owner. It homes on the fleet behind the
+    // signal while that fleet stays within radar range plus the reserve from the launch
+    // point (owner, 2026-11-09).
+    const missile = spawnMissile(h, {
       owner: mine.owner,
-      location: null,
-      movement: null,
-      edge: null,
-      flight: { from: { ...position }, to: { ...target }, departedAt: h.ctx.now, arrivesAt },
-      units: [{ unit: MISSILE_UNIT, count: 1, modules: [layer.id] }],
-      landing: [],
-      traits: [],
-      battleId: null,
-    };
-    h.state.fleets[missile.id] = missile;
-    (ord.warheads ??= {})[missile.id] = control.damage;
-    h.schedule(arrivesAt, 'rocketMine.impact', { missileId: missile.id });
-    scheduleFlight(h, missile);
+      from: position,
+      to: { x: target.x, y: target.y },
+      stack: { unit: MISSILE_UNIT, count: 1, modules: [layer.id] },
+      speed: def.speed,
+      minFlightHours: def.minFlightHours,
+      warhead: control.damage,
+      ...(target.fleetId !== undefined
+        ? { guidance: { fleetId: target.fleetId, range: def.radarRange * (1 + def.guidanceReserve) } }
+        : {}),
+    });
     h.emit('rocketMine.launched', { owner: mine.owner, mineId: mine.id, missileId: missile.id });
   } else {
     const first = h.ctx.now + scanStep(h, def);
@@ -434,24 +449,37 @@ function intercepted(h: HandlerContext, m: Fleet): boolean {
   return false;
 }
 
-/** Шаг полёта ракеты — игровая минута. */
 function flightStep(h: HandlerContext): number {
-  return Math.max(1, Math.ceil(hoursToMs(h.ctx, 1 / 60)));
+  return missileFlightStep(h.ctx);
 }
 
 /** Время последнего шага полёта до попадания (или пуск, если шагов не было): шаги идут
- *  через `flightStep` от пуска, пока строго раньше прибытия (см. `scheduleFlight`). */
+ *  через `flightStep` от пуска, пока строго раньше прибытия (см. `scheduleMissileStep`). */
 function lastStepAt(h: HandlerContext, fl: { departedAt: number; arrivesAt: number }): number {
   const step = flightStep(h);
   const steps = Math.max(0, Math.ceil((fl.arrivesAt - fl.departedAt) / step) - 1);
   return fl.departedAt + steps * step;
 }
 
-function scheduleFlight(h: HandlerContext, missile: Fleet): void {
-  const step = flightStep(h);
-  if (missile.flight && h.ctx.now + step < missile.flight.arrivesAt) {
-    h.schedule(h.ctx.now + step, 'rocketMine.flight', { missileId: missile.id });
-  }
+/** Ракета по МИРУ бьёт и его здания (решение 2026-11-09): гарнизон взрыв не трогает. Свой,
+ *  союзный и мирный мир не задевается, как и флоты в радиусе. */
+function strikePlanet(h: HandlerContext, owner: string, planetId: string, warhead: number): void {
+  const planet = h.state.planets[planetId];
+  if (!planet?.owner || getStance(h.state, owner, planet.owner) !== 'war') return;
+  const dealt = hookedDamage(h, warhead, {
+    phase: 'missile',
+    location: planet.id,
+    attacker: owner,
+    defender: planet.owner,
+  });
+  if (dealt > 0) wearStructures(h, planet.id, dealt, planet.owner);
+}
+
+/** Ракета ушла мимо: цель-флот дальше её дальности от точки пуска (решение владельца
+ *  2026-11-09). Отряд уходит с карты, как после попадания, но без взрыва. */
+function missMissile(h: HandlerContext, missile: Fleet): void {
+  endMissile(h, missile);
+  h.emit('missile.missed', { owner: missile.owner, missileId: missile.id });
 }
 
 export const rocketMinesModule: GameModule = {
@@ -467,7 +495,11 @@ export const rocketMinesModule: GameModule = {
   // 3.3.0: мина, к которой цель может подойти, не ставит поиск в очередь каждую минуту, а
   //        сторожит (`watch`): хук `time.stop` останавливает мир в ту минуту сетки, где поиск
   //        найдёт цель, и поиск идёт на `time.stopped`. Пуски в те же минуты.
-  version: '3.3.0',
+  // 3.4.0: ракета самонаводящаяся (решение владельца 2026-11-09): идёт за флотом под
+  //        отметкой, пока он не дальше радиуса радара мины с запасом от точки пуска, иначе
+  //        промах (`missile.missed`). Полёт и попадание общие с ракетой из ангара
+  //        (`util/missileFlight.ts`); ракета по миру бьёт и его здания.
+  version: '3.4.0',
   setup(api) {
     api.onAction('fleet.deployRocketMine', (action, h) => {
       const p = action.payload as { fleetId?: string; mode?: string } | null;
@@ -674,7 +706,10 @@ export const rocketMinesModule: GameModule = {
         flightPointAt(fl, h.ctx.now),
       );
       if (!missileFleet(h, missileId)) return; // сбита на влёте
-      scheduleFlight(h, missile);
+      const aim = guidedAim(h.state, missileId, h.ctx.now);
+      if (aim === 'lost') return missMissile(h, missile);
+      if (aim) retargetMissile(h, missile, aim);
+      scheduleMissileStep(h, missile);
     });
     api.on('rocketMine.impact', (event, h) => {
       const { missileId } = event.payload as { missileId: string };
@@ -690,9 +725,13 @@ export const rocketMinesModule: GameModule = {
         fl.to,
       );
       if (!missileFleet(h, missileId)) return; // сбита на подлёте
-      const to = missile.flight!.to;
+      // Самонаведение: бьёт туда, где цель сейчас; цель за дальностью — промах.
+      const aim = guidedAim(h.state, missileId, h.ctx.now);
+      if (aim === 'lost') return missMissile(h, missile);
+      const to = aim ?? missile.flight!.to;
       const def = missileWarhead(missile, h.ctx.data);
       const warhead = h.state.ordnance?.warheads?.[missile.id];
+      const planetId = h.state.ordnance?.guidance?.[missile.id]?.planetId;
       // Off the map first: the terminal point defense below hits a missile that is gone.
       endMissile(h, missile);
       if (!def || intercepted(h, missile)) return;
@@ -728,6 +767,7 @@ export const rocketMinesModule: GameModule = {
         );
         removeIfWiped(h, fleet.id);
       }
+      if (planetId !== undefined) strikePlanet(h, missile.owner, planetId, warhead ?? def.damage);
       h.emit('rocketMine.detonated', { owner: missile.owner, missileId });
     });
     // Movement, loss or transfer invalidates installation permanently, even if the
@@ -748,6 +788,8 @@ export const rocketMinesModule: GameModule = {
           if (!h.state.fleets[id]) delete ord.controls![id];
         for (const id of Object.keys(ord.warheads ?? {}))
           if (!h.state.fleets[id]) delete ord.warheads![id];
+        for (const id of Object.keys(ord.guidance ?? {}))
+          if (!h.state.fleets[id]) delete ord.guidance![id];
       });
     // Отряд встал на новый отрезок пути или на дорогу — спящая мина могла проспать его
     // подход: срок поиска пересчитывается от его новой записи (`quietUntil`).

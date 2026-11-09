@@ -248,6 +248,7 @@ export const en: Record<string, string> = {
   // Rocket mines
   "data.rocket-mine": "Rocket Mine",
   "data.missile": "Missile",
+  "data.cruise-missile": "Cruise Missile",
   "module.rocket-mine.desc": "Legendary road mine, hero ship only. Deployment 15 min; radar 120, sight 24; base damage 80. Mine signature 0.1. Anti-shuttle PD intercepts the missile. Per charge: 40 metal, 20 electronics. Cooldown 1 h; at most 6 mines.",
   "cmd.rocket-mine": "Rocket mine",
   "cmd.rocket-mine.hint": "Deploy on a road and choose the launch mode",
@@ -278,6 +279,8 @@ export const en: Record<string, string> = {
   "mine.rules": "Stop on a road. Deployment {minutes} min; radar {radar}, sight {sight}, damage {damage}. Moving cancels deployment without refund.",
   "mine.detected": "Space mine detected",
   "err.no-rocket-minelayer": "Equip the Rocket Mine module",
+  "err.missile-squadron": "Missiles are launched, not flown",
+  "err.not-missile": "The squadron holds more than missiles",
   "err.mine-road-required": "Stop the carrier on a road",
   "err.mine-installing": "The carrier is deploying a mine",
   "err.mine-limit": "Deployed mine limit reached",

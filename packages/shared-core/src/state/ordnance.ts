@@ -53,6 +53,21 @@ export interface OrdnanceState {
    *  owner only — the missile itself is a fleet and passes the ordinary fog. A world saved
    *  before SM-3.7b keeps its old `missiles` list, which nothing reads any more. */
   warheads?: Record<string, number>;
+  /** Наведение летящей ракеты, по id её отряда (решение владельца 2026-11-09): за кем она
+   *  идёт и докуда. Никому не проецируется: у ракеты мины целью бывает безымянная радарная
+   *  отметка, и её флот хозяину знать нельзя. Нет записи — ракета летит в точку. */
+  guidance?: Record<string, MissileGuidance>;
+}
+
+/** За чем идёт самонаводящаяся ракета. Ракета не промахивается, пока цель-флот не дальше
+ *  `range` от точки пуска `origin`; мир не уходит никуда, и по нему промаха нет. */
+export interface MissileGuidance {
+  fleetId?: string;
+  planetId?: string;
+  origin: RoadPoint;
+  range: number;
+  /** Скорость ракеты в единицах карты за час, без темпа перемещения матча. */
+  speed: number;
 }
 export function emptyOrdnance(): OrdnanceState {
   return { serials: {}, cooldowns: {}, installations: [], controls: {}, warheads: {} };

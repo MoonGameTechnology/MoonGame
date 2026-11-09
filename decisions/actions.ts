@@ -88,6 +88,15 @@ export const strikeShuttle = (
   squadronId: string,
   target: { targetFleetId: string } | { targetPlanetId: string },
 ) => act(playerId, 'shuttle.strike', { ...base, squadronId, ...target });
+/** Пустить ракеты эскадры по цели (missiles-roadmap): база и цель — как у удара, `count` —
+ *  размер залпа, по умолчанию одна. */
+export const launchMissiles = (
+  playerId: string,
+  base: { planetId: string } | { fleetId: string },
+  squadronId: string,
+  target: { targetFleetId: string } | { targetPlanetId: string },
+  count = 1,
+) => act(playerId, 'missile.launch', { ...base, squadronId, ...target, count });
 /** Поставить ЭСКАДРУ в патруль над точкой карты (SHU-6.2): та же база, что у удара, а
  *  цель — точка в мировых координатах, а не флот или мир. `hold` — «Держать патруль»
  *  (SHU-6.6): вернувшись, эскадра встанет снова сама. */

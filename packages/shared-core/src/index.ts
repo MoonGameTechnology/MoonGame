@@ -883,6 +883,7 @@ export {
   isMissileFleet,
   isOrdnanceFleet,
   missileModule,
+  missileWarhead,
   ROCKET_MINE_UNIT,
   ROCKET_MINE_TRAIT,
   MISSILE_UNIT,
