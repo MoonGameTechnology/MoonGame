@@ -84,6 +84,13 @@ function statusLine(spot: Spot, deps: SquadronCardDeps): string {
   return `${where} · ${state}`;
 }
 
+/** Строка состояния своей эскадры на стоянке — та же, что под именем в её карточке;
+ *  `null` — такой эскадры на стоянке нет. Её же читает список «◇ Авиация». */
+export function parkedStatusText(id: string, deps: SquadronCardDeps): string | null {
+  const spot = spotOf(deps.world, deps.me, id);
+  return spot ? statusLine(spot, deps) : null;
+}
+
 /** Перегрузка ЭТОЙ эскадры между портом и стоящим у мира своим носителем. Ядро возит
  *  соединение целиком, поэтому кнопка есть, только когда на той стороне хватит места. */
 function transferButton(spot: Spot, card: SquadronCard, deps: SquadronCardDeps): string {

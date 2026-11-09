@@ -370,6 +370,8 @@ async function boot(
     nick: () => env.nick,
     income: () => env.income,
     control: () => env.control,
+    aviation: () => null,
+    toggleAviation: () => {},
     mobile: () => env.mobile,
     aiSeats: () => env.aiSeats,
     speedControl: () => env.speedControl,

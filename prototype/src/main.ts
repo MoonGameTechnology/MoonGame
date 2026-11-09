@@ -120,6 +120,7 @@ import {
 } from './unitGlyphs';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { drawHangarBadges, initMapHangars } from './mapHangars';
+import { aviationCount, aviationOpen, closeAviation, initAviation, renderAviation, toggleAviation } from './aviationPanel';
 import { worldName } from './planetName';
 // «Производство» — экран заказа (REFM-13, ROS-3.1): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
@@ -895,6 +896,7 @@ const holographic = initHolographicUi({
   },
   selectionKey: () =>
     (selStrike ? `strike:${selStrike}` : '') || (selSquadron ? `sq:${selSquadron}` : '') || selectedFleetIds().join('|') || panelFleet() || selPlanet || '',
+  rightInset: () => (aviationOpen() ? (document.getElementById('aviapanel')?.getBoundingClientRect().width ?? 0) + 24 : 0),
   selectionAnchor: () => {
     const fid = panelFleet();
     const fleet = fid && s.fleets[fid];
@@ -1402,6 +1404,18 @@ initMapOverlays({
   aimSquadron,
 });
 initMapHangars({ world: () => s, me: () => ME, ctx: () => cx });
+// Список «◇ Авиация» (UIX-10.15): строка выделяет эскадру или её вылет и подводит камеру.
+initAviation({
+  world: () => s, me: () => ME, mobile: () => MOBILE,
+  selected: () => !!(selStrike || selSquadron || selPlanet || selectedFleetIds().length),
+  pick: (row, at) => {
+    if (row.kind === 'aloft') pickStrike(row.strikeId);
+    else pickSquadron(row.squadronId);
+    if (at) centerOn(at, cam.scale);
+    invalidatePanel();
+    renderPanel();
+  },
+});
 
 // Прицелы и цели — путь к цели, цели «Атаки» и «Штурма», круги каста и патруля, базы
 // перелёта — живут в `mapAim.ts` (REFM-233, часть 2). Мир, кадр, узлы карты, раскладку,
@@ -2138,6 +2152,8 @@ initTopBar({
   control: () =>
     perWorld('control', () => controlCounter(s, data, ME, controlLimitOf(s, ME), worldPlanets())),
   mobile: () => MOBILE,
+  aviation: () => (MOBILE ? null : { count: aviationCount(), open: aviationOpen() }),
+  toggleAviation,
   aiSeats: () => AI_PLAYERS.size,
   speedControl: () => devSpeedControl,
   lessonSpeed: lessonRunning,
@@ -3137,6 +3153,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'news-sheet', isOpen: () => news?.isOpen() ?? false, close: () => news?.close() }, // inside the hub (z52), the feed and a corp card
   { id: 'corp-sheet', isOpen: () => corp?.hubSheetOpen() ?? false, close: () => corp?.closeHubSheet() }, // inside the hub (z52), a building, levels, a member
   { id: 'pingpanel', isOpen: () => pings?.panelOpen() ?? false, close: () => pings?.closePanel() }, // z60
+  { id: 'aviapanel', isOpen: aviationOpen, close: closeAviation }, // z44, на телефоне z30
   { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { drop('splitState'); invalidatePanel(); } }, // z45
   // Всплывашка надбавок стоит над окном флота: Back закрывает её, а не выделение под ней.
@@ -3711,6 +3728,7 @@ function frame(nowReal: number, nativeGap: number) {
   // Строка статуса, шапка, плашки ресурсов и значки внимания — у владельца полосы (REFM-222).
   renderTopBar(missions);
   missionPanel.render(missions);
+  renderAviation();
 
   // Служебное наложение (FPS, задержка, десинк) — `netOverlay.ts` (REFM-192): десинк
   // ПОКАЗЫВАЕТ строку сам, помимо галочки игрока, потому что иначе о нём некому сообщить;
