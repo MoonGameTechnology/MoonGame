@@ -160,6 +160,47 @@ describe('session chat relay', () => {
     await room.receive('green', g, say('session', '\u0000\u200B'));
     expect(g.ofType('error').at(-1)?.code).toBe('E_CHAT_TEXT');
   });
+  it('masks multilingual abuse before delivery, replay and optional human chat callbacks', async () => {
+    const seen: string[] = [];
+    const room = makeRoom({ onChat: (message) => { seen.push(message.text); } });
+    const g = new Peer();
+    const b = new Peer();
+    room.addPeer('green', g);
+    room.addPeer('blue', b);
+    await room.receive('green', g, say('session', 'Hello f.u.c.k, scheiße and Scunthorpe!'));
+    expect(g.chatTexts()).toEqual(['Hello ***, *** and Scunthorpe!']);
+    expect(b.chatTexts()).toEqual(g.chatTexts());
+    expect(seen).toEqual(g.chatTexts());
+
+    const reconnect = new Peer();
+    room.addPeer('blue', reconnect);
+    expect(reconnect.chatTexts()).toEqual(g.chatTexts());
+  });
+
+  it('masks host-only chat through the same boundary, without affecting DM privacy', () => {
+    const room = makeRoom({ serverChatAllowed: (id) => id === 'blue' });
+    const g = new Peer(), r = new Peer();
+    room.addPeer('green', g);
+    room.addPeer('red', r);
+    expect(room.sendServerChat('blue', 'green', 'kurwa and nice move')).toBe(true);
+    expect(g.chatTexts()).toEqual(['*** and nice move']);
+    expect(r.chatTexts()).toEqual([]);
+  });
+
+  it('rejects an abusive coalition description before applying the public state', () => {
+    const room = makeRoom();
+    const action = (sequence: number, type: string, payload: unknown) => ({
+      id: `t:green:${sequence}`, type, playerId: 'green', payload, issuedAt: 0,
+    });
+    expect(room.submitAction('green', action(1, 'coalition.create', {})).ok).toBe(true);
+    const denied = room.submitAction('green',
+      action(2, 'coalition.edit', { emblem: 'star', description: 'f.u.c.k the world' }));
+    expect(denied).toMatchObject({ ok: false, code: 'E_BAD_PAYLOAD' });
+    const accepted = room.submitAction('green',
+      action(3, 'coalition.edit', { emblem: 'star', description: 'Peaceful explorers' }));
+    expect(accepted.ok).toBe(true);
+  });
+
   it('session channel reaches every seat, including the sender (the echo renders it)', async () => {
     const room = makeRoom();
     const g = new Peer();

@@ -74,7 +74,7 @@ import { canvasCompatibilityOptions } from './canvasCompatibility';
 import { SECTOR_TYPES, type MapNode } from './game';
 import { data } from './gameData';
 import { glowOn, starfieldOn } from './graphicsPrefs';
-import { clipGlassSurface, drawGlassRim, drawGlassScreen, drawGlassWave, type TerrainField } from './holographicSurface';
+import { clipGlassSurface, drawGlassRim, drawGlassScreen, drawGlassWave, glassFrame, type GlassFrame, type TerrainField } from './holographicSurface';
 import { atOverview, cam, insets, mapBounds, panBy, world } from './mapCamera';
 import { known, memory, surveyed, vision, type Vision } from './mapFog';
 import { pinchStart } from './mapInput';
@@ -264,7 +264,7 @@ export function mapMoving(now: number): boolean {
  *  (rule 8, as {@link blitStaticLayer} judged this frame). */
 export let mapCostly = false;
 export let terrainFields: TerrainField[] = [];
-export let holographicFrame = { x: 0, y: 0, width: 0, height: 0 };
+export let holographicFrame: GlassFrame = { x: 0, y: 0, width: 0, height: 0 };
 
 /** WebView can restore contexts without changing canvas dimensions or camera state. */
 export function invalidateMapSurfaces(): void {
@@ -406,8 +406,8 @@ function knowledgeRevision(s: GameState, me: string): number {
   return revision;
 }
 
-/** Чем обрезаются провинции. На картах Фронтира это выпуклый контур галактики, на
- *  прочих — прежняя рамка по границам карты. Координаты ЭКРАННЫЕ: кэш геометрии
+/** Чем обрезаются провинции: выпуклый контур галактики (Фронтир; `state.mapEdge` — контур
+ *  ядра `mosaicClip`), на прочих картах — прежняя рамка по границам карты. Координаты ЭКРАННЫЕ: кэш геометрии
  *  (`territoryGeometry.ts`) нормализует вход по первой точке клипа и масштабу сам,
  *  поэтому панорама и зум из его подписи сокращаются, а на выход он отдаёт форму в этих
  *  нормализованных координатах и место, куда её поставить в экранные (`placePoly`). */
@@ -539,7 +539,7 @@ export interface MapLayerGeometry {
   /** The cell of each province, built when first asked ({@link provincePolygon}). */
   index: Map<string, number> | null;
   readonly clip: Array<[number, number]>;
-  readonly frame: { x: number; y: number; width: number; height: number };
+  readonly frame: GlassFrame;
 }
 /** The current bake's geometry; `null` before the first bake. */
 let mapLayerGeometry: MapLayerGeometry | null = null;
@@ -609,7 +609,7 @@ function measureMapLayer(): MapLayerGeometry {
     polys: new Array(shape.cells.length),
     index: null,
     clip,
-    frame: { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y },
+    frame: glassFrame(clip, tl, br, game.outline().length > 0),
   };
 }
 

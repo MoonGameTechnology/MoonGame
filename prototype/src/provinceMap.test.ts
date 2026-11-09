@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   loadGameData,
   matchMapEdges,
+  mosaicBorderSegments,
   mosaicBorders,
   parseMatchMap,
 } from '../../packages/shared-core/src/index';
@@ -19,6 +20,7 @@ import {
   seedWeight,
   type SeedSource,
 } from './provinceMap';
+import { networkSeats, newGame } from './matchSetup';
 
 const node = (id: string, sector = 'core'): { id: string; sector: string } => ({ id, sector });
 const src = (over: Partial<SeedSource> = {}): SeedSource => ({
@@ -189,6 +191,7 @@ describe('СТОРОЖ: рендер рисует ту же мозаику, чт
     // Масштаб 1 — вес семени тот же, что у ядра (`SEED_WEIGHT`), значит и диаграмма та же.
     const drawn = mosaicBorders(
       seeds.map((seed, i) => ({ id: nodes[i]!.id, x: seed.x, y: seed.y, size: seed.w / 9000 })),
+      map.edge, // край карты рендер берёт тот же, что ядро (`mosaicClip`)
     )
       .map((b) => `${b.a}|${b.b}`)
       .sort();
@@ -199,5 +202,34 @@ describe('СТОРОЖ: рендер рисует ту же мозаику, чт
     // Карта со своим списком путей (легаси) мозаику не выводит — сверять не с чем.
     if (map.paths !== undefined) return;
     expect(drawn).toEqual(real);
+  });
+});
+
+// Карта 50 мест — круглая. С прямоугольной рамкой её крайние провинции уходили в пустые
+// углы длинными клиньями, а их границы — длинными параллельными линиями через пустоту
+// (жалоба владельца 2026-11-09). Карта кончается по своему ободу (`edge: 'hull'`).
+describe('большая FFA кончается по ободу, а не по рамке', () => {
+  const root = path.resolve(__dirname, '..', '..');
+  const read = (id: string) =>
+    parseMatchMap(JSON.parse(readFileSync(path.join(root, 'data', 'maps', `${id}.json`), 'utf8')));
+
+  it('ffa-50 объявляет обод, и ни одна граница не длиннее трёх обычных', () => {
+    const map = read('ffa-50');
+    expect(map.edge).toBe('hull');
+    const seeds = Object.keys(map.sectors)
+      .sort()
+      .map((id) => ({ id, ...map.sectors[id]!.position, size: map.sectors[id]!.size }));
+    const lengths = mosaicBorderSegments(seeds, map.edge)
+      .map((b) => b.length)
+      .sort((a, b) => a - b);
+    const median = lengths[lengths.length >> 1]!;
+    // С рамкой самая длинная граница была 4630 при медиане 348 — в 13 раз длиннее.
+    expect(lengths.at(-1)!).toBeLessThan(median * 3);
+  });
+
+  it('состояние партии помнит край, а старые карты и сохранения остаются с рамкой', () => {
+    // Через настоящую сборку партии прототипа — тот же путь, что у игрока.
+    expect(newGame({ mapId: 'ffa-50', seats: networkSeats('ffa', 'ffa-50') }).mapEdge).toBe('hull');
+    expect(newGame({ mapId: 'duel-1', seats: networkSeats('ffa', 'duel-1') }).mapEdge).toBeUndefined();
   });
 });
