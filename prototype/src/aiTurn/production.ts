@@ -26,6 +26,8 @@ export function lineOrders(bot: AiTurn, home: HomeTurn): void {
     // выигрывала 49/35% партий (`selfplay 200` sp/alt). Челнок вдобавок держит потолок
     // своего рода. Иначе крейсер.
     const strikeCap = army.strikeCap ?? SHUTTLE_CAP;
+    const capOf = (u: string): number =>
+      data.units[u]?.traits.includes('missile') ? (army.missileCap ?? SHUTTLE_CAP) : strikeCap;
     const owned = (unit: string): number => {
       if (data.units[unit]?.traits.includes('shuttle')) return shuttlesOwned(unit);
       const count = (stacks: readonly UnitStack[] = []): number =>
@@ -41,7 +43,7 @@ export function lineOrders(bot: AiTurn, home: HomeTurn): void {
       [...(warFooting ? (army.warHulls ?? []) : []), ...(army.lineHulls ?? [])].find(
         (u) =>
           owned(u) < cruisers &&
-          (!data.units[u]?.traits.includes('shuttle') || owned(u) < strikeCap) &&
+          (!data.units[u]?.traits.includes('shuttle') || owned(u) < capOf(u)) &&
           canOrder(state, buildUnit(ai, base.id, u, 1)) === null,
       ) ?? lineUnit;
     const order = buildUnit(ai, base.id, hull, 1);

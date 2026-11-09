@@ -94,7 +94,8 @@ const GROUND_DEFENDERS = ['heavy_infantry', 'tank', 'militia'] as const;
  *   носитель) требует стапель третьего уровня, а без улучшения ядро отбивало носитель
  *   `E_YARD_TOO_SMALL` каждый тик, и его не строил никто.
  * - `siegeCap`, `strikeCap` — потолки вместо `SIEGE_CAP` и `SHUTTLE_CAP` (у ударных
- *   челноков; перехватчиков — прежний).
+ *   челноков; перехватчиков — прежний). `missileCap` — потолок крылатых ракет: по трейту
+ *   они тоже челнок, но их потолок — залп, а не звено ударных (без поля — `SHUTTLE_CAP`).
  * - `minerEveryHero` — ракетный минёр в отсеке у каждого героя, а не у одного.
  */
 export interface DoctrineArmy {
@@ -103,6 +104,7 @@ export interface DoctrineArmy {
   heavyYard?: true;
   siegeCap?: number;
   strikeCap?: number;
+  missileCap?: number;
   minerEveryHero?: true;
 }
 const DOCTRINE_ARMY: Readonly<Record<string, DoctrineArmy>> = {
@@ -113,8 +115,9 @@ const DOCTRINE_ARMY: Readonly<Record<string, DoctrineArmy>> = {
   // Шаттлы: удары челноков — на войне ударный челнок вместо крейсера, их вдвое больше;
   // носители поднимают эскадры у фронта.
   shuttle: { heavyYard: true, warHulls: ['heavy_striker', 'bomber'], strikeCap: 6 },
-  // Ракеты: урон ракетной ветки идёт только минам.
-  missile: { minerEveryHero: true },
+  // Ракеты: урон ракетной ветки идёт минам и ракетам; на войне — крылатая ракета вместо
+  // крейсера, до залпа в ангаре.
+  missile: { minerEveryHero: true, warHulls: ['cruise_missile'], missileCap: 12 },
 };
 
 /** Один ход одного места: что знают о нём все фазы хода. */
