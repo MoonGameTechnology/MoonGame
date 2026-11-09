@@ -954,10 +954,6 @@ export interface GameState {
   ordnance?: import('./ordnance').OrdnanceState;
   /** Authored map identity, persisted and public; absent on legacy saves. */
   mapId?: string;
-  /** How the province mosaic ends (`MatchMap.edge`, `mosaicClip`), pinned at birth: the
-   *  lanes were derived with it, so every renderer must clip the cells by the same edge.
-   *  Absent — the bounding rectangle, which is also what every older save was built with. */
-  mapEdge?: import('./mosaic').MapEdge;
   /** Game mode the match was created with (`data.modes`), pinned at birth like the map
    *  and persisted for the same reason: the snapshot is the ONLY thing that survives a
    *  restart, and a mode that lived solely in the host's `MatchConfig` would evaporate

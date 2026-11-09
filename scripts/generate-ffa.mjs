@@ -81,15 +81,16 @@ const MAPS = {
   },
   50: {
     id: 'ffa-50',
-    seed: 'fifty-suns-20261015',
-    // The galaxy ends at its rim, not at the bounding rectangle (`mosaicClip`). ffa-20 keeps
-    // the rectangle for now: its AvA cuts (`data/avaFormats.json`) were balanced on those lanes.
-    edge: 'hull',
+    seed: 'fifty-suns-square-5',
     perSeat: 16,
     pirates: 6,
     hives: 4,
     neutrals: 8,
     rimRifts: 4,
+    // A square board, filled to its corners (owner 2026-11-09): the round galaxy left the
+    // rectangle the mosaic is clipped by empty in its corners, and the rim provinces ran out
+    // into them as long wedges.
+    shape: 'square',
     hub: 'abyss',
     names: [
       'zorna',
@@ -210,13 +211,27 @@ function rngFrom(seed) {
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const pos = (s) => [s.position.x, s.position.y];
 
-/** A map's identity and edge; no `edge` — the bounding rectangle. */
-const headOf = (cfg) => ({ id: cfg.id, seed: cfg.seed, edge: cfg.edge });
-
-function generate(seats, cfg) {
-  const rnd = rngFrom(cfg.seed);
-  const total = seats * cfg.perSeat;
-  // The map: an ellipse with a wavy rim — space has no straight edges (M2.9).
+/**
+ * The board's outline. `ellipse` (default): an ellipse with a wavy rim — space has no straight
+ * edges (M2.9). `square`: a square of the same area, filled to its corners, so the rectangle
+ * the province mosaic is clipped by (`mosaicFrame`) is the board itself and no rim province
+ * runs out into an empty corner. `reach` is how far out a point is (1 on the rim), `rimDepth`
+ * how far in from the rim (0 on it).
+ */
+function boardShape(shape, total, rnd) {
+  if (shape === 'square') {
+    const half = Math.sqrt(total * CELL_AREA) / 2;
+    const reach = ([x, y]) => Math.max(Math.abs(x), Math.abs(y)) / half;
+    return {
+      rx: half,
+      ry: half,
+      area: 4 * half * half,
+      // A province may stand right at the edge: the rim row fills the board to its frame.
+      inside: (p, margin = 0) => reach(p) <= 1 - margin / half,
+      reach,
+      rimDepth: (p) => 1 - reach(p),
+    };
+  }
   const ry = Math.sqrt((total * CELL_AREA) / (Math.PI * ASPECT));
   const rx = ry * ASPECT;
   const waves = [0, 1, 2].map(() => rnd() * Math.PI * 2);
@@ -225,14 +240,25 @@ function generate(seats, cfg) {
     0.05 * Math.sin(3 * theta + waves[0]) +
     0.035 * Math.sin(5 * theta + waves[1]) +
     0.02 * Math.sin(7 * theta + waves[2]);
-  const inside = ([x, y], margin = 0) => {
-    const u = x / rx,
-      v = y / ry;
-    return Math.hypot(u, v) <= rimAt(Math.atan2(v, u)) - margin / ry;
+  const reach = ([x, y]) => Math.hypot(x / rx, y / ry);
+  return {
+    rx,
+    ry,
+    area: Math.PI * rx * ry,
+    inside: ([x, y], margin = 0) =>
+      reach([x, y]) <= rimAt(Math.atan2(y / ry, x / rx)) - margin / ry,
+    reach,
+    rimDepth: ([x, y]) => rimAt(Math.atan2(y / ry, x / rx)) - reach([x, y]),
   };
+}
+
+function generate(seats, cfg) {
+  const rnd = rngFrom(cfg.seed);
+  const total = seats * cfg.perSeat;
+  const { rx, ry, area, inside, reach, rimDepth } = boardShape(cfg.shape, total, rnd);
 
   // ── starts: Lloyd's relaxation with the centre held by the black hole ──
-  const step = Math.sqrt((Math.PI * rx * ry) / 40000);
+  const step = Math.sqrt(area / 40000);
   const grid = [];
   for (let y = -ry * 1.1; y <= ry * 1.1; y += step)
     for (let x = -rx * 1.1; x <= rx * 1.1; x += step) if (inside([x, y])) grid.push([x, y]);
@@ -274,11 +300,11 @@ function generate(seats, cfg) {
   // Seats are numbered around the map, outer ring first, so neighbouring slots are
   // neighbouring places on the map and the order reads naturally on the setup screen.
   homes.sort((a, b) => {
-    const ra = Math.hypot(a[0] / rx, a[1] / ry) > 0.62,
-      rb = Math.hypot(b[0] / rx, b[1] / ry) > 0.62;
+    const ra = reach(a) > 0.62,
+      rb = reach(b) > 0.62;
     return ra !== rb ? (ra ? -1 : 1) : Math.atan2(a[1], a[0]) - Math.atan2(b[1], b[0]);
   });
-  const spacing = Math.sqrt((Math.PI * rx * ry) / (seats + 1));
+  const spacing = Math.sqrt(area / (seats + 1));
 
   // ── authored provinces: homes, their two opening worlds, the black hole ──
   const sectors = {},
@@ -357,6 +383,19 @@ function generate(seats, cfg) {
         if (dist(at, hole) < spacing * 0.8) continue;
         junctions.push({ at, r });
       }
+  // A square board's corners belong to no triangle of seats, yet each is a stretch of space
+  // of its own: give it an area too, or the corner is folded into its neighbours' areas.
+  if (cfg.shape === 'square')
+    for (const [sx, sy] of [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ]) {
+      let at = [sx * rx, sy * ry];
+      for (let t = 0; t < 80 && !inside(at, spacing * 0.3); t++) at = [at[0] * 0.97, at[1] * 0.97];
+      junctions.push({ at, r: Math.min(...sites.map((s) => dist(s, at))) });
+    }
   // Thin to about one area per seat, the widest gaps first.
   junctions.sort((p, q) => q.r - p.r || p.at[0] - q.at[0]);
   const thin = (gap) => {
@@ -364,11 +403,14 @@ function generate(seats, cfg) {
     for (const jn of junctions) if (kept.every((a) => dist(a.at, jn.at) >= gap)) kept.push(jn);
     return kept;
   };
+  // A square's junctions bunch at its edges and some areas there come out empty, so it
+  // aims two above one per seat to keep at least one area per seat.
+  const target = cfg.shape === 'square' ? seats + 2 : seats;
   let lo = 0,
     hi = spacing * 2;
   for (let it = 0; it < 30; it++) {
     const mid = (lo + hi) / 2;
-    if (thin(mid).length > seats) lo = mid;
+    if (thin(mid).length > target) lo = mid;
     else hi = mid;
   }
   const anchors = thin(hi).map((jn) => ({ at: jn.at }));
@@ -549,10 +591,7 @@ function generate(seats, cfg) {
   // rim close the far edge behind the outer seats. Each is kept only if the map stays whole.
   const rifts = [];
   const hubRing = inArea(areas.length - 1, 'shell');
-  const rimOf = (sid) => {
-    const [x, y] = pos(sectors[sid]);
-    return rimAt(Math.atan2(y / ry, x / rx)) - Math.hypot(x / rx, y / ry);
-  };
+  const rimOf = (sid) => rimDepth(pos(sectors[sid]));
   const riftCandidates = [
     ...hubRing.filter((_, i) => i % 3 === 1).slice(0, 2),
     ...Object.keys(ROLE)
@@ -566,7 +605,7 @@ function generate(seats, cfg) {
       .sort((p, q) => rimOf(p) - rimOf(q)),
   ];
   const edgesOf = () => {
-    const map = core.parseMatchMap({ ...headOf(cfg), sectors, players, slots, fleets });
+    const map = core.parseMatchMap({ id: cfg.id, seed: cfg.seed, sectors, players, slots, fleets });
     return core.matchMapEdges(map, data);
   };
   let rimLeft = cfg.rimRifts,
@@ -582,7 +621,7 @@ function generate(seats, cfg) {
       continue;
     const before = { ...sectors[sid] };
     set(sid, { kind: 'rift', terrain: 'empty_space' });
-    const map = core.parseMatchMap({ ...headOf(cfg), sectors, players, slots, fleets });
+    const map = core.parseMatchMap({ id: cfg.id, seed: cfg.seed, sectors, players, slots, fleets });
     if (
       core
         .validateMatchMap(map, data)
@@ -808,7 +847,6 @@ function finish(seats, cfg, g) {
   const content = {
     id: cfg.id,
     seed: cfg.seed,
-    edge: cfg.edge, // undefined on ffa-20: JSON.stringify leaves the key out
     sectors,
     regions,
     players,
@@ -846,7 +884,7 @@ function finish(seats, cfg, g) {
   const missing = (field, catalogue) =>
     Object.keys(catalogue).filter((k) => !all.some((s) => s[field] === k));
   const kinds = missing('kind', data.sectorKinds).filter(
-    (k) => k !== 'empty' && k !== 'fork_station' && k !== 'void_station',
+    (k) => k !== 'empty' && k !== 'station_site' && k !== 'fork_station' && k !== 'void_station',
   );
   if (kinds.length) fail.push(`kinds ${kinds}`);
   if (missing('terrain', data.sectors).length)

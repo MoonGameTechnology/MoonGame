@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { drawTerrainEnvironmentTile } from '../../packages/client/src/terrainEnvironmentDraw';
-import { drawGlassRim, drawGlassWave, drawTerrainField, glassFrame, makeTerrainField, type TerrainField } from './holographicSurface';
+import { drawGlassRim, drawGlassWave, drawTerrainField, makeTerrainField, type TerrainField } from './holographicSurface';
 
 vi.mock('../../packages/client/src/terrainEnvironmentDraw', () => ({ drawTerrainEnvironmentTile: vi.fn() }));
 
@@ -200,36 +200,5 @@ describe('the glass rim and wave keep to the strip of the bake they can touch', 
     const { g, paths } = tracing();
     drawGlassRim(g, frame, 0, false, { x0: 10, y0: 300, x1: 20, y1: 310 });
     expect(paths).toEqual([]);
-  });
-});
-
-// Карта, что кончается по ободу (`state.mapEdge`): стекло — сам обод, а не пустые углы рамки
-// (владелец 2026-11-09: «чтоб рамки карты были»).
-describe('стекло по ободу карты', () => {
-  const hex: Array<[number, number]> = [[100, 0], [300, 0], [400, 200], [300, 400], [100, 400], [0, 200]];
-
-  it('обод даёт стеклу свою форму и описанную рамку; без обода — прежний прямоугольник', () => {
-    const rimmed = glassFrame(hex, { x: -50, y: -50 }, { x: 450, y: 450 }, true);
-    expect(rimmed).toEqual({ x: 0, y: 0, width: 400, height: 400, outline: hex });
-    expect(glassFrame(hex, { x: -50, y: -50 }, { x: 450, y: 450 }, false))
-      .toEqual({ x: -50, y: -50, width: 500, height: 500 });
-  });
-
-  it('кайма идёт по ободу: каждая точка линии лежит на его гранях', () => {
-    const points: Array<[number, number]> = [];
-    const g = new Proxy({}, {
-      get: (_, name) => (name === 'moveTo' || name === 'lineTo' ? (x: number, y: number) => { points.push([x, y]); }
-        : typeof name === 'string' && name.startsWith('create') ? () => ({ addColorStop() {} }) : () => undefined),
-      set: () => true,
-    }) as CanvasRenderingContext2D;
-    drawGlassRim(g, glassFrame(hex, { x: 0, y: 0 }, { x: 0, y: 0 }, true), 0, false);
-    expect(points.length).toBeGreaterThan(300);
-    // Кайма дрожит по нормали на доли процента короткой стороны: до грани — меньше 2 px.
-    const toEdge = ([x, y]: [number, number]): number => Math.min(...hex.map(([ax, ay], i) => {
-      const [bx, by] = hex[(i + 1) % hex.length]!;
-      const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
-      return Math.hypot(x - ax - t * (bx - ax), y - ay - t * (by - ay));
-    }));
-    for (const p of points.slice(0, 321)) expect(toEdge(p)).toBeLessThan(2);
   });
 });

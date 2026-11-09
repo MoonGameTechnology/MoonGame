@@ -162,7 +162,6 @@ import {
   typingTarget,
 } from './backGesture';
 import {
-  mosaicClip,
   viewSightCircles,
   type Planet,
   type SightCircle,
@@ -1060,13 +1059,7 @@ function installMapGeometry(state: GameState): void {
   forgetMapArt(); // другая карта — другая сеть дорог и местность
   MAP = mapNodesFromState(state);
   mapNodeSpacing = mapSpacing(MAP);
-  // Карта, которая кончается по своему краю (`state.mapEdge`), режет провинции тем же
-  // контуром, что ядро, когда выводило её проходы; у Фронтира свой контур только для рисунка.
-  galaxyOutline = isFrontier(state.mapId)
-    ? frontierOutline(MAP)
-    : state.mapEdge
-      ? mosaicClip(MAP, state.mapEdge).map(([x, y]) => ({ x, y }))
-      : [];
+  galaxyOutline = isFrontier(state.mapId) ? frontierOutline(MAP) : [];
   SCORE_LIMIT = scoreLimitFor(state);
   SECTOR_OF = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
   frameMap(MAP);

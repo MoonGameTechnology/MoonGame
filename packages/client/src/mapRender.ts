@@ -16,7 +16,7 @@ import { forkMarks, roadStrokes } from '../../../decisions/roadNetwork';
 import { buildTerrainEnvironment, type TerrainEnvironment } from '../../../decisions/terrainEnvironment';
 import { ambushOf } from '../../../decisions/forkAmbush';
 import { drawAmbushMark, drawForkMark } from './forkMark';
-import { effectiveStats, fleetPositionAt, isForkSite, isMineFleet, isMissileFleet, mosaicClip, type GameData, type GameState, type PlayerId } from '@void/shared-core';
+import { effectiveStats, fleetPositionAt, isForkSite, isMineFleet, isMissileFleet, type GameData, type GameState, type PlayerId } from '@void/shared-core';
 import { worldToScreen, fitTransform, inView, projection, type Cam, type Viewport, type Bounds } from './camera';
 import { blitGlow, blitSphere, rgba } from './holoDraw';
 import { drawTerritory, type TerritorySeed } from './territory';
@@ -121,17 +121,13 @@ export function renderMap(
   // a province change shape on window resize, and would move its cached terrain with it.
   const screen = projection(cam, vp, bounds);
   const at = { scale: screen.a, x: screen.x, y: screen.y };
-  // A map that ends at its rim (`state.mapEdge`) clips by the core's own outline: the lanes
-  // were derived with it, so drawing another edge would draw another mosaic.
   const padB = Math.max(40, (bounds.maxX - bounds.minX) * 0.05);
-  const clip: Array<[number, number]> = state.mapEdge
-    ? mosaicClip(planets.map((p) => p.position), state.mapEdge)
-    : [
-        [bounds.minX - padB, bounds.minY - padB],
-        [bounds.maxX + padB, bounds.minY - padB],
-        [bounds.maxX + padB, bounds.maxY + padB],
-        [bounds.minX - padB, bounds.maxY + padB],
-      ];
+  const clip: Array<[number, number]> = [
+    [bounds.minX - padB, bounds.minY - padB],
+    [bounds.maxX + padB, bounds.minY - padB],
+    [bounds.maxX + padB, bounds.maxY + padB],
+    [bounds.minX - padB, bounds.maxY + padB],
+  ];
   const seeds: TerritorySeed[] = [];
   for (const p of planets) {
     seeds.push({

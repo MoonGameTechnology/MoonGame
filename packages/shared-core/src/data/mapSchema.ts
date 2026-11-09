@@ -226,11 +226,6 @@ export const MatchMapSchema = z.object({
    *  map want" is DATA rather than a branch at every call site — a PvE map and the
    *  `pve_waves` mode used to both exist and never be introduced to each other. */
   mode: z.string().optional(),
-  /** How the province mosaic ends (`mosaicClip`): absent — the padded bounding rectangle;
-   *  `'hull'` — the padded convex hull of the centres, for a round map whose rim provinces
-   *  would otherwise stretch into the rectangle's empty corners. It decides which rim
-   *  worlds border each other, so it is pinned into the state (`GameState.mapEdge`). */
-  edge: z.literal('hull').optional(),
   sectors: z.record(z.string(), MapSectorSchema),
   /** Дополнительные задачи забега на этой карте. Пусто — карта без задач, и это
    *  нормальный случай: задачи ДОПОЛНИТЕЛЬНЫЕ, победа от них не зависит. */

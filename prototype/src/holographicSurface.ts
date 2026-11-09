@@ -5,28 +5,6 @@ import type { ProvincePolygon } from '../../packages/client/src/provinceSelectio
 import type { TerrainEnvironmentTile } from '../../decisions/terrainEnvironment';
 import { drawTerrainEnvironmentTile, type TerrainEnvironmentProjection } from '../../packages/client/src/terrainEnvironmentDraw';
 import type { HoloRect } from './holographicLayout';
-
-/** The glass: its box, and on a map that ends at its rim (`state.mapEdge`, Frontier) the
- *  rim itself — a convex polygon in the box's own coordinates. Without `outline` the glass
- *  is the rounded rectangle of the box. */
-export type GlassFrame = HoloRect & { outline?: ReadonlyArray<readonly [number, number]> };
-
-/** The glass under the map, in screen space: on a map that ends at its rim (`rimmed`) the
- *  province clip itself, so the frame hugs the provinces instead of leaving the empty corners
- *  of the box (owner 2026-11-09: «чтоб рамки карты были»); else the box `tl`–`br`. */
-export function glassFrame(
-  clip: ReadonlyArray<readonly [number, number]>,
-  tl: { x: number; y: number },
-  br: { x: number; y: number },
-  rimmed: boolean,
-): GlassFrame {
-  if (!rimmed || clip.length < 3) return { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y };
-  const xs = clip.map((p) => p[0]);
-  const ys = clip.map((p) => p[1]);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y, outline: clip };
-}
 import { drawTerrainArt } from './holographicTerrainArt';
 
 /** A box of the canvas's space, `x0..x1` × `y0..y1`: what a strip of the map's bake paints. */
@@ -209,11 +187,7 @@ function polygon(g: CanvasRenderingContext2D, poly: ProvincePolygon): void {
   g.closePath();
 }
 
-function glassPath(g: CanvasRenderingContext2D, r: GlassFrame): void {
-  if (r.outline?.length) {
-    polygon(g, r.outline as ProvincePolygon);
-    return;
-  }
+function glassPath(g: CanvasRenderingContext2D, r: HoloRect): void {
   const x = r.x;
   const y = r.y;
   const w = r.width;
@@ -233,13 +207,13 @@ function glassPath(g: CanvasRenderingContext2D, r: GlassFrame): void {
 }
 
 /** Clip paint only. Province polygons, ownership and hit testing stay unchanged. */
-export function clipGlassSurface(g: CanvasRenderingContext2D, frame: GlassFrame): void {
+export function clipGlassSurface(g: CanvasRenderingContext2D, frame: HoloRect): void {
   glassPath(g, frame);
   g.clip();
 }
 
 /** Cached with the political map, including its world-boundary projection. */
-export function drawGlassScreen(g: CanvasRenderingContext2D, frame: GlassFrame): void {
+export function drawGlassScreen(g: CanvasRenderingContext2D, frame: HoloRect): void {
   if (frame.width <= 0 || frame.height <= 0) return;
   g.save();
   glassPath(g, frame);
@@ -278,12 +252,7 @@ export function drawGlassScreen(g: CanvasRenderingContext2D, frame: GlassFrame):
   }
   g.stroke();
   g.restore();
-  // Registration marks on the rim make this read as a deployed tactical surface. They run
-  // along a rectangle's top and bottom: a rim-shaped glass has no straight edge to carry them.
-  if (frame.outline?.length) {
-    g.restore();
-    return;
-  }
+  // Registration marks on the rim make this read as a deployed tactical surface.
   g.strokeStyle = rgba(theme.cyan, 0.32);
   g.lineWidth = 0.9;
   g.beginPath();
@@ -501,19 +470,8 @@ interface RimShape {
   radius: number;
   lengths: number[];
   perimeter: number;
-  /** A rim-shaped glass: its corners relative to the frame's corner, one run per edge. */
-  corners?: Array<readonly [number, number]>;
 }
-function rimShape(frame: GlassFrame): RimShape {
-  if (frame.outline?.length) {
-    const corners = frame.outline.map(([x, y]) => [x - frame.x, y - frame.y] as const);
-    const lengths = corners.map(([x, y], i) => {
-      const [nx, ny] = corners[(i + 1) % corners.length]!;
-      return Math.hypot(nx - x, ny - y);
-    });
-    return { width: frame.width, height: frame.height, radius: 0, lengths, corners,
-      perimeter: lengths.reduce((a, b) => a + b, 0) };
-  }
+function rimShape(frame: HoloRect): RimShape {
   const scale = Math.min(frame.width, frame.height);
   const radius = scale * 0.026;
   const arc = Math.PI * radius / 2;
@@ -531,21 +489,9 @@ function rimShape(frame: GlassFrame): RimShape {
  * length. Writes into one reused object: the rim asks for it 321 times a frame. */
 const RIM_POINT = { x: 0, y: 0, nx: 0, ny: 0 };
 function rimPoint(shape: RimShape, fraction: number): typeof RIM_POINT {
-  const { radius, lengths, corners } = shape;
+  const { radius, lengths } = shape;
   let distance = fraction * shape.perimeter;
   let segment = 0;
-  if (corners) {
-    // Along the polygon; the outward normal of a run is its direction turned a quarter to
-    // the outside (the outline winds like the old rectangle: top edge left to right).
-    while (segment < lengths.length - 1 && distance > lengths[segment]!) distance -= lengths[segment++]!;
-    const [ax, ay] = corners[segment]!;
-    const [bx, by] = corners[(segment + 1) % corners.length]!;
-    const len = lengths[segment]! || 1;
-    const out = RIM_POINT;
-    out.nx = (by - ay) / len; out.ny = -(bx - ax) / len;
-    out.x = ax + (bx - ax) * distance / len; out.y = ay + (by - ay) * distance / len;
-    return out;
-  }
   while (segment < 7 && distance > lengths[segment]!) distance -= lengths[segment++]!;
   const out = RIM_POINT;
   if (segment % 2 === 1) {
@@ -579,7 +525,7 @@ function rimPoint(shape: RimShape, fraction: number): typeof RIM_POINT {
  * With `box`, only where the rim can touch it: a strip of the map's bake far from the rim
  * draws none, and one the rim crosses gets the stretches near it ({@link traceRim}). */
 export function drawGlassRim(
-  g: CanvasRenderingContext2D, frame: GlassFrame, clock: number, glow = true, box?: PaintBox,
+  g: CanvasRenderingContext2D, frame: HoloRect, clock: number, glow = true, box?: PaintBox,
 ): void {
   if (frame.width <= 0 || frame.height <= 0) return;
   if (box && !rimMeets(frame, glow, box)) return;
@@ -672,13 +618,12 @@ function traceRim(g: CanvasRenderingContext2D, near: Uint8Array | null): void {
 /** Could the rim touch `box`? Its strokes keep within the widest halo's half and the boil
  * (`0.00035 + 0.0017` of the short side) of the frame's outline, and the corners round
  * inward by their radius. */
-function rimMeets(frame: GlassFrame, glow: boolean, box: PaintBox): boolean {
+function rimMeets(frame: HoloRect, glow: boolean, box: PaintBox): boolean {
   const scale = Math.min(frame.width, frame.height);
   const reach = scale * ((glow ? RIM_HALO : RIM_HALO_LITE)[0]![0] / 2 + 0.00205) + 1;
   const x1 = frame.x + frame.width;
   const y1 = frame.y + frame.height;
   if (box.x1 < frame.x - reach || box.x0 > x1 + reach || box.y1 < frame.y - reach || box.y0 > y1 + reach) return false;
-  if (frame.outline?.length) return true; // a rim-shaped glass: its box says nothing of its inside
   const inset = scale * 0.026 + reach;
   return !(box.x0 > frame.x + inset && box.x1 < x1 - inset && box.y0 > frame.y + inset && box.y1 < y1 - inset);
 }
@@ -758,7 +703,7 @@ function drawRimBurn(
  * With `box`, only where the wave can touch it, as {@link drawGlassRim}. */
 export function drawGlassWave(
   g: CanvasRenderingContext2D,
-  frame: GlassFrame,
+  frame: HoloRect,
   width: number,
   height: number,
   clock: number,
