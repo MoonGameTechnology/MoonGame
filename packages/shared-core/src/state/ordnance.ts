@@ -124,3 +124,19 @@ export function missileModule(
   }
   return null;
 }
+/** Боевая часть летящей ракеты: у ракеты мины — из модуля, с которым её пустили, у
+ *  самостоятельной ракеты — из её юнита (`warhead`). Нет ни того, ни другого — ракете нечем
+ *  взорваться, и ядро снимает её без удара. */
+export function missileWarhead(
+  fleet: Pick<Fleet, 'units'>,
+  data: GameData,
+): { damage: number; blastRadius: number } | null {
+  const mod = missileModule(fleet, data);
+  if (mod) return { damage: mod.def.damage, blastRadius: mod.def.blastRadius };
+  if (!isMissileFleet(fleet, data)) return null;
+  for (const stack of fleet.units) {
+    const own = stack.count > 0 ? data.units[stack.unit]?.warhead : undefined;
+    if (own) return { damage: own.damage, blastRadius: own.blastRadius };
+  }
+  return null;
+}

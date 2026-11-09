@@ -219,6 +219,11 @@ export const UnitDefSchema = z.object({
    *  building; the built ship is locked (no refit). Omitted → all-zero → carries no
    *  modules (a partial object defaults the rest to 0). */
   slots: ShipSlotsSchema.default({ weapon: 0, defense: 0, utility: 0 }),
+  /** Боевая часть РАКЕТЫ (missiles-roadmap): урон и радиус взрыва на прилёте. Есть только у
+   *  ракет, которые несут её сами; ракета ракетной мины берёт их из модуля мины. */
+  warhead: z
+    .object({ damage: z.number().positive(), blastRadius: z.number().positive() })
+    .optional(),
 });
 
 /** One stack in a faction's starting loadout (a unit id + how many). */

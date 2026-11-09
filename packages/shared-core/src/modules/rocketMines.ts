@@ -8,7 +8,7 @@ import {
   isMissileFleet,
   isOrdnanceFleet,
   isRocketMineFleet,
-  missileModule,
+  missileWarhead,
   MISSILE_TRAIT,
   MISSILE_UNIT,
   rocketMinelayer,
@@ -379,7 +379,7 @@ function intercepted(h: HandlerContext, m: Fleet): boolean {
   const stack = m.units.find((st) => st.count > 0);
   const unit = stack && h.ctx.data.units[stack.unit];
   const full = unit && stack ? (effectiveStats(unit, stack, h.ctx.data).hp ?? 0) * stack.count : 0;
-  if (!flight || !stack || !(full > 0) || !missileModule(m, h.ctx.data)) return true;
+  if (!flight || !stack || !(full > 0) || !missileWarhead(m, h.ctx.data)) return true;
   let hp = stack.hp ?? full;
   const position = flightPointAt(flight, h.ctx.now);
   for (const f of Object.values(h.state.fleets).sort((a, b) => (a.id < b.id ? -1 : 1))) {
@@ -691,7 +691,7 @@ export const rocketMinesModule: GameModule = {
       );
       if (!missileFleet(h, missileId)) return; // сбита на подлёте
       const to = missile.flight!.to;
-      const def = missileModule(missile, h.ctx.data)?.def;
+      const def = missileWarhead(missile, h.ctx.data);
       const warhead = h.state.ordnance?.warheads?.[missile.id];
       // Off the map first: the terminal point defense below hits a missile that is gone.
       endMissile(h, missile);
