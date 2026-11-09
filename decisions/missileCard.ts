@@ -11,14 +11,14 @@
  * Чистая функция: что показать. Слова и разметку рисует хост.
  */
 import type { Fleet, GameData } from '../packages/shared-core/src/index';
-import { effectiveStats, missileModule } from '../packages/shared-core/src/index';
+import { effectiveStats, missileWarhead } from '../packages/shared-core/src/index';
 
 export interface MissileCard {
   /** Своя ракета — ей показывают боевую часть. */
   own: boolean;
   /** Урон боевой части, зафиксированный при постановке мины; только хозяину. */
   damage: number | null;
-  /** Радиус взрыва в точке цели — из модуля, которым ракету пустили. */
+  /** Радиус взрыва — из модуля мины или из юнита ракеты. */
   blast: number;
   /** Прочность ракеты: текущая и полная. */
   hull: { cur: number; max: number };
@@ -33,8 +33,8 @@ export function missileCard(
   viewer: string,
   data: GameData,
 ): MissileCard | null {
-  const launcher = missileModule(fleet, data);
-  if (!launcher || !fleet.flight) return null;
+  const warheadDef = missileWarhead(fleet, data);
+  if (!warheadDef || !fleet.flight) return null;
   let cur = 0;
   let max = 0;
   for (const st of fleet.units) {
@@ -48,7 +48,7 @@ export function missileCard(
   return {
     own,
     damage: own ? (warhead ?? null) : null,
-    blast: launcher.def.blastRadius,
+    blast: warheadDef.blastRadius,
     hull: { cur: Math.round(cur), max: Math.round(max) },
     arrivesAt: fleet.flight.arrivesAt,
   };

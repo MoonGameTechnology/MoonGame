@@ -1141,13 +1141,13 @@
 | M4 | ✅ | core | `docs/metrics-roadmap.md` | Балансная аналитика + self-play [tools] — реализовано |
 | M5 | 🔒 |  | `docs/metrics-roadmap.md` | Ops-дашборды и алерты [server] |
 | M6 | ⏳ |  | `docs/metrics-roadmap.md` | Продуктовая аналитика (категория H) [server][tools] |
-| MS-0.1 | ⏳ | data core | `docs/missiles-roadmap.md` | Тип missile + пусковой модуль |
-| MS-1.1 | 🔒 | core | `docs/missiles-roadmap.md` | launchMissile(targetNode) |
-| MS-1.2 | 🔒 | core | `docs/missiles-roadmap.md` | Полёт (неуправляемый) + детект |
-| MS-2.1 | 🔒 | core | `docs/missiles-roadmap.md` | Перехват ближним ПВО (pointDefense) |
-| MS-2.2 | 🔒 | core data | `docs/missiles-roadmap.md` | Детонация |
-| MS-3.1 | 🔒 | core data | `docs/missiles-roadmap.md` | Пусковой/ракеты как предмет + P2W-guardrail |
-| MS-4.1 | 🔒 | cli | `docs/missiles-roadmap.md` | Рендер полёта/перехвата/удара |
+| MS-0.1 | ✅ | data core | `docs/missiles-roadmap.md` | Тип missile + пусковой модуль 2026-11-09 |
+| MS-1.1 | ✅ | core | `docs/missiles-roadmap.md` | launchMissile(targetNode) 2026-11-09 |
+| MS-1.2 | ✅ | core | `docs/missiles-roadmap.md` | Полёт (неуправляемый) + детект 2026-11-09 |
+| MS-2.1 | ✅ | core | `docs/missiles-roadmap.md` | Перехват ближним ПВО (pointDefense) 2026-11-09 |
+| MS-2.2 | ⏳ | core data | `docs/missiles-roadmap.md` | Детонация |
+| MS-3.1 | ⏳ | core data | `docs/missiles-roadmap.md` | Пусковой/ракеты как предмет + P2W-guardrail |
+| MS-4.1 | ✅ | cli | `docs/missiles-roadmap.md` | Рендер полёта/перехвата/удара 2026-11-09 |
 | MS-5.1 | ✅ | core data cli | `docs/missiles-roadmap.md` | Легендарная способность «Ракетная мина» 2026-09-27 |
 | MSB-0 | ✅ | docs | `docs/multiside-combat-roadmap.md` | Решение владельца: (а), (б) или (в) |
 | MSB-1 | ✅ | core | `docs/multiside-combat-roadmap.md` | Battle стал СПИСКОМ сторон |

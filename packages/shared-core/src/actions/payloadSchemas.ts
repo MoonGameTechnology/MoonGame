@@ -37,6 +37,16 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'fleet.deployRocketMine': z.object({ fleetId: id, mode: z.enum(['any', 'confirmed']) }),
   'rocketMine.mode': z.object({ mineId: id, mode: z.enum(['any', 'confirmed']) }),
   'rocketMine.disarm': z.object({ mineId: id }),
+  // Пуск ракет из ангара (missiles-roadmap): база и цель — ровно по одной, это гейт
+  // обработчика; залп — до 12 ракет одним приказом.
+  'missile.launch': z.object({
+    planetId: id.optional(),
+    fleetId: id.optional(),
+    squadronId: id,
+    targetFleetId: id.optional(),
+    targetPlanetId: id.optional(),
+    count: z.number().int().min(1).max(12).optional(),
+  }),
   // orbital.ts
   'fleet.orbit': z.object({ fleetId: id, orbit: z.literal('near') }), // a single orbit (GDD §7.4)
   'fleet.bombard': z.object({ fleetId: id, on: z.boolean() }),

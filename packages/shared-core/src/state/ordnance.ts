@@ -53,6 +53,24 @@ export interface OrdnanceState {
    *  owner only — the missile itself is a fleet and passes the ordinary fog. A world saved
    *  before SM-3.7b keeps its old `missiles` list, which nothing reads any more. */
   warheads?: Record<string, number>;
+  /** Наведение летящей ракеты, по id её отряда (решение владельца 2026-11-09): за кем она
+   *  идёт и докуда. Никому не проецируется: у ракеты мины целью бывает безымянная радарная
+   *  отметка, и её флот хозяину знать нельзя. Нет записи — ракета летит в точку. */
+  guidance?: Record<string, MissileGuidance>;
+}
+
+/** За чем идёт самонаводящаяся ракета. Ракета не промахивается, пока цель-флот не дальше
+ *  `range` от точки пуска `origin`; мир не уходит никуда, и по нему промаха нет. */
+/** Largest missile salvo one `missile.launch` may fire; more is a stockpile, not a salvo. */
+export const MISSILE_SALVO = 12;
+
+export interface MissileGuidance {
+  fleetId?: string;
+  planetId?: string;
+  origin: RoadPoint;
+  range: number;
+  /** Скорость ракеты в единицах карты за час, без темпа перемещения матча. */
+  speed: number;
 }
 export function emptyOrdnance(): OrdnanceState {
   return { serials: {}, cooldowns: {}, installations: [], controls: {}, warheads: {} };
@@ -121,6 +139,22 @@ export function missileModule(
       const def = data.modules[id]?.rocketMine;
       if (def) return { id, def };
     }
+  }
+  return null;
+}
+/** Боевая часть летящей ракеты: у ракеты мины — из модуля, с которым её пустили, у
+ *  самостоятельной ракеты — из её юнита (`warhead`). Нет ни того, ни другого — ракете нечем
+ *  взорваться, и ядро снимает её без удара. */
+export function missileWarhead(
+  fleet: Pick<Fleet, 'units'>,
+  data: GameData,
+): { damage: number; blastRadius: number } | null {
+  const mod = missileModule(fleet, data);
+  if (mod) return { damage: mod.def.damage, blastRadius: mod.def.blastRadius };
+  if (!isMissileFleet(fleet, data)) return null;
+  for (const stack of fleet.units) {
+    const own = stack.count > 0 ? data.units[stack.unit]?.warhead : undefined;
+    if (own) return { damage: own.damage, blastRadius: own.blastRadius };
   }
   return null;
 }

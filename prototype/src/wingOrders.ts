@@ -37,14 +37,23 @@ const LOOK = {
   merge: ['arrows-merge', '⛬', 'cmd.merge'],
   keep: ['push-pin', '⟳', 'cmd.wing.keep'],
   recall: ['arrow-u-up-left', '↩', 'cmd.wing.recall'],
+  // Ракетная эскадра (missiles-roadmap): одна ракета или залп всей эскадрой.
+  launch: ['paper-plane-tilt', '➚', 'side.missile.launch'],
+  salvo: ['lightning', '⁂', 'side.missile.salvo'],
 } as const satisfies Record<string, readonly [HoloIcon, string, string]>;
 
 export type WingOrderKind = keyof typeof LOOK;
 
-/** Приказ `act` с адресом `arg` в виде `kind`; `on` — у переключателя. */
-export function wingOrder(kind: WingOrderKind, act: string, arg: string, on?: boolean): WingOrder {
+/** Приказ `act` с адресом `arg` в виде `kind`; `on` — у переключателя, `vars` — числа подписи. */
+export function wingOrder(
+  kind: WingOrderKind,
+  act: string,
+  arg: string,
+  on?: boolean,
+  vars?: Record<string, number>,
+): WingOrder {
   const [icon, glyph, key] = LOOK[kind];
-  return { act, arg, icon, glyph, label: t(key), ...(on === undefined ? {} : { on }) };
+  return { act, arg, icon, glyph, label: t(key, vars), ...(on === undefined ? {} : { on }) };
 }
 
 /** Какой ряд раскрыт кнопкой «Ещё»: id эскадры или вылета. */

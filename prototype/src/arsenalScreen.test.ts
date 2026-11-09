@@ -173,7 +173,7 @@ describe('арсенал — список', () => {
       /data-ar-tab="modules" aria-selected="true">Модули<small>\d+ из 18<\/small>/,
     );
     expect(html).toContain(
-      'data-ar-tab="hulls" aria-selected="false">Корабли<small>12 из 12</small>',
+      'data-ar-tab="hulls" aria-selected="false">Корабли<small>13 из 13</small>',
     );
   });
 

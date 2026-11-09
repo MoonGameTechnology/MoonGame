@@ -44,6 +44,7 @@
     "smoke:hero-arsenal": "pnpm run prototype && node prototype/heroarsenaltest.mjs",
     "smoke:registration-reward": "pnpm run prototype && node prototype/registrationrewardtest.mjs",
     "smoke:bots": "node prototype/botpopulationtest.mjs",
+    "smoke:missiles": "pnpm run prototype && node prototype/missiletest.mjs",
     "smoke:steward": "node prototype/stewardofflinetest.mjs",
     "smoke:bots:chat": "node prototype/botsocialtest.mjs",
     "perf:bots": "node prototype/bot-scheduler-perf.mjs",

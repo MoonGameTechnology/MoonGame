@@ -89,6 +89,7 @@ import {
   retreatFleet,
   spawnHero,
   strikeShuttle,
+  launchMissiles,
   type MapNode,
 } from './game';
 import { pcUi } from './graphicsPrefs';
@@ -235,6 +236,20 @@ export let selectionBox: { x1: number; y1: number; x2: number; y2: number } | nu
 /** Убежище пленного главы V (PVR-9.5), по которому уже предупредили: удар, губящий мир,
  *  по нему проходит со второго тапа (`captiveAtRisk`). Любой другой тап прицела сбрасывает. */
 let captiveWarned: string | null = null;
+
+/** Приказ эскадре из ангара по цели под пальцем: удар челноков или, когда прицел взвела
+ *  ракетная карточка, пуск `missile` ракет (missiles-roadmap) — цель у них одна. */
+function hangarAimOrder(
+  from: Parameters<typeof strikeShuttle>[1],
+  squadronId: string,
+  target: Parameters<typeof strikeShuttle>[3],
+  missile: number | undefined,
+) {
+  const me = game.me();
+  return missile
+    ? launchMissiles(me, from, squadronId, target, missile)
+    : strikeShuttle(me, from, squadronId, target);
+}
 
 /**
  * Тап взведённого прицела ЭСКАДРЫ В ВОЗДУХЕ (SHU-6.14): цели те же, что у взлёта из ангара
@@ -431,7 +446,7 @@ export function selectAt(mx: number, my: number) {
   // проверяет ЯДРО: свою копию этих правил интерфейс не заводит, он показывает отказ
   // (`errText`).
   if (owner === 'shuttle-strike' && strikeAim) {
-    const { from, squadronId, patrol, relocate, strikeId } = strikeAim;
+    const { from, squadronId, patrol, relocate, strikeId, missile } = strikeAim;
     drop('strikeAim');
     // SHU-6.14 — прицел ЭСКАДРЫ В ВОЗДУХЕ: цели те же, но приказ — новый для вылета.
     if (strikeId) {
@@ -478,10 +493,9 @@ export function selectAt(mx: number, my: number) {
     const node = foe ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (!game.squadronAt(squadronId)) {
       game.note(t('hint.wing-empty')); // звено исчезло между наводкой и тапом
-    } else if (foe) {
-      playerOrder(strikeShuttle(ME, from, squadronId, { targetFleetId: foe.id }));
-    } else if (node) {
-      playerOrder(strikeShuttle(ME, from, squadronId, { targetPlanetId: node.id }));
+    } else if (foe || node) {
+      const target = foe ? { targetFleetId: foe.id } : { targetPlanetId: node!.id };
+      playerOrder(hangarAimOrder(from, squadronId, target, missile));
     } else {
       game.note(t('hint.wing-cancelled'));
     }

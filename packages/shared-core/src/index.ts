@@ -332,6 +332,9 @@ export {
   // SHU-4.2: ангар — список ЭСКАДР, и «просто машины» из него достаёт одна функция на
   // всех читателей; своя развёртка у каждого разъехалась бы с этой.
   hangarMachines,
+  // Ракеты стоят в ангаре эскадрами, но не вылетают (missiles-roadmap).
+  hasMissiles,
+  isMissileStack,
   squadronSize,
   trimCargo,
   squadronCargoUsed,
@@ -883,10 +886,12 @@ export {
   isMissileFleet,
   isOrdnanceFleet,
   missileModule,
+  missileWarhead,
   ROCKET_MINE_UNIT,
   ROCKET_MINE_TRAIT,
   MISSILE_UNIT,
   MISSILE_TRAIT,
+  MISSILE_SALVO,
 } from './state/ordnance';
 export type {
   RocketMineControl,

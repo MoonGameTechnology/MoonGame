@@ -655,6 +655,7 @@
       "scanHours": 0.016666666666666666,
       "maxActive": 6,
       "radarRange": 120,
+      "guidanceReserve": 0.5,
       "radarLevel": 3,
       "sightRange": 24,
       "detectionRange": 24,

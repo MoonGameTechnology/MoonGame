@@ -11,6 +11,7 @@
   { "kind": "hull", "defId": "siege_lance" },
   { "kind": "hull", "defId": "bomber" },
   { "kind": "hull", "defId": "heavy_striker" },
+  { "kind": "hull", "defId": "cruise_missile" },
   { "kind": "module", "defId": "cargo_bay" },
   { "kind": "module", "defId": "repair_bay" },
   { "kind": "module", "defId": "radar_module" },

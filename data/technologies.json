@@ -274,6 +274,11 @@
     "dayGate": 2,
     "effects": {
       "radarRangeBonus": 0.1
+    },
+    "unlocks": {
+      "units": [
+        "cruise_missile"
+      ]
     }
   },
   "warhead_miniaturization": {

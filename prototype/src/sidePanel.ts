@@ -91,6 +91,7 @@ import {
 } from './game';
 import { pcUi } from './graphicsPrefs';
 import { fleetHangar, planetHangar, transferPick } from './hangarPanel';
+import { armMissileAim } from './missileAim';
 import { type DockState, mapIsWorkspace, panelOpen } from './hudDock';
 import { unitIconHtml } from './icons';
 import {
@@ -824,9 +825,9 @@ function onSideClick(ev: MouseEvent): void {
     if (from && found && playerOrder(mergeSquadron(ME, found.base, from, arg)) && selSquadron)
       pickSquadron(arg);
     drop('squadMerge');
-  } else if (act === 'wingmore') {
-    // «Ещё» ряда приказов эскадры на телефоне: остальные плитки на месте (`wingOrders.ts`).
-    toggleWingMore(arg);
+  } else if (act === 'wingmore' || act === 'msllaunch' || act === 'mslsalvo') {
+    if (act === 'wingmore') toggleWingMore(arg); // «Ещё» ряда плиток эскадры на телефоне
+    else armMissileAim(squadronAt(arg), arg, act === 'mslsalvo');
   } else if (act === 'sqpick') {
     // Имя эскадры в карточке соседки, в «i» мира или в трюме носителя — выделить её саму.
     pickSquadron(arg);

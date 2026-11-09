@@ -307,6 +307,29 @@ describe('legendary rocket mine', () => {
     launch.fleets.target!.edge!.t = 0.9;
     expect(advance(launch, m.arrivesAt).fleets.target!.units[0]!.hp).toBeUndefined();
   });
+  it('homes on the fleet behind the signal: hits within radar plus the reserve, misses beyond', () => {
+    // Решение владельца 2026-11-09: ракета мины идёт за целью; промах — только когда цель
+    // дальше радиуса радара мины с запасом от точки пуска (здесь 120 × 1,5 = 180).
+    const reserve = structuredClone(data);
+    reserve.modules.mine!.rocketMine!.guidanceReserve = 0.5;
+    const run = (s: GameState, now: number) => {
+      const r = kernel.advanceTo(s, { now, data: reserve });
+      if (!r.ok) throw new Error(r.code);
+      return r;
+    };
+    const launch = run(deploy(), HOUR / 4).state;
+    const m = missiles(launch)[0]!.flight!;
+    // Цель ушла к t = 0,9 (160 от мины): в запасе — ракета догоняет и бьёт.
+    launch.fleets.target!.edge!.t = 0.9;
+    const hit = run(launch, m.arrivesAt + HOUR);
+    expect(missiles(hit.state)).toHaveLength(0);
+    expect(hit.state.fleets.target!.units[0]!.hp).toBe(20);
+    // Цель у самого B (200 от мины): за запасом — промах без взрыва.
+    launch.fleets.target!.edge!.t = 0.999;
+    const miss = run(launch, m.arrivesAt + HOUR);
+    expect(miss.events.map((e) => e.type)).toContain('missile.missed');
+    expect(miss.state.fleets.target!.units[0]!.hp).toBeUndefined();
+  });
   it('CORE-DMG-4: a hero psi zone over the blast point weighs on the hit fleet', () => {
     // Цель стоит на дороге A→B у B: `fleetNodeAt` относит её к провинции B, туда и светим.
     const withHeroes = createKernel([movementModule, rocketMinesModule, heroEffectsModule]);

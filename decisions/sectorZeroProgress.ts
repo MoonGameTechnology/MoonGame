@@ -497,6 +497,8 @@ export function sectorHullIds(data: GameData): string[] {
       // и без этой оговорки подготовка его прятала (замечание владельца 2026-09-26).
       (Object.values(def.slots).some((n) => n > 0) || def.traits.includes('shuttle')) &&
       !def.traits.includes('issued') &&
+      // Ракета — расходник, не корпус: звёзд и отсеков у неё нет (missiles-roadmap).
+      !def.traits.includes('missile') &&
       !factionOnly.has(id)
     );
   });

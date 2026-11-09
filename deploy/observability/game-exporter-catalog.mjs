@@ -55,6 +55,7 @@ export const ACTION_TYPES = new Set([
   'market.cancel',
   'market.list',
   'market.take',
+  'missile.launch',
   'order.auto',
   'order.chain',
   'order.retreat',

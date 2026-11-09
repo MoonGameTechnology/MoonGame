@@ -63,6 +63,8 @@ import {
   fleetShuttleBay,
   hangarMachines,
   hangarSize,
+  hasMissiles,
+  isMissileStack,
   hangarUsed,
   freshSortie,
   portDisabled,
@@ -267,7 +269,9 @@ function baseSortieSpec(
   const away = (state.strikes ?? []).find(
     (s) => s.base.kind === base.ref.kind && s.base.id === base.ref.id,
   );
-  const st = hangarMachines({ hangar: base.hangar })[0] ?? away?.units.find((u) => u.count > 0);
+  const st =
+    hangarMachines({ hangar: base.hangar }).find((u) => !isMissileStack(u, data)) ??
+    away?.units.find((u) => u.count > 0);
   const stats = st ? data.units[st.unit]?.stats : undefined;
   return {
     maxFuel: Math.max(0, Math.floor(stats?.fuel ?? 0)),
@@ -994,7 +998,11 @@ function scheduleChase(h: HandlerContext, strike: ShuttleStrike): void {
 function readySquadron(h: HandlerContext, base: BaseView, squadronId: unknown): Ready {
   const blocked = baseBlock(base);
   if (blocked) return h.reject(blocked);
-  const ready = squadronReady(h, base, requireSquadron(h, base, squadronId));
+  const squad = requireSquadron(h, base, squadronId);
+  // Ракеты не вылетают: их пускают (`missile.launch`), а удар, патруль и перелёт — для
+  // челноков (решение владельца 2026-11-09).
+  if (hasMissiles(squad, h.ctx.data)) return h.reject('E_MISSILE_SQUADRON');
+  const ready = squadronReady(h, base, squad);
   return typeof ready === 'string' ? h.reject(ready) : ready;
 }
 
@@ -1837,6 +1845,42 @@ function splitAloft(h: HandlerContext, playerId: string, p: Record<string, unkno
   });
 }
 
+/**
+ * `shuttle.merge { planetId | fleetId, squadronId, intoId }` — свести две эскадры
+ * ОДНОЙ базы в одну (SHU-4.2). Трюмы складываются и переполнить приёмник не могут:
+ * вместимость складывается вместе с бортами, а каждая половина уже влезала в свою.
+ */
+function mergeSquadrons(action: { playerId: string; payload: unknown }, h: HandlerContext): void {
+  const p = (action.payload ?? {}) as { squadronId?: unknown; intoId?: unknown };
+  const base = baseFromPayload(h, action.playerId, p as Record<string, unknown>);
+  if (p.squadronId === p.intoId) return h.reject('E_BAD_PAYLOAD');
+  const from = requireSquadron(h, base, p.squadronId);
+  const into = requireSquadron(h, base, p.intoId);
+  // Ракеты с челноками в одну эскадру не сводятся: такую эскадру нельзя было бы ни поднять,
+  // ни пустить (решение владельца 2026-11-09).
+  if (hasMissiles(from, h.ctx.data) !== hasMissiles(into, h.ctx.data)) return h.reject('E_MISSILE_SQUADRON');
+
+  const units = into.units.map((st) => ({ ...st }));
+  for (const st of from.units) addUnits(units, st.unit, st.count, st.modules, st.moduleStars, st.moduleRarity);
+  const cargo = (into.cargo ?? []).map((st) => ({ ...st }));
+  for (const st of from.cargo ?? []) addUnits(cargo, st.unit, st.count);
+  const damage = (into.damage ?? 0) + (from.damage ?? 0);
+  const merged: Squadron = {
+    id: into.id,
+    units,
+    ...(cargo.length > 0 ? { cargo } : {}),
+    ...(damage > 0 ? { damage } : {}),
+  };
+  base.setHangar(base.hangar.flatMap((q) => (q.id === from.id ? [] : q.id === into.id ? [merged] : [q])));
+  h.emit('squadron.merged', {
+    baseId: base.ref.id,
+    baseKind: base.ref.kind,
+    owner: action.playerId,
+    squadronId: into.id,
+    absorbed: from.id,
+  });
+}
+
 export const shuttleModule: GameModule = {
   id: 'shuttle',
   // 1.3.0: невидимая чужая мина — не цель вылета (`E_NO_TARGET`, ревью #1411).
@@ -2126,38 +2170,7 @@ export const shuttleModule: GameModule = {
       });
     });
 
-    /**
-     * `shuttle.merge { planetId | fleetId, squadronId, intoId }` — свести две эскадры
-     * ОДНОЙ базы в одну (SHU-4.2). Трюмы складываются и переполнить приёмник не могут:
-     * вместимость складывается вместе с бортами, а каждая половина уже влезала в свою.
-     */
-    api.onAction('shuttle.merge', (action, h: HandlerContext) => {
-      const p = (action.payload ?? {}) as { squadronId?: unknown; intoId?: unknown };
-      const base = baseFromPayload(h, action.playerId, p as Record<string, unknown>);
-      if (p.squadronId === p.intoId) return h.reject('E_BAD_PAYLOAD');
-      const from = requireSquadron(h, base, p.squadronId);
-      const into = requireSquadron(h, base, p.intoId);
-
-      const units = into.units.map((st) => ({ ...st }));
-      for (const st of from.units) addUnits(units, st.unit, st.count, st.modules, st.moduleStars, st.moduleRarity);
-      const cargo = (into.cargo ?? []).map((st) => ({ ...st }));
-      for (const st of from.cargo ?? []) addUnits(cargo, st.unit, st.count);
-      const damage = (into.damage ?? 0) + (from.damage ?? 0);
-      const merged: Squadron = {
-        id: into.id,
-        units,
-        ...(cargo.length > 0 ? { cargo } : {}),
-        ...(damage > 0 ? { damage } : {}),
-      };
-      base.setHangar(base.hangar.flatMap((q) => (q.id === from.id ? [] : q.id === into.id ? [merged] : [q])));
-      h.emit('squadron.merged', {
-        baseId: base.ref.id,
-        baseKind: base.ref.kind,
-        owner: action.playerId,
-        squadronId: into.id,
-        absorbed: from.id,
-      });
-    });
+    api.onAction('shuttle.merge', mergeSquadrons);
 
     /**
      * `shuttle.load` / `shuttle.unload { fleetId, squadronId }` — перегрузка ЭСКАДРЫ

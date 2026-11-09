@@ -100,7 +100,10 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '104'; // BAL-19: порядок тот же; `economy` 1.4.0 —
+export const MODULE_MANIFEST_VERSION = '105'; // Ракеты: ЧЛЕНСТВО — `missiles` 1.0.0 перед
+// `auto-merge` (пуск ракет из ангара); `rocketMines` 3.4.0 — ракета самонаводящаяся, промах
+// только за дальностью от точки пуска. Партия на 104 вела бы ракету мины в точку.
+// export const MODULE_MANIFEST_VERSION = '104'; // BAL-19: порядок тот же; `economy` 1.4.0 —
 // хук `economy.unitUpkeep` множит содержание войск владельца; `technology` 1.7.0 вешает на него
 // `effects.armyUpkeep` и знает учёного по id в `has_scientist` (линия Наместника: +2 планеты
 // под управлением и +10% содержания армии за узел). Партия на 103 не брала бы надбавку.

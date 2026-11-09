@@ -18,6 +18,7 @@ export const WIRE_PAYLOADS: Record<string, unknown> = {
   'fleet.deployRocketMine': { fleetId: 'p1_1', mode: 'confirmed' },
   'rocketMine.mode': { mineId: 'mine:1', mode: 'any' },
   'rocketMine.disarm': { mineId: 'mine:1' },
+  'missile.launch': { planetId: 'home_a', squadronId: 'sq:1', targetPlanetId: 'home_b' },
   'army.prepare': { fleetId: 'p1_1' },
   'army.load': { fleetId: 'p1_1', unit: 'militia', count: 1 },
   'army.unload': { fleetId: 'p1_1', unit: 'militia', count: 1 },
