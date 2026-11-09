@@ -18,9 +18,13 @@ import {
   type GameState,
   type Planet,
   type StewardPosture,
+  type UnitStack,
+  NEUTRAL_PLANET_MILITIA,
 } from '../../../packages/shared-core/src/index';
 import { provinceScore } from '../../../packages/shared-core/src/state/sectorKind';
 import { garrisonNeed } from '../../../decisions/garrisonPolicy';
+import { knownGarrison } from '../../../decisions/garrisonIntel';
+import { identifiedNodes } from '../../../packages/shared-core/src/state/visibility';
 import { canTraverse } from '../../../decisions/actions';
 import { isPirateClan, pirateRaidZone } from '../../../decisions/pirateReach';
 import { seatDoctrine } from '../botDoctrine';
@@ -149,6 +153,10 @@ export interface AiTurn {
   readonly capturable: (p: Planet) => boolean;
   readonly orbitalLayer: (p: Planet) => boolean;
   readonly assaultTargetFor: (fl: Fleet) => Planet | undefined;
+  /** Гарнизон мира, каким его знает бот: свой — целиком, чужой — живое наблюдение или
+   *  последний снимок тумана, неизвестный — пустой (правило №1: бот знает то же, что
+   *  игрок на его месте; за неизвестным гарнизоном летят посмотреть). */
+  readonly seenGarrison: (p: Planet) => readonly UnitStack[];
   readonly neediestWorld: (from: { x: number; y: number }) => Planet | undefined;
   readonly d: (a: { x: number; y: number }, b: { x: number; y: number }) => number;
   readonly warFooting: boolean;
@@ -253,6 +261,16 @@ export function openTurn(
           d(at.position, a.position) - d(at.position, b.position) ||
           (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
       )[0];
+  };
+  const NEUTRAL_GUARD: readonly UnitStack[] = [{ unit: 'militia', count: NEUTRAL_PLANET_MILITIA }];
+  let identified: Set<string> | undefined;
+  const seenGarrison = (p: Planet): readonly UnitStack[] => {
+    if (p.owner === ai) return p.garrison;
+    identified ??= identifiedNodes(state, ai, data);
+    const known = knownGarrison(state, ai, p.id, data, identified);
+    if (known) return known.units;
+    // Ничью планету по правилу держит ополчение (`neutralSector`), и это знает любой игрок.
+    return p.owner === null && p.kind === 'planet' ? NEUTRAL_GUARD : [];
   };
   /** Свой мир, которому подкрепление нужнее всего и ближе всего. Сортировка по паре
    *  «расстояние, id» — решение бота обязано быть чистой функцией состояния. */
@@ -372,6 +390,7 @@ export function openTurn(
     capturable,
     orbitalLayer,
     assaultTargetFor,
+    seenGarrison,
     neediestWorld,
     d,
     warFooting,
