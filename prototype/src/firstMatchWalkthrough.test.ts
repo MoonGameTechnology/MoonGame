@@ -104,6 +104,8 @@ describe('guided first match: every chapter is playable by real orders', () => {
       selectedFleet: () => guideHeroFleet(s, ME)?.id ?? null,
       intent: (kind) => kind === 'details',
       anchor: () => null,
+      hangar: () => null,
+      selectedSquadron: () => 'sq',
       heroSelector: () => null,
       show: () => {},
     };

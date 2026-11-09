@@ -568,14 +568,16 @@ describe('свой флот', () => {
     expect(html).not.toContain(t('side.ground.title'));
   });
 
-  it('носитель с трюмом показывает ангар', async () => {
+  it('носитель с трюмом показывает ангар: имя эскадры выделяет её, приказов здесь нет', async () => {
     const { card, put } = await boot();
     put(
       fleet('F3', 'p1', 'Z', [{ unit: 'shuttle_carrier', count: 1 }], {
         hangar: [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 2 }] }],
       } as Partial<Fleet>),
     );
-    expect(card('F3')).toContain(`${act('wingstrike')} data-arg="sq:1"`);
+    expect(card('F3')).toContain(`${act('sqpick')} data-arg="sq:1"`);
+    expect(card('F3')).not.toContain(act('wingstrike'));
+    expect(card('F3')).not.toContain(act('wingunload'));
   });
 });
 

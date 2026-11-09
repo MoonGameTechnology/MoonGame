@@ -11,6 +11,9 @@
  * носитель у причала и обратно держит выбор на той же эскадре, а после взлёта выбор едет
  * за ней на её вылет.
  *
+ * UIX-10.14: у своего носителя с эскадрой в трюме такой же значок у плашки флота, и тап по
+ * нему выделяет эскадру. В «i» мира приказов эскадре нет: имя эскадры там — кнопка выбора.
+ *
  *   node prototype/hangartest.mjs                    # или pnpm run smoke:hangar
  *   HANGAR_SHOTS=каталог node prototype/hangartest.mjs   # плюс снимки
  *   HANGAR_LOCALE=ru-RU …                                 # язык браузера для снимков
@@ -26,7 +29,7 @@ import {
 
 const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
 import { hpOfLevel as __hpOfLevel } from './game';
-import { hangarHits as __hangarHits } from './mapHangars';
+import { hangarHits as __hangarHits, hangarBadgeRect as __hangarBadgeRect } from './mapHangars';
 window.__hangarTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // Свой мир с портом, в ангаре две эскадры перехватчиков, у причала пустой носитель.
@@ -58,6 +61,27 @@ window.__hangarTest = {
   hits: () => {
     const r = canvas.getBoundingClientRect();
     return __hangarHits().map((h) => ({ x: r.left + h.x, y: r.top + h.y, ids: h.squadronIds }));
+  },
+  // Середина значка места (мира или носителя) на странице; null — не нарисован.
+  badge: (spot) => {
+    const b = __hangarBadgeRect(spot);
+    const r = canvas.getBoundingClientRect();
+    return b && { x: r.left + b.left + b.width / 2, y: r.top + b.top + b.height / 2 };
+  },
+  clear: () => {
+    clearSelection();
+    invalidatePanel();
+    renderPanel();
+  },
+  // «i» мира с раскрытым блоком «Эскадра», как его открывает игрок.
+  dossier: (id) => {
+    pickWorld(id);
+    invalidatePanel();
+    renderPanel();
+    const wing = side.querySelector('[data-act="dossier"][data-arg="wing"]');
+    if (wing.getAttribute('aria-expanded') !== 'true') wing.click();
+    invalidatePanel();
+    renderPanel();
   },
   sel: () => ({ squadron: selSquadron, strike: selStrike, choices: mobileChoices.length }),
   strikeOf: (sq) => (s.strikes ?? []).find((st) => st.squadronId === sq)?.id ?? null,
@@ -157,10 +181,42 @@ try {
       assert.equal(await page.evaluate((q) => window.__hangarTest.where(q), ids.a), 'hold');
       assert.equal((await sel()).squadron, ids.a, 'выбор пережил погрузку');
       await shot('5-na-bortu');
+
+      // Значок у плашки носителя: тап выделяет эскадру в трюме (UIX-10.14).
+      await page.evaluate(() => window.__hangarTest.clear());
+      await frame();
+      await page.waitForFunction((f) => window.__hangarTest.badge(f) !== null, ids.carrier);
+      await shot('5a-znachok-nositelya');
+      await tapAt(await page.evaluate((f) => window.__hangarTest.badge(f), ids.carrier));
+      await frame();
+      assert.equal((await sel()).squadron, ids.a, 'значок носителя выделил эскадру в трюме');
+      if (phone && !(await page.locator('#side [data-act="squnload"]').isVisible()))
+        await page.locator('#mobile-sheet .mobile-info').tap();
       await press(page.locator(`#side [data-act="squnload"][data-arg="${ids.a}"]`));
       await frame();
       assert.equal(await page.evaluate((q) => window.__hangarTest.where(q), ids.a), 'port');
       assert.equal((await sel()).squadron, ids.a, 'выбор пережил выгрузку');
+
+      // «i» мира: приказов эскадре нет, её имя — кнопка выбора.
+      await page.evaluate((h) => window.__hangarTest.dossier(h), ids.home);
+      await frame();
+      if (
+        phone &&
+        !(await page.locator(`#side [data-act="sqpick"][data-arg="${ids.a}"]`).isVisible())
+      )
+        await page.locator('#mobile-sheet .mobile-info').tap();
+      for (const act of ['wingstrike', 'wingpatrol', 'wingload', 'wingsplit'])
+        assert.equal(
+          await page.locator(`#side [data-act="${act}"]`).count(),
+          0,
+          `в «i» нет ${act}`,
+        );
+      await shot('5b-i-mira');
+      await press(page.locator(`#side [data-act="sqpick"][data-arg="${ids.a}"]`));
+      await frame();
+      assert.equal((await sel()).squadron, ids.a, 'имя эскадры в «i» выделяет её');
+      if (phone && !(await page.locator('#side [data-act="wingpatrol"]').isVisible()))
+        await page.locator('#mobile-sheet .mobile-info').tap();
 
       // Патруль: после взлёта выбор едет за эскадрой на её вылет.
       await press(page.locator(`#side [data-act="wingpatrol"][data-arg="${ids.a}"]`));
@@ -177,7 +233,7 @@ try {
     await context.close();
   }
   console.log(
-    'Hangar badge smoke passed: badge, pick, list on the phone, card, load and unload, launch follow — desktop and phone.',
+    'Hangar badge smoke passed: badge, pick, list on the phone, card, load and unload, carrier badge, world «i» pick, launch follow — desktop and phone.',
   );
 } finally {
   await browser.close();

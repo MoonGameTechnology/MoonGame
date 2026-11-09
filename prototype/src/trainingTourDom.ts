@@ -13,10 +13,12 @@ import {
   retreatAim,
   selFleet,
   selPlanet,
+  selSquadron,
   strikeAim,
   troopsPlan,
 } from './interaction';
 import { cam, centerOn, focusWorld, panBy, world } from './mapCamera';
+import { hangarBadgeRect } from './mapHangars';
 import type { TrainingTourUi } from './trainingTour';
 
 interface TrainingDomHost {
@@ -72,6 +74,8 @@ export function trainingTourUi(h: TrainingDomHost): TrainingTourUi {
     visible,
     selectedWorld: () => selPlanet,
     selectedFleet: () => selFleet,
+    selectedSquadron: () => selSquadron,
+    hangar: (spot) => hangarBadgeRect(spot),
     fleetSelector: (role) => {
       const f = fleet(role);
       return f ? `[data-act="selfleet"][data-arg="${CSS.escape(f.id)}"]` : null;
@@ -116,7 +120,8 @@ export function trainingTourUi(h: TrainingDomHost): TrainingTourUi {
         );
       if (kind === 'retreat') return retreatAim !== null;
       if (kind === 'strike') return strikeAim !== null;
-      if (kind === 'troops-ready') return hasPlannedArmyLoad(h.world(), troopsPlan, 'heavy_infantry', data);
+      if (kind === 'troops-ready')
+        return hasPlannedArmyLoad(h.world(), troopsPlan, 'heavy_infantry', data);
       if (kind === 'carrier-course')
         return (
           !!fleet('carrier')?.movement ||

@@ -31,6 +31,7 @@ import { hpOfLevel as __hpOfLevel } from './game';
 // Базы прицела — у прицелов (REFM-233); \`main.ts\` сам их не зовёт.
 import { relocateSpots as __relocateSpots } from './mapAim';
 import { unworld as __unworld } from './mapCamera';
+import { pickSquadron as __pickSquadron } from './interaction';
 window.__relocateTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
   // Эскадра из двух перехватчиков стоит в порту своего мира ('port') или в
@@ -84,12 +85,6 @@ window.__relocateTest = {
       s.fleets[carrier.id] = carrier;
       from = { kind: 'planet', id: home.id };
       dest = { kind: 'fleet', id: carrier.id };
-      pickWorld(home.id);
-      // Блок «Эскадра» окна «i» — тапом, как у игрока (UIX-10.12); раскрытый не сворачиваем.
-      invalidatePanel();
-      renderPanel();
-      const wing = side.querySelector('[data-act="dossier"][data-arg="wing"]');
-      if (wing.getAttribute('aria-expanded') !== 'true') wing.click();
     } else {
       near.owner = ME;
       port(near);
@@ -97,8 +92,9 @@ window.__relocateTest = {
       s.fleets[carrier.id] = carrier;
       from = { kind: 'fleet', id: carrier.id };
       dest = { kind: 'planet', id: near.id };
-      setFleetSelection([carrier.id]);
     }
+    // Эскадра выделена — как тапом по значку ангара (UIX-10.14): приказы у её карточки.
+    __pickSquadron(deck[0].id);
     forgetVision();
     invalidatePanel();
     renderPanel();
@@ -200,8 +196,8 @@ try {
         const bases = await page.evaluate((k) => window.__relocateTest.prepare(k), kind);
         const { squadronId } = bases;
         const button = page.locator(`[data-act="wingrelocate"][data-arg="${squadronId}"]`);
-        // Кнопка у эскадры взводит прицел ПЕРЕЛЁТА с её базы. Телефон показывает сначала
-        // короткую карточку; ангар живёт в подробностях. «Подробности» — переключатель,
+        // Кнопка в карточке эскадры взводит прицел ПЕРЕЛЁТА с её базы. Телефон показывает
+        // сначала короткую карточку; кнопки живут в подробностях. «Подробности» — переключатель,
         // поэтому жмём его по состоянию листа, а не по видимости кнопки.
         const arm = async () => {
           await frame();
@@ -240,7 +236,11 @@ try {
         );
         await tapAt(fullAt);
         assert.deepEqual(await page.evaluate(() => window.__relocateTest.flights()), []);
-        assert.equal(await page.evaluate(() => window.__relocateTest.armed()), null, 'прицел погас');
+        assert.equal(
+          await page.evaluate(() => window.__relocateTest.armed()),
+          null,
+          'прицел погас',
+        );
 
         // Снова кнопка — и тап по подходящей базе ставит перелёт.
         await arm();
@@ -257,7 +257,11 @@ try {
         assert.deepEqual(flight.base, bases.dest, 'летит на выбранную базу');
         assert.deepEqual(flight.origin, bases.from, 'помнит, откуда ушёл');
         assert.equal(flight.leg, 'back');
-        assert.equal(await page.evaluate(() => window.__relocateTest.armed()), null, 'прицел погас');
+        assert.equal(
+          await page.evaluate(() => window.__relocateTest.armed()),
+          null,
+          'прицел погас',
+        );
 
         // Долетела — эскадра в ангаре новой базы под своим именем.
         await page.evaluate(() => window.__relocateTest.arrive());

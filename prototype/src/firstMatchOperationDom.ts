@@ -13,10 +13,12 @@ import {
   pickWorld,
   selFleet,
   selPlanet,
+  selSquadron,
   strikeAim,
   troopsPlan,
 } from './interaction';
 import { focusWorld, panBy, world } from './mapCamera';
+import { hangarBadgeRect } from './mapHangars';
 
 interface OperationDomHost {
   world(): GameState;
@@ -47,6 +49,8 @@ export function operationUi(h: OperationDomHost): OperationUi {
     productionCount: () => Number(document.querySelector('#constructor .cn-sv')?.textContent ?? 1),
     selectedWorld: () => selPlanet,
     selectedFleet: () => selFleet,
+    selectedSquadron: () => selSquadron,
+    hangar: (spot) => hangarBadgeRect(spot),
     heroSelector: () => {
       const f = hero();
       return f ? `[data-act="selfleet"][data-arg="${CSS.escape(f.id)}"]` : null;

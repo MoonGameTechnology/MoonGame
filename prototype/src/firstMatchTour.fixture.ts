@@ -27,6 +27,8 @@ export function operationFixture(mobile = false, world = lessonWorld()): Operati
     selectedFleet: () => null,
     intent: () => false,
     anchor: () => null,
+    hangar: () => null,
+    selectedSquadron: () => null,
     heroSelector: () => null,
     show: () => {},
   };

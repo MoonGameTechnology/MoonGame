@@ -77,7 +77,7 @@
 | UIX-10.11 | ✅ | proto | `docs/backlog.md` | Приказы шпионов в меню «Шпионаж». |
 | UIX-10.12 | ✅ | proto | `docs/backlog.md` | Окно «i» мира — только сведения. |
 | UIX-10.13 | ✅ | proto | `docs/backlog.md` | Эскадра на стоянке — с карты. |
-| UIX-10.14 | ⏳ | proto | `docs/backlog.md` | Приказы эскадре — только в её карточке. |
+| UIX-10.14 | ✅ | proto | `docs/backlog.md` | Приказы эскадре — только в её карточке. |
 | UIX-10.15 | ⏳ | proto | `docs/backlog.md` | Список «◇ Авиация». |
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
 | CORP-5 | ✅ | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |

@@ -57,20 +57,11 @@ import { data } from './gameData';
 import { canOrder } from './game';
 import { fortressStatusHtml, fortressServicesHtml } from './fortressView';
 import { pcUi } from './graphicsPrefs';
-import {
-  dockedCarrier,
-  fleetHangar,
-  hasHangar,
-  planetHangar,
-  transferOffer,
-  type HangarView,
-} from './hangarPanel';
+import { hasHangar, planetHangar, type HangarView } from './hangarPanel';
 import { BUILD_ICON, KIND_ICON, unitIconHtml } from './icons';
 import { myAgents, SPY_COST } from './intel';
-import { squadMerge } from './interaction';
 import { liveTimerHtml } from './liveTimers';
 import { SECTOR_TYPES, type SectorType } from './map';
-import { squadronRelocateSpots } from './mapAim';
 import { known, memory, myIntel, surveyed } from './mapFog';
 import { ownerColor, youColor } from './mapPalette';
 import {
@@ -87,7 +78,6 @@ import { spyMenuHtml } from './spyMenu';
 export { toggleSpyMenu } from './spyMenu';
 import { spyOffer } from './spyOffer';
 import {
-  mergeTargets,
   squadronCallsignOf,
   squadronCards,
   SQUADRON_KIND_KEY,
@@ -177,7 +167,6 @@ function cardHeader(
  * ОТКУДА поднимать вылет, не заводя второго состояния.
  */
 export function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): string {
-  const s = game.world();
   // Заголовок берётся у САМОГО места (правило 6 в `hangarPanel.ts`): секция одна на порт
   // и на трюм, и общая подпись «Ангар порта» врала бы про корабль. Оба ключа стоят
   // литералами — разбор гейта локализации видит в вызове только первый, поэтому выбор
@@ -220,27 +209,19 @@ export function hangarSectionHtml(view: HangarView, owner: string, mine: boolean
   // не нашёл бы, где его вернуть. Стоят и над пустым ангаром — в небе может висеть весь
   // состав.
   const patrols = mine ? patrolRowsHtml(owner) : '';
-  // Перелёт (SHU-6.5) — только туда, где ядро его примет: своя база в дальности, где
-  // звено поместится. Вид базы выводится по карте, где нашёлся id: id мира и id флота
-  // живут в разных картах состояния.
-  const from = s.planets[owner] ? { planetId: owner } : { fleetId: owner };
-  const cards = squadronCards(view, {
-    mine,
-    data,
-    relocate: (sq) => squadronRelocateSpots(sq, from).length > 0,
-  });
+  const cards = squadronCards(view, { mine, data });
   if (cards.length === 0) {
     return head + patrols + `<div class="row dim">${esc(t('side.wing.empty'))}</div>`;
   }
-  const body = cards.map((c) => squadronCardHtml(c, view)).join('');
+  const body = cards.map((c) => squadronCardHtml(c, mine)).join('');
   return head + patrols + body + (mine && why ? `<div class="row dim">${esc(why)}</div>` : '');
 }
 
 /**
- * Строки патрулей, поднятых с базы `owner` (SHU-6.3): позывной, остаток висения,
- * «Держать патруль» (SHU-6.6) и «Вернуть». Что считается патрулём и чей он —
- * `patrolMarks.ts`; здесь только разметка. Вид базы выводится по карте, где нашёлся id:
- * id мира и id флота живут в разных картах состояния.
+ * Строки патрулей, поднятых с базы `owner` (SHU-6.3): позывной и остаток висения. Приказы
+ * патрулю — «Держать», «Вернуть» — живут в карточке эскадры в полёте (UIX-10.14): имя
+ * здесь её выделяет. Что считается патрулём и чей он — `patrolMarks.ts`. Вид базы
+ * выводится по карте, где нашёлся id: id мира и id флота живут в разных картах состояния.
  */
 function patrolRowsHtml(owner: string): string {
   const s = game.world();
@@ -250,29 +231,22 @@ function patrolRowsHtml(owner: string): string {
     : { kind: 'fleet', id: owner };
   return basePatrols(patrolMarks(s.strikes, { me: ME, now: s.time }), base)
     .map((m) => {
-      const name = esc(squadronCallsignOf(m.squadronId));
+      const name = squadronCallsignOf(m.squadronId);
       const text =
         m.until !== null
-          ? t('side.wing.patrol.on', { name, left: liveTimerHtml(m.until) })
-          : t('side.wing.patrol.out', { name });
-      // «Держать патруль» стоит у САМОГО патруля, а не у базы: удержание принадлежит
-      // вылету и уходит с ним, и с одной базы могут висеть два патруля в разных точках.
-      const keep = m.hold ? t('side.wing.keep.off') : t('side.wing.keep');
-      return `<div class="row"><span class="dim">${text}</span> ${btn('wingkeep', m.id, keep, true)} ${btn('wingrecall', m.id, t('side.wing.recall'), true)}</div>`;
+          ? t('side.wing.patrol.on', { left: liveTimerHtml(m.until) })
+          : t('side.aloft.order.patrol-out');
+      return `<div class="row">${btn('strikepick', m.id, `✳ ${name}`, true)} <span class="dim">${text}</span></div>`;
     })
     .join('');
 }
 
 /**
- * КАРТОЧКА ЭСКАДРЫ (SHU-4.3) — соединение читается так же, как флот на карте: своё имя,
- * свой состав, свои кнопки. До этого кирпича ангар был одним списком машин, а «Удар»
- * поднимал ПЕРВОЕ живое звено: выбирать было не из чего.
- *
- * Решения (кому что можно) живут в `squadronPanel.ts` — здесь только разметка. Адрес
- * приказа — id ЭСКАДРЫ: он уникален, и по нему же находится база (`squadronBase`),
- * поэтому составного ключа «база+звено» в разметке нет и разъезжаться нечему.
+ * ЭСКАДРА В АНГАРЕ (SHU-4.3) — имя, места, десант, корпус и состав. Приказы эскадре живут
+ * только в её карточке (UIX-10.14, концепт «Управление эскадрой»): своё имя здесь —
+ * кнопка, которая выделяет эскадру, как значок ангара на карте.
  */
-function squadronCardHtml(card: SquadronCard, view: HangarView): string {
+function squadronCardHtml(card: SquadronCard, mine: boolean): string {
   const title = `${t(SQUADRON_KIND_KEY)} «${card.name}»`;
   const cargo = card.cargo.reduce((n, st) => n + st.count, 0);
   // Места звена в трюме (SHU-5.1), десант (SHU-5.2) и корпус подбитого борта (SHU-5.3).
@@ -283,40 +257,11 @@ function squadronCardHtml(card: SquadronCard, view: HangarView): string {
     // Вернулась из удерживаемого патруля и встанет снова сама (SHU-6.6).
     ...(card.hold ? [t('side.wing.holding')] : []),
   ];
-  const sub = ` <span class="dim">· ${esc(notes.join(' · '))}</span>`;
-  const head = `<div class="row"><b>${esc(title)}</b>${sub}</div>`;
-  const rows = unitRows(card.stacks);
-  if (!card.canStrike && !card.canSplit && !card.canMerge && !card.hold) return head + rows;
-
-  // Слияние — ДВА ТАПА: первый взводит источник, второй выбирает приёмника. Пока
-  // источник взведён, у остальных карточек кнопка меняет смысл на «сюда», а у самого
-  // источника — на отмену: взведённый режим обязан иметь выход без приказа.
-  const armed = squadMerge?.from ?? null;
-  const isSource = armed === card.id;
-  const canReceive = armed !== null && mergeTargets(view, armed).includes(card.id);
-  const merge = card.canMerge
-    ? canReceive
-      ? btn('wingmergeto', card.id, t('side.wing.merge.into'), true)
-      : btn('wingmerge', card.id, t('side.wing.merge'), true)
-    : '';
-  const buttons =
-    `<div class="row">` +
-    btn('wingstrike', card.id, t('side.wing.strike'), card.canStrike) +
-    // Патруль (SHU-6.3) — только у звена, которое умеет висеть; готовность базы та же,
-    // что у удара: топливо и перезарядка у места общие.
-    (card.canPatrol ? btn('wingpatrol', card.id, t('side.wing.patrol'), card.canStrike) : '') +
-    // Снять удержание (SHU-6.6) можно и на перезарядке: это отмена стоячего приказа, а не
-    // вылет (правило 8 `squadronPanel.ts`).
-    (card.hold ? btn('wingrelease', card.id, t('side.wing.keep.off'), true) : '') +
-    // Перелёт (SHU-6.5) — только когда есть куда; база готова — та же, что у удара.
-    (card.canRelocate
-      ? btn('wingrelocate', card.id, t('side.wing.relocate'), card.canStrike)
-      : '') +
-    (card.canSplit ? btn('wingsplit', card.id, t('side.wing.split'), true) : '') +
-    merge +
-    `</div>` +
-    (isSource ? `<div class="row dim">${esc(t('side.wing.merge.pick'))}</div>` : '');
-  return head + rows + buttons;
+  // У кнопки-имени точка-разделитель не нужна: кнопка и так отделена, а перенос строки
+  // оставлял бы точку висеть у её края.
+  const sub = ` <span class="dim">${mine ? '' : '· '}${esc(notes.join(' · '))}</span>`;
+  const name = mine ? btn('sqpick', card.id, `◇ ${title}`, true) : `<b>${esc(title)}</b>`;
+  return `<div class="row">${name}${sub}</div>` + unitRows(card.stacks);
 }
 
 export function unitRows(stacks: Array<UnitStack>): string {
@@ -727,48 +672,16 @@ export function planetPanelHtml(p: Planet): string {
   // Эскадра порта (SHU-3.1) — свёрнутым блоком, вместе с приказами звеньев: вылет — дело
   // эскадры, а не стройки мира, и окна «Построить» у него нет.
   const port = planetHangar(p, data);
-  // Пустой порт без носителя, которому есть что выгрузить, — блока нет: показывать нечего.
-  if (hasHangar(port)) {
-    const wing = wingTransfer(p, port, mine);
-    if (counts.shuttle > 0 || wing.offer.unload)
-      h += foldHtml('wing', t('side.tab.wings'), counts.shuttle, () =>
-        wingBodyHtml(p, port, mine, wing),
-      );
-  }
+  // Пустой порт — блока нет: показывать нечего. Перегрузка с носителем и прочие приказы —
+  // в карточке самой эскадры (UIX-10.14).
+  if (hasHangar(port) && counts.shuttle > 0)
+    h += foldHtml('wing', t('side.tab.wings'), counts.shuttle, () =>
+      hangarSectionHtml(port, p.id, mine),
+    );
   // ПК: вход в окно «Построить» — внизу карточки; телефон держит его в нижней полосе листа.
   if (pcUi() && mine && buildsAnything(p, data, feedsOnBiomass(s, ME, data)))
     h += `<button class="bw-open btn-main" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
   return h;
-}
-
-/** Тело блока эскадры: ангар порта и перегрузка с носителя на стоянке. */
-function wingBodyHtml(
-  p: Planet,
-  port: HangarView,
-  mine: boolean,
-  { ship, offer } = wingTransfer(p, port, mine),
-): string {
-  // ПЕРЕГРУЗКА ПРЕДЛАГАЕТСЯ И ОТСЮДА (правило 5 в `hangarPanel.ts`): челноки игрок видит
-  // здесь, и кнопки только на панели носителя он не находил.
-  const transfer =
-    ship && (offer.load || offer.unload)
-      ? `<div class="row">` +
-        (offer.load ? btn('wingload', ship.id, t('side.wing.load'), true) : '') +
-        (offer.unload ? btn('wingunload', ship.id, t('side.wing.unload'), true) : '') +
-        `</div>`
-      : '';
-  return hangarSectionHtml(port, p.id, mine) + transfer;
-}
-
-/** Носитель у причала и что можно перегрузить между ним и портом. */
-function wingTransfer(p: Planet, port: HangarView, mine: boolean) {
-  const s = game.world();
-  const ship = mine ? dockedCarrier(Object.values(s.fleets), p.id, game.me(), data) : null;
-  const offer = transferOffer(port, ship ? fleetHangar(ship, data, s) : null, {
-    docked: true, // `dockedCarrier` уже спросил про стоянку, бой и чужой флот
-    mine: true,
-  });
-  return { ship, offer };
 }
 
 /**

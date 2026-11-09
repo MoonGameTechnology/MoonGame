@@ -46,7 +46,7 @@ import {
 } from './goalsPanel';
 import { goalBaseline, grew, mineLevels } from './goalTally';
 import { pcUi } from './graphicsPrefs';
-import { aiming, mobileDraft, pickWorld, selFleet, selPlanet } from './interaction';
+import { aiming, mobileDraft, pickWorld, selFleet, selPlanet, selSquadron } from './interaction';
 import { focusWorld, panBy, world } from './mapCamera';
 import { pointers } from './mapInput';
 import { applyTimeSpeed } from './matchTopBar';
@@ -318,7 +318,14 @@ export function startGuidedMatch(): void {
             me,
             mobile: game.mobile(),
             expanded: () =>
-              game.sheetExpanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`),
+              // Ключ листа — тот же, что ставит `updateMobileHud` в `main.ts`.
+              game.sheetExpanded(
+                selSquadron
+                  ? `sq:${selSquadron}`
+                  : selPlanet
+                    ? `planet:${selPlanet}`
+                    : `fleet:${selFleet}`,
+              ),
             collapse: () => game.collapseSheet(),
             market: (good) => game.openMarket(good),
             // Synchronize the phone selection before Show expands its sheet.

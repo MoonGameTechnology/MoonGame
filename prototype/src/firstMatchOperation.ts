@@ -43,6 +43,10 @@ export interface OperationUi {
    *  `spawn` (deploy aim armed), `move`, `strike`, `troops-ready`, `picked:<planet>`. */
   intent(kind: string): boolean;
   anchor(planet: string): Rect | null;
+  /** The hangar badge of a world or a carrier (`spot` is its id), as drawn this frame. */
+  hangar(spot: string): Rect | null;
+  /** The squadron picked on the map, if any. */
+  selectedSquadron(): string | null;
   /** The hero ship's row in the open world card, while the ship exists. */
   heroSelector(): string | null;
   /** Camera and window navigation only, never an order: `world:<id>` selects a world,
@@ -316,9 +320,10 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       null,
       () => guideWingsHome(w(), home) + guideWingsAboard(w(), me) > 0 && deployed(),
     ),
-    // Приказы эскадры — в её свёрнутом блоке окна «i» (UIX-10.12).
-    step('aviation', 'wing-open', '[data-act="dossier"][data-arg="wing"]', () => ui.visible('[data-act="wingload"]') || guideWingsAboard(w(), me) > 0, { copy: 'onb.guide.wing.open' }),
-    step('aviation', 'load', '[data-act="wingload"]', () => guideWingsAboard(w(), me) > 0),
+    // Эскадра командуется со своей карточки: её открывает значок ангара у мира (UIX-10.14).
+    step('aviation', 'wing-badge', null, () => !!ui.selectedSquadron() || guideWingsAboard(w(), me) > 0, { anchor: () => ui.hangar(home), reveal: () => ui.show(home), gate: true }),
+    ...details('aviation', 'wing-details'),
+    step('aviation', 'load', '[data-act="sqload"]', () => guideWingsAboard(w(), me) > 0),
 
     // Troops into the hold, then the flight.
     ...heroShip('landing'),
@@ -347,8 +352,10 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     step('landing', 'troops-aboard', null, () => guideTroopsAboard(w(), me) >= GUIDE_TROOPS),
     ...course('landing'),
 
-    // At the world: the strike from the hold, Rally, the landing.
-    ...heroShip('assault'),
+    // At the world: the strike from the hold (its squadron picked by the hangar badge beside
+    // the hero ship), then the ship again for Rally, the landing.
+    step('assault', 'wing', null, () => !!ui.selectedSquadron() || ui.intent('strike') || guideStrikeFlying(w(), me), { anchor: () => ui.hangar(guideHeroFleet(w(), me)?.id ?? ''), reveal: () => ui.show(GUIDE_ASSAULT), gate: true }),
+    ...details('assault', 'wing-details'),
     step(
       'assault',
       'strike',
@@ -360,6 +367,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       reveal: () => ui.show(GUIDE_ASSAULT),
       gate: true,
     }),
+    ...heroShip('assault'),
     ...commands('assault', 'cast-commands', 'cast'),
     step(
       'assault',

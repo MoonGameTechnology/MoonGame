@@ -483,23 +483,22 @@ describe('окно «i» — только сведения (UIX-10.12)', () => {
     expect(card('N')).not.toContain(act('dossier', 'buildings'));
   });
 
-  it('эскадра порта — свёрнутым блоком с приказами внутри; без порта блока нет', async () => {
+  it('эскадра порта — свёрнутым блоком, имя выделяет эскадру; без порта блока нет', async () => {
     const { folds, card } = await boot();
     expect(card('A')).toContain(act('dossier', 'wing'));
-    expect(card('A')).not.toContain('data-act="wingstrike"');
+    expect(card('A')).not.toContain('data-act="sqpick"');
     folds.toggleDossierBlock('wing');
-    expect(card('A')).toContain('data-act="wingstrike"');
+    expect(card('A')).toContain(act('sqpick', 'sq:1'));
     expect(card('Z')).not.toContain(act('dossier', 'wing'));
   });
 
-  it('единственный свой носитель у мира: перегрузка адресует флот, а не мир', async () => {
+  it('приказов эскадре и перегрузки с носителем в «i» нет: они в карточке эскадры (UIX-10.14)', async () => {
     const { env, folds, card } = await boot();
     folds.toggleDossierBlock('wing');
-    // Трюм есть и у крейсеров F1: два кандидата — и кнопок нет, кому грузить, не угадывают.
     env.s.fleets.K = fleet('K', 'p1', 'A', [{ unit: 'shuttle_carrier', count: 1 }]);
-    expect(card('A')).not.toContain('data-act="wingload"');
     delete env.s.fleets.F1;
-    expect(card('A')).toContain(act('wingload', 'K'));
+    for (const gone of ['wingstrike', 'wingpatrol', 'wingsplit', 'wingmerge', 'wingload', 'wingunload'])
+      expect(card('A'), gone).not.toContain(`data-act="${gone}"`);
   });
 });
 
@@ -610,14 +609,15 @@ describe('ангар', () => {
     expect(holdHtml).not.toContain(t('side.wing.hangar', { used: hold.used, bay: hold.bay }));
   });
 
-  it('карточка эскадры: позывной, места и удар; чужой ангар — без кнопок', async () => {
+  it('эскадра в ангаре: позывной кнопкой выбора и места; чужой ангар — без кнопок', async () => {
     const { env, m } = await boot();
     const port = planetHangar(env.s.planets.A!, data)!;
     const html = m.hangarSectionHtml(port, 'A', true);
-    expect(html.match(/data-act="wingstrike"/g)).toHaveLength(2);
-    expect(html).toContain(act('wingstrike', 'sq:1'));
+    expect(html.match(/data-act="sqpick"/g)).toHaveLength(2);
+    expect(html).toContain(act('sqpick', 'sq:1'));
+    expect(html).not.toContain('data-act="wingstrike"');
     expect(html).toContain(t('side.wing.places', { n: 2 }));
-    expect(m.hangarSectionHtml(port, 'A', false)).not.toContain('data-act="wingstrike"');
+    expect(m.hangarSectionHtml(port, 'A', false)).not.toContain('data-act="sqpick"');
   });
 
   it('пустой ангар говорит словами — одной строкой, без второй причины «поднимать нечего»', async () => {
@@ -629,25 +629,31 @@ describe('ангар', () => {
     expect(html).not.toContain(t('side.wing.blocked.empty'));
   });
 
-  it('слияние: источник ждёт выбора, остальные звенья его принимают', async () => {
-    const { env, m } = await boot();
-    const port = planetHangar(env.s.planets.A!, data)!;
-    expect(m.hangarSectionHtml(port, 'A', true)).toContain(act('wingmerge', 'sq:2'));
+  // Приказы эскадры на стоянке — в её карточке (`squadronCardView.ts`); она читает те же
+  // подменённые выбор и прицел, поэтому проверяется здесь.
+  it('карточка эскадры: слияние — источник ждёт выбора, соседка его принимает', async () => {
+    const { env } = await boot();
+    const v = await import('./squadronCardView');
+    const card = () => v.parkedSquadronHtml('sq:1', { world: env.s, me: 'p1' })!;
+    expect(card()).toContain(act('wingmerge', 'sq:1'));
+    expect(card()).toContain(act('sqpick', 'sq:2'));
     env.merge = { from: 'sq:1' };
-    const html = m.hangarSectionHtml(port, 'A', true);
-    expect(html).toContain(act('wingmergeto', 'sq:2'));
-    expect(html).toContain(t('side.wing.merge.pick'));
+    expect(card()).toContain(act('wingmergeto', 'sq:2'));
+    expect(card()).toContain(t('side.wing.merge.pick'));
+    expect(v.parkedSquadronHtml('sq:404', { world: env.s, me: 'p1' })).toBeNull();
   });
 
-  it('перелёт — только когда есть куда', async () => {
-    const { env, m } = await boot();
-    const port = planetHangar(env.s.planets.A!, data)!;
-    expect(m.hangarSectionHtml(port, 'A', true)).not.toContain('data-act="wingrelocate"');
+  it('карточка эскадры: перелёт — только когда есть куда', async () => {
+    const { env } = await boot();
+    const v = await import('./squadronCardView');
+    const card = () => v.parkedSquadronHtml('sq:1', { world: env.s, me: 'p1' })!;
+    expect(card()).toContain(act('wingstrike', 'sq:1'));
+    expect(card()).not.toContain('data-act="wingrelocate"');
     env.relocate = true;
-    expect(m.hangarSectionHtml(port, 'A', true)).toContain(act('wingrelocate', 'sq:1'));
+    expect(card()).toContain(act('wingrelocate', 'sq:1'));
   });
 
-  it('патрули своей базы стоят над ангаром: удержание и возврат', async () => {
+  it('патрули своей базы стоят над ангаром: имя выделяет вылет, приказы — в его карточке', async () => {
     const { env, m } = await boot();
     const strike = {
       id: 'st:1',
@@ -665,11 +671,12 @@ describe('ангар', () => {
     env.s.strikes = [strike];
     const port = planetHangar(env.s.planets.A!, data)!;
     const html = m.hangarSectionHtml(port, 'A', true);
-    expect(html).toContain(act('wingkeep', 'st:1'));
-    expect(html).toContain(act('wingrecall', 'st:1'));
-    expect(m.hangarSectionHtml(port, 'A', false)).not.toContain('data-act="wingrecall"');
+    expect(html).toContain(act('strikepick', 'st:1'));
+    expect(html).not.toContain('data-act="wingkeep"');
+    expect(html).not.toContain('data-act="wingrecall"');
+    expect(m.hangarSectionHtml(port, 'A', false)).not.toContain('data-act="strikepick"');
     env.s.strikes = [{ ...strike, base: { kind: 'planet', id: 'C' } } as ShuttleStrike];
-    expect(m.hangarSectionHtml(port, 'A', true)).not.toContain('data-act="wingrecall"');
+    expect(m.hangarSectionHtml(port, 'A', true)).not.toContain('data-act="strikepick"');
   });
 });
 
