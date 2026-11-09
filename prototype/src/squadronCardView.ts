@@ -65,12 +65,14 @@ function spotOf(s: GameState, me: string, id: string): Spot | null {
 }
 
 /** Строка под именем: где стоит и можно ли лететь (`hangarBadge.ts`, правило 5). */
-function statusLine(spot: Spot, deps: SquadronCardDeps): string {
+function statusLine(spot: Spot, deps: SquadronCardDeps, missiles: boolean): string {
   const where =
     spot.kind === 'port'
       ? t('side.squad.port', { name: worldName(deps.world, spot.planet.id) })
       : t('side.squad.hold', { name: fleetCallsign(spot.fleetId) });
   const st = parkedState(spot.view.blocked, spot.view.sortie);
+  // Ракетам топливо порта не нужно: им важно одно — не в бою ли база.
+  if (missiles) return `${where} · ${t(st.kind === 'busy' ? 'side.squad.busy' : 'side.missile.ready')}`;
   const state =
     st.kind === 'busy'
       ? t('side.squad.busy')
@@ -122,7 +124,7 @@ export function parkedSquadronHtml(id: string, deps: SquadronCardDeps): string |
   if (!card) return null;
   const cargo = card.cargo.reduce((n, c) => n + c.count, 0);
   const notes = [
-    esc(statusLine(spot, deps)),
+    esc(statusLine(spot, deps, card.missiles)),
     ...(cargo > 0 ? [esc(t('side.wing.cargo', { n: cargo }))] : []),
     ...(card.hull !== null ? [esc(t('side.wing.hull', { p: card.hull }))] : []),
     ...(card.hold ? [esc(t('side.wing.holding'))] : []),
@@ -135,7 +137,12 @@ export function parkedSquadronHtml(id: string, deps: SquadronCardDeps): string |
   // перелёта общая (`canStrike`), и серая кнопка здесь обещала бы то, чего нет.
   const ready = card.canStrike;
   const merging = squadMerge?.from === card.id;
+  // Ракеты пускаются, пока база не в бою: топливо и перезарядка порта им не нужны.
+  const launch = card.missiles && spot.view.blocked !== 'busy';
+  const salvo = Math.min(12, card.machines);
   const buttons =
+    (launch ? btn('msllaunch', card.id, t('side.missile.launch'), true) : '') +
+    (launch && salvo > 1 ? btn('mslsalvo', card.id, t('side.missile.salvo', { n: salvo }), true) : '') +
     (ready ? btn('wingstrike', card.id, t('side.wing.strike'), true) : '') +
     (ready && card.canPatrol ? btn('wingpatrol', card.id, t('side.wing.patrol'), true) : '') +
     (ready && card.canRelocate ? btn('wingrelocate', card.id, t('side.wing.relocate'), true) : '') +
@@ -152,7 +159,7 @@ export function parkedSquadronHtml(id: string, deps: SquadronCardDeps): string |
 function siblingsHtml(view: HangarView, id: string, merging: boolean): string {
   const others = view.squadrons.filter((sq) => sq.id !== id && sq.units.some((st) => st.count > 0));
   if (others.length === 0) return '';
-  const into = merging ? new Set(mergeTargets(view, id)) : new Set<string>();
+  const into = merging ? new Set(mergeTargets(view, id, data)) : new Set<string>();
   const chips = others
     .map((sq) => {
       const name = squadronCallsignOf(sq.id);

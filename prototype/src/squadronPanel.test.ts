@@ -91,15 +91,25 @@ describe('SHU-4.3 — делёж одной кнопкой', () => {
   });
 });
 
+describe('ракетная эскадра (missiles-roadmap)', () => {
+  it('не вылетает: ни удара, ни патруля, ни перелёта; сводится только с ракетами', () => {
+    const v = view([sq('m', [['cruise_missile', 3]]), sq('a', [['interceptor', 1]]), sq('n', [['cruise_missile', 1]])]);
+    const card = squadronCards(v, { mine: true, data, relocate: () => true })[0]!;
+    expect(card).toMatchObject({ missiles: true, canStrike: false, canPatrol: false, canRelocate: false, canMerge: true });
+    expect(mergeTargets(v, 'm', data)).toEqual(['n']);
+    expect(mergeTargets(v, 'a', data)).toEqual([]);
+  });
+});
+
 describe('SHU-4.3 — слияние двумя тапами', () => {
   it('ПРИЁМНИКИ — ВСЕ ОСТАЛЬНЫЕ ЗВЕНЬЯ этой базы, кроме самого источника', () => {
     const v = view([sq('a', [['interceptor', 1]]), sq('b', [['bomber', 1]]), sq('c', [['bomber', 1]])]);
-    expect(mergeTargets(v, 'a')).toEqual(['b', 'c']);
+    expect(mergeTargets(v, 'a', data)).toEqual(['b', 'c']);
   });
 
   it('ОДНО ЗВЕНО — СЛИВАТЬ НЕ С ЧЕМ: кнопки нет', () => {
     const v = view([sq('a', [['interceptor', 2]])]);
-    expect(mergeTargets(v, 'a')).toEqual([]);
+    expect(mergeTargets(v, 'a', data)).toEqual([]);
     expect(squadronCards(v, { mine: true, data })[0]?.canMerge).toBe(false);
   });
 });

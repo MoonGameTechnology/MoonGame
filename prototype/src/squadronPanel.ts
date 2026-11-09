@@ -45,7 +45,7 @@
  *    погрузка и делёж снимают удержание сами.
  */
 import type { GameData, Squadron, UnitStack } from '../../packages/shared-core/src/index';
-import { squadronPatrol, stacksSize } from '../../packages/shared-core/src/index';
+import { hasMissiles, squadronPatrol, stacksSize } from '../../packages/shared-core/src/index';
 import { squadronHullPercent } from '../../decisions/squadronHull';
 import { fleetCallsign } from './fleetName';
 import type { HangarView } from './hangarPanel';
@@ -85,6 +85,8 @@ export interface SquadronCard {
   canRelocate: boolean;
   canSplit: boolean;
   canMerge: boolean;
+  /** Ракетная эскадра (missiles-roadmap): не вылетает, а пускается — свои кнопки. */
+  missiles: boolean;
   /** Держит патруль: встанет снова сама, снять можно всегда (правило 8). */
   hold: boolean;
 }
@@ -109,6 +111,9 @@ export function squadronCards(
   return live.map((sq) => {
     const cargo = (sq.cargo ?? []).filter((st) => st.count > 0);
     const plan = squadronPatrol(sq, opts.data);
+    const missiles = hasMissiles(sq, opts.data);
+    // Сводить можно только эскадры одного рода: ракеты с челноками ядро не сводит.
+    const kin = live.filter((q) => hasMissiles(q, opts.data) === missiles);
     return {
       id: sq.id,
       name: squadronCallsignOf(sq.id),
@@ -117,11 +122,12 @@ export function squadronCards(
       places: stacksSize(sq.units, opts.data),
       hull: squadronHullPercent(sq, opts.data),
       cargo,
-      canStrike: opts.mine && view.blocked === null,
-      canPatrol: opts.mine && plan.hours > 0 && plan.radius > 0 && cargo.length === 0,
-      canRelocate: opts.mine && (opts.relocate?.(sq) ?? false),
+      canStrike: opts.mine && !missiles && view.blocked === null,
+      canPatrol: opts.mine && !missiles && plan.hours > 0 && plan.radius > 0 && cargo.length === 0,
+      canRelocate: opts.mine && !missiles && (opts.relocate?.(sq) ?? false),
       canSplit: opts.mine && splitOne(sq) !== null,
-      canMerge: opts.mine && live.length > 1,
+      canMerge: opts.mine && kin.length > 1,
+      missiles,
       hold: opts.mine && sq.hold !== undefined,
     };
   });
@@ -139,6 +145,10 @@ export function splitOne(sq: Squadron): { unit: string; count: number } | null {
 
 /** Куда можно слить это звено — все остальные ЖИВЫЕ звенья той же базы. Само себя в
  *  приёмниках нет: ядро отбивает такую заявку как опечатку (`E_BAD_PAYLOAD`). */
-export function mergeTargets(view: HangarView, fromId: string): string[] {
-  return view.squadrons.filter((sq) => size(sq) > 0 && sq.id !== fromId).map((sq) => sq.id);
+export function mergeTargets(view: HangarView, fromId: string, data: GameData): string[] {
+  const from = view.squadrons.find((sq) => sq.id === fromId);
+  const kind = from ? hasMissiles(from, data) : false;
+  return view.squadrons
+    .filter((sq) => size(sq) > 0 && sq.id !== fromId && hasMissiles(sq, data) === kind)
+    .map((sq) => sq.id);
 }

@@ -89,6 +89,7 @@ import {
   retreatFleet,
   spawnHero,
   strikeShuttle,
+  launchMissiles,
   type MapNode,
 } from './game';
 import { pcUi } from './graphicsPrefs';
@@ -431,7 +432,7 @@ export function selectAt(mx: number, my: number) {
   // проверяет ЯДРО: свою копию этих правил интерфейс не заводит, он показывает отказ
   // (`errText`).
   if (owner === 'shuttle-strike' && strikeAim) {
-    const { from, squadronId, patrol, relocate, strikeId } = strikeAim;
+    const { from, squadronId, patrol, relocate, strikeId, missile } = strikeAim;
     drop('strikeAim');
     // SHU-6.14 — прицел ЭСКАДРЫ В ВОЗДУХЕ: цели те же, но приказ — новый для вылета.
     if (strikeId) {
@@ -478,10 +479,14 @@ export function selectAt(mx: number, my: number) {
     const node = foe ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (!game.squadronAt(squadronId)) {
       game.note(t('hint.wing-empty')); // звено исчезло между наводкой и тапом
-    } else if (foe) {
-      playerOrder(strikeShuttle(ME, from, squadronId, { targetFleetId: foe.id }));
-    } else if (node) {
-      playerOrder(strikeShuttle(ME, from, squadronId, { targetPlanetId: node.id }));
+    } else if (foe || node) {
+      // Ракеты пускаются по той же цели, что и удар: флот или мир (missiles-roadmap).
+      const target = foe ? { targetFleetId: foe.id } : { targetPlanetId: node!.id };
+      playerOrder(
+        missile
+          ? launchMissiles(ME, from, squadronId, target, missile)
+          : strikeShuttle(ME, from, squadronId, target),
+      );
     } else {
       game.note(t('hint.wing-cancelled'));
     }

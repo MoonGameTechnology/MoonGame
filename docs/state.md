@@ -174,7 +174,7 @@ JSONL. Root guard контролирует свободный диск, inode и
 packages/
   shared-core/src/     ядро: детерминированная симуляция без сети и БД
     kernel/            kernel.ts: createKernel, applyAction, advanceTo, canApply; module.ts
-    modules/           57 модулей механик; порядок ядра — GAME_MODULES в gameModules.ts
+    modules/           58 модулей механик; порядок ядра — GAME_MODULES в gameModules.ts
     state/             gameState.ts (GameState), visibility.ts (туман), buildFromMap.ts (посев)
     action/, actions/  types.ts (Action, Context, MatchConfig), matchMode.ts; payloadSchemas.ts
     data/              schemas.ts (zod-схемы GameData), mapSchema.ts, loadGameData.ts
@@ -254,7 +254,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 
 ## 5. Модули ядра
 
-57 модулей в `packages/shared-core/src/modules`, по файлу на механику; порядок исполнения —
+58 модулей в `packages/shared-core/src/modules`, по файлу на механику; порядок исполнения —
 `GAME_MODULES` (`packages/shared-core/src/gameModules.ts`), один на оба хоста, счётчик — §9.
 Модули не импортируют друг друга: события, хуки и возможности, а без модуля работает базовый дефолт
 ([modulesystem.md](modulesystem.md)). Значение из соседнего модуля запрещает ESLint, тип — можно
@@ -391,7 +391,11 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `void_station`/`fork_station` читаются прежним путём. Подробности: `fortress-roadmap.md`.
   Карты основной игры крепость не кладут, её строит игрок (`data/seededFortress.test.ts`).
 - `minefield` — `fleet.layMines`, мина — неподвижный отряд в `fleets`; `rocketMines` —
-  `fleet.deployRocketMine`, `rocketMine.mode/disarm`.
+  `fleet.deployRocketMine`, `rocketMine.mode/disarm`; ракета мины наводится на флот за сигналом
+  с запасом `guidanceReserve`.
+- `missiles` — `missile.launch`: крылатая ракета стоит эскадрой в ангаре порта или трюме и
+  пускается по одной или залпом; самонаводящаяся, промах — только когда цель-флот дальше
+  дальности от точки пуска. Полёт общий с миной (`util/missileFlight.ts`).
 - `shuttle` — 10 приказов `shuttle.*`: шаттлы стоят в космопорте мира и бьют от своего узла.
 - `loadoutEffects` — модули кораблей, которые меняют правило, а не число корпуса.
 
@@ -470,7 +474,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 флот не выдаёт. Поле сорвано в бою, при обстреле и час после боя, залпа или вылета шаттлов
 (`Fleet.cloakBrokenUntil`); шпион на мире и скан героя его видят.
 
-## 6. Данные (`data/*.json`, версия `0.1.84`)
+## 6. Данные (`data/*.json`, версия `0.1.85`)
 
 Контент — данные: новая сущность или число — правка JSON, а не кода (скилл `add-game-content`).
 Имя в JSON английское, текст — ключ `data.<слаг>` в обеих локалях (`prototype/src/i18n.test.ts`).
@@ -493,7 +497,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 
 | Фрагмент бандла `GameData` | Что в нём | Записей |
 | --- | --- | --: |
-| `units` | корабли и наземка домов, флагман, Рой, пираты, служебные (мины, ракета) | 35 |
+| `units` | корабли и наземка домов, флагман, Рой, пираты, служебные (мины, ракета мины, крылатая ракета) | 36 |
 | `technologies` | технологии основной игры | 56 |
 | `buildings` `modules` `factions` `scientists` | постройки, модули, фракции, учёные | 34·26·7·8 |
 | `heroes` и ещё 4 `hero*` | архетипы, способности, пассивки, узлы дерева, грейды | 6·12·13·19·4 |
@@ -1198,13 +1202,13 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 Готовность по этапам и продуктам — [readiness.md](readiness.md), путь к выпуску —
 [release-path.md](release-path.md). Здесь — состав ядра и технические долги.
 
-**57 модулей** на микроядре: столько файлов в `packages/shared-core/src/modules` (без тестов).
+**58 модулей** на микроядре: столько файлов в `packages/shared-core/src/modules` (без тестов).
 Оба хоста собирают весь каталог одним списком (SLIM-4): `MODULES` прототипа и `DEV_MODULES`
 канонического сервера — это `GAME_MODULES` из ядра.
 
 | Сборка | Модулей | Состав |
 | --- | --: | --- |
-| `GAME_MODULES` (оба хоста, `gameModules.ts`) | **57** | весь каталог ядра |
+| `GAME_MODULES` (оба хоста, `gameModules.ts`) | **58** | весь каталог ядра |
 
 §9 — единственный дом этих чисел: `scripts/docs-check.mjs` сверяет их с кодом (файлы каталога и
 закреплённый список `moduleManifest.test.ts`), другие доки ссылаются сюда. Состав и порядок —

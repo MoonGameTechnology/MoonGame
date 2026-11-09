@@ -190,6 +190,7 @@ export {
   loadShuttle,
   unloadShuttle,
   strikeShuttle,
+  launchMissiles,
   splitSquadron,
   mergeSquadron,
   buildBuilding,

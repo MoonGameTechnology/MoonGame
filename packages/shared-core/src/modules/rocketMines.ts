@@ -1,6 +1,6 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { GameData, RocketMineDef } from '../data/schemas';
-import type { Fleet } from '../state/gameState';
+import type { Fleet, RoadPoint } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import {
   emptyOrdnance,
@@ -8,6 +8,7 @@ import {
   isMissileFleet,
   isOrdnanceFleet,
   isRocketMineFleet,
+  missileModule,
   missileWarhead,
   MISSILE_TRAIT,
   MISSILE_UNIT,
@@ -197,7 +198,12 @@ function scan(h: HandlerContext, mine: Fleet): void {
       minFlightHours: def.minFlightHours,
       warhead: control.damage,
       ...(target.fleetId !== undefined
-        ? { guidance: { fleetId: target.fleetId, range: def.radarRange * (1 + def.guidanceReserve) } }
+        ? {
+            guidance: {
+              fleetId: target.fleetId,
+              range: def.radarRange * (1 + def.guidanceReserve),
+            },
+          }
         : {}),
     });
     h.emit('rocketMine.launched', { owner: mine.owner, mineId: mine.id, missileId: missile.id });
@@ -420,7 +426,12 @@ function intercepted(h: HandlerContext, m: Fleet): boolean {
     hp -= dealt;
     f.pdCooldownUntil = h.ctx.now + hoursToMs(h.ctx, PD_COOLDOWN_MINUTES / 60);
     if (hp <= 0) {
-      h.emit('rocketMine.intercepted', { owner: m.owner, playerId: f.owner, missileId: m.id });
+      h.emit('rocketMine.intercepted', {
+        owner: m.owner,
+        playerId: f.owner,
+        missileId: m.id,
+        mine: missileModule(m, h.ctx.data) !== null,
+      });
       return true;
     }
   }
@@ -442,7 +453,12 @@ function intercepted(h: HandlerContext, m: Fleet): boolean {
       defender: m.owner,
     });
     if (hp <= 0) {
-      h.emit('rocketMine.intercepted', { owner: m.owner, playerId: planet.owner, missileId: m.id });
+      h.emit('rocketMine.intercepted', {
+        owner: m.owner,
+        playerId: planet.owner,
+        missileId: m.id,
+        mine: missileModule(m, h.ctx.data) !== null,
+      });
       return true;
     }
   }
@@ -459,6 +475,51 @@ function lastStepAt(h: HandlerContext, fl: { departedAt: number; arrivesAt: numb
   const step = flightStep(h);
   const steps = Math.max(0, Math.ceil((fl.arrivesAt - fl.departedAt) / step) - 1);
   return fl.departedAt + steps * step;
+}
+
+/** Взрыв: враждебные флоты в радиусе. `mine` в событии — ракета мины или из ангара: у
+ *  них разные строки журнала. */
+function blastFleets(
+  h: HandlerContext,
+  missile: Fleet,
+  to: RoadPoint,
+  radius: number,
+  warhead: number,
+): void {
+  const mine = missileModule(missile, h.ctx.data) !== null;
+  for (const fleet of Object.values(h.state.fleets).sort((a, b) => (a.id < b.id ? -1 : 1))) {
+    // Мина и ракета взрывом не ранятся, как и прицелом не выбираются: мину снимают
+    // челноки (SM-3.6), ракету — ПРО и челноки (SM-3.7b).
+    if (isOrdnanceFleet(fleet, h.ctx.data)) continue;
+    if (getStance(h.state, missile.owner, fleet.owner) !== 'war') continue;
+    const at = fleetPositionAt(h.state, fleet, h.ctx.now);
+    if (!at || !inRadius(at, to, radius)) continue;
+    const damage = hookedDamage(h, warhead, {
+      phase: 'missile',
+      location: fleetNodeAt(h.state, fleet, h.ctx.now) ?? '',
+      attacker: missile.owner,
+      defender: fleet.owner,
+      defenderFleet: fleet.id,
+    });
+    h.emit('rocketMine.hit', {
+      owner: missile.owner,
+      playerId: fleet.owner,
+      missileId: missile.id,
+      damage,
+      mine,
+    });
+    applyDamageToSide(
+      h,
+      { kind: 'fleet', fleetId: fleet.id },
+      damage,
+      h.ctx.data,
+      fleetNodeAt(h.state, fleet, h.ctx.now) ?? '',
+      undefined,
+      undefined,
+      missile.owner,
+    );
+    removeIfWiped(h, fleet.id);
+  }
 }
 
 /** Ракета по МИРУ бьёт и его здания (решение 2026-11-09): гарнизон взрыв не трогает. Свой,
@@ -735,38 +796,7 @@ export const rocketMinesModule: GameModule = {
       // Off the map first: the terminal point defense below hits a missile that is gone.
       endMissile(h, missile);
       if (!def || intercepted(h, missile)) return;
-      for (const fleet of Object.values(h.state.fleets).sort((a, b) => (a.id < b.id ? -1 : 1))) {
-        // Мина и ракета взрывом не ранятся, как и прицелом не выбираются: мину снимают
-        // челноки (SM-3.6), ракету — ПРО и челноки (SM-3.7b).
-        if (isOrdnanceFleet(fleet, h.ctx.data)) continue;
-        if (getStance(h.state, missile.owner, fleet.owner) !== 'war') continue;
-        const at = fleetPositionAt(h.state, fleet, h.ctx.now);
-        if (!at || !inRadius(at, to, def.blastRadius)) continue;
-        const damage = hookedDamage(h, warhead ?? def.damage, {
-          phase: 'missile',
-          location: fleetNodeAt(h.state, fleet, h.ctx.now) ?? '',
-          attacker: missile.owner,
-          defender: fleet.owner,
-          defenderFleet: fleet.id,
-        });
-        h.emit('rocketMine.hit', {
-          owner: missile.owner,
-          playerId: fleet.owner,
-          missileId,
-          damage,
-        });
-        applyDamageToSide(
-          h,
-          { kind: 'fleet', fleetId: fleet.id },
-          damage,
-          h.ctx.data,
-          fleetNodeAt(h.state, fleet, h.ctx.now) ?? '',
-          undefined,
-          undefined,
-          missile.owner,
-        );
-        removeIfWiped(h, fleet.id);
-      }
+      blastFleets(h, missile, to, def.blastRadius, warhead ?? def.damage);
       if (planetId !== undefined) strikePlanet(h, missile.owner, planetId, warhead ?? def.damage);
       h.emit('rocketMine.detonated', { owner: missile.owner, missileId });
     });

@@ -237,6 +237,8 @@ const panelFleet = (): string | null => game.panelFleet();
 const objDossier = (key: string): Dossier | null => game.dossier(key);
 const setFleetSelection = (ids: string[]): void => game.setFleetSelection(ids);
 const clearSelection = (): void => game.clearSelection();
+/** Самый крупный залп одним приказом — тот же предел, что у ядра (`missile.launch`). */
+const MISSILE_SALVO = 12;
 const squadronBase = (id: string) => game.squadronBase(id);
 const squadronAt = (id: string) => game.squadronAt(id);
 const ownStrike = (id: string): ShuttleStrike | null => game.ownStrike(id);
@@ -743,6 +745,16 @@ function onSideClick(ev: MouseEvent): void {
     if (base) {
       arm('strikeAim', { from: base, squadronId: arg }); // слияние звеньев гаснет само
       note(t('hint.wing-aim'));
+    }
+  } else if (act === 'msllaunch' || act === 'mslsalvo') {
+    // Пуск ракет (missiles-roadmap): тот же прицел, что у удара, — круг дальности ракеты и
+    // тап по чужому флоту или миру. «Залп» пускает всю эскадру, до 12 ракет за приказ.
+    const found = squadronAt(arg);
+    if (found) {
+      const all = found.sq.units.reduce((n, st) => n + Math.max(0, st.count), 0);
+      const count = act === 'mslsalvo' ? Math.min(MISSILE_SALVO, all) : 1;
+      arm('strikeAim', { from: found.base, squadronId: arg, missile: count });
+      note(t('hint.missile-aim', { n: count }));
     }
   } else if (act === 'wingpatrol') {
     // SHU-6.3 — тот же прицел, но тап выбирает ТОЧКУ патруля, а не цель: под пальцем

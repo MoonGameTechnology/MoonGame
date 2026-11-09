@@ -47,6 +47,8 @@ export interface Armed {
     squadronId: string;
     patrol?: true;
     relocate?: true;
+    /** Пуск ракет эскадры (missiles-roadmap): сколько ракет в залпе. */
+    missile?: number;
     /** Эскадра В ВОЗДУХЕ (SHU-6.14): прицел меняет приказ вылета, а не поднимает её из
      *  ангара. `from` тогда — база вылета: от неё ядро меряет радиус удара и патруля. */
     strikeId?: string;

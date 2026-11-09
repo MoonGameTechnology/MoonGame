@@ -41,7 +41,15 @@ const data: GameData = parseGameData({
     interceptor: {
       faction: 'x',
       traits: ['shuttle'],
-      stats: { attack: 14, defense: 3, speed: 50, hp: 10, strikeRange: 250, fuel: 3, rearmRounds: 2 },
+      stats: {
+        attack: 14,
+        defense: 3,
+        speed: 50,
+        hp: 10,
+        strikeRange: 250,
+        fuel: 3,
+        rearmRounds: 2,
+      },
       cost: { metal: 10 },
       buildTimeHours: 0,
     },
@@ -54,14 +62,25 @@ const data: GameData = parseGameData({
   events: {},
 });
 
-const kernel = createKernel([movementModule, constructionModule, shuttleModule, rocketMinesModule, missilesModule]);
+const kernel = createKernel([
+  movementModule,
+  constructionModule,
+  shuttleModule,
+  rocketMinesModule,
+  missilesModule,
+]);
 
 function world(): GameState {
   const s = createInitialState({ seed: 'msl', version: { data: '0.1.0', manifest: '1' } });
   s.sight = { world: 300, fleet: 300, radarScale: 1 };
   for (const id of ['p', 'q'])
     s.players[id] = { id, name: id, faction: 'x', status: 'active', resources: { metal: 1000 } };
-  const planet = (id: string, owner: string | null, x: number, buildings: Array<[string, number]>) => ({
+  const planet = (
+    id: string,
+    owner: string | null,
+    x: number,
+    buildings: Array<[string, number]>,
+  ) => ({
     id,
     owner,
     position: { x, y: 0 },
@@ -123,7 +142,10 @@ describe('missile launch', () => {
   it('a built missile stands in the hangar as a squadron, like a shuttle', () => {
     const s = world();
     s.planets.A!.hangar = [];
-    const built = advance(ok(s, 'unit.build', { planetId: 'A', unit: 'cruise', count: 2 }), 1).state;
+    const built = advance(
+      ok(s, 'unit.build', { planetId: 'A', unit: 'cruise', count: 2 }),
+      1,
+    ).state;
     expect(built.planets.A!.hangar).toEqual([
       expect.objectContaining({ units: [expect.objectContaining({ unit: 'cruise', count: 2 })] }),
     ]);
@@ -136,20 +158,32 @@ describe('missile launch', () => {
     const all = ok(world(), 'missile.launch', launch({ count: 3 }));
     expect(all.planets.A!.hangar).toEqual([]);
     expect(missiles(all)).toHaveLength(3);
-    expect(act(world(), 'missile.launch', launch({ count: 4 }))).toMatchObject({ ok: false, code: 'E_NOT_ENOUGH' });
+    expect(act(world(), 'missile.launch', launch({ count: 4 }))).toMatchObject({
+      ok: false,
+      code: 'E_NOT_ENOUGH',
+    });
   });
 
   it('refuses a target out of range, unseen, friendly, or another missile', () => {
     const far = world();
     far.fleets.target!.location = 'C';
     far.sight = { world: 700, fleet: 700, radarScale: 1 };
-    expect(act(far, 'missile.launch', launch())).toMatchObject({ ok: false, code: 'E_OUT_OF_RANGE' });
+    expect(act(far, 'missile.launch', launch())).toMatchObject({
+      ok: false,
+      code: 'E_OUT_OF_RANGE',
+    });
     const blind = world();
     blind.sight = { world: 0, fleet: 0, radarScale: 1 };
-    expect(act(blind, 'missile.launch', launch())).toMatchObject({ ok: false, code: 'E_NO_TARGET' });
+    expect(act(blind, 'missile.launch', launch())).toMatchObject({
+      ok: false,
+      code: 'E_NO_TARGET',
+    });
     const peace = world();
     setStance(peace, 'p', 'q', 'peace');
-    expect(act(peace, 'missile.launch', launch())).toMatchObject({ ok: false, code: 'E_NOT_HOSTILE' });
+    expect(act(peace, 'missile.launch', launch())).toMatchObject({
+      ok: false,
+      code: 'E_NOT_HOSTILE',
+    });
     const neutral = world();
     expect(
       act(neutral, 'missile.launch', { planetId: 'A', squadronId: 'sq:p:1', targetPlanetId: 'C' }),
@@ -174,7 +208,11 @@ describe('missile launch', () => {
     const s = ok(world(), 'missile.launch', launch());
     const first = missiles(s)[0]!.flight!.arrivesAt;
     // The target slips 30 units further along the lane — still within 240 of A.
-    s.fleets.target = { ...s.fleets.target!, location: null, edge: { from: 'B', to: 'C', t: 0.075 } };
+    s.fleets.target = {
+      ...s.fleets.target!,
+      location: null,
+      edge: { from: 'B', to: 'C', t: 0.075 },
+    };
     const r = advance(s, first + HOUR);
     expect(r.events.map((e) => e.type)).not.toContain('missile.missed');
     expect(missiles(r.state)).toHaveLength(0);
@@ -183,7 +221,11 @@ describe('missile launch', () => {
 
   it('misses only when the target is beyond range from the launch point', () => {
     const s = ok(world(), 'missile.launch', launch());
-    s.fleets.target = { ...s.fleets.target!, location: null, edge: { from: 'B', to: 'C', t: 0.25 } };
+    s.fleets.target = {
+      ...s.fleets.target!,
+      location: null,
+      edge: { from: 'B', to: 'C', t: 0.25 },
+    };
     const r = advance(s, HOUR);
     expect(r.events.map((e) => e.type)).toContain('missile.missed');
     expect(missiles(r.state)).toHaveLength(0);
@@ -216,7 +258,11 @@ describe('missile launch', () => {
       hangar: s.planets.A!.hangar,
     } as Fleet;
     s.planets.A!.hangar = [];
-    const r = ok(s, 'missile.launch', { fleetId: 'carrier', squadronId: 'sq:p:1', targetFleetId: 'target' });
+    const r = ok(s, 'missile.launch', {
+      fleetId: 'carrier',
+      squadronId: 'sq:p:1',
+      targetFleetId: 'target',
+    });
     expect(missiles(r)).toHaveLength(1);
     expect(r.fleets.carrier!.hangar![0]!.units[0]!.count).toBe(2);
   });
@@ -238,13 +284,21 @@ describe('missile launch', () => {
   it('missiles in the hangar do not dry up the port: shuttles keep their fuel', () => {
     const s = world();
     s.planets.A!.hangar!.push({ id: 'sq:p:2', units: [{ unit: 'interceptor', count: 1 }] });
-    const r = act(s, 'shuttle.strike', { planetId: 'A', squadronId: 'sq:p:2', targetFleetId: 'target' });
+    const r = act(s, 'shuttle.strike', {
+      planetId: 'A',
+      squadronId: 'sq:p:2',
+      targetFleetId: 'target',
+    });
     expect(r).toMatchObject({ ok: true });
   });
 
   it('is identical across advance partitions', () => {
     const s = ok(world(), 'missile.launch', launch({ count: 2 }));
-    s.fleets.target = { ...s.fleets.target!, location: null, edge: { from: 'B', to: 'C', t: 0.05 } };
+    s.fleets.target = {
+      ...s.fleets.target!,
+      location: null,
+      edge: { from: 'B', to: 'C', t: 0.05 },
+    };
     const whole = advance(s, HOUR).state;
     let step = s;
     for (let t = 7_000; t < HOUR; t += 7_000) step = advance(step, t).state;

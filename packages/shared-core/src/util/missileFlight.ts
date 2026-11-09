@@ -28,7 +28,13 @@ export function missileFlightStep(ctx: Context): number {
 }
 
 /** Время полёта от `from` до `to`: не короче `minHours` и не короче одного мига. */
-function flightMs(ctx: Context, from: RoadPoint, to: RoadPoint, speed: number, minHours: number): number {
+function flightMs(
+  ctx: Context,
+  from: RoadPoint,
+  to: RoadPoint,
+  speed: number,
+  minHours: number,
+): number {
   const hours = distance(from, to) / (speed * travelSpeedFactorOf(ctx));
   return Math.max(1, Math.ceil(hoursToMs(ctx, Math.max(minHours, hours))));
 }
@@ -56,7 +62,8 @@ export function spawnMissile(
     guidance?: Omit<MissileGuidance, 'origin' | 'speed'>;
   },
 ): Fleet {
-  const arrivesAt = h.ctx.now + flightMs(h.ctx, spec.from, spec.to, spec.speed, spec.minFlightHours);
+  const arrivesAt =
+    h.ctx.now + flightMs(h.ctx, spec.from, spec.to, spec.speed, spec.minFlightHours);
   const missile: Fleet = {
     id: `fleet:missile:${h.ctx.now}:${nextFleetSeq(h.state)}`,
     owner: spec.owner,
@@ -87,7 +94,11 @@ export function spawnMissile(
  * Куда сейчас идёт ракета. `null` — наведения нет или цели больше нет: ракета летит в
  * прежнюю точку. `'lost'` — цель-флот дальше дальности от точки пуска: промах.
  */
-export function guidedAim(state: GameState, missileId: string, now: number): RoadPoint | 'lost' | null {
+export function guidedAim(
+  state: GameState,
+  missileId: string,
+  now: number,
+): RoadPoint | 'lost' | null {
   const g = state.ordnance?.guidance?.[missileId];
   if (!g) return null;
   if (g.planetId !== undefined) return state.planets[g.planetId]?.position ?? null;

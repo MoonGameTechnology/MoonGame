@@ -20,7 +20,13 @@ import { distance } from '../state/route';
 import { getStance } from '../state/diplomacy';
 import { isVisibleTo } from '../state/visibility';
 import { isOrdnanceFleet } from '../state/ordnance';
-import { isMissileStack, portDisabled, shuttleBayAt, squadronReach, squadronSize } from '../state/shuttle';
+import {
+  isMissileStack,
+  portDisabled,
+  shuttleBayAt,
+  squadronReach,
+  squadronSize,
+} from '../state/shuttle';
 import { requireOwnedUnengagedFleet } from '../util/fleet';
 import { spawnMissile } from '../util/missileFlight';
 
