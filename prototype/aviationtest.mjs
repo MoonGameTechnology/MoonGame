@@ -9,7 +9,8 @@
  * открывает панель справа, тап по строке выделяет эскадру, а панель остаётся рядом с её
  * карточкой; взлетевшая эскадра переезжает в группу «В полёте» и выделяется оттуда своим
  * вылетом. На телефоне — плавающая кнопка, пока ничего не выделено, лист на 56% экрана, и
- * тап по строке закрывает лист и открывает карточку.
+ * тап по строке закрывает лист и открывает карточку, а её приказы стоят плитками, как у флота:
+ * две первые и «Ещё».
  *
  *   node prototype/aviationtest.mjs                    # или pnpm run smoke:aviation
  *   AVIA_SHOTS=каталог node prototype/aviationtest.mjs   # плюс снимки
@@ -147,6 +148,15 @@ try {
         assert.equal(await panel.isVisible(), true, 'панель осталась рядом с карточкой');
       }
       await shot('3-vybrana');
+      if (phone) {
+        // Приказы плитками, как у флота: на свёрнутом листе две первые и «Ещё», остальные —
+        // по «Ещё» на том же месте.
+        const extra = page.locator('#mobile-sheet .wing-orders > .extra').first();
+        assert.equal(await extra.isVisible(), false, 'лишние плитки под «Ещё»');
+        await press(page.locator('#mobile-sheet [data-act="wingmore"]'));
+        await extra.waitFor({ state: 'visible' });
+        await shot('3b-eshche');
+      }
 
       // Взлёт: эскадра «a» уходит в патруль и переезжает в группу «В полёте».
       if (!phone) await press(page.locator(`#aviapanel [data-avia="sq:${ids.a}"]`));

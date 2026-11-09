@@ -137,6 +137,7 @@ import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { splitOne } from './squadronPanel';
 import { cursorTipPos } from './tipPlacement';
 import { arrivalHours } from './travelEta';
+import { toggleWingMore } from './wingOrders';
 import { forkPanelHtml, planetPanelHtml, toggleSpyMenu, unknownPlanetHtml } from './worldCard';
 import { toggleDossierBlock } from './dossierFolds';
 import { enqueueBuild, timeLeft } from './worldQueries';
@@ -823,6 +824,9 @@ function onSideClick(ev: MouseEvent): void {
     if (from && found && playerOrder(mergeSquadron(ME, found.base, from, arg)) && selSquadron)
       pickSquadron(arg);
     drop('squadMerge');
+  } else if (act === 'wingmore') {
+    // «Ещё» ряда приказов эскадры на телефоне: остальные плитки на месте (`wingOrders.ts`).
+    toggleWingMore(arg);
   } else if (act === 'sqpick') {
     // Имя эскадры в карточке соседки, в «i» мира или в трюме носителя — выделить её саму.
     pickSquadron(arg);
