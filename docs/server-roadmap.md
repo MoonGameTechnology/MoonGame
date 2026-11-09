@@ -138,5 +138,5 @@ SIGKILL/OOM одного worker не останавливает другой; с
 
 ## Ссылки
 
-`tech-research.md` §2/§5 · `backlog.md` Блок F (F1/F4/F5/F6/F7), Блок E · `deep-technical-roadmap.md`
+`tech-research.md` §2/§5 · `backlog-archive.md` Блок F (F1/F4/F5/F6/F7), Блок E · `deep-technical-roadmap.md`
 §3 гонки/§5 sync · `persistence-roadmap.md` · `secure-environment-roadmap.md` · `multiplayer.md`.

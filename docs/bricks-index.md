@@ -18,11 +18,9 @@
 | ID | Ст. | Зоны | Где | Заголовок |
 | --- | --- | --- | --- | --- |
 | B4 | 🗑 |  | `docs/backlog.md` | вырезано: |
-| RQ-1 | ✅ | core proto | `docs/backlog.md` | Очередь исследований |
 | G2 | 🗑 |  | `docs/backlog.md` | Skia-рендер карты (зум / скролл / culling) — RN-вариант, снят вместе с RN. |
 | H4 | 🗑 |  | `docs/backlog.md` | Конструктор наземной армии: пехота в 3 вариантах (militia — дешёвое мясо, |
 | LARS-2 | 🔒 | srv | `docs/backlog.md` | (EC-1.2, EC-2/EC-3 — economy-roadmap.md) Цепочка валют → фронт |
-| PROG-2 | ✅ | proto data | `docs/backlog.md` | Убрать три силовые ветки командующего. |
 | CON-3 | 🗑 | proto | `docs/backlog.md` | Армия |
 | SHIP-5 | 🔒 | srv | `docs/backlog.md` | предметы мета-экономики |
 | ONB-5 | 🔶 | proto srv | `docs/backlog.md` | Async-модель + дневной дайджест. |
@@ -30,32 +28,13 @@
 | BAL-4 | 🗑 | core proto | `docs/backlog.md` | Захват прилётом обесценивает армию. |
 | BAL-10 | 🔶 | proto data core | `docs/backlog.md` | Восемь дней сессии ничего не решают — что с этим |
 | BAL-16 | 🔶 | core proto | `docs/backlog.md` | Бои за планеты дают очки, порог считается от карты. |
-| BAL-17 | ✅ | proto | `docs/backlog.md` | Пираты — местная угроза, а не завоеватель карты. |
-| BAL-18 | ✅ | core proto | `docs/backlog.md` | Раны лечит госпиталь, ремонта за металл больше нет. |
-| BAL-19 | ✅ | core proto | `docs/backlog.md` | Лимит управления вместо налога на рост. |
 | BAL-6 | 🔶 | core data proto | `docs/backlog.md` | Ветки дерева технологий были взаимозаменяемы. |
 | SEC-8 | 🔒 |  | `docs/backlog.md` | OWASP Top 10 2021 |
 | SEC-36 | ⏳ | sec ops | `docs/backlog.md` | увести Caddy с root внутри контейнера. |
 | REFP-13 | 🗑 | proto | `docs/backlog.md` | division.ts |
 | REFM-8 | 🗑 | proto | `docs/backlog.md` | divisionDesigner.ts |
-| REFM-219 | ✅ | proto | `docs/backlog.md` | Жизненный цикл матча |
-| REFM-220 | ✅ | proto | `docs/backlog.md` | Хаб и настройки |
-| REFM-244 | ✅ | proto | `docs/backlog.md` | Точка сборки |
-| REFM-245 | ✅ | proto | `docs/backlog.md` | Поток расчёта соло-мира |
-| REFM-246 | ✅ | proto | `docs/backlog.md` | Проводка окна боя |
-| REFM-247 | ✅ | proto | `docs/backlog.md` | Экран подключения |
-| REFM-248 | ✅ | proto | `docs/backlog.md` | Проводка настроек |
-| REFM-249 | ✅ | proto | `docs/backlog.md` | Окна забега: торговец, союзник, подсказка пиратов, комиксы |
-| SLIM-1 | ✅ | proto srv core | `docs/backlog.md` | Сторож размеров. |
-| SLIM-2 | ✅ | proto | `docs/backlog.md` | CSS из build.mjs в файлы. |
-| SLIM-3 | ✅ | proto | `docs/backlog.md` | Мозг ботов по фазам. |
-| SLIM-4 | ✅ | core srv proto | `docs/backlog.md` | Один список модулей ядра. |
-| SLIM-5 | ✅ | srv | `docs/backlog.md` | Хранилища сервера по доменам. |
-| SLIM-6 | ✅ | proto core | `docs/backlog.md` | Длинные функции — по месту. |
-| SLIM-7 | ✅ | proto core docs | `docs/backlog.md` | Мелкая уборка. |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
-| CMD-VIS-4 | ✅ | core proto | `docs/backlog.md` | Штурм и бомбардировка в ряду приказов, отмена |
 | TXT-8 | 🔒 | proto docs | `docs/backlog.md` | (LORE-1) Досье кораблей и зданий: описание о роли, числа в |
 | TXT-9 | 🔒 | proto | `docs/backlog.md` | (LORE-1) Лорный оборот там, где после чистки остались одни числа: |
 | LORE-1 | ⏳ | docs | `docs/backlog.md` | Документ сеттинга: опора для лорных строк. |
@@ -66,51 +45,9 @@
 | TRN-5 | ⏳ | proto | `docs/backlog.md` | Повтор упражнения с начала этапа (§14.8). |
 | TRN-6 | ⏳ | proto docs | `docs/backlog.md` | Матрица «механика → упражнение → результат» (§14.4, §14.10). |
 | UIX-8.2 | 🔶 | proto | `docs/backlog.md` | Настройка матча и совет учёных. |
-| UIX-10.3 | ✅ | proto | `docs/backlog.md` | Хаб: шапка только на «Домой», отступы плотнее. |
-| UIX-10.4 | ✅ | proto | `docs/backlog.md` | Карточка партии без повторов, поля 4 px, целый ромбик. |
-| UIX-10.5 | ✅ | proto | `docs/backlog.md` | Лист выбора на телефоне: «Сведения» значком, приказы |
-| UIX-10.6 | ✅ | proto | `docs/backlog.md` | Карточки мира и флота без повторов и подсказок-прозы. |
-| UIX-10.7 | ✅ | proto | `docs/backlog.md` | Окно науки без повторов. |
-| UIX-10.8 | ✅ | proto | `docs/backlog.md` | Окно производства без подсказок-прозы. |
-| UIX-10.9 | ✅ | proto | `docs/backlog.md` | Журнал «Событий» без повторов дня. |
-| UIX-10.10 | ✅ | proto | `docs/backlog.md` | Карточка провинции: хозяин кнопкой, «Построить» рядом |
-| UIX-10.11 | ✅ | proto | `docs/backlog.md` | Приказы шпионов в меню «Шпионаж». |
-| UIX-10.12 | ✅ | proto | `docs/backlog.md` | Окно «i» мира — только сведения. |
-| UIX-10.13 | ✅ | proto | `docs/backlog.md` | Эскадра на стоянке — с карты. |
-| UIX-10.14 | ✅ | proto | `docs/backlog.md` | Приказы эскадре — только в её карточке. |
-| UIX-10.15 | ✅ | proto | `docs/backlog.md` | Список «◇ Авиация». |
-| UIX-10.16 | ✅ | proto | `docs/backlog.md` | Приказы эскадры — плитками, как у флота. |
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
-| CORP-5 | ✅ | srv proto | `docs/backlog.md` | Битвы корпораций на хосте игроков. |
-| CORP-6 | ✅ | data srv proto | `docs/backlog.md` | Уровни корпорации 4 и 5. |
-| CORP-7 | ✅ | data srv | `docs/backlog.md` | Форматы битв от 2 на 2 до 10 на 10. |
-| CORP-8 | ✅ | core data srv proto | `docs/backlog.md` | Карта под формат. |
-| CORP-9 | ✅ | srv | `docs/backlog.md` | Данные вкладки «Битвы». |
-| CORP-10 | ✅ | proto | `docs/backlog.md` | «Битвы» в пять вкладок. |
-| CORP-11 | ✅ | data srv proto | `docs/backlog.md` | Склад, зал славы и монумент. |
-| CORP-12 | ✅ | srv proto | `docs/backlog.md` | Медали игроков в ленте. |
-| CORP-13 | ✅ | proto | `docs/backlog.md` | Картинки базы. |
-| CORP-14 | ✅ | data srv proto | `docs/backlog.md` | Стили базы в магазине. |
-| CORP-15 | ✅ | data srv proto | `docs/backlog.md` | Фоны базы в магазине. |
-| CORP-16 | ✅ | data srv proto | `docs/backlog.md` | Материалы для зданий корпораций. |
-| CORP-17 | ✅ | proto | `docs/backlog.md` | Сцена базы в хабе. |
-| CORP-18 | ✅ | srv proto | `docs/backlog.md` | Отзыв вызова и маркер битвы. |
-| CORP-19 | ✅ | srv data proto | `docs/backlog.md` | Экономика влияния в битвах. |
 | CORP-20 | ⏳ | core srv proto | `docs/backlog.md` | Битва четырёх корпораций. |
 | CORP-21 | ⏳ | data | `docs/backlog.md` | Карта для битвы четырёх корпораций. |
-| SPY-12 | ✅ | core proto | `docs/backlog.md` | Разная цена операций. |
-| SPY-13 | ✅ | core srv proto | `docs/backlog.md` | Разведка, которая копится. |
-| SPY-14 | ✅ | core proto | `docs/backlog.md` | Саботаж очереди. |
-| SPY-15 | ✅ | core proto | `docs/backlog.md` | Подрыв экономики. |
-| SPY-16 | ✅ | srv proto | `docs/backlog.md` | Провал шпиона — новость для всех. |
-| SPY-17 | ✅ | core proto | `docs/backlog.md` | До 3 агентов на одном мире. |
-| SPY-18 | ✅ | core data | `docs/backlog.md` | Перевербовка. |
-| SPY-19 | ✅ | proto | `docs/backlog.md` | Шанс на кнопке операции. |
-| SPY-20 | ✅ | proto | `docs/backlog.md` | Архив докладов. |
-| SPY-21 | ✅ | core | `docs/backlog.md` | Кража по развитости мира. |
-| SPY-22 | ✅ | core proto | `docs/backlog.md` | Раскрытие без войны. |
-| BLD-2.1 | ✅ | core | `docs/backlog.md` | Полоса юнита — его производственная постройка. |
-| BLD-2.2 | ✅ | proto | `docs/backlog.md` | Конвейер на каждую полосу. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |
@@ -130,6 +67,7 @@
 | C2 | ✅ |  | `docs/backlog-archive.md` | technologyModule + действие technology.research, состояние анлоков (Player.technologies). |
 | C3 | ✅ |  | `docs/backlog-archive.md` | Предматчевый выбор: SlotAssignment.technologies (buildFromMap) — стартовые |
 | C4 | ✅ |  | `docs/backlog-archive.md` | Бонусы тех на хуках (производство/скорость/бой) + гейт постройки юнитов/зданий. |
+| RQ-1 | ✅ | core proto | `docs/backlog-archive.md` | Очередь исследований |
 | D1 | ✅ |  | `docs/backlog-archive.md` | Состояние дипломатии в GameState: diplomacy?: Record<pairKey, DiplomaticStance> |
 | D2 | ✅ |  | `docs/backlog-archive.md` | diplomacyModule (modules/diplomacy.ts): действие diplomacy.declare |
 | D3 | ✅ |  | `docs/backlog-archive.md` | Consent-протокол смягчения — то же действие diplomacy.declare, взаимно: |
@@ -334,6 +272,9 @@
 | BAL-14 | ✅ | proto | `docs/backlog-archive.md` | Бот исследует псевдоузлы мета-прокачки — и получает даром то, |
 | BAL-15 | ✅ | core | `docs/backlog-archive.md` | Бот не исследует НИЧЕГО: запрет грант-узлов поставлен в |
 | BAL-7 | ✅ | proto data | `docs/backlog-archive.md` | У heavyinfantry нет ниши. |
+| BAL-17 | ✅ | proto | `docs/backlog-archive.md` | Пираты — местная угроза, а не завоеватель карты. |
+| BAL-18 | ✅ | core proto | `docs/backlog-archive.md` | Раны лечит госпиталь, ремонта за металл больше нет. |
+| BAL-19 | ✅ | core proto | `docs/backlog-archive.md` | Лимит управления вместо налога на рост. |
 | PC-UI | ✅ | proto | `docs/backlog-archive.md` | Десктоп-полировка правой панели (consolidation, ветка |
 | PERF-2 | ✅ |  | `docs/backlog-archive.md` | Оптимизационный проход по shared-core (3-линзовый агент-ревью: горячие пути |
 | PERF-1 | ✅ |  | `docs/backlog-archive.md` | Сведено и проверено |
@@ -705,6 +646,14 @@
 | REFM-241 | ✅ | proto | `docs/backlog-archive.md` | Экран загрузки карты |
 | REFM-242 | ✅ | proto | `docs/backlog-archive.md` | Запросы к миру и очередь стройки |
 | REFM-243 | ✅ | proto | `docs/backlog-archive.md` | Остатки Sector Zero |
+| REFM-219 | ✅ | proto | `docs/backlog-archive.md` | Жизненный цикл матча |
+| REFM-220 | ✅ | proto | `docs/backlog-archive.md` | Хаб и настройки |
+| REFM-244 | ✅ | proto | `docs/backlog-archive.md` | Точка сборки |
+| REFM-245 | ✅ | proto | `docs/backlog-archive.md` | Поток расчёта соло-мира |
+| REFM-246 | ✅ | proto | `docs/backlog-archive.md` | Проводка окна боя |
+| REFM-247 | ✅ | proto | `docs/backlog-archive.md` | Экран подключения |
+| REFM-248 | ✅ | proto | `docs/backlog-archive.md` | Проводка настроек |
+| REFM-249 | ✅ | proto | `docs/backlog-archive.md` | Окна забега: торговец, союзник, подсказка пиратов, комиксы |
 | MIG-1 | ✅ | cli proto | `docs/backlog-archive.md` | Вход в сетевой матч переехал в /decisions. |
 | MIG-2 | ✅ | cli srv | `docs/backlog-archive.md` | Клиент ПОТРЕБЛЯЕТ переехавшее: вход, обзор, место, отказы. |
 | MIG-3 | ✅ | cli | `docs/backlog-archive.md` | HUD-модели наконец РИСУЮТСЯ, и интентов стало три. |
@@ -806,6 +755,7 @@
 | OBJP-3 | ✅ | proto | `docs/backlog-archive.md` | Каталог юнитов уехал в окно производства — туда же, |
 | CMD-VIS-2 | ✅ | proto | `docs/backlog-archive.md` | Кнопка штурма появляется только когда есть кем |
 | CMD-VIS-3 | ✅ | proto | `docs/backlog-archive.md` | «Слить» и «Десант» появляются, только когда есть |
+| CMD-VIS-4 | ✅ | core proto | `docs/backlog-archive.md` | Штурм и бомбардировка в ряду приказов, отмена |
 | EVT-1 | ✅ | core data proto | `docs/backlog-archive.md` | Тёмные события наконец видны игроку, |
 | EVT-2 | ✅ | core data proto | `docs/backlog-archive.md` | Трофеи за бой: победитель |
 | EVT-3 | ✅ | core data | `docs/backlog-archive.md` | Пассивка героя «мародёр»: лестница из пяти |
@@ -887,16 +837,66 @@
 | UIX-15.4 | ✅ | proto | `docs/backlog-archive.md` | Sector Zero — в палитре хаба. |
 | UIX-16.1 | ✅ | proto | `docs/backlog-archive.md` | Стартовое меню — одним экраном. |
 | UIX-17.1 | ✅ | proto | `docs/backlog-archive.md` | Страница «Матчи» — без полей адреса и позывного. |
+| UIX-10.3 | ✅ | proto | `docs/backlog-archive.md` | Хаб: шапка только на «Домой», отступы плотнее. |
+| UIX-10.4 | ✅ | proto | `docs/backlog-archive.md` | Карточка партии без повторов, поля 4 px, целый ромбик. |
+| UIX-10.5 | ✅ | proto | `docs/backlog-archive.md` | Лист выбора на телефоне: «Сведения» значком, приказы |
+| UIX-10.6 | ✅ | proto | `docs/backlog-archive.md` | Карточки мира и флота без повторов и подсказок-прозы. |
+| UIX-10.7 | ✅ | proto | `docs/backlog-archive.md` | Окно науки без повторов. |
+| UIX-10.8 | ✅ | proto | `docs/backlog-archive.md` | Окно производства без подсказок-прозы. |
+| UIX-10.9 | ✅ | proto | `docs/backlog-archive.md` | Журнал «Событий» без повторов дня. |
+| UIX-10.10 | ✅ | proto | `docs/backlog-archive.md` | Карточка провинции: хозяин кнопкой, «Построить» рядом |
+| UIX-10.11 | ✅ | proto | `docs/backlog-archive.md` | Приказы шпионов в меню «Шпионаж». |
+| UIX-10.12 | ✅ | proto | `docs/backlog-archive.md` | Окно «i» мира — только сведения. |
+| UIX-10.13 | ✅ | proto | `docs/backlog-archive.md` | Эскадра на стоянке — с карты. |
+| UIX-10.14 | ✅ | proto | `docs/backlog-archive.md` | Приказы эскадре — только в её карточке. |
+| UIX-10.15 | ✅ | proto | `docs/backlog-archive.md` | Список «◇ Авиация». |
+| UIX-10.16 | ✅ | proto | `docs/backlog-archive.md` | Приказы эскадры — плитками, как у флота. |
 | CORP-1 | ✅ | srv | `docs/backlog-archive.md` | Лента новостей на сервере: события корпораций и объявления. |
 | CORP-2 | ✅ | proto | `docs/backlog-archive.md` | Лента на «Домой» вместо «Сводки». |
 | CORP-3 | ✅ | proto | `docs/backlog-archive.md` | Вкладка «Корпорация» в хабе вместо «Альянсов». |
 | CORP-4 | ✅ | srv | `docs/backlog-archive.md` | Битва корпораций загружается и считает победу по сторонам. |
+| CORP-5 | ✅ | srv proto | `docs/backlog-archive.md` | Битвы корпораций на хосте игроков. |
+| CORP-6 | ✅ | data srv proto | `docs/backlog-archive.md` | Уровни корпорации 4 и 5. |
+| CORP-7 | ✅ | data srv | `docs/backlog-archive.md` | Форматы битв от 2 на 2 до 10 на 10. |
+| CORP-8 | ✅ | core data srv proto | `docs/backlog-archive.md` | Карта под формат. |
+| CORP-9 | ✅ | srv | `docs/backlog-archive.md` | Данные вкладки «Битвы». |
+| CORP-10 | ✅ | proto | `docs/backlog-archive.md` | «Битвы» в пять вкладок. |
+| CORP-11 | ✅ | data srv proto | `docs/backlog-archive.md` | Склад, зал славы и монумент. |
+| CORP-12 | ✅ | srv proto | `docs/backlog-archive.md` | Медали игроков в ленте. |
+| CORP-13 | ✅ | proto | `docs/backlog-archive.md` | Картинки базы. |
+| CORP-14 | ✅ | data srv proto | `docs/backlog-archive.md` | Стили базы в магазине. |
+| CORP-15 | ✅ | data srv proto | `docs/backlog-archive.md` | Фоны базы в магазине. |
+| CORP-16 | ✅ | data srv proto | `docs/backlog-archive.md` | Материалы для зданий корпораций. |
+| CORP-17 | ✅ | proto | `docs/backlog-archive.md` | Сцена базы в хабе. |
+| CORP-18 | ✅ | srv proto | `docs/backlog-archive.md` | Отзыв вызова и маркер битвы. |
+| CORP-19 | ✅ | srv data proto | `docs/backlog-archive.md` | Экономика влияния в битвах. |
 | SPY-6 | ✅ | core proto | `docs/backlog-archive.md` | Сеть из 3 агентов. |
 | SPY-7 | ✅ | core data proto | `docs/backlog-archive.md` | Бюро контрразведки |
 | SPY-8 | ✅ | core srv proto | `docs/backlog-archive.md` | Цель — планета, операция 12 ч, разведка |
 | SPY-9 | ✅ | core srv proto | `docs/backlog-archive.md` | Саботаж и кража ресурсов. |
 | SPY-10 | ✅ | core proto | `docs/backlog-archive.md` | Кража исследований. |
 | SPY-11 | ✅ | core srv proto | `docs/backlog-archive.md` | Контрразведчик и война. |
+| SPY-12 | ✅ | core proto | `docs/backlog-archive.md` | Разная цена операций. |
+| SPY-13 | ✅ | core srv proto | `docs/backlog-archive.md` | Разведка, которая копится. |
+| SPY-14 | ✅ | core proto | `docs/backlog-archive.md` | Саботаж очереди. |
+| SPY-15 | ✅ | core proto | `docs/backlog-archive.md` | Подрыв экономики. |
+| SPY-16 | ✅ | srv proto | `docs/backlog-archive.md` | Провал шпиона — новость для всех. |
+| SPY-17 | ✅ | core proto | `docs/backlog-archive.md` | До 3 агентов на одном мире. |
+| SPY-18 | ✅ | core data | `docs/backlog-archive.md` | Перевербовка. |
+| SPY-19 | ✅ | proto | `docs/backlog-archive.md` | Шанс на кнопке операции. |
+| SPY-20 | ✅ | proto | `docs/backlog-archive.md` | Архив докладов. |
+| SPY-21 | ✅ | core | `docs/backlog-archive.md` | Кража по развитости мира. |
+| SPY-22 | ✅ | core proto | `docs/backlog-archive.md` | Раскрытие без войны. |
+| PROG-2 | ✅ | proto data | `docs/backlog-archive.md` | Убрать три силовые ветки командующего. |
+| SLIM-1 | ✅ | proto srv core | `docs/backlog-archive.md` | Сторож размеров. |
+| SLIM-2 | ✅ | proto | `docs/backlog-archive.md` | CSS из build.mjs в файлы. |
+| SLIM-3 | ✅ | proto | `docs/backlog-archive.md` | Мозг ботов по фазам. |
+| SLIM-4 | ✅ | core srv proto | `docs/backlog-archive.md` | Один список модулей ядра. |
+| SLIM-5 | ✅ | srv | `docs/backlog-archive.md` | Хранилища сервера по доменам. |
+| SLIM-6 | ✅ | proto core | `docs/backlog-archive.md` | Длинные функции — по месту. |
+| SLIM-7 | ✅ | proto core docs | `docs/backlog-archive.md` | Мелкая уборка. |
+| BLD-2.1 | ✅ | core | `docs/backlog-archive.md` | Полоса юнита — его производственная постройка. |
+| BLD-2.2 | ✅ | proto | `docs/backlog-archive.md` | Конвейер на каждую полосу. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md` | Сессии и refresh |
 | AC-0.3 | ⏳ | srv data | `docs/accounts-roadmap.md` | Уровень/опыт аккаунта |

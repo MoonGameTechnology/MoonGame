@@ -144,5 +144,5 @@ action-log) — PE-1.1 в `persistence-roadmap.md`.
 
 ## Ссылки
 
-`tech-research.md` §1 · `backlog.md` Блоки A/B/C/D · `architecture.md` (модули/данные) ·
+`tech-research.md` §1 · `backlog-archive.md` Блоки A/B/C/D · `architecture.md` (модули/данные) ·
 `persistence-roadmap.md` (хранилище реплеев) · `server-roadmap.md` (проекция видимости).
