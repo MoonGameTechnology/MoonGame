@@ -3,14 +3,14 @@
  * «справа должна открываться панель с картой, где видно, что игрок разведал, а что нет»).
  *
  * Та же мозаика провинций, что у игровой карты: клетки строит `computePowerCells` по
- * центрам и размерам секторов, рамка — `mosaicFrame` ядра. Своей геометрии тут нет —
+ * центрам и размерам секторов, край — `mosaicClip` ядра. Своей геометрии тут нет —
  * иначе карта в меню разошлась бы с той, по которой потом летают флоты.
  *
  * Знание — ПАМЯТЬ ТУМАНА прошлых забегов (`SectorZeroProgress.chapterScouted`) плюс
  * стартовые провинции игрока: их он знает до первого забега. Про неопознанное панель не
  * говорит ничего — ни вида, ни хозяина, ни проходов: это была бы разведка даром.
  */
-import { mosaicFrame, SEED_WEIGHT, type GameState } from '../packages/shared-core/src/index';
+import { mosaicClip, SEED_WEIGHT, type GameState } from '../packages/shared-core/src/index';
 import { computePowerCells } from '../packages/client/src/territory';
 
 /** Опознанная провинция: стартовый мир игрока (`you`) или любая другая (`other`). Чья
@@ -118,6 +118,15 @@ export function chapterTargets(
   };
 }
 
+/** Рамка вида — описанный прямоугольник края мозаики (при прямоугольном крае это он сам). */
+function frameOf(clip: ReadonlyArray<readonly [number, number]>): ChapterMapView['frame'] {
+  const xs = clip.map((p) => p[0]);
+  const ys = clip.map((p) => p[1]);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
 /**
  * Модель панели. `state` — стартовое состояние главы (`pveState`), `scouted` — память
  * тумана из профиля, `targets` — провинции-цели задач главы (`chapterTargets`).
@@ -142,15 +151,10 @@ export function chapterMapView(
     owner: p.owner,
     kind: p.kind ?? 'planet',
   }));
-  const f = mosaicFrame(
-    planets.map((p) => ({ id: p.id, x: p.position.x, y: p.position.y, size: p.size ?? 1 })),
+  const clip = mosaicClip(
+    planets.map((p) => p.position),
+    state.mapEdge,
   );
-  const clip: Array<[number, number]> = [
-    [f.x0, f.y0],
-    [f.x1, f.y0],
-    [f.x1, f.y1],
-    [f.x0, f.y1],
-  ];
   const cells = computePowerCells(seeds, clip).map((c): ChapterMapCell => {
     const p = planets[c.idx]!;
     const known = knownIds.has(p.id);
@@ -180,7 +184,7 @@ export function chapterMapView(
     }
   }
   return {
-    frame: { x: f.x0, y: f.y0, w: f.x1 - f.x0, h: f.y1 - f.y0 },
+    frame: frameOf(clip),
     cells,
     lanes,
     known: planets.filter((p) => knownIds.has(p.id)).length,
