@@ -290,6 +290,42 @@ function upkeepByOwner(
         bag[res] = (bag[res] ?? 0) + perDay;
       }
     }
+    // A paused site past its 50% mark keeps producing its frozen share
+    // (`pausedProduction`), so it pays the same share of its upkeep. Without this a build
+    // parked at 99% gave 99% of the output for free, indefinitely.
+    for (const [res, perDay] of Object.entries(pausedUpkeep(planet, data, eatsBiomass))) {
+      if (perDay === 0) continue;
+      let bag = out.get(planet.owner);
+      if (!bag) out.set(planet.owner, (bag = {}));
+      bag[res] = (bag[res] ?? 0) + perDay;
+    }
+  }
+  return out;
+}
+
+/** Daily upkeep of a planet's PAUSED sites: the frozen share (`thresholdRamp`) of what
+ *  the finished work would cost, the mirror of `pausedProduction`. A fresh building
+ *  owes its level-1 upkeep, an upgrade the rise over its current level. */
+export function pausedUpkeep(planet: Planet, data: GameData, eatsBiomass: boolean): ResourceBag {
+  const out: Record<string, number> = {};
+  for (const site of planet.pausedConstruction ?? []) {
+    const ramp = thresholdRamp(site.progress);
+    if (ramp <= 0 || typeof site.building !== 'string') continue;
+    const def = data.buildings[site.building];
+    if (!def || (!eatsBiomass && isInfected(def))) continue;
+    if (site.kind === 'building') {
+      const level1 = buildingLevel(def, 1).upkeep;
+      for (const res of Object.keys(level1)) out[res] = (out[res] ?? 0) + (level1[res] ?? 0) * ramp;
+    } else if (site.kind === 'upgrade' && typeof site.level === 'number') {
+      const instance = planet.buildings.find((b) => b.type === site.building);
+      if (!instance) continue;
+      const current = buildingLevel(def, instance.level).upkeep;
+      const target = buildingLevel(def, site.level).upkeep;
+      for (const res of Object.keys(target)) {
+        const rise = (target[res] ?? 0) - (current[res] ?? 0);
+        if (rise > 0) out[res] = (out[res] ?? 0) + rise * ramp;
+      }
+    }
   }
   return out;
 }
@@ -314,7 +350,8 @@ export const economyModule: GameModule = {
   // 1.3.0: a construction ramp is settled by Simpson's rule, exact under a share that
   // changes with time (замечание Codex на #1996).
   // 1.4.0: хук `economy.unitUpkeep` — множитель содержания войск владельца (BAL-19).
-  version: '1.4.1',
+  // 1.4.2: приостановленная стройка платит содержание за ту долю, которую производит.
+  version: '1.4.2',
   setup(api) {
     api.on('time.advanced', (event, h) => {
       const { from, to } = event.payload as { from: number; to: number };

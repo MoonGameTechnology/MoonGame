@@ -220,6 +220,35 @@ describe('economy module — a paused construction keeps its frozen share', () =
     // Base (level 1, always in `planet.buildings`): 5/h. Frozen delta: (15−5) × 0.6 = 6/h.
     expect(r.state.players.p1?.resources.metal).toBeCloseTo((5 + 6) * 1);
   });
+
+  it('bills the same frozen share of its upkeep (ponytail audit 2026-11-09)', () => {
+    // Parked at 99% the site gave 99% of the output and paid nothing, indefinitely.
+    const upkeepData = parseGameData({
+      version: '0.1.0',
+      resources: ['metal', 'energy'],
+      units: {},
+      factions: {},
+      buildings: {
+        mine: { name: 'Mine', cost: { metal: 50 }, buildTimeHours: 4, produces: { metal: 10 }, upkeep: { energy: 24 } },
+      },
+      events: {},
+    });
+    const kernel = createKernel([economyModule]);
+    const s = createInitialState({ seed: 'paused-upkeep', version: { data: '0.1.0', manifest: '1' } });
+    const site = (progress: number) => ({
+      id: 0, kind: 'building' as const, playerId: 'p1', building: 'mine', progress, remainingHours: 1, remainingCost: { metal: 1 },
+    });
+    const world = (progress: number): GameState => ({
+      ...s,
+      players: { p1: { ...player('p1'), resources: { energy: 100 } } },
+      planets: { A: { ...planet('A', 'p1'), pausedConstruction: [site(progress)] } },
+      scheduled: [],
+    });
+    const high = okAdvance(kernel.advanceTo(world(0.75), { now: 24 * HOUR, data: upkeepData }));
+    expect(high.state.players.p1?.resources.energy).toBeCloseTo(100 - 0.75 * 24); // 82
+    const low = okAdvance(kernel.advanceTo(world(0.3), { now: 24 * HOUR, data: upkeepData }));
+    expect(low.state.players.p1?.resources.energy).toBe(100); // produces nothing, owes nothing
+  });
 });
 
 // Gaps found by a mutation-testing pilot (Stryker over economy.ts): each case below

@@ -607,6 +607,17 @@ export const PAUSED_SLOTS_SOLO_MIGRATION = {
   toDataHash: ANNIHILATE_PEACE_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Приостановленная стройка платит содержание за свою долю (economy 1.4.2): мир сейва
+ *  не меняется, меняется только счёт содержания со следующего шага часов. */
+export const PAUSED_UPKEEP_SOLO_MIGRATION = {
+  fromRules: PAUSED_SLOTS_SOLO_MIGRATION.toRules,
+  fromData: PAUSED_SLOTS_SOLO_MIGRATION.toData,
+  fromDataHash: PAUSED_SLOTS_SOLO_MIGRATION.toDataHash,
+  toRules: '11840548fb0fdf',
+  toData: PAUSED_SLOTS_SOLO_MIGRATION.toData,
+  toDataHash: PAUSED_SLOTS_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -660,6 +671,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   MISSILES_SOLO_MIGRATION,
   ANNIHILATE_PEACE_SOLO_MIGRATION,
   PAUSED_SLOTS_SOLO_MIGRATION,
+  PAUSED_UPKEEP_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

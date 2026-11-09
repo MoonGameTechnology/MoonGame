@@ -634,7 +634,7 @@ export {
 } from './util/recap';
 
 // Base modules (plugins) — opt-in via the manifest passed to createKernel.
-export { economyModule, BROWNOUT } from './modules/economy';
+export { economyModule, BROWNOUT, pausedUpkeep } from './modules/economy';
 export { movementModule } from './modules/movement';
 export { combatModule } from './modules/combat';
 export { orbitalModule, BOMBARD_FRACTION } from './modules/orbital';
