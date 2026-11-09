@@ -97,20 +97,6 @@ export function splitDealt(pools: ClassPools, total: number, dealt: number): Cla
   return out;
 }
 
-/** Сложить два разложения (несколько стрелков по одной цели). */
-export function addPools(a: ClassPools, b: ClassPools): ClassPools {
-  return {
-    infantry: a.infantry + b.infantry,
-    vehicle: a.vehicle + b.vehicle,
-    other: a.other + b.other,
-  };
-}
-
-/** Разложение, умноженное на `k` (доля залпа одному врагу, множитель хука). */
-export function scalePools(p: ClassPools, k: number): ClassPools {
-  return { infantry: p.infantry * k, vehicle: p.vehicle * k, other: p.other * k };
-}
-
 export function poolsTotal(p: ClassPools): number {
   return p.infantry + p.vehicle + p.other;
 }
