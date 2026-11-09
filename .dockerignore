@@ -14,3 +14,6 @@ deploy/certs
 /rulesets
 # Listening drafts and offline synthesis sources are not production server assets.
 art/audio/sketches
+# Design docs, mockups and reviews (~50 MB) are not read by the build or the server: the
+# only runtime art they used to hold, the profile portraits, lives in art/profile.
+docs
