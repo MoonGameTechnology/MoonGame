@@ -42,7 +42,7 @@ PvE-режим «волны» (`docs/game-modes-roadmap.md` GM-4.6): игрок�
     timeline → тот же спавн.
 
 - **Сервер (`pveOrchestrator`):** тактика NPC (ADR 05).
-  - По тику генерирует действия: `fleet.move`, `fleet.barrage`, `army.load` и т.д.
+  - По тику генерирует действия: `fleet.move`, `fleet.assault`, `army.load` и т.д.
   - Недетерминирована (зависит от server time и живого state), но это допустимо
     для PvE (не соревновательный режим).
 

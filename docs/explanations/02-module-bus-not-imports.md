@@ -6,8 +6,8 @@
 ## Контекст
 
 Ядро Void Dominion — `createKernel(modules)`, где modules — упорядоченный список
-`GameModule`. ~30 модулей: economy, combat, diplomacy, hero, technology, market и
-др. Каждый модуль — самостоятельная игровая механика.
+`GameModule` (счётчик — `docs/state.md` §9): economy, combat, diplomacy, hero,
+technology, market и др. Каждый модуль — самостоятельная игровая механика.
 
 **Проблема:** если модули импортируют друг друга напрямую, получается жёсткая
 связанность — изменение одного ломает других, порядок исполнения неявный,
@@ -28,17 +28,19 @@
 
 1. **События (pub/sub).** `api.on(eventType, handler)` — подписка; `h.emit(type,
    payload)` — публикация. Модуль реагирует на события других модулей, не зная
-   кто их эмитит. Пример: `combat` эмитит `planet.captured`, `steward` слушает.
+   кто их эмитит. Пример: `combat` эмитит `planet.captured`, `victory` слушает.
 2. **Хуки (value pipelines).** `api.hook<T>(name, fn)` — регистрация; `h.hook<T>(
    name, base, args)` — вызов. Конвейер: base → fn1 → fn2 → … → результат. Каждый
    модуль может модифицировать значение. Пример: `economy.production` —
-   `planet-type` → `tax` → `faction` → `technology` надстраивают производство.
+   `sector`, `planetType`, `tax`, `faction`, `technology` и другие надстраивают
+   производство в порядке списка модулей.
 3. **Capabilities (optional links).** `api.provideCapability(name, impl)` —
    регистрация; `h.capability(name)` — вызов. Опциональная связь с fallback: нет
    модуля → base default, никогда краш. Пример: `effect.<name>` от `effects`.
 
-**Ключевое правило:** модуль **не импортирует** другой модуль (инвариант #3,
-ESLint не enforced, но convention). Утилиты (`state/sectorKind.ts`,
+**Ключевое правило:** модуль **не импортирует** другой модуль (инвариант #3).
+ESLint это сторожит: в `packages/shared-core/src/modules/**` значение из соседнего
+модуля импортировать нельзя, только его типы (`eslint.config.js`). Утилиты (`state/sectorKind.ts`,
 `util/combat.ts`) — не модули, их импортировать можно.
 
 ## Последствия
@@ -49,7 +51,8 @@ ESLint не enforced, но convention). Утилиты (`state/sectorKind.ts`,
   трогается.
 - Тестируемость: модуль тестируется в изоляции (подписки/хуки мокаются через
   `createKernel([oneModule])`).
-- Порядок исполнения = порядок в массиве `DEV_MODULES` (инвариант #6),
+- Порядок исполнения = порядок в списке `GAME_MODULES`
+  (`packages/shared-core/src/gameModules.ts`, инвариант #6),
   записан в `kernel.manifest`, версионирован per match.
 
 **Цена:**
