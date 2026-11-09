@@ -299,13 +299,15 @@ export function initMobileHud(host: MobileHudHost) {
       sheet.classList.toggle('order-mode', mode);
       sheet.classList.toggle('more-open', more);
       sheet.classList.toggle('has-commands', host.commands.classList.contains('show'));
-      // Эскадра в полёте (UIX-10.5, заказ владельца «кнопки приказов тоже у авиации сделать»):
-      // свёрнутый лист показывает ряд приказов её карточки, как ряд команд у флота. Кнопки те
-      // же, что в карточке, — стиль листа прячет остальное (`mobile-console.css`). Чужой
-      // эскадре приказывать нечего: без ряда лист остаётся одной шапкой.
+      // Эскадра в полёте (UIX-10.5, заказ владельца «кнопки приказов тоже у авиации сделать»)
+      // и на стоянке (заказ 2026-11-09 «кнопки управления как для флота»): свёрнутый лист
+      // показывает ряд приказов её карточки, как ряд команд у флота. Кнопки те же, что в
+      // карточке, — стиль листа прячет остальное (`mobile-console.css`). Чужой эскадре
+      // приказывать нечего: без ряда лист остаётся одной шапкой.
       sheet.classList.toggle(
         'aloft',
-        key.startsWith('strike:') && !!host.side.querySelector('.aloft-acts'),
+        (key.startsWith('strike:') || key.startsWith('sq:')) &&
+          !!host.side.querySelector('.aloft-acts'),
       );
       setHidden(head, mode);
       setHidden(tabs, mode || choosing || !tab);

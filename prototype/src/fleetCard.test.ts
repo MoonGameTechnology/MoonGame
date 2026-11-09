@@ -757,7 +757,8 @@ describe('эскадра в воздухе', () => {
     expect(m.aloftPanelHtml(st)).toBe(html);
     // Кнопки стоят в помеченном ряду: свёрнутый лист телефона показывает из карточки только
     // его (UIX-10.5).
-    const row = html.slice(html.indexOf('<div class="row aloft-acts">'));
+    const row = html.slice(html.indexOf('<div class="row aloft-acts wing-orders'));
+    expect(row.length).toBeLessThan(html.length);
     for (const a of ['aloftstrike', 'aloftpatrol', 'aloftsplit', 'wingrecall'])
       expect(row).toContain(order(a, 'S1'));
     // Сесть некуда — перелёта нет; патруля нет — нечего и держать.
@@ -815,12 +816,13 @@ describe('эскадра в воздухе', () => {
     const patrol = { hours: 3, radius: 40 };
     const out = m.aloftPanelHtml(strike('P1', { target: { kind: 'point' }, patrol }));
     expect(subLine(out)).toMatch(new RegExp(`^${t('side.aloft.order.patrol-out')} · <span class="pn-timer"`));
-    expect(out).toContain(`${order('wingkeep', 'P1')} >${t('side.wing.keep')}</button>`);
+    // «Держать» — переключатель плиткой, как «Бомбардировка» у флота: горит, пока держится.
+    expect(out).toContain(`${order('wingkeep', 'P1')} title="${t('cmd.wing.keep')}" aria-pressed="false"`);
     const held = m.aloftPanelHtml(
       strike('P2', { target: { kind: 'point' }, leg: 'patrol', patrol: { ...patrol, hold: true } }),
     );
     expect(subLine(held)).toMatch(new RegExp(`^${t('side.aloft.order.patrol')} · <span class="pn-timer"`));
-    expect(held).toContain(`${order('wingkeep', 'P2')} >${t('side.wing.keep.off')}</button>`);
+    expect(held).toContain(`${order('wingkeep', 'P2')} title="${t('cmd.wing.keep')}" aria-pressed="true"`);
   });
 
   it('повернувшая домой: строка о возврате, бить и отзывать нечего', async () => {

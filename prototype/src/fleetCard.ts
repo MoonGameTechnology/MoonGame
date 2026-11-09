@@ -128,6 +128,7 @@ import { termBody } from './termTip';
 import { restRouteHours } from './travelEta';
 import { unitGlyphSvg } from './unitGlyphs';
 import { veteranTag } from './veteranChevrons';
+import { wingOrder, wingOrdersHtml } from './wingOrders';
 import { hangarSectionHtml, unitRows } from './worldCard';
 import { planet } from './worldQueries';
 import { fortressStatusHtml } from './fortressView';
@@ -1077,21 +1078,17 @@ export function aloftPanelHtml(st: ShuttleStrike): string {
   let h = kitCardHeader(ownerColor(ME), strikeTitle(st), '', sub) + unitRows(card.stacks);
   // Повернувшая домой бить снова не может (правило 3): без строки игрок искал бы кнопку.
   if (card.returning) h += `<div class="row dim">${esc(t('side.aloft.returning'))}</div>`;
-  const buttons =
-    (card.canStrike ? btn('aloftstrike', card.strikeId, t('side.wing.strike'), true) : '') +
-    (card.canPatrol ? btn('aloftpatrol', card.strikeId, t('side.wing.patrol'), true) : '') +
-    (card.canRelocate ? btn('aloftrelocate', card.strikeId, t('side.wing.relocate'), true) : '') +
-    (card.canSplit ? btn('aloftsplit', card.strikeId, t('side.wing.split'), true) : '') +
-    (card.hold !== null
-      ? btn(
-          'wingkeep',
-          card.strikeId,
-          card.hold ? t('side.wing.keep.off') : t('side.wing.keep'),
-          true,
-        )
-      : '') +
-    (card.canRecall ? btn('wingrecall', card.strikeId, t('side.wing.recall'), true) : '');
-  return buttons ? `${h}<div class="row aloft-acts">${buttons}</div>` : h;
+  const id = card.strikeId;
+  const orders = [
+    card.canStrike && wingOrder('strike', 'aloftstrike', id),
+    card.canPatrol && wingOrder('patrol', 'aloftpatrol', id),
+    card.canRelocate && wingOrder('relocate', 'aloftrelocate', id),
+    card.canSplit && wingOrder('split', 'aloftsplit', id),
+    // «Держать» — переключатель: горит, пока патруль держится; нажатие снимает.
+    card.hold !== null && wingOrder('keep', 'wingkeep', id, card.hold),
+    card.canRecall && wingOrder('recall', 'wingrecall', id),
+  ];
+  return h + wingOrdersHtml(orders, id);
 }
 
 // --- Всплывашка надбавок: тап по параметру флота (заказ владельца 2026-09-27) ----------
