@@ -1035,7 +1035,7 @@ function strikeBaseName(base: StrikeBase): string {
 
 /** Чем занята эскадра (`aloftCard.ts`, правило 7). Ключи стоят литералами в каждой ветке:
  *  разбор гейта локализации видит только литеральные ключи. */
-function aloftOrderText(card: AloftCard): string {
+export function aloftOrderText(card: AloftCard): string {
   const o = card.order;
   if (o.kind === 'fleet') return t('side.aloft.order.strike', { name: fleetTitleOf(o.id) });
   if (o.kind === 'planet') return t('side.aloft.order.strike', { name: placeName(o.id) });

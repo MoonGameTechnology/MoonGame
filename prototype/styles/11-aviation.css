@@ -1,0 +1,65 @@
+/* UIX-10.15: список «◇ Авиация» (aviationPanel.ts). ПК — панель справа под строкой статуса;
+   карточка выбранной эскадры живёт рядом, поэтому панель узкая и не модальная. */
+#aviapanel{position:fixed;right:18px;top:calc(var(--tbh) + 96px);z-index:44;display:none;
+  width:min(300px,92vw);max-height:calc(100vh - var(--tbh) - 200px);overflow:auto;background:rgba(6,16,20,.97);
+  border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.6);}
+#aviapanel.show{display:block;}
+.av-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px 6px 12px;
+  border-bottom:1px solid var(--line);font-size:var(--fs-body);color:var(--cyan);}
+.av-head .btn-x{width:26px;height:26px;flex:0 0 auto;}
+.av-gh{padding:8px 12px 4px;font-size:var(--fs-caption);color:var(--dim);}
+.av-row{display:flex;flex-direction:column;align-items:stretch;gap:2px;width:100%;padding:6px 12px;border:0;
+  border-top:1px solid rgba(46,150,160,.14);background:transparent;color:var(--ink);text-align:left;cursor:pointer;
+  font:inherit;}
+.av-row:hover{background:rgba(53,214,230,.08);}
+.av-name{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:var(--fs-body);}
+.av-name i{font-style:normal;color:var(--dim);font-size:var(--fs-caption);flex:0 0 auto;}
+.av-st{font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.av-empty{padding:14px 12px;font-size:var(--fs-body);}
+#avia-fab{display:none;}
+
+/* UIX-10.15: список «◇ Авиация» на телефоне — лист на нижние 56% экрана над нижней панелью
+   (карта сверху видна), вход — плавающая кнопка справа над кнопкой скорости, пока ничего не
+   выделено. */
+body.mobile-ui #aviapanel {
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  top: auto;
+  bottom: calc(var(--phone-navh) + 8px);
+  width: auto;
+  height: 56dvh;
+  max-height: calc(100dvh - var(--tbh) - var(--phone-navh) - 16px);
+  border-radius: 18px;
+  /* Над кнопкой скорости и стопкой сообщений (z 40), под окнами (44+). */
+  z-index: 41;
+}
+body.mobile-ui .av-row {
+  min-height: 48px;
+  padding: 8px 14px;
+}
+body.mobile-ui .av-head .btn-x {
+  width: 36px;
+  height: 36px;
+}
+body.mobile-ui #avia-fab:not([hidden]) {
+  display: inline-flex;
+  position: fixed;
+  right: max(8px, env(safe-area-inset-right));
+  /* Над кнопкой скорости (`#phone-speed`, 44 px у того же края). */
+  bottom: calc(var(--phone-navh) + 68px);
+  z-index: 28;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(95, 224, 208, 0.7);
+  border-radius: 24px;
+  background: rgba(3, 14, 20, 0.94);
+  color: #5fe0d0;
+  font: 700 16px var(--sf-font);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+body.mobile-ui:is(.aim-mode, .chain-mode, .sheet-open) #avia-fab {
+  display: none;
+}

@@ -329,6 +329,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <!-- Всплывашка надбавок параметра флота: тап по «Атаке», «Корпусу»… (fleetCard.ts, renderStatPop) -->
 <div id="statpop" role="dialog" aria-live="polite"></div>
   <div id="pingpanel"></div>
+<!-- Список «◇ Авиация» (aviationPanel.ts): ПК — панель справа, телефон — лист и плавающая кнопка -->
+<div id="aviapanel" role="dialog" data-i18n-aria="avia.title"></div>
+<button id="avia-fab" type="button" hidden></button>
 <div id="tgted"></div>
 <div id="objtip"></div>
 <div id="splitdlg"></div>

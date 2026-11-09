@@ -21,6 +21,9 @@ interface HolographicHost {
   dismiss(): void;
   selectionKey(): string;
   selectionAnchor(): HoloPoint | null;
+  /** Ширина, которую у правого края держит другая панель (список «◇ Авиация»): окно выбора
+   *  открывается левее неё, и оба окна живут вместе. */
+  rightInset?(): number;
 }
 
 /** `aside` встаёт между приказами и «Подробнее»: окно флота консолью кладёт туда ⇅-меню
@@ -246,7 +249,8 @@ export function initHolographicUi(host: HolographicHost) {
             const box = selection.getBoundingClientRect();
             measureChrome();
             windows.openAt('holo-selection-window', selectionWindowPosition(anchor,
-              { width: box.width, height: box.height }, { width, height }, chromeBottom));
+              { width: box.width, height: box.height },
+              { width: width - (host.rightInset?.() ?? 0), height }, chromeBottom));
           }
           selected = key;
         }

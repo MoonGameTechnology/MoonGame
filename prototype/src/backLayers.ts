@@ -148,6 +148,7 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['news-sheet', 'layer'], // шторка ленты новостей «Домой» и карточка корпорации — внутри хаба (z52)
   ['corp-sheet', 'layer'], // шторка вкладки «Корпорация»: здание, уровни, участник — внутри хаба (z52)
   ['pingpanel', 'layer'], // окно «Метки коалиции», z60
+  ['aviapanel', 'layer'], // список «◇ Авиация» (UIX-10.15), z44, на телефоне z41
   ['pingpop', 'layer'], // всплывашка пинга, z45
   ['splitdlg', 'layer'], // диалог разделения флота, z45
   ['statpop', 'layer'], // надбавки параметра флота (тап по числу), z43 — над окном флота
