@@ -1,6 +1,6 @@
 ---
 name: determinism-audit
-description: Аудит инварианта детерминизма симуляционного ядра Void Dominion — проверка, что shared-core остаётся чистой функцией (state, action, context) и что реплей/hashState/анти-чит не сломаны. Запускай, когда просят "аудит детерминизма", "проверь детерминизм", "не сломали ли реплей", "почему разъезжается hashState / desync", "audit determinism", "determinism check", "replay/desync investigation", "is the RNG stream still stable", а также перед мержем PR, который трогает packages/shared-core/src (kernel, rng, hash, replay, modules), список модулей (DEV_MODULES / MODULES) или форму GameState; и при обновлении золотых значений RNG/hash.
+description: Аудит инварианта детерминизма симуляционного ядра Void Dominion — проверка, что shared-core остаётся чистой функцией (state, action, context) и что реплей/hashState/анти-чит не сломаны. Запускай, когда просят "аудит детерминизма", "проверь детерминизм", "не сломали ли реплей", "почему разъезжается hashState / desync", "audit determinism", "determinism check", "replay/desync investigation", "is the RNG stream still stable", а также перед мержем PR, который трогает packages/shared-core/src (kernel, rng, hash, replay, modules), список модулей (GAME_MODULES) или форму GameState; и при обновлении золотых значений RNG/hash.
 ---
 
 # Аудит детерминизма ядра
@@ -43,11 +43,14 @@ description: Аудит инварианта детерминизма симул
   контракт реплея (`replay/replay.test.ts`) и живой record→replay→hash на полном
   dev-стеке (`packages/server/src/replayDeterminism.test.ts`).
 
-**Слепая зона, ради которой аудит и существует:** ESLint игнорирует `prototype/**`,
-`testclient/**`, `mobile/**`, а semgrep-правила смотрят только в
-`packages/shared-core/src`. Но игровые модули прототипа (`prototype/src/game.ts`,
-`export const MODULES` → `createKernel(MODULES)`) исполняются **внутри того же ядра** —
-их детерминизм не проверяет никто, кроме этого аудита.
+**Где машины не хватает — ради этого аудит и существует.** Правила ESLint и semgrep
+ловят вызовы, но не смысл: порядок обхода `Record`, прямую запись в `state.scheduled`,
+нефинитные числа в стейте, перестановку модулей. Всё, что исполняется в ядре, живёт в
+`packages/shared-core/src`: с SLIM-4 оба хоста собирают ядро из одного `GAME_MODULES`
+(`gameModules.ts`), своих модулей у прототипа нет. Код вне ядра (`prototype/src`,
+`decisions/`) правилами детерминизма не покрыт: стейт он не правит, а шлёт действия.
+Исключение по смыслу — боты (`prototype/src/ai.ts` и соседи): self-play воспроизводим по
+сиду, только пока они не читают `Math.random`/часы, и это проверяется глазами.
 
 ## Процедура
 
@@ -60,13 +63,11 @@ description: Аудит инварианта детерминизма симул
 
 ```bash
 grep -rn "Math\.random\|Date\.now()\|new Date(" packages/shared-core/src --include=*.ts | grep -v "\.test\.ts"
-grep -rn "Math\.random\|Date\.now()\|new Date(" prototype/src/game.ts
 grep -rn "from 'node:\|require('node:" packages/shared-core/src --include=*.ts | grep -v "\.test\.ts"
 ```
 
-В `shared-core` попадания ожидаются только в комментариях (на момент написания —
-`action/types.ts`, `rng/rng.ts`, `state/hash.ts`); живой вызов — находка. В
-`prototype/src/game.ts` линтера нет, смотри руками. Время в ядро приходит только через
+В `shared-core` попадания ожидаются только в комментариях; живой вызов — находка
+(линтер его уже должен был поймать, значит, кто-то обошёл правило). Время в ядро приходит только через
 `Context.now`, случайность — только через `h.rng` (сид лежит в `state.rng`, поэтому
 реплей воспроизводит стрим). Там же проверь приближённую математику
 (`Math.pow/exp/log/sin/...`) в новых формулах боя и экономики — та же категория дефекта.
@@ -118,13 +119,13 @@ grep -rn "scheduled\.push\|scheduled\.sort\|scheduled\.splice" packages/shared-c
 ### 5. Порядок модулей (инвариант #6)
 
 Порядок исполнения = порядок массива, и только он: `Kernel` проходит модули `forEach` в
-порядке массива и записывает `manifest`. Списки — `packages/server/src/scenario.ts`
-(`DEV_MODULES`) и `prototype/src/game.ts` (`MODULES`). Ищи в диффе сортировку/фильтрацию
-этих массивов, сборку списка из `Set`/`Map`/`Object.keys`, условное добавление модуля по
-env: всё это делает порядок неявным, а исход матча — зависящим от среды. Порядок внутри
-`DEV_MODULES` смысловой (`orbitalModule` штампует орбиту до `combatModule`, тот до
-`artilleryModule`), поэтому перестановка меняет исход боёв и должна быть осознанным
-решением, а не побочкой рефакторинга.
+порядке массива и записывает `manifest`. Список один — `GAME_MODULES` в
+`packages/shared-core/src/gameModules.ts`; `DEV_MODULES` (`scenario.ts`) и `MODULES`
+(`protoKernel.ts`) — его псевдонимы. Ищи в диффе сортировку/фильтрацию массива, сборку
+списка из `Set`/`Map`/`Object.keys`, условное добавление модуля по env: всё это делает
+порядок неявным, а исход матча — зависящим от среды. Порядок смысловой (`orbitalModule`
+штампует орбиту до `combatModule`), поэтому перестановка меняет исход боёв и должна быть
+осознанным решением с подъёмом `MODULE_MANIFEST_VERSION`, а не побочкой рефакторинга.
 
 ### 6. Контрольный прогон
 

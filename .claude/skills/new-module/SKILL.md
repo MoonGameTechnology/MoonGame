@@ -19,7 +19,7 @@ description: Каркас новой игровой механики как мо
   `modules/sector.ts` (чистые хуки), `modules/heroEffects.ts` (`provideCapability`),
   `modules/movement.ts` (`h.schedule` + `api.on` на отложенное событие).
 - Проверь, что механика не принадлежит существующему модулю: в
-  `packages/shared-core/src/modules/` их уже больше двадцати.
+  `packages/shared-core/src/modules/` их уже больше пятидесяти (таблица — `CODE-MAP.md`).
 
 ## 2. Форма модуля
 
@@ -47,9 +47,11 @@ export const myModule: GameModule = { id: 'my', version: '1.0.0', setup(api) { �
 `research.slots`, `construction.requirement`, `victory.score`). Именно отсутствие
 прямых связей даёт свойство «нет модуля → база, а не падение»; прямой импорт
 превращает опциональный модуль в обязательный и ломает манифесты режимов игры.
+ESLint это ловит: из соседнего модуля можно взять только ТИПЫ, общие чистые хелперы
+живут в `state/` или `util/`.
 
 Ядро подстраховывает это само: `hook` без контрибьюторов возвращает `base`
-(`kernel.ts:369`), событие без подписчиков гаснет. Дубликаты запрещены — второй
+(`Kernel` в `kernel.ts`), событие без подписчиков гаснет. Дубликаты запрещены — второй
 `onAction` на тот же тип или второй `provideCapability` на то же имя бросают
 исключение при сборке ядра (см. конструктор `Kernel`). Один тип действия — один
 обработчик; расширяют его хуками и событиями, а не вторым обработчиком.
@@ -111,7 +113,7 @@ export const beaconModule: GameModule = {
   кладут только JSON: без `Map`, `Set`, `Date`, классов и функций.
 - **Fail-secure.** Любая проверка не прошла → `h.reject('E_…')` со стабильным кодом
   и без деталей: код уходит клиенту, подробности — в лог сервера. Неожиданный throw
-  ядро превратит в `E_INTERNAL` (`kernel.ts:409`) — это страховка, а не рабочий путь.
+  ядро превратит в `E_INTERNAL` (`kernel.ts`) — это страховка, а не рабочий путь.
   Отложенное событие, чей обработчик бросил, dead-letter'ится в `failures`, поэтому
   таймлайн не встаёт: пиши обработчики событий терпимыми к исчезнувшим сущностям.
 
@@ -127,11 +129,12 @@ export const beaconModule: GameModule = {
 ## 7. Имена ключей в payload события — это контракт фога
 
 Сервер решает, кому показать событие, **по именам ключей payload**
-(`MatchRoom.eventVisibleTo`, `packages/server/src/matchRoom.ts:1751`):
+(`MatchRoom.eventVisibleTo`, `packages/server/src/matchRoom.ts`):
 адресат — `owner`/`playerId`/`a`/`b`/`from`/`to`/`buyer`/`seller`; место —
-`location`/`planetId`/`at`; владение флотом — `fleetId`. Назовёшь адресата `target`
-или `recipient` — событие молча скроется от игрока (fail-closed: утечки нет, но и
-уведомления нет), пока ключ не добавят в фильтр вместе с тестом в `matchRoom.test.ts`.
+`location`/`planetId`/`at`; владение флотом — `fleetId`; бой — `battleId`. Назовёшь
+адресата `target` или `recipient` — событие скроется от игрока (fail-closed: утечки нет,
+но и уведомления нет). Гейт это ловит: `packages/server/src/eventFogContract.test.ts`
+сканирует `h.emit` во всех модулях и краснеет на событии без маршрутизируемого ключа.
 
 ## 8. Тест рядом с исходником
 
@@ -147,18 +150,25 @@ export const beaconModule: GameModule = {
 
 ## 9. Регистрация: порядок — это поведение
 
-Экспортируй модуль из `packages/shared-core/src/index.ts` (секция «Base modules»),
-затем добавь в списки, которые собирают ядро:
-
-- `packages/server/src/scenario.ts` → `DEV_MODULES` (`scenario.ts:113`);
-- `prototype/src/protoKernel.ts` → `MODULES` (`protoKernel.ts:54`) — играбельный
-  прототип. (В `game.ts` этот список только РЕЭКСПОРТИРУЕТСЯ: после REFP он стал
-  фасадом и собственной логики не несёт — правь `protoKernel.ts`.)
+Экспортируй модуль из `packages/shared-core/src/index.ts` (секция «Base modules») и
+впиши в **один** список модулей игры — `GAME_MODULES` в
+`packages/shared-core/src/gameModules.ts` (SLIM-4). Его берут оба хоста: прод-хост
+игроков через `prototype/src/protoKernel.ts` и канонический сервер через
+`packages/server/src/scenario.ts`; своих списков у них больше нет.
 
 Позиция в массиве = приоритет исполнения (инвариант #6): в этом порядке идут
 подписчики событий и звенья хук-конвейера, и он же записан в `kernel.manifest`.
 Вставка в середину меняет результат уже идущих матчей — выбирай место осознанно и
-объясни его комментарием рядом, как это сделано для `orbital → combat → artillery`.
+объясни его комментарием рядом, как это сделано для `orbital → combat`.
+
+Правка состава или порядка — это ещё две обязательные правки в том же PR:
+
+- подними `MODULE_MANIFEST_VERSION` в `packages/server/src/scenario.ts` (комментарий
+  рядом — что поменялось) и перезакрепи список в `moduleManifest.test.ts`;
+- добавь пару соло-сохранений в `decisions/soloSaveMigration.ts`: новый граф модулей
+  меняет отпечаток правил, и без пары локальная схватка прошлого выпуска перестанет
+  читаться. Сторож — `prototype/src/soloSaveMigrationWiring.test.ts`. То же нужно,
+  когда модуль меняет правила без смены состава (поднял `version`).
 
 ## 10. Финал
 

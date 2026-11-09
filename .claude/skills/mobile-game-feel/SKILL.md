@@ -18,7 +18,7 @@ description: Отклик и «сок» карты Void Dominion на ТЕЛЕФ
 | `flashFx.ts` | жизнь вспышки: возраст, прогресс 0→1, «отгорела» |
 | `pulseFx.ts` | дыхание слоя: `base + amp·sin`, устойчивая фаза от места или id |
 | `sweepFx.ts` | послесвечение радарной развёртки по углу отставания луча |
-| `volleyFx.ts`, `fireEffects.ts` | залпы и огонь |
+| `fireEffects.ts` | залпы и огонь |
 | `fleetEffects.ts`, `pingPulse.ts` | флот и метки |
 | `sound.ts` | синтезированные отклики (SND-1) |
 
