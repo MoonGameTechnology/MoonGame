@@ -7,13 +7,14 @@
 
 ## Текущее состояние (факт)
 
-`victoryModule` существует в ядре (`GameState.match`, scoreboard, `match.ended` по доминированию/
-уничтожению/лимиту/тайм-ауту) и **уже подключён в прототипе** (`prototype/src/game.ts` `MODULES` →
-`createKernel`); `checkEnd()` в `prototype/src/main.ts` выводит баннер из авторитетного
-`s.match.status==='ended'` (не фейк). На сервере есть **ручной старт-лобби** (хост + гард слотов,
-`packages/server/src/matchRoom.ts`) и **пер-игроковый архив** через `MatchRegistry`
-(`matchRegistry.ts`; хендлер HTTP `GET /matches` — в `matchApi.ts`/`registerBrowserApi`, смонтирован через `httpRoutes`-шов `wsServer.ts`). Нет формальной машины состояний
-матча/ready-check, очереди матчмейкинга, предматчевого экрана. Старт по фракции — `core` (CR-1.3).
+`victoryModule` живёт в ядре (`GameState.match`, scoreboard, `match.ended` по доминированию/
+уничтожению/лимиту/тайм-ауту) и стоит в общем списке `GAME_MODULES` обоих хостов; итог матча
+прототип показывает в `prototype/src/matchEnd.ts` по авторитетному `s.match.status`. Лобби нет
+по решению SES-2.1: партия создаётся кнопкой (`POST /matches`) и живёт с момента создания;
+режим ручного старта (`manualStart` в `packages/server/src/matchRoom.ts`) остался в коде, но хосты
+его не включают. **Пер-игроковый архив** — `MatchRegistry` (`matchRegistry.ts`; HTTP `GET /matches` —
+`registerBrowserApi` в `matchApi.ts`, смонтирован через `httpRoutes`-шов `wsServer.ts`). Нет
+очереди матчмейкинга и предматчевого экрана. Старт по фракции — `core` (CR-1.3).
 
 ## Зависимости
 
@@ -28,13 +29,13 @@ victoryModule) · `server-roadmap.md` (match-actor, lifecycle) · `persistence-r
 **Цель:** управляемый полный цикл матча.
 **Подзадачи:** машина состояний матча; переходы (старт по заполнению/таймеру, завершение по victory, архивация); хранение (persistence); события lifecycle для клиента.
 **Готово, когда:** матч проходит весь цикл; переходы персистентны и наблюдаемы.
-> Частично уже в коде: ручной старт-лобби (хост, гард слотов) в `packages/server/src/matchRoom.ts`; архивация (`ongoing`/`ended` + пер-игроковый архив) в `matchRegistry.ts`. Формальная машина состояний с переходами по заполнению/таймеру — ⏳.
+> Частично уже в коде: ручной старт-лобби (хост, гард слотов) в `packages/server/src/matchRoom.ts`, хосты его не включают (SES-2.1); архивация (`ongoing`/`ended` + пер-игроковый архив) в `matchRegistry.ts`. Формальная машина состояний с переходами по заполнению/таймеру — ⏳.
 
 ### MM-0.2 · Подключить victoryModule + баннер `[core][proto][srv]` ✅ — S
 **Цель:** реальное завершение вместо фейка. **Бирка H1.**
 **Подзадачи:** включить `victoryModule` в кернел (прототип и сервер); баннер из `state.match`; завершение матча по `match.ended`.
 **Готово, когда:** матч реально завершается по условиям победы; фейковый `checkEnd` удалён.
-✅ уже в коде: `victoryModule` в `prototype/src/game.ts` (`MODULES` → `createKernel`); `checkEnd()` в `prototype/src/main.ts` строит баннер из авторитетного `s.match.status==='ended'` (фейка нет).
+✅ уже в коде: `victoryModule` в `GAME_MODULES` обоих хостов; итог матча — `prototype/src/matchEnd.ts` из авторитетного `s.match.status` (фейка нет).
 
 ---
 

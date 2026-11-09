@@ -145,9 +145,9 @@ computeSpeed(флот):
 
 Ядро — чистая функция (для replay и античита), значит **порядок срабатывания модулей обязан быть фиксированным**. Pub/sub с произвольным порядком сломал бы воспроизводимость.
 
-Решение: порядок модулей задаётся явным приоритетом и **версионируется вместе с матчем** (как игровые данные в `architecture.md`). Матч помнит, какие модули, в каком порядке и какой версии были активны — это **манифест модулей** партии.
+Решение: порядок модулей — их порядок в одном списке `GAME_MODULES` (`packages/shared-core/src/gameModules.ts`), и он **версионируется вместе с матчем** (как игровые данные в `architecture.md`). Матч помнит, какие модули, в каком порядке и какой версии были активны — это **манифест модулей** партии (`kernel.manifest`, версия — `MODULE_MANIFEST_VERSION` в `packages/server/src/scenario.ts`).
 
-Бонус: из одного кода собираются разные режимы игры разным манифестом — «классика» (все модули), «хардкор без дипломатии», «песочница без событий».
+Режимы сейчас различаются данными (`data/modes.json`, поля карты), а не составом модулей: оба хоста собирают один список. Модуль, которому в режиме нечего делать, инертен — например, `pve` в PvP-партии.
 
 ---
 
@@ -176,11 +176,14 @@ computeSpeed(флот):
 - `time.advanced`, `match.*` и публичные новости (`PUBLIC_EVENTS` в `matchRoom.ts`: сейчас
   только `espionage.exposed`, раскрытый шпион) — глобальные (видны всем); `hero.*` — строго owner-only;
   разведданные (`OWNER_ONLY_EVENTS` в `matchRoom.ts`) — тоже только владельцу, даже на
-  опознанном мире. Это стройка и производство (`building.constructed`, `building.upgraded`,
-  `unit.built`, `army.load.cancelled`, `army.unload.cancelled`): результат наблюдатель видит
+  опознанном мире. Это стройка, ремонт и производство (`building.constructed`, `building.upgraded`,
+  `building.repair.started`, `station.repair.started`, `unit.built`, `army.load.cancelled`,
+  `army.unload.cancelled`): результат наблюдатель видит
   в состоянии. И это события, пересказывающие то, что проекция режет у соперника даже на
   опознанном мире: приказы стройки (`construction.*`), `capital.designated`,
-  `steward.holdpoint`, `mines.laid`, `salvage.paid`, `fleet.merge.pending`, `refuge.found`.
+  `steward.holdpoint`, `mines.laid`, `salvage.paid`, `fleet.merge.pending`, `refuge.found`,
+  `fleet.halted`, а также шпионаж и украденные сведения (`espionage.*`, кроме публичного
+  `espionage.exposed`, и `intel.*`).
   У каждого записан ключ, которым событие называет хозяина (`owner` или `playerId`), и
   эмиттер обязан нести именно его.
 

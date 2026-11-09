@@ -49,7 +49,7 @@ red    : ws://127.0.0.1:8787/matches/dev?player=red
 
 Connecting as an unknown player is refused at the upgrade (HTTP 403). For a test
 across the internet, bind `HOST=0.0.0.0` and tunnel the port, or host the server
-(Fly.io/Railway, per `docs/roadmap.md`).
+(see the [production deployment guide](../deploy/README.md)).
 
 The wire is covered headlessly by `packages/server/src/scenario.test.ts` (part of
 `pnpm test`): it connects two real WebSocket clients to the dev match, has each
@@ -58,13 +58,14 @@ peers and that a peer reconstructs the exact authoritative state from `welcome` 
 deltas. The construction (data loader + `createDevMatch`) lives in
 `packages/server/src/scenario.ts`, reused by both the runner and the test.
 
-## Playing the real prototype together — up to 10 players
+## Playing the real prototype together
 
 The section above connects to a minimal core harness (`dev:server`, green/red). To
 play the **actual prototype** — the map, the HUD, the whole console — as a
 multiplayer session, use the prototype dev server. It hosts the prototype's _own_
-world (same `kernel` + `data` + `newGame()`), defaults to ten claimable FFA seats,
-and **serves the game HTML at `/`** so peers need no file at all. Empty seats are
+world (same `kernel` + `data` + `newGame()`), takes its seats from the map (the default
+`duel-1` has two chairs; a match created from the browser can pick any of the six maps,
+2–50 chairs), and **serves the game HTML at `/`** so peers need no file at all. Empty seats are
 driven by server AI after the reconnect grace window.
 
 ### One command to host
@@ -77,7 +78,7 @@ It prints the URLs and detects your LAN IP, e.g.:
 
 ```
   game   : http://localhost:8788/   (player client · dev client with test tools: http://localhost:8788/dev)
-  mode   : 10-player FFA — empty chairs are AI-driven
+  map    : duel-1 — 2 claimable chairs; empty chairs are AI-driven
   Multiplayer test:
    • You:     open http://localhost:8788/   → enter a callsign → join
    • Friends: open http://192.168.1.23:8788/  → enter unique callsigns → join
@@ -100,24 +101,23 @@ The game opens on a **connect overlay**:
   maps that callsign back to the same chair on reconnect. The URL is remembered
   (the APK reconnects in one tap).
 
-Match modes are selected when starting the host:
-
 ```bash
-pnpm host                    # 10-player FFA
-TEAMS=5v5 pnpm host          # ten chairs: p1–p5 vs p6–p10
-TEAMS=3v3 pnpm host          # six chairs: p1–p3 vs p4–p6
-TEAMS=2v2 pnpm host          # compact four-chair team test
-TEAMS=1v1 pnpm host          # duel — two chairs, opposite sides of the board
-TEAMS=pve pnpm host          # two humans against one strong bot
-MATCHES=3 pnpm host          # three independent sessions in ONE process
+pnpm host                    # one session on the default map
+MATCHES=3 pnpm host          # seed three independent sessions in ONE process
 ```
 
-`MATCHES=N` (default 1, up to 16) hosts N sessions side by side — ids `proto`,
-`proto-2`, … Every one appears in the in-game match browser («Доступные»), players
-pick a row; each session runs from the moment it is created (SES-2.1, Iron Order
+The map owns the seat count and the sides: `duel-1` 2, `ffa-4` 4, `team-2v2` 4,
+`team-3v3` 6, `ffa-20` 20, `ffa-50` 50. `TEAMS` (`ffa`, `1v1`…`5v5`, `pve`) is a legacy
+setting: it seats only the retired maps that old saved sessions still use
+(`networkSeats` in `prototype/src/matchSetup.ts`).
+
+`MATCHES=N` (default 1, up to 16) seeds N sessions on an EMPTY store — the first keeps
+the historical id `proto`, the rest get random eight-digit ids; after that the store,
+not the variable, lists the sessions (ADDR-1). Every one appears in the in-game match
+browser («Доступные»), players pick a row; each session runs from the moment it is created (SES-2.1, Iron Order
 model — no lobby, no host, no Start press: a join lands in a live world), with its
-own empty-seat AI and its own durable snapshot, so a restart resumes them all. The
-mode/`TIME_SCALE` apply to every session alike.
+own empty-seat AI and its own durable snapshot, so a restart resumes them all.
+`TIME_SCALE` applies to every session alike.
 
 Unsupported `TEAMS` values fail at startup. A durable saved match keeps its
 original roster; remove the saved `proto` snapshot or use an empty database before
@@ -127,7 +127,7 @@ expecting a new mode.
 
 1. Host runs `pnpm host` and reads off the local and LAN URLs.
 2. **You** open the `localhost` URL and enter a callsign.
-3. Up to nine **friends** on the same Wi-Fi open `http://<LAN-IP>:8788/` and enter
+3. **Friends** on the same Wi-Fi open `http://<LAN-IP>:8788/` and enter
    different callsigns.
 4. Everyone lands straight in the running world — the session clock started when
    the server created it. (If a friend can't reach it, allow port 8788 through
@@ -231,8 +231,8 @@ first failing step:
    `cloudflared tunnel --url http://localhost:8788` and share the printed `https://…` URL.
 
 7. **Page loads but the WebSocket won't connect?** Open DevTools → Console/Network (filter WS).
-   A **403** on raw `?player=` means the id is outside the configured range (default
-   `p1`–`p10`, `TEAMS=2v2`: `p1`–`p4`); normal clients should enter a callsign instead.
+   A **403** on raw `?player=` means the id is not a seat of that match (the default
+   `duel-1` has `p1`–`p2`); normal clients should enter a callsign instead.
    A **404** means a stray path — the connect field wants an **origin only** (`ws://host:8788`),
    not a `/matches/…` URL. A **mixed-content** block means an `https` page tried `ws://` — the
    overlay now auto-upgrades to `wss://`, but a stale saved value can linger:
@@ -247,24 +247,17 @@ game day each session is on). Empty/offline chairs are driven by server AI after
 their reconnect grace window; a claimed chair goes back to its player the moment
 they return.
 
-### Net-mode scope (first MP test)
+### Net mode: one rule set
 
-The prototype was built single-player, so some rules live in the client. Against
-the authoritative server those are suspended; the server only enforces the
-**kernel** rules. What that means in MP:
+Single-player, the prototype host and the production entry run the same kernel (one module
+list, `GAME_MODULES`), so a rule that works offline works on the server:
 
-- **Capture** is via the kernel's combat: orbit **near** → **assault** (the
-  walk-into-an-undefended-neutral-sector shortcut is a client-only convenience
-  and does not apply in MP).
+- **Capture:** orbit **near** → **assault**; walking into an undefended neutral sector takes
+  it on arrival — a kernel rule (`captureOnArrival`), not a client shortcut.
+- **Builds:** the build queue lives in the core (`construction.queued` / `construction.started`),
+  so a queued order keeps running while the player is offline.
 - **Server AI fills empty chairs** after a reconnect grace period; a live player always
   commands their own chair unless they explicitly delegate it to the Steward.
-- **Builds** send one order per tap (the server times construction); the local
-  multi-item build queue is single-player only.
-- Starfort auto-AA and in-MP event toast notifications are not wired yet.
-
-State still updates fully on every snapshot; these are follow-ups, not blockers
-for a connectivity test. The natural next step is promoting walk-in capture into
-a real kernel rule so MP and single-player share one capture mechanic.
 
 ## Preparing for a live multiplayer test
 
@@ -312,7 +305,7 @@ seats N players — each gets a homeworld (spread around the neutral `nexus`) an
 - _LAN (two devices):_ `HOST=0.0.0.0 PORT=9000 pnpm dev:server`, then dial
   `ws://<this-machine-LAN-IP>:9000/matches/dev?player=green`.
 - _Internet (throwaway):_ tunnel the port — `cloudflared tunnel --url http://localhost:8787`
-  (or `ngrok http 8787`) — and use the printed `wss://…` URL; or host it (Fly.io/Railway). Do
+  (or `ngrok http 8787`) — and use the printed `wss://…` URL; or host it ([deploy/README.md](../deploy/README.md)). Do
   **not** expose an unauthenticated dev server long-term — enable the JWT handshake
   (`AUTH_JWT_SECRET`, SE-0.1) for anything beyond a LAN playtest.
 
@@ -425,7 +418,7 @@ Broadcasts are entity-level deltas (changed entities per collection + removed id
 
 - **Persistence:** ✅ a Postgres `GameState`+receipts store exists (`store/postgres.ts`) and is wired in **both** hosts (`packages/server/src/main.ts` via `createStores` + strict commit-before-broadcast, and the prototype host `netserver.ts`; opt-in via `DATABASE_URL`); durable matches survive restart.
 - **Scheduling:** ✅ a v1 offline scheduler exists — `MatchRoom.tick()`/`msUntilNextEvent()` + the shared single-process wakeup driver (`clockDriver.ts`; both hosts use `startClockDriver` — the prototype host's old inline `setTimeout` driver was removed in NETA2-6) fire due events with nobody connected. ⚠️ a durable, cross-process wake-up (pg-boss, v2 — NOT Redis/BullMQ) is needed for >1 server process.
-- **Auth:** ✅ opt-in JWT join-token handshake (`auth.ts`, `?token=`; `?player=`/`?nick=` refused when enabled) + Origin allowlist. ⚠️ default-off for dev; OIDC identity on create/join and TLS termination are the remaining production steps.
+- **Auth:** ✅ opt-in JWT join-token handshake (`auth.ts`, `?token=`; `?player=`/`?nick=` refused when enabled) + Origin allowlist. ⚠️ default-off for dev (`PROD=1` refuses to start without it); TLS terminates at Caddy or natively (`TLS_KEY_FILE`/`TLS_CERT_FILE`); OIDC identity on create/join is the remaining production step.
 - **Fog of war:** ✅ done — deltas are diffed per player against `visibleState(playerId)` and events are fog-filtered; nothing a player can't see leaves the server.
 - **Action gate:** ✅ `@void/action-layer` is wired (`MatchRoom.gate`, `GATE=1`): `action.v1` envelopes pass validate → payload schema → authorize → dedup → sequence before the reducer, and bare `action` is refused on a gated room. ✅ the client sends envelopes: `MultiplayerClient` flips to `action.v1` on the `welcome.gated` handshake (strict per-session `clientSeq`, reset on reconnect).
 - **Diffs:** ✅ deltas are sent (full snapshots only on join/resync). Reconnect works via the `welcome`/`state` full snapshot.
