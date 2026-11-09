@@ -144,8 +144,10 @@ export function troopsModel(input: TroopsInput): TroopsModel {
       rows.some((r) => r.garrisonAll > 0 || r.reserved > 0),
     valid: loadTotal + unloadTotal > 0,
     askFirst: rows.some((r) => {
+      // Свободные раненые против свободного запаса: обещанное другим очередям не выбирается.
       const w = r.wounded ?? 0;
-      return !r.group && r.delta > 0 && w > 0 && w < r.garrison && r.delta < r.garrison - r.reserved;
+      const free = r.garrison - r.reserved;
+      return r.delta > 0 && w > 0 && w < free && r.delta < free;
     }),
     asking: !!input.asking,
   };
@@ -167,7 +169,7 @@ export function maxPlan(input: TroopsInput, unit: string, dir: 1 | -1): Record<s
 }
 
 /** Приказы на выбранные группы. Погрузка и выгрузка завершаются в ядре через час. */
-export function planOrders(m: TroopsModel): {
+export function planOrders(m: TroopsModel, first?: 'wounded' | 'healthy'): {
   load: Array<{ unit: string; count: number; group?: string }>;
   unload: Array<{ unit: string; count: number; group?: string }>;
 } {
@@ -175,7 +177,8 @@ export function planOrders(m: TroopsModel): {
   const unload: Array<{ unit: string; count: number; group?: string }> = [];
   for (const r of m.rows) {
     if (r.transferSources) {
-      const orders = splitArmyTransferSources(r.transferSources, Math.abs(r.delta))
+      // «Кого первыми» решает только погрузку: при выгрузке вопрос не задаётся.
+      const orders = splitArmyTransferSources(r.transferSources, Math.abs(r.delta), r.delta > 0 ? first : undefined)
         .map((source) => ({ unit: r.unit, ...source }));
       if (r.delta > 0) load.push(...orders);
       else if (r.delta < 0) unload.push(...orders);
@@ -336,6 +339,10 @@ function compactTroopsHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
     <div class="ttabs" role="tablist" aria-label="${esc(t('troops.direction'))}">${tabs}</div>
     <div class="tcapacity"><div>${esc(t('troops.hold', { a: occupied, b: m.capacity }))}${selected ? ` → ${esc(t('troops.hold', { a: projected, b: m.capacity }))}` : ''}</div><div class="tcapacity-bar" aria-hidden="true"><i style="width:${percent(occupied)}%"></i><b style="width:${percent(projected)}%"></b></div><small>${esc(t('troops.free', { n: m.freeCargo }))}</small></div>
     <div class="tlist" id="troops-list" role="tabpanel" aria-labelledby="troops-tab-${mode}">${rows || `<div class="tnote">${esc(t('troops.empty'))}</div>`}${loading && m.holdFull ? `<div class="tnote warn">${esc(t('cargo.hold-full'))}</div>` : ''}</div>
-    <div class="tacts"><div class="tsummary"><b>${esc(t('troops.selected', { n: selected }))}</b><button data-cmd="tclear" class="btn-quiet"${selected ? '' : ' disabled'}>${esc(t('troops.clear'))}</button></div><button data-cmd="tok" class="cbtn btn-main"${m.valid ? '' : ' disabled'}>${esc(label)}${selected ? ` · ${selected}` : ''}</button><small>${esc(t('troops.timing'))}</small></div>
+    <div class="tacts"><div class="tsummary"><b>${esc(t('troops.selected', { n: selected }))}</b><button data-cmd="tclear" class="btn-quiet"${selected ? '' : ' disabled'}>${esc(t('troops.clear'))}</button></div>${m.asking && m.askFirst
+      // Вопрос «кого первыми» встаёт на место кнопки погрузки: без него «Погрузить»
+      // только поднимал флаг вопроса, а окно его не показывало.
+      ? `<div class="tnote">${esc(t('troops.first.ask'))}</div><button data-cmd="tfirst" data-first="wounded" class="cbtn btn-main">${esc(t('troops.first.wounded'))}</button><button data-cmd="tfirst" data-first="healthy" class="cbtn btn-main">${esc(t('troops.first.healthy'))}</button>`
+      : `<button data-cmd="tok" class="cbtn btn-main"${m.valid ? '' : ' disabled'}>${esc(label)}${selected ? ` · ${selected}` : ''}</button>`}<small>${esc(t('troops.timing'))}</small></div>
   </div>`;
 }

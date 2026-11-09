@@ -185,7 +185,7 @@ describe('compatible formation display without changing combat wounds', () => {
     const rows = armyTransferRows(state, fleet, true, data);
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({ hp: 104.8, maxHp: 120, health: 87.3, garrisonAll: 6, reserved: 2 });
-    expect(rows[0]!.transferSources).toEqual([{ group: 'healthy', count: 4 }, { group: 'veteran', count: 0 }]);
+    expect(rows[0]!.transferSources).toEqual([{ group: 'healthy', count: 4 }, { group: 'veteran', count: 0, wounded: true }]);
     expect(state).toEqual(before);
   });
   it('apportions whole units without consuming reservations or duplicating a source', () => {
@@ -227,4 +227,28 @@ it('opening and regrouping the menu never mints veteran XP or averages valour le
   expect(veteranXp(JSON.parse(JSON.stringify(current)), 'p', rewardData)).toBe(1100);
   expect(current.planets.a!.garrison.map(({ count, damageDealt }) => ({ count, damageDealt })))
     .toEqual(state.planets.a!.garrison.map(({ count, damageDealt }) => ({ count, damageDealt })));
+});
+
+it('a merged row keeps which formations are wounded, and «first» drains them before the rest', () => {
+  const { state, fleet } = fixture();
+  delete state.fleets.other;
+  fleet.loading = []; fleet.unloading = []; fleet.landing = [];
+  state.planets.a!.garrison = [
+    { unit: 'infantry', count: 4, armyGroup: 'whole' },
+    { unit: 'infantry', count: 4, armyGroup: 'hurt', hp: 40 },
+  ];
+  const [row] = armyTransferRows(state, fleet, true, data);
+  expect(row).toMatchObject({ garrison: 8, wounded: 4 });
+  expect(row!.transferSources).toEqual([
+    { group: 'whole', count: 4 },
+    { group: 'hurt', count: 4, wounded: true },
+  ]);
+  expect(splitArmyTransferSources(row!.transferSources, 5, 'wounded'))
+    .toEqual([{ group: 'hurt', count: 4 }, { group: 'whole', count: 1 }]);
+  expect(splitArmyTransferSources(row!.transferSources, 3, 'healthy')).toEqual([{ group: 'whole', count: 3 }]);
+  expect(splitArmyTransferSources(row!.transferSources, 3)).toEqual([
+    { group: 'whole', count: 2 },
+    { group: 'hurt', count: 1 },
+  ]);
+  expect(splitArmyTransferSources(row!.transferSources, NaN, 'wounded')).toEqual([]);
 });
