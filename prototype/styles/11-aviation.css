@@ -63,3 +63,26 @@ body.mobile-ui #avia-fab:not([hidden]) {
 body.mobile-ui:is(.aim-mode, .chain-mode, .sheet-open) #avia-fab {
   display: none;
 }
+
+/* Приказы эскадры плитками, как ряд команд флота (wingOrders.ts, заказ владельца 2026-11-09):
+   значок над подписью, три колонки. Колонка не уже самого длинного слова: «Перебазировать»
+   иначе вылезало бы из плитки. «Ещё» нужна только свёрнутому листу телефона. */
+#side .row.wing-orders{display:grid;grid-template-columns:repeat(3,minmax(min-content,1fr));gap:8px;
+  margin:10px 0 4px;}
+#side .wing-orders > .fc-title{grid-column:1/-1;}
+#side .wing-orders > button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  min-width:0;min-height:64px;margin:0;padding:8px 6px;border-radius:6px;text-align:center;white-space:normal;
+  line-height:1.2;}
+#side .wing-orders > button .ci{font-size:19px;line-height:1;}
+#side .wing-orders > button .ci svg{width:24px;height:24px;}
+#side .wing-orders > button .cl{font-size:var(--fs-body);}
+body:not(.mobile-ui) #side .wing-orders > .wing-more{display:none;}
+/* Телефон: ряд прямо под шапкой листа, без заголовка; плитки по размеру — как у флота. Пока
+   лист свёрнут и «Ещё» не нажата, видны две первые плитки и «Ещё»; раскрытый лист — все. */
+body.mobile-ui #mobile-sheet #side .aloft-acts.wing-orders > .wing-orders-title{display:none;}
+body.mobile-ui #mobile-sheet #side .aloft-acts.wing-orders > button{min-height:48px;padding:5px 3px;
+  border-radius:11px;}
+body.mobile-ui #mobile-sheet #side .aloft-acts.wing-orders > button .cl{font-size:var(--fs-caption);}
+body.mobile-ui #mobile-sheet:not(.expanded) #side .wing-orders:not(.open) > .extra,
+body.mobile-ui #mobile-sheet.expanded #side .wing-orders > .wing-more{display:none;}
+body.mobile-ui #mobile-sheet #side .wing-orders > .wing-more{order:1;}

@@ -138,6 +138,7 @@ import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { splitOne } from './squadronPanel';
 import { cursorTipPos } from './tipPlacement';
 import { arrivalHours } from './travelEta';
+import { toggleWingMore } from './wingOrders';
 import { forkPanelHtml, planetPanelHtml, toggleSpyMenu, unknownPlanetHtml } from './worldCard';
 import { toggleDossierBlock } from './dossierFolds';
 import { enqueueBuild, timeLeft } from './worldQueries';
@@ -745,8 +746,6 @@ function onSideClick(ev: MouseEvent): void {
       arm('strikeAim', { from: base, squadronId: arg }); // слияние звеньев гаснет само
       note(t('hint.wing-aim'));
     }
-  } else if (act === 'msllaunch' || act === 'mslsalvo') {
-    armMissileAim(squadronAt(arg), arg, act === 'mslsalvo'); // пуск ракет (missiles-roadmap)
   } else if (act === 'wingpatrol') {
     // SHU-6.3 — тот же прицел, но тап выбирает ТОЧКУ патруля, а не цель: под пальцем
     // идёт круг патруля (`drawPatrolAim`), вокруг базы — круг дальности, как у удара.
@@ -826,6 +825,9 @@ function onSideClick(ev: MouseEvent): void {
     if (from && found && playerOrder(mergeSquadron(ME, found.base, from, arg)) && selSquadron)
       pickSquadron(arg);
     drop('squadMerge');
+  } else if (act === 'wingmore' || act === 'msllaunch' || act === 'mslsalvo') {
+    if (act === 'wingmore') toggleWingMore(arg); // «Ещё» ряда плиток эскадры на телефоне
+    else armMissileAim(squadronAt(arg), arg, act === 'mslsalvo');
   } else if (act === 'sqpick') {
     // Имя эскадры в карточке соседки, в «i» мира или в трюме носителя — выделить её саму.
     pickSquadron(arg);

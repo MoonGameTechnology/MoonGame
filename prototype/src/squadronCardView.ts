@@ -31,6 +31,8 @@ import { squadronRelocateSpots } from './mapAim';
 import { ownerColor } from './mapPalette';
 import { actionButton as btn, cardHeader } from './panelKit';
 import { worldName } from './planetName';
+import { MISSILE_SALVO } from './missileAim';
+import { wingOrder, wingOrdersHtml, type WingOrder } from './wingOrders';
 import { unitRows } from './worldCard';
 import {
   mergeTargets,
@@ -100,20 +102,20 @@ export function parkedStatusText(id: string, deps: SquadronCardDeps): string | n
 }
 
 /** Перегрузка ЭТОЙ эскадры между портом и стоящим у мира своим носителем. Ядро возит
- *  соединение целиком, поэтому кнопка есть, только когда на той стороне хватит места. */
-function transferButton(spot: Spot, card: SquadronCard, deps: SquadronCardDeps): string {
+ *  соединение целиком, поэтому приказ есть, только когда на той стороне хватит места. */
+function transferOrder(spot: Spot, card: SquadronCard, deps: SquadronCardDeps): WingOrder | null {
   const s = deps.world;
   if (spot.kind === 'port') {
     const ship = dockedCarrier(Object.values(s.fleets), spot.planet.id, deps.me, data);
     const hold = ship ? fleetHangar(ship, data, s) : null;
-    if (!ship || !hasHangar(hold) || hold.free < card.places) return '';
-    return btn('sqload', card.id, t('side.wing.load'), true);
+    if (!ship || !hasHangar(hold) || hold.free < card.places) return null;
+    return wingOrder('load', 'sqload', card.id);
   }
   const f = s.fleets[spot.fleetId];
   const at = f?.location ? s.planets[f.location] : undefined;
-  if (!f || !at || f.movement || f.battleId || at.owner !== deps.me) return '';
-  if (!hasHangar(planetHangar(at, data))) return '';
-  return btn('squnload', card.id, t('side.wing.unload'), true);
+  if (!f || !at || f.movement || f.battleId || at.owner !== deps.me) return null;
+  if (!hasHangar(planetHangar(at, data))) return null;
+  return wingOrder('unload', 'squnload', card.id);
 }
 
 /** Карточка своей эскадры на стоянке; `null` — такой эскадры у места больше нет. */
@@ -139,26 +141,27 @@ export function parkedSquadronHtml(id: string, deps: SquadronCardDeps): string |
   let h =
     cardHeader(ownerColor(deps.me), title, '', { compact: pcUi(), subLive: notes.join(' · ') }) +
     unitRows(card.stacks);
-  // Кнопка есть, только если приказ пройдёт сейчас: готовность базы у удара, патруля и
-  // перелёта общая (`canStrike`), и серая кнопка здесь обещала бы то, чего нет.
+  // Плитка есть, только если приказ пройдёт сейчас: готовность базы у удара, патруля и
+  // перелёта общая (`canStrike`), и серая плитка здесь обещала бы то, чего нет.
   const ready = card.canStrike;
   const merging = squadMerge?.from === card.id;
   // Ракеты пускаются, пока база не в бою: топливо и перезарядка порта им не нужны.
   const launch = card.missiles && spot.view.blocked !== 'busy';
-  const salvo = Math.min(12, card.machines);
-  const buttons =
-    (launch ? btn('msllaunch', card.id, t('side.missile.launch'), true) : '') +
-    (launch && salvo > 1
-      ? btn('mslsalvo', card.id, t('side.missile.salvo', { n: salvo }), true)
-      : '') +
-    (ready ? btn('wingstrike', card.id, t('side.wing.strike'), true) : '') +
-    (ready && card.canPatrol ? btn('wingpatrol', card.id, t('side.wing.patrol'), true) : '') +
-    (ready && card.canRelocate ? btn('wingrelocate', card.id, t('side.wing.relocate'), true) : '') +
-    transferButton(spot, card, deps) +
-    (card.canSplit ? btn('wingsplit', card.id, t('side.wing.split'), true) : '') +
-    (card.canMerge ? btn('wingmerge', card.id, t('side.wing.merge'), true) : '') +
-    (card.hold ? btn('wingrelease', card.id, t('side.wing.keep.off'), true) : '');
-  if (buttons) h += `<div class="row aloft-acts">${buttons}</div>`;
+  const salvo = Math.min(MISSILE_SALVO, card.machines);
+  const orders = [
+    launch && wingOrder('launch', 'msllaunch', id),
+    launch && salvo > 1 && wingOrder('salvo', 'mslsalvo', id, undefined, { n: salvo }),
+    ready && wingOrder('strike', 'wingstrike', id),
+    ready && card.canPatrol && wingOrder('patrol', 'wingpatrol', id),
+    ready && card.canRelocate && wingOrder('relocate', 'wingrelocate', id),
+    transferOrder(spot, card, deps),
+    card.canSplit && wingOrder('split', 'wingsplit', id),
+    // Слияние взведено — плитка горит, повторное нажатие его снимает.
+    card.canMerge && wingOrder('merge', 'wingmerge', id, merging),
+    // Держит патруль и ждёт дома перезарядки: плитка горит, нажатие отпускает.
+    card.hold && wingOrder('keep', 'wingrelease', id, true),
+  ];
+  h += wingOrdersHtml(orders, id);
   h += siblingsHtml(spot.view, card.id, merging);
   return h;
 }

@@ -205,7 +205,7 @@ describe('перегрузка предлагается и со стороны �
 // «i» мира и карточка носителя только называют эскадры. Сторож проводки — по исходнику.
 describe('перегрузка с носителем — в карточке эскадры (UIX-10.14)', () => {
   const src = readFileSync(new URL('./squadronCardView.ts', import.meta.url), 'utf8');
-  const at = src.indexOf('function transferButton(');
+  const at = src.indexOf('function transferOrder(');
   const body = src.slice(at, at + 1200);
 
   it('тело кнопки найдено: пустой срез прошёл бы любые проверки ниже', () => {
@@ -217,8 +217,8 @@ describe('перегрузка с носителем — в карточке э�
   });
 
   it('кнопки адресуют ЭСКАДРУ: обработчик сам находит носитель и порт', () => {
-    expect(body).toMatch(/btn\('sqload', card\.id/);
-    expect(body).toMatch(/btn\('squnload', card\.id/);
+    expect(body).toContain("wingOrder('load', 'sqload', card.id)");
+    expect(body).toContain("wingOrder('unload', 'squnload', card.id)");
   });
 
   it('в «i» мира перегрузки больше нет', () => {

@@ -209,13 +209,16 @@ it('нижний ряд виден, только пока в нём есть к�
   expect(quick.hidden).toBe(true);
 });
 
-it('свёрнутый лист эскадры в полёте держит ряд её приказов', () => {
+it('свёрнутый лист эскадры в полёте и на стоянке держит ряд её приказов', () => {
   const { hud, sheet, side } = boot();
   // Чужая эскадра: приказов в карточке нет, лист остаётся шапкой.
   hud.update('strike:s1', false, false, []);
   expect(sheet.classList.contains('aloft')).toBe(false);
   side.found['.aloft-acts'] = new FakeEl();
   hud.update('strike:s1', false, false, []);
+  expect(sheet.classList.contains('aloft')).toBe(true);
+  // Эскадра на стоянке держит свой ряд так же (плитки «как у флота», 2026-11-09).
+  hud.update('sq:a', false, false, []);
   expect(sheet.classList.contains('aloft')).toBe(true);
   // Ряд приказов есть только у эскадры: у флота свой ряд команд.
   hud.update('fleet:f1', false, false, []);
