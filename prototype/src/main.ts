@@ -119,6 +119,8 @@ import {
 import {
 } from './unitGlyphs';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
+import { drawHangarBadges, initMapHangars } from './mapHangars';
+import { aviationCount, aviationOpen, closeAviation, initAviation, renderAviation, toggleAviation } from './aviationPanel';
 import { worldName } from './planetName';
 // «Производство» — экран заказа (REFM-13, ROS-3.1): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
@@ -138,7 +140,6 @@ import { initTermTips } from './termTip';
 import {
   closeStatPop,
   fleetLandShown,
-  garrisonTilesHtml,
   initFleetCard,
   initStatPop,
   statPopOpen,
@@ -197,12 +198,11 @@ import {
   initSidePanel,
   invalidatePanel,
   openDossier,
-  planetTab,
-  setPlanetTab,
   renderPanel,
   renderSplitDialog,
   revealMobileSelection,
   splitAwait,
+  worldOrder,
 } from './sidePanel';
 import {
   initWorldCard,
@@ -394,7 +394,7 @@ import {
 import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, setView, world, worldDist } from './mapCamera';
 import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, restoreFogMemory, vision, type Vision } from './mapFog';
 import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
-import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, initMapRadar, netSignatures, radarSweepSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
+import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, IDENTIFY_REACH_FRACTION, initMapRadar, netSignatures, planetRadar, radarSweepSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder } from './orderPipeline';
 import {
   forceIntroduced,
@@ -507,6 +507,8 @@ import {
   selFleets,
   selPlanet,
   selStrike,
+  selSquadron,
+  pickSquadron,
   splitState,
   stageDraft,
   strikeAim,
@@ -791,7 +793,7 @@ initNetSession({
     if (changedMap && plan.fanfare) defaultView();
     // Та же чистка выбора, что после хода локального мира (REFM-208): `s` заменён здесь
     // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
-    pruneSelection(s.fleets, ME, s.strikes);
+    pruneSelection(s.fleets, ME, s.strikes, s.planets);
     invalidatePanel();
     syncCoalitions(); // чужая правка коалиции приходит дельтой без события
   },
@@ -893,14 +895,16 @@ const holographic = initHolographicUi({
     side.querySelector<HTMLElement>('[data-act="fleetinfo"]')?.click();
   },
   selectionKey: () =>
-    (selStrike ? `strike:${selStrike}` : '') || selectedFleetIds().join('|') || panelFleet() || selPlanet || '',
+    (selStrike ? `strike:${selStrike}` : '') || (selSquadron ? `sq:${selSquadron}` : '') || selectedFleetIds().join('|') || panelFleet() || selPlanet || '',
+  rightInset: () => (aviationOpen() ? (document.getElementById('aviapanel')?.getBoundingClientRect().width ?? 0) + 24 : 0),
   selectionAnchor: () => {
     const fid = panelFleet();
     const fleet = fid && s.fleets[fid];
     const planet = selPlanet && s.planets[selPlanet];
     // Эскадра в воздухе (SHU-6.14) — её значок на трассе: нить окна идёт к нему.
     const aloft = selStrike ? strikeWorldPos(selStrike) : null;
-    const at = aloft ? world(aloft) : fleet ? fleetAnchor(fleet) : planet ? world(planet.position) : null;
+    const parked = selSquadron ? squadronSpotPx(selSquadron) : null;
+    const at = aloft ? world(aloft) : parked ?? (fleet ? fleetAnchor(fleet) : planet ? world(planet.position) : null);
     return at ? toScreen(at, canvas.getBoundingClientRect(), VW, VH) : null;
   },
 });
@@ -932,8 +936,8 @@ const mobileHud = initMobileHud({
 /** Выбор с карточки телефона — строкой списка или вкладкой «Флот» / «Мир». */
 function choosePhonePick(pick: TapPick): void {
   if (pick.kind === 'fleet') setFleetSelection([pick.id]);
-  else if (pick.kind === 'strike') {
-    pickStrike(pick.id);
+  else if (pick.kind === 'strike' || pick.kind === 'squadron') {
+    (pick.kind === 'strike' ? pickStrike : pickSquadron)(pick.id);
     invalidatePanel();
   } else {
     clearSelection();
@@ -1399,6 +1403,19 @@ initMapOverlays({
   aa: () => perWorld('aa', () => aaRings(s, data, ME, known, worldPlanets())),
   aimSquadron,
 });
+initMapHangars({ world: () => s, me: () => ME, ctx: () => cx });
+// Список «◇ Авиация» (UIX-10.15): строка выделяет эскадру или её вылет и подводит камеру.
+initAviation({
+  world: () => s, me: () => ME, mobile: () => MOBILE,
+  selected: () => !!(selStrike || selSquadron || selPlanet || selectedFleetIds().length),
+  pick: (row, at) => {
+    if (row.kind === 'aloft') pickStrike(row.strikeId);
+    else pickSquadron(row.squadronId);
+    if (at) centerOn(at, cam.scale);
+    invalidatePanel();
+    renderPanel();
+  },
+});
 
 // Прицелы и цели — путь к цели, цели «Атаки» и «Штурма», круги каста и патруля, базы
 // перелёта — живут в `mapAim.ts` (REFM-233, часть 2). Мир, кадр, узлы карты, раскладку,
@@ -1592,6 +1609,7 @@ function renderMap(now: number) {
   drawOrbitRings(now, detail); // кольцо орбиты у мира со стоящим флотом
   drawBattleTracers(now); // трассы огня между строями боя
   drawFleets(now, lod); // флоты: корпус доминанта, счёт, трюм, рамка выбора, портреты героев
+  drawHangarBadges(lod); // «◇ N» под своей базой с эскадрами: тап выделяет эскадру
   drawRadarContacts(now); // swept enemy signatures — last-known ghosts until repainted
 
   // 7. Верхний слой: рамка выделения, метки, цели, радиусы и прицелы.
@@ -1619,18 +1637,17 @@ function renderMap(now: number) {
 // --- side panel --------------------------------------------------------------
 
 // Карточка мира, ангар и карточки эскадр — у владельца, `worldCard.ts` (REFM-223). Отсюда —
-// то, что принадлежит игре: мир, место, имена, открытая вкладка, плитки гарнизона и карта узлов.
+// то, что принадлежит игре: мир, место, имена, карта узлов и радар мира.
 initWorldCard({
   world: () => s,
   me: () => ME,
   names: () => NAME,
-  planetTab: () => planetTab,
   buildUnits: () => PRODUCTION_UNITS,
   devUi: () => DEV_UI,
   sectorOf: (id) => SECTOR_OF[id],
   sectorType: sectorTypeOf,
-  garrisonTiles: garrisonTilesHtml,
   sectorZeroToolsHidden,
+  radar: (p) => { const reach = planetRadar(p); return { reach, identify: reach * IDENTIFY_REACH_FRACTION }; },
 });
 
 // Карточка флота, группы, мин и ракеты, плитки юнитов — у владельца, `fleetCard.ts` (REFM-224).
@@ -1663,6 +1680,18 @@ function squadronBase(id: string): { planetId: string } | { fleetId: string } | 
     if ((f.hangar ?? []).some((q) => q.id === id)) return { fleetId: f.id };
   }
   return null;
+}
+
+/** Точка базы эскадры на экране: мир — его узел, носитель — его значок. */
+function squadronSpotPx(id: string): { x: number; y: number } | null {
+  const base = squadronBase(id);
+  if (!base) return null;
+  if ('planetId' in base) {
+    const p = s.planets[base.planetId];
+    return p ? world(p.position) : null;
+  }
+  const f = s.fleets[base.fleetId];
+  return f ? fleetAnchor(f) : null;
 }
 
 /** Эскадра по id — вместе с базой, на которой она стоит. */
@@ -1844,6 +1873,8 @@ function updateMobileHud(): void {
   const inspectable = f && fleetSeen(f);
   const key = selStrike
     ? `strike:${selStrike}`
+    : selSquadron
+    ? `sq:${selSquadron}`
     : selPlanet && s.planets[selPlanet]
       ? `planet:${selPlanet}`
       : inspectable
@@ -1856,6 +1887,8 @@ function updateMobileHud(): void {
       const st = ownStrike(pick.id);
       if (!st) continue;
       choices.push({ ...pick, title: strikeTitle(st), sub: t('side.aloft.sub') });
+    } else if (pick.kind === 'squadron') {
+      choices.push({ ...pick, title: `${t('fleet.kind.shuttles')} «${fleetCallsign(pick.id)}»`, sub: t('side.squad.pick') });
     } else if (pick.kind === 'fleet') {
       const f = s.fleets[pick.id];
       if (!f || !fleetSeen(f)) continue;
@@ -1870,7 +1903,7 @@ function updateMobileHud(): void {
     !!mobileOrderKind() || pickMode || !!chainMode,
     cmdMore,
     choices,
-    selStrike ? null : (cardTabs()?.active ?? null),
+    selStrike || selSquadron ? null : (cardTabs()?.active ?? null),
   );
 }
 
@@ -2119,6 +2152,8 @@ initTopBar({
   control: () =>
     perWorld('control', () => controlCounter(s, data, ME, controlLimitOf(s, ME), worldPlanets())),
   mobile: () => MOBILE,
+  aviation: () => (MOBILE ? null : { count: aviationCount(), open: aviationOpen() }),
+  toggleAviation,
   aiSeats: () => AI_PLAYERS.size,
   speedControl: () => devSpeedControl,
   lessonSpeed: lessonRunning,
@@ -2244,8 +2279,7 @@ initMatchLifecycle({
         baseline,
         ui: trainingTourUi({
           world: () => s, me: () => ME, mobile: MOBILE,
-          expanded: () => mobileHud.expanded(selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`), collapse: () => mobileHud.collapse(), tab: () => planetTab,
-          ships: () => { setPlanetTab('ships'); },
+          expanded: () => mobileHud.expanded(selSquadron ? `sq:${selSquadron}` : selPlanet ? `planet:${selPlanet}` : `fleet:${selFleet}`), collapse: () => mobileHud.collapse(),
           // Synchronize the phone selection before Show expands its sheet.
           render: () => { invalidatePanel(); renderPanel(); updateMobileHud(); },
         }),
@@ -2490,6 +2524,17 @@ const shipyard = initShipyard({
   heroClick: heroStaff.click,
 });
 document.getElementById('rail-constructor')?.addEventListener('click', () => shipyard.open());
+// Приказы мира в окне «Построить» (UIX-10.12, `worldOrdersPane.ts`): мир — выбранный списком
+// окна. Выбор цели на карте, крепость и переход к ней закрывают окно, остальное его обновляет.
+constructorWin.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-wo]');
+  if (!b || b.disabled) return;
+  const { wo = '', arg = '', pid = '' } = b.dataset;
+  if (wo === 'opentech') techTree.open(arg || undefined);
+  else if (!worldOrder(wo, arg, pid)) return;
+  if (wo === 'fortress' || wo === 'openstation' || (wo === 'rally' && arg !== 'off')) shipyard.close();
+  else shipyard.render();
+});
 
 // Экран подключения — у владельца, `connectScreen.ts` (REFM-247): узлы экрана, показ, адрес и
 // позывной по умолчанию, разбор адреса, вход в обозреватель и такт активности игрока.
@@ -3108,6 +3153,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'news-sheet', isOpen: () => news?.isOpen() ?? false, close: () => news?.close() }, // inside the hub (z52), the feed and a corp card
   { id: 'corp-sheet', isOpen: () => corp?.hubSheetOpen() ?? false, close: () => corp?.closeHubSheet() }, // inside the hub (z52), a building, levels, a member
   { id: 'pingpanel', isOpen: () => pings?.panelOpen() ?? false, close: () => pings?.closePanel() }, // z60
+  { id: 'aviapanel', isOpen: aviationOpen, close: closeAviation }, // z44, на телефоне z30
   { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { drop('splitState'); invalidatePanel(); } }, // z45
   // Всплывашка надбавок стоит над окном флота: Back закрывает её, а не выделение под ней.
@@ -3682,6 +3728,7 @@ function frame(nowReal: number, nativeGap: number) {
   // Строка статуса, шапка, плашки ресурсов и значки внимания — у владельца полосы (REFM-222).
   renderTopBar(missions);
   missionPanel.render(missions);
+  renderAviation();
 
   // Служебное наложение (FPS, задержка, десинк) — `netOverlay.ts` (REFM-192): десинк
   // ПОКАЗЫВАЕТ строку сам, помимо галочки игрока, потому что иначе о нём некому сообщить;

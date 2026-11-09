@@ -35,6 +35,10 @@ export interface TrainingTourUi {
   selectedFleet(): string | null;
   intent(kind: string): boolean;
   anchor(target: string): Rect | null;
+  /** The hangar badge of a world or a carrier (`spot` is its id), as drawn this frame. */
+  hangar(spot: string): Rect | null;
+  /** The squadron picked on the map, if any. */
+  selectedSquadron(): string | null;
   fleetSelector(role: TrainingFleetRole): string | null;
   /** Camera/panel navigation only: never an order or a change to the game state. */
   show(target: string): void;
@@ -49,6 +53,9 @@ export interface TrainingTourDeps {
    *  этап «Бой» не засчитывает. Нет — считаем, что всё на карте с начала. */
   introduced?: (fleetId: string) => boolean;
 }
+
+/** «Построить» мира: кнопка карточки на ПК или её копия в нижней полосе листа телефона. */
+const BUILD_OPEN = '[data-act="openbuild"], [data-lift="openbuild"]';
 
 const step = (
   stage: TrainingStage,
@@ -121,14 +128,20 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
           }),
         ]
       : [];
-  const tab = (stage: TrainingStage, id: string, name: string) =>
+  // Юниты заказывают в окне «Построить» (UIX-10.12): «i» мира только сообщает, вкладок
+  // с каталогами в нём нет. Шаг открывает окно, второй — его раздел.
+  const yard = (stage: TrainingStage, id: string, main: 'ships' | 'infantry', unit: string) => [
+    step(stage, `${id}-yard`, BUILD_OPEN, visible('#constructor.show'), {
+      copy: 'onb.guide.build.yard',
+    }),
     step(
       stage,
       id,
-      `[data-act="tab"][data-arg="${name}"]`,
-      state(() => ui.intent(`tab:${name}`)),
-      { copy: `training.guide.tab.${name}` },
-    );
+      `#constructor .pw-main-tabs [data-ctab="${main}"]`,
+      visible(`#constructor.show [data-cnhull="${unit}"]`),
+      { copy: `onb.guide.yard.${main}` },
+    ),
+  ];
   const close = (stage: TrainingStage, id: string) =>
     step(
       stage,
@@ -191,7 +204,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     ...(role === 'hero' ? [fleet(stage, `${id}-arrived-fleet`, role)] : []),
   ];
   const building = (stage: TrainingStage, id: string, type: string, upgrade = false) => [
-    step(stage, `${id}-catalog`, '[data-act="openbuild"]', visible('#constructor.show [data-bwtab]'), {
+    step(stage, `${id}-catalog`, BUILD_OPEN, visible('#constructor.show [data-bwtab]'), {
       copy: 'training.guide.build.catalog',
     }),
     step(
@@ -294,11 +307,9 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
   return [
     world('prep', 'base', 'base'),
     ...details('prep', 'details'),
-    tab('prep', 'ships', 'ships'),
     fleet('prep', 'fleet', 'hero'),
     world('economy', 'base', 'base'),
     ...details('economy', 'details'),
-    tab('economy', 'buildings', 'buildings'),
     ...building('economy', 'mine', 'mine', true),
     step(
       'economy',
@@ -306,13 +317,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       null,
       state(() => productionGrew(d.world(), me, b, data)),
     ),
-    tab('economy', 'ships', 'ships'),
-    step(
-      'economy',
-      'catalog',
-      '[data-act="openunits"][data-arg="ships"]',
-      visible('#constructor.show [data-cnhull="cruiser"]'),
-    ),
+    ...yard('economy', 'catalog', 'ships', 'cruiser'),
     step('economy', 'ship-select', '#constructor [data-cnhull="cruiser"]', visible('#constructor.pw-fitting-open [data-cnhull="cruiser"].on'), { copy: 'onb.guide.build.units' }),
     step('economy', 'ship-order', '#constructor [data-cnbuild]', action('unit.build')),
     close('economy', 'ship-close'),
@@ -453,62 +458,11 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     // Шаг подсвечивает полосу корпуса и ждёт, пока она подрастёт, — часы идут.
     step('retreat', 'repair', '[data-stat="hull"]', state(mending), { holdClock: false }),
     fleet('carrier', 'select', 'carrier'),
-    step(
-      'carrier',
-      'move',
-      '[data-cmd="move"]',
-      state(() => ui.intent('move')),
-    ),
-    step(
-      'carrier',
-      'position',
-      null,
-      state(() => ui.intent('carrier-course')),
-      {
-        holdClock: true,
-        anchor: () => ui.anchor('carrier-edge'),
-        reveal: () => ui.show('carrier-edge'),
-      },
-    ),
-    ...(ui.mobile
-      ? [
-          step(
-            'carrier',
-            'send',
-            '[data-cmd="mobile-send"]',
-            state(() => !!f('carrier')?.movement || !!f('carrier')?.edge),
-          ),
-        ]
-      : []),
-    step(
-      'carrier',
-      'arrive',
-      null,
-      state(() => !!f('carrier')?.edge && !f('carrier')?.movement),
-    ),
-    ...details('carrier', 'details'),
-    step(
-      'carrier',
-      'strike-open',
-      '[data-act="wingstrike"]',
-      state(() => ui.intent('strike')),
-    ),
-    step('carrier', 'strike', null, action('shuttle.strike'), {
-      holdClock: true,
-      anchor: () => ui.anchor('outpost'),
-      reveal: () => ui.show('outpost'),
-    }),
-    step(
-      'carrier',
-      'home',
-      null,
-      state(() => squadronHome(d.world(), me)),
-    ),
+    ...carrierStrikeSteps(d, details),
     ...troops('assault', 'load', 2),
     ...assault('assault', 'outpost', 'outpost'),
     world('fortify', 'outpost', 'outpost'),
     ...details('fortify', 'details'),
-    tab('fortify', 'buildings', 'buildings'),
     ...building('fortify', 'fort', 'fort'),
     ...building('fortify', 'defense', 'orbital_aa'),
     step(
@@ -534,13 +488,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     ...route('finale', 'rally-hero', 'hero', 'base', () => at('hero', 'base')),
     world('finale', 'base', 'base'),
     ...details('finale', 'details'),
-    tab('finale', 'ground', 'ground'),
-    step(
-      'finale',
-      'catalog',
-      '[data-act="openunits"][data-arg="ground"]',
-      visible('#constructor.show [data-cnhull="heavy_infantry"]'),
-    ),
+    ...yard('finale', 'catalog', 'infantry', 'heavy_infantry'),
     step('finale', 'recruit-select', '#constructor [data-cnhull="heavy_infantry"]', visible('#constructor.pw-fitting-open [data-cnhull="heavy_infantry"].on'), { copy: 'onb.guide.build.units' }),
     trainingRecruitQuantity(d),
     step(
@@ -569,6 +517,80 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       null,
       state(() => trainingWon(d.world(), me)),
     ),
+  ];
+}
+
+/**
+ * «Носитель»: курс к точке на трассе, остановка, эскадра в трюме — значком ангара у плашки
+ * носителя (UIX-10.14), удар по посту и возвращение эскадры. Вынесено из `buildTrainingTour`
+ * (SLIM-6: функция из бюджета режется, когда её трогает фича).
+ */
+function carrierStrikeSteps(
+  d: TrainingTourDeps,
+  details: (stage: TrainingStage, id: string) => SpotlightStep[],
+): SpotlightStep[] {
+  const { me, ui } = d;
+  const state = (when: () => boolean): StepAdvance => ({ on: 'state', when });
+  const action = (type: string): StepAdvance => ({ on: 'action', type });
+  const f = (role: TrainingFleetRole) => trainingFleet(d.world(), me, role);
+  return [
+  step(
+    'carrier',
+    'move',
+    '[data-cmd="move"]',
+    state(() => ui.intent('move')),
+  ),
+  step(
+    'carrier',
+    'position',
+    null,
+    state(() => ui.intent('carrier-course')),
+    {
+      holdClock: true,
+      anchor: () => ui.anchor('carrier-edge'),
+      reveal: () => ui.show('carrier-edge'),
+    },
+  ),
+  ...(ui.mobile
+    ? [
+        step(
+          'carrier',
+          'send',
+          '[data-cmd="mobile-send"]',
+          state(() => !!f('carrier')?.movement || !!f('carrier')?.edge),
+        ),
+      ]
+    : []),
+  step(
+    'carrier',
+    'arrive',
+    null,
+    state(() => !!f('carrier')?.edge && !f('carrier')?.movement),
+  ),
+  // Эскадра в трюме выбирается значком ангара у плашки носителя (UIX-10.14).
+  step('carrier', 'wing', null, state(() => !!ui.selectedSquadron() || ui.intent('strike')), {
+    holdClock: true,
+    anchor: () => ui.hangar(f('carrier')?.id ?? ''),
+    reveal: () => ui.show('carrier-edge'),
+  }),
+  ...details('carrier', 'details'),
+  step(
+    'carrier',
+    'strike-open',
+    '[data-act="wingstrike"]',
+    state(() => ui.intent('strike')),
+  ),
+  step('carrier', 'strike', null, action('shuttle.strike'), {
+    holdClock: true,
+    anchor: () => ui.anchor('outpost'),
+    reveal: () => ui.show('outpost'),
+  }),
+  step(
+    'carrier',
+    'home',
+    null,
+    state(() => squadronHome(d.world(), me)),
+  ),
   ];
 }
 

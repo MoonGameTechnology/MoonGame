@@ -217,6 +217,17 @@ describe('workflow wiring and required-check isolation', () => {
     }
   });
 
+  it('only the six required jobs carry the Branch prefix; the rest keep plain names', () => {
+    // GitHub does not evaluate `name:` of a job skipped by its `if`, so a prefixed
+    // skipped job shows the raw `${{ ... }}` expression in the checks list.
+    const names = workflows
+      .join('\n')
+      .split('\n')
+      .filter((s) => /^ {4}name: /.test(s) && s.includes('${{'));
+    for (const line of names)
+      expect(required.some((name) => line.endsWith(` }}${name}`))).toBe(true);
+  });
+
   it('actual required-job guards run after a missing/failed router and ignore its result on canonical events', () => {
     const jobs = workflows.flatMap((text) => text.split(/\n {2}[a-z][a-z-]*:\n/));
     for (const name of required) {

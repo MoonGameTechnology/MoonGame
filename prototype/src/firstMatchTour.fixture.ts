@@ -27,6 +27,8 @@ export function operationFixture(mobile = false, world = lessonWorld()): Operati
     selectedFleet: () => null,
     intent: () => false,
     anchor: () => null,
+    hangar: () => null,
+    selectedSquadron: () => null,
     heroSelector: () => null,
     show: () => {},
   };
@@ -35,8 +37,8 @@ export function operationFixture(mobile = false, world = lessonWorld()): Operati
 
 /** Mutable signals for the tour's state-machine and copy contract tests. */
 export function firstMatchFixture() {
+  const folds = new Set<string>(['buildings', 'grp:economy']);
   const facts = {
-    buildingsTabOpen: true,
     homeOpened: false,
     panelOpen: false,
     mineCardOpen: false,
@@ -48,7 +50,7 @@ export function firstMatchFixture() {
     spaceTabOpen: false,
     researchStarted: false,
     researchDone: false,
-    shipsTabOpen: false,
+    shipListOpen: false,
     shipCardOpen: false,
     catalogOpen: false,
     shipOrdered: false,
@@ -66,6 +68,8 @@ export function firstMatchFixture() {
     ...signals,
     mouse: () => true,
     cardLayout: () => false,
+    // Свёрнутые блоки «i» (UIX-10.12): открытые записаны здесь.
+    foldOpen: (key) => folds.has(key),
     homeAnchor: () => null,
     fleetSelector: () => null,
     targetAnchor: () => null,
@@ -74,5 +78,5 @@ export function firstMatchFixture() {
     showTarget: () => {},
     operation: operationFixture(),
   };
-  return { facts, deps };
+  return { facts, folds, deps };
 }

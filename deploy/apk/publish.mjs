@@ -22,8 +22,10 @@ export async function download(url, limit, { fetchImpl = fetch, destination } = 
     for (let hop=0; hop<6; hop++) {
       const u = new URL(url);
       if (u.protocol !== 'https:' || !ALLOWED.has(u.hostname) || u.username || u.password || (u.port && u.port !== '443')) throw new Error('E_APK_SOURCE');
+      const assetApi = u.origin === 'https://api.github.com' &&
+        /^\/repos\/MoonGameTechnology\/MoonGame\/releases\/assets\/[1-9][0-9]*$/.test(u.pathname);
       const res = await fetchImpl(u.href, { redirect:'manual', credentials:'omit', signal:abort.signal,
-        headers: { Accept: u.hostname==='api.github.com'?'application/vnd.github+json':'application/octet-stream', 'User-Agent':'MoonGame-APK-publisher' } });
+        headers: { Accept: u.hostname==='api.github.com' && !assetApi ? 'application/vnd.github+json':'application/octet-stream', 'User-Agent':'MoonGame-APK-publisher' } });
       if ([301,302,303,307,308].includes(res.status)) {
         const location = res.headers.get('location'); await res.body?.cancel();
         if (!location) throw new Error('E_APK_SOURCE'); url = new URL(location,u).href; continue;
@@ -90,10 +92,10 @@ export async function installRelease({ root, lane, signed, acquire, verify=verif
     return true;
   } finally { await rm(stage,{recursive:true,force:true}); await unlink(pointer).catch(()=>{}); }
 }
-export async function syncLane(root,lane,{ get=download, publicKey=distribution.manifestPublicKey }={}) {
+export async function syncLane(root,lane,{ get=download, publicKey=distribution.manifestPublicKey, verify=verifyApk, statfsImpl=statfs }={}) {
   const release=JSON.parse((await get(`${REPO}/releases/tags/${lane}`,65536)).body.toString('utf8'));
   if(release.tag_name!==lane || !Array.isArray(release.assets))throw new Error('E_APK_RELEASE');
-  const asset=(name)=>release.assets.find(a=>a.name===name && typeof a.browser_download_url==='string')?.browser_download_url;
+  const asset=(name)=>release.assets.find(a=>a?.name===name);
   const metadata=asset('version.json'),apk=asset(apkName(lane));
   const prefix=`https://github.com/MoonGameTechnology/MoonGame/releases/download/${lane}/`;
   if(!metadata) {
@@ -105,9 +107,16 @@ export async function syncLane(root,lane,{ get=download, publicKey=distribution.
     if(vc && sha && Number(vc[1])===current.versionCode && sha[1]===current.sha)return false;
     throw new Error('E_APK_RELEASE');
   }
-  if(metadata!==prefix+'version.json' || apk!==prefix+apkName(lane))throw new Error('E_APK_RELEASE');
-  const signed=JSON.parse((await get(metadata,32768)).body.toString('utf8'));
-  return installRelease({root,lane,signed,publicKey,acquire:destination=>get(apk,MAX_APK,{destination})});
+  const assetUrl=(asset,name)=>{
+    if(!asset || asset.browser_download_url!==prefix+name || !Number.isSafeInteger(asset.id) || asset.id<=0)
+      throw new Error('E_APK_RELEASE');
+    // Immutable IDs keep the manifest and APK tied to this release snapshot.
+    // Rolling-tag browser URLs can serve stale redirects or transient 504s.
+    return `${REPO}/releases/assets/${asset.id}`;
+  };
+  const metadataUrl=assetUrl(metadata,'version.json'),apkUrl=assetUrl(apk,apkName(lane));
+  const signed=JSON.parse((await get(metadataUrl,32768)).body.toString('utf8'));
+  return installRelease({root,lane,signed,publicKey,verify,statfsImpl,acquire:destination=>get(apkUrl,MAX_APK,{destination})});
 }
 async function main() {
   const root=process.env.APK_PUBLIC_DIR;

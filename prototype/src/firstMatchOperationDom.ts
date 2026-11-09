@@ -13,10 +13,12 @@ import {
   pickWorld,
   selFleet,
   selPlanet,
+  selSquadron,
   strikeAim,
   troopsPlan,
 } from './interaction';
 import { focusWorld, panBy, world } from './mapCamera';
+import { hangarBadgeRect } from './mapHangars';
 
 interface OperationDomHost {
   world(): GameState;
@@ -24,8 +26,6 @@ interface OperationDomHost {
   mobile: boolean;
   expanded(): boolean;
   collapse(): void;
-  tab(): string;
-  ships(): void;
   market(good: string): void;
   render(): void;
 }
@@ -49,6 +49,8 @@ export function operationUi(h: OperationDomHost): OperationUi {
     productionCount: () => Number(document.querySelector('#constructor .cn-sv')?.textContent ?? 1),
     selectedWorld: () => selPlanet,
     selectedFleet: () => selFleet,
+    selectedSquadron: () => selSquadron,
+    hangar: (spot) => hangarBadgeRect(spot),
     heroSelector: () => {
       const f = hero();
       return f ? `[data-act="selfleet"][data-arg="${CSS.escape(f.id)}"]` : null;
@@ -73,7 +75,6 @@ export function operationUi(h: OperationDomHost): OperationUi {
         if (f.location) {
           focusWorld(f.location);
           pickWorld(f.location);
-          h.ships();
         } else pickFleets([f.id], (id) => h.world().fleets[id]?.owner === h.me());
         h.render();
         details();
@@ -92,7 +93,6 @@ export function operationUi(h: OperationDomHost): OperationUi {
     },
     intent: (kind) => {
       if (kind === 'details') return h.expanded();
-      if (kind.startsWith('tab:')) return h.tab() === kind.slice(4);
       if (kind === 'spawn') return heroSpawnAim !== null;
       if (kind === 'move') return aiming;
       if (kind === 'strike') return strikeAim !== null;

@@ -15,7 +15,7 @@ export function mobileOrderBar(title: string, target: string | null, picking = f
     `<div class="mobile-order-copy"><b>${esc(title)}</b><span>${esc(
       picking ? t('hud.mobile.pick-hint') : t('hud.mobile.target-hint'),
     )}</span>${picking ? '' : `<strong>${esc(target ?? t('hud.mobile.target-none'))}</strong>`}</div>` +
-    `<button data-cmd="mobile-cancel" class="btn-second">${esc(t('hud.mobile.cancel'))}</button>` +
+    `<button data-cmd="mobile-cancel" class="btn-second warning">${esc(t('hud.mobile.cancel'))}</button>` +
     `<button data-cmd="${picking ? 'pick' : 'mobile-send'}" class="btn-main"${!picking && !target ? ' disabled' : ''}>${esc(picking ? t('hud.mobile.ready') : t('hud.mobile.send'))}</button>`
   );
 }
@@ -287,7 +287,7 @@ export function initMobileHud(host: MobileHudHost) {
       const html = list
         .map(
           (c, i) =>
-            `<button type="button" data-mobile="choose" data-index="${i}"><i aria-hidden="true">${c.kind === 'strike' ? '✳' : c.kind === 'fleet' ? '△' : '◎'}</i><span><b>${esc(c.title)}</b><small>${esc(c.sub)}</small></span><i aria-hidden="true">›</i></button>`,
+            `<button type="button" data-mobile="choose" data-index="${i}"><i aria-hidden="true">${c.kind === 'strike' ? '✳' : c.kind === 'squadron' ? '◇' : c.kind === 'fleet' ? '△' : '◎'}</i><span><b>${esc(c.title)}</b><small>${esc(c.sub)}</small></span><i aria-hidden="true">›</i></button>`,
         )
         .join('');
       if (html !== choicesHtml) {
@@ -299,13 +299,15 @@ export function initMobileHud(host: MobileHudHost) {
       sheet.classList.toggle('order-mode', mode);
       sheet.classList.toggle('more-open', more);
       sheet.classList.toggle('has-commands', host.commands.classList.contains('show'));
-      // Эскадра в полёте (UIX-10.5, заказ владельца «кнопки приказов тоже у авиации сделать»):
-      // свёрнутый лист показывает ряд приказов её карточки, как ряд команд у флота. Кнопки те
-      // же, что в карточке, — стиль листа прячет остальное (`mobile-console.css`). Чужой
-      // эскадре приказывать нечего: без ряда лист остаётся одной шапкой.
+      // Эскадра в полёте (UIX-10.5, заказ владельца «кнопки приказов тоже у авиации сделать»)
+      // и на стоянке (заказ 2026-11-09 «кнопки управления как для флота»): свёрнутый лист
+      // показывает ряд приказов её карточки, как ряд команд у флота. Кнопки те же, что в
+      // карточке, — стиль листа прячет остальное (`mobile-console.css`). Чужой эскадре
+      // приказывать нечего: без ряда лист остаётся одной шапкой.
       sheet.classList.toggle(
         'aloft',
-        key.startsWith('strike:') && !!host.side.querySelector('.aloft-acts'),
+        (key.startsWith('strike:') || key.startsWith('sq:')) &&
+          !!host.side.querySelector('.aloft-acts'),
       );
       setHidden(head, mode);
       setHidden(tabs, mode || choosing || !tab);

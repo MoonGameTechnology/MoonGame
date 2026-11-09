@@ -241,7 +241,7 @@ export function forgetVision(): void {
 
 /** Записать в память разведки миры, увиденные не радаром: захват, который игрок видел. */
 export function rememberScan(ids: Iterable<string>): void {
-  scans.remember(ids, game.world().planets);
+  scans.remember(ids, game.world().planets, game.world().time);
 }
 
 /** Смена матча: память разведки принадлежит старому, и зрение в неё уже записано. */
@@ -330,7 +330,7 @@ export const memory: Pick<ScanMemory, 'get' | 'has' | 'ownerOf' | 'dump' | 'vers
  */
 function updateMemory(identify: Set<string>): void {
   const s = game.world();
-  scans.remember(identify, s.planets);
+  scans.remember(identify, s.planets, s.time);
   const remembered = (s as { remembered?: string[] }).remembered;
   if (remembered?.length) scans.remember(remembered, s.planets);
 }

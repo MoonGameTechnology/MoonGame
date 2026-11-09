@@ -304,7 +304,7 @@ export function chainStripHtml(m: ChainStripModel): string {
     btn('chundo', '⟲', t('chain.undo'), !m.canUndo) +
     btn('chhome', '⌂', t('tgt.step.home'), !m.canHome) +
     btn('chsend', '✓', m.clearMode ? t('tgt.clear') : t('tgt.send'), !m.canSend, 'btn-main') +
-    btn('chexit', '✕', t('ping.cancel'), false, 'btn-second danger')
+    btn('chexit', '✕', t('ping.cancel'), false, 'btn-second warning')
   );
 }
 

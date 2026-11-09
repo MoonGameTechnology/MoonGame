@@ -25,6 +25,17 @@ const data: GameData = parseGameData({
       produces: { metal: 5 },
       upgrades: [{ cost: { metal: 60 }, buildTimeHours: 4, produces: { metal: 15 } }],
     },
+    // Two upgrade steps: level 2 → 6/h, level 3 → 12/h.
+    forge: {
+      name: 'Forge',
+      cost: { metal: 20 },
+      buildTimeHours: 2,
+      produces: { metal: 2 },
+      upgrades: [
+        { cost: { metal: 40 }, buildTimeHours: 4, produces: { metal: 6 } },
+        { cost: { metal: 80 }, buildTimeHours: 4, produces: { metal: 12 } },
+      ],
+    },
   },
   events: {},
 });
@@ -208,5 +219,93 @@ describe('economy module — a paused construction keeps its frozen share', () =
     const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
     // Base (level 1, always in `planet.buildings`): 5/h. Frozen delta: (15−5) × 0.6 = 6/h.
     expect(r.state.players.p1?.resources.metal).toBeCloseTo((5 + 6) * 1);
+  });
+});
+
+// Gaps found by a mutation-testing pilot (Stryker over economy.ts): each case below
+// pins a branch whose deliberate breakage no other test noticed.
+describe('economy module — construction ramps, edge cases', () => {
+  function stateWithSites(
+    buildings: Planet['buildings'],
+    sites: Array<Record<string, unknown> & { at: number }>,
+  ): GameState {
+    const s = createInitialState({ seed: 'ramps', version: { data: '0.1.0', manifest: '1' } });
+    return {
+      ...s,
+      players: { p1: player('p1') },
+      planets: { A: planet('A', 'p1', buildings) },
+      scheduled: sites.map(({ at, ...payload }, seq) => ({
+        id: `e${seq}`,
+        at,
+        type: 'construction.complete',
+        payload: { planetId: 'A', playerId: 'p1', ...payload },
+        seq,
+      })),
+      scheduleSeq: sites.length,
+    };
+  }
+
+  it('two buildings rising on one world both ramp in', () => {
+    const st = stateWithSites([], [
+      { at: 4 * HOUR, kind: 'building', building: 'mine' },
+      { at: 4 * HOUR, kind: 'building', building: 'mine' },
+    ]);
+    const r = okAdvance(createKernel([economyModule]).advanceTo(st, ctx(4 * HOUR)));
+    expect(r.state.players.p1?.resources.metal).toBeCloseTo(15 + 15);
+  });
+
+  it('an upgrade reads the level of the building being upgraded, not of its neighbour', () => {
+    // mine 10/h + forge at level 2 (6/h) for 4h, plus the forge's delta to level 3
+    // (12 − 6 = 6/h) ramped at 0.75 over the last 2h.
+    const st = stateWithSites(
+      [
+        { type: 'mine', level: 1, hp: 0 },
+        { type: 'forge', level: 2, hp: 0 },
+      ],
+      [{ at: 4 * HOUR, kind: 'upgrade', building: 'forge', level: 3 }],
+    );
+    const r = okAdvance(createKernel([economyModule]).advanceTo(st, ctx(4 * HOUR)));
+    expect(r.state.players.p1?.resources.metal).toBeCloseTo(40 + 24 + 9);
+  });
+
+  it('an upgrade whose building is gone (destroyed mid-upgrade) adds nothing and breaks nothing', () => {
+    const st = stateWithSites(
+      [{ type: 'mine', level: 1, hp: 0 }],
+      [{ at: 4 * HOUR, kind: 'upgrade', building: 'power', level: 2 }],
+    );
+    const r = okAdvance(createKernel([economyModule]).advanceTo(st, ctx(4 * HOUR)));
+    expect(r.state.players.p1?.resources.metal).toBeCloseTo(40);
+  });
+
+  it('a paused upgrade reads the level of the building being upgraded, not of its neighbour', () => {
+    const s = createInitialState({ seed: 'paused-neighbour', version: { data: '0.1.0', manifest: '1' } });
+    const st: GameState = {
+      ...s,
+      players: { p1: player('p1') },
+      planets: {
+        A: {
+          ...planet('A', 'p1', [
+            { type: 'mine', level: 1, hp: 0 },
+            { type: 'forge', level: 2, hp: 0 },
+          ]),
+          pausedConstruction: [
+            { id: 0, kind: 'upgrade', playerId: 'p1', building: 'forge', level: 3, progress: 0.75, remainingHours: 1, remainingCost: { metal: 20 } },
+          ],
+        },
+      },
+      scheduled: [],
+    };
+    const r = okAdvance(createKernel([economyModule]).advanceTo(st, ctx(HOUR)));
+    // mine 10 + forge 6 + frozen delta (12 − 6) × 0.75 = 4.5, for one hour.
+    expect(r.state.players.p1?.resources.metal).toBeCloseTo(10 + 6 + 4.5);
+  });
+
+  it('a ramp under accelerated time credits per GAME hour', () => {
+    // ×2: the 4 game-hour build completes after 2 real hours; its ramp covers the last
+    // 2 game hours at an average 0.75 of 10/h = 15, the same as at ×1.
+    const ctx2 = (now: number): Context => ({ now, data, config: { timeScale: 2 } });
+    const st = statePendingBuild(2 * HOUR);
+    const r = okAdvance(createKernel([economyModule]).advanceTo(st, ctx2(2 * HOUR)));
+    expect(r.state.players.p1?.resources.metal).toBeCloseTo(15);
   });
 });

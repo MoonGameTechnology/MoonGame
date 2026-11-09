@@ -559,6 +559,19 @@ export const PACE_RELIEF_SOLO_MIGRATION = {
   toDataHash: '0d3235ac256571',
 } as const;
 
+/** Rules-only patch: fleet-ops 1.15.1 and auto-merge 1.0.2 carry a fleet's clocks (shield
+ * delay, point-defense reload, cloak break) through split and merge, and keep the LATER of
+ * two bombardment deadlines. Saved fleets keep their shape; only future splits and merges
+ * use the new rule. */
+export const FLEET_CLOCKS_SOLO_MIGRATION = {
+  fromRules: PACE_RELIEF_SOLO_MIGRATION.toRules,
+  fromData: PACE_RELIEF_SOLO_MIGRATION.toData,
+  fromDataHash: PACE_RELIEF_SOLO_MIGRATION.toDataHash,
+  toRules: '0789174782bba3',
+  toData: PACE_RELIEF_SOLO_MIGRATION.toData,
+  toDataHash: PACE_RELIEF_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -608,6 +621,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   PRODUCTION_WORKBENCH_SOLO_MIGRATION,
   BUILD_PRODUCTION_TIMES_SOLO_MIGRATION,
   PACE_RELIEF_SOLO_MIGRATION,
+  FLEET_CLOCKS_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

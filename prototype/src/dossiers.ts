@@ -575,31 +575,6 @@ export function createDossiers(host: DossierHost): {
         body: t('dossier.fleet.desc'),
       };
     }
-    if (key === 'tab:ground') {
-      // The ЗЕМЛЯ tab's hover dossier — carries what used to be the tab's bottom hint.
-      return {
-        name: t('dossier.tab.ground.name'),
-        body: t('dossier.tab.ground.desc'),
-      };
-    }
-    if (key === 'tab:ships') {
-      return {
-        name: t('dossier.tab.ships.name'),
-        body: t('dossier.tab.ships.desc'),
-      };
-    }
-    if (key === 'tab:shuttle') {
-      return {
-        name: t('dossier.tab.shuttle.name'),
-        body: t('dossier.tab.shuttle.desc'),
-      };
-    }
-    if (key === 'tab:buildings') {
-      return {
-        name: t('dossier.tab.buildings.name'),
-        body: t('dossier.tab.buildings.desc'),
-      };
-    }
     if (key.startsWith('fact:')) {
       // Фишки шапки мира (UIX-14.1): на ПК досье приходит наведением, на телефоне — тапом.
       // Защита построек в шапке — иконка с числом (заказ владельца 2026-09-29: «оставить

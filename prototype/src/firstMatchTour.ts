@@ -11,7 +11,8 @@ export interface FirstMatchDeps {
   cardLayout: () => boolean;
   homeOpened: () => boolean;
   panelOpen: () => boolean;
-  buildingsTabOpen: () => boolean;
+  /** Раскрыт ли свёрнутый блок окна «i» мира (`buildings`, `grp:economy`). */
+  foldOpen: (key: string) => boolean;
   mineCardOpen: () => boolean;
   mineOrdered: () => boolean;
   mineImproved: () => boolean;
@@ -21,7 +22,8 @@ export interface FirstMatchDeps {
   spaceTabOpen: () => boolean;
   researchStarted: () => boolean;
   researchDone: () => boolean;
-  shipsTabOpen: () => boolean;
+  /** Раздел кораблей окна «Построить» открыт: фрегат виден. */
+  shipListOpen: () => boolean;
   catalogOpen: () => boolean;
   shipCardOpen: () => boolean;
   shipOrdered: () => boolean;
@@ -75,7 +77,13 @@ export function buildFirstMatchTour(d: FirstMatchDeps): SpotlightStep[] {
     ...(d.cardLayout()
       ? [step('details', '#mobile-sheet [data-mobile="details"]', d.panelOpen)]
       : []),
-    step('buildings-tab', '[data-act="tab"][data-arg="buildings"]', d.buildingsTabOpen),
+    // Постройки «i» свёрнуты, и группы внутри тоже (UIX-10.12).
+    step('buildings-open', '[data-act="dossier"][data-arg="buildings"]', () =>
+      d.foldOpen('buildings'),
+    ),
+    step('economy-open', '[data-act="dossier"][data-arg="grp:economy"]', () =>
+      d.foldOpen('grp:economy'),
+    ),
     step('mine', '[data-codex^="b:mine:"]', d.mineCardOpen),
     step('mine-order', '#codex [data-cx-upg="mine"]', d.mineOrdered, { inDialog: true }),
     step('mine-close', '#codex .cx-close', d.dossierClosed, { inDialog: true }),
@@ -94,8 +102,9 @@ export function buildFirstMatchTour(d: FirstMatchDeps): SpotlightStep[] {
     step('research-close', '#tech .tw-close', () => !d.techOpen()),
   ];
   const fleet: SpotlightStep[] = [
-    step('ships-tab', '[data-act="tab"][data-arg="ships"]', d.shipsTabOpen),
-    step('catalog', '[data-act="openunits"][data-arg="ships"]', d.catalogOpen),
+    // Корабли заказывают в окне «Построить», его раздел кораблей — вторым шагом.
+    step('yard', '[data-act="openbuild"], [data-lift="openbuild"]', d.catalogOpen),
+    step('yard-ships', '#constructor .pw-main-tabs [data-ctab="ships"]', d.shipListOpen),
     step('ship', '#constructor [data-pw-info="unit:frigate"]', d.shipCardOpen),
     step('ship-order', '#codex [data-build="unit:frigate"]', d.shipOrdered, { inDialog: true }),
     step('catalog-close', '#constructor .cn-close', () => !d.catalogOpen()),

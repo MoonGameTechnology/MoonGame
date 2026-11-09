@@ -305,7 +305,7 @@ export function drawRadarContacts(now: number): void {
 // of worlds to yield any signature) are tuned in the content, next to the data.
 // A radar projects two concentric ranges: signatures out to its full reach, and
 // full identification within the inner half (mirrors shared-core visibility).
-const IDENTIFY_REACH_FRACTION = 0.5;
+export const IDENTIFY_REACH_FRACTION = 0.5;
 
 /** Radar reach (distance) a fleet projects, from its loudest radar-ship (0 = none).
  *  Тонкая обёртка над ЯДРОВЫМ `fleetRadarReach` — не своя копия правила: когда копия

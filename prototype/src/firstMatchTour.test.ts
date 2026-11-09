@@ -22,17 +22,20 @@ describe('guided first match', () => {
     count = 1;
     expect(wing.advance?.on === 'state' && wing.advance.when()).toBe(true);
   });
-  it('returns to the buildings tab when a previous lesson left the fleet tab selected', () => {
-    const { deps, facts } = firstMatchFixture();
+  it('opens the collapsed buildings and their economy group before the mine (UIX-10.12)', () => {
+    const { deps, facts, folds } = firstMatchFixture();
     facts.homeOpened = true;
-    facts.buildingsTabOpen = false;
+    folds.clear();
     const steps = buildFirstMatchTour(deps);
     const tour = new SpotlightTour(steps, host);
     tour.start();
     tour.tap();
     tour.tap();
-    expect(steps[tour.index]?.id).toBe('buildings-tab');
-    facts.buildingsTabOpen = true;
+    expect(steps[tour.index]?.id).toBe('buildings-open');
+    folds.add('buildings');
+    tour.refresh();
+    expect(steps[tour.index]?.id).toBe('economy-open');
+    folds.add('grp:economy');
     tour.refresh();
     expect(steps[tour.index]?.id).toBe('mine');
   });
@@ -68,9 +71,9 @@ describe('guided first match', () => {
     advance('researchDone', 'research-close');
     facts.techOpen = false;
     tour.refresh();
-    expect(at()).toBe('ships-tab');
-    advance('shipsTabOpen', 'catalog');
-    advance('catalogOpen', 'ship');
+    expect(at()).toBe('yard');
+    advance('catalogOpen', 'yard-ships');
+    advance('shipListOpen', 'ship');
     advance('shipCardOpen', 'ship-order');
     tour.notifyAction('unit.build');
     expect(at()).toBe('ship-order'); // a scout or ground troop does not count
@@ -143,9 +146,11 @@ describe('guided first match', () => {
       'hero.production-more',
       'ground.details',
       'aviation.details',
+      'aviation.wing-details',
       'landing.hero-details',
       'landing.troops-commands',
       'landing.send',
+      'assault.wing-details',
       'assault.hero-details',
       'assault.cast-commands',
       'assault.land-details',

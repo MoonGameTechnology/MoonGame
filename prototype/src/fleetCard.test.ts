@@ -161,13 +161,12 @@ async function boot(over: Record<string, unknown> = {}) {
     world: () => env.s,
     me: () => 'p1',
     names: () => env.names,
-    planetTab: () => 'buildings',
     buildUnits: () => [],
     devUi: () => false,
     sectorOf: () => undefined,
     sectorType: (id) => env.types[id],
-    garrisonTiles: m.garrisonTilesHtml,
     sectorZeroToolsHidden: () => false,
+    radar: () => ({ reach: 0, identify: 0 }),
   });
   m.initFleetCard({
     world: () => env.s,
@@ -569,14 +568,16 @@ describe('свой флот', () => {
     expect(html).not.toContain(t('side.ground.title'));
   });
 
-  it('носитель с трюмом показывает ангар', async () => {
+  it('носитель с трюмом показывает ангар: имя эскадры выделяет её, приказов здесь нет', async () => {
     const { card, put } = await boot();
     put(
       fleet('F3', 'p1', 'Z', [{ unit: 'shuttle_carrier', count: 1 }], {
         hangar: [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 2 }] }],
       } as Partial<Fleet>),
     );
-    expect(card('F3')).toContain(`${act('wingstrike')} data-arg="sq:1"`);
+    expect(card('F3')).toContain(`${act('sqpick')} data-arg="sq:1"`);
+    expect(card('F3')).not.toContain(act('wingstrike'));
+    expect(card('F3')).not.toContain(act('wingunload'));
   });
 });
 
@@ -673,14 +674,6 @@ describe('карточка группы', () => {
 });
 
 describe('плитки и надбавки', () => {
-  it('гарнизон — плитки в справочник, пустой называется словами', async () => {
-    const { m } = await boot();
-    expect(m.garrisonTilesHtml('p1', [{ unit: 'militia', count: 2 }])).toContain(
-      'data-codex="u:militia"',
-    );
-    expect(m.garrisonTilesHtml('p1', [])).toContain(t('side.none'));
-  });
-
   it('пустой или неизвестный стек плитки не даёт', async () => {
     const { m } = await boot();
     expect(m.unitTileHtml({ unit: 'cruiser', count: 0 }, 'p1', '')).toBe('');
@@ -764,7 +757,8 @@ describe('эскадра в воздухе', () => {
     expect(m.aloftPanelHtml(st)).toBe(html);
     // Кнопки стоят в помеченном ряду: свёрнутый лист телефона показывает из карточки только
     // его (UIX-10.5).
-    const row = html.slice(html.indexOf('<div class="row aloft-acts">'));
+    const row = html.slice(html.indexOf('<div class="row aloft-acts wing-orders'));
+    expect(row.length).toBeLessThan(html.length);
     for (const a of ['aloftstrike', 'aloftpatrol', 'aloftsplit', 'wingrecall'])
       expect(row).toContain(order(a, 'S1'));
     // Сесть некуда — перелёта нет; патруля нет — нечего и держать.
@@ -822,12 +816,13 @@ describe('эскадра в воздухе', () => {
     const patrol = { hours: 3, radius: 40 };
     const out = m.aloftPanelHtml(strike('P1', { target: { kind: 'point' }, patrol }));
     expect(subLine(out)).toMatch(new RegExp(`^${t('side.aloft.order.patrol-out')} · <span class="pn-timer"`));
-    expect(out).toContain(`${order('wingkeep', 'P1')} >${t('side.wing.keep')}</button>`);
+    // «Держать» — переключатель плиткой, как «Бомбардировка» у флота: горит, пока держится.
+    expect(out).toContain(`${order('wingkeep', 'P1')} title="${t('cmd.wing.keep')}" aria-pressed="false"`);
     const held = m.aloftPanelHtml(
       strike('P2', { target: { kind: 'point' }, leg: 'patrol', patrol: { ...patrol, hold: true } }),
     );
     expect(subLine(held)).toMatch(new RegExp(`^${t('side.aloft.order.patrol')} · <span class="pn-timer"`));
-    expect(held).toContain(`${order('wingkeep', 'P2')} >${t('side.wing.keep.off')}</button>`);
+    expect(held).toContain(`${order('wingkeep', 'P2')} title="${t('cmd.wing.keep')}" aria-pressed="true"`);
   });
 
   it('повернувшая домой: строка о возврате, бить и отзывать нечего', async () => {
@@ -1113,7 +1108,6 @@ describe('стык с main.ts', () => {
   it('панель зовёт карточки модуля', () => {
     expect(PANEL).toContain("if (pick.kind === 'group') return taskGroupPanelHtml(pick.fleets);");
     expect(PANEL).toContain("if (pick.kind === 'fleet') return fleetPanelHtml(pick.fleet);");
-    expect(MAIN).toContain('garrisonTiles: garrisonTilesHtml,');
     expect(PANEL).toContain('if (aloft) return aloftPanelHtml(aloft);');
   });
 

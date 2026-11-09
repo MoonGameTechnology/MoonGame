@@ -13,10 +13,12 @@ import {
   retreatAim,
   selFleet,
   selPlanet,
+  selSquadron,
   strikeAim,
   troopsPlan,
 } from './interaction';
 import { cam, centerOn, focusWorld, panBy, world } from './mapCamera';
+import { hangarBadgeRect } from './mapHangars';
 import type { TrainingTourUi } from './trainingTour';
 
 interface TrainingDomHost {
@@ -25,8 +27,6 @@ interface TrainingDomHost {
   mobile: boolean;
   expanded(): boolean;
   collapse(): void;
-  tab(): string;
-  ships(): void;
   render(): void;
 }
 
@@ -74,6 +74,8 @@ export function trainingTourUi(h: TrainingDomHost): TrainingTourUi {
     visible,
     selectedWorld: () => selPlanet,
     selectedFleet: () => selFleet,
+    selectedSquadron: () => selSquadron,
+    hangar: (spot) => hangarBadgeRect(spot),
     fleetSelector: (role) => {
       const f = fleet(role);
       return f ? `[data-act="selfleet"][data-arg="${CSS.escape(f.id)}"]` : null;
@@ -98,7 +100,6 @@ export function trainingTourUi(h: TrainingDomHost): TrainingTourUi {
         if (f.location) {
           focusWorld(f.location);
           pickWorld(f.location);
-          h.ships();
         } else pickFleets([f.id], (id) => h.world().fleets[id]?.owner === h.me());
         h.render();
         details();
@@ -109,7 +110,6 @@ export function trainingTourUi(h: TrainingDomHost): TrainingTourUi {
     },
     intent: (kind) => {
       if (kind === 'details') return h.expanded();
-      if (kind.startsWith('tab:')) return h.tab() === kind.slice(4);
       if (kind === 'move') return aiming;
       if (kind === 'merge') return merging;
       if (kind === 'merge-confirm')
@@ -120,7 +120,8 @@ export function trainingTourUi(h: TrainingDomHost): TrainingTourUi {
         );
       if (kind === 'retreat') return retreatAim !== null;
       if (kind === 'strike') return strikeAim !== null;
-      if (kind === 'troops-ready') return hasPlannedArmyLoad(h.world(), troopsPlan, 'heavy_infantry', data);
+      if (kind === 'troops-ready')
+        return hasPlannedArmyLoad(h.world(), troopsPlan, 'heavy_infantry', data);
       if (kind === 'carrier-course')
         return (
           !!fleet('carrier')?.movement ||

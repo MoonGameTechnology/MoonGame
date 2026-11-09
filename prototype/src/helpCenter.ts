@@ -460,7 +460,10 @@ export function initHelpCenter(host: HelpCenterHost): void {
       const build = (tg.closest('.cx-build') as HTMLElement | null)?.dataset.build;
       if (build && world) {
         const [kind, id] = build.split(':');
-        enqueueBuild(world, { kind: kind as BuildKind, id: id!, count: 1 });
+        if (enqueueBuild(world, { kind: kind as BuildKind, id: id!, count: 1 }) === false) {
+          openCodex(activeCodexKey, world);
+          return;
+        }
         codexEl.classList.remove('show');
         invalidatePanel();
         renderPanel();

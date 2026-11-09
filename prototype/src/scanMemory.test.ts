@@ -214,3 +214,23 @@ describe('память разведки — тот же объект мира н
     expect(mem.ownerOf('A')).toBe('p3');
   });
 });
+
+describe('память разведки — время опознания (UIX-10.12)', () => {
+  it('снимок помнит, когда мир видели последний раз, даже если сам мир не менялся', () => {
+    const mem = createScanMemory();
+    const a = world('A');
+    mem.remember(['A'], worlds(a), 1000);
+    expect(mem.get('A')?.at).toBe(1000);
+    mem.remember(['A'], worlds(a), 5000);
+    expect(mem.get('A')?.at).toBe(5000);
+  });
+
+  it('запись без времени (память с сервера) не стирает известное время', () => {
+    const mem = createScanMemory();
+    mem.remember(['A'], worlds(world('A')), 1000);
+    mem.remember(['A'], worlds(world('A', { owner: 'p3' })));
+    expect(mem.get('A')).toMatchObject({ owner: 'p3', at: 1000 });
+    mem.remember(['B'], worlds(world('B')));
+    expect(mem.get('B')?.at).toBeUndefined();
+  });
+});

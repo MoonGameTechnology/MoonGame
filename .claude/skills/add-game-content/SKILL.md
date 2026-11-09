@@ -34,7 +34,9 @@ description: Добавление и правка игрового контен�
 опечатка в имени не упадёт — она молча превратится в дефолт (либо, наоборот, улетит
 в `.catchall(z.number())` у `UnitStatsSchema` как «ещё один стат»).
 
-Что где лежит (список фрагментов задан в `loadGameData.ts` — он же и есть контракт):
+Что где лежит (главные фрагменты; полный список — `composeGameDataBundle` в
+`loadGameData.ts`, он же и есть контракт: там ещё `scoring`, `modes`, `market`, `veteran`,
+`promotion`, `medalGrades`, `sectorZeroStars`, `sectorZeroShop`):
 
 | Файл | Схема | Про что |
 | --- | --- | --- |
@@ -49,10 +51,11 @@ description: Добавление и правка игрового контен�
 | `scientists.json`, `events.json`, `rewards.json` | `ScientistDefSchema`, `EffectRuleSchema`, `RewardsDefSchema` | учёные, trigger→effect, XP-шкала |
 
 Вне общего бандла (у них свои валидаторы, их читает сервер, а не `loadGameData`):
-`starterArsenal.json`, `dropTables.json`, `medals.json`, `metaEconomy.json`, `corpBuildings.json`
-(см. `packages/server/src/` — `scenario.ts`, `arsenal.ts`, `dropRoller.ts`, `medalCatalog.ts`,
-`metaEconomyCatalog.ts`, `corpConstruction.ts`) и `data/maps/*.json`
-(схема `packages/shared-core/src/data/mapSchema.ts`).
+`starterArsenal.json`, `dropTables.json`, `medals.json`, `metaEconomy.json`, `corpBuildings.json`,
+`avaFormats.json`, `corpNames.json`, `metaModuleProgression.json` (читатели — в
+`packages/server/src/`: `arsenal.ts`, `dropRoller.ts`, `medalCatalog.ts`, `metaEconomyCatalog.ts`,
+`corpConstruction.ts`, `avaFormats.ts`, `corpNames.ts`, `moduleProgression.ts`) и
+`data/maps/*.json` (схема `packages/shared-core/src/data/mapSchema.ts`).
 
 Ориентируйся на соседнюю запись того же файла — она уже прошла схему и балансную
 правку. Поля с дефолтом можно просто не писать: `cruiser` не объявляет `domain`,
@@ -68,7 +71,7 @@ description: Добавление и правка игрового контен�
   контента (`heroAbilities`/`heroSkillTrees`) — `nonnegative`:
   отрицательная цена печатала бы ресурсы через `payCost`.
 - Enum'ы fail-closed: неизвестная ветка героя (`transhuman|psionic`), ветка техов
-  (`ground|space|shuttle|missile|command`) или `hook` пассивки роняют парс целиком.
+  (`ground|space|shuttle|missile|command|industry`) или `hook` пассивки роняют парс целиком.
   Это правильно (инвариант 4, fail-secure): битые данные не должны доехать до ядра.
 
 ## 3. Перекрёстные ссылки должны резолвиться
@@ -126,6 +129,13 @@ Id (ключ записи) — `snake_case`, как у всех существу
 
 - `packages/shared-core/src/data/schemas.test.ts` — `expect(data.version).toBe(...)`.
 - заголовок `## 6. Данные (data/*.json, версия …)` в `docs/state.md`.
+
+И третья правка, которую забывают чаще всего: **пара соло-сохранений** в
+`decisions/soloSaveMigration.ts` (по образцу последней пары: версии и отпечатки данных и
+правил «до» и «после», комментарий — что поменялось и почему старое сохранение читается
+без потерь). Без неё локальная схватка прошлого выпуска перестаёт загружаться; сторож —
+`prototype/src/soloSaveMigrationWiring.test.ts`, его падение показывает новые отпечатки
+(`Received`), которые и вписываются в пару.
 
 ## 6. Новый top-level каталог (редко)
 

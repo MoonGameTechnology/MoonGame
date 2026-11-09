@@ -4,7 +4,8 @@ import { productionCatalogHeading, productionCatalogTile } from './productionCat
 import { closeProductionOverlay, fittingSheet, presentProduction, rememberProductionDetails, productionOrderHtml } from './productionPresentation';
 import { productionQueueHtml } from './productionQueueView';
 import { completedUnitSpend } from './economy';
-import { productionIncomeHtml } from './productionIncome';
+import { productionIncomeHtml, productionStockHtml, refreshProductionStock } from './productionIncome';
+import { worldOrdersHtml } from './worldOrdersPane';
 import { productionClick } from './productionInteraction';
 /**
  * «ПРОИЗВОДСТВО» — the unified in-match order screen (CON-1, LARS-4, REFM-13, ROS-3.1).
@@ -784,7 +785,7 @@ function orderView(host: YardHost, draft: YardDraft, hulls: string[], troopsFor:
   return { draft, body, order };
 }
 
-function productionAvailability(host: YardHost): string { return JSON.stringify([host.state().players[host.me()]?.resources, host.state().players[host.me()]?.technologies, host.state().players[host.me()]?.arsenal, Object.values(host.state().planets).filter(p => p.owner === host.me()).map(p => [p.id,p.buildings])]); }
+function productionAvailability(host: YardHost): string { const pl = host.state().players[host.me()]; return JSON.stringify([pl?.resources, pl?.technologies, pl?.arsenal, host.state().capital?.[host.me()], pl?.stewardHoldPoints, host.state().rallyPoints?.[host.me()], Object.values(host.state().planets).filter(p => p.owner === host.me()).map(p => [p.id,p.buildings])]); }
 
 export function initShipyard(host: YardHost) {
   let tab: YardTab = 'ships';
@@ -836,6 +837,7 @@ export function initShipyard(host: YardHost) {
     } else {
       ({ draft, body, order } = orderView(host, draft, hullsOf(), troopsFor, tab));
     }
+    body = productionStockHtml(host.state(), host.me()) + body;
     if (draft.planet) body = productionIncomeHtml(host.state(), host.me(), draft.planet) + body;
     // Перерисовка не сбрасывает прокрутку: поставил модуль внизу списка — там и остался.
     const keep =
@@ -1099,6 +1101,7 @@ export function initShipyard(host: YardHost) {
     },
     refreshHeroes: () => {
       if (tab !== 'heroes' || !host.root().classList.contains('show')) return;
+      refreshProductionStock(host.root(), host.state(), host.me());
       // Do not even build the expensive hero HTML while touch/inertial scrolling is active.
       // The next 1s host tick catches up after the 180ms idle guard expires.
       if (heroScrolling) return;
@@ -1117,7 +1120,9 @@ export function initShipyard(host: YardHost) {
       }
     },
     refreshQueue: () => {
-      if (heroScrolling || !host.root().classList.contains('show')) return;
+      if (!host.root().classList.contains('show')) return;
+      refreshProductionStock(host.root(), host.state(), host.me());
+      if (heroScrolling) return;
       if (tab !== 'heroes' && (tab === 'buildings' || productionAvailability(host) !== lastAvailability)) { paint(); return; }
       const el = host.root().querySelector('#cn-queue');
       if (!el) return;
@@ -1136,7 +1141,7 @@ function productionWorlds(state: GameState, me: string) {
   return Object.values(state.planets).filter(p => p.owner === me && SECTOR_TYPES[p.kind ?? '']?.buildable);
 }
 function productionWorldSelect(state: GameState, me: string, selected: string): string {
-  return `<select id="cn-planet" class="cn-plan" aria-label="${t('yard.where')}">${productionWorlds(state, me).map(p => `<option value="${esc(p.id)}"${p.id === selected ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`).join('')}</select>`;
+  return `<select id="cn-planet" class="cn-plan" aria-label="${t('yard.where')}">${productionWorlds(state, me).map(p => `<option value="${esc(p.id)}"${p.id === selected ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`).join('')}</select>` + worldOrdersHtml(state, me, selected);
 }
 function anchorBuilding(root: HTMLElement, id: string): void {
   const target = Array.from(root.querySelectorAll<HTMLElement>('[data-bw]')).find(el => el.dataset.bw === id);

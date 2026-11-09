@@ -179,7 +179,10 @@ export function takeFromStacks(
   let remaining = count;
   const taken: UnitStack[] = [];
   for (const st of src) {
-    if (st.unit !== unit || remaining <= 0) continue;
+    // An earlier take in the same order can leave a stack at count 0 (`fleet.split` runs
+    // one take per requested line before it filters): it has nothing to give, and its
+    // pool share would be 0 / 0 = NaN on a ghost stack of zero ships.
+    if (st.unit !== unit || remaining <= 0 || st.count <= 0) continue;
     if (wantKey !== null && loadoutKey(st.modules) !== wantKey) continue;
     const move = Math.min(st.count, remaining);
     remaining -= move;

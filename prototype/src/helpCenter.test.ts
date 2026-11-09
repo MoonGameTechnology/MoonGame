@@ -65,6 +65,7 @@ interface Env {
   calls: string[];
   sel: string | null;
   hidden: boolean;
+  rejected?: boolean;
 }
 
 function stubBrowser(): Env {
@@ -124,7 +125,7 @@ async function load(world: () => GameState) {
   }));
   vi.doMock('./worldQueries', () => ({
     enqueueBuild: (pid: string, o: { kind: string; id: string }) =>
-      env.calls.push(`build:${pid}:${o.kind}:${o.id}`),
+      (env.calls.push(`build:${pid}:${o.kind}:${o.id}`), !env.rejected),
     myRes: () => ({}),
   }));
   const help = await import('./helpCenter');
@@ -231,6 +232,17 @@ describe('REFM-221 · справка — справочник', () => {
       .fire('click', hit({ '.cx-build': { dataset: { build: 'unit:frigate' } } }));
     expect(env.calls).toEqual(['build:' + home.id + ':unit:frigate', 'invalidate', 'render']);
     expect(shown('codex')).toBe(false);
+  });
+
+  it('keeps the card open when the build order is rejected', async () => {
+    const s = game.newGame();
+    const help = await load(() => s);
+    env.sel = Object.values(s.planets).find(p => p.owner === 'p1')!.id;
+    help.openCodex('u:frigate');
+    env.rejected = true;
+    env.els.get('codex')!.fire('click', hit({ '.cx-build': { dataset: { build: 'unit:frigate' } } }));
+    expect(shown('codex')).toBe(true);
+    expect(env.calls).not.toContain('invalidate');
   });
 
   // Заперто технологией (основная игра): вместо «Построить здесь», которое ядро отбило бы

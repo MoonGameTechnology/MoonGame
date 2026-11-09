@@ -128,6 +128,7 @@ import { termBody } from './termTip';
 import { restRouteHours } from './travelEta';
 import { unitGlyphSvg } from './unitGlyphs';
 import { veteranTag } from './veteranChevrons';
+import { wingOrder, wingOrdersHtml } from './wingOrders';
 import { hangarSectionHtml, unitRows } from './worldCard';
 import { planet } from './worldQueries';
 import { fortressStatusHtml } from './fortressView';
@@ -364,15 +365,6 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[], named = false): string {
     .join('');
   return tiles ? `<div class="ptiles">${tiles}</div>` : '';
 }
-/** Гарнизон мира — теми же плитками, что состав флота (заказ владельца 2026-09-25): тап —
- *  досье юнита, как у прежней строки. Пустой гарнизон называется словами, а не пропадает. */
-export function garrisonTilesHtml(owner: string | null, stacks: UnitStack[]): string {
-  const tiles = stacks.map((u) => unitTileHtml(u, owner, `data-codex="u:${esc(u.unit)}"`)).join('');
-  return tiles
-    ? `<div class="ptiles">${tiles}</div>`
-    : `<div class="row dim">${esc(t('side.none'))}</div>`;
-}
-
 /** Сводка армии (тап по имени в шапке карточки): состав по архетипам, боевой вес
  *  с капом, пулы корпуса/щита, скорость с активными множителями, трюм, радар,
  *  содержание. Обратно — тем же тапом по имени или кнопкой «назад». */
@@ -734,19 +726,10 @@ function fleetHangarHtml(f: Fleet, compact: boolean): string {
   if (!hasHangar(hold)) return '';
   const idle =
     hold.aloft === 0 && !hold.sortie && squadronCards(hold, { mine: true, data }).length === 0;
-  let h =
-    compact && idle
-      ? `<div class="row dim fc-hangar">${esc(t('side.wing.empty'))}</div>`
-      : hangarSectionHtml(hold, f.id, true);
-  const offer = fleetWingOffer(f, hold);
-  if (offer.load || offer.unload) {
-    h +=
-      `<div class="row">` +
-      (offer.load ? btn('wingload', f.id, t('side.wing.load'), true) : '') +
-      (offer.unload ? btn('wingunload', f.id, t('side.wing.unload'), true) : '') +
-      `</div>`;
-  }
-  return h;
+  // Перегрузка порт ⇄ трюм — в карточке самой эскадры (UIX-10.14): имя в секции её выделяет.
+  return compact && idle
+    ? `<div class="row dim fc-hangar">${esc(t('side.wing.empty'))}</div>`
+    : hangarSectionHtml(hold, f.id, true);
 }
 
 /** Перегрузка челноков между носителем и портом под ним. Предлагается, только когда
@@ -1053,7 +1036,7 @@ function strikeBaseName(base: StrikeBase): string {
 
 /** Чем занята эскадра (`aloftCard.ts`, правило 7). Ключи стоят литералами в каждой ветке:
  *  разбор гейта локализации видит только литеральные ключи. */
-function aloftOrderText(card: AloftCard): string {
+export function aloftOrderText(card: AloftCard): string {
   const o = card.order;
   if (o.kind === 'fleet') return t('side.aloft.order.strike', { name: fleetTitleOf(o.id) });
   if (o.kind === 'planet') return t('side.aloft.order.strike', { name: placeName(o.id) });
@@ -1095,21 +1078,17 @@ export function aloftPanelHtml(st: ShuttleStrike): string {
   let h = kitCardHeader(ownerColor(ME), strikeTitle(st), '', sub) + unitRows(card.stacks);
   // Повернувшая домой бить снова не может (правило 3): без строки игрок искал бы кнопку.
   if (card.returning) h += `<div class="row dim">${esc(t('side.aloft.returning'))}</div>`;
-  const buttons =
-    (card.canStrike ? btn('aloftstrike', card.strikeId, t('side.wing.strike'), true) : '') +
-    (card.canPatrol ? btn('aloftpatrol', card.strikeId, t('side.wing.patrol'), true) : '') +
-    (card.canRelocate ? btn('aloftrelocate', card.strikeId, t('side.wing.relocate'), true) : '') +
-    (card.canSplit ? btn('aloftsplit', card.strikeId, t('side.wing.split'), true) : '') +
-    (card.hold !== null
-      ? btn(
-          'wingkeep',
-          card.strikeId,
-          card.hold ? t('side.wing.keep.off') : t('side.wing.keep'),
-          true,
-        )
-      : '') +
-    (card.canRecall ? btn('wingrecall', card.strikeId, t('side.wing.recall'), true) : '');
-  return buttons ? `${h}<div class="row aloft-acts">${buttons}</div>` : h;
+  const id = card.strikeId;
+  const orders = [
+    card.canStrike && wingOrder('strike', 'aloftstrike', id),
+    card.canPatrol && wingOrder('patrol', 'aloftpatrol', id),
+    card.canRelocate && wingOrder('relocate', 'aloftrelocate', id),
+    card.canSplit && wingOrder('split', 'aloftsplit', id),
+    // «Держать» — переключатель: горит, пока патруль держится; нажатие снимает.
+    card.hold !== null && wingOrder('keep', 'wingkeep', id, card.hold),
+    card.canRecall && wingOrder('recall', 'wingrecall', id),
+  ];
+  return h + wingOrdersHtml(orders, id);
 }
 
 // --- Всплывашка надбавок: тап по параметру флота (заказ владельца 2026-09-27) ----------

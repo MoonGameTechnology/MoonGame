@@ -267,7 +267,7 @@ body.holo-ui #connect .mfmenu{max-height:calc(var(--vph) * .38);}
    и союзник забега, профиль, выбор места, заставка загрузки карты и список языков. Чат
    остаётся в масштабе 1: его перетаскивание и размер считает `chatWindow.ts` в экранных px. */
 @media (min-width:900px) and (hover:hover) and (pointer:fine){
-  body.holo-ui :is(.holo-nav,.holo-back,#holo-selection-window,#missionpanel,#swarm-tab,#rescard,#pingpanel,
+  body.holo-ui :is(.holo-nav,.holo-back,#holo-selection-window,#missionpanel,#swarm-tab,#rescard,#pingpanel,#aviapanel,
     #trader,#ally,#profile,#seatpick,#maploading,.locmenu,#key-memo){zoom:var(--pcz);}
   /* Окна, чей размер задаёт PC-блок `styles/08-pc.css` в vw/vh, — те же доли видимого окна. */
   body.holo-ui #scipick .twbox{width:calc(var(--vpw) * .534);max-height:calc(var(--vph) * .585);}

@@ -73,8 +73,7 @@ window.__szTest = {
   // предмет проверки, а не попадание мышью по карте, где камера у Sector Zero близко к дому.
   select: id => { pickWorld(id); invalidatePanel(); renderPanel(); },
   selected: () => selPlanet,
-  // Вкладка карточки мира — как тап по ней; живые наземные части гарнизона мира.
-  tab: (x) => side.querySelector('[data-act="tab"][data-arg="' + x + '"]').click(),
+  // Живые наземные части гарнизона мира.
   ground: (id) => s.planets[id].garrison.filter((st) => st.count > 0 && data.units[st.unit]?.domain === 'ground').length,
   garrisonUnits: (id) => s.planets[id].garrison.filter((st) => st.count > 0).map((st) => st.unit),
   // Открыт ли слой, который закроет Escape/Back.
@@ -243,7 +242,7 @@ async function check(label, run) {
   // Хук перерисовывает карточку сразу (`renderPanel`, как кадр игры): иначе на той же
   // странице до следующего кадра в `#side` лежала карточка ПРОШЛОЙ партии, и счёт «Пинга»
   // плавал — 2 падения из 10, оба с числом от предыдущей фазы.
-  await page.locator('#side .ptabs').first().waitFor({ state: 'attached' });
+  await page.locator('#side .dsec').first().waitFor({ state: 'attached' });
   assert.equal(
     await page.locator('#side [data-act="ping"]').count(),
     run ? 0 : 1,
@@ -267,22 +266,13 @@ async function check(label, run) {
     await page.locator('#missionpanel .mp-close').click();
     await page.locator('#missionpanel').waitFor({ state: 'hidden' });
     await page.waitForFunction(() => document.querySelector('#devline .dl-missions')?.getAttribute('aria-expanded') === 'false');
-    // Гарнизон — плитками, как состав флота (заказ владельца 2026-09-25): у каждой наземной
-    // части подпись, полоска и числа корпуса «осталось/всего».
-    await page.evaluate(() => window.__szTest.tab('ground'));
+    // Гарнизон окна «i» — сеткой (UIX-10.12): у каждой части имя, число и полоска здоровья.
     const ground = await page.evaluate((id) => window.__szTest.ground(id), home);
     assert(ground > 0, `${label}: на домашнем мире есть наземный гарнизон`);
-    const hp = await page.locator('#side .ptile .pt-hpn').allTextContents();
-    assert.equal(hp.length, ground, `${label}: плитка с числами на каждую наземную часть`);
-    for (const x of hp) assert.match(x, /^[\d.]+k?\/[\d.]+k?$/, `${label}: числа корпуса на плитке`);
-    assert.equal(await page.locator('#side .ptile .pt-n').count(), ground, `${label}: подпись наземной плитки`);
-    // Гарнизон — только наземный (владелец 2026-09-26): гарнизон крепости не носит трейта
-    // `ground`, и вкладка «Флот» показывала его «кораблями в гарнизоне». Её плитки — орбита.
-    assert((await page.evaluate((id) => window.__szTest.garrisonUnits(id), home)).includes('garrison'), `${label}: у дома гарнизон крепости`);
-    await page.evaluate(() => window.__szTest.tab('ships'));
-    assert.equal(await page.locator('#side .ptile').count(), 0, `${label}: во «Флоте» нет наземных плиток`);
-    assert.equal(await page.locator('#side .sec', { hasText: /На орбите|In orbit/ }).count(), 1, `${label}: во «Флоте» — орбита`);
-    await page.evaluate(() => window.__szTest.tab('ground'));
+    const units = await page.evaluate((id) => window.__szTest.garrisonUnits(id), home);
+    assert(units.includes('garrison'), `${label}: у дома гарнизон крепости`);
+    assert.equal(await page.locator('#side .dunit').count(), units.length, `${label}: ячейка на каждую часть гарнизона`);
+    assert.equal(await page.locator('#side .dunit .dhp').count(), units.length, `${label}: полоска здоровья у каждой части`);
     // SZ-map-ids: карточка мира, журнал и панели называют места именами провинций. Id
     // узлов глав — английские слова (`home_a`, `drift`): на русском экране забега их быть
     // не должно. Сводки по тапу на имя у мира больше нет (переработка окна, 2026-09-29).
@@ -899,7 +889,7 @@ try {
       ' комиксы глав — до первого забега и после победы, один раз, с пропуском; портреты Академии загружены; торговец покупает, продаёт и меняет, курс отвечает на сделку; страница героя вкладками, навыки деревом с линиями;' +
       ' аналитика забега — сессия, старт, один исход, открытия, шаг обучения;' +
       ' «+» у Суверенов даёт ролик прямо в забеге; пакет снабжения за 5 ◆ — из карточки ресурса; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
-      ' без флота — карточка «Отстроиться / Завершить экспедицию», сдача ставит поражение с итогами; гарнизон мира — плитками с подписью, полоской и числами корпуса; карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты;' +
+      ' без флота — карточка «Отстроиться / Завершить экспедицию», сдача ставит поражение с итогами; гарнизон мира — сеткой с именем, числом и полоской здоровья; карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты;' +
       ' «Обучение» открывает полигон с героем и объявленным противником; подсказка этапов сворачивается и пропускает этап; силы противника входят по этапам, контратака объявлена с отсчётом, который ждёт чтения;' +
       ' горячие клавиши ПК — только кнопки режима: в забеге B, M и 2 молчат, пробел — пауза с прежним темпом;' +
       ' подписи колонки инструментов под мышью — в своих кнопках\n',

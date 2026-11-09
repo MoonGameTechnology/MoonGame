@@ -106,6 +106,10 @@ export interface TopBarHost {
   /** Планеты места и лимит управления (`decisions/controlCounter.ts`) — памятка кадра;
    *  `null`, где лимит не действует. */
   control(): ControlCounterView | null;
+  /** Список «◇ Авиация» (UIX-10.15): число своих эскадр и открыт ли он; `null` — чипа нет
+   *  (телефон держит свою плавающую кнопку). */
+  aviation(): { count: number; open: boolean } | null;
+  toggleAviation(): void;
   /** Телефонная раскладка. */
   mobile(): boolean;
   /** Сколько мест ведёт локальный ИИ. */
@@ -388,6 +392,13 @@ export function renderTopBar(missions: MissionRow[]): void {
     ? `<button type="button" class="dl-control${control.over > 0 ? ' over' : ''}" data-control="1" title="${esc(t('hud.control.title'))}">` +
       `<i aria-hidden="true">⊙</i><span>${esc(t('hud.control.label'))}</span><b>${control.planets}/${control.limit}</b></button>`
     : '';
+  // UIX-10.15: «◇ Авиация N» — вход в список своих эскадр, пока они есть.
+  const avia = game.aviation();
+  const aviaHtml =
+    avia && avia.count > 0
+      ? `<button type="button" class="dl-control dl-avia" data-avia-open="1" aria-expanded="${avia.open}" title="${esc(t('avia.title'))}">` +
+        `<i aria-hidden="true">◇</i><span>${esc(t('avia.title'))}</span><b>${avia.count}</b></button>`
+      : '';
   // В забеге время суток ничего не значит (дня в шапке нет) — часы показывают, сколько
   // забег идёт, в тех же реальных минутах, что и все его таймеры.
   const clockHtml = `<span id="clock">${isSectorZeroRun() ? runClockText(s.time) : clockHM(s.time)}</span>`;
@@ -397,6 +408,7 @@ export function renderTopBar(missions: MissionRow[]): void {
   }
   const statusHtml =
     controlHtml +
+    aviaHtml +
     missionHtml +
     allyHtml +
     siegeHtml +
@@ -748,6 +760,10 @@ export function initTopBar(host: TopBarHost): void {
     }
     if ((event.target as Element).closest('[data-ally-open]')) {
       game.openAlly();
+      return;
+    }
+    if ((event.target as Element).closest('[data-avia-open]')) {
+      game.toggleAviation();
       return;
     }
     if ((event.target as Element).closest('[data-control]')) {

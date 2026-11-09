@@ -197,32 +197,34 @@ describe('перегрузка предлагается и со стороны �
   });
 });
 
-// Само ПОДКЛЮЧЕНИЕ вкладки живёт в карточке мира (`worldCard.ts`, REFM-223) — сканом
+// Само ПОДКЛЮЧЕНИЕ блока «Эскадра» живёт в карточке мира (`worldCard.ts`, REFM-223) — сканом
 // исходника, как в `rankScreen.test.ts`. Именно подключения и не хватало:
 // решение (`transferOffer`) было верным и покрытым, а звать его со стороны мира было
 // некому, и для игрока механики не существовало.
-describe('вкладка мира «Эскадра» подключена к перегрузке', () => {
-  const src = readFileSync(new URL('./worldCard.ts', import.meta.url), 'utf8');
-  const at = src.indexOf("game.planetTab() === 'shuttle'");
-  const tab = src.slice(at, at + 2000);
+// Перегрузка между портом и носителем у причала живёт в карточке самой эскадры (UIX-10.14):
+// «i» мира и карточка носителя только называют эскадры. Сторож проводки — по исходнику.
+describe('перегрузка с носителем — в карточке эскадры (UIX-10.14)', () => {
+  const src = readFileSync(new URL('./squadronCardView.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('function transferOrder(');
+  const body = src.slice(at, at + 1200);
 
-  it('ветка вкладки найдена: пустой срез прошёл бы любые проверки ниже', () => {
+  it('тело кнопки найдено: пустой срез прошёл бы любые проверки ниже', () => {
     expect(at).toBeGreaterThan(0);
   });
 
-  it('вкладка спрашивает, есть ли у мира носитель', () => {
-    expect(tab).toContain('dockedCarrier(');
+  it('кнопка спрашивает, стоит ли у мира свой носитель', () => {
+    expect(body).toContain('dockedCarrier(');
   });
 
-  it('и рисует те же две кнопки, что панель флота', () => {
-    expect(tab).toContain("btn('wingload'");
-    expect(tab).toContain("btn('wingunload'");
+  it('кнопки адресуют ЭСКАДРУ: обработчик сам находит носитель и порт', () => {
+    expect(body).toContain("wingOrder('load', 'sqload', card.id)");
+    expect(body).toContain("wingOrder('unload', 'squnload', card.id)");
   });
 
-  it('кнопка адресует ФЛОТ — обработчик `wingload` ждёт id носителя, а не мира', () => {
-    // Адресуй она мир, приказ ушёл бы в никуда: `wingload` резолвит флот по `arg`.
-    expect(tab).toMatch(/btn\('wingload', ship\.id/);
-    expect(tab).toMatch(/btn\('wingunload', ship\.id/);
+  it('в «i» мира перегрузки больше нет', () => {
+    const card = readFileSync(new URL('./worldCard.ts', import.meta.url), 'utf8');
+    expect(card).not.toContain("'wingload'");
+    expect(card).not.toContain("'wingunload'");
   });
 });
 

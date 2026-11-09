@@ -65,7 +65,7 @@ export function drawFleetHoldBadge(
   ownerColor: string,
   /** Высшая степень «Выслуги» во флоте (`fleetVeteranGrade`); >0 — у числа кораблей шеврон. */
   veteran = 0,
-): void {
+): { x: number; y: number; w: number; h: number } {
   cx.font = FLEET_COUNT_FONT;
   cx.textBaseline = 'middle';
   cx.textAlign = 'left';
@@ -145,4 +145,6 @@ export function drawFleetHoldBadge(
     });
     cx.font = FLEET_COUNT_FONT;
   }
+  // Где встала плашка: рядом с ней значок ангара носителя (`mapHangars.ts`).
+  return { x: box.x, y: box.y, w: width, h: height };
 }

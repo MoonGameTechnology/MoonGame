@@ -71,56 +71,24 @@ reasoning loops.
 
 ## GitHub publication path
 
-For every request to push/publish/create a PR, follow `.claude/skills/publish-pr/SKILL.md`.
-That skill is the canonical publication ritual, including the binary Git Data API fallback.
+For every request to push/publish/create a PR, read and follow
+`.claude/skills/publish-pr/SKILL.md`: the single write transport, the final sync with fresh
+`main` right before the PR, the preflight, creating or reusing the PR, the merge queue and
+the binary Git Data API fallback. The rules that are easiest to get wrong:
 
-Do not mix local Git transport, the connected GitHub API/app, and the merge queue as if they were
-one mechanism.
+1. Do not assume a readable `origin` can push. After one terminal `git push` auth failure, or
+   one GitHub MCP transport error such as `Invalid MCP request metadata`, do not retry through
+   that transport: switch once to a genuinely independent one or stop with the recovery
+   checkpoint from `publish-pr`.
+2. Do **not** enable generic GitHub auto-merge or enqueue a normal PR by hand:
+   `.github/workflows/automerge.yml` enqueues eligible ready PRs after required checks. A
+   queued branch is frozen; dequeue first or report that exact blocker.
+3. For a PR that is not merging, read its sticky “🚦 Почему этот PR не вливается” diagnosis
+   and `docs/pr-merge-rule.md` before trying mutations.
 
-1. Decide the remote write transport before publication. In hosted agent sessions, prefer the
-   connected GitHub API/app when it has repository write access. Do not assume that a readable
-   `origin` also has terminal push credentials.
-2. If a terminal `git push` fails authentication once, do not retry it. Switch once to the
-   authenticated GitHub API/app, or report that no writable transport is available.
-   If the GitHub MCP itself returns a transport/session error such as
-   `Invalid MCP request metadata`, mark that MCP write transport unusable for the session:
-   do not retry it and do not call lower-level Git Data operations through the same connector.
-   Use at most one genuinely independent write transport, otherwise stop with the local recovery
-   checkpoint described by `publish-pr`.
-3. **Final sync before PR:** after the implementation is complete and immediately before remote
-   publication, refresh the current `main` again and compare the task branch against it. If the
-   branch is behind or diverged, integrate the fresh `main` first (normally rebase a short-lived
-   branch), resolve any conflicts, and re-run the checks that the integration could invalidate.
-   Do not create a PR from a branch already known to be stale. If the owner explicitly asked to
-   skip checks, still perform the sync/preflight but do not invent extra test runs.
-4. Before creating a PR, verify that the remote head branch exists, is based on current `main`,
-   and has at least one commit/change ahead of `main`. Search for an existing open PR with the
-   same head branch and reuse it instead of creating a duplicate.
-5. Keep a PR as draft while more code changes are expected. Mark it ready only when the intended
-   change is complete enough for CI/review and no planned edits remain.
-6. This repository's `.github/workflows/automerge.yml` owns merge-queue enrollment. Do **not**
-   call generic GitHub auto-merge and do not manually enqueue a normal green PR: the workflow
-   automatically enqueues eligible ready PRs after required checks.
-7. Once a PR is in the merge queue, its head branch is effectively frozen for updates. Never loop
-   on push/update failures against a queued branch. If a new fix is required, the PR must be
-   dequeued first; if the available tools cannot dequeue it, report that exact blocker.
-8. For a PR that is not merging, read its sticky “🚦 Почему этот PR не вливается” diagnosis and
-   `docs/pr-merge-rule.md` before trying mutations.
-
-## Task completion discipline
-
-When a requested task is complete and ready for integration, do not leave the finished work only
-on a feature branch and do not wait for a separate request to publish it.
-
-1. Publish the complete branch through the chosen authenticated write transport.
-2. Create or reuse the pull request targeting current `main`.
-3. Follow the PR through CI and review. If a check, conflict, permission error, or tool failure
-   blocks it, make at most one retry of the same failed action; then report the exact blocker
-   instead of looping.
-4. Do not manually enable auto-merge or enqueue the PR. Let `automerge.yml` put a ready, eligible
-   PR into the merge queue and let the queue revalidate it against fresh `main`.
-5. A task is not considered fully handed off while completed code is stranded only in a local or
-   remote branch without a PR.
+Completed work is not handed off while it sits only on a branch: publish it, create or reuse
+the PR to `main` and follow it through CI and review. A blocked step gets at most one retry,
+then the exact blocker is reported.
 
 ## Project rules live elsewhere — read them before writing code
 
@@ -132,10 +100,10 @@ that decide whether a change is *correct* in this repository are elsewhere:
   `applyAction`, modules talk only through the bus, fail-secure rejection (an error is a
   stable `E_*` code, never a leaked detail), server authority, fixed module order.
 - **`CONTRIBUTING.md`** — the full Git and review regimen.
-- **`.claude/skills/`** — the executable rituals: `brick` (take a backlog task),
-  `publish-pr` (publish local work + create/reuse PR, including binary assets),
-  `localization` (player-visible text is a KEY, never a literal), `new-module`,
-  `add-game-content`, `sync-state-doc`.
+- **`.claude/skills/`** — the executable rituals, listed with their triggers in
+  `CONTRIBUTING.md`: `brick` (take a backlog task), `publish-pr`, `localization`
+  (player-visible text is a KEY, never a literal), `new-module`, `add-game-content`,
+  `sync-state-doc` and others.
 
 Run `pnpm run check` (lint + typecheck + test + docs-check) before every commit; it is the
 gate CI mirrors.
