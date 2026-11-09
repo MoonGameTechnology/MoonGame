@@ -237,6 +237,20 @@ export let selectionBox: { x1: number; y1: number; x2: number; y2: number } | nu
  *  по нему проходит со второго тапа (`captiveAtRisk`). Любой другой тап прицела сбрасывает. */
 let captiveWarned: string | null = null;
 
+/** Приказ эскадре из ангара по цели под пальцем: удар челноков или, когда прицел взвела
+ *  ракетная карточка, пуск `missile` ракет (missiles-roadmap) — цель у них одна. */
+function hangarAimOrder(
+  from: Parameters<typeof strikeShuttle>[1],
+  squadronId: string,
+  target: Parameters<typeof strikeShuttle>[3],
+  missile: number | undefined,
+) {
+  const me = game.me();
+  return missile
+    ? launchMissiles(me, from, squadronId, target, missile)
+    : strikeShuttle(me, from, squadronId, target);
+}
+
 /**
  * Тап взведённого прицела ЭСКАДРЫ В ВОЗДУХЕ (SHU-6.14): цели те же, что у взлёта из ангара
  * (чужой видимый флот, иначе мир; точка патруля; подсвеченная база перелёта), но приказ
@@ -480,13 +494,8 @@ export function selectAt(mx: number, my: number) {
     if (!game.squadronAt(squadronId)) {
       game.note(t('hint.wing-empty')); // звено исчезло между наводкой и тапом
     } else if (foe || node) {
-      // Ракеты пускаются по той же цели, что и удар: флот или мир (missiles-roadmap).
       const target = foe ? { targetFleetId: foe.id } : { targetPlanetId: node!.id };
-      playerOrder(
-        missile
-          ? launchMissiles(ME, from, squadronId, target, missile)
-          : strikeShuttle(ME, from, squadronId, target),
-      );
+      playerOrder(hangarAimOrder(from, squadronId, target, missile));
     } else {
       game.note(t('hint.wing-cancelled'));
     }

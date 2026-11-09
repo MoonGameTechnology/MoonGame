@@ -44,6 +44,7 @@ import {
 } from '../../decisions/battleReport';
 import { t, tData } from '../../localization/runtime';
 import { refusalText as errText } from '../../decisions/refusalText';
+import { ordnanceLogKey } from '../../decisions/ordnanceLog';
 import { hitKey, seenPatrolOver, shuttleHitView } from '../../decisions/shuttleHit';
 import { splitSelectTarget } from '../../decisions/splitFollow';
 import { battleOutcome, battlePhaseKey, lossTally } from './battleLog';
@@ -398,21 +399,8 @@ export function handleEvents(events: DomainEvent[]) {
   const nowMs = Date.now();
   for (const e of events) {
     const p = e.payload as Record<string, unknown>;
-    if (e.type.startsWith('rocketMine.') && (p.owner === ME || p.playerId === ME)) {
-      const keys: Record<string, string> = {
-        'rocketMine.ready': 'mine.ready',
-        'rocketMine.cancelled': 'mine.cancelled',
-        'rocketMine.launched': 'mine.launched',
-        'rocketMine.intercepted': 'mine.intercepted',
-        'rocketMine.hit': 'mine.hit',
-        'rocketMine.disarmed': 'mine.disarmed',
-      };
-      // Ракета из ангара (missiles-roadmap) летит тем же путём, но журнал зовёт её ракетой.
-      const key = p.mine === false && e.type !== 'rocketMine.launched' ? keys[e.type]?.replace('mine.', 'missile.') : keys[e.type];
-      if (key) note(t(key, { damage: Math.round(Number(p.damage) || 0) }));
-    }
-    if (e.type === 'missile.launched' && p.owner === ME) note(t('missile.launched'));
-    if (e.type === 'missile.missed' && p.owner === ME) note(t('missile.missed'));
+    const ordnanceKey = ordnanceLogKey(e.type, p, ME);
+    if (ordnanceKey) note(t(ordnanceKey, { damage: Math.round(Number(p.damage) || 0) }));
     switch (e.type) {
       case 'battle.started':
         // Видимость события — `eventVisibility.ts` (REFM-86): своё всегда, чужое только
