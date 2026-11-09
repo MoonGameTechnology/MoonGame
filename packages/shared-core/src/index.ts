@@ -891,6 +891,7 @@ export {
   ROCKET_MINE_TRAIT,
   MISSILE_UNIT,
   MISSILE_TRAIT,
+  MISSILE_SALVO,
 } from './state/ordnance';
 export type {
   RocketMineControl,

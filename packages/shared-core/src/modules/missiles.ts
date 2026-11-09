@@ -19,7 +19,7 @@ import { fleetPositionAt } from '../state/fleetPosition';
 import { distance } from '../state/route';
 import { getStance } from '../state/diplomacy';
 import { isVisibleTo } from '../state/visibility';
-import { isOrdnanceFleet } from '../state/ordnance';
+import { isOrdnanceFleet, MISSILE_SALVO } from '../state/ordnance';
 import {
   isMissileStack,
   portDisabled,
@@ -29,9 +29,6 @@ import {
 } from '../state/shuttle';
 import { requireOwnedUnengagedFleet } from '../util/fleet';
 import { spawnMissile } from '../util/missileFlight';
-
-/** Самый крупный залп одним приказом: больше — уже не залп, а склад. */
-const MAX_SALVO = 12;
 
 interface LaunchBase {
   id: string;
@@ -134,7 +131,12 @@ export const missilesModule: GameModule = {
       if (squad.units.some((st) => st.count > 0 && !isMissileStack(st, h.ctx.data)))
         return h.reject('E_NOT_MISSILE');
       const count = p.count === undefined ? 1 : p.count;
-      if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > MAX_SALVO)
+      if (
+        typeof count !== 'number' ||
+        !Number.isInteger(count) ||
+        count < 1 ||
+        count > MISSILE_SALVO
+      )
         return h.reject('E_BAD_PAYLOAD');
       if (squadronSize(squad) < count) return h.reject('E_NOT_ENOUGH');
       const target = launchTarget(h, action.playerId, p);

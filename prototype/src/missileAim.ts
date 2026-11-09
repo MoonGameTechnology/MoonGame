@@ -4,12 +4,9 @@
  * ракету, «Залп» — всю эскадру, но не больше `MISSILE_SALVO` за приказ (предел ядра).
  */
 import { t } from '../../localization/runtime';
-import type { Squadron } from '../../packages/shared-core/src/index';
+import { MISSILE_SALVO, type Squadron } from '../../packages/shared-core/src/index';
 import { note } from './eventFeed';
 import { arm } from './interaction';
-
-/** Самый крупный залп одним приказом — тот же предел, что у ядра (`missile.launch`). */
-export const MISSILE_SALVO = 12;
 
 export function armMissileAim(
   found: { sq: Squadron; base: { planetId: string } | { fleetId: string } } | null,

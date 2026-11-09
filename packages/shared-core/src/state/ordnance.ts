@@ -61,6 +61,9 @@ export interface OrdnanceState {
 
 /** За чем идёт самонаводящаяся ракета. Ракета не промахивается, пока цель-флот не дальше
  *  `range` от точки пуска `origin`; мир не уходит никуда, и по нему промаха нет. */
+/** Largest missile salvo one `missile.launch` may fire; more is a stockpile, not a salvo. */
+export const MISSILE_SALVO = 12;
+
 export interface MissileGuidance {
   fleetId?: string;
   planetId?: string;

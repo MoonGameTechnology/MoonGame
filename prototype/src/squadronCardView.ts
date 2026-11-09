@@ -12,7 +12,7 @@
  * взведено слияние, имя становится «сюда».
  */
 import type { Action, GameState, Planet } from '../../packages/shared-core/src/index';
-import { hasMissiles } from '../../packages/shared-core/src/index';
+import { hasMissiles, MISSILE_SALVO } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { parkedState } from '../../decisions/hangarBadge';
 import { fleetCallsign } from './fleetName';
@@ -31,7 +31,6 @@ import { squadronRelocateSpots } from './mapAim';
 import { ownerColor } from './mapPalette';
 import { actionButton as btn, cardHeader } from './panelKit';
 import { worldName } from './planetName';
-import { MISSILE_SALVO } from './missileAim';
 import { wingOrder, wingOrdersHtml, type WingOrder } from './wingOrders';
 import { unitRows } from './worldCard';
 import {
