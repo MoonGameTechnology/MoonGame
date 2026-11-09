@@ -1148,6 +1148,7 @@
 | MS-2.2 | ⏳ | core data | `docs/missiles-roadmap.md` | Детонация |
 | MS-3.1 | ⏳ | core data | `docs/missiles-roadmap.md` | Пусковой/ракеты как предмет + P2W-guardrail |
 | MS-4.1 | ✅ | cli | `docs/missiles-roadmap.md` | Рендер полёта/перехвата/удара 2026-11-09 |
+| MS-4.2 | ✅ | cli | `docs/missiles-roadmap.md` | Боты строят и пускают ракеты 2026-11-09 |
 | MS-5.1 | ✅ | core data cli | `docs/missiles-roadmap.md` | Легендарная способность «Ракетная мина» 2026-09-27 |
 | MSB-0 | ✅ | docs | `docs/multiside-combat-roadmap.md` | Решение владельца: (а), (б) или (в) |
 | MSB-1 | ✅ | core | `docs/multiside-combat-roadmap.md` | Battle стал СПИСКОМ сторон |

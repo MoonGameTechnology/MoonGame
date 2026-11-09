@@ -38,6 +38,7 @@ import { isLander } from '../../../decisions/landerTroops';
 import { canOrder } from '../protoKernel';
 import { data } from '../gameData';
 import { STRIKE_SHUTTLES } from './rules';
+import { missileSalvo } from './missiles';
 import type { HomeTurn } from './home';
 import type { AiTurn } from './turn';
 
@@ -64,7 +65,7 @@ interface Launchpad {
 type HoldPick = { readonly id: string; readonly squadronId: string } | undefined;
 
 /** Общее для вылетов одного тика: базы, цели и что уже занято приказами. */
-interface Sorties {
+export interface Sorties {
   readonly holdPick: HoldPick;
   /** Базы, с которых в этот тик уже был вылет (топливо у базы общее). */
   readonly launched: Set<string>;
@@ -100,6 +101,7 @@ export function shuttleSorties(bot: AiTurn, home: HomeTurn): void {
   const { defensive } = bot;
   const s = openSorties(bot, home, loadCarrier(bot));
   if (!landingSortie(bot, s)) strikerSortie(bot, s);
+  if (!defensive) missileSalvo(bot, s);
   if (!defensive && s.foeWorlds.length > 0) rebaseToFront(bot, s);
   if (!defensive) holdPatrols(bot, s);
 }
