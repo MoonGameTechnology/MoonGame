@@ -242,8 +242,16 @@ function openSorties(bot: AiTurn, home: HomeTurn, holdPick: HoldPick): Sorties {
   }
   const foeFleetAt = new Set<string>();
   for (const fl of Object.values(state.fleets)) {
-    // Мина (SM-3.6) орбиту не занимает: высадке под ней она не помеха.
-    if (fl.owner !== ai && fl.location && fl.units.some((st) => st.count > 0) && !isMineFleet(fl, data)) {
+    // Мина (SM-3.6) орбиту не занимает: высадке под ней она не помеха. Считается только
+    // флот, который бот видит: скрытый полем или стоящий в слепой зоне игрок тоже не
+    // заметил бы (правило №1 — бот знает то же, что игрок на его месте).
+    if (
+      fl.owner !== ai &&
+      fl.location &&
+      fl.units.some((st) => st.count > 0) &&
+      !isMineFleet(fl, data) &&
+      isVisibleTo(state, ai, { fleetId: fl.id }, data, identified)
+    ) {
       foeFleetAt.add(fl.location);
     }
   }
