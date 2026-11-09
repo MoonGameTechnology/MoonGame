@@ -7,7 +7,7 @@
         "ru": "Стальной взгляд",
         "en": "Steel Gaze"
       },
-      "asset": "assets/portrait-01.webp",
+      "asset": "../../../art/profile/portrait-01.webp",
       "width": 640,
       "height": 640,
       "alpha": true,
@@ -22,7 +22,7 @@
         "ru": "Северное сияние",
         "en": "Northern Lights"
       },
-      "asset": "assets/portrait-02.webp",
+      "asset": "../../../art/profile/portrait-02.webp",
       "width": 640,
       "height": 640,
       "alpha": true,
@@ -37,7 +37,7 @@
         "ru": "Глубокий космос",
         "en": "Deep Space"
       },
-      "asset": "assets/portrait-03.webp",
+      "asset": "../../../art/profile/portrait-03.webp",
       "width": 640,
       "height": 640,
       "alpha": true,
@@ -52,7 +52,7 @@
         "ru": "Тихая орбита",
         "en": "Quiet Orbit"
       },
-      "asset": "assets/portrait-04.webp",
+      "asset": "../../../art/profile/portrait-04.webp",
       "width": 640,
       "height": 640,
       "alpha": true,
@@ -67,7 +67,7 @@
         "ru": "За горизонтом",
         "en": "Beyond the Horizon"
       },
-      "asset": "assets/portrait-05.webp",
+      "asset": "../../../art/profile/portrait-05.webp",
       "width": 640,
       "height": 640,
       "alpha": true,
@@ -82,7 +82,7 @@
         "ru": "Серебряная смена",
         "en": "Silver Watch"
       },
-      "asset": "assets/portrait-06.webp",
+      "asset": "../../../art/profile/portrait-06.webp",
       "width": 640,
       "height": 640,
       "alpha": true,
@@ -97,7 +97,7 @@
         "ru": "Новый курс",
         "en": "New Course"
       },
-      "asset": "assets/portrait-07.webp",
+      "asset": "../../../art/profile/portrait-07.webp",
       "width": 640,
       "height": 640,
       "alpha": true,
@@ -112,7 +112,7 @@
         "ru": "Солнечный ветер",
         "en": "Solar Wind"
       },
-      "asset": "assets/portrait-08.webp",
+      "asset": "../../../art/profile/portrait-08.webp",
       "width": 640,
       "height": 640,
       "alpha": true,
@@ -127,7 +127,7 @@
         "ru": "Последний рубеж",
         "en": "Last Frontier"
       },
-      "asset": "assets/portrait-09.webp",
+      "asset": "../../../art/profile/portrait-09.webp",
       "width": 640,
       "height": 640,
       "alpha": true,
@@ -142,7 +142,7 @@
         "ru": "Дальний сигнал",
         "en": "Distant Signal"
       },
-      "asset": "assets/portrait-10.webp",
+      "asset": "../../../art/profile/portrait-10.webp",
       "width": 640,
       "height": 640,
       "alpha": true,
@@ -157,7 +157,7 @@
         "ru": "Полярная звезда",
         "en": "Polar Star"
       },
-      "asset": "assets/portrait-11.webp",
+      "asset": "../../../art/profile/portrait-11.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -172,7 +172,7 @@
         "ru": "Тёмная материя",
         "en": "Dark Matter"
       },
-      "asset": "assets/portrait-12.webp",
+      "asset": "../../../art/profile/portrait-12.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -187,7 +187,7 @@
         "ru": "Красное смещение",
         "en": "Redshift"
       },
-      "asset": "assets/portrait-13.webp",
+      "asset": "../../../art/profile/portrait-13.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -202,7 +202,7 @@
         "ru": "Небесная механика",
         "en": "Celestial Mechanics"
       },
-      "asset": "assets/portrait-14.webp",
+      "asset": "../../../art/profile/portrait-14.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -217,7 +217,7 @@
         "ru": "Гравитация",
         "en": "Gravity"
       },
-      "asset": "assets/portrait-15.webp",
+      "asset": "../../../art/profile/portrait-15.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -232,7 +232,7 @@
         "ru": "Линия рассвета",
         "en": "Dawn Line"
       },
-      "asset": "assets/portrait-16.webp",
+      "asset": "../../../art/profile/portrait-16.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -247,7 +247,7 @@
         "ru": "Ионный след",
         "en": "Ion Trail"
       },
-      "asset": "assets/portrait-17.webp",
+      "asset": "../../../art/profile/portrait-17.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -262,7 +262,7 @@
         "ru": "Золотой час",
         "en": "Golden Hour"
       },
-      "asset": "assets/portrait-18.webp",
+      "asset": "../../../art/profile/portrait-18.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -277,7 +277,7 @@
         "ru": "Белый карлик",
         "en": "White Dwarf"
       },
-      "asset": "assets/portrait-19.webp",
+      "asset": "../../../art/profile/portrait-19.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -292,7 +292,7 @@
         "ru": "Лунная тень",
         "en": "Moon Shadow"
       },
-      "asset": "assets/portrait-20.webp",
+      "asset": "../../../art/profile/portrait-20.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -307,7 +307,7 @@
         "ru": "Звёздный путь",
         "en": "Star Path"
       },
-      "asset": "assets/portrait-21.webp",
+      "asset": "../../../art/profile/portrait-21.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -322,7 +322,7 @@
         "ru": "Синий импульс",
         "en": "Blue Pulse"
       },
-      "asset": "assets/portrait-22.webp",
+      "asset": "../../../art/profile/portrait-22.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -337,7 +337,7 @@
         "ru": "Точка опоры",
         "en": "Anchor Point"
       },
-      "asset": "assets/portrait-23.webp",
+      "asset": "../../../art/profile/portrait-23.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -352,7 +352,7 @@
         "ru": "Пятый сектор",
         "en": "Fifth Sector"
       },
-      "asset": "assets/portrait-24.webp",
+      "asset": "../../../art/profile/portrait-24.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -367,7 +367,7 @@
         "ru": "Курс на восток",
         "en": "Eastbound"
       },
-      "asset": "assets/portrait-25.webp",
+      "asset": "../../../art/profile/portrait-25.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -382,7 +382,7 @@
         "ru": "Свет маяка",
         "en": "Beacon Light"
       },
-      "asset": "assets/portrait-26.webp",
+      "asset": "../../../art/profile/portrait-26.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -397,7 +397,7 @@
         "ru": "Дальний рубеж",
         "en": "Outer Reach"
       },
-      "asset": "assets/portrait-27.webp",
+      "asset": "../../../art/profile/portrait-27.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -412,7 +412,7 @@
         "ru": "Орбитальный вальс",
         "en": "Orbital Waltz"
       },
-      "asset": "assets/portrait-28.webp",
+      "asset": "../../../art/profile/portrait-28.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -427,7 +427,7 @@
         "ru": "Тихий гром",
         "en": "Quiet Thunder"
       },
-      "asset": "assets/portrait-29.webp",
+      "asset": "../../../art/profile/portrait-29.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -442,7 +442,7 @@
         "ru": "Комета",
         "en": "Comet"
       },
-      "asset": "assets/portrait-30.webp",
+      "asset": "../../../art/profile/portrait-30.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -457,7 +457,7 @@
         "ru": "Пустотный ветер",
         "en": "Void Wind"
       },
-      "asset": "assets/portrait-31.webp",
+      "asset": "../../../art/profile/portrait-31.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -472,7 +472,7 @@
         "ru": "Ледяная орбита",
         "en": "Frozen Orbit"
       },
-      "asset": "assets/portrait-32.webp",
+      "asset": "../../../art/profile/portrait-32.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -487,7 +487,7 @@
         "ru": "Пульсар",
         "en": "Pulsar"
       },
-      "asset": "assets/portrait-33.webp",
+      "asset": "../../../art/profile/portrait-33.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -502,7 +502,7 @@
         "ru": "Пески Марса",
         "en": "Martian Sands"
       },
-      "asset": "assets/portrait-34.webp",
+      "asset": "../../../art/profile/portrait-34.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -517,7 +517,7 @@
         "ru": "Проводник",
         "en": "Pathfinder"
       },
-      "asset": "assets/portrait-35.webp",
+      "asset": "../../../art/profile/portrait-35.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -532,7 +532,7 @@
         "ru": "Первая волна",
         "en": "First Wave"
       },
-      "asset": "assets/portrait-36.webp",
+      "asset": "../../../art/profile/portrait-36.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -547,7 +547,7 @@
         "ru": "Солнечный парус",
         "en": "Solar Sail"
       },
-      "asset": "assets/portrait-37.webp",
+      "asset": "../../../art/profile/portrait-37.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -562,7 +562,7 @@
         "ru": "Созвездие",
         "en": "Constellation"
       },
-      "asset": "assets/portrait-38.webp",
+      "asset": "../../../art/profile/portrait-38.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -577,7 +577,7 @@
         "ru": "Радиомолчание",
         "en": "Radio Silence"
       },
-      "asset": "assets/portrait-39.webp",
+      "asset": "../../../art/profile/portrait-39.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
@@ -592,7 +592,7 @@
         "ru": "Новая эра",
         "en": "New Era"
       },
-      "asset": "assets/portrait-40.webp",
+      "asset": "../../../art/profile/portrait-40.webp",
       "width": 768,
       "height": 768,
       "alpha": true,
