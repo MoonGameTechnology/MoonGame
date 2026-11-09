@@ -40,6 +40,10 @@ function mkEl(id) {
     },
     textContent: '',
     focus() { globalThis.document.activeElement = this; },
+    contains(node) {
+      for (let n = node; n; n = n.parentNode) if (n === this) return true;
+      return false;
+    },
     addEventListener(type, fn) {
       const m = listeners.get(this) ?? {};
       (m[type] ??= []).push(fn);
@@ -76,7 +80,11 @@ function mkEl(id) {
     getBoundingClientRect() {
       return { left: 0, top: 0, right: 900, bottom: 600, width: 900, height: 600 };
     },
-    querySelector() { return null; },
+    // A named part of a window (`.troops-content`, `[data-cmd="tcancel"]`) is there, like
+    // `document.querySelector` above: windows bind their parts once, at creation.
+    querySelector(selector) {
+      return ((this._parts ??= {})[selector] ??= mkEl(`${id} ${selector}`));
+    },
     querySelectorAll() {
       return [];
     },
