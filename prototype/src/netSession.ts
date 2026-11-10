@@ -56,6 +56,7 @@ import { dropPing, takeChat, takePing } from './messageLog';
 import { showStage } from './signInPages';
 import { WAIT_MARK, waitingBanner } from './snapshotIngest';
 import type { SoundId } from './sound';
+import { readLocal, writeLocal } from './localStore';
 
 /** Что сетевому циклу нужно от игры. Всё перечисленное живёт в `main.ts`. */
 export interface NetSessionHost {
@@ -288,7 +289,7 @@ function netClientFor(seat: string): MultiplayerClient {
       onSeatTicket: (ticket) => {
         // The server minted our seat ticket (first join of this nick) — persist it;
         // every later join must present it, and the server can't re-issue (hash-only).
-        localStorage.setItem(netTicketKey, ticket);
+        writeLocal(netTicketKey, ticket);
       },
       onPong: (_serverTime, clientTime) => {
         if (clientTime === undefined) return;
@@ -421,7 +422,7 @@ export function connect(): void {
   // presented back on every reconnect so nobody else can take the seat by typing
   // our nick. Keyed per server+match+nick (the ticket is seat-scoped).
   const ticketKey = seatTicketKey(base, currentMatchId, nick);
-  const seatTicket = localStorage.getItem(ticketKey);
+  const seatTicket = readLocal(ticketKey);
   // Чем представляемся и как это ложится в адрес — `netDial.ts` (REFM-142). Там же
   // причины: два способа не смешиваются (в режиме аккаунтов ник и билет сервер
   // отвергнет), билет привязан к тройке «сервер + матч + позывной», а всё уходящее в
@@ -432,8 +433,8 @@ export function connect(): void {
     dialIdentity(authMode === 'accounts', takeJoinToken(), nick, seatTicket),
   );
   game.status(t('net.connecting', { nick }));
-  localStorage.setItem('void.server', base);
-  localStorage.setItem('void.nick', nick); // resume this seat next visit
+  writeLocal('void.server', base);
+  writeLocal('void.nick', nick); // resume this seat next visit
 
   // WS "open" only means the socket connected, not that the server admitted us — it
   // may still reject (slot taken / unknown player). Flip to "in the match" only on

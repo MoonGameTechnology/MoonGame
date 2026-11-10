@@ -32,6 +32,7 @@ import type {
   PlatformOutcome,
   PlatformPurchase,
 } from './types';
+import { readLocal, writeLocal } from '../localStore';
 
 export interface WebPlatformOptions {
   /** Поднять управляемые реклама/покупки для разработки и тестов. В сборке игрока — `false`. */
@@ -51,23 +52,6 @@ export interface WebPlatform extends GamePlatform {
 }
 
 const GUEST_ID = 'web:guest';
-
-/** Хранилище может быть недоступно (приватное окно, запрет сайту) — это НЕ повод падать:
- *  сейв просто не переживёт вкладку, а игра идёт. */
-function readLocal(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function writeLocal(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    /* хранилище недоступно — молча продолжаем, см. комментарий выше */
-  }
-}
 
 export function createWebPlatform(options: WebPlatformOptions = {}): WebPlatform {
   const simulate = options.simulate === true;

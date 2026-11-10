@@ -26,6 +26,7 @@ import { initPasswordReset } from './passwordReset';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
 import { callsignFor, nextCallsignNumber, registerPayload, registerProblems, type RegisterField } from './registerForm';
 import { initFormFeedback } from './formFeedback';
+import { readLocal, writeLocal } from './localStore';
 
 /** Что страницам входа нужно от игры. Всё перечисленное живёт в `main.ts`. */
 export interface SignInPagesHost {
@@ -96,8 +97,8 @@ let loginShown = false;
 // time even in UI glue) — the wordlist and the counter arithmetic live in
 // `registerForm.ts` (REFM-52); only the storage read/write stays here.
 export function suggestCallsign(): string {
-  const n = nextCallsignNumber(localStorage.getItem('void.newcount'));
-  localStorage.setItem('void.newcount', String(n));
+  const n = nextCallsignNumber(readLocal('void.newcount'));
+  writeLocal('void.newcount', String(n));
   const pick = callsignFor(n);
   return `${t(pick.key)}-${pick.suffix}`;
 }
@@ -129,7 +130,7 @@ function signInByCallsign(): void {
         return;
       }
       game.setNick(nick);
-      localStorage.setItem('void.nick', nick); // remembered — next visit skips the welcome card
+      writeLocal('void.nick', nick); // remembered — next visit skips the welcome card
       game.openHub();
     }),
   );
@@ -166,7 +167,7 @@ async function welcomeSignIn(nick: string): Promise<void> {
       },
     });
     if (!session) return;
-    localStorage.setItem('void.nick', nick);
+    writeLocal('void.nick', nick);
     wPassInput.value = ''; // the session JWT is stored instead — a password never lingers
     welcomeFeedback.clear();
     game.status('');
@@ -263,7 +264,7 @@ async function submitRegister(): Promise<void> {
       },
     });
     if (!session) return;
-    localStorage.setItem('void.nick', nick);
+    writeLocal('void.nick', nick);
     game.setNick(nick);
     crPassInput.value = '';
     crPass2Input.value = '';
@@ -366,7 +367,7 @@ export function startAuthProbe(base: string): void {
     // `suggestCallsign()` затёр бы уже введённое имя. Режим передаётся как есть: прежнее
     // `authMode ? 'accounts' : 'nicks'` осталось с тех пор, когда режим был булевым, а строка
     // истинна всегда — и новичку на сервере без аккаунтов раскрывалось поле пароля.
-    if (!revealSignup(authMode, localStorage.getItem('void.nick') ?? '')) {
+    if (!revealSignup(authMode, readLocal('void.nick') ?? '')) {
       return;
     }
     if (!wNickInput.value.trim()) wNickInput.value = suggestCallsign();
@@ -458,7 +459,7 @@ export function initSignInPages(host: SignInPagesHost): void {
               saveSession(localStorage, base, { login, token });
               notifySessionChanged();
             }
-            localStorage.setItem('void.nick', login);
+            writeLocal('void.nick', login);
             game.setNick(login);
             game.note('✔ ' + t('auth.reset.done'));
             game.openHub();
@@ -471,7 +472,7 @@ export function initSignInPages(host: SignInPagesHost): void {
             // `autocomplete="username"`); без этого запись сохранится ни к чему не привязанной.
             const resetUser = document.getElementById('cresetuser');
             if (resetUser instanceof HTMLInputElement) {
-              resetUser.value = (localStorage.getItem('void.nick') ?? '').trim();
+              resetUser.value = (readLocal('void.nick') ?? '').trim();
             }
           },
         });
@@ -502,7 +503,7 @@ export function initSignInPages(host: SignInPagesHost): void {
     wLoginEl.style.display = show ? 'flex' : 'none';
     game.status('');
     if (show) {
-      wNickInput.value = (localStorage.getItem('void.nick') ?? '').trim();
+      wNickInput.value = (readLocal('void.nick') ?? '').trim();
     }
   });
   $('cwgo').addEventListener('click', signInByCallsign);
@@ -546,7 +547,7 @@ export function initSignInPages(host: SignInPagesHost): void {
     showStage('welcome');
     wLoginEl.style.display = 'flex';
     wPassRowEl.style.display = authMode === 'accounts' ? 'flex' : 'none';
-    if (!wNickInput.value.trim()) wNickInput.value = (localStorage.getItem('void.nick') ?? '').trim();
+    if (!wNickInput.value.trim()) wNickInput.value = (readLocal('void.nick') ?? '').trim();
     game.status('');
   });
 

@@ -19,6 +19,7 @@ import { detach } from './detach';
 import { refreshMatches } from './matchBrowser';
 import { showStage, suggestCallsign } from './signInPages';
 import { bakedServer } from './updater';
+import { readLocal } from './localStore';
 
 declare const __SECTOR_ZERO_ONLY__: boolean;
 
@@ -44,11 +45,11 @@ export function initConnectScreen(host: ConnectScreenHost): void {
   statusEl = document.getElementById('cstatus') as HTMLElement;
   // Запомненный сервер, затем вшитый в APK, затем свой адрес страницы (`serverAddress.ts`,
   // правило 8).
-  srvInput.value = defaultServerField(localStorage.getItem('void.server'), bakedServer(), location);
+  srvInput.value = defaultServerField(readLocal('void.server'), bakedServer(), location);
   // Remember the side you last commanded, so reopening the link drops you back onto
   // your own seat — the server maps nick→side, so a returning name resumes its own
   // faction (nick-login; full accounts in docs/persistence-accounts-roadmap.md).
-  nickInput.value = localStorage.getItem('void.nick') ?? '';
+  nickInput.value = readLocal('void.nick') ?? '';
 }
 
 export function showConnect(show: boolean): void {

@@ -69,6 +69,7 @@ import type { Rect, TourResult } from './spotlight';
 import { type RunningTour, startTour } from './spotlightDom';
 import { activeConstruction, coreQueue } from './worldQueries';
 import type { TutorialGuide } from '../../packages/client/src/tutorialAnalytics';
+import { readLocal, writeLocal } from './localStore';
 
 declare const __PLAYER_BUILD__: boolean;
 
@@ -196,10 +197,10 @@ function onboardKey(): string {
   return 'vd.onboard.' + (game.callsign() || 'guest');
 }
 export function loadOnboard(): OnboardState {
-  return parseOnboardState(localStorage.getItem(onboardKey()));
+  return parseOnboardState(readLocal(onboardKey()));
 }
 function saveOnboard(st: OnboardState): void {
-  localStorage.setItem(onboardKey(), JSON.stringify(st));
+  writeLocal(onboardKey(), JSON.stringify(st));
 }
 // A guide queued to launch once the next match's HUD is live (from installMatch).
 let pendingGuide: (() => void) | null = null;
