@@ -28,9 +28,12 @@ export const SPY_XP = {
   turn: 1.25,
   /** A successful theft, research theft, sabotage, queue delay or economic disruption. */
   deed: 1,
-  /** Every completed `RECON_LAYER_HOURS` a recon spy survives on post. */
+  /** Every completed `SPY_RECON_XP_HOURS` a recon spy survives on post; an unfinished
+   *  span cut short by capture or recall earns nothing, an earned step is never lost. */
   reconStep: 0.25,
 } as const;
+/** How long a recon spy stays on post for one `SPY_XP.reconStep`, game-hours. */
+export const SPY_RECON_XP_HOURS = 24;
 
 /** The level `xp` points reach (0–3). Broken input (NaN, negative) is level 0. */
 export function spyLevel(xp: number | undefined): SpyLevel {
