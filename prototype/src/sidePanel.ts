@@ -85,8 +85,6 @@ import {
   setRallyPoint,
   splitFleet,
   splitSquadron,
-  recallSpy,
-  spyOn,
   unloadShuttle,
 } from './game';
 import { pcUi } from './graphicsPrefs';
@@ -139,7 +137,8 @@ import { splitOne } from './squadronPanel';
 import { cursorTipPos } from './tipPlacement';
 import { arrivalHours } from './travelEta';
 import { toggleWingMore } from './wingOrders';
-import { forkPanelHtml, planetPanelHtml, toggleSpyMenu, unknownPlanetHtml } from './worldCard';
+import { forkPanelHtml, planetPanelHtml, unknownPlanetHtml } from './worldCard';
+import { openSpyWindow } from './spyWindow';
 import { toggleDossierBlock } from './dossierFolds';
 import { enqueueBuild, timeLeft } from './worldQueries';
 import { openFortressDialog } from './fortressDialog';
@@ -853,21 +852,8 @@ function onSideClick(ev: MouseEvent): void {
     if (pick) {
       playerOrder((up ? loadShuttle : unloadShuttle)(ME, arg, pick.squadronId, at?.fortress ? at.id : undefined));
     }
-  } else if (act === 'spyplanet') {
-    if (
-      arg === 'recon' ||
-      arg === 'sabotage' ||
-      arg === 'delay' ||
-      arg === 'disrupt' ||
-      arg === 'theft' ||
-      arg === 'research' ||
-      arg === 'counter'
-    )
-      playerOrder(spyOn(ME, selPlanet!, arg));
-  } else if (act === 'spymenu') {
-    if (arg) toggleSpyMenu(arg);
-  } else if (act === 'spyrecall') {
-    playerOrder(recallSpy(ME, selPlanet!, arg === 'recon' ? 'recon' : undefined));
+  } else if (act === 'spyagents') {
+    if (selPlanet) openSpyWindow(selPlanet);
   } else if (act === 'ping') {
     game.pings()?.openMenu();
   } else if (act === 'seat') {

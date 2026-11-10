@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { IntelGrant } from '../../packages/shared-core/src/index';
 import {
-  SPY_COST,
-  spyCostRange,
   grantLeftMs,
   grantVision,
   liveGrants,
@@ -98,18 +96,5 @@ describe('разведка — подписи', () => {
 
   it('остаток считается от текущего часа мира', () => {
     expect(grantLeftMs(grant({ until: 1000 }), 400)).toBe(600);
-  });
-
-  it('цена на кнопке — та, что спишет ядро, своя у каждой операции (SPY-12)', () => {
-    expect(SPY_COST).toEqual({
-      counter: 50,
-      recon: 150,
-      sabotage: 300,
-      delay: 300,
-      disrupt: 300,
-      theft: 300,
-      research: 400,
-    });
-    expect(spyCostRange()).toBe('50–400');
   });
 });

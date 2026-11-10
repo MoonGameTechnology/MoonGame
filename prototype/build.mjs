@@ -235,7 +235,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
          2026-09-24); показывается в PvE-партии, пока досье не приколото справа -->
     <button id="rail-dossier" type="button" style="display:none">☣<span class="rlbl" data-i18n="swarm.intel.title"></span></button>
     <button id="rail-diplo">⬡<span class="rlbl" data-i18n="rail.diplo.title"></span></button>
-    <button id="rail-msgs">✉<span class="rlbl" data-i18n="rail.msgs.title"></span><b id="msgbadge" class="railbadge" style="display:none"></b></button>
+    <button id="rail-msgs">✉<span class="rlbl" data-i18n="rail.msgs.title"></span><b id="msgbadge" class="railbadge" style="display:none"></b></button><button id="rail-spy" type="button">🕵<span class="rlbl" data-i18n="rail.spy.title"></span></button>
     <button id="rail-coal">⛨<span class="rlbl" data-i18n="rail.coal.title"></span></button>
     <button id="rail-pings" data-i18n-title="rail.pings.title">📍<span class="rlbl" data-i18n="rail.pings.label"></span></button>
     <button id="rail-tech" data-i18n-title="rail.tech.title">⚛<span class="rlbl" data-i18n="rail.tech.label"></span></button>

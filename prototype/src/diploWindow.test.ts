@@ -25,7 +25,13 @@ interface El {
   scrollHeight: number;
   dataset: Record<string, string>;
   classes: Set<string>;
-  classList: { add(c: string): void; remove(c: string): void; contains(c: string): boolean };
+  classList: {
+    add(c: string): void;
+    remove(c: string): void;
+    contains(c: string): boolean;
+    toggle(c: string, on?: boolean): void;
+  };
+  style: Record<string, string>;
   addEventListener(type: string, fn: (ev: unknown) => void): void;
   fire(type: string, ev?: unknown): void;
   click(): void;
@@ -49,7 +55,9 @@ function stub(id: string): El {
       add: (c) => void el.classes.add(c),
       remove: (c) => void el.classes.delete(c),
       contains: (c) => el.classes.has(c),
+      toggle: (c, on = !el.classes.has(c)) => void (on ? el.classes.add(c) : el.classes.delete(c)),
     },
+    style: {},
     addEventListener: (type, fn) => void on.set(type, [...(on.get(type) ?? []), fn]),
     fire: (type, ev = {}) => {
       for (const fn of on.get(type) ?? []) fn(ev);
@@ -197,18 +205,23 @@ describe('REFM-214 — окно и вкладки', () => {
   it('вкладка переключается тапом и перерисовывает окно', async () => {
     const { win } = await boot();
     win.openDiplo('diplo');
-    tap('diplo', { '.dp-tab': { tab: 'intel' } });
-    expect(win.diploTab).toBe('intel');
-    expect(el('diplo').innerHTML).toContain(t('spy.log.title'));
+    tap('diplo', { '.dp-tab': { tab: 'msgs' } });
+    expect(win.diploTab).toBe('msgs');
+    expect(el('diplo').innerHTML).toContain('dp-convo');
   });
 
-  it('в забеге Sector Zero вкладки «Шпионаж» нет, открытая уступает ростеру', async () => {
-    const { win, env } = await boot();
-    env.szHidden = true;
-    win.openDiplo('intel');
-    expect(win.diploTab).toBe('diplo');
+  it('вкладки «Шпионаж» в дипломатии больше нет: шпионаж — своё окно', async () => {
+    const { win } = await boot();
+    win.openDiplo('diplo');
     expect(el('diplo').innerHTML).not.toContain('data-tab="intel"');
-    expect(el('diplo').innerHTML).not.toContain('class="dp-spy"');
+    expect(el('diplo').innerHTML).not.toContain(t('spy.log.title'));
+  });
+
+  it('в забеге Sector Zero окно «Шпионаж» не открывается', async () => {
+    const { env } = await boot();
+    env.szHidden = true;
+    el('rail-spy').click();
+    expect(el('spywin').classes.has('show')).toBe(false);
   });
 
   it('кнопки полосы: «Дипломатия» — ростер и подсказка, «Сообщения» гасят значок', async () => {
@@ -339,11 +352,12 @@ describe('REFM-214 — стойки, договор карт и шпионаж',
     expect(env.orders).toEqual([]);
   });
 
-  it('мир в окне разведки ведёт камеру к миру и закрывает окно', async () => {
-    const { win, env } = await boot();
-    win.openDiplo('intel');
-    tap('diplo', { '[data-iw]': { iw: 'n7' } });
-    expect([win.diploOpen, env.focus]).toEqual([false, ['n7']]);
+  it('мир в окне разведки ведёт камеру к миру и закрывает окно «Шпионаж»', async () => {
+    const { env } = await boot();
+    el('rail-spy').click();
+    expect(el('spywin').classes.has('show')).toBe(true);
+    tap('spywin', { '[data-iw]': { iw: 'n7' } });
+    expect([el('spywin').classes.has('show'), env.focus]).toEqual([false, ['n7']]);
   });
 });
 
@@ -403,16 +417,17 @@ describe('REFM-214 — карточки', () => {
 });
 
 describe('REFM-214 — журнал разведки', () => {
-  it('строка штампуется временем мира, новые сверху, перерисовка — только на своей вкладке', async () => {
+  it('строка штампуется временем мира, новые сверху, перерисовка — только в открытом окне', async () => {
     const { win, env } = await boot();
     win.openDiplo('diplo');
     el('diplo').innerHTML = 'ростер';
     win.pushSpyLog('первая');
     expect(el('diplo').innerHTML).toBe('ростер');
+    expect(el('spywin').innerHTML).toBe('');
     env.s = { ...env.s, time: env.s.time + 3_600_000 };
-    win.openDiplo('intel');
+    el('rail-spy').click();
     win.pushSpyLog('вторая');
-    const html = el('diplo').innerHTML;
+    const html = el('spywin').innerHTML;
     expect(html.indexOf('вторая')).toBeLessThan(html.indexOf('первая'));
     expect(html).not.toContain(t('spy.log.empty'));
   });
@@ -420,50 +435,49 @@ describe('REFM-214 — журнал разведки', () => {
   it('SPY-20: запись с миром ведёт к нему, архив ставится из сейва и чистится новой партией', async () => {
     const { win } = await boot();
     win.restoreSpyArchive();
-    win.openDiplo('intel');
+    el('rail-spy').click();
     win.pushSpyLog('кража', 'espionage.succeeded', { planetId: 'n7', kind: 'theft' });
     win.pushSpyLog('провал', 'espionage.failed', { target: 'p3', kind: 'theft' });
     expect(win.spyArchive()).toEqual([
       expect.objectContaining({ text: 'провал', op: 'theft' }),
       expect.objectContaining({ text: 'кража', planetId: 'n7', op: 'theft' }),
     ]);
-    expect(el('diplo').innerHTML).toContain('data-iw="n7"');
+    expect(el('spywin').innerHTML).toContain('data-iw="n7"');
     const saved = win.spyArchive();
     win.restoreSpyArchive();
     expect(win.spyArchive()).toEqual([]);
     win.restoreSpyArchive(saved);
-    win.openDiplo('intel');
-    expect(el('diplo').innerHTML).toContain('кража');
+    el('rail-spy').click();
+    expect(el('spywin').innerHTML).toContain('кража');
   });
 });
 
 // Перерисовка «Шпионажа» по таймеру пересобирала вкладку каждые пять секунд: строки миров и
 // крестик под курсором пересоздавались (как «Штурм» на высадке, #1801).
 describe('живые таймеры «Шпионажа»', () => {
-  it('таймер перерисовки не пересобирает вкладку, пока в ней ничего не изменилось', async () => {
+  it('таймер перерисовки не пересобирает окно, пока в нём ничего не изменилось', async () => {
     const { win, env } = await boot();
     const until = env.s.time + 3 * 3_600_000;
     env.intel = [{ kind: 'planet', target: 'n7', until }];
-    win.openDiplo('intel');
-    const html = el('diplo').innerHTML;
+    el('rail-spy').click();
+    const html = el('spywin').innerHTML;
     expect(html).toContain(`⏳ <span class="pn-timer" data-at="${until}" data-fmt="hceil">…</span>`);
     expect(liveRender(html, env.s.time, { hceil: (ms) => String(Math.ceil(ms / 3_600_000)) })).toContain('>3<');
-    el('diplo').innerHTML = 'нарисовано';
+    el('spywin').innerHTML = 'нарисовано';
     env.s = { ...env.s, time: env.s.time + 3_600_000 };
     win.refreshIntelTab();
-    expect(el('diplo').innerHTML).toBe('нарисовано');
-    // Окно закрылось — вкладка изменилась, и перерисовка её пересобирает.
+    expect(el('spywin').innerHTML).toBe('нарисовано');
+    // Окно разведки закрылось — разметка изменилась, и перерисовка её пересобирает.
     env.intel = [];
     win.refreshIntelTab();
-    expect(el('diplo').innerHTML).toContain(t('spy.windows.empty'));
+    expect(el('spywin').innerHTML).toContain(t('spy.windows.empty'));
   });
 
-  it('на другой вкладке таймер «Шпионажа» окно не трогает', async () => {
+  it('закрытое окно таймер не трогает', async () => {
     const { win } = await boot();
-    win.openDiplo('diplo');
-    el('diplo').innerHTML = 'ростер';
     win.refreshIntelTab();
-    expect(el('diplo').innerHTML).toBe('ростер');
+    expect(el('spywin').innerHTML).toBe('');
+    expect(win.spyWindow.live()).toBe(false);
   });
 });
 

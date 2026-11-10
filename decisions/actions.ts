@@ -326,6 +326,11 @@ export const declareWar = (playerId: string, target: string, stance: DiplomaticS
 /** Send an agent on an operation against another commander's world (SPY-8/9). */
 export const spyOn = (playerId: string, planetId: string, op: SpyOp) =>
   act(playerId, 'espionage.spy', { planetId, op });
+/** Вкладка «Шпионаж»: дать шпиону `spyId` задание `op` на мире `planetId` (передислокация
+ *  тоже задание) и отменить его текущее задание. */
+export const sendSpy = (playerId: string, spyId: number, planetId: string, op: SpyOp | 'relocate') =>
+  act(playerId, 'espionage.spy', { spyId, planetId, op });
+export const cancelSpy = (playerId: string, spyId: number) => act(playerId, 'espionage.cancel', { spyId });
 /** Call a counter-intelligence agent off its post on this world (SPY-11), or the posted
  *  recon agent with `op: 'recon'` (SPY-13). */
 export const recallSpy = (playerId: string, planetId: string, op?: 'recon') =>

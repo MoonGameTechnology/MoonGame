@@ -8,6 +8,7 @@
  * Список утверждён владельцем 2026-09-23 (PVR-6.1): чат, почта, маркеры коалиции,
  * рынок и «Сон» (Хранитель). Дипломатию владелец оставил. Рынок здесь — книга заявок живых
  * игроков; у экспедиции свой рынок, торговец (`modules/trader.ts`, PVR-6.37), и он в забеге есть.
+ * Кнопка «Шпионаж» (окно шпионов, 2026-11-10) уходит по правилу `espionageShown` ниже.
  *
  * Значение — id кнопки в рельсе «☰ Ещё» (`prototype/build.mjs`). Сторож в тесте сверяет
  * их с разметкой: переименованная кнопка иначе молча вернулась бы в забег.
@@ -19,6 +20,7 @@ export const SECTOR_ZERO_ABSENT_TOOLS = {
   pings: 'rail-pings',
   market: 'rail-market',
   steward: 'rail-steward',
+  espionage: 'rail-spy',
 } as const;
 
 export type SessionTool = keyof typeof SECTOR_ZERO_ABSENT_TOOLS;
