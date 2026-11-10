@@ -104,7 +104,8 @@ export function buildFirstMatchTour(d: FirstMatchDeps): SpotlightStep[] {
   const fleet: SpotlightStep[] = [
     // Корабли заказывают в окне «Построить», его раздел кораблей — вторым шагом.
     step('yard', '[data-act="openbuild"], [data-lift="openbuild"]', d.catalogOpen),
-    step('yard-ships', '#constructor .pw-main-tabs [data-ctab="ships"]', d.shipListOpen),
+    // На телефоне каталог другой линии закрывает список: тогда подсвечивается «←».
+    step('yard-ships', '#constructor [data-pw-lane="ships"], #constructor .pw-lane-back', d.shipListOpen),
     step('ship', '#constructor [data-pw-info="unit:frigate"]', d.shipCardOpen),
     step('ship-order', '#codex [data-build="unit:frigate"]', d.shipOrdered, { inDialog: true }),
     step('catalog-close', '#constructor .cn-close', () => !d.catalogOpen()),

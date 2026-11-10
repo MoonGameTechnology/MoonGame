@@ -67,6 +67,9 @@ type Stage = 'market' | 'hero' | 'ground' | 'aviation' | 'landing' | 'assault';
 
 /** «Построить» мира: кнопка карточки на ПК или её копия в нижней полосе листа телефона. */
 const BUILD_OPEN = '[data-act="openbuild"], [data-lift="openbuild"]';
+/** Линия окна производства. На телефоне каталог другой линии закрывает список линий —
+ *  тогда подсвечивается «←», и следующим кадром уже видна нужная линия. */
+const LANE = (lane: string) => `#constructor [data-pw-lane="${lane}"], #constructor .pw-lane-back`;
 
 const step = (
   stage: Stage,
@@ -146,8 +149,15 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       stage,
       `${type}-catalog`,
       BUILD_OPEN,
-      () => ui.visible('#constructor.show [data-bwtab]') || guideBuildingOrdered(w(), home, me, type),
+      () => ui.visible('#constructor.show') || guideBuildingOrdered(w(), home, me, type),
       { copy: 'onb.guide.build.catalog' },
+    ),
+    step(
+      stage,
+      `${type}-lane`,
+      LANE('buildings'),
+      () => ui.visible('#constructor.show [data-bwtab]') || guideBuildingOrdered(w(), home, me, type),
+      { copy: 'onb.guide.yard.buildings' },
     ),
     step(
       stage,
@@ -168,8 +178,9 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
   const listed = (unit: string) => ui.visible(`#constructor.show [data-cnhull="${unit}"]`);
   const units = (stage: Stage, yard: 'infantry' | 'squads', unit: string, enough: () => boolean) => [
     step(stage, `${unit}-yard`, BUILD_OPEN, () => ui.visible('#constructor.show') || enough(), { copy: 'onb.guide.build.yard' }),
-    step(stage, `${unit}-catalog`, `#constructor .pw-main-tabs [data-ctab="${yard === 'squads' ? 'ships' : 'infantry'}"]`, () => listed(unit) || (yard === 'squads' && ui.visible('#constructor [data-ctab="squads"]')) || enough(), { copy: yard === 'squads' ? 'onb.guide.yard.ships' : 'onb.guide.yard.infantry' }),
-    ...(yard === 'squads' ? [step(stage, `${unit}-squads`, '#constructor [data-ctab="squads"]', () => listed(unit) || enough(), { copy: 'onb.guide.yard.squads' })] : []),
+    step(stage, `${unit}-catalog`, LANE(yard === 'squads' ? 'shuttles' : 'mobilization'), () => listed(unit) || ui.visible(`#constructor .pw-catalog[data-lane="${yard === 'squads' ? 'shuttles' : 'mobilization'}"]`) || enough(), { copy: yard === 'squads' ? 'onb.guide.yard.squads' : 'onb.guide.yard.infantry' }),
+    // Мобилизация открывается на разделе, где игрок был в прошлый раз (могли быть «Герои»).
+    ...(yard === 'infantry' ? [step(stage, `${unit}-section`, '#constructor [data-ctab="infantry"]', () => listed(unit) || enough(), { copy: 'onb.guide.yard.infantry' })] : []),
     step(stage, `${unit}-select`, `#constructor [data-cnhull="${unit}"]`, () => ui.visible(`#constructor.pw-fitting-open [data-cnhull="${unit}"].on`) || enough(), { copy: 'onb.guide.build.units' }),
     productionQuantity(stage, unit, stage === 'ground' ? GUIDE_TROOPS : 1, enough, ui),
     step(stage, unit, '#constructor [data-cnbuild]', enough),
@@ -264,7 +275,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     step(
       'hero',
       'mobilization',
-      '#constructor .pw-main-tabs [data-ctab="infantry"]',
+      LANE('mobilization'),
       () => ui.visible('[data-ctab="heroes"]') || deployed(true),
       { copy: 'production.mobilization' },
     ),

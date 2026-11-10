@@ -1,13 +1,16 @@
 import type { GameState } from '../../packages/shared-core/src/index';
 import { patchLiveTimers } from './liveTimers';
 import { refreshProductionStock } from './productionIncome';
-import { productionQueueHtml } from './productionQueueView';
+import { laneStripHtml, productionLanesHtml } from './productionQueueView';
+import type { ProductionLane } from '../../decisions/productionSections';
 
 interface ProductionRefreshHost {
   root(): HTMLElement;
   state(): GameState;
   me(): string;
+  /** Подвкладка открытого каталога; пусто — каталог закрыт. */
   tab(): string;
+  lane(): ProductionLane | null;
   planet(): string;
   heroPaneHtml(): string;
   renderedHeroBody(): string;
@@ -42,11 +45,20 @@ function selecting(root: HTMLElement): boolean {
 export function initProductionRefresh(host: ProductionRefreshHost) {
   let scrolling = false;
   let scrollTimer: ReturnType<typeof setTimeout> | null = null;
-  let queuePainted = '';
   let lastAvailability = '';
-  const queueHtml = (): string => {
-    queuePainted = productionQueueHtml(host.state(), host.planet());
-    return queuePainted;
+  /** Список линий и очередь открытой линии обновляются на месте, без перерисовки окна, и
+   *  только когда их разметка изменилась: узел под пальцем не пересоздаётся каждую секунду. */
+  const painted = new Map<string, string>();
+  const remember = (selector: string, html: string): string => (painted.set(selector, html), html);
+  const queueHtml = (): string => remember('#cn-queue', productionLanesHtml(host.state(), host.planet(), host.lane()));
+  const stripHtml = (): string => {
+    const lane = host.lane();
+    return remember('.pw-lane-strip', lane ? laneStripHtml(host.state(), host.planet(), lane) : '');
+  };
+  const patch = (selector: string, html: () => string): void => {
+    const el = host.root().querySelector(selector);
+    const before = painted.get(selector);
+    if (el && html() !== before) el.innerHTML = painted.get(selector)!;
   };
   // Scroll does not bubble. Preserve the existing touch/inertia idle guard.
   host.root().addEventListener(
@@ -65,8 +77,10 @@ export function initProductionRefresh(host: ProductionRefreshHost) {
 
   return {
     queueHtml,
+    stripHtml,
     painted: () => {
       lastAvailability = availability(host);
+      painted.clear();
     },
     refreshHeroes: () => {
       const root = host.root();
@@ -104,17 +118,9 @@ export function initProductionRefresh(host: ProductionRefreshHost) {
         host.paint();
         return;
       }
+      patch('#cn-queue', queueHtml);
+      patch('.pw-lane-strip', stripHtml);
       patchLiveTimers(root, host.state().time);
-      const el = root.querySelector('#cn-queue');
-      if (!el) return;
-      const before = queuePainted,
-        html = queueHtml();
-      if (html !== before) {
-        const open = el.querySelector('details')?.open;
-        el.innerHTML = html;
-        const details = el.querySelector('details');
-        if (details && open !== undefined) details.open = open;
-      }
     },
   };
 }

@@ -3,6 +3,16 @@ import assert from 'node:assert/strict';
 
 import { enterSkirmish, pressSpeed } from './harnessKit.mjs';
 
+/** «Производство» открывается списком линий; на телефоне каталог линии закрывает список.
+ *  Открыть линию `id`, затем нажать `taps` внутри её каталога. */
+async function openLane(page, id, ...taps) {
+  if (!(await page.locator(`#constructor .pw-catalog[data-lane="${id}"]`).count())) {
+    if (await page.locator('#constructor .pw-lane-back').count()) await page.locator('#constructor .pw-lane-back').tap();
+    await page.locator(`[data-pw-lane="${id}"]`).tap();
+  }
+  for (const sel of taps) await page.locator(`#constructor ${sel}`).first().tap();
+}
+
 /** Real phone layouts and actions through the existing controllers/reducer. */
 export async function checkMobileStrategy(browser, url) {
   const page = await browser.newPage({
@@ -334,12 +344,12 @@ export async function checkMobileStrategy(browser, url) {
             await fits('#tech .tt-mbtn');
             await page.locator('#tech .tt-mx').tap();
           } else if (id === 'constructor') {
-            for (const tab of ['ships', 'squads', 'infantry', 'vehicles', 'heroes']) {
-              await page.locator(`[data-ctab="${tab}"]`).tap();
+            for (const [id, ...tab] of [['ships', '[data-ctab="ships"]'], ['shuttles'], ['mobilization', '[data-ctab="infantry"]'], ['mobilization', '[data-ctab="vehicles"]'], ['mobilization', '[data-ctab="heroes"]']]) {
+              await openLane(page, id, ...tab);
               await dismissIntro();
               await fits('#constructorbody');
             }
-            await page.locator('[data-ctab="ships"]').tap();
+            await openLane(page, 'ships');
             await page.locator('.cn-build').scrollIntoViewIfNeeded();
             await touchTarget('.cn-build');
             await touchTarget('#constructor .cn-close');

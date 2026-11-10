@@ -390,6 +390,7 @@ export function startTour(
     clearInterval(heartbeat);
     document.removeEventListener('visibilitychange', hidden);
     window.removeEventListener('pagehide', pagehide, true);
+    for (const type of handEvents) document.removeEventListener(type, touched, true);
   };
 
   // A highlighted target can sit inside a scrollable panel (the world/fleet sheet)
@@ -399,12 +400,17 @@ export function startTour(
   // genuinely scrollable ancestor (the app's own body/window never scroll — fixed
   // single-viewport layout), so this is a no-op for fixed HUD targets like #cmdbar.
   // A panel that is still opening or re-rendering can cut that smooth scroll short (the
-  // fleet console right after a ship is picked): for the first seconds of a step a
-  // target left outside its panel is scrolled again, at once. Later the player may
-  // scroll the panel freely.
+  // fleet console right after a ship is picked), and pictures loading late can push the
+  // target back out (a catalogue on a slow machine): while the player has not touched
+  // the screen during the step, a target left outside its panel is scrolled again, at
+  // once, every half second. Once the player scrolls or presses, the panel is theirs.
   let scrolledFor: string | null = null;
   let scrollStart = 0;
   let scrollCheck = 0;
+  let handsOn = false;
+  const touched = (): void => { handsOn = true; };
+  const handEvents = ['wheel', 'pointerdown', 'touchstart', 'keydown'] as const;
+  for (const type of handEvents) document.addEventListener(type, touched, { capture: true, passive: true });
   const host: SpotlightHost = {
     locate: (sel) => {
       const node = Array.from(document.querySelectorAll(sel)).find((el) => {
@@ -416,18 +422,20 @@ export function startTour(
       // A detached / display:none node reports a zero box — treat as absent.
       if (r.width === 0 && r.height === 0) return null;
       const now = performance.now();
+      const inView = onScreen(node, r);
       if (scrolledFor !== sel) {
         scrolledFor = sel;
+        handsOn = false;
         scrollStart = scrollCheck = now;
         node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      } else if (now - scrollStart < 3000 && now - scrollCheck > 500) {
+      } else if (!handsOn && !inView && now - scrollCheck > 500) {
         scrollCheck = now;
-        if (!onScreen(node, r)) node.scrollIntoView({ block: 'nearest' });
+        node.scrollIntoView({ block: 'nearest' });
       }
       // While the step's scroll is still bringing the target in, a target clipped by its
       // panel gets no ring: a press at the ring would land on whatever lies under the
       // clipped part (the map, picking another world).
-      if (now - scrollStart < 3000 && !onScreen(node, r)) return null;
+      if (now - scrollStart < 3000 && !inView) return null;
       return { left: r.left, top: r.top, width: r.width, height: r.height };
     },
     render: (view) => {

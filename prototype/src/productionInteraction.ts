@@ -13,18 +13,13 @@ import { data } from './gameData';
 interface Navigation {
   planet: string;
   repaint(): void;
-  open(tab: YardTab, templates?: boolean, building?: string): void;
+  open(tab: YardTab, building?: string): void;
   category(value: BuildCategory | null): void;
 }
 /** Shared workspace actions; the host still sends every mutation through the existing gate. */
 export function productionClick(tg: HTMLElement, host: YardHost, nav: Navigation): boolean {
   const income = tg.closest<HTMLElement>('[data-pw-income]')?.dataset.pwIncome;
   if (income) { host.openInfo?.(`income:${income}`, income); return true; }
-  const empty = tg.closest<HTMLElement>('[data-pw-empty]')?.dataset.pwEmpty;
-  if (empty) {
-    nav.open(empty as YardTab, empty === 'ships' || empty === 'squads');
-    return true;
-  }
   const cancel = tg.closest<HTMLElement>('[data-pw-cancel]')?.dataset.pwCancel;
   const resume = tg.closest<HTMLElement>('[data-pw-resume]')?.dataset.pwResume;
   const cancelHero = tg.closest<HTMLElement>('[data-pw-hero-cancel]')?.dataset.pwHeroCancel;
@@ -64,7 +59,7 @@ export function productionClick(tg: HTMLElement, host: YardHost, nav: Navigation
   }
   const target = tg.closest<HTMLElement>('[data-pw-building]');
   if (target?.dataset.pwBuilding) {
-    nav.open('buildings', false, target.dataset.pwBuilding);
+    nav.open('buildings', target.dataset.pwBuilding);
     return true;
   }
   const cat = tg.closest<HTMLElement>('[data-bwtab]')?.dataset.bwtab;
