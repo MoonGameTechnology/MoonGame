@@ -400,8 +400,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   по нажатию на неё (`decisions/productionSections.ts`), над каталогом очередь линии;
   шаблоны сборок (`decisions/buildTemplates.ts`), требования —
   `decisions/productionRequirements.ts` ([production-workbench.md](production-workbench.md)).
-  «Герои» — `heroStaff.ts`. Обновления (`productionRefresh.ts`) сохраняют список планет и
-  фокус при начислении ресурсов; запас, линии и таймеры обновляются без замены списка.
+  «Герои» — `heroStaff.ts`, «Развитие» плитками (`decisions/heroTreeRows.ts`). Обновления
+  (`productionRefresh.ts`) сохраняют список планет и фокус при начислении ресурсов; запас,
+  линии и таймеры обновляются без замены списка.
 - Флот: погрузка и высадка — `troopsWindow.ts` (`decisions/armyTransferRows.ts`), плашки и дуги
   перевозки на карте (`decisions/troopTransferTimers.ts`, `mapTransfers.ts`), цепочка приказов
   `chainPlanner.ts`, шаттлы — `hangarPanel.ts`, `squadronPanel.ts`.
