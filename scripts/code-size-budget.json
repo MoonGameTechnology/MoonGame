@@ -14,7 +14,7 @@
     "packages/shared-core/src/state/visibility.ts": 1516,
     "prototype/src/corpScreen.ts": 1391,
     "packages/server/src/metaEconomy.ts": 1379,
-    "packages/shared-core/src/modules/hero.ts": 1163,
+    "packages/shared-core/src/modules/hero.ts": 1165,
     "prototype/src/fleetCard.ts": 1290,
     "prototype/src/eventFeed.ts": 1282,
     "prototype/selfplay.mjs": 1198,

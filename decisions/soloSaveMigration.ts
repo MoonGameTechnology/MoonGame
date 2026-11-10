@@ -585,6 +585,17 @@ export const MISSILES_SOLO_MIGRATION = {
   toDataHash: '02451de143b4e0',
 } as const;
 
+/** hero 4.12.2: «Аннигиляция» отказывает по миру игрока, с которым нет войны. Мир сохранения
+ *  не меняется: прежде такой удар просто проходил. */
+export const ANNIHILATE_PEACE_SOLO_MIGRATION = {
+  fromRules: MISSILES_SOLO_MIGRATION.toRules,
+  fromData: MISSILES_SOLO_MIGRATION.toData,
+  fromDataHash: MISSILES_SOLO_MIGRATION.toDataHash,
+  toRules: '093b4c8af2ade6',
+  toData: MISSILES_SOLO_MIGRATION.toData,
+  toDataHash: MISSILES_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -636,6 +647,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   PACE_RELIEF_SOLO_MIGRATION,
   FLEET_CLOCKS_SOLO_MIGRATION,
   MISSILES_SOLO_MIGRATION,
+  ANNIHILATE_PEACE_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

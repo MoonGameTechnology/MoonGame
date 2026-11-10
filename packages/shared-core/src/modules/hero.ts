@@ -30,7 +30,7 @@ import { heroByFleet, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
 import { isCapturable } from '../state/sectorKind';
 import { laneIsPublic } from '../state/corridor';
-import { isAllied } from '../util/combat';
+import { isAllied, isHostile } from '../util/combat';
 import { canInstall } from '../util/fitting';
 import { knownSkillNodes } from '../util/heroSkills';
 import { moduleAllowed } from '../util/loadout';
@@ -620,6 +620,8 @@ function requireDestructible(
  *  range/cooldown/equip gates belong to the dispatcher. */
 function castAnnihilate(h: HandlerContext, playerId: PlayerId, planetId: PlanetId): void {
   const planet = requireDestructible(h, planetId);
+  // Peace and alliance hold against the hero too: another player's world falls only at war.
+  if (planet.owner && planet.owner !== playerId && !isHostile(h, playerId, planet.owner)) h.reject('E_NOT_HOSTILE');
   const previousOwner = planet.owner;
   planet.owner = null; // neutral again — a depleted world anyone can re-claim
   planet.buildings = [];
@@ -676,7 +678,8 @@ export const heroModule: GameModule = {
   // 4.6.0: чужая ракета (SM-3.7b) для `hero.spawn` — как отсутствующая цель (`E_NO_PLANET`).
   // 4.10.0 combines remembered loadouts with aura removal before the reply volley.
   // 4.11.0: a closing corridor hands the edge it added to a corridor still on it (BAL-19).
-  version: '4.12.1',
+  // 4.12.2: «Аннигиляция» не трогает мир игрока, с которым нет войны.
+  version: '4.12.2',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };

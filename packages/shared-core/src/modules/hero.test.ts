@@ -691,6 +691,17 @@ describe('hero — planet annihilation (через hero.ability)', () => {
     );
   });
 
+  it('does not destroy the world of a player at peace or allied (ponytail audit 2026-11-08)', () => {
+    for (const stance of ['peace', 'alliance'] as const) {
+      const st = annihilator();
+      st.diplomacy = { 'p1|p2': stance };
+      expect(errCode(kernel.applyAction(st, annihilate('C'), ctx(0)))).toBe('E_NOT_HOSTILE');
+    }
+    const war = annihilator();
+    war.diplomacy = { 'p1|p2': 'war' };
+    expect(okApply(kernel.applyAction(war, annihilate('C'), ctx(0))).state.planets.C!.owner).toBe(null);
+  });
+
   it('rejects a second annihilation while on cooldown', () => {
     const first = okApply(kernel.applyAction(annihilator(), annihilate('C'), ctx(0)));
     // B is in range and still capturable, but the ability is on cooldown.
