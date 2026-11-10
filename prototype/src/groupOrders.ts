@@ -635,7 +635,10 @@ export function orderMerge(movers: string[], anchorId: string) {
     playerOrder(mergeFleet(ME, step.mover, anchorId));
   }
   game.selectFleets([anchorId]); // keep the surviving fleet selected for follow-up
-  game.note(plan.queued ? `⛬ ${plan.queued} fleet(s) en route to merge` : '⛬ fleets merged');
+  // Слияние на месте объявляет лента по событию ядра `fleet.merged` («флоты объединены ·
+  // место»), и только если ядро его приняло. Здесь — лишь те, кто ещё летит к якорю:
+  // о них событие придёт позже, по прилёте.
+  if (plan.queued) game.note(t('log.fleet.merge-queued', { n: plan.queued }));
 }
 
 /** Merge button on a multi-selection: pick a docked anchor, fold the rest into it. */

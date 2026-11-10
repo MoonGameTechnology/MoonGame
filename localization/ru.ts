@@ -4138,6 +4138,7 @@ export const ru: Record<string, string> = {
   'log.fleet.launched': '🚀 {who} поднял флот · {at}',
   'log.fleet.merged': '⛬ флоты объединены · {at}',
   'log.fleet.split': '⊟ флот разделён · {at}',
+  'log.fleet.merge-queued': '⛬ {n} {n|флот летит|флота летят|флотов летят} к якорю на слияние',
   'log.fleet.split-transit': '⊟ флот разделён в пути',
   // AUDM-4: флот ушёл раньше, чем закончилась погрузка, — десант остался в гарнизоне.
   'loadprompt.title': 'Идёт погрузка десанта',

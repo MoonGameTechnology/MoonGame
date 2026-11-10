@@ -233,7 +233,9 @@ describe('REFM-228 — слияние', () => {
     expect(env.world.fleets['p1-x']).toBeUndefined();
     expect(env.world.fleets[fleet.id]?.units.find((u) => u.unit === 'cruiser')?.count).toBe(3);
     expect(env.selected).toEqual([[fleet.id]]);
-    expect(env.notes.at(-1)?.[0]).toBe('⛬ fleets merged');
+    // Итог на месте объявляет лента по событию ядра `fleet.merged`, не приказ: строка
+    // приказа повторила бы его, да ещё и до ответа ядра.
+    expect(env.notes).toHaveLength(0);
   });
 
   it('далёкий летит к якорю и несёт намерение слиться', async () => {
@@ -243,7 +245,7 @@ describe('REFM-228 — слияние', () => {
     const mover = env.world.fleets['p1-x']!;
     expect(mover.movement?.to).toBe(home.id);
     expect((mover as { mergeInto?: string }).mergeInto).toBe(fleet.id);
-    expect(env.notes.at(-1)?.[0]).toBe('⛬ 1 fleet(s) en route to merge');
+    expect(env.notes.at(-1)?.[0]).toBe(t('log.fleet.merge-queued', { n: 1 }));
   });
 
   it('кнопка группы берёт якорем стоящего, одиночку не сливает', async () => {

@@ -3570,6 +3570,7 @@ export const es: Record<string, string> = {
   'log.fleet.launched': '🚀 {who} envió una flota · {at}',
   'log.fleet.merged': '⛬ Flotas unificadas · {at}',
   'log.fleet.split': '⊟ Flota dividida · {at}',
+  'log.fleet.merge-queued': '⛬ {n} {n|flota|flotas} en camino para unificarse',
   'log.fleet.split-transit': '⊟ Flota dividida en tránsito',
   'loadprompt.title': 'Carga de tropas en curso',
   'loadprompt.body': 'Carga o descarga en curso en {n} {n|flota|flotas}, quedan ≈{m} min. Despegar la cancelará.',
