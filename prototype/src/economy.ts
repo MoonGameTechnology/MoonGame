@@ -23,6 +23,7 @@ import {
   matchUnitCost,
   loadoutCost,
   creditsBonusOf,
+  pausedUpkeep,
 } from '../../packages/shared-core/src/index';
 import {
   isInhabited,
@@ -306,6 +307,12 @@ export function netIncome(
         }
       }
     }
+    // …and pays the same share of its upkeep (the core's `pausedUpkeep`).
+    for (const [res, perDay] of Object.entries(pausedUpkeep(p, data, feedsOnBiomass(state, playerId, data)))) {
+      const spent = perDay / 24;
+      out[res] = (out[res] ?? 0) - spent;
+      if (upkeep) upkeep[res] = (upkeep[res] ?? 0) + spent;
+    }
     if (isInhabited(data, p)) {
       credits += civicTax(inhabited) * bonusMult * control; // civic tax is post-tax income → also boosted (BF-35)
       const taxBonus = creditsBonusOf(data, p); // RULES-2: правило из данных здания
@@ -392,6 +399,11 @@ export function incomeBreakdown(
         if (res === 'credits') credits -= v;
         else { cell(res).buildingUpkeep += v; }
       }
+    }
+    for (const [res, perDay] of Object.entries(pausedUpkeep(p, data, eatsBiomass))) {
+      const v = perDay / 24;
+      if (res === 'credits') credits -= v;
+      else { cell(res).buildingUpkeep += v; }
     }
     if (isInhabited(data, p)) {
       credits += civicTax(inhabited) * bonusMult * control;
