@@ -360,9 +360,10 @@ export function drawWorlds(now: number, lod: MapLod): void {
     // показывается ПАМЯТЬЮ, никогда не виденный — знаком вопроса только вблизи.
     if (n.sector === 'black_hole') {
       cx.save();
+      const hs = ns * (p.size ?? 1); // the Abyss of ffa-50 is a size-2 hole, drawn twice as big
       cx.fillStyle = '#03030a'; cx.strokeStyle = '#8764ce'; cx.lineWidth = 3;
-      cx.beginPath(); cx.arc(c.x, c.y, 20 * ns, 0, TAU); cx.fill(); cx.stroke();
-      cx.beginPath(); cx.ellipse(c.x, c.y, 31 * ns, 10 * ns, -0.3, 0, TAU); cx.stroke();
+      cx.beginPath(); cx.arc(c.x, c.y, 20 * hs, 0, TAU); cx.fill(); cx.stroke();
+      cx.beginPath(); cx.ellipse(c.x, c.y, 31 * hs, 10 * hs, -0.3, 0, TAU); cx.stroke();
       cx.restore();
       continue;
     }
@@ -603,6 +604,18 @@ export function drawWorlds(now: number, lod: MapLod): void {
         cx.lineTo(c.x + R * .18 + side * 4, c.y - R * .25);
         cx.lineTo(c.x - R * .18 + side * 4, c.y + R * .25);
         cx.lineTo(c.x + R * .3 + side * 2, c.y + R);
+        cx.stroke();
+      }
+      cx.restore();
+    } else if (sector === 'accretion_disk') {
+      // Classic mode: a hot, flattened swirl — plasma falling into the black hole.
+      cx.save();
+      cx.strokeStyle = '#ffb26b';
+      cx.lineWidth = 1.2;
+      for (const k of [0.45, 0.75, 1]) {
+        cx.globalAlpha = lit * dim * (1.1 - k * 0.6);
+        cx.beginPath();
+        cx.ellipse(c.x, c.y, R * k, R * k * 0.38, -0.3, 0.2, TAU - 0.6);
         cx.stroke();
       }
       cx.restore();

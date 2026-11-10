@@ -3,6 +3,7 @@ import {
   buildStateFromMap,
   getStance,
   laneRoadLength,
+  mosaicBorderSegments,
   validateMatchMap,
 } from '../../packages/shared-core/src/index';
 import { dataKey } from '../../localization/index';
@@ -202,6 +203,8 @@ describe.each(FFA_MAPS)(
         // Fortresses (`void_station`, `fork_station`) are only raised by a player, see
         // data/seededFortress.test.ts; `empty` stays off combat maps.
         .filter((k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station' && k !== 'empty')
+        // The accretion disk rings only the Abyss of `ffa-50` (owner 2026-11-10).
+        .filter((k) => k !== 'accretion_disk' || id === 'ffa-50')
         .sort();
       expect(has((s) => s.kind)).toEqual(kinds);
       expect(has((s) => s.terrain)).toEqual(Object.keys(data.sectors).sort());
@@ -226,6 +229,43 @@ describe.each(FFA_MAPS)(
     });
   },
 );
+
+describe('Fifty Suns — the Abyss and its accretion disk (owner 2026-11-10)', () => {
+  const map = mapPreset('ffa-50').map!;
+  const ids = Object.keys(map.sectors).sort();
+  const borders = mosaicBorderSegments(
+    ids.map((id) => {
+      const s = map.sectors[id]!;
+      return { id, x: s.position.x, y: s.position.y, size: s.size ?? 1 };
+    }),
+    map.edge,
+  );
+  const around = (id: string): string[] =>
+    borders.filter((b) => b.a === id || b.b === id).map((b) => (b.a === id ? b.b : b.a));
+  /** A cell's area: the triangles from its centre to every border it has. */
+  const area = (id: string): number => {
+    const { x, y } = map.sectors[id]!.position;
+    return borders
+      .filter((b) => b.a === id || b.b === id)
+      .reduce((sum, { p, q }) => sum + Math.abs((p[0] - x) * (q[1] - y) - (q[0] - x) * (p[1] - y)) / 2, 0);
+  };
+  const disk = ids.filter((id) => map.sectors[id]!.kind === 'accretion_disk');
+  const hole = ids.find((id) => map.sectors[id]!.kind === 'black_hole')!;
+
+  it('closes the black hole on every side with a solid ring of disk', () => {
+    expect(disk.length).toBeGreaterThanOrEqual(8);
+    expect(around(hole).sort()).toEqual([...disk].sort());
+    for (const id of disk) expect(around(id).filter((n) => disk.includes(n)), id).toHaveLength(2);
+    expect(data.sectorKinds.accretion_disk!.traversable).toBe(false);
+  });
+
+  it('makes the black hole twice an average province', () => {
+    const free = ids.filter((id) => id.startsWith('suns_')).map(area).sort((a, b) => a - b);
+    const median = free[free.length >> 1]!;
+    expect(area(hole) / median).toBeGreaterThan(1.8);
+    expect(area(hole) / median).toBeLessThan(2.2);
+  });
+});
 
 describe('Twenty Lights — inhabitants', () => {
   it('runs every inhabitant: pirates, hives and neutrals all give orders', () => {

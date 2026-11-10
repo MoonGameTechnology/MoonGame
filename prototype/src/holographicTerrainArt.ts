@@ -27,6 +27,7 @@ const COLORS: Readonly<Record<string, string>> = {
   dead_world: "#929ac0",
   asteroid_cluster: "#b7c4a1",
   rift: "#c7a0ed",
+  accretion_disk: "#ffb26b",
   dust_lane: "#baa7cc",
   depleted_system: "#7f99ab",
 };
@@ -36,6 +37,7 @@ const ANIMATED = new Set([
   "ion_storm",
   "solar_flare",
   "rift",
+  "accretion_disk",
 ]);
 
 /** Smooth interior coverage, including concave boundaries. Outside is transparent. */
@@ -75,6 +77,64 @@ interface Geometry {
   lines: Segment[];
   glints: Segment[];
 }
+interface ArtPen {
+  marker: Point;
+  box: { width: number; height: number };
+  poly: readonly Point[];
+  path: (points: readonly Point[], alpha?: number) => void;
+  line: (a: Point, z: Point, alpha?: number) => void;
+  random: () => number;
+}
+
+/** Plasma spiralling into the black hole: streaks circle the hole (the field's marker),
+ * not the province, so the ring of disk provinces reads as one continuous disk.
+ * Measured in box pixels and divided back, so the circles stay round in a wide box. */
+function accretionDisk({ marker, box: b, poly, path, line, random }: ArtPen): void {
+  const cx = marker[0] * b.width;
+  const cy = marker[1] * b.height;
+  let near = Infinity;
+  let far = 0;
+  let lo = Infinity;
+  let hi = -Infinity;
+  const base = Math.atan2(0.5 * b.height - cy, 0.5 * b.width - cx);
+  for (const [x, y] of poly) {
+    const dx = x * b.width - cx;
+    const dy = y * b.height - cy;
+    const r = Math.hypot(dx, dy);
+    near = Math.min(near, r);
+    far = Math.max(far, r);
+    // Angles relative to the box centre's bearing, so a cell never wraps across ±π.
+    let a = Math.atan2(dy, dx) - base;
+    a = Math.atan2(Math.sin(a), Math.cos(a));
+    lo = Math.min(lo, a);
+    hi = Math.max(hi, a);
+  }
+  const toLocal = (r: number, a: number): Point => [
+    (cx + Math.cos(base + a) * r) / b.width,
+    (cy + Math.sin(base + a) * r) / b.height,
+  ];
+  // Bands at the same radii in every disk province: `near` is a vertex of the hole's
+  // regular polygon, the same for the whole ring, so the streaks run on across borders.
+  const step = near * 0.085;
+  for (let band = 0; near + band * step < far; band++) {
+    const r0 = near + (band + 0.5) * step;
+    // Hotter (brighter) towards the hole, a faint wisp at the outer edge.
+    const heat = Math.max(0.12, 0.62 - (band * step) / near);
+    path(Array.from({ length: 41 }, (_, j): Point => {
+      const a = lo + ((hi - lo) * j) / 40;
+      // A ripple in the absolute bearing, so neighbouring provinces agree on it.
+      return toLocal(r0 + Math.sin((base + a) * 14 + band) * step * 0.18, a);
+    }), heat);
+  }
+  // Hot knots in the stream: short bright dashes along the flow.
+  for (let i = 0; i < 26; i++) {
+    const r = near + (far - near) * Math.pow(random(), 1.6);
+    const a = lo + (hi - lo) * random();
+    const span = 0.04 + random() * 0.06;
+    line(toLocal(r, a), toLocal(r * 0.995, a + span), 0.5 - ((r - near) / (far - near || 1)) * 0.3);
+  }
+}
+
 const fieldCache = new WeakMap<TerrainArtField, Geometry>();
 const geometryCache = new Map<string, Geometry>();
 
@@ -185,6 +245,8 @@ function geometry(field: TerrainArtField): Geometry {
           [x + side * 0.23, y - 0.075]], 0.15);
       }
     }
+  } else if (field.kind === "accretion_disk") {
+    accretionDisk({ marker, box: b, poly, path, line, random });
   } else if (field.kind === "dust_lane") {
     // Fine sediment follows one oblique ribbon, with a dense middle and soft edges.
     for (let band = -4; band <= 4; band++) {

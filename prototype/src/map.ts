@@ -55,6 +55,8 @@ const SECTOR_TYPE_UI: Record<string, SectorTypeUi> = {
   asteroid: { name: 'Asteroid Field', core: 'asteroid_field', color: '#d6a645' },
   asteroid_cluster: { name: 'Dense Asteroid Cluster', core: 'asteroid_cluster', color: '#c98a3a' },
   rift: { name: 'Spatial Rift', core: 'empty_space', color: '#7a4a8f' },
+  // The plasma ring round the Abyss black hole (ffa-50): impassable like a rift, hot in colour.
+  accretion_disk: { name: 'Accretion Disk', core: 'empty_space', color: '#ff9a4a' },
   empty: { name: 'Empty Space', core: 'empty_space', color: '#46606e' },
   // new terrains — each maps to a core `data.sectors` entry for its speed/HP bonus
   ion_storm: { name: 'Ion Storm', core: 'ion_storm', color: '#6fe3ff' },
