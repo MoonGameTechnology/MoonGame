@@ -451,7 +451,7 @@ it('public career exposes exact match counters and live accepted corporation mem
       corporation: { id: created.corpId, name: 'Live Corp' },
       progress: {},
     });
-    expect(response.body).not.toMatch(/999|accountId|private@example/);
+    expect(response.body).not.toMatch(/explored|:999|accountId|private@example/);
     await corporations.setRole(created.corpId, alice, 'recruit');
     expect((await read()).json().corporation).toBeNull();
     await corporations.removeCorp(created.corpId);
