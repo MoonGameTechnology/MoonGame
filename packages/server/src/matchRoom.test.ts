@@ -1567,6 +1567,13 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         h.emit('espionage.counter.caught', { owner, planetId: 'node1', spy: 'p3' });
         h.emit('espionage.counter.lost', { owner, planetId: 'node1' });
         h.emit('espionage.detected', { owner, kind: 'recon', planetId: 'node1', spy: 'p3' });
+        h.emit('espionage.started', { owner, spyId: 1, planetId: 'node1', kind: 'recon', until: 9 });
+        h.emit('espionage.arrived', { owner, spyId: 1, planetId: 'node1' });
+        h.emit('espionage.waiting', { owner, spyId: 1, planetId: 'node1', kind: 'theft' });
+        h.emit('espionage.home', { owner, spyId: 1, planetId: 'node1' });
+        h.emit('espionage.cancelled', { owner, spyId: 1, planetId: 'node1' });
+        h.emit('espionage.caught', { owner, spyId: 1, planetId: 'node1' });
+        h.emit('espionage.recruited', { owner, spyId: 1 });
         h.emit('building.destroyed', { planetId: 'node1', building: 'mine', owner });
       });
       // Бой p1 против p3 в мире `far`, которого не опознаёт никто.
@@ -1736,6 +1743,14 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
       'espionage.counter.caught',
       'espionage.counter.lost',
       'espionage.detected',
+      // SPY-23: where a named spy goes says whom it spies on.
+      'espionage.started',
+      'espionage.arrived',
+      'espionage.waiting',
+      'espionage.home',
+      'espionage.cancelled',
+      'espionage.caught',
+      'espionage.recruited',
     ];
     // Every entry of the server's list is exercised here, so a new one can't skip this test.
     expect([...OWNER_ONLY_EVENTS.keys()].sort()).toEqual([...intel].sort());

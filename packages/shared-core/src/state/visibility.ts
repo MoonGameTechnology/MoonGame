@@ -1181,18 +1181,12 @@ function project(
     if (own?.length) view.intel = { [viewerId]: own };
     else delete view.intel;
   }
-  // The agent network (SPY-6) is as secret as the grants: how many agents a rival
-  // has out says that someone is being spied on.
-  if (view.spyAgents) {
-    const own = view.spyAgents[viewerId];
-    if (own?.length) view.spyAgents = { [viewerId]: own };
-    else delete view.spyAgents;
-  }
-  // Turned agents (SPY-18) say who caught whom: only the catcher sees their own.
-  if (view.spyTurned) {
-    const own = view.spyTurned[viewerId];
-    if (own?.length) view.spyTurned = { [viewerId]: own };
-    else delete view.spyTurned;
+  // The spy network (SPY-6) is as secret as the grants: where a rival's spies are says
+  // whom they spy on — and turned agents (SPY-18) say who caught whom.
+  if (view.spies) {
+    const own = view.spies[viewerId];
+    if (own?.length) view.spies = { [viewerId]: own };
+    else delete view.spies;
   }
   // Diplomatic OFFERS are private to the two negotiating parties (the committed
   // stances themselves are public): a third party must not see who is suing for

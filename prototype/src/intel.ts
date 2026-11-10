@@ -18,12 +18,11 @@
  * вкладки показывает последние строки.
  */
 import {
-  BASE_SPY_AGENTS,
   SPY_OP_COST,
+  spyRoster,
   type GameState,
   type IntelGrant,
   type SpyOp,
-  turnedAgents,
 } from '../../packages/shared-core/src/index';
 import { spyAgents, type SpyAgents } from '../../decisions/spyAgents';
 
@@ -31,17 +30,16 @@ import { spyAgents, type SpyAgents } from '../../decisions/spyAgents';
  *  кнопке: авторитетно ядро, оно же отвергает попытку с `E_INSUFFICIENT`, когда денег мало. */
 export const SPY_COST: Readonly<Record<SpyOp, number>> = SPY_OP_COST;
 
-/** Разброс цен для сводки во вкладке «Шпионаж»: «50–400». */
+/** Разброс цен для сводки во вкладке «Шпионаж»: «50–400» (бесплатный переезд не в счёт). */
 export function spyCostRange(): string {
-  const all = Object.values(SPY_COST);
+  const all = Object.values(SPY_COST).filter((c) => c > 0);
   return `${Math.min(...all)}–${Math.max(...all)}`;
 }
 
-/** Сеть агентов игрока сейчас (SPY-6). Размер — база ядра `BASE_SPY_AGENTS` и
- *  перевербованные агенты (SPY-18): как и `SPY_COST`, это ПОДПИСЬ, авторитетно ядро (оно
- *  отвергает попытку с `E_NO_AGENT`). */
+/** Сеть шпионов игрока сейчас (SPY-6/22) — реестр ядра или стартовая сеть в столице: как
+ *  и `SPY_COST`, это ПОДПИСЬ, авторитетно ядро (оно отвергает попытку с `E_NO_AGENT`). */
 export function myAgents(s: GameState, me: string): SpyAgents {
-  return spyAgents(s.spyAgents?.[me], BASE_SPY_AGENTS + turnedAgents(s, me, s.time), s.time);
+  return spyAgents(spyRoster(s, me));
 }
 
 /** ЖИВЫЕ окна на момент `now`. Просроченное окно не показывает ничего — даже если ядро
