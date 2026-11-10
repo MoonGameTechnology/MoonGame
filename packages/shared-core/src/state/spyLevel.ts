@@ -74,7 +74,9 @@ export function splitGuardXp(total: number, guardXp: readonly number[]): number[
   const n = guardXp.length;
   if (n === 0) return [];
   const quarters = Math.round(total * 4);
-  const rank = guardXp.map((_, i) => i).sort((a, b) => (guardXp[b] ?? 0) - (guardXp[a] ?? 0) || a - b);
+  const rank = guardXp
+    .map((_, i) => i)
+    .sort((a, b) => (guardXp[b] ?? 0) - (guardXp[a] ?? 0) || a - b);
   const weightSum = (n * (n + 1)) / 2;
   const out = new Array<number>(n).fill(0);
   let given = 0;
