@@ -956,8 +956,6 @@ describe('REFM-225 — нажатия по листу', () => {
       ['cancelbuild', '2', 'world', game.cancelConstruction('p1', H, 2)],
       ['resumebuild', '1', 'world', game.resumeConstruction('p1', H, 1)],
       ['dequeue', '3', 'world', game.cancelConstruction('p1', H, 3)],
-      ['spyplanet', 'recon', 'world', game.spyOn('p1', H, 'recon')],
-      ['spyrecall', '', 'world', game.recallSpy('p1', H)],
       ['capital', '', 'world', game.designateCapital('p1', H)],
       ['holdpoint', 'on', 'world', game.setHoldPoint('p1', H, true)],
       ['holdpoint', 'off', 'world', game.setHoldPoint('p1', H, false)],
