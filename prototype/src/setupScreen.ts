@@ -57,6 +57,7 @@ import {
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 import { askReplace, saveSolo } from './soloCheckpoint';
 import { branchLabel } from './techTree';
+import { readLocal, writeLocal } from './localStore';
 
 /** Что экрану нужно от игры. Места, позывной, часы, экраны и старт партии живут в `main.ts`. */
 export interface SetupScreenHost {
@@ -487,7 +488,7 @@ export function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   // A lively default: ×1 wall-clock reads as a FROZEN screen to a newcomer, so the
   // setup opens on the last chosen multiplier (first launch: ×10). True real time
   // stays one tap away — the ×1 chip.
-  const savedSpeed = Number(localStorage.getItem('void.setupSpeed'));
+  const savedSpeed = Number(readLocal('void.setupSpeed'));
   setupSpeed = SETUP_SPEEDS.includes(savedSpeed) ? savedSpeed : 10;
   game.showConnect(false);
   setupEl.style.display = 'flex';
@@ -732,7 +733,7 @@ export function initSetupScreen(host: SetupScreenHost): void {
     const t = (ev.target as Element).closest('[data-spd]');
     if (!t) return;
     setupSpeed = Number(t.getAttribute('data-spd'));
-    localStorage.setItem('void.setupSpeed', String(setupSpeed));
+    writeLocal('void.setupSpeed', String(setupSpeed));
     renderSetup();
   });
   setupGoEl.addEventListener('click', () => {

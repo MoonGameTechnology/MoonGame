@@ -558,6 +558,7 @@ import type {
   Fleet,
 } from '../../packages/shared-core/src/index';
 import { recordValues } from '../../packages/shared-core/src/util/records';
+import { readLocal, writeLocal } from './localStore';
 
 // --- constants ---------------------------------------------------------------
 
@@ -1383,8 +1384,8 @@ const matchEnd = initMatchEnd({
   me: () => ME,
   nick: () => nickInput.value,
   endShown: () => endScreen !== null,
-  readMarker: (k) => localStorage.getItem(k),
-  writeMarker: (k, v) => localStorage.setItem(k, v),
+  readMarker: (k) => readLocal(k),
+  writeMarker: (k, v) => writeLocal(k, v),
   loadMeta,
   saveMeta,
   runAward: () => isSectorZeroRun() ? awardSectorRun() : null,
@@ -2820,7 +2821,7 @@ if (bootReset) {
       // оверлея, и карточка входа выставлялась ВНУТРИ него — игрок получал пустой экран.
       showConnect(true);
       showStage('welcome');
-      const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+      const savedNick = (readLocal('void.nick') ?? '').trim();
       fillWelcome(savedNick, 'show');
     })(),
   );
@@ -2845,7 +2846,7 @@ if (bootReset) {
     (async () => {
       const srv = resolveServer();
       const mode = srv ? await probeAuthMode(srv.base) : authMode;
-      const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+      const savedNick = (readLocal('void.nick') ?? '').trim();
       if (mode === 'accounts') {
         const resumed = srv && savedNick ? await resumeSession(srv.base, savedNick) : null;
         // Пока продлевали, игрок мог уйти с карточки (регистрация, восстановление) или

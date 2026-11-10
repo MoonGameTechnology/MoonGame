@@ -48,6 +48,7 @@ import { openSetup } from './setupScreen';
 import { initShop } from './shopScreen';
 import { fillWelcome, showStage, suggestCallsign } from './signInPages';
 import { refreshHubDoor, restoreSolo, saveSolo, soloSaveActive } from './soloCheckpoint';
+import { readLocal, writeLocal } from './localStore';
 
 declare const __SECTOR_ZERO_ONLY__: boolean;
 
@@ -428,10 +429,10 @@ function metaKey(): string {
   return 'vd.meta.' + (game.nick().trim() || 'guest');
 }
 export function loadMeta(): MetaState {
-  return parseMetaState(localStorage.getItem(metaKey()));
+  return parseMetaState(readLocal(metaKey()));
 }
 export function saveMeta(st: MetaState): void {
-  localStorage.setItem(metaKey(), JSON.stringify(st));
+  writeLocal(metaKey(), JSON.stringify(st));
 }
 
 // Player emblem — a cosmetic console crest the player picks in the main menu (hub) and
@@ -508,7 +509,7 @@ export function initHubScreen(host: HubScreenHost): void {
       sheet: () => $('arsenal-sheet'),
       narrow: () => $('hp-arsenal').clientWidth < ARSENAL_WIDE_MIN,
       readCache: readArsenalCache,
-      writeCache: (items) => localStorage.setItem(arsenalKey(), JSON.stringify(items)),
+      writeCache: (items) => writeLocal(arsenalKey(), JSON.stringify(items)),
       confirmed: (items) => (moduleRewards ??= createModuleRewards()).observe(items),
       openCodex,
       authorizedBase: hubAuthorizedBase,
@@ -517,7 +518,7 @@ export function initHubScreen(host: HubScreenHost): void {
         showHub(false);
         game.showConnect(true);
         showStage('welcome');
-        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
+        fillWelcome((readLocal('void.nick') ?? '').trim(), 'show');
       },
       openAuction: () => hubTab('auction'),
       openHeroMatch: () => hubTab('games'),
@@ -562,7 +563,7 @@ export function initHubScreen(host: HubScreenHost): void {
         showHub(false);
         game.showConnect(true);
         showStage('welcome');
-        fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
+        fillWelcome((readLocal('void.nick') ?? '').trim(), 'show');
       },
       warrants: () => metaMarket?.balance() ?? 0,
       now: () => Date.now(),
@@ -633,7 +634,7 @@ export function initHubScreen(host: HubScreenHost): void {
           return null;
         }
       },
-      writeCache: (value) => localStorage.setItem(medalsKey(), JSON.stringify(value)),
+      writeCache: (value) => writeLocal(medalsKey(), JSON.stringify(value)),
       authorizedBase: async () => {
         const srv = game.resolveServer();
         if (!srv) return null;
@@ -692,7 +693,7 @@ export function initHubScreen(host: HubScreenHost): void {
           showHub(false);
           game.showConnect(true);
           showStage('welcome');
-          fillWelcome((localStorage.getItem('void.nick') ?? '').trim(), 'show');
+          fillWelcome((readLocal('void.nick') ?? '').trim(), 'show');
         },
         // CORP-14: стиль базы покупают в магазине, на вкладке «Стили».
         openShop: (style) => {

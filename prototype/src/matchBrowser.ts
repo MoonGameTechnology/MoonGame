@@ -50,6 +50,7 @@ import { INFO_ICON } from './infoIcon';
 import { fmtJoinWindow, joinWindow, rowAction, type MatchRules, type MatchTab } from './matchRow';
 import { openSetup } from './setupScreen';
 import { canCreateOnlineMatch, forgetMatchCreation, initMatchCreation, refreshMatchCreation } from './matchCreation';
+import { readLocal, writeLocal } from './localStore';
 
 /** Что обозревателю нужно от игры. Живёт в `main.ts`. */
 export interface MatchBrowserHost {
@@ -164,8 +165,8 @@ async function loadMatchLists(srv: { base: string; nick: string }): Promise<bool
         mine: matchLists.active?.length ?? 0,
       });
     }
-    localStorage.setItem('void.server', srv.base);
-    localStorage.setItem('void.nick', srv.nick);
+    writeLocal('void.server', srv.base);
+    writeLocal('void.nick', srv.nick);
     loadFailed = false;
     return true;
   } catch {
@@ -203,7 +204,7 @@ async function toggleArchive(id: string, restore: boolean): Promise<void> {
 
 /** Запомнить выбор между заходами — рядом с `void.server` / `void.nick`. */
 function saveMatchFilter(): void {
-  if (matchFilter) localStorage.setItem(FILTER_STORE_KEY, serializeFilter(matchFilter));
+  if (matchFilter) writeLocal(FILTER_STORE_KEY, serializeFilter(matchFilter));
 }
 
 /**
@@ -437,7 +438,7 @@ function renderMatches(): void {
   const available = lists?.available ?? [];
   const f = (matchFilter = matchFilter
     ? clampFilter(matchFilter, available)
-    : restoreFilter(localStorage.getItem(FILTER_STORE_KEY), available));
+    : restoreFilter(readLocal(FILTER_STORE_KEY), available));
   const found = available.filter((m) => matchesFilter(m, f));
   const counts = tabCounts(lists, found.length);
   for (const b of Array.from(document.querySelectorAll('.mtab'))) {

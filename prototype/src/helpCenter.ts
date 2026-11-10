@@ -54,6 +54,7 @@ import { PRODUCTION_UNITS } from './productionRoster';
 import { refusalText } from '../../decisions/refusalText';
 import { productionRequirementsHtml, productionUnlocksHtml } from './productionRequirementsView';
 import { enqueueBuild, myRes } from './worldQueries';
+import { readLocal, writeLocal } from './localStore';
 
 /** Что справке нужно от игры. Мир, позывной, мета, досье и забег — в `main.ts`. */
 export interface HelpCenterHost {
@@ -294,10 +295,10 @@ function showIntro(card: IntroCard): void {
 }
 // Panel-open hook: show the intro for `id` once (unless already seen / a veteran).
 export function maybeIntro(id: string): void {
-  const seen = parseSeenIntros(localStorage.getItem(seenIntrosKey()));
+  const seen = parseSeenIntros(readLocal(seenIntrosKey()));
   const veteran = game.loadMeta().xp > 0; // finished at least one match → knows the ropes
   const { card, seen: next } = resolveIntro(seen, id, { veteran });
-  localStorage.setItem(seenIntrosKey(), JSON.stringify(next));
+  writeLocal(seenIntrosKey(), JSON.stringify(next));
   if (card) showIntro(card);
 }
 // С клавиатуры так же: клавиша убирает подсказку раньше, чем её прочтут горячие клавиши, и
