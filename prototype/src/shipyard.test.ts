@@ -1,13 +1,14 @@
-import { laneStripHtml, productionLanesHtml } from './productionQueueView';
+import { laneStripHtml, productionLanesHtml, toggleLaneStrip } from './productionQueueView';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t, tData } from '../../localization/runtime';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 import { newGame, canOrder, order as applyOrder, HOUR } from './game';
 import { cost as priceHtml, fmtDur, fmtEta, displayUnit } from './format';
-import { buildShip } from '../../decisions/actions';
+import { act, buildShip } from '../../decisions/actions';
 import { data } from './gameData';
 import type { Action, ArsenalItem, GameState } from '../../packages/shared-core/src/index';
+import { matchUnitHours } from '../../packages/shared-core/src/index';
 import {
   statBarHtml,
   originTagHtml,
@@ -574,7 +575,7 @@ describe('верфь — окно', () => {
     yard.open('ships');
     expect(win.html()).toContain(`<div class="pw-lane-strip"><p class="pw-strip-idle">${t('production.lane.idle')}</p></div>`);
     win.fire(click('[data-cnbuild]'));
-    expect(win.html()).toContain('class="pw-job"');
+    expect(win.html()).toContain('class="pw-job run"');
     win.fire(click('[data-cncount]', { cncount: '+' }));
     win.fire(click('[data-cnbuild]'));
     expect(win.html()).toContain('class="pw-job waiting"');
@@ -617,9 +618,36 @@ describe('верфь — окно', () => {
     expect(html).toContain(`<b>${displayUnit('cruiser')} ×3</b><progress`);
     expect(html).toContain('<span class="pw-lane-more">+1</span>');
     const strip = laneStripHtml(after, home, 'ships');
-    expect(strip).toContain('class="pw-job"');
+    expect(strip).toContain('class="pw-job run"');
     expect(strip).toContain('class="pw-job waiting"');
     expect(strip).toContain('<progress');
+  });
+
+  it('the lane queue: a waiting order shows when it is ready, a paused one resumes only on a free lane, a long queue folds', () => {
+    const s = rich();
+    const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
+    let after = applyOrder(s, buildShip('p1', home, 'cruiser', 1, []), s.time).state;
+    after = applyOrder(after, buildShip('p1', home, 'frigate', 1, []), after.time).state;
+    const run = after.scheduled.find((e) => e.type === 'construction.complete')!;
+    const frigateMs = matchUnitHours(after, data.units.frigate!.buildTimeHours) * HOUR;
+    let strip = laneStripHtml(after, home, 'ships');
+    // Ждущий готов после идущего и своей длительности; один корабль без «×1».
+    expect(strip).toContain(`<b>${displayUnit('frigate')}</b><span class="pn-timer" data-at="${run.at + frigateMs}"`);
+    expect(strip).toContain(`aria-label="${t('side.conveyor.dequeue.title')}"`);
+    expect(strip).not.toContain('data-pw-strip-more');
+    // Отменённый идущий встаёт на паузу; линия занята следующим — «Продолжить» не нажать.
+    after = applyOrder(after, act('p1', 'construction.cancel', { planetId: home, seq: run.seq }), after.time).state;
+    after = applyOrder(after, buildShip('p1', home, 'frigate', 1, []), after.time).state;
+    strip = laneStripHtml(after, home, 'ships');
+    expect(strip).toMatch(/data-pw-resume="\d+" disabled/);
+    // Три строки сворачиваются до первой и «+2».
+    expect(strip.match(/<div hidden class="pw-job/g)).toHaveLength(2);
+    expect(strip).toContain(t('production.queue.more', { n: 2 }));
+    toggleLaneStrip();
+    strip = laneStripHtml(after, home, 'ships');
+    toggleLaneStrip();
+    expect(strip).not.toContain('<div hidden');
+    expect(strip).toContain(t('production.queue.less'));
   });
 
   it('refreshes completed and next orders on Heroes without replacing the hero pane', () => {

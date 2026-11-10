@@ -65,6 +65,8 @@ export const en: Record<string, string> = {
   "production.lane.paused": "Paused",
   "production.lane.back": "Back to lines",
   "production.lane.hide": "Hide catalog",
+  "production.queue.more": "+{n} queued",
+  "production.queue.less": "Collapse",
   "production.hero-development": "Development",
   "production.hero-ship": "Ship and fittings",
   "production.hire": "Recruit",

@@ -397,7 +397,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   список «◇ Авиация» (`aviationPanel.ts`); приказы эскадре — только в её карточке
   (`squadronCardView.ts`), плитками, как у флота (`wingOrders.ts`).
 - «Производство» (`shipyard.ts`): открывается списком четырёх линий мира, каталог линии —
-  по нажатию на неё (`decisions/productionSections.ts`), над каталогом очередь линии; мир с
+  по нажатию на неё (`decisions/productionSections.ts`), над каталогом очередь линии строками со сроком каждого заказа, свёрнутая до «+N»
+  (`decisions/laneQueue.ts`); мир с
   простаивающей линией отмечен у выбора мира в шапке (`idleProductionLanes`);
   шаблоны сборок (`decisions/buildTemplates.ts`), требования —
   `decisions/productionRequirements.ts` ([production-workbench.md](production-workbench.md)).

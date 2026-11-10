@@ -68,6 +68,8 @@ export const ru: Record<string, string> = {
   "production.lane.paused": "На паузе",
   "production.lane.back": "К линиям",
   "production.lane.hide": "Скрыть каталог",
+  "production.queue.more": "+{n} в очереди",
+  "production.queue.less": "Свернуть",
   "production.hero-development": "Развитие",
   "production.hero-ship": "Корабль и оснащение",
   "production.hire": "Нанять",

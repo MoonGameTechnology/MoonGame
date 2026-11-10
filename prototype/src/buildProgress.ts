@@ -17,7 +17,13 @@
  *    назвать время стройки; полоса обязана показать 100%, а не NaN.
  */
 import type { GameData, GameState, QueuedConstruction } from '../../packages/shared-core/src/index';
-import { acceptedConstructionHours, orderLane } from '../../packages/shared-core/src/index';
+import {
+  acceptedConstructionHours,
+  buildingLevel,
+  matchBuildingHours,
+  matchUnitHours,
+  orderLane,
+} from '../../packages/shared-core/src/index';
 import type { ActiveBuild, BuildLane, ConstructionPayload } from './buildQueue';
 
 /** Полезная нагрузка события стройки, если она вообще похожа на неё. */
@@ -82,6 +88,29 @@ export function buildDurationHours(
   match: Pick<GameState, 'pricing'> = {},
 ): number {
   return acceptedConstructionHours(match, data, p);
+}
+
+/**
+ * Сколько продлится ЖДУЩИЙ заказ, когда стартует. Срока в нём ещё нет (его ставит старт),
+ * поэтому считаем как ядро при старте: юнит — `matchUnitHours` (десант — дольший из
+ * челнока и бойца), здание — `matchBuildingHours` нужного уровня. Общий запасной путь
+ * `buildDurationHours` для старых нагрузок берёт только общий множитель часов и
+ * занижал срок юнитов вдвое. Неизвестное — `undefined`: лучше без срока, чем неверный.
+ */
+export function queuedOrderHours(
+  q: Pick<QueuedConstruction, 'kind' | 'unit' | 'troop' | 'building' | 'level'>,
+  data: GameData,
+  match: Pick<GameState, 'pricing'> = {},
+): number | undefined {
+  if (q.kind === 'unit') {
+    const def = q.unit ? data.units[q.unit] : undefined;
+    if (!def) return undefined;
+    const troop = q.troop ? data.units[q.troop] : undefined;
+    return matchUnitHours(match, Math.max(def.buildTimeHours, troop?.buildTimeHours ?? 0));
+  }
+  const def = q.building ? data.buildings[q.building] : undefined;
+  if (!def) return undefined;
+  return matchBuildingHours(match, buildingLevel(def, q.kind === 'upgrade' ? (q.level ?? 1) : 1).buildTimeHours);
 }
 
 /**

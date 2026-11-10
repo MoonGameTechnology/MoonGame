@@ -5,13 +5,14 @@ import { t } from '../../localization/runtime';
 import { data } from './gameData';
 import { displayUnit, buildingName, esc } from './format';
 import { liveTimerHtml } from './liveTimers';
-import { buildDurationHours, constructionPayload, barPct } from './buildProgress';
+import { buildDurationHours, constructionPayload, barPct, queuedOrderHours } from './buildProgress';
 import { HOUR } from './time';
 import { catalogPortraitHtml } from './shipArt';
 import { BUILD_ICON } from './icons';
 import { heroFlagshipUnit } from '../../packages/shared-core/src/state/heroFlagship';
 import { YARD_GROUND_HULLS, YARD_HULLS, YARD_SQUAD_HULLS } from './productionRoster';
 import { PRODUCTION_LANES, type ProductionLane } from '../../decisions/productionSections';
+import { laneCanResume, laneReadyTimes, laneVisibleRows } from '../../decisions/laneQueue';
 
 /** Имя линии в списке и в шапке каталога. */
 export const LANE_NAME: Record<ProductionLane, string> = {
@@ -35,15 +36,22 @@ interface LaneJob {
   label: string;
   unit?: string;
   building?: string;
-  /** Идёт: когда закончится и сколько длится (для полосы). Ждёт: нет. */
+  /** Идёт: когда закончится. Идёт и ждёт: сколько длится (полоса и срок ждущего). */
   at?: number;
   duration?: number;
   /** Атрибут кнопки отмены; пусто — отменить нельзя. */
   cancel: string;
+  /** Подпись отмены: идущий встаёт на паузу с возвратом, ждущий просто убирается. */
+  cancelTitle?: string;
 }
 
+const hoursMs = (h: number | undefined): number | undefined => (h === undefined ? undefined : h * HOUR);
+
+/** Обычный случай — один корабль — не подписан: «×N» только при N > 1. */
 const orderLabel = (o: { unit?: string; count?: number; building?: string }): string =>
-  o.unit ? `${displayUnit(o.unit)} ×${o.count ?? 1}` : buildingName(data.buildings[o.building ?? '']?.name, o.building ?? '');
+  o.unit
+    ? `${displayUnit(o.unit)}${(o.count ?? 1) > 1 ? ` ×${o.count}` : ''}`
+    : buildingName(data.buildings[o.building ?? '']?.name, o.building ?? '');
 
 /** Заказы одной линии мира: идущие (их может быть несколько у старых сохранений), ждущие
  *  в очереди и герои в мобилизации. Отдельно — заказы, поставленные на паузу. */
@@ -57,11 +65,16 @@ function laneJobs(state: GameState, world: string, lane: ProductionLane) {
     jobs.push({
       seq: -1, label: orderLabel(p), unit: p.unit, building: p.building, at: e.at,
       duration: buildDurationHours(p, data, state) * HOUR, cancel: `data-pw-cancel="${esc(String(e.seq))}"`,
+      cancelTitle: 'side.conveyor.cancel.title',
     });
   }
   for (const q of planet.buildQueue ?? []) {
     if (orderLane(data, q) !== lane) continue;
-    jobs.push({ seq: q.id, label: orderLabel(q), unit: q.unit, building: q.building, cancel: `data-pw-cancel="${esc(String(q.id))}"` });
+    jobs.push({
+      seq: q.id, label: orderLabel(q), unit: q.unit, building: q.building,
+      duration: hoursMs(queuedOrderHours(q, data, state)),
+      cancel: `data-pw-cancel="${esc(String(q.id))}"`, cancelTitle: 'side.conveyor.dequeue.title',
+    });
   }
   if (lane === 'mobilization')
     for (const h of Object.values(state.heroes ?? {})) {
@@ -70,7 +83,9 @@ function laneJobs(state: GameState, world: string, lane: ProductionLane) {
       jobs.push({
         seq: p.queued ? (p.orderId ?? 0) : -1, label: heroDisplayName(h), unit: heroFlagshipUnit(h, data),
         // Идущую мобилизацию ядро не отменяет: крестик только у ждущего героя.
-        ...(p.queued ? { cancel: `data-pw-hero-cancel="${esc(h.id)}"` } : { at: p.readyAt, cancel: '' }),
+        ...(p.queued
+          ? { cancel: `data-pw-hero-cancel="${esc(h.id)}"`, cancelTitle: 'side.conveyor.dequeue.title' }
+          : { at: p.readyAt, cancel: '' }),
       });
     }
   jobs.sort((a, b) => a.seq - b.seq);
@@ -112,21 +127,45 @@ export function productionLanesHtml(state: GameState, world: string, active: Pro
   return PRODUCTION_LANES.map((lane) => laneCard(state, world, lane, active)).join('');
 }
 
-/** Очередь открытой линии над её каталогом: каждый заказ с отменой, пауза — с «Продолжить».
- *  Заказал — тут же видишь, что он встал в линию. */
+/** Раскрыта ли очередь открытой линии; переживает перерисовки окна. */
+let stripOpen = false;
+export function toggleLaneStrip(): void {
+  stripOpen = !stripOpen;
+}
+
+/** Очередь открытой линии над её каталогом (`decisions/laneQueue.ts`): строка на заказ —
+ *  когда будет готов, отмена; приостановленный — с «Продолжить», когда линия свободна.
+ *  Длинная очередь сворачивается до идущего и «+N» со сроком всей линии. */
 export function laneStripHtml(state: GameState, world: string, lane: ProductionLane): string {
   const { jobs, paused } = laneJobs(state, world, lane);
   if (!jobs.length && !paused.length) return `<p class="pw-strip-idle">${t('production.lane.idle')}</p>`;
+  const ready = laneReadyTimes(state.time, jobs);
+  const timer = (at: number | undefined): string => (at === undefined ? '<span></span>' : liveTimerHtml(at, 'hms'));
   const rows = jobs.map(
-    (j) =>
-      `<div class="pw-job${j.at === undefined ? ' waiting' : ''}"><span class="pw-job-art">${jobArt(j)}</span><b>${esc(j.label)}</b>` +
-      `${j.at === undefined ? `<span class="pw-job-wait">${t('build.state.waiting')}</span>` : liveTimerHtml(j.at, 'hms')}` +
-      `${j.cancel ? `<button class="btn-x" ${j.cancel} aria-label="${t('side.conveyor.cancel.title')}">×</button>` : ''}` +
+    (j, i) =>
+      `<div class="pw-job${j.at === undefined ? ' waiting' : j.duration ? ' run' : ''}"><span class="pw-job-art">${jobArt(j)}</span><b>${esc(j.label)}</b>` +
+      timer(ready[i]) +
+      (j.cancel ? `<button class="btn-x" ${j.cancel} aria-label="${t(j.cancelTitle ?? 'side.conveyor.cancel.title')}" title="${t(j.cancelTitle ?? 'side.conveyor.cancel.title')}">×</button>` : '<span></span>') +
       `${j.at !== undefined && j.duration ? `<progress max="100" value="${barPct(j.at, j.duration, state.time)}"></progress>` : ''}</div>`,
   );
+  const canResume = laneCanResume(jobs);
+  const resumeTitle = t(canResume ? 'side.conveyor.resume.title' : 'err.lane-busy');
   const resume = paused.map(
     (p) =>
-      `<button class="pw-paused" data-pw-resume="${esc(String(p.id))}">${t('side.conveyor.resume.title')} · ${esc(p.unit ? displayUnit(p.unit) : buildingName(data.buildings[p.building ?? '']?.name, p.building ?? ''))} · ${Math.round(p.progress * 100)}%</button>`,
+      `<div class="pw-job paused"><span class="pw-job-art">${jobArt(p)}</span><b>${esc(orderLabel(p))}</b>` +
+      `<span class="pw-job-pct">${t('side.conveyor.paused', { n: Math.round(p.progress * 100) })}</span>` +
+      `<button class="pw-paused" data-pw-resume="${esc(String(p.id))}"${canResume ? '' : ' disabled'} aria-label="${resumeTitle}" title="${resumeTitle}">▶</button></div>`,
   );
-  return rows.join('') + resume.join('');
+  const all = [...rows, ...resume];
+  const shown = laneVisibleRows(all.length, stripOpen);
+  if (shown === all.length && all.length <= 2) return all.join('');
+  const hide = (row: string): string => row.replace('<div class="pw-job', '<div hidden class="pw-job');
+  const last = ready.length ? ready[ready.length - 1] : undefined;
+  const toggle =
+    `<button class="pw-strip-more" data-pw-strip-more aria-expanded="${stripOpen}">` +
+    (stripOpen
+      ? `${t('production.queue.less')} ▴`
+      : `<b>${t('production.queue.more', { n: all.length - 1 })}</b>${last === undefined ? '' : liveTimerHtml(last, 'hms')} ▾`) +
+    `</button>`;
+  return all.map((row, i) => (i < shown ? row : hide(row))).join('') + toggle;
 }
