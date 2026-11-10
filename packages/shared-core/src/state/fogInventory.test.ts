@@ -53,6 +53,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   pve: 'public',
   version: 'public',
   mapId: 'public', // правила матча — общий факт
+  mapEdge: 'public', // форма края карты — геометрия, которую и так видит каждый
   // BRW-0: режим — тот же класс факта, что и карта, и прятать его не от кого. Он уже
   // публичен ДО входа: строка браузера партий показывает его каждому, кто смотрит ленту
   // (`MatchSummary.modeId`), — снимать его в проекции значило бы скрыть от игрока за
@@ -224,6 +225,7 @@ function maximalState(): GameState {
   return {
     ...base,
     mapId: 'frontier-100',
+    mapEdge: 'hull',
     modeId: 'pve_waves',
     sight: { world: 330, fleet: 90, radarScale: 2.5 },
     techRules: { dayGates: false, exclude: ['ai_stewardship'] },

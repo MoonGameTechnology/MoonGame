@@ -60,10 +60,14 @@ const SPLIT_FLEET_CAP = 6;
  * который этим десантом наверняка не взять, весит в пять раз меньше: лететь к нему —
  * значит встать на орбите и ждать.
  */
-export function huntWeight(target: Planet, landing: readonly UnitStack[]): number {
+export function huntWeight(
+  target: Planet,
+  landing: readonly UnitStack[],
+  garrison: readonly UnitStack[] = target.garrison,
+): number {
   let w = Math.min(5, Math.max(1, provinceScore(data, target) / 10));
-  const guarded = target.garrison.some((st) => st.count > 0);
-  if (guarded && !confidentGroundWin(landing, target.garrison, data)) w /= 5;
+  const guarded = garrison.some((st) => st.count > 0);
+  if (guarded && !confidentGroundWin(landing, garrison, data)) w /= 5;
   return w;
 }
 
@@ -81,8 +85,9 @@ export const RETAKE_WEIGHT = 3;
 export function retakeWeight(bot: AiTurn, f: Fleet, from: string, target: Planet): number {
   const held = target.integration;
   if (!bot.claims.has(target.id) || !held) return 1;
-  const guarded = target.garrison.some((st) => st.count > 0);
-  if (guarded && !confidentGroundWin(f.landing ?? [], target.garrison, data)) return 1;
+  const garrison = bot.seenGarrison(target);
+  const guarded = garrison.some((st) => st.count > 0);
+  if (guarded && !confidentGroundWin(f.landing ?? [], garrison, data)) return 1;
   const left = (INTEGRATION_HOURS * (held.until - bot.state.time)) / (held.until - held.since);
   const eta = estimateTravelHours(bot.state, ctx(bot.state.time, bot.state), from, target.id, f);
   return eta !== null && eta < left ? RETAKE_WEIGHT : 1;
@@ -298,7 +303,7 @@ function fleetOrders(bot: AiTurn, f: Fleet): void {
   // Охота отстающего — у обоих профилей обычного места (игровой бот, 2026-09-28).
   const hunting = skilled && warFooting && trailing;
   const weight = (p: Planet): number =>
-    (hunting ? huntWeight(p, f.landing ?? []) : 1) *
+    (hunting ? huntWeight(p, f.landing ?? [], bot.seenGarrison(p)) : 1) *
     (skilled ? retakeWeight(bot, f, here.id, p) : 1);
   for (const p of Object.values(state.planets)) {
     if (p.id === here.id || p.owner === ai || !capturable(p)) continue;
@@ -308,8 +313,8 @@ function fleetOrders(bot: AiTurn, f: Fleet): void {
     // выбирают, иначе флот повиснет на её орбите до конца матча.
     if (
       p.owner === null &&
-      p.garrison.some((st) => st.count > 0) &&
-      !confidentGroundWin(f.landing ?? [], p.garrison, data)
+      bot.seenGarrison(p).some((st) => st.count > 0) &&
+      !confidentGroundWin(f.landing ?? [], bot.seenGarrison(p), data)
     )
       continue;
     // Равные цели (в пределах пикселя) разводятся шумом, а не порядком перебора.
@@ -389,7 +394,7 @@ function fleetOrders(bot: AiTurn, f: Fleet): void {
     const needy = neediestWorld(here.position);
     if (needy && needy.id !== here.id) {
       const closer = d(here.position, needy.position) < d(here.position, best.position);
-      if (closer || !confidentGroundWin(f.landing ?? [], best.garrison, data)) best = needy;
+      if (closer || !confidentGroundWin(f.landing ?? [], bot.seenGarrison(best), data)) best = needy;
     }
   }
   // Взять нечего тем, что в трюме, — домой, за десантом.
@@ -462,7 +467,7 @@ function landingOrders(bot: AiTurn, f: Fleet, at: string, base: Planet): boolean
         const left = carried.map((st) =>
           st.unit === give.unit ? { ...st, count: st.count - give.count } : { ...st },
         );
-        if (target && !confidentGroundWin(left, target.garrison, data)) break;
+        if (target && !confidentGroundWin(left, bot.seenGarrison(target), data)) break;
         out.push(unloadArmy(ai, f.id, give.unit, give.count));
         gave = true;
       }

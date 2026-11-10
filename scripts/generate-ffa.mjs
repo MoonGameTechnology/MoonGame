@@ -211,6 +211,9 @@ function rngFrom(seed) {
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const pos = (s) => [s.position.x, s.position.y];
 
+/** A map's identity and edge; no `edge` — the bounding rectangle. */
+const headOf = (cfg) => ({ id: cfg.id, seed: cfg.seed, edge: cfg.edge });
+
 /**
  * The board's outline. `ellipse` (default): an ellipse with a wavy rim — space has no straight
  * edges (M2.9). `square`: a square of the same area, filled to its corners, so the rectangle
@@ -605,7 +608,7 @@ function generate(seats, cfg) {
       .sort((p, q) => rimOf(p) - rimOf(q)),
   ];
   const edgesOf = () => {
-    const map = core.parseMatchMap({ id: cfg.id, seed: cfg.seed, sectors, players, slots, fleets });
+    const map = core.parseMatchMap({ ...headOf(cfg), sectors, players, slots, fleets });
     return core.matchMapEdges(map, data);
   };
   let rimLeft = cfg.rimRifts,
@@ -621,7 +624,7 @@ function generate(seats, cfg) {
       continue;
     const before = { ...sectors[sid] };
     set(sid, { kind: 'rift', terrain: 'empty_space' });
-    const map = core.parseMatchMap({ id: cfg.id, seed: cfg.seed, sectors, players, slots, fleets });
+    const map = core.parseMatchMap({ ...headOf(cfg), sectors, players, slots, fleets });
     if (
       core
         .validateMatchMap(map, data)
@@ -847,6 +850,7 @@ function finish(seats, cfg, g) {
   const content = {
     id: cfg.id,
     seed: cfg.seed,
+    edge: cfg.edge, // undefined on ffa-20: JSON.stringify leaves the key out
     sectors,
     regions,
     players,
