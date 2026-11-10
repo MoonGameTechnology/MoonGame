@@ -83,6 +83,7 @@ export function splitGuardXp(total: number, guardXp: readonly number[]): number[
     out[guard] = q;
     given += q;
   });
-  out[rank[0]!] += quarters - given;
+  const top = rank[0]!;
+  out[top] = (out[top] ?? 0) + quarters - given;
   return out.map((q) => q / 4);
 }
