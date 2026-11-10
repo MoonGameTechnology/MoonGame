@@ -4480,7 +4480,6 @@ export const pl: Record<string, string> = {
   'side.world.rally.clear': 'Usuń punkt zborny',
   'side.world.production': 'Wytwarzanie: +{p}/t',
   'side.world.spy-window': 'Okno wywiadowcze aktywne',
-  'side.world.spy-menu': '🕵 Szpiegostwo',
   'side.world.spy-window.left': 'jeszcze {left}',
   'side.world.spy-layer': '🕵 Wywiad: poziom {n} z 4',
   'side.world.disrupted': '📉 Paraliż gospodarki: wydobycie −25%, jeszcze {left}',

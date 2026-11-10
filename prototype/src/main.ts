@@ -47,13 +47,10 @@ import {
   openDiplo,
   openPlayerCard,
   openSeatCard,
-  refreshIntelTab,
   spyWindow,
   renderDiplo,
   renderDiploFeed,
-  restoreSpyArchive,
   seatBadge,
-  spyArchive,
   worldsOf,
 } from './diploWindow';
 import { closeCoalitions, coalOpen, initCoalitionWindow, syncCoalitions } from './coalitionWindow';
@@ -3357,7 +3354,7 @@ function soloSaveHost(): Omit<SoloSave, 'state'> {
     normalSpeed: Number($('spd-play').dataset.speed) / PLAY_BASE,
     fastSpeed: Number($('spd-fast').dataset.speed) / PLAY_BASE,
     autoAssault: [...soloAutoAssault], memory: memory.dump(),
-    spyArchive: spyArchive(),
+    spyArchive: spyWindow.archive(),
   };
 }
 initSoloCheckpoint({
@@ -3379,7 +3376,7 @@ initSoloCheckpoint({
     installMatch(save.state, new Map(save.ai), save.state.modeId);
     restoreAutoAssault(save.autoAssault);
     restoreFogMemory(save.memory);
-    restoreSpyArchive(save.spyArchive);
+    spyWindow.restore(save.spyArchive);
     applyTimeSpeed(save.normalSpeed, save.fastSpeed);
     speed = 0;
     for (const x of Array.from(document.querySelectorAll('[data-speed]')))
@@ -3833,7 +3830,7 @@ function frame(nowReal: number, nativeGap: number) {
   }
   if (repaintDue(spyWindow.live(), nowReal, lastIntelAt, INTEL_MS)) {
     lastIntelAt = nowReal;
-    refreshIntelTab();
+    spyWindow.refresh();
   }
 }
 

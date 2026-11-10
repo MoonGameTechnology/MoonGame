@@ -291,6 +291,9 @@ export const spyWindow = {
   pickOpen: () => step.kind === 'pick',
   winOpen: () => step.kind === 'roster' || step.kind === 'tasks',
   close: () => closeSpyWindow(),
+  refresh: () => refreshSpyWindow(),
+  archive: () => spyArchive(),
+  restore: (records?: readonly SpyRecord[]) => restoreSpyArchive(records),
 };
 
 /** Перерисовка по таймеру (`liveWindows.ts`): пересборка только при перемене. */
