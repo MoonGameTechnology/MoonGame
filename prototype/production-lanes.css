@@ -4,8 +4,17 @@
 html body #constructor.pw-production .cnbox:not(.pw-cat-open) { width:min(440px, calc(100vw - 24px)); }
 #constructor.pw-production .cnbox > .pw-context { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; padding:0; }
 #constructor.pw-production .cnbox > .pw-context .pw-stock { flex:1 1 100%; }
-#constructor.pw-production .cnbox > .pw-context .cn-plan { flex:0 0 auto; width:auto; max-width:160px; min-height:36px; margin:0; }
-#constructor.pw-production .cnbox > .pw-context .pw-income { flex:1 1 0; min-width:0; }
+/* Шапка: название, выбор мира рядом с ним, ✕ справа. Запас ресурсов на ПК уже в верхней
+   панели игры — в окне он только на телефоне, где панели нет. */
+#constructor.pw-production .cnbox > .cn-head > b { flex:none; }
+#constructor.pw-production .cn-head .pw-world { display:flex; align-items:center; gap:6px; min-width:0; margin-right:auto; }
+#constructor.pw-production .cn-head .cn-plan { width:auto; max-width:190px; min-height:36px; margin:0; }
+#constructor.pw-production .cn-head .pw-idle-dot { flex:none; width:8px; height:8px; border-radius:50%; background:#e2b45c; box-shadow:0 0 6px #e2b45c99; }
+body:not(.mobile-ui) #constructor.pw-production .cnbox > .pw-context .pw-stock { display:none; }
+/* Доход мира — одна строка: подпись, затем числа. */
+#constructor.pw-production .cnbox > .pw-context .pw-income { display:flex; flex:1 1 100%; align-items:center; gap:4px 12px; min-height:32px; min-width:0; padding:4px 8px; }
+#constructor.pw-production .cnbox > .pw-context .pw-income-label { flex:none; gap:4px; }
+#constructor.pw-production .cnbox > .pw-context .pw-income-values { display:flex; flex:1 1 auto; flex-wrap:wrap; justify-content:flex-start; gap:2px 12px; padding:0; }
 #constructor.pw-production .cnbox .pw-work { flex:1 1 auto; min-height:0; display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
 #constructor.pw-production .cnbox.pw-cat-open .pw-work { grid-template-columns:270px minmax(0,1fr); }
 #constructor.pw-production .pw-lane-pane { display:flex; flex-direction:column; gap:8px; min-height:0; overflow:auto; overscroll-behavior:contain; }
