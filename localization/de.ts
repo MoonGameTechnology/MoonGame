@@ -3573,6 +3573,7 @@ export const de: Record<string, string> = {
   'log.fleet.launched': '🚀 {who} startete eine Flotte · {at}',
   'log.fleet.merged': '⛬ Flotten zusammengelegt · {at}',
   'log.fleet.split': '⊟ Flotte aufgeteilt · {at}',
+  'log.fleet.merge-queued': '⛬ {n} {n|Flotte|Flotten} auf dem Weg zur Zusammenlegung',
   'log.fleet.split-transit': '⊟ Flotte unterwegs aufgeteilt',
   'loadprompt.title': 'Truppen werden verladen',
   'loadprompt.body': 'Verladung oder Entladung läuft bei {n} {n|Flotte|Flotten}, noch ≈{m} Min. Der Abflug bricht dies ab.',

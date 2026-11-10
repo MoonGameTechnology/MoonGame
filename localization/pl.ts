@@ -3576,6 +3576,7 @@ export const pl: Record<string, string> = {
   'log.fleet.launched': '🚀 {who} wysłał flotę · {at}',
   'log.fleet.merged': '⛬ połączono floty · {at}',
   'log.fleet.split': '⊟ rozdzielono flotę · {at}',
+  'log.fleet.merge-queued': '⛬ {n} {n|flota leci|floty lecą|flot leci} na połączenie',
   'log.fleet.split-transit': '⊟ flota rozdzielona w locie',
   'loadprompt.title': 'Trwa załadunek desantu',
   'loadprompt.body': 'Załadunek lub wyładunek trwa w {n} {n|flocie|flotach|flotach}, pozostało ≈{m} min. Odlot go anuluje.',

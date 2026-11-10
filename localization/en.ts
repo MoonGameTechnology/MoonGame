@@ -4129,6 +4129,7 @@ export const en: Record<string, string> = {
   'log.fleet.launched': '🚀 {who} launched a fleet from {at}',
   'log.fleet.merged': '⛬ fleets merged at {at}',
   'log.fleet.split': '⊟ fleet split at {at}',
+  'log.fleet.merge-queued': '⛬ {n} {n|fleet|fleets} en route to merge',
   'log.fleet.split-transit': '⊟ fleet split under way',
   // AUDM-4: the fleet left before loading finished — the troops stayed in the garrison.
   'loadprompt.title': 'Troops are loading',
