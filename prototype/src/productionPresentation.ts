@@ -35,6 +35,8 @@ function topProductionDetails(root: HTMLElement): HTMLDetailsElement | null {
 export function closeProductionOverlay(root: HTMLElement): boolean {
   if (root.nodeType !== 1) return false;
   if (closeTemplateDialog(root)) return true;
+  const nodeCard = root.querySelector<HTMLElement>('.hx-tmodal [data-hdclose]');
+  if (nodeCard) { nodeCard.click(); return true; }
   const templates = root.querySelector<HTMLElement>('.pw-template-picker [data-cntpl]');
   if (templates) { templates.click(); return true; }
   const details = topProductionDetails(root);

@@ -58,3 +58,30 @@ html body #constructor.pw-production .cnbox:not(.pw-cat-open) { width:min(440px,
   #constructor.pw-production .pw-cat-head > .pw-lane-back { display:inline-grid; place-items:center; }
   #constructor.pw-production .pw-cat-head > .pw-cat-close { display:none; }
 }
+/* «Развитие» героя плитками: на плитке только знак узла и цена, описание — окном поверх. */
+#constructor.pw-production #herobody .hx-rail { display:grid; gap:6px; }
+#constructor.pw-production #herobody .hx-rhd { margin:0; }
+#constructor.pw-production #herobody .hx-rhd .hx-rn { margin-left:auto; color:var(--dim); font-variant-numeric:tabular-nums; }
+#constructor.pw-production #herobody .hx-from { margin:0 0 -2px 4px; font-size:11px; color:var(--dim); }
+#constructor.pw-production #herobody .hx-trow { display:flex; align-items:stretch; gap:4px; overflow-x:auto; padding-bottom:2px; scrollbar-width:thin; }
+#constructor.pw-production #herobody .hx-tar { flex:none; align-self:center; color:#3f7380; font-size:13px; }
+#constructor.pw-production #herobody .hx-tile { position:relative; flex:none; display:grid; justify-items:center; align-content:center; gap:4px; min-width:66px; min-height:66px; margin:0; padding:9px 6px 7px; border:1px solid #2b6170; border-radius:9px; background:#0e2830; color:#dcf0f4; font:inherit; cursor:pointer; }
+#constructor.pw-production #herobody .hx-tile .hero-pictogram { display:grid; place-items:center; width:32px; height:32px; }
+#constructor.pw-production #herobody .hx-tile .hero-pictogram svg { width:30px; height:30px; }
+#constructor.pw-production #herobody .hx-tf { display:flex; gap:4px; font-size:11px; white-space:nowrap; }
+#constructor.pw-production #herobody .hx-tile.owned { border-color:#4fbf86; background:#0e2e27; }
+#constructor.pw-production #herobody .hx-tile.owned .hx-tf { color:#7bdc9e; }
+#constructor.pw-production #herobody .hx-tile.avail { border-color:var(--cyan); box-shadow:0 0 0 1px rgba(53,214,230,.35) inset; }
+#constructor.pw-production #herobody .hx-rail.ps .hx-tile.avail { border-color:var(--hx-ps); box-shadow:0 0 0 1px rgba(185,140,255,.35) inset; }
+#constructor.pw-production #herobody .hx-tile.locked { opacity:.55; border-style:dashed; }
+#constructor.pw-production #herobody .hx-tile:focus-visible { outline:2px solid var(--cyan); outline-offset:1px; }
+#constructor.pw-production #herobody .hx-tk { position:absolute; top:4px; right:5px; font-size:10px; color:#c0a3f1; }
+#constructor.pw-production #herobody .hx-tl { position:absolute; top:3px; left:4px; font-size:10px; }
+#constructor.pw-production #herobody .hx-tmodal { position:fixed; inset:0; z-index:8; display:flex; align-items:center; justify-content:center; padding:12px; background:#020a10db; }
+#constructor.pw-production #herobody .hx-dossier { display:grid; gap:8px; width:min(360px,100%); max-height:100%; overflow:auto; margin:0; padding:14px 16px; border:1px solid #376270; border-radius:12px; background:#0b202d; box-shadow:0 18px 50px #000b; }
+#constructor.pw-production #herobody .hx-dossier .hx-dh .hero-pictogram { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:8px; background:#123540; }
+#constructor.pw-production #herobody .hx-dossier .hx-dh .hero-pictogram svg { width:30px; height:30px; }
+#constructor.pw-production #herobody .hx-dossier .hx-dx { width:32px; height:32px; }
+#constructor.pw-production #herobody .hx-ddesc { margin:0; font-size:13px; line-height:1.45; color:#cfe6eb; }
+#constructor.pw-production #herobody .hx-dossier .hx-give { margin:0; }
+#constructor.pw-production #herobody .hx-dossier .hx-dbtn { min-height:40px; }

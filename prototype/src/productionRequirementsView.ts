@@ -28,7 +28,7 @@ export function productionRequirementsHtml(
     const price = kind === 'unit' && data.units[id]
       ? completedUnitSpend(state, { unit: id, count: 1, modules: [] })
       : def && level < buildingMaxLevel(def) ? matchCost(state, buildingLevel(def, level + 1).cost) : {};
-    const shortage = Object.fromEntries(Object.entries(price).map(([r,n]) => [r, n - (state.players[me]?.resources[r] ?? 0)]).filter(([,n]) => Number(n) > 0));
+    const shortage = Object.fromEntries(Object.entries(price).map(([r,n]) => [r, Math.ceil(n - (state.players[me]?.resources[r] ?? 0))]).filter(([,n]) => Number(n) > 0));
     if (Object.keys(shortage).length) resources = `<div class="pw-requirement-row"><span>${t('production.resources-required')} ${cost(shortage)}</span><button data-pw-income="${esc(world)}">${t('production.planet-income')} ›</button></div>`;
   }
   const arsenal = state.players[me]?.arsenal;

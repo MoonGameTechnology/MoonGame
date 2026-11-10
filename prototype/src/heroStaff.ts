@@ -2,6 +2,7 @@ import { productionHeroLayout, skillInformation, moduleInformation, productionHe
 import { effectChip } from './moduleEffect';
 import { canInstall } from '../../packages/shared-core/src/util/fitting';
 import { heroPictogram } from './heroPictograms';
+import { heroTreeRows } from '../../decisions/heroTreeRows';
 import { moduleIcon } from './moduleIcons';
 import { heroFlagshipHtml, retainedHeroModules } from './heroFlagshipView';
 import { selectHeroFlagship } from '../../decisions/actions';
@@ -234,7 +235,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     `</div>`;
 
 
-  const body = view.tab === 'tree' ? heroTreeHtml(hero, res)
+  const body = view.tab === 'tree' ? heroTreeHtml(hero)
     : view.tab === 'ship' ? heroFlagshipHtml(state, hero, view.flagship) + heroShipHtml(hero, state.players[hero.owner]?.arsenal) : '';
 
 
@@ -242,118 +243,48 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
   return productionHeroLayout(chips, ident + summary, heroAbilitiesHtml(hero, state.time, view.tab === 'abilities'), view.tab, body, heroOverviewHtml(hero, state.time, fleet), dossier, deploy);
 }
 
-/**
- * Глубина узла в цепочке `requires` — длина САМОГО ДЛИННОГО пути до корня.
- *
- * По ней рейка и упорядочивается: игрок читает ветку сверху вниз в том порядке, в
- * котором её и качают. Сортировать по ЧИСЛУ родителей (как было) нельзя: у всей
- * цепочки коридора по одному родителю, поэтому дальше вступал алфавит и «Общий
- * коридор» (`corridor_open`) всплывал выше «Разогнанного шлема», который ему дед.
- *
- * `seen` — защита от цикла в данных: каталог редактируется руками, а зациклённый
- * `requires` иначе увёл бы рендер в бесконечную рекурсию. Цикл считается корнем
- * (глубина 0) — узел просто встанет наверх, но UI не повесится.
- */
-export function nodeDepth(
-  id: string,
-  trees: Record<string, { requires: readonly string[] } | undefined>,
-  seen: ReadonlySet<string> = new Set(),
-): number {
-  const node = trees[id];
-  if (!node || node.requires.length === 0 || seen.has(id)) return 0;
-  const next = new Set([...seen, id]);
-  return 1 + Math.max(...node.requires.map((r) => nodeDepth(r, trees, next)));
-}
-
-/** The skill tree tab — the hero's own rail (own-branch nodes + branch-less «common»
- *  nodes any hero may take) plus a dimmed rail per foreign branch; nodes ordered
- *  roots-first with a prereq connector; tap an own, un-owned node → dossier. */
-function heroTreeHtml(hero: HeroInst, res: Bag): string {
+/** The skill tree tab as tiles (production window mockup, 2026-11-09): one rail per branch —
+ *  the hero's own (own-branch + branch-less common nodes) first, foreign branches dimmed.
+ *  A rail is rows of chains (`heroTreeRows`); a tile carries only the pictogram and the
+ *  price (✓ when learned, 🔒 when a prerequisite is missing, ◆ when it grants an ability).
+ *  Any tile opens the description overlay — the purchase lives there. */
+function heroTreeHtml(hero: HeroInst): string {
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
   // Изученное — купленное И врождённое (AUD-22): тот же набор, по которому судит ядро.
   const known = knownSkillNodes(hero.skills ?? [], hero.archetype, data);
   const entries = Object.entries(data.heroSkillTrees);
   const ownBranch = def?.branch;
-  // The hero's rail carries own-branch AND branch-less common nodes (both unlockable),
-  // so the tree membership matches heroOverviewHtml's node count. Foreign branches get a
-  // dimmed reference rail.
   const ownNodes = entries.filter(([, n]) => n.branch === ownBranch || n.branch === undefined);
   const foreignBranches = Array.from(
-    new Set(
-      entries
-        .map(([, n]) => n.branch)
-        .filter((b): b is NonNullable<typeof b> => b !== undefined && b !== ownBranch),
-    ),
+    new Set(entries.map(([, n]) => n.branch).filter((b): b is NonNullable<typeof b> => b !== undefined && b !== ownBranch)),
   ).sort();
   const rails: Array<{ label: string; own: boolean; ps: boolean; nodes: typeof entries }> = [];
-  if (ownNodes.length) {
-    rails.push({
-      label: ownBranch ? (HERO_BRANCH_RU[ownBranch] ?? ownBranch) : 'hero.branch.common',
-      own: true,
-      ps: ownBranch === 'psionic',
-      nodes: ownNodes,
-    });
-  }
-  for (const br of foreignBranches) {
-    rails.push({
-      label: HERO_BRANCH_RU[br] ?? br,
-      own: false,
-      ps: br === 'psionic',
-      nodes: entries.filter(([, n]) => n.branch === br),
-    });
-  }
+  if (ownNodes.length)
+    rails.push({ label: ownBranch ? (HERO_BRANCH_RU[ownBranch] ?? ownBranch) : 'hero.branch.common', own: true, ps: ownBranch === 'psionic', nodes: ownNodes });
+  for (const br of foreignBranches)
+    rails.push({ label: HERO_BRANCH_RU[br] ?? br, own: false, ps: br === 'psionic', nodes: entries.filter(([, n]) => n.branch === br) });
   if (!rails.length) return `<div class="hx-note">${t('hero.tree.empty')}</div>`;
+  const tile = (id: string, own: boolean): string => {
+    const nd = data.heroSkillTrees[id]!;
+    const owned = known.has(id);
+    const state = !own ? 'foreign' : owned ? 'owned' : nd.requires.every((r) => known.has(r)) ? 'avail' : 'locked';
+    const name = esc(tData(nd.name));
+    return `<button type="button" class="hx-tile ${state}" data-hnode="${id}" title="${name}" aria-label="${name}">` +
+      (nd.grants.ability ? `<span class="hx-tk" aria-hidden="true">◆</span>` : '') +
+      (state === 'locked' ? `<span class="hx-tl" aria-hidden="true">🔒</span>` : '') +
+      `${heroPictogram('skills', id)}<span class="hx-tf">${owned ? '✓' : cost(nd.cost)}</span></button>`;
+  };
   let html = `<div class="hx-tree ha-tree">`;
   for (const rail of rails) {
-    const rn = rail.nodes
-      .slice()
-      .sort(
-        (a, b) =>
-          nodeDepth(a[0], data.heroSkillTrees) - nodeDepth(b[0], data.heroSkillTrees) ||
-          a[0].localeCompare(b[0]),
-      );
+    const done = rail.nodes.filter(([id]) => known.has(id)).length;
     html +=
       `<div class="hx-rail${rail.own ? '' : ' foreign'}${rail.ps ? ' ps' : ''}">` +
       `<div class="hx-rhd"><span class="hx-dot"></span>${esc(t(rail.label))}` +
-      (rail.own ? '' : `<span class="hx-ftag">${t('hero.tree.not-your-branch')}</span>`) +
+      (rail.own ? `<span class="hx-rn">${done}/${rail.nodes.length}</span>` : `<span class="hx-ftag">${t('hero.tree.not-your-branch')}</span>`) +
       `</div>`;
-    for (const [nid, nd] of rn) {
-      const owned = known.has(nid);
-      const reqMet = nd.requires.every((r) => known.has(r));
-      let cls = 'hx-node';
-      let crest: string;
-      let foot: string;
-      if (!rail.own) {
-        cls += ' foreignn';
-        crest = '·';
-        foot = `<span class="hx-st">${t('hero.tree.other-branch')}</span>`;
-      } else if (owned) {
-        cls += ' owned';
-        crest = '✓';
-        foot = `<span class="hx-st on">✓ ${t('hero.tree.unlocked')}</span>`;
-      } else if (!reqMet) {
-        cls += ' locked';
-        crest = '🔒';
-        const need = esc(nd.requires.map((r) => tData(data.heroSkillTrees[r]?.name ?? r)).join(', '));
-        foot = `<span class="hx-st">${t('hero.tree.needs', { n: need })}</span>`;
-      } else {
-        cls += ' avail';
-        crest = '◆';
-        foot = `<span class="hx-cost">${cost(nd.cost, res)}</span>`;
-      }
-      const conn = nd.requires.length
-        ? `<span class="hx-conn${rail.own && reqMet ? ' lit' : ''}"></span>`
-        : '';
-      const grant = nd.grants.ability
-        ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
-        : nd.grants.passive
-          ? `<span class="hx-g pa">${t('hero.tree.passive')}</span>`
-          : '';
-      const tap = rail.own && !owned ? ` data-hnode="${nid}"` : '';
-      html +=
-        `<button type="button" class="${cls}"${tap}${tap ? '' : ' disabled'}>${conn}<div class="hx-nn"><span class="hx-crest">${crest}</span>${heroPictogram('skills', nid)}${esc(tData(nd.name))}</div>` +
-        `<div class="hx-nd">${esc(t(nd.description ?? ''))}</div>` +
-        `<div class="hx-nf">${grant}${foot}</div></button>`;
+    for (const row of heroTreeRows(Object.fromEntries(rail.nodes))) {
+      if (row.from) html += `<div class="hx-from">↳ ${esc(t('hero.tree.branch-from', { n: tData(data.heroSkillTrees[row.from]?.name ?? row.from) }))}</div>`;
+      html += `<div class="hx-trow">${row.items.map((id) => tile(id, rail.own)).join('<span class="hx-tar" aria-hidden="true">›</span>')}</div>`;
     }
     html += `</div>`;
   }
@@ -648,55 +579,47 @@ function heroOverviewHtml(hero: HeroInst, now: number, fleet?: GameState['fleets
   return html;
 }
 
-/** The dossier card — what the tapped skill node grants, its prereqs and price, and the
- *  commit button («Изучить»). Modules need no such card: installing one is reversible,
- *  so it commits straight from the pool row — a permanent choice earned the extra tap,
- *  a reversible one does not. */
+/** The description overlay of a tapped tile (production window mockup, 2026-11-09): what
+ *  the node grants, what it requires and opens, its price and the commit button
+ *  («Изучить»). Modules need no such card: installing one is reversible, so it commits
+ *  straight from the pool row — a permanent choice earned the extra tap. */
 function heroDossierHtml(hero: HeroInst, dossier: string, res: Bag): string {
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const dead = hero.alive === false;
   const sep = dossier.indexOf(':');
-  const kind = dossier.slice(0, sep);
   const id = dossier.slice(sep + 1);
-  const close = `<button class="hx-dx btn-x" data-hdclose>✕</button>`;
-  if (kind === 'node') {
-    const nd = data.heroSkillTrees[id];
-    if (!nd) return '';
-    const known = knownSkillNodes(hero.skills ?? [], hero.archetype, data);
-    const gAb = nd.grants.ability ? data.heroAbilities[nd.grants.ability] : undefined;
-    const give = gAb
-      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(tData(gAb.name))}${(gAb.range ?? 0) > 0 ? ` · ${t('hero.tree.range', { r: gAb.range })}` : ''}${gAb.cooldownHours ? ` · ${t('hero.tree.cooldown', { h: gAb.cooldownHours })}` : ''}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
-      : nd.grants.passive
-        ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(nd.grants.passive))}</div>`
-        : '';
-    const branchOk = nd.branch === undefined || nd.branch === def?.branch;
-    const reqMet = nd.requires.every((r) => known.has(r));
-    const owned = known.has(id);
-    const reqHtml = nd.requires
-      .map(
-        (r) =>
-          `<span class="${known.has(r) ? 'hx-ok' : 'hx-no'}">${known.has(r) ? '✓' : '✗'} ${esc(tData(data.heroSkillTrees[r]?.name ?? r))}</span>`,
-      )
-      .join(' ');
-    const canBuy = branchOk && reqMet && !owned && affordable(res, nd.cost) && !dead;
-    const btn = owned
-      ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('hero.tree.unlocked')}</span></div>`
-      : !branchOk
-        ? `<div class="hx-drow"><span class="hx-no">${t('hero.tree.other-branch')}</span></div>`
-        : `<button class="hx-dbtn btn-main" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${cost(nd.cost, res)}</button>`;
-    return (
-      `<div class="hx-dossier">` +
-      `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(tData(nd.name))}</span>${close}</div>` +
-      (give ? `<div class="hx-give">${give}</div>` : '') +
-      (reqHtml
-        ? `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.requires')}</span><span class="hx-dv">${reqHtml}</span></div>`
-        : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(nd.cost, res)}</span></div>` +
-      btn +
-      `</div>`
-    );
-  }
-  return '';
+  const nd = dossier.slice(0, sep) === 'node' ? data.heroSkillTrees[id] : undefined;
+  if (!nd) return '';
+  const known = knownSkillNodes(hero.skills ?? [], hero.archetype, data);
+  const name = (r: string): string => esc(tData(data.heroSkillTrees[r]?.name ?? r));
+  const gAb = nd.grants.ability ? data.heroAbilities[nd.grants.ability] : undefined;
+  const give = gAb
+    ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(tData(gAb.name))}${(gAb.range ?? 0) > 0 ? ` · ${t('hero.tree.range', { r: gAb.range })}` : ''}${gAb.cooldownHours ? ` · ${t('hero.tree.cooldown', { h: gAb.cooldownHours })}` : ''}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
+    : nd.grants.passive
+      ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(nd.grants.passive))}</div>`
+      : '';
+  const branchOk = nd.branch === undefined || nd.branch === def?.branch;
+  const owned = known.has(id);
+  const canBuy = branchOk && nd.requires.every((r) => known.has(r)) && !owned && affordable(res, nd.cost) && hero.alive !== false;
+  const reqHtml = nd.requires.map((r) => `<span class="${known.has(r) ? 'hx-ok' : 'hx-no'}">${known.has(r) ? '✓' : '✗'} ${name(r)}</span>`).join(' ');
+  const opens = Object.entries(data.heroSkillTrees).filter(([, n]) => n.requires.includes(id)).map(([k]) => name(k)).join(', ');
+  const row = (key: string, value: string): string => `<div class="hx-drow"><span class="hx-dk">${t(key)}</span><span class="hx-dv">${value}</span></div>`;
+  const btn = owned
+    ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('hero.tree.unlocked')}</span></div>`
+    : !branchOk
+      ? `<div class="hx-drow"><span class="hx-no">${t('hero.tree.other-branch')}</span></div>`
+      : `<button class="hx-dbtn btn-main" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')}</button>`;
+  const kind = nd.grants.ability ? 'hero.tree.ability' : nd.grants.passive || nd.grants.passives ? 'hero.tree.passive' : '';
+  return (
+    `<div class="hx-tmodal" data-hdback><div class="hx-dossier" role="dialog" aria-modal="true" aria-label="${name(id)}">` +
+    `<div class="hx-dh">${heroPictogram('skills', id)}<span class="hx-dnm">${name(id)}${kind ? `<small>${t(kind)}</small>` : ''}</span><button class="hx-dx btn-x" data-hdclose aria-label="${t('hero.tree.close')}">✕</button></div>` +
+    (nd.description ? `<p class="hx-ddesc">${esc(t(nd.description))}</p>` : '') +
+    (give ? `<div class="hx-give">${give}</div>` : '') +
+    (reqHtml ? row('hero.tree.requires', reqHtml) : '') +
+    (opens ? row('hero.tree.opens', opens) : '') +
+    (owned ? '' : row('hero.tree.cost', `<span class="hx-cost">${cost(nd.cost, res)}</span>`)) +
+    btn +
+    `</div></div>`
+  );
 }
 /** What the hero staff needs from the match screen. */
 export interface HeroStaffHost {
@@ -775,7 +698,7 @@ export function initHeroStaff(host: HeroStaffHost): {
       view = { ...view, dossier: `node:${nodeBtn.dataset.hnode!}` };
       return 'repaint';
     }
-    if (tg.closest('[data-hdclose]')) {
+    if (tg.closest('[data-hdclose]') || (tg.matches?.('[data-hdback]') ?? false)) {
       view = { ...view, dossier: null };
       return 'repaint';
     }
