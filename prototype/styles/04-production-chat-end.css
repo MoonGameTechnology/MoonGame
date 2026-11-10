@@ -31,8 +31,6 @@
 .cn-tpldel{flex:none;width:28px;height:28px;border-radius:6px;}
 .cn-tplnone{font-size:var(--fs-caption);color:var(--dim);padding:2px 0;}
 .cn-tplsave{align-self:flex-start;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);}
-#cn-queue{flex:none;}
-#cn-queue:empty{display:none;}
 .cn-queue{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);min-width:0;}
 .cn-qh{flex:none;font-size:var(--fs-caption);color:var(--dim);white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis;}
 .cn-qlist{display:flex;gap:6px;overflow-x:auto;min-width:0;scrollbar-width:none;}

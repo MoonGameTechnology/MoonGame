@@ -395,11 +395,12 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Эскадры: значок «◇ N» у мира и носителя (`mapHangars.ts`, `decisions/hangarBadge.ts`),
   список «◇ Авиация» (`aviationPanel.ts`); приказы эскадре — только в её карточке
   (`squadronCardView.ts`), плитками, как у флота (`wingOrders.ts`).
-- «Производство» (`shipyard.ts`): постройки, корабли, мобилизация, шаблоны сборок
-  (`decisions/buildTemplates.ts`), требования — `decisions/productionRequirements.ts`
-  ([production-workbench.md](production-workbench.md)). «Герои» — `heroStaff.ts`.
-  Обновления (`productionRefresh.ts`) сохраняют список планет и фокус при начислении
-  ресурсов; запас, очередь и таймеры обновляются без замены списка.
+- «Производство» (`shipyard.ts`): открывается списком четырёх линий мира, каталог линии —
+  по нажатию на неё (`decisions/productionSections.ts`), над каталогом очередь линии;
+  шаблоны сборок (`decisions/buildTemplates.ts`), требования —
+  `decisions/productionRequirements.ts` ([production-workbench.md](production-workbench.md)).
+  «Герои» — `heroStaff.ts`. Обновления (`productionRefresh.ts`) сохраняют список планет и
+  фокус при начислении ресурсов; запас, линии и таймеры обновляются без замены списка.
 - Флот: погрузка и высадка — `troopsWindow.ts` (`decisions/armyTransferRows.ts`), плашки и дуги
   перевозки на карте (`decisions/troopTransferTimers.ts`, `mapTransfers.ts`), цепочка приказов
   `chainPlanner.ts`, шаттлы — `hangarPanel.ts`, `squadronPanel.ts`.

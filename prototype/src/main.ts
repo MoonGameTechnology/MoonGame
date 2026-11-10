@@ -2368,7 +2368,8 @@ document.getElementById('rail-tech')?.addEventListener('click', () => techTree.o
 
 // World-card entry points reuse the same production workspace and world context.
 const buildWin = {
-  open: (pid: string, units?: import('./buildScreen').UnitCatalogTab) => shipyard.open(units === 'ground' ? 'infantry' : units === 'shuttle' ? 'squads' : units === 'ships' ? 'ships' : 'buildings', pid),
+  // Без ростера — список линий мира; ростер карточки сразу открывает свою линию.
+  open: (pid: string, units?: import('./buildScreen').UnitCatalogTab) => shipyard.open(units === 'ground' ? 'infantry' : units === 'shuttle' ? 'squads' : units === 'ships' ? 'ships' : undefined, pid),
 };
 
 

@@ -30,8 +30,7 @@ function setup() {
   const nav = {
     planet: 'world-a',
     repaint: () => {},
-    open: (_tab: string, _templates?: boolean, building?: string) =>
-      navigation.push(building ?? _tab),
+    open: (_tab: string, building?: string) => navigation.push(building ?? _tab),
     category: () => {},
   };
   return {

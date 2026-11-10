@@ -1,0 +1,60 @@
+/* Окно «Производство»: сначала линии мира, каталог только по нажатию на линию
+   (заказ владельца 2026-11-09). ПК: узкое окно со списком линий, открытая линия
+   выдвигает каталог справа. Телефон: каталог закрывает список, «←» возвращает. */
+html body #constructor.pw-production .cnbox:not(.pw-cat-open) { width:min(440px, calc(100vw - 24px)); }
+#constructor.pw-production .cnbox > .pw-context { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; padding:0; }
+#constructor.pw-production .cnbox > .pw-context .pw-stock { flex:1 1 100%; }
+#constructor.pw-production .cnbox > .pw-context .cn-plan { flex:0 0 auto; width:auto; max-width:160px; min-height:36px; margin:0; }
+#constructor.pw-production .cnbox > .pw-context .pw-income { flex:1 1 0; min-width:0; }
+#constructor.pw-production .cnbox .pw-work { flex:1 1 auto; min-height:0; display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
+#constructor.pw-production .cnbox.pw-cat-open .pw-work { grid-template-columns:270px minmax(0,1fr); }
+#constructor.pw-production .pw-lane-pane { display:flex; flex-direction:column; gap:8px; min-height:0; overflow:auto; overscroll-behavior:contain; }
+#constructor.pw-production .cnbox .pw-lane-list { display:flex; flex-direction:column; gap:6px; margin:0; padding:0; border:0; }
+#constructor.pw-production .pw-lane-card { display:grid; grid-template-columns:48px minmax(0,1fr) auto; align-items:center; gap:10px; width:100%; min-height:58px; margin:0; padding:6px 10px 6px 6px; text-align:left; color:#e1f0f3; background:#0b202d; border:1px solid #24434f; border-radius:10px; cursor:pointer; }
+#constructor.pw-production .pw-lane-card:hover { border-color:#376270; }
+#constructor.pw-production .pw-lane-card.idle { border-style:dashed; border-color:#5d5132; }
+#constructor.pw-production .pw-lane-card.on { background:#0e2b38; border:1px solid #39d4df; box-shadow:inset 3px 0 0 #39d4df; }
+#constructor.pw-production .pw-lane-art { display:grid; place-items:center; width:48px; height:40px; overflow:hidden; border-radius:7px; background:#06141f; color:#39d4df; }
+#constructor.pw-production .pw-lane-art.dim { opacity:.5; }
+#constructor.pw-production .pw-lane-art .ship-art { width:48px; height:40px; margin:0; border:0; }
+#constructor.pw-production .pw-lane-art .ship-art img { width:100%; height:100%; object-fit:cover; }
+#constructor.pw-production .pw-lane-art .holo-icon svg { width:22px; height:22px; }
+#constructor.pw-production .pw-lane-text { display:flex; flex-direction:column; gap:2px; min-width:0; }
+#constructor.pw-production .pw-lane-text > small { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#39d4df; }
+#constructor.pw-production .pw-lane-text > b { overflow:hidden; font-size:13px; white-space:nowrap; text-overflow:ellipsis; }
+#constructor.pw-production .pw-lane-text > b.pw-lane-free { color:#e2b45c; }
+#constructor.pw-production .pw-lane-text > progress { width:100%; height:3px; margin-top:2px; appearance:none; border:0; border-radius:2px; background:#1e3e4a; color:#39d4df; }
+#constructor.pw-production .pw-lane-text > progress::-webkit-progress-bar { background:#1e3e4a; }
+#constructor.pw-production .pw-lane-text > progress::-webkit-progress-value { background:#39d4df; }
+#constructor.pw-production .pw-lane-end { display:flex; align-items:center; gap:6px; font-size:12px; font-variant-numeric:tabular-nums; color:#94afb9; white-space:nowrap; }
+#constructor.pw-production .pw-lane-more { padding:1px 6px; border:1px solid #2f5462; border-radius:999px; font-size:11px; color:#e1f0f3; }
+#constructor.pw-production .pw-lane-end > .holo-icon { display:grid; place-items:center; width:30px; height:30px; border:1px solid #376270; border-radius:8px; color:#39d4df; }
+#constructor.pw-production .pw-lane-end > .holo-icon svg { width:18px; height:18px; }
+#constructor.pw-production .pw-lane-pane > .pw-orders { margin:0; }
+#constructor.pw-production .pw-catalog { display:flex; flex-direction:column; gap:6px; min-width:0; min-height:0; }
+#constructor.pw-production .pw-cat-head { display:flex; align-items:center; gap:8px; min-width:0; }
+#constructor.pw-production .pw-cat-head > b { flex:none; font-size:15px; }
+#constructor.pw-production .cnbox .pw-cat-head > .pw-subtabs { display:flex; flex:1 1 auto; flex-wrap:nowrap; gap:4px; min-width:0; margin:0; padding:0; overflow-x:auto; scrollbar-width:none; }
+#constructor.pw-production .cnbox .pw-cat-head > .pw-subtabs .cn-tab { flex:0 0 auto; min-height:36px; padding:4px 12px; white-space:nowrap; }
+#constructor.pw-production .pw-cat-head > .pw-cat-close { flex:none; margin-left:auto; }
+#constructor.pw-production .pw-cat-head > .pw-lane-back { display:none; flex:none; }
+#constructor.pw-production .pw-lane-strip { display:flex; gap:6px; min-width:0; overflow-x:auto; scrollbar-width:thin; }
+#constructor.pw-production .pw-lane-strip:empty { display:none; }
+#constructor.pw-production .pw-strip-idle { flex:1; margin:0; padding:6px 10px; font-size:12px; color:#94afb9; border:1px dashed #24434f; border-radius:8px; }
+#constructor.pw-production .pw-lane-strip .pw-job { display:inline-grid; flex:none; grid-template-columns:32px auto auto 28px; grid-template-rows:auto auto; align-items:center; gap:2px 6px; padding:4px 4px 4px 6px; white-space:nowrap; border:1px solid #24434f; border-radius:8px; }
+#constructor.pw-production .pw-lane-strip .pw-job.waiting { border-style:dashed; }
+#constructor.pw-production .pw-lane-strip .pw-job-art { grid-row:1; width:32px; height:26px; }
+#constructor.pw-production .pw-lane-strip .pw-job-art .ship-art { width:32px; height:26px; }
+#constructor.pw-production .pw-lane-strip .pw-job > b { grid-column:2; font-size:12px; }
+#constructor.pw-production .pw-lane-strip .pw-job > .pn-timer, #constructor.pw-production .pw-lane-strip .pw-job-wait { grid-column:3; font-size:11px; color:#94afb9; }
+#constructor.pw-production .pw-lane-strip .pw-job > .btn-x { grid-column:4; grid-row:1; width:28px; height:28px; }
+#constructor.pw-production .pw-lane-strip .pw-job > progress { grid-column:1/-1; grid-row:2; height:3px; }
+#constructor.pw-production .pw-lane-strip .pw-paused { flex:none; }
+#constructor.pw-production .cnbox .pw-catalog #constructorbody { display:block; flex:1 1 auto; min-height:0; overflow:auto; }
+@media(max-width:700px) {
+  html body #constructor.pw-production .cnbox:not(.pw-cat-open) { width:100%; }
+  #constructor.pw-production .cnbox.pw-cat-open .pw-work { grid-template-columns:minmax(0,1fr); }
+  #constructor.pw-production .cnbox.pw-cat-open .pw-lane-pane { display:none; }
+  #constructor.pw-production .pw-cat-head > .pw-lane-back { display:inline-grid; place-items:center; }
+  #constructor.pw-production .pw-cat-head > .pw-cat-close { display:none; }
+}

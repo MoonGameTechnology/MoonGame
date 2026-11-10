@@ -37,6 +37,7 @@ const SHEETS: Record<string, string> = {
   'mobile-console.css': read('../mobile-console.css'),
   'mobile-strategy.css': read('../mobile-strategy.css'),
   'production-presentation.css': read('../production-presentation.css'),
+  'production-lanes.css': read('../production-lanes.css'),
 };
 const STYLES = ['btn-main', 'btn-second', 'btn-quiet'];
 

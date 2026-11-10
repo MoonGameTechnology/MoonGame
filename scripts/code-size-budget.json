@@ -18,7 +18,7 @@
     "prototype/src/fleetCard.ts": 1290,
     "prototype/src/eventFeed.ts": 1282,
     "prototype/selfplay.mjs": 1198,
-    "prototype/src/shipyard.ts": 1097,
+    "prototype/src/shipyard.ts": 1021,
     "prototype/src/rehearsal.ts": 1024,
     "packages/server/src/wsServer.ts": 1117,
     "packages/client/src/matchHud.ts": 1061,

@@ -81,7 +81,7 @@ const controls = {
   research: '#tech [data-go="frigate_design"]',
   'research-close': '#tech .tw-close',
   yard: '[data-act="openbuild"], [data-lift="openbuild"]',
-  'yard-ships': '#constructor .pw-main-tabs [data-ctab="ships"]',
+  'yard-ships': '#constructor [data-pw-lane="ships"]',
   ship: '#constructor [data-pw-info="unit:frigate"]',
   'ship-order': '#codex [data-build="unit:frigate"]',
   'catalog-close': '#constructor .cn-close',

@@ -56,6 +56,9 @@ export interface TrainingTourDeps {
 
 /** «Построить» мира: кнопка карточки на ПК или её копия в нижней полосе листа телефона. */
 const BUILD_OPEN = '[data-act="openbuild"], [data-lift="openbuild"]';
+/** Линия окна производства. На телефоне каталог другой линии закрывает список линий —
+ *  тогда подсвечивается «←», и следующим кадром уже видна нужная линия. */
+const LANE = (lane: string) => `#constructor [data-pw-lane="${lane}"], #constructor .pw-lane-back`;
 
 const step = (
   stage: TrainingStage,
@@ -74,6 +77,67 @@ const step = (
   ...extra,
 });
 
+/** Шаги окна «Производство»: открыть окно, линию, раздел линии; заказать здание; закрыть. */
+function productionSteps(ui: TrainingTourUi) {
+  const state = (when: () => boolean): StepAdvance => ({ on: 'state', when });
+  const action = (type: string): StepAdvance => ({ on: 'action', type });
+  const visible = (selector: string) => state(() => ui.visible(selector));
+  // Юниты заказывают в окне «Построить» (UIX-10.12): «i» мира только сообщает, вкладок
+  // с каталогами в нём нет. Шаг открывает окно, второй — линию, третий — раздел линии
+  // (линия открывается на разделе, где игрок был в прошлый раз).
+  const yard = (stage: TrainingStage, id: string, main: 'ships' | 'infantry', unit: string) => {
+    const lane = main === 'ships' ? 'ships' : 'mobilization';
+    const listed = `#constructor.show [data-cnhull="${unit}"]`;
+    return [
+      step(stage, `${id}-yard`, BUILD_OPEN, visible('#constructor.show'), {
+        copy: 'onb.guide.build.yard',
+      }),
+      step(
+        stage,
+        id,
+        LANE(lane),
+        state(() => ui.visible(listed) || ui.visible(`#constructor .pw-catalog[data-lane="${lane}"]`)),
+        { copy: `onb.guide.yard.${main}` },
+      ),
+      step(stage, `${id}-section`, `#constructor [data-ctab="${main}"]`, visible(listed), {
+        copy: `onb.guide.yard.${main}`,
+      }),
+    ];
+  };
+  const close = (stage: TrainingStage, id: string) =>
+    step(
+      stage,
+      id,
+      '#constructor .cn-close',
+      state(() => !ui.visible('#constructor.show')),
+      { copy: 'training.guide.catalog-close' },
+    );
+  const building = (stage: TrainingStage, id: string, type: string, upgrade = false) => [
+    step(stage, `${id}-catalog`, BUILD_OPEN, visible('#constructor.show'), {
+      copy: 'training.guide.build.catalog',
+    }),
+    step(stage, `${id}-lane`, LANE('buildings'), visible('#constructor.show [data-bwtab]'), {
+      copy: 'onb.guide.yard.buildings',
+    }),
+    step(
+      stage,
+      `${id}-all`,
+      '#constructor [data-bwtab="*"]',
+      visible(`#constructor [data-bw-${upgrade ? 'up' : 'go'}="${type}"]`),
+      { copy: 'training.guide.build.all' },
+    ),
+    step(
+      stage,
+      `${id}-order`,
+      `#constructor [data-bw-${upgrade ? 'up' : 'go'}="${type}"]`,
+      action(upgrade ? 'building.upgrade' : 'building.construct'),
+      { copy: `training.guide.build.${type}` },
+    ),
+    close(stage, `${id}-close`),
+  ];
+  return { yard, close, building };
+}
+
 export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
   const { me, data, baseline: b, ui } = d;
   const state = (when: () => boolean): StepAdvance => ({ on: 'state', when });
@@ -81,6 +145,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
   const f = (role: TrainingFleetRole) => trainingFleet(d.world(), me, role);
   const has = (id: string) => owns(d.world(), me, id);
   const visible = (selector: string) => state(() => ui.visible(selector));
+  const { yard, close, building } = productionSteps(ui);
 
   const world = (stage: TrainingStage, id: string, planet: string) =>
     step(
@@ -128,28 +193,6 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
           }),
         ]
       : [];
-  // Юниты заказывают в окне «Построить» (UIX-10.12): «i» мира только сообщает, вкладок
-  // с каталогами в нём нет. Шаг открывает окно, второй — его раздел.
-  const yard = (stage: TrainingStage, id: string, main: 'ships' | 'infantry', unit: string) => [
-    step(stage, `${id}-yard`, BUILD_OPEN, visible('#constructor.show'), {
-      copy: 'onb.guide.build.yard',
-    }),
-    step(
-      stage,
-      id,
-      `#constructor .pw-main-tabs [data-ctab="${main}"]`,
-      visible(`#constructor.show [data-cnhull="${unit}"]`),
-      { copy: `onb.guide.yard.${main}` },
-    ),
-  ];
-  const close = (stage: TrainingStage, id: string) =>
-    step(
-      stage,
-      id,
-      '#constructor .cn-close',
-      state(() => !ui.visible('#constructor.show')),
-      { copy: 'training.guide.catalog-close' },
-    );
   const at = (role: TrainingFleetRole, planet: string) =>
     !!f(role) && f(role)!.location === planet && !f(role)!.movement && !f(role)!.battleId;
   // Доля корпуса героя на входе в шаг «Ремонт»: проверку зовут только у текущего шага,
@@ -202,26 +245,6 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       : []),
     step(stage, id, null, state(arrived), { reveal: () => ui.show(planet) }),
     ...(role === 'hero' ? [fleet(stage, `${id}-arrived-fleet`, role)] : []),
-  ];
-  const building = (stage: TrainingStage, id: string, type: string, upgrade = false) => [
-    step(stage, `${id}-catalog`, BUILD_OPEN, visible('#constructor.show [data-bwtab]'), {
-      copy: 'training.guide.build.catalog',
-    }),
-    step(
-      stage,
-      `${id}-all`,
-      '#constructor [data-bwtab="*"]',
-      visible(`#constructor [data-bw-${upgrade ? 'up' : 'go'}="${type}"]`),
-      { copy: 'training.guide.build.all' },
-    ),
-    step(
-      stage,
-      `${id}-order`,
-      `#constructor [data-bw-${upgrade ? 'up' : 'go'}="${type}"]`,
-      action(upgrade ? 'building.upgrade' : 'building.construct'),
-      { copy: `training.guide.build.${type}` },
-    ),
-    close(stage, `${id}-close`),
   ];
   const troops = (stage: TrainingStage, id: string, n: number) => [
     fleet(stage, `${id}-fleet`, 'hero'),
