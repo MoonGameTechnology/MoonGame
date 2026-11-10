@@ -53,33 +53,16 @@
   color:var(--dim);font:inherit;font-size:var(--fs-caption);cursor:pointer;}
 #herobody .hx-tab i{font-style:normal;font-size:var(--fs-body);opacity:.85;}
 #herobody .hx-tab.on{color:var(--cyan);border-color:var(--cyan);background:rgba(53,214,230,.12);font-weight:700;}
-#herobody .hx-tree{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+#herobody .hx-tree{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;}
 #herobody .hx-rail.foreign{opacity:.5;}
 #herobody .hx-rhd{display:flex;align-items:center;gap:6px;font-size:var(--fs-caption);color:var(--cyan);margin-bottom:10px;}
 #herobody .hx-rail.ps .hx-rhd{color:var(--hx-ps);}
 #herobody .hx-rhd .hx-dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 7px currentColor;}
 #herobody .hx-rhd .hx-ftag{margin-left:auto;font-size:var(--fs-caption);color:var(--dim);}
-#herobody .hx-node{position:relative;border:1px solid var(--line-hi);border-radius:8px;padding:8px 9px;background:rgba(53,214,230,.03);}
-#herobody .hx-node+.hx-node{margin-top:22px;}
-#herobody .hx-node .hx-conn{position:absolute;top:-18px;left:16px;width:2px;height:16px;background:var(--line-hi);}
-#herobody .hx-node .hx-conn.lit{background:linear-gradient(#7df0d0,var(--line-hi));}
-#herobody .hx-node.owned{border-color:rgba(125,240,208,.5);background:rgba(125,240,208,.06);}
-#herobody .hx-node.avail{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(53,214,230,.35);cursor:pointer;}
-#herobody .hx-rail.ps .hx-node.avail{border-color:var(--hx-ps);box-shadow:0 0 0 1px rgba(185,140,255,.35);}
-#herobody .hx-node.locked{opacity:.65;cursor:pointer;}
-#herobody .hx-node.foreignn{opacity:.55;}
-#herobody .hx-nn{display:flex;align-items:center;gap:6px;font-weight:600;font-size:var(--fs-caption);color:#eafffb;}
-#herobody .hx-crest{width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center;font-size:var(--fs-caption);flex:0 0 auto;border:1px solid var(--line-hi);color:var(--dim);}
-#herobody .hx-node.owned .hx-crest{background:#7df0d0;color:#04201a;border-color:#7df0d0;}
-#herobody .hx-node.avail .hx-crest{color:var(--cyan);border-color:var(--cyan);}
-#herobody .hx-nd{font-size:var(--fs-caption);color:var(--dim);line-height:1.4;margin:3px 0 6px;}
-#herobody .hx-nf{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 #herobody .hx-g{font-size:var(--fs-caption);padding:2px 5px;border-radius:4px;}
 #herobody .hx-g.ab{color:var(--cyan);background:rgba(53,214,230,.12);}
 #herobody .hx-g.pa{color:#9ff0da;background:rgba(125,240,208,.12);}
 #herobody .hx-cost{margin-left:auto;font-size:var(--fs-caption);color:#ffb43a;border:1px solid rgba(255,180,58,.4);border-radius:5px;padding:2px 7px;white-space:nowrap;}
-#herobody .hx-st{margin-left:auto;font-size:var(--fs-caption);color:var(--dim);text-align:right;}
-#herobody .hx-st.on{color:#9ff0da;}
 #herobody .hx-ov{display:flex;gap:8px;margin-bottom:6px;}
 #herobody .hx-ovc{flex:1;text-align:center;border:1px solid var(--line);border-radius:8px;padding:9px 4px;}
 #herobody .hx-ovc b{display:block;font-size:16px;color:var(--cyan);}
@@ -96,9 +79,9 @@
 #herobody .hx-bayact{display:flex;align-items:center;gap:6px;flex-shrink:0;}
 /* Не влезающее ПОКАЗЫВАЕТСЯ погашенным, а не прячется: экран не должен врать о том, чем игрок владеет. */
 #herobody .hx-row.dim{opacity:.55;}
-#herobody .hx-dossier{margin-top:12px;border:1px solid var(--cyan);border-radius:10px;padding:12px;background:var(--glass);}
 #herobody .hx-dh{display:flex;align-items:center;gap:8px;}
-#herobody .hx-dnm{font-weight:700;color:#eafffb;font-size:var(--fs-body);}
+#herobody .hx-dnm{display:grid;font-weight:700;color:#eafffb;font-size:var(--fs-body);}
+#herobody .hx-dnm small{font-weight:400;font-size:var(--fs-caption);color:var(--dim);}
 #herobody .hx-dx{margin-left:auto;width:24px;height:24px;border-radius:6px;}
 #herobody .hx-give{margin:10px 0;padding:9px 10px;border-radius:7px;background:rgba(53,214,230,.08);border:1px solid var(--cyan-dim);}
 #herobody .hx-dgl{font-size:var(--fs-caption);color:var(--cyan);}
@@ -694,15 +677,6 @@
 .fortress-dialog-actions button{min-height:44px;padding:10px 16px;font:inherit;}
 
 /* Плитки способностей и развития: эффект и состояние читаются на самой карточке. */
-#herobody .ha-tree { grid-template-columns: minmax(0, 1fr); }
-#herobody .ha-tree .hx-rail { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 12px; align-items: stretch; }
-#herobody .ha-tree .hx-rhd { grid-column: 1 / -1; }
-#herobody .ha-tree .hx-node { min-height: 135px; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-#herobody .ha-tree .hx-nf { margin-top: auto; }
-#herobody .ha-tree .hx-conn { display: none; }
 #herobody .ha-ability-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); gap: 12px; }
 #herobody .ha-ability-grid :is(.hx-row, .hx-bay) { min-height: 145px; flex-direction: column; align-items: stretch; border: 1px solid var(--line-hi); border-radius: 10px; padding: 12px; }
 
-#herobody .ha-tree button.hx-node { width: 100%; font: inherit; color: inherit; text-align: left; white-space: normal; }
-#herobody .ha-tree button.hx-node:disabled { opacity: 1; cursor: default; }
-#herobody .ha-tree button.hx-node:focus-visible { outline: 2px solid #d1f69a; outline-offset: 3px; }

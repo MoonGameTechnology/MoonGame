@@ -17,7 +17,6 @@ import {
   heroDisplayName,
   HERO_CASTABLE,
   heroCdKey,
-  nodeDepth,
   type HeroView,
   type HeroStaffHost,
 } from './heroStaff';
@@ -308,27 +307,6 @@ describe('штаб героев — разметка панели', () => {
     expect(order).toEqual([...order].sort((a, b) => a - b)); // и именно в этом порядке
   });
 
-  it('глубина узла — длина самого длинного пути до корня, цикл в данных не вешает UI', () => {
-    const trees = {
-      root: { requires: [] },
-      mid: { requires: ['root'] },
-      leaf: { requires: ['mid'] },
-      // Две дороги до корня: считается ДЛИННАЯ, иначе узел встанет выше своего же деда.
-      forked: { requires: ['root', 'leaf'] },
-      loopA: { requires: ['loopB'] },
-      loopB: { requires: ['loopA'] },
-    };
-    expect(nodeDepth('root', trees)).toBe(0);
-    expect(nodeDepth('mid', trees)).toBe(1);
-    expect(nodeDepth('leaf', trees)).toBe(2);
-    expect(nodeDepth('forked', trees)).toBe(3);
-    // Цикл обрывается на повторе узла В ТЕКУЩЕМ пути, а не рекурсирует вечно: обход
-    // проходит loopA → loopB и упирается в loopA, то есть длину самого цикла. Важно не
-    // конкретное число, а что оно конечно и рендер не виснет.
-    expect(nodeDepth('loopA', trees)).toBe(2);
-    expect(nodeDepth('unknown', trees)).toBe(0); // нет в каталоге — корень (fail-secure)
-  });
-
   it('переключение вкладки меняет тело панели', () => {
     const staff = initHeroStaff(hostOf());
     const tree = staff.paneHtml();
@@ -388,19 +366,18 @@ describe('штаб героев — врождённый узел (AUD-22)', () 
   // отбивает его покупку `E_ALREADY_UNLOCKED`, и экран обязан говорить то же самое, а не
   // вешать цену и кнопку, которая всегда кончится отказом.
   const treeName = (id: string): string => tData(data.heroSkillTrees[id]!.name);
-  /** Начало разметки узла — от его `<button class="hx-node…">` до имени. */
+  /** Начало разметки плитки — от её `<button class="hx-tile…">` до имени в подписи. */
   const nodeHead = (html: string, id: string): string => {
     const at = html.indexOf(treeName(id));
-    return html.slice(html.lastIndexOf('<button type="button" class="hx-node', at), at);
+    return html.slice(html.lastIndexOf('<button type="button" class="hx-tile', at), at);
   };
 
   it('у Командира «Сонастройка» и «Пси-вуаль» изучены, а узел за ними открыт', () => {
     const html = treePanel(); // главный герой места — Командир
     for (const id of ['void_attunement', 'psi_veil']) {
-      expect(nodeHead(html, id), id).toContain('hx-node owned');
-      expect(nodeHead(html, id), id).not.toContain('data-hnode');
+      expect(nodeHead(html, id), id).toContain('hx-tile owned');
     }
-    expect(nodeHead(html, 'psi_weak_points')).toContain('hx-node avail');
+    expect(nodeHead(html, 'psi_weak_points')).toContain('hx-tile avail');
   });
 
   it('в досье врождённого узла нет кнопки покупки, а у его ребёнка требование выполнено', () => {
@@ -421,15 +398,15 @@ describe('штаб героев — имена узлов в списке тре
    *  по-русски, а его же имя строкой ниже — по-английски. */
   const treeName = (id: string): string => tData(data.heroSkillTrees[id]!.name);
 
-  it('под запертым узлом требование названо по-русски', () => {
+  it('плитка запертого узла подписана по-русски и несёт замок, а не текст требования', () => {
     const html = treePanel();
-    // `overclocked_helm` заперт на старте и требует ровно `neural_lace`.
-    const needs = [...html.matchAll(/<span class="hx-st">([^<]*)<\/span>/g)]
-      .map((m) => m[1]!)
-      .filter((x) => x.startsWith(t('hero.tree.needs', { n: '' }).trim()));
-    expect(needs.length).toBeGreaterThan(0);
-    expect(needs.some((x) => x.includes(treeName('neural_lace')))).toBe(true); // «Нейрокружево»
-    expect(needs.some((x) => x.includes(data.heroSkillTrees.neural_lace!.name))).toBe(false);
+    // `overclocked_helm` заперт на старте: на плитке только знак, замок и цена.
+    const at = html.indexOf(`aria-label="${treeName('overclocked_helm')}"`);
+    expect(at).toBeGreaterThan(-1);
+    const tile = html.slice(html.lastIndexOf('<button', at), html.indexOf('</button>', at));
+    expect(tile).toContain('hx-tile locked');
+    expect(tile).toContain('🔒');
+    expect(tile).not.toContain(data.heroSkillTrees.overclocked_helm!.name);
   });
 
   it('в досье узла список требований тоже переведён', () => {
@@ -463,6 +440,28 @@ describe('штаб героев — клики', () => {
     const other = ownHeroes(s, 'p1')[1] ?? ownHeroes(s, 'p1')[0]!;
     expect(staff.click(click('[data-hsel]', { hsel: other.id }))).toBe('repaint');
     expect(staff.paneHtml()).not.toContain('hx-dossier');
+  });
+
+  it('плитка открывает описание поверх окна: что требует и что открывает', () => {
+    const staff = initHeroStaff(hostOf());
+    staff.click(click('[data-htab]', { htab: 'tree' }));
+    staff.click(click('[data-hnode]', { hnode: 'neural_lace' }));
+    const html = staff.paneHtml();
+    expect(html).toContain('class="hx-tmodal" data-hdback');
+    const opens = html.slice(html.indexOf(t('hero.tree.opens')));
+    expect(opens).toContain(tData(data.heroSkillTrees.overclocked_helm!.name));
+    expect(opens).toContain(tData(data.heroSkillTrees.fleet_uplink!.name));
+  });
+
+  it('нажатие на затемнение вокруг описания закрывает его, нажатие внутри — нет', () => {
+    const staff = initHeroStaff(hostOf());
+    staff.click(click('[data-hnode]', { hnode: 'neural_lace' }));
+    const inside = { closest: () => null, matches: () => false } as unknown as HTMLElement;
+    expect(staff.click(inside)).toBeNull();
+    expect(staff.paneHtml()).toContain('hx-tmodal');
+    const backdrop = { closest: () => null, matches: (q: string) => q === '[data-hdback]' } as unknown as HTMLElement;
+    expect(staff.click(backdrop)).toBe('repaint');
+    expect(staff.paneHtml()).not.toContain('hx-tmodal');
   });
 
   it('крестик досье закрывает его', () => {
