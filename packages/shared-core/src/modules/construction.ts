@@ -218,6 +218,8 @@ function slotsAt(h: HandlerContext, planet: Planet): { capacity: number; used: n
   for (const q of planet.buildQueue ?? []) {
     if (q.kind === 'building') used += 1;
   }
+  // Пауза держит место: возобновление его не спрашивает, иначе на одно место встали бы две.
+  for (const s of planet.pausedConstruction ?? []) if (s.kind === 'building') used += 1;
   return { capacity, used };
 }
 
@@ -786,7 +788,8 @@ export const constructionModule: GameModule = {
   // 1.12.0 combines paid module snapshots with immediate structure casualties.
   // 1.13.0: the requirement hook names the order's world; queued units re-ask it (BAL-19).
   // 1.14.0: a running unit build is parked when its world leaves control; resume re-asks (BAL-19).
-  version: '1.15.1',
+  // 1.15.2: приостановленная постройка держит своё место в крепости (ponytail-аудит).
+  version: '1.15.2',
   setup(api) {
     api.provideCapability<StructureDamage>('construction.impact', (h, id, amount, owner, covered) => {
       const planet = h.state.planets[id];

@@ -87,6 +87,27 @@ describe('legacy save compatibility — слоты построек — реше
     expect(second.ok ? '' : second.code).toBe('E_NO_BUILD_SLOTS');
   });
 
+  it('ПРИОСТАНОВЛЕННАЯ стройка держит своё место — лимит не обойти паузой (ponytail-аудит 2026-11-09)', () => {
+    // Без этого: начать постройку, приостановить (деньги почти все вернулись), заказать
+    // вторую в то же место, а потом возобновить первую — две постройки на одно место.
+    const st = fortress();
+    const first = order(st, 'radar');
+    if (!first.ok) throw new Error('первая постройка не прошла');
+    const seq = first.state.scheduled.find((e) => e.type === 'construction.complete')?.seq;
+    const paused = kernel.applyAction(first.state, act('construction.cancel', { planetId: 'A', seq }), ctx(1));
+    if (!paused.ok) throw new Error(`пауза: отказ ${paused.code}`);
+    expect(paused.state.planets.A?.pausedConstruction?.length).toBe(1);
+    const second = order(paused.state, 'fort', 1);
+    expect(second.ok ? '' : second.code).toBe('E_NO_BUILD_SLOTS');
+    // А возобновить свою же приостановленную можно: место за ней и числится.
+    const resumed = kernel.applyAction(
+      paused.state,
+      act('construction.resume', { planetId: 'A', id: paused.state.planets.A!.pausedConstruction![0]!.id }),
+      ctx(2),
+    );
+    expect(resumed.ok ? '' : resumed.code).toBe('');
+  });
+
   it('НА ПЛАНЕТЕ лимита нет — слоты только у крепости (решение 11)', () => {
     // Первый пункт: лимит включается наличием мест, а на планете их не объявляет никто.
     let st = world('planet');

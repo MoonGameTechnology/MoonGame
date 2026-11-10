@@ -596,6 +596,17 @@ export const ANNIHILATE_PEACE_SOLO_MIGRATION = {
   toDataHash: MISSILES_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Приостановленная постройка держит место в крепости (construction 1.15.2): мир сейва
+ *  не меняется, меняется только счёт мест на следующем заказе. */
+export const PAUSED_SLOTS_SOLO_MIGRATION = {
+  fromRules: ANNIHILATE_PEACE_SOLO_MIGRATION.toRules,
+  fromData: ANNIHILATE_PEACE_SOLO_MIGRATION.toData,
+  fromDataHash: ANNIHILATE_PEACE_SOLO_MIGRATION.toDataHash,
+  toRules: '03f991eb289f8d',
+  toData: ANNIHILATE_PEACE_SOLO_MIGRATION.toData,
+  toDataHash: ANNIHILATE_PEACE_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -648,6 +659,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   FLEET_CLOCKS_SOLO_MIGRATION,
   MISSILES_SOLO_MIGRATION,
   ANNIHILATE_PEACE_SOLO_MIGRATION,
+  PAUSED_SLOTS_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
