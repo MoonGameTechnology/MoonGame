@@ -36,6 +36,7 @@ import { promotionModule } from './modules/promotion';
 import { autoRallyModule } from './modules/autoRally';
 import { diplomacyModule } from './modules/diplomacy';
 import { espionageModule } from './modules/espionage';
+import { spyLevelsModule } from './modules/spyLevels';
 import { botDiplomacyModule } from './modules/botDiplomacy';
 import { marketModule } from './modules/market';
 import { capitalModule } from './modules/capital';
@@ -140,6 +141,7 @@ export const GAME_MODULES: GameModule[] = [
   autoRallyModule, // CONV-10: построенный корабль сам уходит на орбиту в RALLY-флот (BF-29)
   diplomacyModule, // declarations + consent offers + the `diplomacy` capability combat consults
   espionageModule, // SPY-1/2: espionage.spy → окна краденого intel + контрразведка
+  spyLevelsModule, // опыт и уровни шпионов: слушает шпионаж, гнёт его хуки шанса/качества/скорости
   botDiplomacyModule, // bots: friendly-by-default favour meter → embargo/war only when provoked
   marketModule, // session resource market: two-sided order book (sell/buy lots), embargo-gated
   capitalModule, // capital.designate: re-point the hero respawn anchor
