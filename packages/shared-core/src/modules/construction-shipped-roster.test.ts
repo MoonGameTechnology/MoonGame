@@ -121,6 +121,8 @@ const EXPECTED: Record<string, string[] | null> = {
   // MAP-BARRIER: a rift is a HOLE in the map — nothing routes through it and no lane
   // may lead into it, so nothing can be raised there either.
   rift: [],
+  // The accretion disk round the Abyss black hole: impassable plasma, the same hole as a rift.
+  accretion_disk: [],
   pirate_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
   neutral_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
   // owner decision 8: a fortress does not exclude mining — the rig can be rebuilt here

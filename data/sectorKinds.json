@@ -225,6 +225,20 @@
     },
     "traversable": false
   },
+  "accretion_disk": {
+    "name": "Accretion Disk",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": false,
+    "orbit": false,
+    "allowedBuildings": [],
+    "appearance": {
+      "color": "#ff9a4a",
+      "label": "accretion disk",
+      "shape": "marker"
+    },
+    "traversable": false
+  },
   "station_site": {
     "name": "Space Fortress",
     "scoreValue": 0,

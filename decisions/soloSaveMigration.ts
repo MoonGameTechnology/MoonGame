@@ -618,6 +618,18 @@ export const PAUSED_UPKEEP_SOLO_MIGRATION = {
   toDataHash: PAUSED_SLOTS_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Data 0.1.86: a new province kind, the accretion disk round the Abyss black hole of
+ *  `ffa-50`. A saved world keeps its map and provinces: the kind only appears in new matches
+ *  on that map. */
+export const ACCRETION_DISK_SOLO_MIGRATION = {
+  fromRules: PAUSED_UPKEEP_SOLO_MIGRATION.toRules,
+  fromData: PAUSED_UPKEEP_SOLO_MIGRATION.toData,
+  fromDataHash: PAUSED_UPKEEP_SOLO_MIGRATION.toDataHash,
+  toRules: '18ddffcbbefbff',
+  toData: '0.1.86',
+  toDataHash: '0ab210564da766',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -672,6 +684,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   ANNIHILATE_PEACE_SOLO_MIGRATION,
   PAUSED_SLOTS_SOLO_MIGRATION,
   PAUSED_UPKEEP_SOLO_MIGRATION,
+  ACCRETION_DISK_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
