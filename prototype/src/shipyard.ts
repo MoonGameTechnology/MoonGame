@@ -7,6 +7,10 @@ import { completedUnitSpend } from './economy';
 import { productionIncomeHtml, productionStockHtml } from './productionIncome';
 import { worldOrdersHtml } from './worldOrdersPane';
 import { productionClick } from './productionInteraction';
+import { YARD_TABS, yardBoxHtml } from './productionFrame';
+export { yardBoxHtml } from './productionFrame';
+import { equipModule, unequipModule } from './productionFitting';
+import { laneOfSection, sectionForLane, type ProductionLane, type ProductionSection } from '../../decisions/productionSections';
 /**
  * «ПРОИЗВОДСТВО» — the unified in-match order screen (CON-1, LARS-4, REFM-13, ROS-3.1).
  *
@@ -86,26 +90,12 @@ import { unitDamageHtml } from './unitDamageView';
 import { termHtml } from './termTip';
 import {
   createLoadoutEditor,
-  applyLoadoutAction,
   type LoadoutModel,
   type LoadoutStatLine,
   type LoadoutEditorResult,
 } from '../../packages/client/src/loadoutEditor';
 
-export type YardTab = 'buildings' | 'ships' | 'support' | 'squads' | 'infantry' | 'vehicles' | 'heroes';
-
-/** Порядок вкладок — заказ владельца дословно: Корабли · Челноки · Пехота · Техника ·
- *  Герои. Наземные посередине, а не в конце: они дешевле и заказываются чаще. */
-const YARD_TABS: [YardTab, string][] = [
-  ['buildings', 'production.buildings'],
-  ['ships', 'yard.tab.ships'],
-  // ROS-SUP-1: корабли не для линии боя — своя вкладка; признак в данных (`support`).
-  ['support', 'yard.tab.support'],
-  ['squads', 'yard.tab.squads'],
-  ['infantry', 'yard.tab.infantry'],
-  ['vehicles', 'yard.tab.vehicles'],
-  ['heroes', 'yard.tab.heroes'],
-];
+export type YardTab = ProductionSection;
 
 import { YARD_HULLS, YARD_SQUAD_HULLS, YARD_GROUND_HULLS } from './productionRoster';
 export { YARD_HULLS, YARD_SQUAD_HULLS, YARD_GROUND_HULLS } from './productionRoster';
@@ -619,27 +609,6 @@ export function orderBarHtml(
   });
 }
 
-/** The window chrome: title, close, the tabs, whichever pane is open and, under it, the
- *  order bar — outside the scrolling body, so it never leaves the screen. */
-export function yardBoxHtml(
-  tab: YardTab,
-  body: string,
-  order = '',
-  again = '',
-  queue = '',
-  templates = '',
-): string {
-  const tabBtn = (k: YardTab, label: string, active = tab === k): string =>
-    `<button class="cn-tab${active ? ' on' : ''}" data-ctab="${k}">${t(label)}</button>`;
-  return (
-    `<div class="cnbox"><div class="cn-head"><b>${holoIcon('hammer')}${t('production.title')}</b><button data-pw-queue aria-label="${t('production.queue')}">${holoIcon('stack')}</button>${again}<button class="cn-close btn-x">✕</button></div>` +
-    `<div class="cn-tabs pw-main-tabs">${tabBtn('buildings', 'production.buildings')}${tabBtn('ships', 'yard.title', ['ships','support','squads'].includes(tab))}${tabBtn('infantry', 'production.mobilization', ['infantry','vehicles','heroes'].includes(tab))}</div>` +
-    (tab === 'buildings' ? '' : `<div class="cn-tabs pw-subtabs">${YARD_TABS.filter(([k]) => ['infantry','vehicles','heroes'].includes(tab) ? ['infantry','vehicles','heroes'].includes(k) : ['ships','support','squads'].includes(k)).map(([k,l]) => tabBtn(k,l)).join('')}</div>`) +
-    templates +
-    `<div id="constructorbody"><div class="pw-content">${body}</div><aside id="cn-queue">${queue}</aside></div>${order}</div>`
-  );
-}
-
 /** Вкладки, на которых собирается заказ, — у них и бывают шаблоны. */
 const TEMPLATE_TABS = YARD_TABS.map(([k]) => k).filter((k) => k !== 'heroes' && k !== 'buildings');
 /** Ключ хранилища шаблонов: они общие для всех партий на этом устройстве. */
@@ -780,25 +749,27 @@ function orderView(host: YardHost, draft: YardDraft, hulls: string[], troopsFor:
     ...(troops ? { troops } : {}),
   };
   const presentation = { ...view, section, blockText: view.block ? host.errText(view.block) : '' };
-  const body = productionWorldSelect(host.state(), host.me(), draft.planet) + loadoutPaneHtml(host.state(), host.me(), draft, hulls, presentation);
+  const body = loadoutPaneHtml(host.state(), host.me(), draft, hulls, presentation);
   const order = orderBarHtml(host.state(), host.me(), draft, hulls, presentation);
   return { draft, body, order };
 }
 
 export function initShipyard(host: YardHost) {
   let tab: YardTab = 'ships';
+  /** Открытая линия; `null` — окно стоит на списке линий, каталога нет. */
+  let lane: ProductionLane | null = null;
   let category: BuildCategory | null = null;
   let renderedHeroBody = '';
   let draft: YardDraft = { hull: YARD_HULLS[0]!, modules: [], count: 1, planet: '' };
   /** Вкладка последней отрисовки: прокрутка переживает перерисовку только внутри вкладки. */
-  let paintedTab: YardTab | null = null;
+  let paintedTab: string | null = null;
   /** Последний заказ за эту партию — для «Как в прошлый раз». */
   let last: LastOrder | null = null;
   let tplOpen = false;
   let templates: BuildTemplate[] = parseTemplates(readRaw(TEMPLATES_KEY), data, TEMPLATE_TABS);
   const saveTemplates = (): void => writeRaw(TEMPLATES_KEY, JSON.stringify(templates));
   const refresh = initProductionRefresh({
-    ...host, tab: () => tab, planet: () => draft.planet,
+    ...host, tab: () => (lane ? tab : ''), lane: () => lane, planet: () => draft.planet,
     renderedHeroBody: () => renderedHeroBody, paint,
   });
 
@@ -816,98 +787,48 @@ export function initShipyard(host: YardHost) {
 
   function paint(): void {
     refresh.painted();
-    let body: string;
+    const state = host.state(), me = host.me();
+    const worlds = productionWorlds(state, me);
+    let body = '';
     let order = '';
-    if (tab === 'buildings') {
-      const worlds = productionWorlds(host.state(), host.me());
+    if (!lane || tab === 'buildings' || tab === 'heroes') {
       if (!worlds.some(p => p.id === draft.planet)) draft.planet = worlds[0]?.id ?? '';
-      body = buildScreenHtml(host.state(), host.me(), draft.planet, a => host.probe ? host.probe(a) : 'E_FORBIDDEN', () => false, host.errText, undefined, category, true);
-      body = productionWorldSelect(host.state(), host.me(), draft.planet) + body;
-    } else if (tab === 'heroes') {
-      const worlds = productionWorlds(host.state(), host.me());
-      if (!worlds.some(p => p.id === draft.planet)) draft.planet = worlds[0]?.id ?? '';
-      renderedHeroBody = host.heroPaneHtml();
-      body = productionWorldSelect(host.state(), host.me(), draft.planet) + renderedHeroBody;
+      if (lane && tab === 'buildings')
+        body = buildScreenHtml(state, me, draft.planet, a => host.probe ? host.probe(a) : 'E_FORBIDDEN', () => false, host.errText, undefined, category, true);
+      else if (lane) body = renderedHeroBody = host.heroPaneHtml();
     } else {
       ({ draft, body, order } = orderView(host, draft, hullsOf(), troopsFor, tab));
     }
-    body = productionStockHtml(host.state(), host.me()) + body;
-    if (draft.planet) body = productionIncomeHtml(host.state(), host.me(), draft.planet) + body;
     // Перерисовка не сбрасывает прокрутку: поставил модуль внизу списка — там и остался.
+    const painting = `${lane}/${tab}`;
     const keep =
-      paintedTab === tab ? (host.root().querySelector('#constructorbody')?.scrollTop ?? 0) : 0;
+      paintedTab === painting ? (host.root().querySelector('#constructorbody')?.scrollTop ?? 0) : 0;
     const tplPane =
-      tplOpen && tab !== 'heroes' && tab !== 'buildings'
-        ? templatesPaneHtml(host.state(), host.me(), templates, templateOf(tab, draft), host.youColor(), tab)
+      lane && tplOpen && tab !== 'heroes' && tab !== 'buildings'
+        ? templatesPaneHtml(state, me, templates, templateOf(tab, draft), host.youColor(), tab)
         : '';
     const restoreDetails = rememberProductionDetails(host.root());
-    host.root().innerHTML = yardBoxHtml(
-      tab,
-      body,
-      order,
-      repeatOrderHtml(last, tab, draft),
-      refresh.queueHtml(),
-      tplPane,
-    );
-    if (paintedTab === tab) restoreDetails();
+    const context = `<div class="pw-context">${productionStockHtml(state, me)}${productionWorldSelect(state, me, draft.planet)}${draft.planet ? productionIncomeHtml(state, me, draft.planet) : ''}</div>`;
+    host.root().innerHTML = yardBoxHtml(tab, body, order, lane ? repeatOrderHtml(last, tab, draft) : '', refresh.queueHtml(), tplPane, {
+      lane, context, strip: refresh.stripHtml(),
+      orders: draft.planet ? worldOrdersHtml(state, me, draft.planet) : '',
+    });
+    if (paintedTab === painting) restoreDetails();
     const scroller = host.root().querySelector('#constructorbody');
-    paintedTab = tab;
-    presentProduction(host.root()); patchLiveTimers(host.root(), host.state().time);
+    paintedTab = painting;
+    presentProduction(host.root()); patchLiveTimers(host.root(), state.time);
     if (scroller && keep) scroller.scrollTop = keep;
   }
 
-  /** The loadout editor for the current order over `modules` — the core-validated model. */
-  function editorFor(modules: readonly string[]): LoadoutEditorResult {
-    const p = host.state().players[host.me()];
-    return createLoadoutEditor(draft.hull, data, p?.resources ?? {}, {
-      modules: [...modules],
-      count: draft.count,
-      ownedModules: p?.arsenal ? new Set(p.arsenal.modules) : undefined,
-      bonusSlots: p?.arsenal?.slots?.[draft.hull],
-      pricing: host.state().pricing,
-    });
-  }
-
-  /** Модуль из колонки открытого отсека. В занятом отсеке он меняет надетый и встаёт на его
-   *  место; выбранный отсек остаётся открытым для сравнения и замены. */
-  function pick(moduleId: string): void {
-    const res = host.state().players[host.me()]?.resources ?? {};
-    const ed = editorFor(draft.modules);
-    if (!ed.ok) return;
-    const bay = ed.slots[selectedBay(ed.slots, draft.slot)];
-    const cur = bay?.moduleId;
-    const swap =
-      cur !== undefined && (bay!.type === 'universal' || data.modules[moduleId]?.slot === bay!.type);
-    const base = swap ? editorFor(draft.modules.filter((id) => id !== cur)) : ed;
-    if (!base.ok) return;
-    const r = applyLoadoutAction({ kind: 'equip', moduleId }, base, data, res);
-    if (!r.ok) {
-      host.note('✖ ' + host.errText(r.code));
-      return;
-    }
-    // Замена встаёт на место снятого: отсеки одного типа заполняются в порядке обвеса
-    // (`loadoutBays`), а добавленный в конец модуль ушёл бы в последний отсек.
-    const modules = swap ? draft.modules.map((id) => (id === cur ? moduleId : id)) : r.modules;
-    const after = editorFor(modules);
-    const slots = after.ok ? after.slots : [];
-    const at = slots.findIndex((sl) => sl.moduleId === moduleId);
-    draft = { ...draft, modules, slot: at >= 0 ? at : undefined, unfit: false };
-  }
-
-  /** Снять модуль: открытым остаётся освободившийся отсек. Отсеки одного типа сдвигаются
-   *  (`loadoutBays`), поэтому пустеет последний отсек этого типа, а не тот, где модуль стоял. */
-  function takeOff(moduleId: string): void {
-    const res = host.state().players[host.me()]?.resources ?? {};
-    const ed = editorFor(draft.modules);
-    if (!ed.ok) return;
-    const type = ed.slots.find((sl) => sl.moduleId === moduleId)?.type;
-    const r = applyLoadoutAction({ kind: 'unequip', moduleId }, ed, data, res);
-    if (!r.ok) {
-      host.note('✖ ' + host.errText(r.code));
-      return;
-    }
-    const freed = r.slots.findIndex((sl) => !sl.moduleId && sl.type === type);
-    draft = { ...draft, modules: r.modules, slot: freed < 0 ? undefined : freed };
+  /** Открыть линию (или подвкладку внутри неё); `null` — вернуться к списку линий. */
+  function showLane(next: ProductionLane | null, section?: YardTab): void {
+    lane = next;
+    if (next) tab = section ?? sectionForLane(next, tab);
+    draft = { ...draft, slot: undefined, unfit: false }; // у корпуса другой вкладки свои отсеки
+    category = null;
+    tplOpen = false;
+    paint();
+    if (next && tab === 'heroes') host.onHeroTab(); // ONB-3 remainder
   }
 
   host.root().addEventListener('click', (e) => {
@@ -916,9 +837,13 @@ export function initShipyard(host: YardHost) {
       close();
       return;
     }
-    if (tg.closest('[data-pw-queue]')) { host.root().querySelector('#cn-queue')?.scrollIntoView({ block: 'nearest' }); return; }
+    const laneHit = (tg.closest('[data-pw-lane]') as HTMLElement | null)?.dataset.pwLane as ProductionLane | undefined;
+    // Повторное нажатие на открытую линию прячет её каталог (на ПК список стоит рядом).
+    if (laneHit) return showLane(laneHit === lane ? null : laneHit);
+    if (tg.closest('[data-pw-back]')) return showLane(null);
     if (last && tg.closest('[data-cnagain]')) {
       tab = last.tab;
+      lane = laneOfSection(tab);
       draft = { ...last.draft };
       paint();
       return;
@@ -938,6 +863,7 @@ export function initShipyard(host: YardHost) {
       }
       if (fit.modules.length < tpl!.modules.length) host.note(t('yard.tpl.trimmed'));
       tab = fit.tab as YardTab;
+      lane = laneOfSection(tab);
       draft = {
         ...draft,
         hull: fit.hull,
@@ -969,17 +895,11 @@ export function initShipyard(host: YardHost) {
     }
     if (productionClick(tg, host, {
       planet: draft.planet, repaint: paint,
-      open: (next, templates = false, building) => { tab = next; tplOpen = templates; category = null; paint(); if (building) anchorBuilding(host.root(), building); },
+      open: (next, building) => { showLane(laneOfSection(next), next); if (building) anchorBuilding(host.root(), building); },
       category: value => { category = value; },
     })) return;
-    const nextTab = (tg.closest('.cn-tab') as HTMLElement | null)?.dataset.ctab;
-    if (nextTab) {
-      tab = nextTab as YardTab;
-      draft = { ...draft, slot: undefined, unfit: false }; // у корпуса другой вкладки свои отсеки
-      paint();
-      if (tab === 'heroes') host.onHeroTab(); // ONB-3 remainder
-      return;
-    }
+    const nextTab = (tg.closest('.cn-tab') as HTMLElement | null)?.dataset.ctab as YardTab | undefined;
+    if (nextTab) return showLane(laneOfSection(nextTab), nextTab);
     const hull = (tg.closest('.cn-hbtn') as HTMLElement | null)?.dataset.cnhull;
     if (hull) {
       draft = { ...draft, hull, modules: host.preparedModules?.(hull) ?? [], slot: undefined, unfit: false };
@@ -988,7 +908,7 @@ export function initShipyard(host: YardHost) {
     }
     const mod = (tg.closest('.cn-mod') as HTMLElement | null)?.dataset.cnmod;
     if (mod) {
-      pick(mod);
+      draft = equipModule(host, draft, mod);
       paint();
       // Модуль выбран из глубины списка — вернуть на экран корабль: на нём видно, куда модуль
       // встал, а под ним (на ПК — рядом) уже модули следующего отсека.
@@ -1000,7 +920,7 @@ export function initShipyard(host: YardHost) {
     }
     const rm = (tg.closest('[data-cnrm]') as HTMLElement | null)?.dataset.cnrm;
     if (rm) {
-      takeOff(rm);
+      draft = unequipModule(host, draft, rm);
       paint();
       return;
     }
@@ -1065,9 +985,13 @@ export function initShipyard(host: YardHost) {
   });
 
   return {
+    /** Без раздела окно открывается списком линий мира; с разделом — сразу его линией. */
     open: (nextTab?: YardTab, world?: string, building?: string) => {
       if (world) draft.planet = world;
+      lane = nextTab ? laneOfSection(nextTab) : null;
       if (nextTab) tab = nextTab;
+      category = null;
+      tplOpen = false;
       const prepared = host.preparedModules?.(draft.hull);
       if (prepared) draft = { ...draft, modules: [...prepared] };
       host.root().classList.add('show');
@@ -1088,7 +1012,7 @@ function productionWorlds(state: GameState, me: string) {
   return Object.values(state.planets).filter(p => p.owner === me && SECTOR_TYPES[p.kind ?? '']?.buildable);
 }
 function productionWorldSelect(state: GameState, me: string, selected: string): string {
-  return `<select id="cn-planet" class="cn-plan" aria-label="${t('yard.where')}">${productionWorlds(state, me).map(p => `<option value="${esc(p.id)}"${p.id === selected ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`).join('')}</select>` + worldOrdersHtml(state, me, selected);
+  return `<select id="cn-planet" class="cn-plan" aria-label="${t('yard.where')}">${productionWorlds(state, me).map(p => `<option value="${esc(p.id)}"${p.id === selected ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`).join('')}</select>`;
 }
 function anchorBuilding(root: HTMLElement, id: string): void {
   const target = Array.from(root.querySelectorAll<HTMLElement>('[data-bw]')).find(el => el.dataset.bw === id);

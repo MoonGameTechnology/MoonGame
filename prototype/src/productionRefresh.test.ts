@@ -10,12 +10,10 @@ function setup() {
   const picker = { tagName: 'SELECT' };
   const document = { activeElement: null as typeof picker | null };
   const stock = { innerHTML: '' };
-  const details = { open: false };
   let queueHtml = '';
   const queue = {
     get innerHTML() { return queueHtml; },
-    set innerHTML(value: string) { queueHtml = value; details.open = true; },
-    querySelector: () => details,
+    set innerHTML(value: string) { queueHtml = value; },
   };
   const handlers: Record<string, () => void> = {};
   const root = {
@@ -39,6 +37,7 @@ function setup() {
     me: () => 'p1',
     planet: () => world.id,
     tab: () => tab,
+    lane: () => null,
     heroPaneHtml: () => heroHtml,
     renderedHeroBody: () => renderedHero,
     paint: () => {
@@ -49,7 +48,6 @@ function setup() {
   });
   refresh.painted();
   queue.innerHTML = refresh.queueHtml();
-  details.open = false;
   return {
     state,
     world,
@@ -57,7 +55,6 @@ function setup() {
     picker,
     stock,
     queue,
-    details,
     handlers,
     refresh,
     paints: () => paints,
@@ -86,7 +83,6 @@ it.each(['ships', 'buildings', 'infantry'])(
     expect(f.document.activeElement).toBe(f.picker);
     expect(f.stock.innerHTML).not.toBe(beforeStock);
     expect(f.queue.innerHTML).not.toBe(beforeQueue);
-    expect(f.details.open).toBe(false);
     f.document.activeElement = null;
     f.refresh.refreshQueue();
     expect(f.paints()).toBe(1);

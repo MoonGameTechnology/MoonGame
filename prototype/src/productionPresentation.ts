@@ -10,7 +10,7 @@ export function fittingSheet(content: string, title: string, ground = false): st
 
 /** Preserve disclosure identity when another pane inserts/removes its own details. */
 export function rememberProductionDetails(root: HTMLElement): () => void {
-  const key = (d: HTMLDetailsElement) => `${d.closest('.pw-hero-dossier') ? 'dossier/' : ''}${d.className}/${d.classList.contains('pw-fit-stats') ? 'stats' : d.classList.contains('pw-queues') ? 'queue' : d.querySelector('summary')?.textContent}/${d.dataset.hero ?? ''}`;
+  const key = (d: HTMLDetailsElement) => `${d.closest('.pw-hero-dossier') ? 'dossier/' : ''}${d.className}/${d.classList.contains('pw-fit-stats') ? 'stats' : d.querySelector('summary')?.textContent}/${d.dataset.hero ?? ''}`;
   const opened = new Map(Array.from(root.querySelectorAll('details')).map(d => [key(d), d.open]));
   return () => root.querySelectorAll('details').forEach(d => { const value = opened.get(key(d)); if (value !== undefined) d.open = value; });
 }
@@ -48,9 +48,6 @@ export function closeProductionOverlay(root: HTMLElement): boolean {
 export function presentProduction(root: HTMLElement): void {
   if (root.nodeType !== 1) return;
   root.classList.add('pw-production');
-  const stock = root.querySelector('.pw-stock');
-  const heading = root.querySelector('.cn-head > b');
-  if (stock && heading) heading.replaceWith(stock);
   wireTemplateDialogs(root);
   compareHardwareStats(root);
   const footer = root.querySelector('.pw-fitting-footer');
@@ -110,18 +107,6 @@ export function presentProduction(root: HTMLElement): void {
     const candidate = saved.length ? Array.from(dialog?.querySelectorAll<HTMLElement>('button,select') ?? [])
       .find(el => saved.every(([key, value]) => el.getAttribute(key) === value)) : undefined;
     (candidate ?? dialog?.querySelector<HTMLElement>('.cn-bay.sel,[data-cnmod],button'))?.focus({ preventScroll: true });
-  }
-  const content = root.querySelector('.pw-content');
-  const subnav = root.querySelector('.cnbox > .pw-subtabs');
-  if (content && subnav) content.prepend(subnav);
-  const context = content?.querySelector('#cn-planet');
-  const income = content?.querySelector('.pw-income');
-  const tabs = root.querySelector('.pw-main-tabs');
-  if (tabs && context && income) {
-    const row = document.createElement('div');
-    row.className = 'pw-context';
-    row.append(context, income);
-    tabs.before(row);
   }
   const heroWorld = root.querySelector('.pw-hero-world');
   if (heroWorld) heroWorld.textContent = (root.querySelector('#cn-planet') as HTMLSelectElement | null)?.selectedOptions[0]?.textContent ?? '';
@@ -190,7 +175,7 @@ export function presentProduction(root: HTMLElement): void {
       positions.delete(root);
       focused.delete(root);
       root.classList.add('pw-fitting-open');
-    } else if (target.closest('.cn-tab,.cn-close,[data-pw-queue]')) {
+    } else if (target.closest('.cn-tab,.cn-close,[data-pw-lane],[data-pw-back]')) {
       root.classList.remove('pw-fitting-open');
     }
   }, true);

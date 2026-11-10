@@ -1,4 +1,4 @@
-import { productionQueueHtml } from './productionQueueView';
+import { laneStripHtml, productionLanesHtml } from './productionQueueView';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t, tData } from '../../localization/runtime';
 import { ru } from '../../localization/ru';
@@ -418,16 +418,17 @@ describe('верфь — панель конструктора', () => {
 
 describe('верфь — окно', () => {
   it('открытая вкладка подсвечена, каркас на месте', () => {
-    const html = yardBoxHtml('squads', '<i>тело</i>');
-    expect(html).toContain('<button class="cn-tab on" data-ctab="squads">');
-    expect(html).toContain('<div id="constructorbody"><div class="pw-content"><i>тело</i></div><aside id="cn-queue"></aside></div>');
+    const html = yardBoxHtml('support', '<i>тело</i>');
+    expect(html).toContain('<button class="cn-tab on" data-ctab="support">');
+    expect(html).toContain('<div id="constructorbody"><div class="pw-content"><i>тело</i></div></div></section>');
+    expect(html).toContain('<nav id="cn-queue" class="pw-lane-list"></nav>');
   });
 
   it('полоса заказа стоит ПОД прокруткой окна, а не в её конце', () => {
     const html = yardBoxHtml('ships', '<i>тело</i>', '<div class="cn-order">заказ</div>');
-    expect(html).toContain('<div id="constructorbody"><div class="pw-content"><i>тело</i></div><aside id="cn-queue"></aside></div><div class="cn-order">заказ</div>');
+    expect(html).toContain('<div class="pw-content"><i>тело</i></div></div></section></div><div class="cn-order">заказ</div>');
     const win = fakeWin();
-    initShipyard(hostOf({ root: () => win })).open();
+    initShipyard(hostOf({ root: () => win })).open('ships');
     const out = win.html();
     expect(out.indexOf('class="cn-order"')).toBeGreaterThan(out.indexOf('id="constructorbody"'));
     expect(out).toMatch(/<\/div><div class="cn-order">[\s\S]*data-cnbuild[\s\S]*<\/div><\/div>$/);
@@ -438,7 +439,7 @@ describe('верфь — окно', () => {
     let intros = 0;
     const yard = initShipyard(hostOf({ root: () => win, onOpen: () => intros++ }));
     expect(win.shown()).toBe(false);
-    yard.open();
+    yard.open('ships');
     expect(win.shown()).toBe(true);
     expect(win.html()).toContain('cnbox');
     expect(intros).toBe(1);
@@ -447,7 +448,7 @@ describe('верфь — окно', () => {
   it('крестик закрывает окно', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-close'));
     expect(win.shown()).toBe(false);
   });
@@ -456,7 +457,7 @@ describe('верфь — окно', () => {
     const win = fakeWin();
     let heroIntros = 0;
     const yard = initShipyard(hostOf({ root: () => win, onHeroTab: () => heroIntros++ }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-tab', { ctab: 'heroes' }));
     expect(win.html()).toContain('id="herobody"');
     expect(heroIntros).toBe(1);
@@ -465,7 +466,7 @@ describe('верфь — окно', () => {
   it('смена вкладки на «Эскадрильи» переводит конструктор на её корпуса', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
-    yard.open();
+    yard.open('ships');
     expect(win.html()).toContain('data-cnhull="cruiser"');
     win.fire(click('.cn-tab', { ctab: 'squads' }));
     expect(win.html()).not.toContain('data-cnhull="cruiser"');
@@ -475,7 +476,7 @@ describe('верфь — окно', () => {
   it('смена корпуса сбрасывает обвес — слоты у корпусов разные', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     expect(worn(win.html())).toEqual([tData(data.modules.ion_engine!.name)]);
     win.fire(click('.cn-hbtn', { cnhull: 'scout' }));
@@ -485,7 +486,7 @@ describe('верфь — окно', () => {
   it('модуль ставится кликом, а снимается кнопкой «Снять» открытого отсека', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     expect(worn(win.html())).toEqual([tData(data.modules.ion_engine!.name)]);
     win.fire(click('[data-cnsel]', { cnsel: '2' }));
@@ -503,7 +504,7 @@ describe('верфь — окно', () => {
     const yard = initShipyard(
       hostOf({ root: () => win, state: () => s, note: (m) => notes.push(m) }),
     );
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     expect(notes.length).toBe(1);
     expect(notes[0]).toMatch(/^✖ E_/);
@@ -513,7 +514,7 @@ describe('верфь — окно', () => {
   it('счётчик не выходит за границы кликами', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('[data-cncount]', { cncount: '-' }));
     expect(win.html()).toContain('<span class="cn-sv">1</span>');
     for (let i = 0; i < 25; i++) win.fire(click('[data-cncount]', { cncount: '+' }));
@@ -524,7 +525,7 @@ describe('верфь — окно', () => {
     const win = fakeWin();
     const sent: Action[] = [];
     const yard = initShipyard(hostOf({ root: () => win, order: (a) => void sent.push(a) }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     win.fire(click('[data-cncount]', { cncount: '+' }));
     win.fire(click('[data-cnbuild]'));
@@ -549,7 +550,7 @@ describe('верфь — окно', () => {
         },
       }),
     );
-    yard.open();
+    yard.open('ships');
     // Пустая очередь — обычный случай: строки очереди нет вовсе (UIX-10.8).
     expect(win.html()).not.toContain('cn-oq');
     win.fire(click('[data-cnbuild]'));
@@ -558,7 +559,7 @@ describe('верфь — окно', () => {
     );
   });
 
-  it('очередь мира стоит над окном: идущий заказ с остатком, ждущие следом, новый подсвечен', () => {
+  it('очередь линии стоит над каталогом: идущий заказ с остатком, ждущий следом', () => {
     const win = fakeWin();
     let s = rich();
     const yard = initShipyard(
@@ -570,8 +571,8 @@ describe('верфь — окно', () => {
         },
       }),
     );
-    yard.open();
-    expect(win.html()).toContain('data-pw-empty="ships"');
+    yard.open('ships');
+    expect(win.html()).toContain(`<div class="pw-lane-strip"><p class="pw-strip-idle">${t('production.lane.idle')}</p></div>`);
     win.fire(click('[data-cnbuild]'));
     expect(win.html()).toContain('class="pw-job"');
     win.fire(click('[data-cncount]', { cncount: '+' }));
@@ -595,23 +596,30 @@ describe('верфь — окно', () => {
         return 'close';
       },
     }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('[data-hspawn]', { hspawn: hero.id }));
     expect(targetPicker).toBe(true);
     expect(sent).toEqual([]);
     expect(win.shown()).toBe(false);
   });
 
-  it('queue offers all idle lanes and renders actual production progress', () => {
+  it('the lane list shows all four lanes, idle ones too, and the running order with progress', () => {
     const s = rich();
     const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
-    expect(productionQueueHtml(s, home)).toContain('data-pw-empty="ships"');
-    expect(productionQueueHtml(s, '')).toBe('');
-    const after = applyOrder(s, buildShip('p1', home, 'cruiser', 3, []), s.time).state;
-    const html = productionQueueHtml(after, home);
-    expect(html).toContain('class="pw-job"');
-    expect(html).toContain('×3');
-    expect(html).toContain('<progress');
+    const idle = productionLanesHtml(s, home, null);
+    for (const lane of ['buildings', 'ships', 'shuttles', 'mobilization'])
+      expect(idle).toContain(`class="pw-lane-card idle" data-pw-lane="${lane}" aria-pressed="false"`);
+    expect(productionLanesHtml(s, '', null)).toBe('');
+    let after = applyOrder(s, buildShip('p1', home, 'cruiser', 3, []), s.time).state;
+    after = applyOrder(after, buildShip('p1', home, 'frigate', 1, []), after.time).state;
+    const html = productionLanesHtml(after, home, 'ships');
+    expect(html).toContain('class="pw-lane-card on" data-pw-lane="ships" aria-pressed="true"');
+    expect(html).toContain(`<b>${displayUnit('cruiser')} ×3</b><progress`);
+    expect(html).toContain('<span class="pw-lane-more">+1</span>');
+    const strip = laneStripHtml(after, home, 'ships');
+    expect(strip).toContain('class="pw-job"');
+    expect(strip).toContain('class="pw-job waiting"');
+    expect(strip).toContain('<progress');
   });
 
   it('refreshes completed and next orders on Heroes without replacing the hero pane', () => {
@@ -619,33 +627,35 @@ describe('верфь — окно', () => {
     const home = Object.values(s.planets).find(p => p.owner === 'p1')!.id;
     s = applyOrder(s, buildShip('p1', home, 'cruiser', 1, []), s.time).state;
     const win = fakeWin();
-    const details = { open: false };
     let queueHtml = '';
+    let stripHtml = '';
     const stock = { innerHTML: '' };
     const queue = {
       get innerHTML() { return queueHtml; },
-      set innerHTML(html: string) { queueHtml = html; details.open = true; },
-      querySelector: () => details,
+      set innerHTML(html: string) { queueHtml = html; },
+    };
+    const strip = {
+      get innerHTML() { return stripHtml; },
+      set innerHTML(html: string) { stripHtml = html; },
     };
     const yard = initShipyard(hostOf({ root: () => win, state: () => s }));
     yard.open('heroes', home);
     const originalPane = win.innerHTML;
-    win.querySelector = ((selector: string) => selector === '#cn-queue' ? queue : selector === '.pw-stock' ? stock : null) as typeof win.querySelector;
+    win.querySelector = ((selector: string) => selector === '#cn-queue' ? queue : selector === '.pw-lane-strip' ? strip : selector === '.pw-stock' ? stock : null) as typeof win.querySelector;
     // The hero HTML is unchanged when an unrelated order finishes; resources can change too.
     s.scheduled = s.scheduled.filter(e => e.type !== 'construction.complete');
     s.players.p1!.resources.metal = 8000;
     yard.refreshHeroes();
     yard.refreshQueue();
     expect(stock.innerHTML).toContain('8000');
-    expect(queueHtml).toContain('data-pw-empty="ships"');
-    expect(details.open).toBe(false);
+    expect(queueHtml).toContain('class="pw-lane-card idle" data-pw-lane="ships"');
     expect(win.innerHTML).toBe(originalPane);
     s = applyOrder(s, buildShip('p1', home, 'cruiser', 2, []), s.time).state;
     yard.refreshHeroes();
     yard.refreshQueue();
     expect(queueHtml).toContain('×2');
-    expect(queueHtml).not.toContain('data-pw-empty="ships"');
-    expect(details.open).toBe(false);
+    expect(queueHtml).not.toContain('class="pw-lane-card idle" data-pw-lane="ships"');
+    expect(stripHtml).toBe(''); // очередь мобилизации не менялась — её не перерисовывали
     expect(win.innerHTML).toBe(originalPane);
   });
 
@@ -663,7 +673,7 @@ describe('верфь — окно', () => {
       id: injection as unknown as number, kind: 'unit', playerId: 'p1',
       unit: 'cruiser', count: 1, progress: 0.5, remainingHours: 1, remainingCost: {},
     }];
-    const html = productionQueueHtml(after, home);
+    const html = laneStripHtml(after, home, 'ships') + productionLanesHtml(after, home, 'ships');
     expect(html).not.toContain('<img src=x');
     expect(html.match(/data-pw-cancel="&quot;&gt;&lt;img/g)).toHaveLength(2);
     expect(html).toContain('data-pw-resume="&quot;&gt;&lt;img');
@@ -673,7 +683,7 @@ describe('верфь — окно', () => {
     const win = fakeWin();
     const sent: Action[] = [];
     const yard = initShipyard(hostOf({ root: () => win, order: (a) => void sent.push(a) }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     win.fire(click('[data-cncount]', { cncount: '+' }));
     win.fire(click('[data-cntpl]'));
@@ -715,7 +725,7 @@ describe('верфь — окно', () => {
     const win = fakeWin();
     const notes: string[] = [];
     const yard = initShipyard(hostOf({ root: () => win, order: () => false, note: (m) => notes.push(m) }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('[data-cnbuild]'));
     expect(notes).toEqual([]);
     expect(win.html()).not.toContain('data-cnagain');
@@ -729,7 +739,7 @@ describe('верфь — окно', () => {
     const yard = initShipyard(
       hostOf({ root: () => win, state: () => homeless, order: (a) => void sent.push(a) }),
     );
-    yard.open();
+    yard.open('ships');
     win.fire(click('[data-cnbuild]'));
     expect(sent).toEqual([]);
   });
@@ -742,7 +752,7 @@ describe('верфь — окно', () => {
     const yard = initShipyard(
       hostOf({ root: () => win, state: () => s, order: (a) => void sent.push(a) }),
     );
-    yard.open();
+    yard.open('ships');
     // второй свой мир, если он есть; иначе первый — важен сам факт, что value доезжает
     const target = (mine[1] ?? mine[0])!.id;
     win.change({ id: 'cn-planet', value: target });
@@ -763,7 +773,7 @@ describe('верфь — окно', () => {
         },
       }),
     );
-    yard.open();
+    yard.open('ships');
     win.fire(click('[data-hsel]', { hsel: 'h1' }));
     expect(seen).toBe(1);
     expect(win.shown()).toBe(true);
@@ -776,7 +786,7 @@ describe('верфь — окно', () => {
     const win = fakeWin();
     const sent: Action[] = [];
     const yard = initShipyard(hostOf({ root: () => win, order: (a) => void sent.push(a) }));
-    yard.open();
+    yard.open('ships');
     const before = win.html();
     win.fire(click('.cn-nothing'));
     expect(win.html()).toBe(before);
@@ -800,19 +810,54 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
     expect(tData(data.buildings.shipyard!.name)).toBe('Орбитальная верфь');
   });
 
-  it('three sections retain the selected group and show its subcategories', () => {
-    for (const [tab, group, children] of [
-      ['support','ships',['ships','support','squads']],
-      ['heroes','infantry',['infantry','vehicles','heroes']],
+  it('a lane catalog shows only its own sections; the lane list has no tabs of its own', () => {
+    for (const [tab, lane, children] of [
+      ['support', 'ships', ['ships', 'support']],
+      ['heroes', 'mobilization', ['infantry', 'vehicles', 'heroes']],
     ] as const) {
       const html = yardBoxHtml(tab, '');
-      const main = html.split('pw-main-tabs')[1]!.split('pw-subtabs')[0]!;
-      expect(main).toContain(`class="cn-tab on" data-ctab="${group}"`);
-      const sub = html.split('pw-subtabs')[1]!.split('constructorbody')[0]!;
+      expect(html).not.toContain('pw-main-tabs');
+      expect(html).toContain(`<b>${t(lane === 'ships' ? 'production.lane.shipyard' : 'production.mobilization')}</b>`);
+      const sub = html.split('pw-subtabs')[1]!.split('pw-lane-strip')[0]!;
       for (const child of children) expect(sub).toContain(`data-ctab="${child}"`);
+      expect(sub).not.toContain('data-ctab="squads"');
       expect(sub).toContain(`class="cn-tab on" data-ctab="${tab}"`);
     }
-    expect(yardBoxHtml('buildings','')).not.toContain('pw-subtabs');
+    expect(yardBoxHtml('buildings', '')).not.toContain('pw-subtabs');
+    expect(yardBoxHtml('squads', '')).not.toContain('pw-subtabs');
+    const lanes = yardBoxHtml('ships', '<i>каталог</i>', '', '', '', '', { lane: null });
+    expect(lanes).not.toContain('pw-catalog');
+    expect(lanes).not.toContain('<i>каталог</i>');
+  });
+
+  it('opens on the lane list; a lane opens its catalog, a second tap or ← returns to the lanes', () => {
+    const win = fakeWin();
+    const heroTabs: number[] = [];
+    const yard = initShipyard(hostOf({ root: () => win, onHeroTab: () => void heroTabs.push(1) }));
+    yard.open();
+    expect(win.html()).toContain('data-pw-lane="ships"');
+    expect(win.html()).not.toContain('pw-catalog');
+    win.fire(click('[data-pw-lane]', { pwLane: 'shuttles' }));
+    expect(win.html()).toContain('class="cnbox pw-cat-open"');
+    expect(win.html()).toContain('data-cnhull="interceptor"');
+    expect(win.html()).not.toContain('data-cnhull="cruiser"');
+    win.fire(click('[data-pw-lane]', { pwLane: 'shuttles' }));
+    expect(win.html()).not.toContain('pw-catalog');
+    win.fire(click('[data-pw-lane]', { pwLane: 'mobilization' }));
+    win.fire(click('.cn-tab', { ctab: 'heroes' }));
+    expect(heroTabs).toEqual([1]);
+    expect(win.html()).toContain('штаб');
+    win.fire(click('[data-pw-back]'));
+    expect(win.html()).not.toContain('pw-catalog');
+    // Вернулся к той же линии — стоишь на том же разделе.
+    win.fire(click('[data-pw-lane]', { pwLane: 'mobilization' }));
+    expect(win.html()).toContain('class="cn-tab on" data-ctab="heroes"');
+    expect(heroTabs).toEqual([1, 1]);
+    // Вход с карточки мира ведёт сразу в свою линию, вход с рельсы — на список линий.
+    yard.open('infantry');
+    expect(win.html()).toContain('class="cn-tab on" data-ctab="infantry"');
+    yard.open();
+    expect(win.html()).not.toContain('pw-catalog');
   });
 
   it('РОД ВОЙСК РЕШАЮТ ДАННЫЕ, а не второй список: каждый наземный корпус ровно в одной вкладке', () => {
@@ -878,7 +923,7 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
     const s = withBuilding(rich(), 'barracks');
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win, state: () => s }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-tab', { ctab: 'infantry' }));
     expect(win.html()).toContain(t('data.militia'));
     expect(win.html()).not.toContain(t('data.cruiser'));
@@ -890,7 +935,7 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
     const sent: Action[] = [];
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win, state: () => s, order: (a) => void sent.push(a) }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-tab', { ctab: 'infantry' }));
     win.fire(click('[data-cnbuild]'));
     expect(sent).toHaveLength(1);
@@ -904,7 +949,7 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
     const sent: Action[] = [];
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win, state: () => s, order: (a) => void sent.push(a) }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-tab', { ctab: 'infantry' }));
     win.fire(click('[data-cnbuild]'));
     expect(sent).toEqual([]);
@@ -1091,7 +1136,7 @@ describe('производство — единая сетка плиток от
   it('плитка на арте открывает свой отсек, как строка отсека', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     win.fire(click('[data-cnsel]', { cnsel: '2' }));
     const html = win.html();
@@ -1177,7 +1222,7 @@ describe('производство — модули открытого отсе�
   it('установка и замена сохраняют выбранный отсек и выделение установленного модуля', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-mod', { cnmod: 'targeting_array' })); // в открытый отсек оружия
     expect(win.html()).toContain('class="cn-bay filled sel r-unique" data-cnsel="0"');
     expect(win.html()).toContain('data-cnmod="targeting_array" aria-pressed="true"');
@@ -1190,7 +1235,7 @@ describe('производство — модули открытого отсе�
   it('все отсеки заняты — после выбора открыт отсек с новым модулем, замена идёт в нём', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-tab', { ctab: 'support' }));
     win.fire(click('.cn-hbtn', { cnhull: 'scout' })); // один отсек системы
     win.fire(click('.cn-mod', { cnmod: 'compact_radar' }));
@@ -1203,7 +1248,7 @@ describe('производство — модули открытого отсе�
   it('«Снять» оставляет открытым освободившийся отсек — последний своего типа', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('.cn-hbtn', { cnhull: 'frigate' }));
     for (const [index, id] of ['cargo_bay', 'ion_engine', 'repair_bay'].entries()) {
       win.fire(click('[data-cnsel]', { cnsel: String(index + 1) }));
@@ -1219,7 +1264,7 @@ describe('производство — модули открытого отсе�
   it('смена корпуса и вкладки закрывает отсек и сворачивает неподходящие', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('[data-cnsel]', { cnsel: '2' }));
     win.fire(click('[data-cnunfit]'));
     expect(win.html()).toContain(t('yard.modules.unfit-hide'));
@@ -1239,7 +1284,7 @@ describe('производство — модули открытого отсе�
       scrollIntoView: (o: unknown) => scrolled.push([q, o]),
     });
     const yard = initShipyard(hostOf({ root: () => win }));
-    yard.open();
+    yard.open('ships');
     win.fire(click('[data-cnsel]', { cnsel: '1' }));
     expect(scrolled).toEqual([]); // открыть отсек — не прокрутка: модули рядом с кораблём
     win.fire(click('.cn-mod', { cnmod: 'ablative_plating' }));
@@ -1278,7 +1323,7 @@ describe('производство — «Как в прошлый раз» (UIX-
     const win = fakeWin();
     const sent: Action[] = [];
     const yard = initShipyard(hostOf({ root: () => win, order: (a) => void sent.push(a) }));
-    yard.open();
+    yard.open('ships');
     expect(win.html()).not.toContain('data-cnagain');
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     win.fire(click('[data-cncount]', { cncount: '+' }));

@@ -93,6 +93,7 @@ export function initHolographicUi(host: HolographicHost) {
   let selected = '';
   /** Раскладка окна выбора в прошлом кадре: сменилась — окно возвращают в экран. */
   let selectionLayout = '';
+  let productionLayout = '';
   /** Для чего подобрана ширина окна (UIX-14.2): узел сведений и раскладка с размером экрана.
    *  Сведения перерисовываются новым узлом `.pscroll`, поэтому сравнения узлов хватает, чтобы
    *  мерить только новое содержимое, а не каждый кадр. */
@@ -255,6 +256,13 @@ export function initHolographicUi(host: HolographicHost) {
           selected = key;
         }
         if (!key) selected = '';
+      }
+      // «Производство» выдвигает каталог открытой линии и становится шире: окно у правого
+      // края ушло бы за экран, поэтому смена раскладки возвращает его в экран.
+      const production = document.querySelector('#constructor.show .cnbox.pw-cat-open') ? 'catalog' : 'lanes';
+      if (production !== productionLayout) {
+        productionLayout = production;
+        windows.refit('constructor');
       }
       // Window coordinates only respond to the user's drag/keys and viewport resize.
       windows.sync(enabled, width, height, scale);

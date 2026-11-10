@@ -33,6 +33,14 @@ window.__productionFixture = (ready = true) => {
   shipyard.render();
 };
 `));
+/** Открыть линию окна: на телефоне каталог другой линии закрывает список — сначала «←». */
+async function openLane(page, lane) {
+  if (await page.locator(`#constructor .pw-catalog[data-lane="${lane}"]`).count()) return;
+  const back = page.locator('#constructor .pw-lane-back');
+  if (await back.count() && await back.isVisible()) await back.click();
+  await page.locator(`#constructor [data-pw-lane="${lane}"]`).click();
+  await page.locator(`#constructor .pw-catalog[data-lane="${lane}"]`).waitFor();
+}
 const browser = await launchBrowser();
 const errors = [];
 const results = [];
@@ -61,13 +69,18 @@ try {
     await page.evaluate(() => document.getElementById('intro')?.classList.remove('show'));
     assert.equal(await page.locator('#buildwin').count(), 0);
     await page.evaluate(() => window.__productionBroke());
-    await page.locator('#constructor [data-ctab="buildings"]').first().click();
-    await page.locator('#constructor [data-pw-info="building:barracks"]').scrollIntoViewIfNeeded();
+    // The window opens on the lane list; a lane opens its catalog.
+    assert.equal(await page.locator('#constructor .pw-catalog').count(), 0);
+    await openLane(page, 'buildings');
+    // The buildings catalog repaints every refresh; scroll in-page so a repaint can't detach
+    // the card between Playwright's stability checks.
+    await page.locator('#constructor [data-pw-info="building:barracks"]').waitFor();
+    await page.evaluate(() => document.querySelector('#constructor [data-pw-info="building:barracks"]').scrollIntoView({ block: 'center' }));
     const scrollBefore = await page.locator('#constructorbody').evaluate(el => el.scrollTop);
     await page.evaluate(() => window.__productionBroke());
     const scrollAfter = await page.locator('#constructorbody').evaluate(el => el.scrollTop);
     assert.ok(Math.abs(scrollAfter - scrollBefore) <= 2, `building scroll reset: ${scrollBefore} -> ${scrollAfter}`);
-    await page.locator('#constructor [data-ctab="ships"]').first().click();
+    await openLane(page, 'ships');
     // Separate info action and research -> return to the same card.
     await page.locator('#constructor [data-pw-info="unit:heavy_cruiser"]').click();
     await page.locator('#codex.show').waitFor();
@@ -116,8 +129,7 @@ try {
     assert.equal(await page.locator('.pw-template-picker').count(), 0);
     assert.ok(await page.locator('#constructor.pw-fitting-open.show').count());
     await page.locator('#constructor [data-pw-fit-close]').click();
-    await page.locator('#constructor [data-pw-queue]').click();
-    await page.locator('#constructor [data-pw-empty="ships"]').click();
+    await page.locator('#constructor .pw-catalog-heading [data-cntpl]').click();
     assert.ok(await page.locator('#constructor .cn-tplrow .rcost').count());
     await page.locator('#constructor [data-cntpldel]').first().click();
     await page.locator('.pw-template-editor [data-pw-template-close]').last().click();
@@ -134,7 +146,7 @@ try {
     await page.evaluate(() => window.__productionFixture(false));
     await page.locator('#constructor [data-pw-building="shipyard"]').first().click();
     assert.ok(await page.locator('#constructor [data-bw="shipyard"].pw-anchor').count());
-    await page.locator('#constructor [data-ctab="infantry"]').first().click();
+    await openLane(page, 'mobilization');
     await page.locator('#constructor [data-ctab="heroes"]').click();
     await page.locator('#constructor .hx-bay.off[data-htab="abilities"]').first().click();
     assert.ok(await page.locator('#constructor .pw-hero-pool[open]').count());
@@ -178,34 +190,33 @@ try {
     await page.locator('#constructor [data-hflagapply]').click();
     assert.equal(await page.locator('#constructor .pw-flagship-picker[open]').count(), 0);
     assert.ok(await page.locator('#constructor [data-hflagapply]').isDisabled());
-    // A changing queue count must not reopen a disclosure the player closed.
+    // An order shows up at once in the lane's own queue above its catalog.
     await page.evaluate(() => window.__productionFixture());
-    await page.locator('#constructor [data-ctab="ships"]').first().click();
-    if (await page.locator('#constructor .pw-queues[open]').count())
-      await page.locator('#constructor .pw-queues > summary').click();
+    await openLane(page, 'ships');
     await page.locator('#constructor [data-cnhull="frigate"]').click();
     await page.locator('#constructor [data-cnbuild]').click();
-    assert.equal(await page.locator('#constructor .pw-queues[open]').count(), 0);
-    assert.ok(await page.locator('#constructor .pw-job').count());
+    assert.ok(await page.locator('#constructor .pw-lane-strip .pw-job').count());
     // Repeating an equipped order after switching tabs must reopen its exact draft.
     await page.locator('#constructor [data-cnhull="frigate"]').click();
     const repeatedModule = await page.locator('#constructor [data-cnmod]').first().getAttribute('data-cnmod');
     await page.locator('#constructor [data-cnmod]').first().click();
     await page.locator('#constructor [data-cnbuild]').click();
-    await page.locator('#constructor [data-ctab="infantry"]').first().click();
+    await openLane(page, 'mobilization');
+    await page.locator('#constructor [data-ctab="infantry"]').click();
     await page.locator('#constructor [data-cnagain]').click();
     assert.ok(await page.locator('#constructor.pw-fitting-open').count());
     assert.equal(await page.locator('#constructor .cn-bay.filled [data-cnrm]').getAttribute('data-cnrm'), repeatedModule);
     assert.ok(await page.locator('#constructor [data-cnbuild]').isVisible());
     await page.locator('#constructor [data-cnbuild]').click();
     assert.equal(await page.locator('#constructor.pw-fitting-open').count(), 0);
-    await page.locator('#constructor [data-ctab="infantry"]').first().click();
+    await openLane(page, 'mobilization');
+    await page.locator('#constructor [data-ctab="infantry"]').click();
     await page.locator('#constructor [data-cnhull="militia"]').click();
     for (let n = 1; n < 4; n++) await page.locator('#constructor [data-cncount="+"]').click();
     assert.equal(await page.locator('#constructor .cn-sv').innerText(), '4');
     await page.locator('#constructor [data-cnbuild]').click();
     assert.equal(await page.locator('#constructor.pw-fitting-open').count(), 0);
-    assert.match(await page.locator('#constructor #cn-queue').innerText(), /×4/);
+    assert.match(await page.locator('#constructor .pw-lane-strip').innerText(), /×4/);
     const overflow = await page
       .locator('#constructorbody')
       .evaluate((el) => el.scrollWidth - el.clientWidth);
@@ -218,8 +229,8 @@ try {
     // Keep the picker fixture isolated from the catalog/fitting regression above.
     await page.evaluate(() => window.__productionPickerScene());
     for (const tab of ['ships', 'buildings', 'heroes']) {
-      if (tab === 'heroes') await page.locator('#constructor [data-ctab="infantry"]').first().click();
-      await page.locator(`#constructor [data-ctab="${tab}"]`).first().click();
+      await openLane(page, tab === 'heroes' ? 'mobilization' : tab);
+      if (tab === 'heroes') await page.locator('#constructor [data-ctab="heroes"]').click();
       const picker = page.locator('#constructor #cn-planet');
       const selected = await picker.inputValue();
       const before = await page.locator('#constructor .pw-stock').innerText();
