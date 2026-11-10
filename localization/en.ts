@@ -60,6 +60,8 @@ export const en: Record<string, string> = {
   "production.lane.spaceport": "Spaceport",
   "production.lane.idle": "Line available",
   "production.lane.free": "Free",
+  "production.world.idle": "idle",
+  "production.world.idle-count": "Idle lines on {n} {n|world|worlds}",
   "production.lane.paused": "Paused",
   "production.lane.back": "Back to lines",
   "production.lane.hide": "Hide catalog",

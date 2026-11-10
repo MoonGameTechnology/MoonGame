@@ -1,7 +1,7 @@
 /**
- * Каркас окна «Производство»: шапка, строка мира, список линий и каталог открытой линии
+ * Каркас окна «Производство»: шапка с выбором мира, строка запаса и дохода, список линий и каталог открытой линии
  * (заказ владельца 2026-11-09 «сначала линии»). Разметка чистая; что в каталоге, решает
- * `shipyard.ts`, какие разделы у линии — `decisions/productionLanes.ts`.
+ * `shipyard.ts`, какие разделы у линии — `decisions/productionSections.ts`.
  */
 import { holoIcon } from './holographicIcons';
 import { t } from '../../localization/runtime';
@@ -28,6 +28,8 @@ export interface ProductionFrame {
   lane?: ProductionLane | null;
   strip?: string;
   context?: string;
+  /** Выбор мира — в шапке, рядом с названием окна. */
+  world?: string;
   orders?: string;
 }
 
@@ -56,7 +58,7 @@ export function yardBoxHtml(
       `<div class="pw-lane-strip">${frame.strip ?? ''}</div><div id="constructorbody"><div class="pw-content">${body}</div></div></section>`
     : '';
   return (
-    `<div class="cnbox${lane ? ' pw-cat-open' : ''}"><div class="cn-head"><b>${holoIcon('hammer')}${t('yard.title')}</b>${again}<button class="cn-close btn-x">✕</button></div>` +
+    `<div class="cnbox${lane ? ' pw-cat-open' : ''}"><div class="cn-head"><b>${holoIcon('hammer')}${t('yard.title')}</b>${frame.world ?? ''}${again}<button class="cn-close btn-x">✕</button></div>` +
     (frame.context ?? '') +
     templates +
     `<div class="pw-work"><div class="pw-lane-pane"><nav id="cn-queue" class="pw-lane-list">${queue}</nav>${frame.orders ?? ''}</div>${catalog}</div>${order}</div>`

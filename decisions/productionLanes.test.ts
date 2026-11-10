@@ -6,7 +6,7 @@ import {
   type BuildingInstance,
   type GameState,
 } from '../packages/shared-core/src/index';
-import { shownProductionLanes } from './productionLanes';
+import { idleProductionLanes, shownProductionLanes } from './productionLanes';
 
 const data = parseGameData({
   version: '0.1.0',
@@ -98,5 +98,14 @@ describe('какие очереди производства показать н
       'mobilization',
     ]);
     expect(shownProductionLanes(world([]), 'нет', ['ships'], data)).toEqual(['ships']);
+  });
+
+  it('простаивает полоса, где мир может строить и ничего не строит', () => {
+    const s = world(['shipyard', 'barracks']);
+    expect(idleProductionLanes(s, 'A', UNIT_LANES, data)).toEqual(['ships', 'mobilization']);
+    s.planets.A!.buildQueue = [{ id: 1, kind: 'unit', playerId: 'p1', unit: 'trooper', count: 1 }];
+    expect(idleProductionLanes(s, 'A', UNIT_LANES, data)).toEqual(['ships']);
+    // Без постройки полосе нечего строить — это не простой.
+    expect(idleProductionLanes(world([]), 'A', UNIT_LANES, data)).toEqual([]);
   });
 });

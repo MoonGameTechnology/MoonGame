@@ -63,6 +63,8 @@ export const ru: Record<string, string> = {
   "production.lane.spaceport": "Космопорт",
   "production.lane.idle": "Линия свободна",
   "production.lane.free": "Свободна",
+  "production.world.idle": "простой",
+  "production.world.idle-count": "Простаивают линии: {n} {n|мир|мира|миров}",
   "production.lane.paused": "На паузе",
   "production.lane.back": "К линиям",
   "production.lane.hide": "Скрыть каталог",

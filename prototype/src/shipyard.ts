@@ -67,6 +67,7 @@ import { unitIconHtml } from './icons';
 import { catalogPortraitHtml } from './shipArt';
 import { SECTOR_TYPES } from './map';
 import { worldName } from './planetName';
+import { productionWorldSelect } from './productionWorldPicker';
 import { originOf } from './arsenal';
 import { originLabel } from './arsenalScreen';
 import { buildShip } from '../../decisions/actions';
@@ -808,9 +809,9 @@ export function initShipyard(host: YardHost) {
         ? templatesPaneHtml(state, me, templates, templateOf(tab, draft), host.youColor(), tab)
         : '';
     const restoreDetails = rememberProductionDetails(host.root());
-    const context = `<div class="pw-context">${productionStockHtml(state, me)}${productionWorldSelect(state, me, draft.planet)}${draft.planet ? productionIncomeHtml(state, me, draft.planet) : ''}</div>`;
+    const context = `<div class="pw-context">${productionStockHtml(state, me)}${draft.planet ? productionIncomeHtml(state, me, draft.planet) : ''}</div>`;
     host.root().innerHTML = yardBoxHtml(tab, body, order, lane ? repeatOrderHtml(last, tab, draft) : '', refresh.queueHtml(), tplPane, {
-      lane, context, strip: refresh.stripHtml(),
+      lane, context, strip: refresh.stripHtml(), world: productionWorldSelect(state, draft.planet, productionWorlds(state, me)),
       orders: draft.planet ? worldOrdersHtml(state, me, draft.planet) : '',
     });
     if (paintedTab === painting) restoreDetails();
@@ -1010,9 +1011,6 @@ export function initShipyard(host: YardHost) {
 /** Include owned worlds with unmet requirements so the player can resolve them here. */
 function productionWorlds(state: GameState, me: string) {
   return Object.values(state.planets).filter(p => p.owner === me && SECTOR_TYPES[p.kind ?? '']?.buildable);
-}
-function productionWorldSelect(state: GameState, me: string, selected: string): string {
-  return `<select id="cn-planet" class="cn-plan" aria-label="${t('yard.where')}">${productionWorlds(state, me).map(p => `<option value="${esc(p.id)}"${p.id === selected ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`).join('')}</select>`;
 }
 function anchorBuilding(root: HTMLElement, id: string): void {
   const target = Array.from(root.querySelectorAll<HTMLElement>('[data-bw]')).find(el => el.dataset.bw === id);

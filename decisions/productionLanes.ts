@@ -63,3 +63,19 @@ export function shownProductionLanes(
   );
   return shown.length > 0 || lanes.length === 0 ? shown : [lanes[0]!];
 }
+
+/**
+ * Простаивающие полосы мира (точка у выбора мира в окне «Производство», макет
+ * 2026-11-09): мир МОЖЕТ строить в полосе (правило 1), а в ней нет ни идущего, ни ждущего,
+ * ни приостановленного заказа. Полоса без постройки не простаивает — ей нечего строить.
+ */
+export function idleProductionLanes(
+  state: GameState,
+  planetId: string,
+  lanes: readonly BuildLane[],
+  data: GameData,
+): BuildLane[] {
+  return lanes.filter(
+    (l) => canProduce(state, planetId, l, data) && !hasWork(state, planetId, l, data),
+  );
+}
