@@ -200,4 +200,15 @@ describe('окно «Шпионаж»', () => {
     tap('spywin', { '[data-spy-yes]': {} });
     expect(env.orders.map(order)).toEqual([{ type: 'espionage.cancel', payload: { spyId: 3 } }]);
   });
+
+  it('путь шпиона звучит в журнале его позывным и миром', async () => {
+    const { win } = await boot([{ id: 1, state: 'wait', location: 'w9' }]);
+    expect(win.spyJourneyLine('espionage.arrived', { owner: 'p1', spyId: 1, planetId: 'w9' })).toBe(
+      t('log.spy.arrived', { who: t('spy.callsign.0'), at: '«w9»', task: '' }),
+    );
+    expect(win.spyJourneyLine('espionage.waiting', { owner: 'p1', spyId: 1, planetId: 'w9', kind: 'theft' })).toContain(
+      t('spy.task.theft.name'),
+    );
+    expect(win.spyJourneyLine('espionage.home', { owner: 'p2', spyId: 1 })).toBeNull();
+  });
 });

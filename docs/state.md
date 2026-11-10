@@ -279,7 +279,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   (остаётся на посту и открывает слои), саботаж, срыв стройки, подрыв экономики,
   кража ресурсов и исследований, контрразведка; бюро контрразведки раскрывает, убивает или
   перевербовывает. Раскрытие войны не объявляет, но публично.
-  Шанс в карточке — `decisions/spyOdds.ts`; цены — `SPY_OP_COST`.
+  Шанс в вопросе «Да / Нет» вкладки «Шпионаж» — `decisions/spyOdds.ts`; цены — `SPY_OP_COST`.
 - `seatClaim` — место в идущей сетевой партии.
 
 **PvE и Sector Zero.**
@@ -411,7 +411,14 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   перевозки на карте (`decisions/troopTransferTimers.ts`, `mapTransfers.ts`), цепочка приказов
   `chainPlanner.ts`, шаттлы — `hangarPanel.ts`, `squadronPanel.ts`.
 - Дипломатия, коалиции (`coalitionWindow.ts`), метки (`pingUi.ts`,
-  [ping-system.md](ping-system.md)), шпионаж с архивом донесений (`decisions/spyArchive.ts`).
+  [ping-system.md](ping-system.md)).
+- Вкладка «Шпионаж» (`spyWindow.ts`, кнопка рядом с «Дипломатией» и «Сообщениями», на
+  телефоне — в «Ещё»): строка на шпиона — портрет с уровнем (`spyPortrait.ts`), позывной,
+  место, занятие, таймер и одна кнопка (`decisions/spyRoster.ts`); «Дать задание» — 8
+  карточек от передислокации до саботажа, невозможные на выбранном мире серые
+  (`decisions/spyTasks.ts`); затем выбор мира на карте и вопрос «Да / Нет» с шансом и
+  временем пути. На карточке мира — одна кнопка шпиона. Под списком — окна разведки и архив
+  донесений (`decisions/spyArchive.ts`); строки о пути шпиона — `decisions/spyJourney.ts`.
 - Клавиши ПК — `decisions/hotkeys.ts`, `pcHotkeys.ts`; Back и Escape — `backLayers.ts`,
   `backGesture.ts`. Вид: размеры текста `typeScale` в `packages/client/src/theme.ts` =
   `--fs-*` в `prototype/styles/01-base.css`, палитра `--sf-*` (сторож — `surfaceTokens.test.ts`);

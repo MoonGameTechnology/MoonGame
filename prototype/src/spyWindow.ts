@@ -29,6 +29,7 @@ import {
 import { cancelSpy, spyOn } from '../../decisions/actions';
 import { pushSpyRecord, spyOpGlyph, spyRecordOf, type SpyRecord } from '../../decisions/spyArchive';
 import { spyRoster, type RosterRow, type SpyRecordView, type SpyDoing } from '../../decisions/spyRoster';
+import { SPY_JOURNEY_EVENTS, spyJourneyKey } from '../../decisions/spyJourney';
 import { SPY_TASKS, taskBlock, type SpyTask, type TaskBlock } from '../../decisions/spyTasks';
 import { oddsPct } from '../../decisions/spyOdds';
 import { espionageShown } from '../../decisions/sectorZeroTools';
@@ -307,6 +308,36 @@ let spyLog: SpyRecord[] = [];
 export function pushSpyLog(text: string, type = '', payload: Record<string, unknown> = {}): void {
   spyLog = pushSpyRecord(spyLog, spyRecordOf(type, payload, game.state().time, text));
   refreshSpyWindow();
+}
+/** Строка ленты и журнала о пути своего шпиона (`decisions/spyJourney.ts`); `null` —
+ *  событие не о моём шпионе или не о пути. */
+export function spyJourneyLine(type: string, p: Record<string, unknown>): string | null {
+  const key = spyJourneyKey(type, p, game.me());
+  if (!key) return null;
+  const id = typeof p.spyId === 'number' ? p.spyId : 0;
+  const task = p.kind ?? p.op;
+  return t(key, {
+    who: nameOf(id) || t('log.spy.who'),
+    at: typeof p.planetId === 'string' ? game.placeName(p.planetId) : '',
+    task: typeof task === 'string' ? taskName(task as SpyDoing) : '',
+  });
+}
+/** Отправка и путь своего шпиона — в ленту `note` и в журнал; `true`, если событие об этом
+ *  (тогда лента дальше его не разбирает). SPY-8: на операцию — с её длительностью. */
+export function tellSpyJourney(type: string, p: Record<string, unknown>, note: (text: string) => void): boolean {
+  if (type !== 'espionage.sent' && !(SPY_JOURNEY_EVENTS as readonly string[]).includes(type)) return false;
+  if (type === 'espionage.sent' && p.owner === game.me() && p.op !== 'relocate') {
+    const at = game.placeName(String(p.planetId));
+    note(t('log.spy.sent', { at, n: MISSION_HOURS }));
+    pushSpyLog(t('log.spy.sent.short', { at }), type, p);
+    return true;
+  }
+  const line = spyJourneyLine(type, p);
+  if (line) {
+    note(line);
+    pushSpyLog(line, type, p);
+  }
+  return true;
 }
 /** Архив для сейва схватки. */
 export function spyArchive(): SpyRecord[] {
