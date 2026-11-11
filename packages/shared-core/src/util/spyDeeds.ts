@@ -34,11 +34,25 @@ const THEFT_SHARE_MIN = 0.05;
 const THEFT_SHARE_MAX = 0.15;
 export const THEFT_CAP = 500;
 
+/** How well `spyId` of `playerId` does a deed of `kind` — the `espionage.quality`
+ *  pipeline over a base of 1 (the spy-levels module raises it by level). A broken or
+ *  non-positive result falls back to 1: a pipeline must not switch a deed off. */
+export function spyQuality(
+  h: HandlerContext,
+  playerId: string,
+  spyId: number,
+  kind: string,
+): number {
+  const raw = h.hook<number>('espionage.quality', 1, { playerId, spyId, kind });
+  return Number.isFinite(raw) && raw > 0 ? raw : 1;
+}
+
 /** Sabotage: pick 3–5 distinct damageable buildings of the world and hand them to the
  *  `building.damage` capability. Fewer buildings than the roll → every one is hit. */
 export function sabotage(
   h: HandlerContext,
   planetId: string,
+  quality = 1,
 ): { building: string; destroyed: boolean }[] {
   const planet = h.state.planets[planetId]!;
   const pool: { index: number; maxHp: number }[] = [];
@@ -55,15 +69,17 @@ export function sabotage(
     const j = h.rng.nextInt(i, pool.length);
     [pool[i], pool[j]] = [pool[j]!, pool[i]!];
     const share =
-      SABOTAGE_SHARE_MIN + h.rng.nextFloat() * (SABOTAGE_SHARE_MAX - SABOTAGE_SHARE_MIN);
+      (SABOTAGE_SHARE_MIN + h.rng.nextFloat() * (SABOTAGE_SHARE_MAX - SABOTAGE_SHARE_MIN)) *
+      quality;
     hits.push({ index: pool[i]!.index, amount: Math.round(pool[i]!.maxHp * share) });
   }
   return h.capability<BuildingDamage>('building.damage')?.(h, planetId, hits) ?? [];
 }
 
-/** Queue sabotage: roll 6–12 h and hand them to the `construction.delay` capability. */
-export function delayQueue(h: HandlerContext, planetId: string): DelayedOrder | null {
-  const hours = h.rng.nextInt(DELAY_MIN_HOURS, DELAY_MAX_HOURS + 1);
+/** Queue sabotage: roll 6–12 h (times `quality`, rounded) and hand them to the
+ *  `construction.delay` capability. */
+export function delayQueue(h: HandlerContext, planetId: string, quality = 1): DelayedOrder | null {
+  const hours = Math.round(h.rng.nextInt(DELAY_MIN_HOURS, DELAY_MAX_HOURS + 1) * quality);
   return h.capability<ConstructionDelay>('construction.delay')?.(h, planetId, hours) ?? null;
 }
 
@@ -81,18 +97,19 @@ export function disrupt(h: HandlerContext, planetId: string): number {
 /** Theft: a random resource the victim holds at least one whole unit of, 5–15% of it
  *  (rounded down, at most `THEFT_CAP`), moved to the spy. Both the share and the cap grow
  *  by the world's `developmentShare` (SPY-21): up to twice from the civilisation's most
- *  developed world. `null` — nothing to take. */
+ *  developed world, and both by the spy's `quality`. `null` — nothing to take. */
 export function theft(
   h: HandlerContext,
   spy: string,
   victim: string,
   development: number,
+  quality = 1,
 ): { resource: string; amount: number } | null {
   const purse = h.state.players[victim]!.resources;
   const held = h.ctx.data.resources.filter((r) => (purse[r] ?? 0) >= 1);
   if (held.length === 0) return null;
   const resource = held[h.rng.nextInt(0, held.length)]!;
-  const scale = 1 + development;
+  const scale = (1 + development) * quality;
   const share = (THEFT_SHARE_MIN + h.rng.nextFloat() * (THEFT_SHARE_MAX - THEFT_SHARE_MIN)) * scale;
   const cap = Math.floor(THEFT_CAP * scale);
   const amount = Math.min(cap, purse[resource]!, Math.max(1, Math.floor(purse[resource]! * share)));
