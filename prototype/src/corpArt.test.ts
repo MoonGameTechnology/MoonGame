@@ -105,6 +105,22 @@ describe('здание на панораме (corpSprite)', () => {
     expect(y + h).toBeCloseTo(lot.h, 0);
   });
 
+  it('портрет карточки — окно по нарисованному, а не весь участок', () => {
+    const view = (svg: string): number[] => /viewBox="([^"]+)"/.exec(svg)![1]!.split(' ').map(Number);
+    const lot = CORP_LOTS.headquarters!;
+    expect(view(corpSprite('headquarters', 1, 'built'))).toEqual([0, 0, lot.w, lot.h]);
+    const [x, y, w, h] = view(corpSprite('headquarters', 1, 'built', 'standard', false, true)) as [number, number, number, number];
+    // Первый уровень штаба занимает малую часть участка: окно вдвое меньше по высоте.
+    expect(h).toBeLessThan(lot.h / 2);
+    expect(y + h).toBeCloseTo(lot.h, 0); // низ окна — линия земли
+    expect(x).toBeGreaterThan(0);
+    expect(w).toBeLessThan(lot.w);
+    // Полоса уровней: одно окно на все уровни, по самому большому из них.
+    const strip = [1, 5].map((l) => view(corpSprite('headquarters', l, 'built', 'standard', false, 5)));
+    expect(strip[0]).toEqual(strip[1]);
+    expect(strip[0]![3]).toBeGreaterThan(h);
+  });
+
   it('здание без рисунка получает корпус-заглушку', () => {
     const svg = corpSprite('orbital_dock', 1, 'built');
     expect(images(svg)).toEqual([]);
