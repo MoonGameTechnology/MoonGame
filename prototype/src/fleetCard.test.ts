@@ -29,6 +29,7 @@ import type { Dossier } from './dossiers';
 import { liveRender, liveText } from './liveTimers.fixture';
 import type { SectorType } from './map';
 import { HOUR } from './time';
+import { worldName } from './planetName';
 
 // Под Node нет языка браузера: рантайм свалился бы в EN, и подписи разъехались бы с ожиданиями.
 beforeAll(() => setLocale('ru'));
@@ -666,9 +667,12 @@ describe('карточка группы', () => {
     ];
     const html = m.taskGroupPanelHtml(group);
     expect(html).toContain(t('side.group.sub', { f: 3, s: 4, tr: 4 }));
-    expect(html).toContain('▲ F1 <span class="dim">A</span> · 2</div>');
-    expect(html).toContain('▲ F3 <span class="dim">A→Z</span> · 1+4</div>');
-    expect(html).toContain('▲ F4 <span class="dim">⟜ Z–N</span> · 1</div>');
+    // Флот — его именем, место — именем мира, а не внутренними id.
+    const at = (id: string) => worldName(env.s, id);
+    expect(html).toContain(`▲ Флот «F1» <span class="dim">${at('A')}</span> · 2</div>`);
+    expect(html).toContain(`▲ Флот «F3» <span class="dim">${at('A')}→${at('Z')}</span> · 1+4</div>`);
+    expect(html).toContain(`▲ Флот «F4» <span class="dim">⟜ ${at('Z')}–${at('N')}</span> · 1</div>`);
+    expect(at('A')).not.toBe('A');
     expect(html).toContain(act('cancel'));
   });
 });
