@@ -205,7 +205,7 @@ export function productionOrderHtml(view: {
   count: number; max: number; world: string; worldName: string; price: string; time: string;
   queue: string; where: string; affordable: boolean; canBuild: boolean; block: string;
 }): string {
-  return `<div class="cn-order"><div class="cn-step"><span class="pw-quantity-label">${t('production.quantity')}</span><button data-cncount="-"${view.count <= 1 ? ' disabled' : ''}>−</button><span class="cn-sv">${view.count}</span><button data-cncount="+"${view.count >= view.max ? ' disabled' : ''}>+</button></div>` +
+  return `<div class="cn-order"><div class="cn-step"><span class="pw-quantity-label">${t('production.quantity')}</span><button data-cncount="-" data-repeat${view.count <= 1 ? ' disabled' : ''}>−</button><span class="cn-sv">${view.count}</span><button data-cncount="+" data-repeat${view.count >= view.max ? ' disabled' : ''}>+</button></div>` +
     `<div class="pw-order-quote"><span>${t('production.planet')}</span><b>${esc(view.worldName)}</b><span>${t('production.cost')}</span><div class="cn-oprice">${view.price}</div><span>${t('production.duration')}</span><span class="cn-otime">${view.time}</span></div>` +
     `<div class="cn-oworld">${view.queue || view.where}</div>` +
     (view.block ? `<span class="pw-order-block">${esc(view.block)}</span>` : '') +

@@ -397,7 +397,7 @@ describe('верфь — панель конструктора', () => {
       YARD_HULLS,
       view,
     );
-    expect(one).toContain('data-cncount="-" disabled');
+    expect(one).toContain('data-cncount="-" data-repeat disabled');
     const many = orderBarHtml(
       s,
       'p1',
@@ -405,7 +405,7 @@ describe('верфь — панель конструктора', () => {
       YARD_HULLS,
       view,
     );
-    expect(many).toContain('data-cncount="+" disabled');
+    expect(many).toContain('data-cncount="+" data-repeat disabled');
   });
 
   it('снимок арсенала добавляет честную оговорку про сроки', () => {

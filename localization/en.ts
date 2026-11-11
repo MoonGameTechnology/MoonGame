@@ -2400,6 +2400,7 @@ export const en: Record<string, string> = {
   'hint.auto-assault':
     '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
   'hint.cast-cancelled': '✖ ability cancelled',
+  'hint.hold-confirm': 'hold for {n} s',
   'hint.deploy-cancelled': '✖ deploy cancelled',
   'hint.forced-march': '⚡ forced march: +50% speed, −5% hull per hour underway',
   'hint.multiselect': '⊕ click your fleets — build the group, then give a common order',

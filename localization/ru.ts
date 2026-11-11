@@ -2406,6 +2406,7 @@ export const ru: Record<string, string> = {
   'hint.auto-retreat.nowhere': '⤺ некуда отходить: выбери свой мир или назначь столицу',
   'hint.auto-assault': '⚔ авто-штурм включён — флот сам штурмует вражеский мир по прибытии',
   'hint.cast-cancelled': '✖ способность отменена',
+  'hint.hold-confirm': 'удерживайте {n} с',
   'hint.deploy-cancelled': '✖ развёртывание отменено',
   'hint.forced-march': '⚡ форс-марш: +50% скорости, −5% прочности за час хода',
   'hint.multiselect': '⊕ щёлкайте по своим флотам — соберите группу и отдайте общий приказ',

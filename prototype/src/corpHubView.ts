@@ -9,8 +9,9 @@ import type { CorpMaterialsView } from '../../packages/protocol/src/corpInfrastr
  *
  * Кнопки несут те же `data-corpact`, что и окно корпорации в партии: приказ один, и
  * разбирает его один обработчик. Приказ, который не отменить (покинуть, расформировать,
- * исключить, передать главенство), просит второго нажатия: `data-corpconfirm` — ключ
- * кнопки, и взведённая кнопка вместо названия задаёт вопрос.
+ * исключить, передать главенство), исполняется УДЕРЖАНИЕМ (`holdButton.ts`): короткий тап
+ * взводит кнопку, и она вместо названия задаёт вопрос; `data-corpconfirm` — ключ кнопки.
+ * Клик без нажатия (экранный диктор) по-прежнему идёт в два шага.
  *
  * Здания рисуются в стиле базы (CORP-14): его применяет глава из «Настроек» в шторке «Стиль базы»
  * (`data-corpstyle`), а за некупленным ведёт в магазин (`data-corpshop`).
@@ -60,6 +61,7 @@ import {
   type CorpLot,
 } from './corpSprites';
 import { esc, nfmt } from './format';
+import { holdConfirmHtml } from './holdButton';
 import { newsCalendar, newsTimeText } from './newsScreen';
 
 // --- таблицы ---------------------------------------------------------------------------
@@ -462,9 +464,10 @@ function confirmable(
   look: string,
 ): string {
   const armed = p.armed === key;
+  // Исполняется удержанием, короткий тап только показывает вопрос (`holdButton.ts`).
   return (
-    `<button type="button" class="${look}${armed ? ' armed' : ''}" ${attrs} data-corpconfirm="${esc(key)}"${off(p.busy)}>` +
-    `${esc(armed ? question : label)}</button>`
+    `<button type="button" class="${look} holdable${armed ? ' armed' : ''}" ${attrs} data-corpconfirm="${esc(key)}" data-hold="${esc(key)}"${off(p.busy)}>` +
+    `${holdConfirmHtml(label, question)}</button>`
   );
 }
 

@@ -835,3 +835,16 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #herobody .hx-badge{font-size:var(--fs-caption);border:1px solid var(--line-hi);border-radius:5px;padding:2px 6px;color:var(--dim);white-space:nowrap;}
 #herobody .hx-badge.on{border-color:#7df0d0;color:#9ff0da;}
 #herobody .hx-badge.cd{border-color:#e2a15a;color:#e2a15a;}
+/* Кнопка необратимого действия (`holdButton.ts`): исполняется удержанием. Взведённая или
+   удерживаемая показывает вопрос; полоса растёт слева направо одним transform, без
+   перерисовки разметки. Полоса — сам ответ «сколько ещё держать», поэтому reduced motion
+   её не гасит. */
+.holdable{position:relative;overflow:hidden;isolation:isolate;}
+.holdable .hold-ask{display:none;}
+.holdable.armed .hold-label,.holdable.sure .hold-label,.holdable.holding .hold-label{display:none;}
+.holdable.armed .hold-ask,.holdable.sure .hold-ask,.holdable.holding .hold-ask{display:inline;}
+.holdable .hold-ask small{display:block;font-size:var(--fs-caption);font-weight:600;opacity:.75;}
+.holdable::after{content:'';position:absolute;inset:0;z-index:-1;background:currentColor;opacity:.22;
+  transform:scaleX(0);transform-origin:left;pointer-events:none;}
+.holdable.holding::after{animation:hold-fill var(--hold-ms,1000ms) linear var(--hold-at,0ms) forwards;}
+@keyframes hold-fill{to{transform:scaleX(1);}}
