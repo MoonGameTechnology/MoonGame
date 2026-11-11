@@ -132,10 +132,10 @@ function rowHtml(r: SplitRow, hooks: SplitDialogHooks): string {
       <span class="sbtns">
         <button class="btn-second" data-sx="dec" data-key="${esc(r.key)}" data-n="1" data-repeat ${r.take <= 0 ? 'disabled' : ''}>−1</button>
         <button class="btn-second" data-sx="inc" data-key="${esc(r.key)}" data-n="1" data-repeat ${r.take >= r.have ? 'disabled' : ''}>+1</button>
-        <button class="btn-second" data-sx="inc" data-key="${esc(r.key)}" data-n="10" ${r.take >= r.have ? 'disabled' : ''}>+10</button>
         <button class="btn-second" data-sx="all" data-key="${esc(r.key)}" ${r.take >= r.have ? 'disabled' : ''}>${t('split.all')}</button>
       </span>
       <b class="snew">→ ${r.take}</b>
+      <input class="srange" type="range" data-sx="set" data-key="${esc(r.key)}" min="0" max="${r.have}" step="1" value="${r.take}" style="--fill:${r.have ? (100 * r.take) / r.have : 0}%" aria-label="${esc(t('split.range', { u: hooks.name(r.unit) }))}">
     </div>`;
 }
 

@@ -3126,6 +3126,7 @@ export const en: Record<string, string> = {
   'split.note':
     'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops are split along with the ships.',
   'split.preview': 'new fleet: {a} {a|ship|ships} · original keeps {b}',
+  'split.range': '{u}: to the new fleet',
   'split.section.landing': 'Carried troops',
   'split.title': 'Split fleet',
 

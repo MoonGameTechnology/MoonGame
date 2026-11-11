@@ -1458,7 +1458,7 @@ describe('REFM-225 — стык с main.ts', () => {
       'pointerleave',
       'contextmenu',
     ]);
-    expect(page.splitdlg.listeners.map(([type]) => type)).toEqual(['click']);
+    expect(page.splitdlg.listeners.map(([type]) => type)).toEqual(['click', 'input']);
     expect(MAIN).not.toMatch(/\b(?:side|splitdlg)\.addEventListener\(/);
     expect(MAIN).not.toMatch(/\$\('splitdlg'\)/);
   });
