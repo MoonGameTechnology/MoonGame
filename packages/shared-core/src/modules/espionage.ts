@@ -11,7 +11,6 @@ import {
   guardsAgainst,
   hostileOwner,
   postedOn,
-  enlistTurned,
   finiteOr,
   findSpy,
   goHome,
@@ -28,6 +27,7 @@ import {
   stepSpy,
   type SpyStep,
 } from '../util/spyLife';
+import { DEFECTOR_HOURS, registerDefectorActions, turnAgent } from './espionage/defector';
 import { recordValues } from '../util/records';
 import { planetDevelopment } from '../state/development';
 import { canAfford, payCost } from '../util/treasury';
@@ -152,7 +152,7 @@ export { THEFT_CAP } from '../util/spyDeeds';
  * Turning (SPY-18): an agent the victim's bureau kills may be turned instead (see
  * `turnAgent`). The spy loses it just like a dead one (`agentTurned: true` beside
  * `agentLost`); the victim's `espionage.detected` adds `turned: true` and the sender,
- * and the victim holds one agent over its network for `TURNED_HOURS`.
+ * and the victim is asked to take the agent in (`espionage/defector.ts`).
  */
 
 const SPY_OPS: ReadonlySet<string> = new Set<SpyOp>([
@@ -288,24 +288,8 @@ function missionOdds(
   };
 }
 
-/** SPY-18: how long a turned agent serves its catcher, game-hours. */
-export const TURNED_HOURS = 24;
-
-/**
- * SPY-18: an agent the catcher's bureau would kill may be turned instead — the
- * `espionage.turn` pipeline over the catcher's strongest `spyTurnChance` (0 without a
- * bureau that turns). For the spy the agent is lost all the same; the catcher holds one
- * more spy for `TURNED_HOURS`. The roll is drawn only for a killed agent with a chance
- * above zero, so a match without such a bureau keeps its RNG stream.
- */
-function turnAgent(h: HandlerContext, catcher: string, spy: string, kind: string): boolean {
-  const base = counterIntelOf(h.ctx.data, h.state, catcher, 'spyTurnChance');
-  const raw = h.hook<number>('espionage.turn', base, { playerId: spy, target: catcher, kind });
-  const chance = Math.min(1, Math.max(0, finiteOr(raw, base)));
-  if (chance <= 0 || h.rng.nextFloat() >= chance) return false;
-  enlistTurned(h, catcher, TURNED_HOURS);
-  return true;
-}
+/** SPY-18: how long a turned agent waits for its catcher's answer, game-hours. */
+export const TURNED_HOURS = DEFECTOR_HOURS;
 
 interface SpyPayload {
   planetId?: string;
@@ -395,7 +379,8 @@ function rollExposure(
   const rawKill = h.hook<number>('espionage.kill', baseKill, args);
   const killed =
     h.rng.nextFloat() < Math.min(1, Math.max(0, finiteOr(rawKill, baseKill))) && detected;
-  const turned = killed && turnAgent(h, a.victim, a.spy, a.kind);
+  const turned =
+    killed && turnAgent(h, a, counterIntelOf(h.ctx.data, h.state, a.victim, 'spyTurnChance'));
   return { detected, killed, turned, guards };
 }
 
@@ -516,7 +501,8 @@ export const espionageModule: GameModule = {
   // 1.13.0: кража вернее и богаче с развитого мира своей цивилизации (SPY-21).
   // 1.14.0: раскрытие шпиона больше не объявляет войну.
   // 2.0.0: именные шпионы летят до мира, ждут там приказа и возвращаются в столицу (SPY-23).
-  version: '2.0.0',
+  // 2.1.0: перевербованный просит перейти — принять навсегда или отказать (он сбегает).
+  version: '2.1.0',
   setup(api) {
     // SPY-15: a disrupted world produces `DISRUPT_FACTOR` of its output. A span never
     // runs across the end (it is a scheduled event), so «until ≥ now» at the span's end
@@ -916,6 +902,7 @@ export const espionageModule: GameModule = {
       h.emit('espionage.cancelled', { owner: action.playerId, spyId, planetId });
     });
 
+    registerDefectorActions(api);
     // The older way to call off a guard (or a posted recon spy) — by the world it stands on.
     api.onAction('espionage.recall', (action, h) => {
       const { planetId, op } = action.payload as { planetId?: unknown; op?: unknown };
@@ -946,9 +933,8 @@ export const espionageModule: GameModule = {
       if (typeof owner === 'string') settleHome(h, owner, arrive);
     });
 
-    // Housekeeping as time advances: turned agents go back to their masters, expired windows
-    // are dropped, idle spies follow the capital (a lost one sends them to ground). The
-    // projection independently ignores expired grants — this is cleanup, not the security check.
+    // Housekeeping as time advances: old turned agents leave, expired windows are dropped, idle
+    // spies follow the capital. The projection ignores expired grants by itself — cleanup only.
     api.on('time.advanced', (event, h) => {
       const { to } = event.payload as { to: number };
       // Saves from before SPY-23 kept anonymous agents: they are all home at once, and the

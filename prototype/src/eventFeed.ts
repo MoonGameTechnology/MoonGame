@@ -28,7 +28,6 @@ import {
   medalsOf,
   MISSILE_TRAIT,
   MISSION_HOURS,
-  TURNED_HOURS,
   unitHasTrait,
 } from '../../packages/shared-core/src/index';
 import { earnsMerit, sideUnits } from '../../packages/shared-core/src/util/combat';
@@ -72,23 +71,24 @@ import { flakTier } from './flakTiers';
 import { fleetAnchor, fleetPos, strikeBasePos, strikeWorldPos } from './fleetGeometry';
 import { destroyHeard, reorgHeard, reorgKey, tradeHeard, tradeSide } from './fleetNews';
 import { costText, countdownHMS, displayUnit, TECH_CUR } from './format';
+import { defectorEvents, type DefectorHost } from './defectorDialog';
 import type { LogEntry } from './eventLogView';
 import { captureHeard, gainRepaint, researchHeard } from './gainNews';
 import { data } from './gameData';
 import { heroDiedNews, heroRespawnedNews } from './heroNews';
-import { jumpToPing, unworld } from './mapCamera';
+import { unworld } from './mapCamera';
 import { addFlak, flashLanding, flashMines, flashProvince, noticeFlash } from './mapEffects';
 import { admits, fleetKnown, fleetNode, known, rememberScan, vision } from './mapFog';
 import { markUnread, pushMsg } from './messageLog';
 import { EVENT_LOG_MAX, isRepeat, LOG_LINES, pushBounded } from './noteLog';
-import { tellBuild, tellHero, tellSteward } from './orderPipeline';
+import { playerOrder, tellBuild, tellHero, tellSteward } from './orderPipeline';
 import type { RecapEvent } from './recap';
 import { sectorRunActive } from './sectorRun';
 import { counterLine, spyRepaint } from './spyLog';
 import { spyDeed } from '../../decisions/spyDeed';
 import { squadronCallsignOf } from './squadronPanel';
 import { stewardMine } from './stewardLog';
-import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
+import { toast } from './toastStack';
 import { deathCount, lossOwner, recordLoss, tallyDeath } from './warTally';
 import { timeLeft } from './worldQueries';
 
@@ -125,6 +125,23 @@ export interface EventFeedHost {
 }
 
 let game: EventFeedHost;
+
+/** Что окну перебежчика нужно от игры: ответ уходит обычным приказом, новость — в ленту. */
+const defectorHost: DefectorHost = {
+  state: () => game.world(),
+  me: () => game.me(),
+  names: () => game.names(),
+  placeName: (id) => game.placeName(id),
+  order: (action) => playerOrder(action),
+  note: (line, quiet) => note(line, undefined, { quiet }),
+  spyLog: (line, type, payload) => pushSpyLog(line, type, payload),
+};
+
+/** Пакет событий мира — лента и перебежчики (их значок держится по состоянию мира). */
+export function handleFeed(events: DomainEvent[]): void {
+  handleEvents(events);
+  defectorEvents(events, defectorHost);
+}
 
 /** Поднять ленту: хуки игры. Зовётся из `main.ts` один раз, до первой строки ленты. */
 export function initEventFeed(host: EventFeedHost): void {
@@ -205,29 +222,7 @@ export function note(msg: string, at?: string, opts?: { quiet?: boolean }) {
   if (!opts?.quiet) toast(msg, at);
 }
 
-/** Transient event toast over the map — feedback must not live only in a hidden
- *  log window. Tap dismisses; with a map anchor the tap also flies the camera
- *  there (the jumpToPing path). At most 3 stacked, ~5s life each. */
-export function toast(msg: string, at?: string): void {
-  const host = document.getElementById('toasts');
-  if (!host) return;
-  // Вид, предел стопки и время жизни — `toastView.ts` (REFM-105).
-  const el = document.createElement('div');
-  el.className = toastClass(!!at);
-  el.textContent = toastText(msg, !!at);
-  el.addEventListener('click', () => {
-    if (at) jumpToPing(at);
-    el.remove();
-  });
-  host.appendChild(el);
-  // Считаются и вытесняются только тосты: предупреждение о сохранении стоит над ними.
-  for (let extra = toastOverflow(host.querySelectorAll('.toast').length); extra > 0; extra--)
-    host.querySelector('.toast')?.remove();
-  window.setTimeout(() => {
-    el.classList.add('out');
-    window.setTimeout(() => el.remove(), TOAST_FADE_MS);
-  }, TOAST_LIFE_MS);
-}
+export { toast } from './toastStack';
 
 /** Бои моего блока зрения, начало которых журнал уже показал: итог приходит, когда боя в
  *  состоянии нет, и спросить «мой ли он» тогда уже не у кого. */
@@ -655,10 +650,10 @@ export function handleEvents(events: DomainEvent[]) {
         const what = t('log.spy.what.world', { at: game.placeName(String(p.planetId)) });
         const c = counterLine(p.spy as string | undefined, p.killed === true);
         const who = NAME[p.spy as string] ?? (p.spy as string);
-        // SPY-18: the bureau turned the agent — one more of ours for a day.
+        // SPY-18: the bureau turned the agent — it asks to join us (`espionage.defector`).
         const line =
           p.turned === true
-            ? t('log.spy.turned', { who, what, n: TURNED_HOURS })
+            ? t('log.spy.turned', { who, what })
             : c.named
               ? t(c.key, { who, what })
               : t(c.key, { what });

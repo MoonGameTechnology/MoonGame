@@ -83,6 +83,7 @@ export const EXTRA_LAYERS: readonly string[] = [
   'match-hero-reward',
   'match-description',
   'fortress-order',
+  'defector-offer',
   'chain',
   'aim',
   'rail',

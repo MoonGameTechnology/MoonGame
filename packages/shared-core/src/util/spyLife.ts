@@ -41,6 +41,11 @@ export function networkSize(h: HandlerContext, playerId: PlayerId): number {
     : BASE_SPY_AGENTS;
 }
 
+/** A spy of the network's own slots — neither a turned agent nor a defector taken in. */
+export function ownSlot(spy: Spy): boolean {
+  return spy.turnedUntil === undefined && spy.defector === undefined;
+}
+
 /** `playerId`'s registry, created on first use from the starting network and grown to the
  *  network's current size (a new spy starts at home). A shrunk network keeps its spies. */
 export function rosterOf(h: HandlerContext, playerId: PlayerId): Spy[] {
@@ -48,7 +53,7 @@ export function rosterOf(h: HandlerContext, playerId: PlayerId): Spy[] {
   const all = (h.state.spies ??= {});
   const list = (all[playerId] ??= spyRoster(h.state, playerId, size).map((s) => ({ ...s })));
   const home = spyHome(h.state, playerId);
-  while (list.filter((s) => s.turnedUntil === undefined).length < size) {
+  while (list.filter(ownSlot).length < size) {
     const id = Math.max(0, ...list.map((s) => s.id)) + 1;
     list.push({
       id,
@@ -178,11 +183,11 @@ export function reachHome(
 }
 
 /** A killed (or turned) spy: its own slot is refilled in `AGENT_RECRUIT_HOURS` by a new spy
- *  of the next generation; a turned enemy agent serving `owner` is simply gone. */
+ *  of the next generation; a turned agent or a defector serving `owner` is simply gone. */
 export function loseSpy(h: HandlerContext, owner: PlayerId, spy: Spy): void {
   const list = h.state.spies?.[owner];
   if (!list) return;
-  if (spy.turnedUntil !== undefined) {
+  if (!ownSlot(spy)) {
     h.state.spies![owner] = list.filter((s) => s !== spy);
     return;
   }
@@ -210,17 +215,26 @@ export function recruited(h: HandlerContext, owner: PlayerId, spy: Spy): void {
   spy.location = home ?? spy.location;
 }
 
-/** A turned enemy agent joins `catcher` for `hours`: one more spy, at home (SPY-18). */
-export function enlistTurned(h: HandlerContext, catcher: PlayerId, hours: number): void {
+/** A defector `catcher` took in (owner's resolution 2026-11-11): one more spy for good, at
+ *  home, with the experience it brought (SPY-18). */
+export function enlistDefector(
+  h: HandlerContext,
+  catcher: PlayerId,
+  from: PlayerId,
+  xp: number | undefined,
+): Spy {
   const list = rosterOf(h, catcher);
   const home = spyHome(h.state, catcher);
-  list.push({
+  const spy: Spy = {
     id: Math.max(0, ...list.map((s) => s.id)) + 1,
     gen: 1,
     state: home ? 'rest' : 'hidden',
     location: home ?? list[0]?.location ?? '',
-    turnedUntil: h.ctx.now + hoursToMs(h.ctx, hours),
-  });
+    defector: from,
+    ...(xp ? { xp } : {}),
+  };
+  list.push(spy);
+  return spy;
 }
 
 /**

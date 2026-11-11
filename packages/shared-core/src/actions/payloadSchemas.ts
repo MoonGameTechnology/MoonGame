@@ -120,6 +120,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   }),
   // SPY-23: call a named spy off its order and home to the capital
   'espionage.cancel': z.object({ spyId: z.number().int().min(1).max(64) }),
+  // a turned enemy agent asks to join (SPY-18): take it in, or turn it down and it flees
+  'espionage.defector.accept': z.object({ offerId: z.number().int().min(1).max(64) }),
+  'espionage.defector.refuse': z.object({ offerId: z.number().int().min(1).max(64) }),
   // SPY-11: call a counter-intelligence agent off its post (or off its way there);
   // SPY-13: `op: 'recon'` calls a posted recon agent off instead
   'espionage.recall': z.object({ planetId: id, op: z.enum(['counter', 'recon']).optional() }),

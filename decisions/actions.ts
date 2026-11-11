@@ -329,6 +329,9 @@ export const spyOn = (playerId: string, planetId: string, op: SpyOp, spyId?: num
   act(playerId, 'espionage.spy', spyId === undefined ? { planetId, op } : { planetId, op, spyId });
 /** Call a named spy off its order and home to the capital (SPY-23). */
 export const cancelSpy = (playerId: string, spyId: number) => act(playerId, 'espionage.cancel', { spyId });
+/** Answer a turned enemy agent asking to join (SPY-18): take it in, or turn it down — it flees. */
+export const answerDefector = (playerId: string, offerId: number, accept: boolean) =>
+  act(playerId, accept ? 'espionage.defector.accept' : 'espionage.defector.refuse', { offerId });
 /** Call a counter-intelligence agent off its post on this world (SPY-11), or the posted
  *  recon agent with `op: 'recon'` (SPY-13). */
 export const recallSpy = (playerId: string, planetId: string, op?: 'recon') =>

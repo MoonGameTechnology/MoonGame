@@ -85,6 +85,7 @@ export const HOTKEY_SILENT_LAYERS: readonly string[] = [
   'match-hero-reward',
   'match-description',
   'fortress-order',
+  'defector-offer',
   'comic',
   'maploading',
   'intro',

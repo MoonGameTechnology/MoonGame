@@ -1574,6 +1574,9 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         h.emit('espionage.cancelled', { owner, spyId: 1, planetId: 'node1' });
         h.emit('espionage.caught', { owner, spyId: 1, planetId: 'node1' });
         h.emit('espionage.recruited', { owner, spyId: 1 });
+        h.emit('espionage.defector', { owner, offerId: 1, from: 'p3', planetId: 'node1' });
+        h.emit('espionage.defector.joined', { owner, offerId: 1, spyId: 4 });
+        h.emit('espionage.defector.fled', { owner, offerId: 1 });
         h.emit('building.destroyed', { planetId: 'node1', building: 'mine', owner });
       });
       // Бой p1 против p3 в мире `far`, которого не опознаёт никто.
@@ -1751,6 +1754,9 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
       'espionage.cancelled',
       'espionage.caught',
       'espionage.recruited',
+      'espionage.defector',
+      'espionage.defector.joined',
+      'espionage.defector.fled',
     ];
     // Every entry of the server's list is exercised here, so a new one can't skip this test.
     expect([...OWNER_ONLY_EVENTS.keys()].sort()).toEqual([...intel].sort());

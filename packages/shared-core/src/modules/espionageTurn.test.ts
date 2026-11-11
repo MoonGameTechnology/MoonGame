@@ -161,11 +161,27 @@ function sendable(
 }
 
 describe('SPY-18 — a level-3 bureau turns the agent it would kill', () => {
-  it('turned: the catcher holds four agents for 24 h, the spy gets a replacement in 24 h', () => {
+  it('turned: the agent asks the catcher to take it in, the spy gets a replacement in 24 h', () => {
     const { k, state, events } = caught(3, [alwaysTurn]);
-    const turned = (state.spies?.p2 ?? []).filter((s) => s.turnedUntil !== undefined);
-    expect(turned).toEqual([
-      { id: 4, gen: 1, state: 'rest', location: 'B', turnedUntil: END + TURNED_HOURS * HOUR },
+    expect(state.spyOffers?.p2).toEqual([
+      {
+        id: 1,
+        from: 'p1',
+        planetId: 'B',
+        kind: 'theft',
+        at: END,
+        until: END + TURNED_HOURS * HOUR,
+      },
+    ]);
+    expect(ofType(events, 'espionage.defector').map((e) => e.payload)).toEqual([
+      {
+        owner: 'p2',
+        offerId: 1,
+        from: 'p1',
+        planetId: 'B',
+        kind: 'theft',
+        until: END + TURNED_HOURS * HOUR,
+      },
     ]);
     // The spy loses it like a dead agent; the victim learns it was turned and by whom.
     expect(ofType(events, 'espionage.failed')[0]!.payload).toMatchObject({
@@ -177,16 +193,11 @@ describe('SPY-18 — a level-3 bureau turns the agent it would kill', () => {
       turned: true,
       spy: 'p1',
     });
-    // Four missions for p2 now, one more than the network of three.
-    expect(sendable(k, state, 'p2', ['H', 'J', 'K', 'L'], END)).toBe(BASE_SPY_AGENTS + 1);
-    // A day later the turned agent is gone: three again.
+    // Not ours until we say so: the network is still three.
+    expect(sendable(k, state, 'p2', ['H', 'J', 'K', 'L'], END)).toBe(BASE_SPY_AGENTS);
+    // The spy: two free agents at once, the third back only after the recruit time.
     const later = k.advanceTo(state, ctx(END + TURNED_HOURS * HOUR));
     if (!later.ok) throw new Error(later.code);
-    expect((later.state.spies?.p2 ?? []).some((s) => s.turnedUntil !== undefined)).toBe(false);
-    expect(sendable(k, later.state, 'p2', ['H', 'J', 'K', 'L'], END + TURNED_HOURS * HOUR)).toBe(
-      BASE_SPY_AGENTS,
-    );
-    // The spy: two free agents at once, the third back only after the recruit time.
     expect(sendable(k, state, 'p1', ['P', 'Q', 'R'], END)).toBe(BASE_SPY_AGENTS - 1);
     expect(sendable(k, later.state, 'p1', ['P', 'Q', 'R'], END + TURNED_HOURS * HOUR)).toBe(
       BASE_SPY_AGENTS,
@@ -207,9 +218,103 @@ describe('SPY-18 — a level-3 bureau turns the agent it would kill', () => {
 
   it("a turned agent is the catcher's secret: no one else sees it in the projection", () => {
     const { state } = caught(3, [alwaysTurn]);
+    expect(visibleState(state, 'p2', data).spyOffers?.p2).toHaveLength(1);
+    expect(visibleState(state, 'p1', data).spyOffers).toBeUndefined();
+  });
+});
+
+describe("a defector waits for the answer (owner's resolution 2026-11-11)", () => {
+  const at = (h: number) => END + h * HOUR;
+  const answer = (k: ReturnType<typeof createKernel>, st: GameState, verb: string, offerId = 1) =>
+    k.applyAction(st, act('p2', `espionage.defector.${verb}`, { offerId }), ctx(END));
+
+  it('taken in: one of ours for good, on top of the network, with its experience', () => {
+    const k0 = caught(3, [alwaysTurn]);
+    const veteran = structuredClone(k0.state);
+    veteran.spyOffers!.p2![0]!.xp = 3;
+    const r = okApply(answer(k0.k, veteran, 'accept'));
+    expect(r.state.spyOffers).toBeUndefined();
+    expect(r.state.spies?.p2?.find((s) => s.id === 4)).toEqual({
+      id: 4,
+      gen: 1,
+      state: 'rest',
+      location: 'B',
+      defector: 'p1',
+      xp: 3,
+    });
+    expect(ofType(r.events, 'espionage.defector.joined').map((e) => e.payload)).toEqual([
+      { owner: 'p2', offerId: 1, from: 'p1', spyId: 4 },
+    ]);
+    expect(sendable(k0.k, r.state, 'p2', ['H', 'J', 'K', 'L'], END)).toBe(BASE_SPY_AGENTS + 1);
+    // Still ours long after the old day of service.
+    const later = k0.k.advanceTo(r.state, ctx(at(10 * TURNED_HOURS)));
+    if (!later.ok) throw new Error(later.code);
+    expect(later.state.spies?.p2).toHaveLength(BASE_SPY_AGENTS + 1);
+  });
+
+  it('a defector lost is not replaced: its place goes with it', () => {
+    const k0 = caught(3, [alwaysTurn]);
+    const r = okApply(answer(k0.k, k0.state, 'accept'));
+    // p2 sends it on a theft onto p1's world, where the same pins kill it.
+    const sent = okApply(
+      k0.k.applyAction(
+        r.state,
+        act('p2', 'espionage.spy', { planetId: 'H', op: 'theft', spyId: 4 }),
+        ctx(END),
+      ),
+    );
+    const done = k0.k.advanceTo(sent.state, ctx(at(10 * MISSION_HOURS)));
+    if (!done.ok) throw new Error(done.code);
+    expect(done.state.spies?.p2?.some((s) => s.id === 4)).toBe(false);
+    expect(done.state.spies?.p2).toHaveLength(BASE_SPY_AGENTS);
+  });
+
+  it('turned down: it flees, the network stays three, its old master has it dead all the same', () => {
+    const k0 = caught(3, [alwaysTurn]);
+    const r = okApply(answer(k0.k, k0.state, 'refuse'));
+    expect(r.state.spyOffers).toBeUndefined();
+    expect(r.state.spies?.p2?.some((s) => s.defector !== undefined) ?? false).toBe(false);
+    expect(ofType(r.events, 'espionage.defector.fled').map((e) => e.payload)).toEqual([
+      { owner: 'p2', offerId: 1, from: 'p1' },
+    ]);
+    expect(r.state.spies?.p1).toEqual(k0.state.spies?.p1);
+  });
+
+  it('left unanswered, it flees when the day is up', () => {
+    const k0 = caught(3, [alwaysTurn]);
+    const before = k0.k.advanceTo(k0.state, ctx(at(TURNED_HOURS) - 1));
+    if (!before.ok) throw new Error(before.code);
+    expect(before.state.spyOffers?.p2).toHaveLength(1);
+    const after = k0.k.advanceTo(k0.state, ctx(at(TURNED_HOURS)));
+    if (!after.ok) throw new Error(after.code);
+    expect(after.state.spyOffers).toBeUndefined();
+    expect(ofType(after.events, 'espionage.defector.fled').map((e) => e.payload)).toEqual([
+      { owner: 'p2', offerId: 1, from: 'p1', expired: true },
+    ]);
     expect(
-      visibleState(state, 'p2', data).spies?.p2?.some((s) => s.turnedUntil !== undefined),
-    ).toBe(true);
-    expect(visibleState(state, 'p1', data).spies?.p2).toBeUndefined();
+      k0.k.applyAction(
+        after.state,
+        act('p2', 'espionage.defector.accept', { offerId: 1 }),
+        ctx(at(TURNED_HOURS)),
+      ),
+    ).toMatchObject({ ok: false, code: 'E_BAD_TARGET' });
+  });
+
+  it('only the catcher answers, and only an open offer', () => {
+    const k0 = caught(3, [alwaysTurn]);
+    const cases: [string, string, unknown, string][] = [
+      ['p1', 'accept', { offerId: 1 }, 'E_BAD_TARGET'], // not p1's offer
+      ['p2', 'accept', { offerId: 2 }, 'E_BAD_TARGET'], // nobody
+      ['p2', 'refuse', { offerId: 'x' }, 'E_BAD_PAYLOAD'],
+      ['p2', 'accept', {}, 'E_BAD_PAYLOAD'],
+    ];
+    for (const [who, verb, payload, code] of cases) {
+      const r = k0.k.applyAction(
+        k0.state,
+        act(who, `espionage.defector.${verb}`, payload),
+        ctx(END),
+      );
+      expect(r.ok ? 'ok' : r.code, JSON.stringify([who, verb, payload])).toBe(code);
+    }
   });
 });

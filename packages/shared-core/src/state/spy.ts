@@ -41,8 +41,34 @@ export interface Spy {
   posted?: true;
   /** World-time (ms) it took up its post. */
   postedAt?: number;
-  /** A turned enemy agent (SPY-18): it serves its catcher until this world-time. */
+  /** A turned enemy agent of an older save (SPY-18): it serves its catcher until this
+   *  world-time. New turned agents are offered instead (`SpyOffer`). */
   turnedUntil?: number;
+  /** A defector the player took in (owner's resolution 2026-11-11): the player it came over
+   *  from. It serves for good on top of the network, and its place is not refilled when it
+   *  is lost. */
+  defector?: string;
   /** Experience (the spy-levels module; absent = 0). Reset for a replacement. */
   xp?: number;
+}
+
+/** An enemy agent the player's counter-intelligence turned (SPY-18), waiting for the
+ *  player's answer (owner's resolution 2026-11-11): taken in, it becomes one of the player's
+ *  spies (`Spy.defector`); turned down — or left unanswered until `until` — it flees. For
+ *  its old master it is dead either way, from the moment it was turned. */
+export interface SpyOffer {
+  /** Stable among the player's open offers. */
+  id: number;
+  /** The player it served. */
+  from: string;
+  /** Where it was caught. */
+  planetId: PlanetId;
+  /** What it was doing there: an operation, or `wait`. */
+  kind: string;
+  /** The experience it brings (absent = 0). */
+  xp?: number;
+  /** World-time (ms) it was turned. */
+  at: number;
+  /** World-time (ms) it flees if the player has not answered. */
+  until: number;
 }

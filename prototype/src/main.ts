@@ -418,7 +418,7 @@ import { initTroopsWindow } from './troopsWindow';
 import { flushPinch, initMapInput, selectionBox, tapByTouch } from './mapInput';
 import { chainMode, dropChainMenu, exitChainMode, forgetChainRoutes, initChainComposer } from './chainComposer';
 import { activeConstruction, coreQueue, initWorldQueries, progressPct } from './worldQueries';
-import { flushStrayLosses, handleEvents, initEventFeed, killStats, logLines, logVersion, note, toast } from './eventFeed';
+import { flushStrayLosses, handleFeed, initEventFeed, killStats, logLines, logVersion, note, toast } from './eventFeed';
 import { eventLogHtml } from './eventLogView';
 import { tickScoutNews } from './scoutNews';
 import {
@@ -800,7 +800,7 @@ initNetSession({
     syncCoalitions(); // чужая правка коалиции приходит дельтой без события
   },
   events: (events) => {
-    handleEvents(events);
+    handleFeed(events);
     push?.onEvents(events, ME); // UIX-4.4: первая спокойная своя новость — спросить о push
   },
   pingProvince: (target) => provinceForPing(target, MAP),
@@ -1270,7 +1270,7 @@ initOrderPipeline({
     s = state;
   },
   me: () => ME,
-  handleEvents,
+  handleEvents: handleFeed,
   note,
   placeName,
   refusalSound: () => snd.play('error'),

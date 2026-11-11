@@ -11,7 +11,7 @@ import type { FleetChain } from './chain';
 import type { Coalition, CoalitionClock } from './coalition';
 import type { SightRules } from './sensorView';
 import type { SeenSortie } from './aircraftSight';
-import type { Spy } from './spy';
+import type { Spy, SpyOffer } from './spy';
 export type { SightRules } from './sensorView';
 
 /**
@@ -283,7 +283,7 @@ export interface IntelGrant {
   mission?: number;
 }
 
-export type { Spy, SpyOp, SpyState } from './spy';
+export type { Spy, SpyOffer, SpyOp, SpyState } from './spy';
 
 export type MatchStatus = 'ongoing' | 'ended';
 export type MatchEndReason =
@@ -1099,6 +1099,9 @@ export interface GameState {
    *  order; until then `spyRoster` reads the network as resting in the capital. PRIVATE like
    *  `intel`: a viewer's projection carries only their own network. */
   spies?: Record<PlayerId, Spy[]>;
+  /** Turned enemy agents waiting for each player's answer (`SpyOffer`, owner's resolution
+   *  2026-11-11). PRIVATE like `spies`: who caught whom is the catcher's secret. */
+  spyOffers?: Record<PlayerId, SpyOffer[]>;
   /** Session resource market: a public per-match order book maintained by
    *  `marketModule`. Sellers escrow a resource at a price; buyers pay money. */
   market?: MarketOrder[];
