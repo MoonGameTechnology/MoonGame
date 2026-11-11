@@ -320,7 +320,7 @@ describe('действия мира', () => {
   it('шпионаж — одна кнопка «Шпионы» на любом мире, без приказов на карточке', async () => {
     const { card } = await boot();
     for (const id of ['A', 'N']) {
-      expect(card(id)).toContain('data-act="spyagents"');
+      expect(card(id).match(/data-act="spyagents"/g)).toHaveLength(1);
       expect(card(id)).not.toContain('data-act="spyplanet"');
       expect(card(id)).not.toContain('data-act="spyrecall"');
     }
@@ -510,7 +510,7 @@ describe('мир вне зрения', () => {
     expect(html).toContain('data-codex="b:mine:1"');
     // Доход чужой постройки разведка не знает.
     expect(html).not.toContain('class="inc"');
-    expect(html).toContain('data-act="spyagents"');
+    expect(html.match(/data-act="spyagents"/g)).toHaveLength(1);
     expect(html).not.toContain('data-act="spyplanet"');
     env.memory.N = { owner: 'p1', garrison: 0, buildings: [] };
     const own = m.unknownPlanetHtml(env.s.planets.N!);

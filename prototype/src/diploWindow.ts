@@ -428,8 +428,8 @@ function intelRowHtml(target: string): string {
   return `<div class="dp-intel">🕵 ${bits.join(' · ')}</div>`;
 }
 /** The diplomacy affordances for one other seat `id`: stance proposals (with the
- *  consent state — их предложение ✓ / наше ⏳), the two spy buttons, and the DM
- *  button, followed by the live intel row. Shared by the roster's expanded row and
+ *  consent state — их предложение ✓ / наше ⏳) and the DM button (spy orders live in
+ *  `spyWindow.ts`), followed by the live intel row. Shared by the roster's expanded row and
  *  the player card opened from a chat nick, so both stay in lockstep. */
 /**
  * MAPSHARE-1 — кнопка договора об обмене картами. Отдельная от лестницы стоек, потому
