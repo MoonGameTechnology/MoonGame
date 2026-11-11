@@ -45,6 +45,7 @@ import {
   type StarterEntry,
 } from '../../decisions/arsenalView';
 import { moduleOfferFor } from '../../decisions/shopView';
+import { warrantsChipHtml } from './hubWallet';
 import starterArsenal from '../../data/starterArsenal.json';
 import { data } from './gameData';
 import { esc, nfmt } from './format';
@@ -167,6 +168,8 @@ export interface ArsenalState {
   notice: { text: string; error: boolean } | null;
   /** The detail sits beside the list: the list marks the open card. */
   wide: boolean;
+  /** The auction wallet, on the head's door to the auction (as on the home screen). */
+  warrants?: number;
 }
 
 /** The catalog of this paint: the starter kit, the collection and what a reward can bring. */
@@ -320,7 +323,8 @@ export function arsenalHtml(s: ArsenalState): string {
     `<button type="button" class="ar-tab" role="tab" data-ar-tab="${id}" aria-selected="${s.tab === id}">${t(key)}` +
     `<small>${t('arsenal.count', { n: list.filter((x) => owns(s.items, x)).length, m: list.length })}</small></button>`;
   const head =
-    `<div class="ar-head"><div><h2>${t('hub.nav.arsenal')}</h2><p class="ar-rule">${t('arsenal.rule')}</p></div>` +
+    `<div class="ar-head"><div><div class="ar-title"><h2>${t('hub.nav.arsenal')}</h2>` +
+    `<span class="ar-wallet">${warrantsChipHtml(s.warrants ?? 0, 'data-ar-auction')}</span></div><p class="ar-rule">${t('arsenal.rule')}</p></div>` +
     `<div class="ar-tabs" role="tablist" aria-label="${esc(t('arsenal.tabs'))}">${tab('modules', 'arsenal.tab.modules', modules)}${tab('hulls', 'arsenal.tab.hulls', hulls)}<button type="button" class="ar-tab" role="tab" data-ar-tab="heroes" aria-selected="${s.tab === 'heroes'}">${t('arsenal.tab.heroes')}</button></div></div>`;
   if (s.tab === 'heroes') return head + arsenalHeroesHtml(s.hero);
   const list = s.tab === 'modules' ? moduleListHtml(s, modules) : hullListHtml(s, hulls);
@@ -641,6 +645,8 @@ export interface ArsenalHost {
   canSignIn(): boolean;
   signIn(): void;
   openAuction(): void;
+  /** The auction wallet's last known balance (the home screen's number). */
+  warrants?(): number;
   openHeroMatch?(): void;
   /** The auction's sell form for this copy. */
   sell(itemId: string): void;
@@ -662,6 +668,8 @@ export function initArsenal(host: ArsenalHost): {
   forget(): void;
   /** Re-lay the tab after its width changed (detail beside the list ⇄ sheet). */
   relayout(): void;
+  /** The auction wallet may have changed: repaint the tab if the head's number is stale. */
+  repaint(): void;
   /** The phone sheet is open (a layer of the Back ladder). */
   isOpen(): boolean;
   /** Close the sheet: Back, or the hub left the tab. */
@@ -742,11 +750,16 @@ export function initArsenal(host: ArsenalHost): {
       notice: actionNotice(st),
       upgradeResult: acting && st.kind === 'done' ? st.receipt?.moduleUpgrade : undefined,
       wide,
+      warrants: host.warrants?.() ?? 0,
     };
   }
 
+  /** The warrants on the head as last painted (the auction's answers repaint only a change). */
+  let shownWarrants = 0;
+
   function paint(): void {
     const s = state();
+    shownWarrants = s.warrants ?? 0;
     const root = host.root();
     const detail = root.querySelector?.('.ar-detail');
     const keep = detail?.scrollTop ?? 0;
@@ -931,6 +944,9 @@ export function initArsenal(host: ArsenalHost): {
       wide = next;
       if (wide) sheetOpen = false;
       paint();
+    },
+    repaint: () => {
+      if ((host.warrants?.() ?? 0) !== shownWarrants) paint();
     },
     isOpen: () => sheetOpen,
     close,

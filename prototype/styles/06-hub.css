@@ -114,12 +114,12 @@
   font-size:16px;}
 #hubwallet .dl-donate :is(i,i svg){width:20px;height:20px;}
 #hubwallet .dl-donate em{width:30px;height:30px;border-radius:8px;font-size:18px;}
-#hubwallet .tw-cur{height:44px;gap:8px;padding:0 5px 0 14px;font-size:16px;cursor:pointer;}
-#hubwallet .tw-cur i{font-size:20px;}
-#hubwallet .hw-go{display:inline-flex;align-items:center;height:30px;margin-left:4px;padding:0 12px;border-radius:999px;
+:is(#hubwallet,.ar-wallet) .tw-cur{height:44px;gap:8px;padding:0 5px 0 14px;font-size:16px;cursor:pointer;}
+:is(#hubwallet,.ar-wallet) .tw-cur i{font-size:20px;}
+:is(#hubwallet,.ar-wallet) .hw-go{display:inline-flex;align-items:center;height:30px;margin-left:4px;padding:0 12px;border-radius:999px;
   background:color-mix(in srgb,currentColor 24%,transparent);color:color-mix(in srgb,currentColor 30%,var(--ink));
   font:600 14px/1 system-ui,sans-serif;}
-#hubwallet .tw-cur:hover .hw-go{background:color-mix(in srgb,currentColor 36%,transparent);}
+:is(#hubwallet,.ar-wallet) .tw-cur:hover .hw-go{background:color-mix(in srgb,currentColor 36%,transparent);}
 /* Узкий экран: кошелёк — своей строкой под именем, а не вместо него. */
 @media (max-width:900px){#hub .hub-id{flex-wrap:wrap;row-gap:8px;}#hub .hub-wallet-row{order:10;flex:1 0 100%;justify-content:space-between;}}
 /* Поля по бокам на главной и в «Играх» — 4px (заказ владельца 2026-11-06): шире они читались
@@ -798,7 +798,7 @@
 .news-prefs .set-sub{margin:0;line-height:1.5;}
 @media (max-width:359px){
   #hub .hub-wallet-row{gap:8px;}#hub .hub-wallet{gap:5px;}
-  #hubwallet .dl-donate,#hubwallet .tw-cur{font-size:14px;gap:6px;padding-left:8px;}
-  #hubwallet .hw-go{padding:0 8px;margin-left:0;font-size:12px;}
+  #hubwallet .dl-donate,:is(#hubwallet,.ar-wallet) .tw-cur{font-size:14px;gap:6px;padding-left:8px;}
+  :is(#hubwallet,.ar-wallet) .hw-go{padding:0 8px;margin-left:0;font-size:12px;}
   .news-pref-topics{grid-template-columns:1fr;}
 }
