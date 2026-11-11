@@ -13,6 +13,9 @@
 :is(#hp-arsenal,#arsenal-sheet) .btn-quiet{padding:0 6px;}
 .ar-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;}
 .ar-head h2{margin:0;font-size:var(--fs-title);font-weight:700;color:var(--sf-hi);}
+/* Дверь в аукцион — та же фиолетовая плашка Варрантов, что на главном экране (hubWallet.ts). */
+.ar-title{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;}
+.ar-wallet{display:flex;}
 .ar-rule{margin:4px 0 0;max-width:60ch;color:var(--sf-dim);line-height:1.5;}
 .ar-tabs{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-inset);}
 .ar-tab{min-height:44px;padding:0 16px;border:0;border-radius:9px;background:none;color:var(--sf-dim);cursor:pointer;
@@ -163,6 +166,7 @@ span.ar-fchip{cursor:default;}
 /* Узкая вкладка (телефон): одна колонка, карточка выбранного уходит в шторку. */
 @container arsenal (max-width:699px){
   .ar-head{align-items:stretch;}
+  .ar-title{justify-content:space-between;}
   .ar-tabs{display:flex;width:100%;}
   .ar-tab{flex:1;padding:0 8px;gap:7px;}
   .ar-goal{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"ic t" "m m" "act act";gap:8px 12px;padding:10px;}

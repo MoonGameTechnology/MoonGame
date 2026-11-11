@@ -177,6 +177,18 @@ describe('арсенал — список', () => {
     );
   });
 
+  it('в шапке — фиолетовая плашка Варрантов с дверью в аукцион, как на главном экране', () => {
+    const html = arsenalHtml(state({ warrants: 1250 }));
+    expect(html).toMatch(
+      /<div class="ar-title"><h2>Арсенал<\/h2><span class="ar-wallet"><button type="button" class="tw-cur tw-warrants" data-ar-auction [^>]*>/,
+    );
+    expect(html).toContain(
+      '<i aria-hidden="true">⌖</i>1.3k<span class="hw-go" aria-hidden="true">Аукцион</span>',
+    );
+    // Плашка в общей шапке: видна и на вкладке героев.
+    expect(arsenalHtml(state({ tab: 'heroes' }))).toContain('data-ar-auction');
+  });
+
   it('модули разложены по отсекам, недостающий — пунктиром с прогрессом материалов', () => {
     const html = arsenalHtml(state());
     const order = ['Оружие', 'Защита', 'Системы'].map((g) => html.indexOf(`</span>${g}<small`));
@@ -486,6 +498,24 @@ describe('арсенал — вкладка', () => {
     expect(host.root().innerHTML).toContain('Арсенал хранится в аккаунте');
     host.root().fire({ arSignIn: '' });
     expect(signIn).toHaveBeenCalledOnce();
+  });
+
+  it('плашка Варрантов в шапке открывает аукцион; ответ аукциона перерисует только новое число', async () => {
+    server();
+    let war = 40;
+    const openAuction = vi.fn();
+    const host = hostOf({ openAuction, warrants: () => war });
+    const arsenal = initArsenal(host);
+    await arsenal.refresh();
+    expect(host.root().innerHTML).toContain('</i>40<span class="hw-go"');
+    host.root().fire({ arAuction: '' });
+    expect(openAuction).toHaveBeenCalledOnce();
+    host.root().innerHTML = 'untouched';
+    arsenal.repaint();
+    expect(host.root().innerHTML).toBe('untouched');
+    war = 75;
+    arsenal.repaint();
+    expect(host.root().innerHTML).toContain('</i>75<span class="hw-go"');
   });
 
   it('гость не видит кэш прошлой сессии — только стартовый набор', async () => {
