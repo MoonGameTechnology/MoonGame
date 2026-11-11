@@ -666,6 +666,18 @@ export const SPY_SALARY_SOLO_MIGRATION = {
   toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: espionage 2.2.0 checks a spy order against what the player knows of the
+ *  world and lets recon look at unclaimed worlds (SPY-24). The catalogue is unchanged; a saved
+ *  world has no spy records yet (`scouted`): a fogged world takes deeds once a spy gets there. */
+export const SPY_FOG_SOLO_MIGRATION = {
+  fromRules: SPY_SALARY_SOLO_MIGRATION.toRules,
+  fromData: SPY_SALARY_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_SALARY_SOLO_MIGRATION.toDataHash,
+  toRules: '010f60df85806f',
+  toData: SPY_LEVELS_SOLO_MIGRATION.toData,
+  toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -724,6 +736,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_TRAVEL_SOLO_MIGRATION,
   SPY_LEVELS_SOLO_MIGRATION,
   SPY_SALARY_SOLO_MIGRATION,
+  SPY_FOG_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

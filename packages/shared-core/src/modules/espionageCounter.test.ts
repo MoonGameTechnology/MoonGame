@@ -14,7 +14,7 @@ import { coalitionOf } from '../state/coalition';
 import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, Context, DomainEvent } from '../action/types';
 import type { GameModule } from '../kernel/module';
-import { instantSpies, spyMap } from '../testkit/spies';
+import { instantSpies, scoutedAll, spyMap } from '../testkit/spies';
 
 // SPY-11: the counter-intelligence agent and war on exposure.
 
@@ -381,6 +381,7 @@ describe('SPY-11 — coalition protection', () => {
     const k = kernel();
     const s = join(k, baseState());
     s.planets.B!.owner = 'p3';
+    s.scouted = scoutedAll(s); // p1 knows the world is p3's
     const sent = play(k, s, [spy('p1', 'B', 'theft')], 0, 0).state;
     const captured = {
       ...sent,
