@@ -147,7 +147,7 @@ function prepareCells(cells: readonly TerrainEnvironmentCell[]): PreparedCell[] 
       // Small provinces retain an interior: their transitions cannot have the width of
       // a neighbouring giant. Special bodies keep their own existing node renderer.
       const influence = Math.min(MAX_INFLUENCE, Math.max(12, Math.min(box.width, box.height) * 0.16));
-      const profile = c.kind === 'black_hole' || c.kind === 'rift' ? undefined
+      const profile = c.kind === 'black_hole' || c.kind === 'rift' || c.kind === 'accretion_disk' ? undefined
         : PROFILES[c.terrain ?? ''] ?? PROFILES[c.kind ?? ''];
       return { id: c.id, poly, box, influence, profile };
     }).sort((a, b) => a.id.localeCompare(b.id));

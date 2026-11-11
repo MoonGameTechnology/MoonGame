@@ -9,6 +9,7 @@ import {
   laneOfPayload,
   barPct,
   progressPct,
+  queuedOrderHours,
 } from './buildProgress';
 
 const HOUR = 3_600_000;
@@ -212,5 +213,20 @@ describe('barPct — полоса от готовых чисел (живой п�
     expect(barPct(100, 0, 0)).toBe(100);
     expect(barPct(100, -5, 0)).toBe(100);
     expect(barPct(100, Number.NaN, 0)).toBe(100);
+  });
+});
+
+describe('queuedOrderHours', () => {
+  const pricing = { pricing: { hours: 1, unitHours: 2, buildingHours: 3 } } as unknown as Pick<GameState, 'pricing'>;
+  it('counts a waiting unit with the unit multiplier, as the core does at start', () => {
+    expect(queuedOrderHours({ kind: 'unit', unit: 'cruiser' }, data, pricing)).toBe(8);
+    expect(queuedOrderHours({ kind: 'unit', unit: 'cruiser', troop: 'trooper' }, data, pricing)).toBe(8);
+  });
+  it('counts a waiting building and upgrade at the right level with the building multiplier', () => {
+    expect(queuedOrderHours({ kind: 'building', building: 'mine' }, data, pricing)).toBe(18);
+    expect(queuedOrderHours({ kind: 'upgrade', building: 'mine', level: 3 }, data, pricing)).toBe(60);
+  });
+  it('an unknown order has no duration rather than a wrong one', () => {
+    expect(queuedOrderHours({ kind: 'unit', unit: 'ghost' }, data)).toBeUndefined();
   });
 });

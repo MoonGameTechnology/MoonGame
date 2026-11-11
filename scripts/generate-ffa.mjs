@@ -16,7 +16,8 @@
  * - the whole catalogue of kinds, terrains and world types is on the map, except `empty`
  *   (kept off combat maps) and both fortresses, `void_station` and `fork_station`: only a
  *   player builds them (`docs/fortress-roadmap.md` §0.6); a map that seeds one gets a
- *   fortress without its core and guns;
+ *   fortress without its core and guns; `accretion_disk` only round a black hole that has
+ *   one (`disk`, the Abyss of `ffa-50`);
  * - wrecks are a rare find: one graveyard and one debris field per map (owner,
  *   2026-10-14);
  * - geometry is an irregular sample, never mirrored quadrants; the owner trades a little
@@ -36,6 +37,7 @@
  */
 import { writeFileSync, readFileSync } from 'node:fs';
 import { build } from 'esbuild';
+import { CELL_AREA, MIN_GAP, dist, freeCells, pos, rngFrom } from './ffa-provinces.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
@@ -92,6 +94,12 @@ const MAPS = {
     // into them as long wedges.
     shape: 'square',
     hub: 'abyss',
+    // The Abyss (owner 2026-11-10): the black hole twice a province in area, behind a solid
+    // ring of accretion disk — plasma falling into the hole, impassable like a rift.
+    disk: 10,
+    // The hub reaches a little further round a disk: the disk fills the space its innermost
+    // provinces held, and the area should not shrink round it.
+    hubWeight: 1.35,
     names: [
       'zorna',
       'karven',
@@ -157,12 +165,8 @@ const MAPS = {
   },
 };
 
-// Spacing of the team maps (`generate-team-3v3.py`): pace per hop stays the same.
-const MIN_GAP = 355;
-const HOME_CLEAR = 480;
+// The opening worlds' reach and the ellipse's aspect; the spacing is in `ffa-provinces.mjs`.
 const OPENING_REACH = 270;
-/** World area per province — the density of the 3v3 map (121 provinces in its ellipse). */
-const CELL_AREA = 252_000;
 const ASPECT = 1.25;
 
 // ── the real core, bundled once ──────────────────────────────────────────────────────
@@ -192,24 +196,6 @@ async function loadCore() {
 const core = await loadCore();
 const data = core.shippedGameData();
 const factions = JSON.parse(readFileSync(ROOT + 'data/factions.json', 'utf8'));
-
-// ── helpers ──────────────────────────────────────────────────────────────────────────
-function rngFrom(seed) {
-  let h = 1779033703 ^ seed.length;
-  for (let i = 0; i < seed.length; i++) {
-    h = Math.imul(h ^ seed.charCodeAt(i), 3432918353);
-    h = (h << 13) | (h >>> 19);
-  }
-  let a = h >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-const pos = (s) => [s.position.x, s.position.y];
 
 /** A map's identity and edge; no `edge` — the bounding rectangle. */
 const headOf = (cfg) => ({ id: cfg.id, seed: cfg.seed, edge: cfg.edge });
@@ -347,22 +333,12 @@ function generate(seats, cfg) {
     });
   });
   const hole = [Math.round((rnd() - 0.5) * 120), Math.round((rnd() - 0.5) * 120)];
-  add('heart', hole, 'black_hole', 'deep_void');
+  // Round a disk the hole is twice a province (`size`): the renderer draws it twice as big.
+  add('heart', hole, 'black_hole', 'deep_void', cfg.disk ? { size: 2 } : {});
   const FIXED = new Set(Object.keys(sectors));
 
-  // ── the free provinces: an unsaturated Poisson sample, varied sizes and degrees ──
-  const taken = Object.values(sectors).map(pos);
-  const cells = [];
-  for (let attempt = 0; attempt < total * 400 && taken.length < total; attempt++) {
-    const p = [(rnd() * 2 - 1) * rx * 1.05, (rnd() * 2 - 1) * ry * 1.05];
-    if (!inside(p, MIN_GAP * 0.35)) continue;
-    if (homes.some((h) => dist(h, p) < HOME_CLEAR)) continue;
-    if (taken.some((q) => dist(q, p) < MIN_GAP)) continue;
-    taken.push(p);
-    cells.push(p);
-  }
-  if (taken.length !== total)
-    throw new Error(`${cfg.id}: layout search exhausted at ${taken.length}/${total}`);
+  // ── the free provinces: an unsaturated Poisson sample, and the disk round the hole ──
+  const cells = freeCells(cfg, total, rnd, { hole, sectors, homes, add, FIXED, inside, rx, ry });
 
   // ── areas: anchored at the junctions of the seat tessellation ──
   const junctions = [];
@@ -464,7 +440,7 @@ function generate(seats, cfg) {
     count[best]++;
     for (const seat of touching[i]) has[seat][best]++;
   }
-  const areas = [...anchors, { at: hole, template: 'hub', weight: 1.25 }];
+  const areas = [...anchors, { at: hole, template: 'hub', weight: cfg.hubWeight ?? 1.25 }];
   const areaOf = (p) => {
     let k = 0,
       kd = Infinity;
@@ -888,7 +864,12 @@ function finish(seats, cfg, g) {
   const missing = (field, catalogue) =>
     Object.keys(catalogue).filter((k) => !all.some((s) => s[field] === k));
   const kinds = missing('kind', data.sectorKinds).filter(
-    (k) => k !== 'empty' && k !== 'station_site' && k !== 'fork_station' && k !== 'void_station',
+    (k) =>
+      k !== 'empty' &&
+      k !== 'station_site' &&
+      k !== 'fork_station' &&
+      k !== 'void_station' &&
+      (k !== 'accretion_disk' || cfg.disk),
   );
   if (kinds.length) fail.push(`kinds ${kinds}`);
   if (missing('terrain', data.sectors).length)

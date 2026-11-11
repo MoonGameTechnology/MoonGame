@@ -68,7 +68,7 @@ import {
 } from '../../decisions/mapLayerView';
 import { forkMarks, roadStrokes, type ForkMark, type NetPoint } from '../../decisions/roadNetwork';
 import type { TerrainEnvironment } from '../../decisions/terrainEnvironment';
-import { knownEnvironment, projectTerrainTile, terrainKnowledge, TerrainEnvironmentSceneCache } from './terrainEnvironmentView';
+import { knownEnvironment, projectTerrainTile, terrainArtCentre, terrainKnowledge, TerrainEnvironmentSceneCache } from './terrainEnvironmentView';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { canvasCompatibilityOptions } from './canvasCompatibility';
 import { SECTOR_TYPES, type MapNode } from './game';
@@ -813,7 +813,7 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
     if (!preparing) terrainRaster.draw(g, field, DPR, zooming);
   }
   g.restore();
-  // Rifts retain their exceptional local identity; ordinary environments use the field above.
+  // Rifts and the accretion disk retain their own art; ordinary environments use the field above.
   if (holographicMapOn() && lod.art > 0) {
     g.save();
     g.globalAlpha *= lod.art;
@@ -821,9 +821,9 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
       if (!meets(i, reach)) continue;
       const n = geo.nodes[geo.shape.cells[i]!.idx]!;
       const visible = terrainKnowledge(s.planets[n.id], known(n.id), memory.get(n.id), surveyed(n.id));
-      if (visible.kind !== 'rift') continue;
-      const field = terrainGeometry.project(n.id, 'rift', sectorTypeOf(n.id)?.color ?? '#9fb6bd',
-        cellPoly(geo, i), visible.known, inBake(n));
+      if (visible.kind !== 'rift' && visible.kind !== 'accretion_disk') continue;
+      const field = terrainGeometry.project(n.id, visible.kind, sectorTypeOf(n.id)?.color ?? '#9fb6bd',
+        cellPoly(geo, i), visible.known, inBake(terrainArtCentre(geo.nodes, n, visible.kind)));
       if (!field) continue;
       fields.push(field);
       if (!preparing) terrainRaster.draw(g, field, DPR, zooming);
