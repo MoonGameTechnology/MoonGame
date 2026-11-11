@@ -1,7 +1,7 @@
 import { hoursToMs } from '../action/types';
 import type { Action } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
-import { noteScouted, spyKnownOwner } from '../state/spyKnowledge';
+import { noteJourney, noteScouted, spyKnownOwner, unguardedBy } from '../state/spyKnowledge';
 import { identifiedNodes } from '../state/visibility';
 import { getStance } from '../state/diplomacy';
 import { coalitionOf } from '../state/coalition';
@@ -295,12 +295,6 @@ function targetError(h: HandlerContext, owner: string, op: SpyOp, target: string
   return null;
 }
 
-/** SPY-24: nobody can catch a spy on a world held by `target` — unclaimed, or its owner is
- *  out of the game. */
-function unguardedBy(state: GameState, target: string | null): boolean {
-  return target === null || state.players[target]?.status !== 'active';
-}
-
 /** Is `planetId` too crowded for `self` to take up `op` there: one guard and one recon spy
  *  of a player per world (SPY-13), at most `MAX_AGENTS_PER_WORLD` of them in all (SPY-17). */
 function crowded(
@@ -367,6 +361,7 @@ function rollExposure(
 /** `owner`'s spy at the end of a journey: home → it rests; out on an order → it starts
  *  the deed if it still can, else waits there for orders. */
 function arrive(h: HandlerContext, owner: string, spy: Spy): void {
+  noteJourney(h.state, owner, spy, h.ctx.now);
   if (spy.state === 'return') {
     if (reachHome(h, owner, spy, arrive))
       h.emit('espionage.home', { owner, spyId: spy.id, planetId: spy.location });
@@ -491,9 +486,10 @@ function orderSpy(action: Action, h: HandlerContext): void {
   const planetId = p.planetId;
   const planet = h.state.planets[planetId];
   if (!planet) return h.reject('E_NO_PLANET');
-  // SPY-24: the order is checked against the owner the player KNOWS. A world they neither
-  // see nor have reconnoitred takes only recon or a move: refusing or taking anything else
-  // there would tell them its hidden owner. What is really there, the spy meets on arrival.
+  // SPY-24: the order is checked against the owner the player KNOWS (`spyKnownOwner`). A
+  // world they do not see and no spy of theirs has been to takes only recon or a move:
+  // refusing or taking anything else there would tell them its hidden owner. What is
+  // really there, the spy meets on arrival.
   const known =
     op === 'relocate'
       ? undefined

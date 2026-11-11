@@ -159,6 +159,42 @@ describe('SPY-24 — an order does not give away the owner of a world in the fog
     expect(sent.state.players.p1!.resources.credits).toBe(5000 - SPY_OP_COST.sabotage);
   });
 
+  it('a spy that got to a world knows whose it is: a move there opens the deeds, no recon needed', () => {
+    const k = kernel();
+    const moved = ok(k.applyAction(fogged(), order('B', 'relocate'), ctx(0)));
+    expect(moved.state.scouted?.p1?.B).toEqual({ owner: 'p2', at: 0 });
+    expect(code(k.applyAction(moved.state, order('B', 'sabotage'), ctx(0)))).toBe('ok');
+    const stray = ok(k.applyAction(fogged(), order('N', 'relocate'), ctx(0)));
+    expect(code(k.applyAction(stray.state, order('N', 'sabotage'), ctx(0)))).toBe('E_BAD_TARGET');
+  });
+
+  it('a spy on its way learns whose every world it passes', () => {
+    // H — M — B in a line, no other lanes: a spy to B flies over M.
+    const s = fogged();
+    s.planets = {
+      H: { ...s.planets.H!, links: ['M'] },
+      M: { ...planet('M', 'p2', 5_000), links: ['H', 'B'] },
+      B: { ...s.planets.B!, links: ['M'] },
+      S: { ...s.planets.S!, links: [] },
+      N: { ...s.planets.N!, links: [] },
+    };
+    const sent = ok(kernel().applyAction(s, order('B', 'relocate'), ctx(0)));
+    expect(Object.keys(sent.state.scouted?.p1 ?? {}).sort()).toEqual(['B', 'M']);
+  });
+
+  it('no fog inside a coalition: a member’s world out of sight is known, and no target', () => {
+    const k = kernel();
+    const s: GameState = {
+      ...fogged(),
+      coalitions: {
+        c1: { id: 'c1', founder: 'p1', members: ['p1', 'p2'], emblem: 'star', description: '' },
+      },
+    };
+    expect(spyKnownOwner(s, 'p1', 'B', new Set())).toEqual({ owner: 'p2' });
+    expect(code(k.applyAction(s, order('B', 'recon'), ctx(0)))).toBe('E_BAD_TARGET');
+    expect(code(k.applyAction(s, order('B', 'counter'), ctx(0)))).toBe('ok');
+  });
+
   it('the newer of the fog memory and the spy record says whose the world is', () => {
     const s = fogged();
     const none = new Set<string>();

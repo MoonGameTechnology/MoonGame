@@ -385,9 +385,9 @@ export function unknownPlanetHtml(p: Planet): string {
     }
     if (toolShown('pings', sectorZeroToolsHidden()))
       acts.push(btn('ping', '', t('side.world.ping'), true));
-    // SPY-24: out of sight, the deeds need the world reconnoitred by the player's own spy
-    // (`state.scouted`) — a world only remembered from sight takes recon first, as the core
-    // demands; recon goes to an unclaimed world too.
+    // SPY-24: out of sight, the deeds need a world one of the player's spies has been to
+    // (`state.scouted`) — a world only remembered from sight takes recon or a move first, as
+    // the core demands; recon goes to an unclaimed world too.
     const deeds = !!mem.owner && !!game.world().scouted?.[ME]?.[p.id];
     if (mem.owner !== ME && espionageShown(sectorZeroToolsHidden()))
       acts.push(
