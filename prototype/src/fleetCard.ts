@@ -767,7 +767,10 @@ function fleetHeroName(f: Fleet): string | null {
   const s = game.world();
   const NAME = game.names();
   if (!f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('hero'))) return null;
-  const hero = Object.values(s.heroes ?? {}).find((x) => x.owner === f.owner);
+  // Героев у игрока до трёх: назвать нужно того, кто ведёт ЭТОТ флот (`Hero.fleetId`), а не
+  // первого по списку. Без отметки (старое сохранение) — прежний выбор по владельцу.
+  const heroes = Object.values(s.heroes ?? {}).filter((x) => x.owner === f.owner);
+  const hero = heroes.find((x) => x.fleetId === f.id) ?? heroes.find((x) => x.fleetId === undefined);
   return hero ? heroDisplayName(hero) : (NAME[f.owner] ?? f.owner);
 }
 
