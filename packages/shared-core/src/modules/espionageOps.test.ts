@@ -3,11 +3,13 @@ import { createKernel } from '../kernel/kernel';
 import { instantSpies, spyMap } from '../testkit/spies';
 import {
   BASE_CHANCE,
+  BASE_SPY_AGENTS,
   DEVELOPMENT_CHANCE_BONUS,
   developmentShare,
   espionageModule,
   MISSION_HOURS,
   SPY_OP_COST,
+  SPY_SALARY,
   THEFT_CAP,
 } from './espionage';
 import { constructionModule } from './construction';
@@ -365,7 +367,11 @@ describe('SPY-15 — economic sabotage', () => {
       kind: 'disrupt',
       disrupted: END + 24 * HOUR,
     });
-    expect(done.state.players.p2!.resources.credits).toBe(10_000);
+    // Only the salary of p2's own spies leaves it (`SPY_SALARY` a day each).
+    expect(done.state.players.p2!.resources.credits).toBeCloseTo(
+      10_000 - (BASE_SPY_AGENTS * SPY_SALARY * END) / (24 * HOUR),
+      6,
+    );
   });
 
   it('a repeat extends the term but never cuts below 75%', () => {
