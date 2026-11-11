@@ -11,6 +11,7 @@ import type { FleetChain } from './chain';
 import type { Coalition, CoalitionClock } from './coalition';
 import type { SightRules } from './sensorView';
 import type { SeenSortie } from './aircraftSight';
+import type { Spy } from './spy';
 export type { SightRules } from './sensorView';
 
 /**
@@ -278,30 +279,11 @@ export interface IntelGrant {
   until: number;
   /** How deep the posted agent has dug (1–4). Absent = 1. */
   layer?: number;
-  /** The posted agent's mission (`AgentAway.mission`) that holds this grant open. */
+  /** The posted spy's order (`Spy.mission`) that holds this grant open. */
   mission?: number;
 }
 
-/** An espionage operation an agent is sent on (SPY-8). */
-export type SpyOp = 'recon' | 'sabotage' | 'delay' | 'disrupt' | 'theft' | 'research' | 'counter';
-
-/** An agent of the spy's network that is away (espionage, SPY-6): on a mission,
- *  busy working a stolen window, slipping home after a failure, or — `lost` —
- *  killed, with a replacement being found. Back in the network once `until` passes. */
-export interface AgentAway {
-  /** World-time (ms) the agent is available again. */
-  until: number;
-  /** The agent was killed; `until` is when the replacement is found. */
-  lost?: true;
-  /** On a mission (SPY-8): its id among the player's live missions, the operation and
-   *  the target world; `until` is when the mission resolves. */
-  mission?: number;
-  op?: SpyOp;
-  planetId?: PlanetId;
-  /** A counter-intelligence agent on post (SPY-11): it stays on `planetId` until
-   *  recalled or caught, and `until` is the `COUNTER_POSTED` sentinel. */
-  posted?: true;
-}
+export type { Spy, SpyOp, SpyState } from './spy';
 
 export type MatchStatus = 'ongoing' | 'ended';
 export type MatchEndReason =
@@ -1113,13 +1095,10 @@ export interface GameState {
   /** Stolen intel windows per beneficiary (`espionageModule`). PRIVATE: a viewer's
    *  projection carries only their own grants — who spies on whom is never public. */
   intel?: Record<PlayerId, IntelGrant[]>;
-  /** Agents away from each spy's network (`espionageModule`, SPY-6). PRIVATE like
+  /** Each player's named spies (`espionageModule`, SPY-6/SPY-23). Created on the first
+   *  order; until then `spyRoster` reads the network as resting in the capital. PRIVATE like
    *  `intel`: a viewer's projection carries only their own network. */
-  spyAgents?: Record<PlayerId, AgentAway[]>;
-  /** Turned enemy agents serving each catcher (`espionageModule`, SPY-18): the game-time
-   *  each one leaves. Every live entry is one agent over the `espionage.agents` network.
-   *  PRIVATE like `spyAgents`. */
-  spyTurned?: Record<PlayerId, number[]>;
+  spies?: Record<PlayerId, Spy[]>;
   /** Session resource market: a public per-match order book maintained by
    *  `marketModule`. Sellers escrow a resource at a price; buyers pay money. */
   market?: MarketOrder[];

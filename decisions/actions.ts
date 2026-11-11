@@ -323,9 +323,12 @@ export const editCoalition = (playerId: string, emblem: string, description: str
   act(playerId, 'coalition.edit', { emblem, description });
 export const declareWar = (playerId: string, target: string, stance: DiplomaticStance = 'war') =>
   act(playerId, 'diplomacy.declare', { target, stance });
-/** Send an agent on an operation against another commander's world (SPY-8/9). */
-export const spyOn = (playerId: string, planetId: string, op: SpyOp) =>
-  act(playerId, 'espionage.spy', { planetId, op });
+/** Send a spy on an operation against a world, or to wait there (`relocate`) — the named
+ *  spy, or the closest free one (SPY-8/9/22). */
+export const spyOn = (playerId: string, planetId: string, op: SpyOp, spyId?: number) =>
+  act(playerId, 'espionage.spy', spyId === undefined ? { planetId, op } : { planetId, op, spyId });
+/** Call a named spy off its order and home to the capital (SPY-23). */
+export const cancelSpy = (playerId: string, spyId: number) => act(playerId, 'espionage.cancel', { spyId });
 /** Call a counter-intelligence agent off its post on this world (SPY-11), or the posted
  *  recon agent with `op: 'recon'` (SPY-13). */
 export const recallSpy = (playerId: string, planetId: string, op?: 'recon') =>

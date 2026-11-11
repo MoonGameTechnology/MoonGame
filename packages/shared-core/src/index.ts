@@ -89,7 +89,8 @@ export {
   type PlayerReward,
   type DiplomaticStance,
   type IntelGrant,
-  type AgentAway,
+  type Spy,
+  type SpyState,
   type SpyOp,
 } from './state/gameState';
 export {
@@ -849,8 +850,20 @@ export {
   MAX_AGENTS_PER_WORLD,
   TURNED_HOURS,
   counterIntelOf,
-  turnedAgents,
 } from './modules/espionage';
+export {
+  spyPath,
+  spyRoute,
+  spyTravelMs,
+  spyJourneyMs,
+  spyRoster,
+  spyHome,
+  spyStandsAt,
+  spyTerritoryFactor,
+  SPY_SPEED,
+  SPY_NEUTRAL_FACTOR,
+  SPY_ENEMY_FACTOR,
+} from './state/spyTravel';
 export { diplomacyModule } from './modules/diplomacy';
 export { botDiplomacyModule } from './modules/botDiplomacy';
 export {

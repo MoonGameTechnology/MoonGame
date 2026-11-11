@@ -50,6 +50,7 @@ const CLIENT_ACTION_TYPES = [
   'coalition.leave',
   'coalition.kick',
   'espionage.spy',
+  'espionage.cancel',
   'espionage.recall',
   'market.list',
   'market.cancel',
@@ -146,6 +147,8 @@ describe('SV-1.2 · action payload schemas', () => {
       ['espionage.spy', { planetId: 'home_b', op: 'research' }],
       ['espionage.spy', { planetId: 'home_a', op: 'counter' }], // SPY-11: your own world too
       ['espionage.recall', { planetId: 'home_a' }],
+      ['espionage.spy', { planetId: 'home_b', op: 'relocate', spyId: 2 }], // SPY-23: a named spy moves
+      ['espionage.cancel', { spyId: 1 }],
       // REL-2 — prototype-host intents
       ['market.list', { side: 'buy', resource: 'metal', amount: 4, price: 2 }], // two-sided book
       ['market.take', { id: 'lot:1', amount: 2 }],
@@ -266,6 +269,9 @@ describe('SV-1.2 · action payload schemas', () => {
       ['espionage.spy', { op: 'recon' }], // an operation needs a target world
       ['espionage.spy', { planetId: 'home_b', op: 'pings' }], // not an operation (yet)
       ['espionage.recall', {}], // recall needs the world
+      ['espionage.spy', { planetId: 'home_b', op: 'recon', spyId: 0 }], // spies count from 1
+      ['espionage.spy', { planetId: 'home_b', op: 'recon', spyId: 1.5 }],
+      ['espionage.cancel', {}], // which spy?
       ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1' }], // SHU-6.2: no point
       ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: 5 } }], // half a point
       ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: NaN, y: 0 } }], // not finite

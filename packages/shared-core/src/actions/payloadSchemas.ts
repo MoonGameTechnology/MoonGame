@@ -113,7 +113,13 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     to: z.number().int().nonnegative().max(MAX_RESEARCH_QUEUE - 1),
   }),
   // espionage.ts — send an agent on an operation against one world (SPY-8)
-  'espionage.spy': z.object({ planetId: id, op: z.enum(['recon', 'sabotage', 'delay', 'disrupt', 'theft', 'research', 'counter']) }),
+  'espionage.spy': z.object({
+    planetId: id,
+    op: z.enum(['relocate', 'recon', 'sabotage', 'delay', 'disrupt', 'theft', 'research', 'counter']),
+    spyId: z.number().int().min(1).max(64).optional(),
+  }),
+  // SPY-23: call a named spy off its order and home to the capital
+  'espionage.cancel': z.object({ spyId: z.number().int().min(1).max(64) }),
   // SPY-11: call a counter-intelligence agent off its post (or off its way there);
   // SPY-13: `op: 'recon'` calls a posted recon agent off instead
   'espionage.recall': z.object({ planetId: id, op: z.enum(['counter', 'recon']).optional() }),
