@@ -282,19 +282,22 @@ export function taskGroupPanelHtml(group: Fleet[]): string {
     t('side.group.sub', { f: totals.fleets, s: totals.ships, tr: totals.troops }),
   );
   h += `<div class="hint">${t('side.group.hint')}</div>`;
+  // Флот и место называются так же, как везде на экране (имя флота, `planetName.ts`), а не
+  // внутренним id: игрок не знает, что такое «p1_3» над «n42».
+  const at = (id: string): string => esc(placeName(id));
   for (const f of group) {
     const where = fleetWhere(f);
     const loc =
       where.kind === 'orbit'
-        ? where.at
+        ? at(where.at)
         : where.kind === 'transit'
-          ? `${where.from}→${where.to}`
+          ? `${at(where.from)}→${at(where.to)}`
           : where.kind === 'lane'
-            ? `⟜ ${where.from}–${where.to}`
+            ? `⟜ ${at(where.from)}–${at(where.to)}`
             : '—';
     const nShips = sumUnits(f.units);
     const nTr = sumUnits(f.landing ?? []);
-    h += `<div class="row" style="color:${ownerColor(f.owner)}">▲ ${f.id} <span class="dim">${loc}</span> · ${nShips}${nTr ? '+' + nTr : ''}</div>`;
+    h += `<div class="row" style="color:${ownerColor(f.owner)}">▲ ${esc(fleetTitleOf(f.id))} <span class="dim">${loc}</span> · ${nShips}${nTr ? '+' + nTr : ''}</div>`;
   }
   h += btn('cancel', '', t('side.group.clear'), true);
   return h;
