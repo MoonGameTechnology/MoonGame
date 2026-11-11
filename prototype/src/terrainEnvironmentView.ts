@@ -141,3 +141,30 @@ export function projectTerrainTile(
     environment: { tile, projection },
   };
 }
+
+interface CentredNode {
+  readonly x: number;
+  readonly y: number;
+  readonly sector: string;
+}
+
+const holes = new WeakMap<readonly CentredNode[], CentredNode | null>();
+
+/**
+ * The point a province's terrain art is drawn round: its own node, except for the accretion
+ * disk, whose plasma streaks circle the black hole, so the ring of disk provinces reads as
+ * one continuous disk. Without a black hole on the map the disk falls back to its own node.
+ */
+export function terrainArtCentre<N extends CentredNode>(
+  nodes: readonly N[],
+  node: N,
+  kind: string | undefined,
+): CentredNode {
+  if (kind !== 'accretion_disk') return node;
+  let hole = holes.get(nodes);
+  if (hole === undefined) {
+    hole = nodes.find((n) => n.sector === 'black_hole') ?? null;
+    holes.set(nodes, hole);
+  }
+  return hole ?? node;
+}

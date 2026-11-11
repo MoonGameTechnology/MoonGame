@@ -618,16 +618,28 @@ export const PAUSED_UPKEEP_SOLO_MIGRATION = {
   toDataHash: PAUSED_SLOTS_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Data 0.1.86: a new province kind, the accretion disk round the Abyss black hole of
+ *  `ffa-50`. A saved world keeps its map and provinces: the kind only appears in new matches
+ *  on that map. */
+export const ACCRETION_DISK_SOLO_MIGRATION = {
+  fromRules: PAUSED_UPKEEP_SOLO_MIGRATION.toRules,
+  fromData: PAUSED_UPKEEP_SOLO_MIGRATION.toData,
+  fromDataHash: PAUSED_UPKEEP_SOLO_MIGRATION.toDataHash,
+  toRules: '18ddffcbbefbff',
+  toData: '0.1.86',
+  toDataHash: '0ab210564da766',
+} as const;
+
 /** Rules-only pair: espionage 2.0.0 — named spies fly to their world, wait there for orders
  *  and come home to the capital (SPY-23). The catalogue is unchanged; a saved world's
  *  anonymous agents (`spyAgents`) are all home at its first tick, their posts closed. */
 export const SPY_TRAVEL_SOLO_MIGRATION = {
-  fromRules: PAUSED_UPKEEP_SOLO_MIGRATION.toRules,
-  fromData: PAUSED_UPKEEP_SOLO_MIGRATION.toData,
-  fromDataHash: PAUSED_UPKEEP_SOLO_MIGRATION.toDataHash,
-  toRules: '0c3a14dbd7af54',
-  toData: PAUSED_UPKEEP_SOLO_MIGRATION.toData,
-  toDataHash: PAUSED_UPKEEP_SOLO_MIGRATION.toDataHash,
+  fromRules: ACCRETION_DISK_SOLO_MIGRATION.toRules,
+  fromData: ACCRETION_DISK_SOLO_MIGRATION.toData,
+  fromDataHash: ACCRETION_DISK_SOLO_MIGRATION.toDataHash,
+  toRules: '17b676831d1377',
+  toData: ACCRETION_DISK_SOLO_MIGRATION.toData,
+  toDataHash: ACCRETION_DISK_SOLO_MIGRATION.toDataHash,
 } as const;
 
 /** Rules-only pair: `spy-levels` 1.0.0 joins right after `espionage` — spies earn
@@ -637,7 +649,7 @@ export const SPY_LEVELS_SOLO_MIGRATION = {
   fromRules: SPY_TRAVEL_SOLO_MIGRATION.toRules,
   fromData: SPY_TRAVEL_SOLO_MIGRATION.toData,
   fromDataHash: SPY_TRAVEL_SOLO_MIGRATION.toDataHash,
-  toRules: '0774430aed8ac6',
+  toRules: '0e16aa5f86099a',
   toData: SPY_TRAVEL_SOLO_MIGRATION.toData,
   toDataHash: SPY_TRAVEL_SOLO_MIGRATION.toDataHash,
 } as const;
@@ -696,6 +708,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   ANNIHILATE_PEACE_SOLO_MIGRATION,
   PAUSED_SLOTS_SOLO_MIGRATION,
   PAUSED_UPKEEP_SOLO_MIGRATION,
+  ACCRETION_DISK_SOLO_MIGRATION,
   SPY_TRAVEL_SOLO_MIGRATION,
   SPY_LEVELS_SOLO_MIGRATION,
 ];

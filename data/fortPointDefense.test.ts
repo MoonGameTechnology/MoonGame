@@ -92,7 +92,8 @@ describe('где ставится космическая крепость — р
     // `fork_station` — единственное исключение из рассуждения, и флаг у неё стоит: площадку
     // развилки не захватывают, но хозяин у неё ЕСТЬ — строитель крепости (FORT-6.1).
     // Своим незахватываемое тут становится, поэтому закрыта она флагом, а не владением.
-    expect(uncapturable.sort()).toEqual(['black_hole', 'debris_field', 'empty', 'fork_station', 'rift', 'station_site']);
+    // `accretion_disk` (плазменное кольцо вокруг чёрной дыры «Бездны») — та же дыра, что разлом.
+    expect(uncapturable.sort()).toEqual(['accretion_disk', 'black_hole', 'debris_field', 'empty', 'fork_station', 'rift', 'station_site']);
     expect(isStationable(data, { kind: 'fork_station' })).toBe(false);
   });
 

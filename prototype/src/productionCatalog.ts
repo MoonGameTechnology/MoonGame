@@ -20,7 +20,7 @@ export function productionCatalogHeading(section?: string): string {
 export function productionCatalogTile(state: GameState, me: string, world: string, id: string, selected: string): string {
   const unit = data.units[id]!;
   const ground = unit.domain === 'ground';
-  const art = catalogPortraitHtml('u', id, data, ground ? 'thumb' : 'portrait');
+  const art = catalogPortraitHtml('u', id, data);
   const title = `<b>${esc(displayUnit(id))}</b>`;
   const price = completedUnitSpend(state, { unit: id, count: 1, modules: [] });
   const resources = state.players[me]?.resources ?? {};
@@ -32,7 +32,8 @@ export function productionCatalogTile(state: GameState, me: string, world: strin
   const action = `<button class="cn-hbtn${id === selected ? ' on' : ''}" data-cnhull="${esc(id)}"${blocked ? ' disabled' : ''}>${t(ground ? 'production.hire' : 'production.equip')}</button>`;
   const requirements = productionRequirementsHtml(state, me, world, 'unit', id);
   const quote = `<div class="pw-catalog-quote">${cost(price)}<small>${fmtDur(matchUnitHours(state, unit.buildTimeHours))}</small></div>`;
-  return `<article class="pw-hull-tile pw-catalog-tile${ground ? ' pw-ground-card' : ''}">${ground
-    ? `<div class="pw-ground-identity">${art}<span>${title}<small>${t('production.stat.hp')} ${unit.stats.hp}</small></span></div><div class="pw-catalog-actions">${quote}${action}${productionInfoButton('unit', id)}</div>`
-    : `<div class="pw-catalog-visual">${art}${requirements}</div>${title}${quote}<div class="pw-catalog-actions">${action}${productionInfoButton('unit', id)}</div>`}${ground ? requirements : ''}</article>`;
+  // Ships and ground units share one card: the requirement block sits over the portrait, so a
+  // locked unit says what it needs where the eye already is (the shipyard layout, everywhere).
+  const name = ground ? `<b>${esc(displayUnit(id))}<small>${t('production.stat.hp')} ${unit.stats.hp}</small></b>` : title;
+  return `<article class="pw-hull-tile pw-catalog-tile"><div class="pw-catalog-visual">${art}${requirements}</div>${name}${quote}<div class="pw-catalog-actions">${action}${productionInfoButton('unit', id)}</div></article>`;
 }

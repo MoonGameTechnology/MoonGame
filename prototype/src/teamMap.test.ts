@@ -118,6 +118,8 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
     // `empty` stays off combat maps by the owner's ruling (see mapSchema.test.ts).
     const kinds = Object.keys(data.sectorKinds)
       .filter((k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station' && k !== 'empty')
+      // The accretion disk rings only the Abyss black hole of `ffa-50` (owner 2026-11-10).
+      .filter((k) => k !== 'accretion_disk')
       .sort();
     expect(has((s) => s.kind)).toEqual(kinds);
     expect(has((s) => s.terrain)).toEqual(Object.keys(data.sectors).sort());

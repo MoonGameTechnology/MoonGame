@@ -146,6 +146,9 @@ describe('shipped maps resolve against the shipped catalogue', () => {
     // Впервые с неё пришли пять: `black_hole`, `debris_field`, `empty`, `neutral_base`,
     // `void_station`.
     expect([...kinds].sort()).toEqual([
+      // Плазменное кольцо вокруг чёрной дыры «Бездны» (`ffa-50`, владелец 2026-11-10):
+      // непроходимо, как разлом; на тестовых картах стоит вместо одного из разломов.
+      'accretion_disk',
       'asteroid',
       'asteroid_cluster',
       'black_hole',
