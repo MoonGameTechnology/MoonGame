@@ -79,8 +79,9 @@ export class FriendService {
     const target = await this.users.findUser(typed);
     if (!target) return { ok: false, code: 'E_NO_ACCOUNT' };
     if (target.userId === who.accountId) return { ok: false, code: 'E_SELF' };
-    // The cap is checked on the ASKER only: accepting is what actually costs the
-    // asked side a slot, and that is checked in `accept`.
+    // Checked here for the ASKER's sake (no point asking with a full list) and again in
+    // `accept` for BOTH sides: pending requests take no slot, so an asker could send many
+    // and see them all accepted past the cap if only the accepting side were counted.
     if (await this.atLimit(who.accountId)) return { ok: false, code: 'E_LIMIT' };
     const made = await this.friends.request(
       who,
@@ -95,7 +96,10 @@ export class FriendService {
    *  code, because distinguishing them tells a caller about rows it cannot see. */
   async accept(accountId: string, otherId: string): Promise<{ ok: true } | FriendFail> {
     if (!otherId || otherId.includes('\0')) return { ok: false, code: 'E_BAD_TARGET' };
-    if (await this.atLimit(accountId)) return { ok: false, code: 'E_LIMIT' };
+    // Accepting fills a slot on BOTH lists, so both are checked: the asker may have
+    // filled theirs since the request went out.
+    if ((await this.atLimit(accountId)) || (await this.atLimit(otherId)))
+      return { ok: false, code: 'E_LIMIT' };
     const done = await this.friends.accept(accountId, otherId, this.now());
     return done.ok ? { ok: true } : { ok: false, code: 'E_NO_EDGE' };
   }
