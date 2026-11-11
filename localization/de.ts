@@ -3534,6 +3534,7 @@ export const de: Record<string, string> = {
   'rescard.integration': '{n} {n|Planet|Planeten} in Integration: Ertrag von {p}% bis 100%',
   'rescard.upkeep': 'Gebäudeunterhalt',
   'rescard.army': 'Armeeunterhalt',
+  'rescard.spies': 'Spionagesold',
   'rescard.market': 'Markt',
   'rescard.trader': 'Händler',
   'rescard.close': 'Schließen',

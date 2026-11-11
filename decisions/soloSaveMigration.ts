@@ -654,6 +654,18 @@ export const SPY_LEVELS_SOLO_MIGRATION = {
   toDataHash: SPY_TRAVEL_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: `economy` 1.5.0 and `espionage` 2.1.0 — spies are paid a salary in
+ *  credits with the daily upkeep. The catalogue is unchanged; a saved world's spies go on
+ *  the payroll from the first settlement after loading. */
+export const SPY_SALARY_SOLO_MIGRATION = {
+  fromRules: SPY_LEVELS_SOLO_MIGRATION.toRules,
+  fromData: SPY_LEVELS_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
+  toRules: '1bff113e714514',
+  toData: SPY_LEVELS_SOLO_MIGRATION.toData,
+  toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -711,6 +723,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   ACCRETION_DISK_SOLO_MIGRATION,
   SPY_TRAVEL_SOLO_MIGRATION,
   SPY_LEVELS_SOLO_MIGRATION,
+  SPY_SALARY_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

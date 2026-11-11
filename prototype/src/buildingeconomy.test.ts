@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { newGame, netIncome, data, HOUR, advance } from './game';
+import { spyPayPerHour } from './economy';
 import {
   BROWNOUT,
   allowedBuildings,
@@ -46,6 +47,8 @@ describe('building economy — the prototype resource loop', () => {
     if (neutral) { neutral.owner='p1'; worlds.push(neutral); }
     const sum: Record<string,number> = {};
     for (const p of worlds) for (const [k,v] of Object.entries(netIncome(s,'p1',undefined,p.id))) sum[k]=(sum[k]??0)+v;
+    // Spies are paid by the whole power, not by a world: their salary is the one empire line.
+    sum.credits = (sum.credits ?? 0) - spyPayPerHour(s, 'p1');
     const total=netIncome(s,'p1');
     for (const k of new Set([...Object.keys(total),...Object.keys(sum)])) expect(sum[k]??0).toBeCloseTo(total[k]??0,8);
     expect(netIncome(s,'p1',undefined,'missing')).toEqual({});

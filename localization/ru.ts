@@ -4086,6 +4086,7 @@ export const ru: Record<string, string> = {
   'rescard.integration': 'В освоении {n} {n|планета|планеты|планет}: доход с них от {p}% до 100%',
   'rescard.upkeep': 'Содержание зданий',
   'rescard.army': 'Содержание войск',
+  'rescard.spies': 'Зарплата шпионов',
   'rescard.market': 'Рынок',
   'rescard.trader': 'Торговец',
   'rescard.close': 'Закрыть',
