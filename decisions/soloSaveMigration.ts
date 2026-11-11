@@ -630,6 +630,30 @@ export const ACCRETION_DISK_SOLO_MIGRATION = {
   toDataHash: '0ab210564da766',
 } as const;
 
+/** Rules-only pair: espionage 2.0.0 — named spies fly to their world, wait there for orders
+ *  and come home to the capital (SPY-23). The catalogue is unchanged; a saved world's
+ *  anonymous agents (`spyAgents`) are all home at its first tick, their posts closed. */
+export const SPY_TRAVEL_SOLO_MIGRATION = {
+  fromRules: ACCRETION_DISK_SOLO_MIGRATION.toRules,
+  fromData: ACCRETION_DISK_SOLO_MIGRATION.toData,
+  fromDataHash: ACCRETION_DISK_SOLO_MIGRATION.toDataHash,
+  toRules: '17b676831d1377',
+  toData: ACCRETION_DISK_SOLO_MIGRATION.toData,
+  toDataHash: ACCRETION_DISK_SOLO_MIGRATION.toDataHash,
+} as const;
+
+/** Rules-only pair: `spy-levels` 1.0.0 joins right after `espionage` — spies earn
+ *  experience and levels that bend the espionage odds, deeds and speed. The catalogue is
+ *  unchanged; a saved world's spies start without experience. */
+export const SPY_LEVELS_SOLO_MIGRATION = {
+  fromRules: SPY_TRAVEL_SOLO_MIGRATION.toRules,
+  fromData: SPY_TRAVEL_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_TRAVEL_SOLO_MIGRATION.toDataHash,
+  toRules: '0e16aa5f86099a',
+  toData: SPY_TRAVEL_SOLO_MIGRATION.toData,
+  toDataHash: SPY_TRAVEL_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -685,6 +709,8 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   PAUSED_SLOTS_SOLO_MIGRATION,
   PAUSED_UPKEEP_SOLO_MIGRATION,
   ACCRETION_DISK_SOLO_MIGRATION,
+  SPY_TRAVEL_SOLO_MIGRATION,
+  SPY_LEVELS_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

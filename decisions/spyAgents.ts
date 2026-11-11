@@ -1,34 +1,53 @@
 /**
- * Сеть агентов шпионажа (SPY-6, решение владельца 2026-10-21: «ограничение по агентам,
- * пока 3»). Само правило — сколько агентов, когда агент занят и когда потерян — в ядре
- * (`espionageModule`, `state.spyAgents`); здесь только что показать игроку.
+ * Сеть шпионов (SPY-6, решение владельца 2026-10-21: «ограничение по агентам, пока 3»;
+ * SPY-23: именные шпионы со своим местом на карте). Само правило — сколько шпионов, где
+ * каждый и чем занят — в ядре (`espionageModule`, `state.spies`); здесь только что
+ * показать игроку в сводке «свободно N из M».
  *
- * 1. **Свободно = сеть минус отсутствующие.** Отсутствующий — тот, чей `until` ещё
- *    впереди: ядро вычищает вернувшихся только на ходу часов, и кадр между этим не
- *    должен показывать занятым агента, который уже дома.
- * 2. **Свободных не бывает меньше нуля.** Сеть может сжаться под занятыми агентами, и
- *    «−1 из 3» — это поломка, а не сведения.
- * 3. **Ближайший вернувшийся — первым.** Список отсутствующих идёт по `until`, чтобы
- *    сверху стояло то, чего ждать меньше всего.
+ * 1. **Свободен = отдыхает в столице или ждёт приказа на мире.** Остальные (в пути, на
+ *    задании, возвращаются, вербуются, залегли на дно) — в списке занятых.
+ * 2. **Ближайший освободившийся — первым.** Список занятых идёт по сроку, чтобы сверху
+ *    стояло то, чего ждать меньше всего; без срока (пост, «на дне») — в конце.
  */
-import type { AgentAway } from '../packages/shared-core/src/index';
+import type { Spy, SpyOp } from '../packages/shared-core/src/index';
 
-/** Что показать про сеть агентов. */
+/** Занятый шпион в сводке: до какого мига, погиб ли (идёт замена), куда ушёл. */
+export interface AgentAway {
+  /** Когда освободится (мс мира); `Number.MAX_SAFE_INTEGER` — без срока. */
+  until: number;
+  lost?: true;
+  op?: SpyOp;
+  planetId?: string;
+  posted?: true;
+}
+
+/** Что показать про сеть шпионов. */
 export interface SpyAgents {
-  /** Сколько агентов можно отправить прямо сейчас. */
+  /** Сколько шпионов можно отправить прямо сейчас. */
   free: number;
   /** Размер сети. */
   total: number;
-  /** Отсутствующие агенты, ближайший вернувшийся первым. */
+  /** Занятые шпионы, ближайший освободившийся первым. */
   away: AgentAway[];
 }
 
-/** Правила 1–3. `total` — размер сети (база ядра `BASE_SPY_AGENTS`). */
-export function spyAgents(
-  away: readonly AgentAway[] | undefined,
-  total: number,
-  now: number,
-): SpyAgents {
-  const live = (away ?? []).filter((a) => a.until > now).sort((a, b) => a.until - b.until);
-  return { free: Math.max(0, total - live.length), total, away: live };
+const NO_END = Number.MAX_SAFE_INTEGER;
+
+/** Правила 1–2 над реестром шпионов игрока (`spyRoster` ядра). */
+export function spyAgents(roster: readonly Spy[]): SpyAgents {
+  const away: AgentAway[] = [];
+  for (const s of roster) {
+    if (s.state === 'rest' || s.state === 'wait') continue;
+    if (s.state === 'recruit') away.push({ until: s.arrivesAt ?? NO_END, lost: true });
+    else if (s.state === 'travel' || s.state === 'work')
+      away.push({
+        until: s.posted ? NO_END : (s.arrivesAt ?? NO_END),
+        ...(s.op ? { op: s.op } : {}),
+        planetId: s.location,
+        ...(s.posted ? { posted: true as const } : {}),
+      });
+    else away.push({ until: s.arrivesAt ?? NO_END });
+  }
+  away.sort((a, b) => a.until - b.until);
+  return { free: roster.length - away.length, total: roster.length, away };
 }
