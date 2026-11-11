@@ -2,7 +2,7 @@
   "about": "Потолки сторожа scripts/codeSize.test.ts (SLIM-1): файлы длиннее 1000 строк и функции длиннее 300. Поднимать потолок — только явно, с причиной в описании PR; опускать — когда код стал короче.",
   "files": {
     "prototype/src/main.ts": 4079,
-    "packages/server/src/matchRoom.ts": 2948,
+    "packages/server/src/matchRoom.ts": 2956,
     "packages/shared-core/src/modules/shuttle.ts": 2897,
     "prototype/netserver.ts": 2097,
     "packages/shared-core/src/state/gameState.ts": 1823,
@@ -42,7 +42,7 @@
     "packages/shared-core/src/modules/fleetOps.ts::fleetOpsModule.setup": 518,
     "prototype/src/trainingTour.ts::buildTrainingTour": 445,
     "prototype/src/mapInput.ts::selectAt": 353,
-    "packages/shared-core/src/modules/espionage.ts::espionageModule.setup": 472,
+    "packages/shared-core/src/modules/espionage.ts::espionageModule.setup": 470,
     "packages/shared-core/src/state/visibility.ts::project": 458,
     "scripts/generate-ffa.mjs::generate": 445,
     "prototype/src/sectorZeroMenu.ts::initSectorZeroMenu": 443,

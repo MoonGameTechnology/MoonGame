@@ -100,7 +100,10 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '105'; // Ракеты: ЧЛЕНСТВО — `missiles` 1.0.0 перед
+export const MODULE_MANIFEST_VERSION = '106'; // ЧЛЕНСТВО — `spy-levels` 1.0.0 сразу за
+// `espionage`: опыт и уровни шпионов (резолюция владельца 2026-11-10). Партия на 105 не знала
+// бы опыта и бонусов уровня.
+// export const MODULE_MANIFEST_VERSION = '105'; // Ракеты: ЧЛЕНСТВО — `missiles` 1.0.0 перед
 // `auto-merge` (пуск ракет из ангара); `rocketMines` 3.4.0 — ракета самонаводящаяся, промах
 // только за дальностью от точки пуска. Партия на 104 вела бы ракету мины в точку.
 // export const MODULE_MANIFEST_VERSION = '104'; // BAL-19: порядок тот же; `economy` 1.4.0 —

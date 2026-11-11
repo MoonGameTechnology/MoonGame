@@ -543,6 +543,14 @@ export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new 
   ['espionage.counter.caught', 'owner'],
   ['espionage.counter.lost', 'owner'],
   ['espionage.detected', 'owner'],
+  // SPY-23: a named spy's way — where it is says whom it spies on.
+  ['espionage.started', 'owner'],
+  ['espionage.arrived', 'owner'],
+  ['espionage.waiting', 'owner'],
+  ['espionage.home', 'owner'],
+  ['espionage.cancelled', 'owner'],
+  ['espionage.caught', 'owner'],
+  ['espionage.recruited', 'owner'],
 ]);
 
 /** Events every player of the match receives, wherever they happen — public news. The

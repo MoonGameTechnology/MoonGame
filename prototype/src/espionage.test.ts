@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { newGame, order, spyOn, recallSpy, advance, botFavour, FAVOUR_SPY_CAUGHT_HIT, HOUR } from './game';
+import {
+  newGame,
+  order,
+  spyOn,
+  recallSpy,
+  advance,
+  botFavour,
+  FAVOUR_SPY_CAUGHT_HIT,
+  HOUR,
+} from './game';
 import { getStance, type GameState } from '../../packages/shared-core/src/index';
 import type { StepOut } from './protoKernel';
 
@@ -21,11 +30,15 @@ function worldOf(s: GameState, owner: string): string {
   return Object.values(s.planets).find((p) => p.owner === owner)!.id;
 }
 
-/** Send one recon mission and let it resolve (12h + slack). */
+/** Send one recon mission and let it resolve (SPY-23: the way there, 12h of work + slack). */
 function mission(s: GameState, planetId: string): StepOut {
   const sent = order(s, spyOn('p1', planetId, 'recon'), s.time);
   expect(sent.error).toBeUndefined();
-  const done = advance(sent.state, sent.state.time + 13 * HOUR);
+  const newest = sent.state.spies!['p1']!.reduce((a, b) =>
+    (b.mission ?? 0) > (a.mission ?? 0) ? b : a,
+  );
+  const arrives = newest.state === 'travel' ? newest.arrivesAt! : sent.state.time;
+  const done = advance(sent.state, arrives + 13 * HOUR);
   return { state: done.state, events: [...sent.events, ...done.events] };
 }
 
@@ -37,7 +50,7 @@ describe('espionage in the prototype kernel (SPY-8 playable)', () => {
     for (let i = 0; i < 12; i++) {
       // SPY-6: retries need a free agent each
       const out = mission(st, target);
-      st = { ...out.state, spyAgents: undefined };
+      st = { ...out.state, spies: undefined };
       // Every attempt is a real dispatch (fee burned, agent away), not a refusal.
       expect(out.events.some((e) => e.type === 'espionage.sent')).toBe(true);
       if (st.intel?.['p1']?.some((g) => g.target === target)) return;
@@ -59,7 +72,7 @@ describe('espionage in the prototype kernel (SPY-8 playable)', () => {
         st = out;
         break;
       }
-      st = { ...out, spyAgents: undefined };
+      st = { ...out, spies: undefined };
     }
     expect(st.intel?.['p1']?.[0]).toMatchObject({ target, layer: 1 });
     const recalled = order(st, recallSpy('p1', target, 'recon'), st.time);
@@ -77,7 +90,7 @@ describe('espionage in the prototype kernel (SPY-8 playable)', () => {
       const out = mission(st, target);
       // SPY-6: the network holds 3 agents — send them home so the retries never trip
       // E_NO_AGENT (this test is about favour, not about the network).
-      st = { ...out.state, spyAgents: undefined };
+      st = { ...out.state, spies: undefined };
       const caught = out.events.find(
         (e) => e.type === 'espionage.detected' && (e.payload as { spy?: string }).spy === 'p1',
       );
@@ -103,10 +116,8 @@ describe('espionage in the prototype kernel (SPY-8 playable)', () => {
       expect(out.error).toBeUndefined();
       st = out.state;
     }
-    expect(st.spyAgents?.['p1']).toHaveLength(3);
-    // SPY-17: a fourth agent on the SAME world is refused by the per-world cap first, so
-    // the network check is read with a guard for our own world.
-    expect(order(st, spyOn('p1', target, 'research'), st.time).error).toBe('E_BAD_TARGET');
+    expect(st.spies?.['p1']?.filter((x) => x.state !== 'rest')).toHaveLength(3);
+    expect(order(st, spyOn('p1', target, 'research'), st.time).error).toBe('E_NO_AGENT');
     expect(order(st, spyOn('p1', worldOf(st, 'p1'), 'counter'), st.time).error).toBe('E_NO_AGENT');
   });
 });

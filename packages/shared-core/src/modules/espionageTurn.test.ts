@@ -1,12 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
-import {
-  BASE_SPY_AGENTS,
-  espionageModule,
-  MISSION_HOURS,
-  TURNED_HOURS,
-  turnedAgents,
-} from './espionage';
+import { instantSpies, spyMap } from '../testkit/spies';
+import { BASE_SPY_AGENTS, espionageModule, MISSION_HOURS, TURNED_HOURS } from './espionage';
 import { createInitialState, type GameState, type Planet, type Player } from '../state/gameState';
 import { visibleState } from '../state/visibility';
 import { parseGameData, type GameData } from '../data/schemas';
@@ -87,7 +82,7 @@ function planet(id: string, owner: string | null, x: number, bureau = 0): Planet
 }
 function baseState(bureau: number): GameState {
   const s = createInitialState({ seed: 'turn', version: { data: '0.1.0', manifest: '1' } });
-  return {
+  return spyMap({
     ...s,
     players: { p1: player('p1'), p2: player('p2') },
     planets: {
@@ -100,7 +95,7 @@ function baseState(bureau: number): GameState {
       K: planet('K', 'p1', -14_000),
       L: planet('L', 'p1', -16_000),
     },
-  };
+  });
 }
 const act = (
   playerId: string,
@@ -122,7 +117,14 @@ const ofType = (events: GameEvent[], type: string) => events.filter((e) => e.typ
 
 /** p1 sends a theft onto B at 0; the world runs to the mission's end. */
 function caught(bureau: number, modules: GameModule[]) {
-  const k = createKernel([espionageModule, sureFail, alwaysDetect, alwaysKill, ...modules]);
+  const k = createKernel([
+    espionageModule,
+    instantSpies,
+    sureFail,
+    alwaysDetect,
+    alwaysKill,
+    ...modules,
+  ]);
   const sent = okApply(
     k.applyAction(
       baseState(bureau),
@@ -161,8 +163,10 @@ function sendable(
 describe('SPY-18 — a level-3 bureau turns the agent it would kill', () => {
   it('turned: the catcher holds four agents for 24 h, the spy gets a replacement in 24 h', () => {
     const { k, state, events } = caught(3, [alwaysTurn]);
-    expect(turnedAgents(state, 'p2', END)).toBe(1);
-    expect(state.spyTurned?.p2).toEqual([END + TURNED_HOURS * HOUR]);
+    const turned = (state.spies?.p2 ?? []).filter((s) => s.turnedUntil !== undefined);
+    expect(turned).toEqual([
+      { id: 4, gen: 1, state: 'rest', location: 'B', turnedUntil: END + TURNED_HOURS * HOUR },
+    ]);
     // The spy loses it like a dead agent; the victim learns it was turned and by whom.
     expect(ofType(events, 'espionage.failed')[0]!.payload).toMatchObject({
       agentLost: true,
@@ -178,7 +182,7 @@ describe('SPY-18 — a level-3 bureau turns the agent it would kill', () => {
     // A day later the turned agent is gone: three again.
     const later = k.advanceTo(state, ctx(END + TURNED_HOURS * HOUR));
     if (!later.ok) throw new Error(later.code);
-    expect(later.state.spyTurned).toBeUndefined();
+    expect((later.state.spies?.p2 ?? []).some((s) => s.turnedUntil !== undefined)).toBe(false);
     expect(sendable(k, later.state, 'p2', ['H', 'J', 'K', 'L'], END + TURNED_HOURS * HOUR)).toBe(
       BASE_SPY_AGENTS,
     );
@@ -195,7 +199,7 @@ describe('SPY-18 — a level-3 bureau turns the agent it would kill', () => {
     expect(seenTurn).toEqual([0.3]);
     for (const level of [0, 1, 2]) {
       const { state, events } = caught(level, []);
-      expect(state.spyTurned).toBeUndefined();
+      expect(state.spies?.p2).toBeUndefined(); // the victim gained nobody
       expect(ofType(events, 'espionage.detected')[0]!.payload).not.toHaveProperty('turned');
       expect(ofType(events, 'espionage.failed')[0]!.payload).toMatchObject({ agentLost: true });
     }
@@ -203,7 +207,9 @@ describe('SPY-18 — a level-3 bureau turns the agent it would kill', () => {
 
   it("a turned agent is the catcher's secret: no one else sees it in the projection", () => {
     const { state } = caught(3, [alwaysTurn]);
-    expect(visibleState(state, 'p2', data).spyTurned).toEqual({ p2: [END + TURNED_HOURS * HOUR] });
-    expect(visibleState(state, 'p1', data).spyTurned).toBeUndefined();
+    expect(
+      visibleState(state, 'p2', data).spies?.p2?.some((s) => s.turnedUntil !== undefined),
+    ).toBe(true);
+    expect(visibleState(state, 'p1', data).spies?.p2).toBeUndefined();
   });
 });

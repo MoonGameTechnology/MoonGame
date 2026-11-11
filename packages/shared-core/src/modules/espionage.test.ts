@@ -7,6 +7,7 @@ import { visibleState } from '../state/visibility';
 import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, ApplyResult, Context, DomainEvent as GameEvent } from '../action/types';
 import type { GameModule } from '../kernel/module';
+import { instantSpies, spyMap } from '../testkit/spies';
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -83,12 +84,12 @@ function planet(id: string, owner: string | null, x = 0): Planet {
 }
 function baseState(): GameState {
   const s = createInitialState({ seed: 'spy', version: { data: '0.1.0', manifest: '1' } });
-  return {
+  return spyMap({
     ...s,
     players: { p1: player('p1'), p2: player('p2'), p3: player('p3') },
     // far apart: nobody's own world sees another's
     planets: { B: planet('B', 'p2'), C: planet('C', 'p3', 10_000), H: planet('H', 'p1', -10_000) },
-  };
+  });
 }
 function spy(playerId: string, payload: unknown): Action {
   return { id: `s:${playerId}:1`, type: 'espionage.spy', playerId, payload, issuedAt: 0 };
@@ -110,7 +111,7 @@ function mission(
   at = 0,
   d: GameData = data,
 ): { state: GameState; events: GameEvent[] } {
-  const k = createKernel([espionageModule, ...modules]);
+  const k = createKernel([espionageModule, instantSpies, ...modules]);
   const sent = okApply(k.applyAction(s, spy('p1', payload), ctx(at, d)));
   const done = k.advanceTo(sent.state, ctx(at + END, d));
   if (!done.ok) throw new Error(done.code);
@@ -119,15 +120,31 @@ function mission(
 const ofType = (events: GameEvent[], type: string) => events.filter((e) => e.type === type);
 
 describe('espionage — sending an agent to a world (SPY-8)', () => {
-  const kernel = createKernel([espionageModule, sureShot]);
+  const kernel = createKernel([espionageModule, instantSpies, sureShot]);
 
   it('pays the fee, takes an agent and resolves nothing until the mission ends', () => {
     const r = okApply(kernel.applyAction(baseState(), spy('p1', recon()), ctx(0)));
     expect(r.state.players.p1?.resources.credits).toBe(350); // 500 − 150 base fee
-    expect(r.state.spyAgents?.p1).toEqual([{ until: END, mission: 1, op: 'recon', planetId: 'B' }]);
+    expect(r.state.spies?.p1?.[0]).toEqual({
+      id: 1,
+      gen: 1,
+      state: 'work',
+      location: 'B',
+      departedAt: 0,
+      arrivesAt: END,
+      op: 'recon',
+      mission: 1,
+    });
     expect(r.state.intel).toBeUndefined();
     expect(r.events).toEqual([
-      { type: 'espionage.sent', payload: { owner: 'p1', planetId: 'B', op: 'recon', until: END } },
+      {
+        type: 'espionage.sent',
+        payload: { owner: 'p1', spyId: 1, planetId: 'B', op: 'recon', arrivesAt: 0, until: END },
+      },
+      {
+        type: 'espionage.started',
+        payload: { owner: 'p1', spyId: 1, planetId: 'B', kind: 'recon', until: END },
+      },
     ]);
     const early = kernel.advanceTo(r.state, ctx(END - 1));
     if (!early.ok) throw new Error(early.code);
@@ -142,13 +159,24 @@ describe('espionage — sending an agent to a world (SPY-8)', () => {
     expect(ofType(r.events, 'intel.stolen')).toEqual([
       {
         type: 'intel.stolen',
-        payload: { owner: 'p1', target: 'p2', kind: 'recon', planetId: 'B', until: COUNTER_POSTED, layer: 1 },
+        payload: {
+          owner: 'p1',
+          spyId: 1,
+          target: 'p2',
+          kind: 'recon',
+          planetId: 'B',
+          until: COUNTER_POSTED,
+          layer: 1,
+        },
       },
     ]);
     // the agent stays on post until recalled or caught
-    expect(r.state.spyAgents?.p1).toEqual([
-      { until: COUNTER_POSTED, mission: 1, op: 'recon', planetId: 'B', posted: true },
-    ]);
+    expect(r.state.spies?.p1?.[0]).toMatchObject({
+      state: 'work',
+      location: 'B',
+      op: 'recon',
+      posted: true,
+    });
   });
 
   it('a failed mission burns the fee, grants nothing, and reports to the actor only', () => {
@@ -156,13 +184,16 @@ describe('espionage — sending an agent to a world (SPY-8)', () => {
     expect(r.state.players.p1?.resources.credits).toBe(350); // spying is a gamble
     expect(r.state.intel).toBeUndefined();
     expect(ofType(r.events, 'espionage.failed')).toEqual([
-      { type: 'espionage.failed', payload: { owner: 'p1', target: 'p2', kind: 'recon', planetId: 'B' } },
+      {
+        type: 'espionage.failed',
+        payload: { owner: 'p1', spyId: 1, target: 'p2', kind: 'recon', planetId: 'B' },
+      },
     ]);
     expect(ofType(r.events, 'espionage.detected')).toEqual([]);
   });
 
   it('the mission resolves against whoever owns the world at its end', () => {
-    const k = createKernel([espionageModule, dudShot, alwaysDetect, neverKill]);
+    const k = createKernel([espionageModule, instantSpies, dudShot, alwaysDetect, neverKill]);
     const sent = okApply(k.applyAction(baseState(), spy('p1', recon()), ctx(0)));
     sent.state.planets.B!.owner = 'p3'; // the world changed hands mid-mission
     const done = k.advanceTo(sent.state, ctx(END));
@@ -170,8 +201,8 @@ describe('espionage — sending an agent to a world (SPY-8)', () => {
     expect(ofType(done.events, 'espionage.detected')[0]?.payload).toMatchObject({ owner: 'p3' });
   });
 
-  it('a world the spy took (or that fell empty) aborts the mission: no rolls, the agent comes home', () => {
-    const k = createKernel([espionageModule, sureShot]);
+  it('a world the spy took (or that fell empty) aborts the mission: no rolls, the spy waits there', () => {
+    const k = createKernel([espionageModule, instantSpies, sureShot]);
     const sent = okApply(k.applyAction(baseState(), spy('p1', recon()), ctx(0)));
     sent.state.planets.B!.owner = 'p1';
     const rngBefore = sent.state.rng;
@@ -179,11 +210,17 @@ describe('espionage — sending an agent to a world (SPY-8)', () => {
     if (!done.ok) throw new Error(done.code);
     expect(done.events).toContainEqual({
       type: 'espionage.aborted',
-      payload: { owner: 'p1', planetId: 'B', kind: 'recon' },
+      payload: { owner: 'p1', spyId: 1, planetId: 'B', kind: 'recon' },
     });
     expect(done.state.intel).toBeUndefined();
     expect(done.state.rng).toEqual(rngBefore);
-    expect(done.state.spyAgents?.p1).toEqual([{ until: END + 6 * HOUR }]);
+    expect(done.state.spies?.p1?.[0]).toEqual({
+      id: 1,
+      gen: 1,
+      state: 'wait',
+      location: 'B',
+      mission: 1,
+    });
   });
 
   it.each([
@@ -224,7 +261,13 @@ describe('espionage — sending an agent to a world (SPY-8)', () => {
   it('keeps at most 8 grants per beneficiary (oldest evicted)', () => {
     const s = baseState();
     s.players.p1!.resources.credits = 10_000;
-    s.intel = { p1: Array.from({ length: 8 }, (_, i) => ({ kind: 'planet' as const, target: `t${i}`, until: 999 * HOUR })) };
+    s.intel = {
+      p1: Array.from({ length: 8 }, (_, i) => ({
+        kind: 'planet' as const,
+        target: `t${i}`,
+        until: 999 * HOUR,
+      })),
+    };
     const r = mission([sureShot, neverDetect], s);
     expect(r.state.intel?.p1).toHaveLength(8);
     expect(r.state.intel?.p1?.[0]?.target).toBe('t1'); // t0 evicted
@@ -232,7 +275,7 @@ describe('espionage — sending an agent to a world (SPY-8)', () => {
   });
 
   it('housekeeping drops expired windows as time advances', () => {
-    const k = createKernel([espionageModule]);
+    const k = createKernel([espionageModule, instantSpies]);
     const s = baseState();
     s.intel = { p1: [{ kind: 'planet', target: 'B', until: 1 * HOUR }] };
     s.scheduled = [{ id: 'evt:t', at: 2 * HOUR, type: 'noop', payload: {}, seq: 0 }];
@@ -248,14 +291,21 @@ describe('espionage — counter-intelligence (SPY-2)', () => {
     const r = mission([dudShot, alwaysDetect, neverKill]);
     expect(ofType(r.events, 'espionage.detected')).toEqual([
       // owner = the VICTIM — the fog filter routes this event to them, not the spy
-      { type: 'espionage.detected', payload: { owner: 'p2', kind: 'recon', planetId: 'B', spy: 'p1' } },
+      {
+        type: 'espionage.detected',
+        payload: { owner: 'p2', kind: 'recon', planetId: 'B', spy: 'p1' },
+      },
     ]);
   });
 
   it('SPY-16: any exposure is public news naming both players and the world, not the operation', () => {
     const news = { type: 'espionage.exposed', payload: { a: 'p2', b: 'p1', planetId: 'B' } };
-    expect(ofType(mission([dudShot, alwaysDetect, neverKill]).events, 'espionage.exposed')).toEqual([news]);
-    expect(ofType(mission([sureShot, alwaysDetect, neverKill]).events, 'espionage.exposed')).toEqual([news]);
+    expect(ofType(mission([dudShot, alwaysDetect, neverKill]).events, 'espionage.exposed')).toEqual(
+      [news],
+    );
+    expect(
+      ofType(mission([sureShot, alwaysDetect, neverKill]).events, 'espionage.exposed'),
+    ).toEqual([news]);
     expect(ofType(mission([dudShot, neverDetect]).events, 'espionage.exposed')).toEqual([]);
   });
 
@@ -296,7 +346,14 @@ describe('espionage — the projection honors live recon windows only', () => {
     const s = baseState();
     s.planets.B!.buildings = [{ type: 'mine', level: 2, hp: 10 }];
     s.fleets = {
-      F2: { id: 'F2', owner: 'p2', location: 'B', movement: null, units: [{ unit: 'cruiser', count: 2 }], traits: [] },
+      F2: {
+        id: 'F2',
+        owner: 'p2',
+        location: 'B',
+        movement: null,
+        units: [{ unit: 'cruiser', count: 2 }],
+        traits: [],
+      },
     };
     s.intel = { p1: [{ kind: 'planet', target: 'B', until }] };
     return s;
@@ -343,35 +400,60 @@ describe('espionage — the agent network (SPY-6)', () => {
     return s;
   };
 
-  it('an unnoticed failure sends the agent home for 6h; a killed one is lost for 24h', () => {
+  it('an unnoticed failure sends the spy home; a killed one is replaced in 24h', () => {
     const a = mission([dudShot, neverDetect], rich());
-    expect(a.state.spyAgents?.p1).toEqual([{ until: END + 6 * HOUR }]);
+    expect(a.state.spies?.p1?.[0]).toMatchObject({ state: 'rest', location: 'H', gen: 1 });
     expect(ofType(a.events, 'espionage.failed')[0]?.payload).not.toHaveProperty('agentLost');
 
     const b = mission([dudShot, alwaysDetect, alwaysKill], rich());
-    expect(b.state.spyAgents?.p1).toEqual([{ until: END + 24 * HOUR, lost: true }]);
+    expect(b.state.spies?.p1?.[0]).toMatchObject({
+      state: 'recruit',
+      location: 'H',
+      arrivesAt: END + 24 * HOUR,
+    });
     expect(ofType(b.events, 'espionage.failed')).toEqual([
       {
         type: 'espionage.failed',
-        payload: { owner: 'p1', target: 'p2', kind: 'recon', planetId: 'B', agentLost: true },
+        payload: {
+          owner: 'p1',
+          spyId: 1,
+          target: 'p2',
+          kind: 'recon',
+          planetId: 'B',
+          agentLost: true,
+        },
       },
     ]);
+    // the replacement reports in the capital as the next generation of the slot
+    const k = createKernel([espionageModule, instantSpies]);
+    const later = k.advanceTo(b.state, ctx(END + 24 * HOUR));
+    if (!later.ok) throw new Error(later.code);
+    expect(later.state.spies?.p1?.[0]).toEqual({
+      id: 1,
+      gen: 2,
+      state: 'rest',
+      location: 'H',
+      mission: 2,
+    });
   });
 
-  it('a detected agent that survives escapes: home in 6h after a failure, still on post after a success', () => {
+  it('a detected agent that survives escapes: home after a failure, still on post after a success', () => {
     const a = mission([dudShot, alwaysDetect, neverKill], rich());
-    expect(a.state.spyAgents?.p1).toEqual([{ until: END + 6 * HOUR }]);
+    expect(a.state.spies?.p1?.[0]).toMatchObject({ state: 'rest', location: 'H' });
     expect(ofType(a.events, 'espionage.failed')[0]?.payload).not.toHaveProperty('agentLost');
     const b = mission([sureShot, alwaysDetect, neverKill], rich());
-    expect(b.state.spyAgents?.p1).toEqual([
-      { until: COUNTER_POSTED, mission: 1, op: 'recon', planetId: 'B', posted: true },
-    ]);
+    expect(b.state.spies?.p1?.[0]).toMatchObject({
+      state: 'work',
+      location: 'B',
+      op: 'recon',
+      posted: true,
+    });
   });
 
   it('a killed agent after a SUCCESS: the window stays, the agent is lost, both sides are told', () => {
     const r = mission([sureShot, alwaysDetect, alwaysKill], rich());
     expect(r.state.intel?.p1?.[0]).toMatchObject({ kind: 'planet', target: 'B' });
-    expect(r.state.spyAgents?.p1).toEqual([{ until: END + 24 * HOUR, lost: true }]);
+    expect(r.state.spies?.p1?.[0]).toMatchObject({ state: 'recruit' });
     expect(ofType(r.events, 'intel.stolen')[0]?.payload).toMatchObject({ agentLost: true });
     expect(r.events).toContainEqual({
       type: 'espionage.detected',
@@ -381,7 +463,7 @@ describe('espionage — the agent network (SPY-6)', () => {
 
   it('no detection, no death — even with the kill hook pinned to 1', () => {
     const r = mission([dudShot, neverDetect, alwaysKill], rich());
-    expect(r.state.spyAgents?.p1).toEqual([{ until: END + 6 * HOUR }]);
+    expect(r.state.spies?.p1?.[0]).toMatchObject({ state: 'rest', location: 'H' });
   });
 
   it('the kill roll is drawn even when nothing was detected (stable RNG shape)', () => {
@@ -391,25 +473,31 @@ describe('espionage — the agent network (SPY-6)', () => {
   });
 
   it('the fourth mission with all three agents away is refused — free of charge', () => {
-    const k = createKernel([espionageModule, dudShot, neverDetect]);
+    const k = createKernel([espionageModule, instantSpies, dudShot, neverDetect]);
     let s = rich();
     // one recon agent per world (SPY-13): the third agent goes on a theft
     for (const payload of [recon('B'), recon('C'), { planetId: 'B', op: 'theft' }])
       s = okApply(k.applyAction(s, spy('p1', payload), ctx(0))).state;
     expect(s.players.p1?.resources.credits).toBe(10_000 - 2 * 150 - 300);
-    expect(s.spyAgents?.p1?.map((a) => a.mission)).toEqual([1, 2, 3]);
-    expect(errCode(k.applyAction(s, spy('p1', { planetId: 'B', op: 'sabotage' }), ctx(0)))).toBe('E_NO_AGENT');
-    // an agent back home (12h mission + 6h return) frees a slot again
-    const later = k.advanceTo(s, ctx(END + 6 * HOUR));
+    expect(s.spies?.p1?.map((a) => [a.id, a.mission, a.location])).toEqual([
+      [1, 1, 'B'],
+      [2, 2, 'C'],
+      [3, 3, 'B'],
+    ]);
+    expect(errCode(k.applyAction(s, spy('p1', { planetId: 'B', op: 'sabotage' }), ctx(0)))).toBe(
+      'E_NO_AGENT',
+    );
+    // a spy back home after its mission frees a slot again
+    const later = k.advanceTo(s, ctx(END));
     if (!later.ok) throw new Error(later.code);
-    okApply(k.applyAction(later.state, spy('p1', recon()), ctx(END + 6 * HOUR)));
+    okApply(k.applyAction(later.state, spy('p1', recon()), ctx(END)));
   });
 
   it('anti-leak: a rival never sees the spy network', () => {
     const s = baseState();
-    s.spyAgents = { p1: [{ until: 9 * HOUR }] };
-    expect(visibleState(s, 'p1', data).spyAgents).toEqual({ p1: [{ until: 9 * HOUR }] });
-    expect(JSON.stringify(visibleState(s, 'p2', data))).not.toContain('spyAgents');
+    s.spies = { p1: [{ id: 1, gen: 1, state: 'travel', location: 'B', op: 'recon', mission: 1 }] };
+    expect(visibleState(s, 'p1', data).spies).toEqual(s.spies);
+    expect(JSON.stringify(visibleState(s, 'p2', data))).not.toContain('spies');
   });
 });
 
@@ -483,10 +571,21 @@ describe('espionage — counter-intelligence building (SPY-7)', () => {
   });
 
   it('the shipped catalogue carries the bureau with a rising bonus', () => {
-    const shipped = JSON.parse(readFileSync(new URL('../../../../data/buildings.json', import.meta.url), 'utf8')) as Record<string, { spyDetectBonus?: number; spyKillBonus?: number; upgrades?: Array<{ spyDetectBonus?: number; spyKillBonus?: number }> }>;
+    const shipped = JSON.parse(
+      readFileSync(new URL('../../../../data/buildings.json', import.meta.url), 'utf8'),
+    ) as Record<
+      string,
+      {
+        spyDetectBonus?: number;
+        spyKillBonus?: number;
+        upgrades?: Array<{ spyDetectBonus?: number; spyKillBonus?: number }>;
+      }
+    >;
     const bureau = shipped.counterintel!;
     const levels = [bureau.spyDetectBonus!, ...bureau.upgrades!.map((u) => u.spyDetectBonus!)];
     expect(levels).toEqual([0.15, 0.25, 0.35]);
-    expect([bureau.spyKillBonus!, ...bureau.upgrades!.map((u) => u.spyKillBonus!)]).toEqual([0.1, 0.2, 0.3]);
+    expect([bureau.spyKillBonus!, ...bureau.upgrades!.map((u) => u.spyKillBonus!)]).toEqual([
+      0.1, 0.2, 0.3,
+    ]);
   });
 });

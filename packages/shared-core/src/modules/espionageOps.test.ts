@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
+import { instantSpies, spyMap } from '../testkit/spies';
 import {
   BASE_CHANCE,
   DEVELOPMENT_CHANCE_BONUS,
@@ -69,24 +70,41 @@ const b = (type: string, hp: number, uid: string) => ({ uid, type, level: 1, hp 
 
 function baseState(over: Partial<GameState> = {}): GameState {
   const s = createInitialState({ seed: 'ops', version: { data: '0.1.0', manifest: '1' } });
-  return {
+  return spyMap({
     ...s,
     players: {
       p1: player('p1', { credits: 500 }),
       p2: player('p2', { credits: 10_000, metal: 300, food: 0 }),
     },
     planets: {
-      B: planet('B', 'p2', [b('mine', 100, 'm1'), b('farm', 200, 'f1'), b('mine', 100, 'm2'), b('beacon', 0, 'x1')]),
+      B: planet('B', 'p2', [
+        b('mine', 100, 'm1'),
+        b('farm', 200, 'f1'),
+        b('mine', 100, 'm2'),
+        b('beacon', 0, 'x1'),
+      ]),
       H: planet('H', 'p1', [], -10_000),
     },
     ...over,
-  };
+  });
 }
 function spy(op: string, planetId = 'B'): Action {
-  return { id: `s:${op}`, type: 'espionage.spy', playerId: 'p1', payload: { planetId, op }, issuedAt: 0 };
+  return {
+    id: `s:${op}`,
+    type: 'espionage.spy',
+    playerId: 'p1',
+    payload: { planetId, op },
+    issuedAt: 0,
+  };
 }
 function run(op: string, pins: GameModule[], s: GameState = baseState()) {
-  const k = createKernel([constructionModule, technologyModule, espionageModule, ...pins]);
+  const k = createKernel([
+    constructionModule,
+    technologyModule,
+    espionageModule,
+    instantSpies,
+    ...pins,
+  ]);
   const sent = k.applyAction(s, spy(op), ctx(0));
   if (!sent.ok) throw new Error(sent.code);
   const done = k.advanceTo(sent.state, ctx(END));
@@ -96,10 +114,11 @@ function run(op: string, pins: GameModule[], s: GameState = baseState()) {
 const ofType = (events: DomainEvent[], type: string) => events.filter((e) => e.type === type);
 
 describe('SPY-12 — each operation has its own price', () => {
-  const k = createKernel([constructionModule, technologyModule, espionageModule]);
+  const k = createKernel([constructionModule, technologyModule, espionageModule, instantSpies]);
 
   it('guarding is the cheapest, stealing research the dearest', () => {
     expect(SPY_OP_COST).toEqual({
+      relocate: 0, // moving to a world is free (SPY-23)
       counter: 50,
       recon: 150,
       sabotage: 300,
@@ -108,7 +127,15 @@ describe('SPY-12 — each operation has its own price', () => {
       theft: 300,
       research: 400,
     });
-    for (const op of ['counter', 'recon', 'sabotage', 'delay', 'disrupt', 'theft', 'research'] as const) {
+    for (const op of [
+      'counter',
+      'recon',
+      'sabotage',
+      'delay',
+      'disrupt',
+      'theft',
+      'research',
+    ] as const) {
       const r = k.applyAction(baseState(), spy(op), ctx(0));
       if (!r.ok) throw new Error(`${op}: ${r.code}`);
       expect(r.state.players.p1!.resources.credits).toBe(500 - SPY_OP_COST[op]);
@@ -129,10 +156,16 @@ describe('SPY-12 — each operation has its own price', () => {
       id: 'half',
       version: '1.0.0',
       setup(api) {
-        api.hook<Record<string, number>>('espionage.cost', (fee) => ({ credits: (fee.credits ?? 0) / 2 }));
+        api.hook<Record<string, number>>('espionage.cost', (fee) => ({
+          credits: (fee.credits ?? 0) / 2,
+        }));
       },
     };
-    const r = createKernel([espionageModule, half]).applyAction(baseState(), spy('research'), ctx(0));
+    const r = createKernel([espionageModule, instantSpies, half]).applyAction(
+      baseState(),
+      spy('research'),
+      ctx(0),
+    );
     expect(r.ok && r.state.players.p1!.resources.credits).toBe(500 - SPY_OP_COST.research / 2);
   });
 });
@@ -143,13 +176,22 @@ describe('SPY-9 — sabotage', () => {
     const after = state.planets.B!.buildings;
     const hp = Object.fromEntries(after.map((x) => [x.uid, x.hp]));
     // Three damageable buildings, the roll asks for 3–5 → all three are hit.
-    for (const [uid, max] of [['m1', 100], ['f1', 200], ['m2', 100]] as const) {
+    for (const [uid, max] of [
+      ['m1', 100],
+      ['f1', 200],
+      ['m2', 100],
+    ] as const) {
       expect(max - hp[uid]!).toBeGreaterThanOrEqual(Math.round(max * 0.1));
       expect(max - hp[uid]!).toBeLessThanOrEqual(Math.round(max * 0.2));
     }
     expect(hp.x1).toBe(0); // the HP-less beacon is untouched
     const [done] = ofType(events, 'espionage.succeeded');
-    expect(done!.payload).toMatchObject({ owner: 'p1', target: 'p2', kind: 'sabotage', planetId: 'B' });
+    expect(done!.payload).toMatchObject({
+      owner: 'p1',
+      target: 'p2',
+      kind: 'sabotage',
+      planetId: 'B',
+    });
     expect((done!.payload as { hits: unknown[] }).hits).toHaveLength(3);
     expect(ofType(events, 'espionage.detected')).toHaveLength(0);
   });
@@ -164,7 +206,9 @@ describe('SPY-9 — sabotage', () => {
       building: 'mine',
       owner: 'p2',
     });
-    const hits = (ofType(events, 'espionage.succeeded')[0]!.payload as { hits: { destroyed: boolean }[] }).hits;
+    const hits = (
+      ofType(events, 'espionage.succeeded')[0]!.payload as { hits: { destroyed: boolean }[] }
+    ).hits;
     expect(hits.filter((x) => x.destroyed)).toHaveLength(1);
   });
 
@@ -184,18 +228,20 @@ describe('SPY-9 — sabotage', () => {
   });
 
   it('without the construction module sabotage degrades to "nothing broke", not a crash', () => {
-    const k = createKernel([espionageModule, sure, unseen, spared]);
+    const k = createKernel([espionageModule, instantSpies, sure, unseen, spared]);
     const sent = k.applyAction(baseState(), spy('sabotage'), ctx(0));
     if (!sent.ok) throw new Error(sent.code);
     const done = k.advanceTo(sent.state, ctx(END));
     if (!done.ok) throw new Error(done.code);
     expect(done.state.planets.B!.buildings).toEqual(baseState().planets.B!.buildings);
-    expect((ofType(done.events, 'espionage.succeeded')[0]!.payload as { hits: unknown[] }).hits).toEqual([]);
+    expect(
+      (ofType(done.events, 'espionage.succeeded')[0]!.payload as { hits: unknown[] }).hits,
+    ).toEqual([]);
   });
 
-  it('the agent comes home after the deed (6h), not after a 24h window', () => {
+  it('the spy comes home after the deed, not after a 24h window', () => {
     const { state } = run('sabotage', [sure, unseen, spared]);
-    expect(state.spyAgents?.p1).toEqual([{ until: END + 6 * HOUR }]);
+    expect(state.spies?.p1?.[0]).toMatchObject({ state: 'rest', location: 'H' });
     expect(state.intel?.p1 ?? []).toEqual([]);
   });
 });
@@ -217,7 +263,7 @@ describe('SPY-14 — queue sabotage', () => {
   const delayed = (events: DomainEvent[]) =>
     (ofType(events, 'espionage.succeeded')[0]!.payload as { delayed: unknown }).delayed;
 
-  it('pushes the world\'s first order back by 6–12 h and keeps its seq', () => {
+  it("pushes the world's first order back by 6–12 h and keeps its seq", () => {
     const { state, events } = run('delay', [sure, unseen, spared], building(20 * HOUR));
     const d = delayed(events) as { kind: string; building: string; hours: number };
     expect(d).toMatchObject({ kind: 'building', building: 'mine' });
@@ -232,7 +278,15 @@ describe('SPY-14 — queue sabotage', () => {
   });
 
   it('the delayed order completes at its new time, not the old one', () => {
-    const k = createKernel([constructionModule, technologyModule, espionageModule, sure, unseen, spared]);
+    const k = createKernel([
+      constructionModule,
+      technologyModule,
+      espionageModule,
+      instantSpies,
+      sure,
+      unseen,
+      spared,
+    ]);
     const sent = k.applyAction(building(20 * HOUR), spy('delay'), ctx(0));
     if (!sent.ok) throw new Error(sent.code);
     const mid = k.advanceTo(sent.state, ctx(END));
@@ -252,7 +306,7 @@ describe('SPY-14 — queue sabotage', () => {
   });
 
   it('without the construction module the delay is a no-op, not a crash', () => {
-    const k = createKernel([espionageModule, sure, unseen, spared]);
+    const k = createKernel([espionageModule, instantSpies, sure, unseen, spared]);
     const sent = k.applyAction(building(20 * HOUR), spy('delay'), ctx(0));
     if (!sent.ok) throw new Error(sent.code);
     const done = k.advanceTo(sent.state, ctx(END));
@@ -263,7 +317,15 @@ describe('SPY-14 — queue sabotage', () => {
 });
 
 describe('SPY-15 — economic sabotage', () => {
-  const k = createKernel([economyModule, constructionModule, technologyModule, espionageModule, sure, unseen]);
+  const k = createKernel([
+    economyModule,
+    constructionModule,
+    technologyModule,
+    espionageModule,
+    instantSpies,
+    sure,
+    unseen,
+  ]);
   /** p2's metal over [from, to] of a world disrupted at the end of a mission sent at 0. */
   function metalOver(from: number, to: number, s = baseState()): number {
     const sent = k.applyAction(s, spy('disrupt'), ctx(0));
@@ -287,7 +349,10 @@ describe('SPY-15 — economic sabotage', () => {
     const full = plainOver(END, END + 24 * HOUR);
     expect(full).toBeGreaterThan(0);
     expect(metalOver(END, END + 24 * HOUR)).toBeCloseTo(full * 0.75, 6);
-    expect(metalOver(END + 24 * HOUR, END + 48 * HOUR)).toBeCloseTo(plainOver(END + 24 * HOUR, END + 48 * HOUR), 6);
+    expect(metalOver(END + 24 * HOUR, END + 48 * HOUR)).toBeCloseTo(
+      plainOver(END + 24 * HOUR, END + 48 * HOUR),
+      6,
+    );
   });
 
   it('the success reports the end, and the cut leaves the treasury itself alone', () => {
@@ -306,7 +371,13 @@ describe('SPY-15 — economic sabotage', () => {
   it('a repeat extends the term but never cuts below 75%', () => {
     const s = baseState();
     s.planets.B!.disruptedUntil = END + 6 * HOUR; // an earlier sabotage still running
-    s.scheduled.push({ id: 'evt:old', at: END + 6 * HOUR, seq: 0, type: 'espionage.disrupt.end', payload: { planetId: 'B' } });
+    s.scheduled.push({
+      id: 'evt:old',
+      at: END + 6 * HOUR,
+      seq: 0,
+      type: 'espionage.disrupt.end',
+      payload: { planetId: 'B' },
+    });
     const full = plainOver(END, END + 24 * HOUR);
     expect(metalOver(END, END + 24 * HOUR, s)).toBeCloseTo(full * 0.75, 6);
   });
@@ -330,9 +401,11 @@ function outskirts(): GameState {
 describe('SPY-9 — resource theft', () => {
   it('moves 5–15% of one held resource from the owner to the spy', () => {
     const { state, events } = run('theft', [sure, unseen, spared], outskirts());
-    const loot = (ofType(events, 'espionage.succeeded')[0]!.payload as {
-      loot: { resource: string; amount: number };
-    }).loot;
+    const loot = (
+      ofType(events, 'espionage.succeeded')[0]!.payload as {
+        loot: { resource: string; amount: number };
+      }
+    ).loot;
     expect(['credits', 'metal']).toContain(loot.resource); // food is at 0 — nothing to take
     const stock = loot.resource === 'credits' ? 10_000 : 300;
     expect(loot.amount).toBeGreaterThanOrEqual(Math.floor(stock * 0.05));
@@ -346,7 +419,8 @@ describe('SPY-9 — resource theft', () => {
     const rich = outskirts();
     rich.players.p2!.resources = { credits: 1_000_000 };
     const { events } = run('theft', [sure, unseen, spared], rich);
-    const loot = (ofType(events, 'espionage.succeeded')[0]!.payload as { loot: { amount: number } }).loot;
+    const loot = (ofType(events, 'espionage.succeeded')[0]!.payload as { loot: { amount: number } })
+      .loot;
     expect(loot.amount).toBe(THEFT_CAP);
   });
 
@@ -354,7 +428,9 @@ describe('SPY-9 — resource theft', () => {
     const poor = baseState();
     poor.players.p2!.resources = { credits: 0.5 };
     const { state, events } = run('theft', [sure, unseen, spared], poor);
-    expect((ofType(events, 'espionage.succeeded')[0]!.payload as { loot: unknown }).loot).toBeNull();
+    expect(
+      (ofType(events, 'espionage.succeeded')[0]!.payload as { loot: unknown }).loot,
+    ).toBeNull();
     expect(state.players.p2!.resources.credits).toBe(0.5);
   });
 
@@ -382,7 +458,11 @@ describe('SPY-10 — research theft', () => {
 
   it('takes a technology the spy has not started before one in its lab, prerequisites ignored', () => {
     // p1 researches `armor`; `lasers` (needs optics, which p1 lacks) is the only fresh one.
-    const { state, events } = run('research', [sure, unseen, spared], withTech(lab([], ['armor']), ['lasers', 'armor']));
+    const { state, events } = run(
+      'research',
+      [sure, unseen, spared],
+      withTech(lab([], ['armor']), ['lasers', 'armor']),
+    );
     expect(stolen(events)).toBe('lasers');
     expect(state.players.p1!.technologies!.completed).toContain('lasers');
     expect(ofType(events, 'technology.researched').map((e) => e.payload)).toContainEqual({
@@ -392,21 +472,29 @@ describe('SPY-10 — research theft', () => {
   });
 
   it('only lab work left — finishes it and frees the slot', () => {
-    const { state, events } = run('research', [sure, unseen, spared], withTech(lab(['optics'], ['armor']), ['optics', 'armor']));
+    const { state, events } = run(
+      'research',
+      [sure, unseen, spared],
+      withTech(lab(['optics'], ['armor']), ['optics', 'armor']),
+    );
     expect(stolen(events)).toBe('armor');
     expect(state.players.p1!.technologies!.completed).toContain('armor');
     expect(state.players.p1!.technologies!.active ?? []).toEqual([]);
   });
 
   it('the victim knows nothing new — the civilisation lags behind (tech: null)', () => {
-    const { state, events } = run('research', [sure, unseen, spared], withTech(lab(['optics', 'armor']), ['optics']));
+    const { state, events } = run(
+      'research',
+      [sure, unseen, spared],
+      withTech(lab(['optics', 'armor']), ['optics']),
+    );
     expect(stolen(events)).toBeNull();
     expect(state.players.p1!.technologies!.completed).toEqual(['optics', 'armor']);
   });
 
   it('the agent comes home after the theft', () => {
     const { state } = run('research', [sure, unseen, spared], withTech(lab([]), ['armor']));
-    expect(state.spyAgents?.p1).toEqual([{ until: END + 6 * HOUR }]);
+    expect(state.spies?.p1?.[0]).toMatchObject({ state: 'rest', location: 'H' });
   });
 });
 
@@ -424,7 +512,13 @@ describe('SPY-17 — up to three agents on one world', () => {
   }
   function wave(ops: string[]) {
     const seen = { chance: [] as number[], detect: [] as number[] };
-    const k = createKernel([constructionModule, technologyModule, espionageModule, probe(seen)]);
+    const k = createKernel([
+      constructionModule,
+      technologyModule,
+      espionageModule,
+      instantSpies,
+      probe(seen),
+    ]);
     let s = baseState();
     s.players.p1!.resources.credits = 10_000;
     for (const op of ops) {
@@ -458,7 +552,7 @@ describe('SPY-17 — up to three agents on one world', () => {
   });
 
   it('a fourth agent on the same world is refused, free of charge', () => {
-    const k = createKernel([constructionModule, technologyModule, espionageModule]);
+    const k = createKernel([constructionModule, technologyModule, espionageModule, instantSpies]);
     let s = baseState();
     s.players.p1!.resources.credits = 10_000;
     const four: GameModule = {
@@ -468,7 +562,13 @@ describe('SPY-17 — up to three agents on one world', () => {
         api.hook<number>('espionage.agents', () => 4);
       },
     };
-    const k4 = createKernel([constructionModule, technologyModule, espionageModule, four]);
+    const k4 = createKernel([
+      constructionModule,
+      technologyModule,
+      espionageModule,
+      instantSpies,
+      four,
+    ]);
     for (const op of ['sabotage', 'theft', 'delay']) {
       const r = k4.applyAction(s, spy(op), ctx(0));
       if (!r.ok) throw new Error(r.code);
@@ -535,15 +635,16 @@ describe('SPY-21 — theft odds and loot follow the world development', () => {
     const top = civ(1);
     top.players.p2!.resources = { metal: 1000 };
     const { events } = run('theft', [sure, unseen, spared], top);
-    const loot = (ofType(events, 'espionage.succeeded')[0]!.payload as { loot: { amount: number } }).loot;
+    const loot = (ofType(events, 'espionage.succeeded')[0]!.payload as { loot: { amount: number } })
+      .loot;
     expect(loot.amount).toBeGreaterThanOrEqual(100); // 10% of 1000
     expect(loot.amount).toBeLessThanOrEqual(300); // 30% of 1000
 
     const rich = civ(1);
     rich.players.p2!.resources = { credits: 1_000_000 };
     const big = run('theft', [sure, unseen, spared], rich).events;
-    expect((ofType(big, 'espionage.succeeded')[0]!.payload as { loot: { amount: number } }).loot.amount).toBe(
-      THEFT_CAP * 2,
-    );
+    expect(
+      (ofType(big, 'espionage.succeeded')[0]!.payload as { loot: { amount: number } }).loot.amount,
+    ).toBe(THEFT_CAP * 2);
   });
 });

@@ -25,6 +25,7 @@ export const ACTION_TYPES = new Set([
   'diplomacy.decline',
   'diplomacy.declare',
   'diplomacy.mapshare',
+  'espionage.cancel',
   'espionage.recall',
   'espionage.spy',
   'extraction.start',

@@ -887,6 +887,7 @@
 | SPY-20 | ✅ | proto | `docs/backlog-archive.md` | Архив докладов. |
 | SPY-21 | ✅ | core | `docs/backlog-archive.md` | Кража по развитости мира. |
 | SPY-22 | ✅ | core proto | `docs/backlog-archive.md` | Раскрытие без войны. |
+| SPY-23 | ✅ | core | `docs/backlog-archive.md` | Шпион добирается до мира. |
 | PROG-2 | ✅ | proto data | `docs/backlog-archive.md` | Убрать три силовые ветки командующего. |
 | SLIM-1 | ✅ | proto srv core | `docs/backlog-archive.md` | Сторож размеров. |
 | SLIM-2 | ✅ | proto | `docs/backlog-archive.md` | CSS из build.mjs в файлы. |
