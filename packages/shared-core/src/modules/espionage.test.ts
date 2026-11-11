@@ -7,7 +7,7 @@ import { visibleState } from '../state/visibility';
 import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, ApplyResult, Context, DomainEvent as GameEvent } from '../action/types';
 import type { GameModule } from '../kernel/module';
-import { instantSpies, spyMap } from '../testkit/spies';
+import { instantSpies, scoutedAll, spyMap } from '../testkit/spies';
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -232,10 +232,13 @@ describe('espionage — sending an agent to a world (SPY-8)', () => {
     expect(errCode(kernel.applyAction(baseState(), spy('p1', payload), ctx(0)))).toBe(code);
   });
 
-  it('fail-secure: an unclaimed world has nobody to spy on (E_BAD_TARGET)', () => {
+  it('fail-secure: an unclaimed world has nobody to steal from (E_BAD_TARGET) — recon still goes (SPY-24)', () => {
     const s = baseState();
     s.planets.B!.owner = null;
-    expect(errCode(kernel.applyAction(s, spy('p1', recon()), ctx(0)))).toBe('E_BAD_TARGET');
+    s.scouted = scoutedAll(s);
+    const theft = { planetId: 'B', op: 'theft' };
+    expect(errCode(kernel.applyAction(s, spy('p1', theft), ctx(0)))).toBe('E_BAD_TARGET');
+    expect(kernel.applyAction(s, spy('p1', recon()), ctx(0)).ok).toBe(true);
   });
 
   it('rejects a mission the actor cannot pay for', () => {
@@ -252,10 +255,12 @@ describe('espionage — sending an agent to a world (SPY-8)', () => {
     expect(errCode(kernel.applyAction(s, spy('p1', recon()), ctx(0)))).toBe('E_FORBIDDEN');
   });
 
-  it('fail-secure: a defeated owner is no target (E_NO_PLAYER)', () => {
+  it('fail-secure: a defeated owner is no target (E_NO_PLAYER) — recon still goes (SPY-24)', () => {
     const s = baseState();
     s.players.p2!.status = 'defeated';
-    expect(errCode(kernel.applyAction(s, spy('p1', recon()), ctx(0)))).toBe('E_NO_PLAYER');
+    const theft = { planetId: 'B', op: 'theft' };
+    expect(errCode(kernel.applyAction(s, spy('p1', theft), ctx(0)))).toBe('E_NO_PLAYER');
+    expect(kernel.applyAction(s, spy('p1', recon()), ctx(0)).ok).toBe(true);
   });
 
   it('keeps at most 8 grants per beneficiary (oldest evicted)', () => {

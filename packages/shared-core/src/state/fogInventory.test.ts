@@ -128,6 +128,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   coalitionJoinAfter: 'public', // membership eligibility is public, like the coalition roster
   intel: 'filtered', // кто за кем шпионит — секрет самого шпиона
   spies: 'filtered', // сеть шпионов (SPY-6/22) — тот же секрет шпиона, и кто кого перевербовал
+  scouted: 'filtered', // что нашли свои шпионы (SPY-24) — да; чужая запись выдала бы, кого разведывал сосед
   market: 'public', // сессионный стакан публичен по замыслу
   marketSeq: 'public',
   trader: 'public', // курс торговца экспедиции — цена рынка, одна на всех
@@ -486,6 +487,10 @@ function maximalState(): GameState {
     spies: {
       [VIEWER]: [{ id: 1, gen: 1, state: 'rest', location: 'n1' }],
       [RIVAL]: [{ id: 1, gen: 1, state: 'travel', location: 'n1', op: 'recon', mission: 1 }],
+    },
+    scouted: {
+      [VIEWER]: { Z: { owner: RIVAL, at: 50 } },
+      [RIVAL]: { CANARY_scouted: { owner: VIEWER, at: 60 } },
     },
     market: [{ id: 'm1', side: 'sell', owner: RIVAL, resource: 'metal', amount: 5, price: 3 }],
     marketSeq: 1,

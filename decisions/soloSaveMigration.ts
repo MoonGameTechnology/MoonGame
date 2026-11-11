@@ -642,6 +642,18 @@ export const SPY_TRAVEL_SOLO_MIGRATION = {
   toDataHash: ACCRETION_DISK_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: espionage 2.1.0 checks a spy order against what the player knows of the
+ *  world and lets recon look at unclaimed worlds (SPY-24). The catalogue is unchanged; a saved
+ *  world has no spy records yet (`scouted`), so its fogged worlds take recon first. */
+export const SPY_FOG_SOLO_MIGRATION = {
+  fromRules: SPY_TRAVEL_SOLO_MIGRATION.toRules,
+  fromData: SPY_TRAVEL_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_TRAVEL_SOLO_MIGRATION.toDataHash,
+  toRules: '14d195fb57d60b',
+  toData: SPY_TRAVEL_SOLO_MIGRATION.toData,
+  toDataHash: SPY_TRAVEL_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -698,6 +710,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   PAUSED_UPKEEP_SOLO_MIGRATION,
   ACCRETION_DISK_SOLO_MIGRATION,
   SPY_TRAVEL_SOLO_MIGRATION,
+  SPY_FOG_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

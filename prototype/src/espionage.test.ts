@@ -110,6 +110,8 @@ describe('espionage in the prototype kernel (SPY-8 playable)', () => {
   it('SPY-6: three agents away → the fourth mission is refused with E_NO_AGENT', () => {
     let st = funded();
     const target = worldOf(st, 'p2');
+    // SPY-24: deeds go only to a world the player knows — as if reconnoitred before.
+    st = { ...st, scouted: { p1: { [target]: { owner: 'p2', at: st.time } } } };
     // SPY-13: one recon agent per world — the network goes on three different operations.
     for (const op of ['recon', 'sabotage', 'theft'] as const) {
       const out = order(st, spyOn('p1', target, op), st.time);

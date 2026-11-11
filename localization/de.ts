@@ -2919,6 +2919,7 @@ export const de: Record<string, string> = {
   'err.no-range': 'das Geschwader hat keine Angriffsreichweite',
   'err.no-right-of-way': 'kein Wegerecht: jede Route durchquert ein Reich, mit dem Sie im Frieden stehen',
   'err.no-route': 'keine Route',
+  'err.unscouted': 'Welt nicht erkundet: zuerst Aufklärung',
   'err.no-ships': 'keine Schiffe',
   'err.no-shipyard': 'erfordert eine Schiffswerft',
   'err.yard-too-small': 'die Werft ist zu klein für diesen Rumpf — eine höhere Helling wird benötigt',

@@ -3390,6 +3390,7 @@ export const ru: Record<string, string> = {
   'err.no-range': 'у эскадры нет боевого радиуса',
   'err.no-right-of-way': 'нет права прохода: маршрут только через территорию мирной державы',
   'err.no-route': 'маршрута нет',
+  'err.unscouted': 'мир не разведан: сначала разведка',
   'err.no-ships': 'нет кораблей',
   'err.no-shipyard': 'нужна верфь',
   'err.yard-too-small': 'верфь мала для такого корпуса — нужен стапель выше',
