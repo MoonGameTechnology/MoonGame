@@ -24,6 +24,8 @@ import {
   loadoutCost,
   creditsBonusOf,
   pausedUpkeep,
+  paidSpies,
+  SPY_SALARY,
 } from '../../packages/shared-core/src/index';
 import {
   isInhabited,
@@ -115,6 +117,12 @@ function heldShare(
   if (controlled === null) return integrated;
   return (p) =>
     (isInhabited(data, p) && !controlled.has(p.id) ? UNCONTROLLED_OUTPUT : 1) * integrated(p);
+}
+
+/** What `playerId` pays their spies per hour, credits — the core's base payroll
+ *  (`espionage` → `economy.upkeep`). */
+export function spyPayPerHour(state: GameState, playerId: string): number {
+  return (paidSpies(state, playerId).length * SPY_SALARY) / 24;
 }
 
 /** Net per-hour income for a player: production from owned, un-bombarded worlds
@@ -339,19 +347,25 @@ export function netIncome(
       if (f.landing) addUpkeep(f.landing);
     }
   for (const stacks of stationed) addUpkeep(stacks);
+  // Spies are paid by the whole power, not by a world.
+  const pay = onlyPlanet ? 0 : spyPayPerHour(state, playerId);
+  if (pay !== 0) {
+    out.credits = (out.credits ?? 0) - pay;
+    if (upkeep) upkeep.credits = (upkeep.credits ?? 0) + pay;
+  }
   return out;
 }
 
 /** Per-resource income breakdown: production (gross income), building upkeep,
- *  unit upkeep, and net (production − buildingUpkeep − unitUpkeep). Used by the
+ *  unit upkeep, spy salaries, and net (production − buildingUpkeep − unitUpkeep − spySalary). Used by the
  *  resource card (RC-1) to show a real split instead of just the sign of `netIncome`. */
 export function incomeBreakdown(
   state: GameState,
   playerId: string,
-): Record<string, { production: number; buildingUpkeep: number; unitUpkeep: number; net: number }> {
-  const result: Record<string, { production: number; buildingUpkeep: number; unitUpkeep: number; net: number }> = {};
+): Record<string, { production: number; buildingUpkeep: number; unitUpkeep: number; spySalary: number; net: number }> {
+  const result: Record<string, { production: number; buildingUpkeep: number; unitUpkeep: number; spySalary: number; net: number }> = {};
   const cell = (res: string) => {
-    if (!result[res]) result[res] = { production: 0, buildingUpkeep: 0, unitUpkeep: 0, net: 0 };
+    if (!result[res]) result[res] = { production: 0, buildingUpkeep: 0, unitUpkeep: 0, spySalary: 0, net: 0 };
     return result[res]!;
   };
   const arrears = state.players[playerId]?.arrears ?? [];
@@ -432,9 +446,11 @@ export function incomeBreakdown(
     if (p.owner === playerId) addUnitUpkeep(p.garrison);
     for (const b of p.beachheads ?? []) if (b.owner === playerId) addUnitUpkeep(b.units);
   }
+  const pay = spyPayPerHour(state, playerId);
+  if (pay !== 0) cell('credits').spySalary += pay;
   for (const res of Object.keys(result)) {
     const c = result[res]!;
-    c.net = c.production - c.buildingUpkeep - c.unitUpkeep;
+    c.net = c.production - c.buildingUpkeep - c.unitUpkeep - c.spySalary;
   }
   return result;
 }

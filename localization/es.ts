@@ -3524,6 +3524,7 @@ export const es: Record<string, string> = {
   'rescard.integration': '{n} {n|planeta|planetas} en integración: producción del {p}% al 100%',
   'rescard.upkeep': 'Mantenimiento de edificios',
   'rescard.army': 'Mantenimiento del ejército',
+  'rescard.spies': 'Sueldo de espías',
   'rescard.market': 'Mercado',
   'rescard.trader': 'Comerciante',
   'rescard.close': 'Cerrar',

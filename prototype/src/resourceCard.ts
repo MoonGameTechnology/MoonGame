@@ -118,7 +118,7 @@ export function resourceCardHtml(
 ): string {
   const player = state.players[me];
   const stock = Math.round(player?.resources?.[resource] ?? 0);
-  const bd = incomeBreakdown(state, me)[resource] ?? { production: 0, buildingUpkeep: 0, unitUpkeep: 0, net: 0 };
+  const bd = incomeBreakdown(state, me)[resource] ?? { production: 0, buildingUpkeep: 0, unitUpkeep: 0, spySalary: 0, net: 0 };
   const name = t(`hud.resource.${resource}`);
   const icon = icons[resource] ?? '';
   const canTrade = TRADEABLE.has(resource);
@@ -163,6 +163,7 @@ export function resourceCardHtml(
     <div class="rc-sec">${esc(t('rescard.expense'))}</div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.upkeep'))}</span><span class="rc-v neg">−${fmt(bd.buildingUpkeep)}</span></div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.army'))}</span><span class="rc-v neg">−${fmt(bd.unitUpkeep)}</span></div>
+    ${bd.spySalary > 0 ? `<div class="rc-stat"><span class="rc-k">${esc(t('rescard.spies'))}</span><span class="rc-v neg">−${fmt(bd.spySalary)}</span></div>` : ''}
     <div class="rc-sec">${esc(t('rescard.net'))}</div>
     <div class="rc-flow ${netCls}">${netStr}${esc(flowPer())}</div>
     ${supply ? supplyHtml(supply) : ''}

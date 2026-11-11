@@ -2,7 +2,7 @@ import { hoursToMs } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import { getStance } from '../state/diplomacy';
 import { coalitionOf } from '../state/coalition';
-import { buildingLevel, type GameData, type ResourceBag } from '../data/schemas';
+import { buildingLevel, type GameData } from '../data/schemas';
 import type { GameState, IntelGrant, Spy, SpyOp } from '../state/gameState';
 import {
   aggressive,
@@ -31,11 +31,13 @@ import {
 import { recordValues } from '../util/records';
 import { planetDevelopment } from '../state/development';
 import { canAfford, payCost } from '../util/treasury';
+import { registerEspionageEconomy } from './espionage/economy';
+export { SPY_SALARY, paidSpies, spySalary } from './espionage/economy';
 import {
-  DISRUPT_FACTOR,
   delayQueue,
   disrupt,
   sabotage,
+  spyQuality,
   stealResearch,
   theft,
 } from '../util/spyDeeds';
@@ -192,6 +194,9 @@ const BASE_DURATION_HOURS = 24;
  *  how many layers there are. Past the last one it keeps the watch (and the risk). */
 const RECON_LAYER_HOURS = 12;
 export const RECON_LAYERS = 4;
+/** One recon layer's dig, ms: a better spy (`espionage.quality`) digs faster. */
+const reconStepMs = (h: HandlerContext, owner: string, spyId: number): number =>
+  hoursToMs(h.ctx, RECON_LAYER_HOURS) / spyQuality(h, owner, spyId, 'recon');
 /** Base odds the VICTIM notices the attempt (`espionage.detect` pipeline bends them;
  *  the result is clamped to [0,1] — hooks may legitimately push to never/always). */
 export const BASE_DETECT_FAILED = 0.5; // a blown attempt leaves tracks
@@ -263,19 +268,23 @@ export function developmentShare(data: GameData, state: GameState, planetId: str
 }
 
 /** The base odds of a resolving mission: SPY-17's wave bonus, and SPY-21's — a theft is
- *  likelier from a world developed against its own civilisation. */
+ *  likelier from a world developed against its own civilisation — and how well the spy
+ *  does its deed (`espionage.quality`). */
 function missionOdds(
   h: HandlerContext,
-  op: SpyOp,
-  planetId: string,
+  owner: string,
+  spy: Spy,
   crew: number,
-): { crewBonus: number; development: number; baseChance: number } {
+): { crewBonus: number; development: number; baseChance: number; quality: number } {
+  const op = spy.op!;
+  const planetId = spy.location;
   const crewBonus = CREW_BONUS * (Math.min(MAX_AGENTS_PER_WORLD, crew) - 1);
   const development =
     op === 'theft' || op === 'research' ? developmentShare(h.ctx.data, h.state, planetId) : 0;
   return {
     crewBonus,
     development,
+    quality: spyQuality(h, owner, spy.id, op),
     baseChance: BASE_CHANCE + crewBonus + DEVELOPMENT_CHANCE_BONUS * development,
   };
 }
@@ -508,26 +517,10 @@ export const espionageModule: GameModule = {
   // 1.13.0: кража вернее и богаче с развитого мира своей цивилизации (SPY-21).
   // 1.14.0: раскрытие шпиона больше не объявляет войну.
   // 2.0.0: именные шпионы летят до мира, ждут там приказа и возвращаются в столицу (SPY-23).
-  version: '2.0.0',
+  // 2.1.0: шпионы получают зарплату в кредитах (хук `economy.upkeep`).
+  version: '2.1.0',
   setup(api) {
-    // SPY-15: a disrupted world produces `DISRUPT_FACTOR` of its output. A span never
-    // runs across the end (it is a scheduled event), so «until ≥ now» at the span's end
-    // means the whole span was disrupted.
-    api.hook<ResourceBag>('economy.production', (bag, args, h) => {
-      const planetId = (args as { planetId?: string } | undefined)?.planetId;
-      const until = planetId ? h.state.planets[planetId]?.disruptedUntil : undefined;
-      if (until === undefined || until < h.ctx.now) return bag;
-      const out: Record<string, number> = {};
-      for (const res of Object.keys(bag)) out[res] = (bag[res] ?? 0) * DISRUPT_FACTOR;
-      return out;
-    });
-
-    api.on('espionage.disrupt.end', (event, h) => {
-      const planet = h.state.planets[(event.payload as { planetId: string }).planetId];
-      // An extended term leaves this end early: the cut stays until its own end fires.
-      if (planet?.disruptedUntil !== undefined && planet.disruptedUntil <= h.ctx.now)
-        delete planet.disruptedUntil;
-    });
+    registerEspionageEconomy(api);
 
     api.onAction('espionage.spy', (action, h) => {
       const p = action.payload as SpyPayload;
@@ -680,7 +673,7 @@ export const espionageModule: GameModule = {
       }
 
       // SPY-17: every crewmate past the first raises both odds.
-      const { crewBonus, development, baseChance } = missionOdds(h, op, planetId, crew);
+      const { crewBonus, development, baseChance, quality } = missionOdds(h, owner, spy, crew);
       const rawChance = h.hook<number>('espionage.chance', baseChance, {
         playerId: owner,
         spyId: spy.id,
@@ -736,13 +729,13 @@ export const espionageModule: GameModule = {
         // Sabotage / theft / research theft: the deed is done at once, the spy heads home.
         const done =
           op === 'sabotage'
-            ? { hits: sabotage(h, planetId) }
+            ? { hits: sabotage(h, planetId, quality) }
             : op === 'delay'
-              ? { delayed: delayQueue(h, planetId) }
+              ? { delayed: delayQueue(h, planetId, quality) }
               : op === 'disrupt'
                 ? { disrupted: disrupt(h, planetId) }
                 : op === 'theft'
-                  ? { loot: theft(h, owner, victim, development) }
+                  ? { loot: theft(h, owner, victim, development, quality) }
                   : { tech: stealResearch(h, owner, victim) };
         outcome(h, owner, spy, killed);
         h.emit('espionage.succeeded', {
@@ -783,7 +776,7 @@ export const espionageModule: GameModule = {
         spy.posted = true;
         spy.postedAt = now;
         delete spy.arrivesAt;
-        h.schedule(now + hoursToMs(h.ctx, RECON_LAYER_HOURS), 'espionage.deepen', {
+        h.schedule(now + reconStepMs(h, owner, spy.id), 'espionage.deepen', {
           spy: owner,
           spyId: spy.id,
           mission: spy.mission!,
@@ -857,7 +850,7 @@ export const espionageModule: GameModule = {
           layer: grant.layer,
         });
       }
-      h.schedule(h.ctx.now + hoursToMs(h.ctx, RECON_LAYER_HOURS), 'espionage.deepen', step);
+      h.schedule(h.ctx.now + reconStepMs(h, owner, spy.id), 'espionage.deepen', step);
     });
 
     // SPY-11: a posted counter-intelligence spy hunts hostile guards on its world.
@@ -874,7 +867,7 @@ export const espionageModule: GameModule = {
       }
       for (const { owner: rival, spy: guard } of postedOn(h.state, planetId)) {
         if (rival === owner || getStance(h.state, owner, rival) !== 'war') continue;
-        const caught = h.rng.nextFloat() < COUNTER_CATCH;
+        const caught = h.rng.nextFloat() < COUNTER_CATCH * spyQuality(h, owner, mine.id, 'counter');
         const killed = h.rng.nextFloat() < BASE_KILL + COUNTER_KILL_BONUS && caught;
         if (!caught) continue;
         outcome(h, rival, guard, killed);

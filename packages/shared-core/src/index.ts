@@ -834,6 +834,19 @@ export {
   traderAffordable,
   TRADER_MAX_UNITS,
 } from './modules/trader';
+export { spyLevelsModule } from './modules/spyLevels';
+export {
+  SPY_LEVEL_STEPS,
+  SPY_LEVEL_THRESHOLDS,
+  SPY_MAX_LEVEL,
+  SPY_XP,
+  SPY_RECON_XP_HOURS,
+  SPY_LEVEL_BONUS,
+  spyLevel,
+  spyLevelBonus,
+  splitGuardXp,
+  type SpyLevel,
+} from './state/spyLevel';
 export {
   espionageModule,
   BASE_SPY_AGENTS,
@@ -850,6 +863,8 @@ export {
   MAX_AGENTS_PER_WORLD,
   TURNED_HOURS,
   counterIntelOf,
+  SPY_SALARY,
+  paidSpies,
 } from './modules/espionage';
 export {
   spyPath,

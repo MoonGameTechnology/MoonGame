@@ -3,10 +3,8 @@
   "files": {
     "prototype/src/main.ts": 4079,
     "packages/server/src/matchRoom.ts": 2956,
-    "packages/shared-core/src/modules/shuttle.ts": 2897,
     "prototype/netserver.ts": 2097,
     "packages/shared-core/src/state/gameState.ts": 1823,
-    "packages/shared-core/src/modules/construction.ts": 1570,
     "packages/shared-core/src/modules/combat.ts": 1574,
     "packages/shared-core/src/data/schemas.ts": 1727,
     "prototype/src/mapLayer.ts": 1615,
@@ -26,8 +24,6 @@
   },
   "functions": {
     "prototype/src/corpScreen.ts::initCorp": 1160,
-    "packages/shared-core/src/modules/shuttle.ts::shuttleModule.setup": 956,
-    "packages/shared-core/src/modules/construction.ts::constructionModule.setup": 814,
     "prototype/src/eventFeed.ts::handleEvents": 890,
     "packages/server/src/main.ts::startServer": 842,
     "prototype/src/sectorZeroPreparation.ts::initSectorZeroPreparation": 685,

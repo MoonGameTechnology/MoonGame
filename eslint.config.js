@@ -84,7 +84,7 @@ export default tseslint.config(
     // Invariant 3 (CLAUDE.md): modules talk only through the bus. A module may borrow
     // another module's TYPES (a capability or payload contract), never its values —
     // shared pure helpers live in `state/` or `util/` (SLIM-7 moved the last one).
-    files: ['packages/shared-core/src/modules/**/*.ts'],
+    files: ['packages/shared-core/src/modules/*.ts'],
     ignores: ['packages/shared-core/src/modules/**/*.test.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
@@ -94,6 +94,27 @@ export default tseslint.config(
             {
               // A sibling module file (`./x`), not the module's own folder (`./x/part`).
               regex: '^\\./[^/]+$',
+              allowTypeImports: true,
+              message:
+                'Modules talk only through the bus: import types only from a sibling module; put shared helpers in state/ or util/.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The same rule one level down: a part of a module's own folder (`modules/x/part.ts`)
+    // may use the other parts of that folder (`./other`), but a sibling MODULE is `../y`.
+    files: ['packages/shared-core/src/modules/*/**/*.ts'],
+    ignores: ['packages/shared-core/src/modules/**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^\\.\\./[^/]+$',
               allowTypeImports: true,
               message:
                 'Modules talk only through the bus: import types only from a sibling module; put shared helpers in state/ or util/.',
