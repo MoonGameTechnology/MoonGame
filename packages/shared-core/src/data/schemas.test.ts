@@ -42,7 +42,7 @@ function parkedBranch(fragment: 'heroes' | 'heroSkillTrees', id: string): string
  *  для репертуара бота: утверждение о коде берётся из кода, поэтому не может разъехаться
  *  с ним молча. Нужен сторожу пометки `issued` ниже. */
 const BUILD_GATE_SOURCE = readFileSync(
-  path.join(repoRoot, 'packages/shared-core/src/modules/construction.ts'),
+  path.join(repoRoot, 'packages/shared-core/src/modules/construction/orders.ts'),
   'utf8',
 );
 
