@@ -16,7 +16,7 @@ import {
 } from './protocol';
 import { InMemoryEphemeralStore, type EphemeralStore } from './ephemeral';
 import { PerKeyWindow } from './rateLimit';
-import type { MatchRoomOptions, RoomPeer } from './matchRoom';
+import type { MatchRoomOptions, RoomPeer } from './matchRoomTypes';
 
 /** The unique tail of a ping/chat id. Random, not a counter: a room-wide (or even
  *  per-sender) counter would show a recipient, by its gaps, how many pings and messages
