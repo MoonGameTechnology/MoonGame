@@ -146,6 +146,19 @@ describe('рынок — книга заявок', () => {
     expect(html).toMatch(/data-mktake="[^"]+" disabled/);
   });
 
+  it('кнопка гаснет, когда денег хватает на штуку, но не на весь лот', () => {
+    const short = booked();
+    // аск p2: 10 металла по 9 = 90 кредитов; у p1 есть 50 — хватит на 5 штук, не на лот.
+    // Бид p2 на 7: 5 металла, у p1 металла 3 — продать весь лот нечем.
+    short.players.p1!.resources = { credits: 50, metal: 3 };
+    const html = marketBoxHtml(short, 'p1', 'metal', 'sell');
+    const takes = [...html.matchAll(/data-mktake="[^"]+"( disabled)?/g)].map((m) => !!m[1]);
+    expect(takes).toEqual([true, true, true]);
+    short.players.p1!.resources = { credits: 90, metal: 5 };
+    const rich = [...marketBoxHtml(short, 'p1', 'metal', 'sell').matchAll(/data-mktake="[^"]+"( disabled)?/g)];
+    expect(rich.map((m) => !!m[1])).toEqual([false, false, false]);
+  });
+
   it('в биде видно, сколько исполнитель получит ЧИСТЫМИ', () => {
     const html = marketBoxHtml(s, 'p1', 'metal', 'sell');
     // бид p2 на 5 @ 7 = 35 gross → исполнителю floor(29.75) = 29
