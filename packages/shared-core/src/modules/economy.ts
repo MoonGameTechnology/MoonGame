@@ -330,6 +330,18 @@ export function pausedUpkeep(planet: Planet, data: GameData, eatsBiomass: boolea
   return out;
 }
 
+/** A player's whole daily bill: the `economy.upkeep` pipeline over what their units and
+ *  buildings cost. A broken result (not a bag of finite, non-negative numbers) bills the
+ *  base: a broken pipeline neither pays the player nor poisons the treasury. */
+function billOf(h: HandlerContext, playerId: string, base: ResourceBag): ResourceBag {
+  const raw = h.hook<ResourceBag>('economy.upkeep', { ...base }, { playerId });
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return base;
+  for (const v of Object.values(raw)) {
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) return base;
+  }
+  return raw;
+}
+
 /**
  * Economy — a base module (docs/modulesystem.md). On every `time.advanced` span
  * it settles the player economy by formula over elapsed real time
@@ -339,7 +351,10 @@ export function pausedUpkeep(planet: Planet, data: GameData, eatsBiomass: boolea
  *     (`Player.resources`), scaled by the `economy.production` hook;
  *   - upkeep: each player pays daily maintenance for their units, drained from
  *     the same treasury (clamped at zero — a deficit just leaves you at empty). The
- *     `economy.unitUpkeep` hook scales an owner's unit bill (base 1, args `{ playerId }`).
+ *     `economy.unitUpkeep` hook scales an owner's unit bill (base 1, args `{ playerId }`),
+ *     and the `economy.upkeep` hook adds what the world's units and buildings do not
+ *     know about (base — that bill, args `{ playerId }`; the espionage module puts its
+ *     spies' pay here). An unpaid addition enters arrears like any other bill.
  *
  * Both scale with `timeScale`, like every other match timer (GDD §3.1).
  */
@@ -351,7 +366,8 @@ export const economyModule: GameModule = {
   // changes with time (замечание Codex на #1996).
   // 1.4.0: хук `economy.unitUpkeep` — множитель содержания войск владельца (BAL-19).
   // 1.4.2: приостановленная стройка платит содержание за ту долю, которую производит.
-  version: '1.4.2',
+  // 1.5.0: хук `economy.upkeep` — счёт игрока целиком (зарплата шпионов).
+  version: '1.5.0',
   setup(api) {
     api.on('time.advanced', (event, h) => {
       const { from, to } = event.payload as { from: number; to: number };
@@ -439,13 +455,13 @@ export const economyModule: GameModule = {
         if (!player) {
           continue;
         }
-        const upkeep = upkeepPerOwner.get(playerId);
+        const upkeep = billOf(h, playerId, upkeepPerOwner.get(playerId) ?? {});
         // Settle the bill and record what went UNPAID: a resource whose drain pinned
         // the treasury at zero with a remainder owed enters arrears — next span its
         // consumers run at BROWNOUT until the debt is coverable again.
         const short: string[] = [];
-        for (const res of Object.keys(upkeep ?? {})) {
-          const perDay = upkeep![res] ?? 0;
+        for (const res of Object.keys(upkeep)) {
+          const perDay = upkeep[res] ?? 0;
           if (perDay === 0) {
             continue;
           }

@@ -4078,6 +4078,7 @@ export const en: Record<string, string> = {
   'rescard.integration': '{n} {n|planet|planets} integrating: output from {p}% to 100%',
   'rescard.upkeep': 'Building upkeep',
   'rescard.army': 'Army upkeep',
+  'rescard.spies': 'Spy salaries',
   'rescard.market': 'Market',
   'rescard.trader': 'Trader',
   'rescard.close': 'Close',

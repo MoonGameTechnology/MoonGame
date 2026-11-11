@@ -5,7 +5,6 @@ import { noteJourney, noteScouted, spyKnownOwner, unguardedBy } from '../state/s
 import { identifiedNodes } from '../state/visibility';
 import { getStance } from '../state/diplomacy';
 import { coalitionOf } from '../state/coalition';
-import type { ResourceBag } from '../data/schemas';
 import type { GameState, IntelGrant, Spy, SpyOp } from '../state/gameState';
 import {
   aggressive,
@@ -33,8 +32,9 @@ import {
 } from '../util/spyLife';
 import { counterIntelOf, developmentShare } from '../state/spyWorld';
 import { canAfford, payCost } from '../util/treasury';
+import { registerEspionageEconomy } from './espionage/economy';
+export { SPY_SALARY, paidSpies, spySalary } from './espionage/economy';
 import {
-  DISRUPT_FACTOR,
   delayQueue,
   disrupt,
   sabotage,
@@ -582,27 +582,11 @@ export const espionageModule: GameModule = {
   // 1.13.0: кража вернее и богаче с развитого мира своей цивилизации (SPY-21).
   // 1.14.0: раскрытие шпиона больше не объявляет войну.
   // 2.0.0: именные шпионы летят до мира, ждут там приказа и возвращаются в столицу (SPY-23).
-  // 2.1.0: приказ сверяется с тем, что игрок знает о мире; разведка и ничейных миров (SPY-24).
-  version: '2.1.0',
+  // 2.1.0: шпионы получают зарплату в кредитах (хук `economy.upkeep`).
+  // 2.2.0: приказ сверяется с тем, что игрок знает о мире; разведка и ничейных миров (SPY-24).
+  version: '2.2.0',
   setup(api) {
-    // SPY-15: a disrupted world produces `DISRUPT_FACTOR` of its output. A span never
-    // runs across the end (it is a scheduled event), so «until ≥ now» at the span's end
-    // means the whole span was disrupted.
-    api.hook<ResourceBag>('economy.production', (bag, args, h) => {
-      const planetId = (args as { planetId?: string } | undefined)?.planetId;
-      const until = planetId ? h.state.planets[planetId]?.disruptedUntil : undefined;
-      if (until === undefined || until < h.ctx.now) return bag;
-      const out: Record<string, number> = {};
-      for (const res of Object.keys(bag)) out[res] = (bag[res] ?? 0) * DISRUPT_FACTOR;
-      return out;
-    });
-
-    api.on('espionage.disrupt.end', (event, h) => {
-      const planet = h.state.planets[(event.payload as { planetId: string }).planetId];
-      // An extended term leaves this end early: the cut stays until its own end fires.
-      if (planet?.disruptedUntil !== undefined && planet.disruptedUntil <= h.ctx.now)
-        delete planet.disruptedUntil;
-    });
+    registerEspionageEconomy(api);
 
     api.onAction('espionage.spy', orderSpy);
 
