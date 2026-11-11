@@ -1,6 +1,6 @@
 import { holoIcon } from './holographicIcons';
 import { heroDisplayName } from './heroStaff';
-import { orderLane, type GameState } from '../../packages/shared-core/src/index';
+import { matchUnitHours, orderLane, type GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { data } from './gameData';
 import { displayUnit, buildingName, esc } from './format';
@@ -80,12 +80,18 @@ function laneJobs(state: GameState, world: string, lane: ProductionLane) {
     for (const h of Object.values(state.heroes ?? {})) {
       const p = h.mobilization;
       if (!p || p.target !== world) continue;
+      const unit = heroFlagshipUnit(h, data);
       jobs.push({
-        seq: p.queued ? (p.orderId ?? 0) : -1, label: heroDisplayName(h), unit: heroFlagshipUnit(h, data),
-        // Идущую мобилизацию ядро не отменяет: крестик только у ждущего героя.
+        seq: p.queued ? (p.orderId ?? 0) : -1, label: heroDisplayName(h), unit,
+        // Срок героя — срок его флагмана, как считает ядро: без него у ждущего героя и у
+        // всех заказов за ним не было бы времени готовности. Идущую мобилизацию ядро не
+        // отменяет: крестик только у ждущего героя.
         ...(p.queued
-          ? { cancel: `data-pw-hero-cancel="${esc(h.id)}"`, cancelTitle: 'side.conveyor.dequeue.title' }
-          : { at: p.readyAt, cancel: '' }),
+          ? {
+              duration: matchUnitHours(state, data.units[unit]?.buildTimeHours || 10) * HOUR,
+              cancel: `data-pw-hero-cancel="${esc(h.id)}"`, cancelTitle: 'side.conveyor.dequeue.title',
+            }
+          : { at: p.readyAt, duration: p.readyAt - p.startedAt, cancel: '' }),
       });
     }
   jobs.sort((a, b) => a.seq - b.seq);
@@ -127,8 +133,10 @@ export function productionLanesHtml(state: GameState, world: string, active: Pro
   return PRODUCTION_LANES.map((lane) => laneCard(state, world, lane, active)).join('');
 }
 
-/** Раскрыта ли очередь открытой линии; переживает перерисовки окна. */
+/** Раскрыта ли очередь открытой линии; переживает перерисовки окна, но не смену линии
+ *  или мира: раскрывали ту очередь, а не эту. */
 let stripOpen = false;
+let stripOf = '';
 export function toggleLaneStrip(): void {
   stripOpen = !stripOpen;
 }
@@ -137,6 +145,10 @@ export function toggleLaneStrip(): void {
  *  когда будет готов, отмена; приостановленный — с «Продолжить», когда линия свободна.
  *  Длинная очередь сворачивается до идущего и «+N» со сроком всей линии. */
 export function laneStripHtml(state: GameState, world: string, lane: ProductionLane): string {
+  if (stripOf !== `${world}:${lane}`) {
+    stripOf = `${world}:${lane}`;
+    stripOpen = false;
+  }
   const { jobs, paused } = laneJobs(state, world, lane);
   if (!jobs.length && !paused.length) return `<p class="pw-strip-idle">${t('production.lane.idle')}</p>`;
   const ready = laneReadyTimes(state.time, jobs);
