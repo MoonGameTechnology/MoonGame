@@ -492,6 +492,18 @@ describe('свой флот', () => {
     expect(html).toContain(t('side.fleet.hero-aura'));
   });
 
+  it('из нескольких героев назван тот, кто ведёт этот флот', async () => {
+    const { env, card, put } = await boot();
+    env.s.heroes = {
+      H1: { id: 'H1', owner: 'p1', fleetId: 'F9' },
+      H2: { id: 'H2', owner: 'p1', fleetId: 'F3' },
+    } as unknown as GameState['heroes'];
+    put(fleet('F3', 'p1', 'Z', [{ unit: 'hero', count: 1 }]));
+    const html = card('F3');
+    expect(html).toContain('♔ герой H2');
+    expect(html).not.toContain('герой H1');
+  });
+
   it('в пути — цель и срок прибытия заглушкой под живой патч', async () => {
     const { env, card, put } = await boot();
     const now = env.s.time;
