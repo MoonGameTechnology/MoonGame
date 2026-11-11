@@ -211,7 +211,9 @@ body #constructor.pw-production { padding:0; }
 #constructor.pw-production .pw-hero-pool[open] > summary { position:sticky; top:-10px; background:#0b202d; }
 #constructor.pw-production .pw-hero-pool[open] > summary:after { content:'×'; margin-left:auto; font-size:24px; }
 /* The prototype's control defaults are local to this workspace. */
-#constructor.pw-production .cnbox { color:#e1f0f3; font-size:14px; line-height:1.45; gap:5px; background:linear-gradient(130deg,#0b1e2a,#06131c 80%); }
+#constructor.pw-production .cnbox { color:#e1f0f3; font-size:14px; line-height:1.45; gap:5px; }
+/* На ПК окно — стекло, как остальные окна (`holographic.css`, ползунок «Непрозрачность окон»). */
+body:not(.holo-ui) #constructor.pw-production .cnbox { background:linear-gradient(130deg,#0b1e2a,#06131c 80%); }
 #constructor.pw-production .cnbox button, #constructor.pw-production .cnbox select { box-sizing:border-box; font-family:inherit; font-weight:600; }
 #constructor.pw-production .cnbox button:disabled { opacity:.55; cursor:not-allowed; }
 #constructor.pw-production .cnbox button:before, #constructor.pw-production .cnbox button:after { pointer-events:none; }
@@ -471,3 +473,11 @@ body #codex.pw-entity-card .cxbox { width:min(550px,100%); max-height:100%; disp
 #constructor.pw-production .pw-catalog-visual .pw-requirement-row { font-size:11px; }
 #constructor.pw-production .pw-catalog-visual .pw-requirement-row button { min-height:36px; }
 @media(max-width:700px) { #constructor.pw-production .pw-catalog-visual > .ship-art { height:115px; } }
+/* ПК: плитки и карточки на стекле окна тоже стекло. Сплошные заливки выше закрывали карту,
+ * и ползунок «Непрозрачность окон» на «Производство» не действовал (как у окна боя —
+ * та же доля `--holo-window-alpha`). Всплывающие поверх окна диалоги остаются сплошными. */
+body.holo-ui #constructor.pw-production :is(.pw-lane-card,.pw-lane-strip .pw-job,.pw-hull-tile,.pw-hero-summary) { background:rgba(11,32,45,calc(.82 * var(--holo-window-alpha,.94))); }
+body.holo-ui #constructor.pw-production .pw-lane-card.on { background:rgba(14,43,56,calc(.9 * var(--holo-window-alpha,.94))); }
+body.holo-ui #constructor.pw-production :is(.pw-lane-art,.pw-catalog-tile > .ship-art,.pw-catalog-visual > .ship-art) { background:rgba(4,19,28,calc(.7 * var(--holo-window-alpha,.94))); }
+body.holo-ui #constructor.pw-production :is(.pw-building,.pw-hero-fold,.cnbox > .pw-context .pw-income) { background:rgba(9,29,40,calc(.82 * var(--holo-window-alpha,.94))); }
+body.holo-ui #constructor.pw-production :is(.pw-catalog-tile .pw-catalog-actions > .cn-hbtn,.pw-catalog-heading button,.pw-requirement-row > button,.pw-building-action .bw-st) { background:rgba(10,32,44,calc(.85 * var(--holo-window-alpha,.94))); }
