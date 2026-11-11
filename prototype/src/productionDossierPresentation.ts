@@ -38,7 +38,15 @@ export function presentProductionDossier(root: HTMLElement, kind: string, id: st
     const copy = root.ownerDocument.createElement('p');
     const description = box.querySelector('.cx-desc')?.textContent ?? '';
     copy.textContent = description.split(/(?<=[.!?])\s/)[0] ?? '';
-    if (art) hero.append(art);
+    // A locked unit's requirement block lies over its portrait, as on the catalog card.
+    const needs = box.querySelector(':scope > .pw-requirements');
+    if (art && needs) {
+      const visual = root.ownerDocument.createElement('div');
+      visual.className = 'pw-dossier-visual';
+      visual.append(art, needs);
+      hero.classList.add('locked');
+      hero.append(visual);
+    } else if (art) hero.append(art);
     hero.append(copy); head.replaceWith(hero);
   }
   const values = box.querySelector<HTMLElement>('.pw-section .cx-stats');

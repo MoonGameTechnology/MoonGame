@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type TerrainEnvironmentInput, type TerrainEnvironmentTile } from '../../decisions/terrainEnvironment';
-import { knownEnvironment, projectTerrainTile, terrainKnowledge, TerrainEnvironmentSceneCache } from './terrainEnvironmentView';
+import { knownEnvironment, projectTerrainTile, terrainArtCentre, terrainKnowledge, TerrainEnvironmentSceneCache } from './terrainEnvironmentView';
 
 function input(): TerrainEnvironmentInput {
   return {
@@ -145,5 +145,23 @@ describe('terrain tile projection', () => {
     expect(close.environment!.tile).toBe(far.environment!.tile);
     expect(close.box.width / far.box.width).toBe(16);
     expect(tile).toEqual(before);
+  });
+});
+
+describe('terrainArtCentre', () => {
+  const hole = { x: 0, y: 0, sector: 'black_hole' };
+  const disk = { x: 700, y: 0, sector: 'accretion_disk' };
+  const rift = { x: 300, y: 300, sector: 'rift' };
+
+  it('centres the accretion disk on the black hole', () => {
+    expect(terrainArtCentre([disk, hole, rift], disk, 'accretion_disk')).toBe(hole);
+  });
+
+  it('keeps every other kind on its own node', () => {
+    expect(terrainArtCentre([disk, hole, rift], rift, 'rift')).toBe(rift);
+  });
+
+  it('falls back to the disk itself on a map without a black hole', () => {
+    expect(terrainArtCentre([disk, rift], disk, 'accretion_disk')).toBe(disk);
   });
 });
