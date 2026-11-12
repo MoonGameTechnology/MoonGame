@@ -690,14 +690,26 @@ export const FORCED_MARCH_PACE_SOLO_MIGRATION = {
   toDataHash: SPY_FOG_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: fleetBrood 1.3.0 — onboard brood measures the hold shared with shuttles in
+ *  the hangar and out on a strike (SHU-5.1). The catalogue is unchanged; organisms already
+ *  aboard stay, and only later cycles see the shuttles. */
+export const BROOD_HOLD_SOLO_MIGRATION = {
+  fromRules: FORCED_MARCH_PACE_SOLO_MIGRATION.toRules,
+  fromData: FORCED_MARCH_PACE_SOLO_MIGRATION.toData,
+  fromDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
+  toRules: '0b513e5c40130b',
+  toData: FORCED_MARCH_PACE_SOLO_MIGRATION.toData,
+  toDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** Rules-only pair: espionage 2.3.0 — a turned agent asks its catcher to take it in (for
  *  good) or flees, instead of serving it for a day. The catalogue is unchanged; a saved
  *  world's turned agent (`turnedUntil`) serves out its term. */
 export const SPY_DEFECTOR_SOLO_MIGRATION = {
-  fromRules: FORCED_MARCH_PACE_SOLO_MIGRATION.toRules,
-  fromData: FORCED_MARCH_PACE_SOLO_MIGRATION.toData,
-  fromDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
-  toRules: '12ac50d760b645',
+  fromRules: BROOD_HOLD_SOLO_MIGRATION.toRules,
+  fromData: BROOD_HOLD_SOLO_MIGRATION.toData,
+  fromDataHash: BROOD_HOLD_SOLO_MIGRATION.toDataHash,
+  toRules: '12196751116470',
   toData: SPY_LEVELS_SOLO_MIGRATION.toData,
   toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
 } as const;
@@ -762,6 +774,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_SALARY_SOLO_MIGRATION,
   SPY_FOG_SOLO_MIGRATION,
   FORCED_MARCH_PACE_SOLO_MIGRATION,
+  BROOD_HOLD_SOLO_MIGRATION,
   SPY_DEFECTOR_SOLO_MIGRATION,
 ];
 
