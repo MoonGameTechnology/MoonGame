@@ -690,6 +690,18 @@ export const FORCED_MARCH_PACE_SOLO_MIGRATION = {
   toDataHash: SPY_FOG_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: fleetBrood 1.3.0 — onboard brood measures the hold shared with shuttles in
+ *  the hangar and out on a strike (SHU-5.1). The catalogue is unchanged; organisms already
+ *  aboard stay, and only later cycles see the shuttles. */
+export const BROOD_HOLD_SOLO_MIGRATION = {
+  fromRules: FORCED_MARCH_PACE_SOLO_MIGRATION.toRules,
+  fromData: FORCED_MARCH_PACE_SOLO_MIGRATION.toData,
+  fromDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
+  toRules: '0b513e5c40130b',
+  toData: FORCED_MARCH_PACE_SOLO_MIGRATION.toData,
+  toDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -750,6 +762,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_SALARY_SOLO_MIGRATION,
   SPY_FOG_SOLO_MIGRATION,
   FORCED_MARCH_PACE_SOLO_MIGRATION,
+  BROOD_HOLD_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
