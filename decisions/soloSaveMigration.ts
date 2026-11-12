@@ -702,14 +702,26 @@ export const BROOD_HOLD_SOLO_MIGRATION = {
   toDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: effects 0.3.0 — scheduled dark events inside one span fire in time order
+ *  (then by rule id), so an offline catch-up lands what the same hours stepped one by one would.
+ *  The catalogue is unchanged. */
+export const SCHEDULE_ORDER_SOLO_MIGRATION = {
+  fromRules: BROOD_HOLD_SOLO_MIGRATION.toRules,
+  fromData: BROOD_HOLD_SOLO_MIGRATION.toData,
+  fromDataHash: BROOD_HOLD_SOLO_MIGRATION.toDataHash,
+  toRules: '03926c569ac068',
+  toData: BROOD_HOLD_SOLO_MIGRATION.toData,
+  toDataHash: BROOD_HOLD_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** Rules-only pair: espionage 2.3.0 — a turned agent asks its catcher to take it in (for
  *  good) or flees, instead of serving it for a day. The catalogue is unchanged; a saved
  *  world's turned agent (`turnedUntil`) serves out its term. */
 export const SPY_DEFECTOR_SOLO_MIGRATION = {
-  fromRules: BROOD_HOLD_SOLO_MIGRATION.toRules,
-  fromData: BROOD_HOLD_SOLO_MIGRATION.toData,
-  fromDataHash: BROOD_HOLD_SOLO_MIGRATION.toDataHash,
-  toRules: '12196751116470',
+  fromRules: SCHEDULE_ORDER_SOLO_MIGRATION.toRules,
+  fromData: SCHEDULE_ORDER_SOLO_MIGRATION.toData,
+  fromDataHash: SCHEDULE_ORDER_SOLO_MIGRATION.toDataHash,
+  toRules: '1ad45e650c402b',
   toData: SPY_LEVELS_SOLO_MIGRATION.toData,
   toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
 } as const;
@@ -775,6 +787,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_FOG_SOLO_MIGRATION,
   FORCED_MARCH_PACE_SOLO_MIGRATION,
   BROOD_HOLD_SOLO_MIGRATION,
+  SCHEDULE_ORDER_SOLO_MIGRATION,
   SPY_DEFECTOR_SOLO_MIGRATION,
 ];
 
