@@ -72,6 +72,7 @@ const TERRAIN_KINDS = new Set([
   'asteroid_cluster',
   'rift',
   'accretion_disk',
+  'black_hole',
   'dust_lane',
   'depleted_system',
 ]);

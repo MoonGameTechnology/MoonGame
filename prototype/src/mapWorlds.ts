@@ -44,6 +44,7 @@ import { radarShown } from './radarSources';
 import { artScale, calloutAlpha, sphereBloom } from './semanticZoom';
 import { VOID_COLOR } from './sideColors';
 import { sweepPaint, sweepShows } from './sweepFx';
+import { drawBlackHole } from './blackHoleArt';
 
 /** Что мирам карты нужно от игры. */
 export interface MapWorldsHost {
@@ -361,9 +362,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     if (n.sector === 'black_hole') {
       cx.save();
       const hs = ns * (p.size ?? 1); // the Abyss of ffa-50 is a size-2 hole, drawn twice as big
-      cx.fillStyle = '#03030a'; cx.strokeStyle = '#8764ce'; cx.lineWidth = 3;
-      cx.beginPath(); cx.arc(c.x, c.y, 20 * hs, 0, TAU); cx.fill(); cx.stroke();
-      cx.beginPath(); cx.ellipse(c.x, c.y, 31 * hs, 10 * hs, -0.3, 0, TAU); cx.stroke();
+      drawBlackHole(cx, c.x, c.y, 20 * hs);
       cx.restore();
       continue;
     }
