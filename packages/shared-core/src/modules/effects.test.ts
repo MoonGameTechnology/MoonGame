@@ -228,6 +228,31 @@ describe('effectsModule — scheduled dark events (EFX-1)', () => {
     expect(advanced.state.players['p1']!.resources['energy']).toBe(0);
   });
 
+  it('a long catch-up span fires in time order, like the same hours stepped one by one', () => {
+    // Порядок важен: штраф срезается в ноль, а бросок шанса берёт следующее число потока.
+    // Длинный скачок (офлайн-догон) обязан дать то же, что ход часов по часу.
+    const data = makeData({
+      a_gain: { ...ANOMALY, params: { resource: 'energy', amount: 50, cadenceHours: 8 } },
+      b_drain: { ...ANOMALY, params: { resource: 'energy', amount: -60, cadenceHours: 12 } },
+      c_luck: {
+        ...ANOMALY,
+        params: { resource: 'metal', amount: 1, cadenceHours: 5 },
+        chance: 0.5,
+      },
+    });
+    const kernel = createKernel([effectsModule]);
+    const start = baseState([], [], [player('p1', 0)]);
+    let stepped = start;
+    for (let t = 1; t <= 48; t += 1)
+      stepped = okAdvance(kernel.advanceTo(stepped, ctxOf(data)(t * HOUR))).state;
+    const jumped = okAdvance(kernel.advanceTo(start, ctxOf(data)(48 * HOUR))).state;
+    // 8h +50 → 50, 12h −60 → 0, 16h → 50, 24h +50 −60 → 40, 32h → 90, 36h → 30,
+    // 40h → 80, 48h +50 −60 → 70.
+    expect(stepped.players['p1']!.resources['energy']).toBe(70);
+    expect(jumped.players['p1']!.resources).toEqual(stepped.players['p1']!.resources);
+    expect(jumped.rng).toEqual(stepped.rng);
+  });
+
   it('caps degenerate cadences at 100 firings per span (fail-secure)', () => {
     const data = makeData({
       void_anomaly: { ...ANOMALY, params: { resource: 'energy', amount: 50, cadenceHours: 1 } },
