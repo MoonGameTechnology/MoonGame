@@ -2400,6 +2400,7 @@ export const en: Record<string, string> = {
   'hint.auto-assault':
     '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
   'hint.cast-cancelled': '✖ ability cancelled',
+  'hint.hold-confirm': 'hold for {n} s',
   'hint.deploy-cancelled': '✖ deploy cancelled',
   'hint.forced-march': '⚡ forced march: +50% speed, −5% hull per hour underway',
   'hint.multiselect': '⊕ click your fleets — build the group, then give a common order',
@@ -3125,6 +3126,7 @@ export const en: Record<string, string> = {
   'split.note':
     'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops are split along with the ships.',
   'split.preview': 'new fleet: {a} {a|ship|ships} · original keeps {b}',
+  'split.range': '{u}: to the new fleet',
   'split.section.landing': 'Carried troops',
   'split.title': 'Split fleet',
 

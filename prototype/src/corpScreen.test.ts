@@ -467,7 +467,7 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     expect(hubSheet.open()).toBe(false);
   });
 
-  it('«Расформировать»: первое нажатие спрашивает, второе отправляет', async () => {
+  it('«Расформировать» кликом без нажатия (диктор): первый спрашивает, второй отправляет', async () => {
     const calls = server({ ...headCorp(), 'POST /corps/c1/disband': {} });
     const { api, hubRoot } = wire(session);
     api.showSection('settings');
@@ -475,7 +475,7 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     await tick();
     const disband = press({ corpconfirm: 'disband', corpact: 'disband' });
     hubRoot.fire(disband);
-    expect(hubRoot.html()).toContain(t('corp.hub.disband.confirm'));
+    expect(hubRoot.html()).toContain('holdable armed');
     expect(calls).not.toContain('POST /corps/c1/disband');
     hubRoot.fire(disband);
     await tick();
@@ -492,7 +492,7 @@ describe('корпорации — вкладка хаба (CORP-3)', () => {
     hubRoot.fire(disband);
     hubRoot.fire(press({ corpsec: 'treasury' }));
     api.showSection('settings');
-    expect(hubRoot.html()).not.toContain(t('corp.hub.disband.confirm'));
+    expect(hubRoot.html()).not.toContain('holdable armed');
     hubRoot.fire(disband);
     await tick();
     expect(calls).not.toContain('POST /corps/c1/disband');

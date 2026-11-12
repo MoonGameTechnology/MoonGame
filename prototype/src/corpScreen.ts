@@ -45,6 +45,9 @@ import { CORP_EMBLEM_LABEL, corpEmblem, corpEmblemPicker } from './corpEmblems';
 import { esc, nfmt } from './format';
 import { attentionTotal, corpAttention, pollCorpAttention } from './corpAttention';
 import { detach } from './detach';
+import { bindHoldConfirm } from './holdButton';
+import { keepTabInView } from './tabScroll';
+import { tabKeyIndex } from '../../decisions/tabKeys';
 import {
   canManage,
   parseAccountIds,
@@ -1147,22 +1150,13 @@ export function initCorp(host: CorpHost): {
     if (!hubShown) return;
     const root = host.hub.root();
     // Выбор эмблемы держит контроллер.
-    const tabsScroll = root.querySelector<HTMLElement>('.cb-battle-tabs')?.scrollLeft ?? 0;
+    const tabsScroll = root.querySelector<HTMLElement>('.cb-battle-tabs')?.scrollLeft ?? 0; // `keepTabInView`
     const active = root.ownerDocument?.activeElement;
     const focused = active && root.contains(active) ? active as HTMLElement : null;
     const focusAttrs = focused ? Array.from(focused.attributes).filter((a) => a.name.startsWith('data-')).map((a) => [a.name, a.value] as const) : [];
     const p = hubPaint();
     root.innerHTML = corpHubHtml(p);
-    const tabs = root.querySelector<HTMLElement>('.cb-battle-tabs');
-    if (tabs) {
-      tabs.scrollLeft = tabsScroll;
-      const selected = tabs.querySelector<HTMLElement>('[aria-selected="true"]');
-      if (selected) {
-        const box = selected.getBoundingClientRect(), frame = tabs.getBoundingClientRect();
-        if (box.left < frame.left) tabs.scrollLeft -= frame.left - box.left;
-        else if (box.right > frame.right) tabs.scrollLeft += box.right - frame.right;
-      }
-    }
+    keepTabInView(root.querySelector<HTMLElement>('.cb-battle-tabs'), tabsScroll);
     if (focusAttrs.length) Array.from(root.querySelectorAll<HTMLElement>('button')).find((el) => focusAttrs.every(([attr, value]) => el.getAttribute(attr) === value))?.focus({ preventScroll: true });
     renderHubSheet(p);
   }
@@ -1250,7 +1244,7 @@ export function initCorp(host: CorpHost): {
         openSheet({ kind: 'report', matchupId: report }, 'data-battle-report', report);
       return;
     }
-    // Любое нажатие снимает взвод; второе нажатие по взведённой кнопке исполняет приказ.
+    // Любое нажатие снимает взвод; второй клик по взведённой исполняет (тап по вопросу съедает `holdButton.ts`).
     const armed = hubArmed;
     hubArmed = null;
     const confirm = tg.closest<HTMLElement>('[data-corpconfirm]');
@@ -1346,14 +1340,17 @@ export function initCorp(host: CorpHost): {
 
   host.hub.root().addEventListener('keydown', (e) => {
     const tab = (e.target as HTMLElement | null)?.closest<HTMLElement>('[role="tab"][data-battletab]');
-    if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    const next = tab ? tabKeyIndex(e.key, CORP_BATTLE_TABS.indexOf(battleTab), CORP_BATTLE_TABS.length) : null;
+    if (next === null) return;
     e.preventDefault();
-    const index = CORP_BATTLE_TABS.indexOf(battleTab);
-    const next = e.key === 'Home' ? 0 : e.key === 'End' ? CORP_BATTLE_TABS.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : -1) + CORP_BATTLE_TABS.length) % CORP_BATTLE_TABS.length;
     battleTab = CORP_BATTLE_TABS[next]!;
     renderHub();
     host.hub.root().querySelector<HTMLElement>(`[data-battletab="${battleTab}"]`)?.focus({ preventScroll: true });
   });
+  // Необратимое исполняется удержанием: дошедшая полоса — тот же второй клик по взведённой кнопке.
+  const holdArmed = (btn: HTMLElement) => hubArmed !== null && hubArmed === btn.dataset.corpconfirm;
+  const holdConfirm = (btn: HTMLElement) => ((hubArmed = btn.dataset.corpconfirm ?? null), onHubClick({ target: btn } as unknown as Event));
+  for (const el of [host.hub.root(), host.hub.sheet()]) bindHoldConfirm(el, { armed: holdArmed, confirm: holdConfirm });
   host.hub.root().addEventListener('click', onHubClick);
   host.hub.sheet().addEventListener('click', onHubClick);
   host.hub.sheet().addEventListener('change', (e) => {

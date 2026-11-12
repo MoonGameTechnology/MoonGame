@@ -21,6 +21,7 @@ import {
   type GameState,
 } from '../../packages/shared-core/src/index';
 import { esc } from './format';
+import { bindHoldConfirm, holdConfirmHtml } from './holdButton';
 import { createCoalition, editCoalition, leaveCoalition, kickCoalitionMember, declareWar } from '../../decisions/actions';
 
 /** Что окну нужно от игры. */
@@ -161,7 +162,7 @@ function cardHtml(c: Coalition): string {
     const status = departure
       ? `<span class="cw-timer" data-coal-timer="${departure.kind}" data-coal-deadline="${deadline}">${timerText(departure.kind, deadline)}</span>` : '';
     const kick = canKickCoalitionMember(s, game.me(), id)
-      ? `<button class="cw-kick${confirmKick === id ? ' sure' : ''}" data-kick="${esc(id)}">${confirmKick === id ? t('coal.kick.confirm') : t('coal.kick')}</button>` : '';
+      ? `<button class="cw-kick holdable${confirmKick === id ? ' sure' : ''}" data-kick="${esc(id)}" data-hold="kick:${esc(id)}">${holdConfirmHtml(t('coal.kick'), t('coal.kick.confirm'))}</button>` : '';
     return `<div class="cw-mem"><span class="cw-dot" style="background:${game.ownerColor(id)}"></span>` +
       `<span class="cw-member-name">${esc(nameOf(id))}${status}</span>${kick}</div>`;
   }).join('');
@@ -179,7 +180,7 @@ function cardHtml(c: Coalition): string {
     ? `<div class="cw-sec">${t('coal.desc')}</div>` +
       `<textarea id="cw-text" maxlength="${COALITION_DESC_MAX}" rows="3" placeholder="${t('coal.desc.ph')}">${esc(c.description)}</textarea>` +
       `<div class="cw-acts"><button class="cw-save">${t('coal.save')}</button>` +
-      (c.departures?.[game.me()] ? '' : `<button class="cw-leave${confirmLeave ? ' sure' : ''}">${confirmLeave ? t('coal.leave.confirm') : t('coal.leave')}</button>`) + '</div>'
+      (c.departures?.[game.me()] ? '' : `<button class="cw-leave holdable${confirmLeave ? ' sure' : ''}" data-hold="leave">${holdConfirmHtml(t('coal.leave'), t('coal.leave.confirm'))}</button>`) + '</div>'
     : `<div class="cw-sec">${t('coal.desc')}</div>` +
       `<div class="cw-text">${c.description ? esc(c.description) : t('coal.desc.empty')}</div>`;
   return (
@@ -270,6 +271,23 @@ export function initCoalitionWindow(host: CoalitionWindowHost): void {
   document.getElementById('rail-coal')?.addEventListener('click', openCoalitions);
   const el = document.getElementById('coalwin');
   if (!el) return;
+  // Исключение и выход исполняются удержанием; короткий тап взводит кнопку ниже.
+  bindHoldConfirm(el, {
+    armed: (btn) => (btn.dataset.kick ? confirmKick === btn.dataset.kick : confirmLeave),
+    confirm: (btn) => {
+      const kick = btn.dataset.kick;
+      confirmKick = null;
+      confirmLeave = false;
+      if (kick) {
+        if (canKickCoalitionMember(game.state(), game.me(), kick))
+          game.playerOrder(kickCoalitionMember(game.me(), kick));
+      } else {
+        const mine = coalitionOf(game.state(), game.me());
+        if (mine && !mine.departures?.[game.me()]) game.playerOrder(leaveCoalition(game.me()));
+      }
+      renderCoalitions();
+    },
+  });
   el.addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
     if (tg.id === 'coalwin' || tg.closest('.dp-close')) return closeCoalitions();
