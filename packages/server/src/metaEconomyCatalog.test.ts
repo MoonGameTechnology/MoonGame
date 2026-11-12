@@ -97,7 +97,9 @@ describe('main-game meta content', () => {
     );
     expect(shipped.map((offer) => offer.corpStyle).sort()).toEqual([
       'high_tech',
+      'imperial',
       'imperial_gothic',
+      'soviet_retrofuturism',
     ]);
     expect(shipped.every((offer) => offer.category === 'styles' && offer.price)).toBe(true);
     const free = loadMetaEconomyCatalog(data);

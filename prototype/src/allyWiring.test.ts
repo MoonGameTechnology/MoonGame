@@ -42,7 +42,7 @@ describe('глава IV — проводка интерфейса', () => {
 
   it('взведённый приказ забирает тап по карте и уходит в ядро как `ally.order`', () => {
     expect(INPUT).toMatch(/allyAim: !!allyAim,/);
-    expect(INPUT).toMatch(/if \(owner === 'ally-order' && allyAim\) \{/);
+    expect(INPUT).toMatch(/if \(owner === 'ally-order' && allyAim\) return allyOrderTap\(allyAim,/);
     expect(INPUT).toMatch(
       /playerOrder\(allyOrder\(ME, ally, kind, hit \? \{ fleet: hit\.id \} : \{ planet: node!\.id \}\)\)/,
     );

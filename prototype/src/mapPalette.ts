@@ -112,6 +112,8 @@ for (let i = 10; i < 100; i++) {
 
 export const GRID = 'rgba(46,150,160,0.07)';
 export const LOCK = '#7df0d0'; // selection / targeting reticle accent
+// RALLY-2: точка сбора выбранного мира — прямая и флажок оранжевым (заказ владельца 2026-11-12).
+export const RALLY = '#ff9a3c';
 export const HOSTILE = '#ff5a4d'; // «Атака»: цели и путь к ним — красным (заказ владельца 2026-09-24)
 // Штурмовая высадка: дуга капсул, плашка, кольцо-часы и вспышка касания — одним цветом.
 export const ASSAULT_TONE = '#ffb347';

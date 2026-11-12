@@ -31,7 +31,7 @@ from PIL import Image
 
 SOURCE = Path('art/corporations/frontal')
 TARGET = Path('prototype/art/corp')
-STYLES = ['standard', 'imperial-gothic', 'high-tech']
+STYLES = ['standard', 'imperial-gothic', 'high-tech', 'soviet-retrofuturism', 'imperial']
 # Sprite width per building, about one and a half times its lot on the hub panorama
 # (corpSprites.ts).
 WIDTHS = {'headquarters': 560, 'supply_center': 460, 'engineering_complex': 500}

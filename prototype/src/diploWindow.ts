@@ -615,7 +615,31 @@ export function renderDiplo(resetRosterScroll = false): void {
     body +
     `</div>`;
   restoreUi();
-  if (diploTab === 'msgs') scrollFeedToEnd();
+  if (diploTab === 'msgs') {
+    scrollFeedToEnd();
+    showOpenChat();
+  }
+}
+/** An opened row near the list's bottom would hide its treaty buttons below the fold:
+ *  scroll the list (only the list) until they show, never past the row's own top. */
+function revealExpanded(): void {
+  const list = document.getElementById('diplo')?.querySelector?.<HTMLElement>('.dp-list');
+  const row = list?.querySelector<HTMLElement>('.dp-row.open');
+  if (!list || !row) return;
+  let last: Element = row;
+  while (last.nextElementSibling && !last.nextElementSibling.classList.contains('dp-row'))
+    last = last.nextElementSibling;
+  const box = list.getBoundingClientRect();
+  const below = last.getBoundingClientRect().bottom - box.bottom;
+  const room = row.getBoundingClientRect().top - box.top;
+  if (below > 0) list.scrollTop += Math.min(below + 6, room);
+}
+/** Phone: the chats are a horizontal strip, so bring the open one into view (PC: no-op). */
+function showOpenChat(): void {
+  const list = document.getElementById('diplo')?.querySelector?.<HTMLElement>('.dp-cvlist');
+  const on = list?.querySelector<HTMLElement>('.dp-cv.on');
+  if (!list || !on || list.scrollWidth <= list.clientWidth) return;
+  list.scrollLeft = on.offsetLeft - (list.clientWidth - on.offsetWidth) / 2;
 }
 /** COAL-1: после дипломатического пакета — список чатов и карточки предложений в
  *  открытой личке, не трогая поле ввода (полу-набранная реплика переживает). */
@@ -628,7 +652,12 @@ export function refreshThreadDiplo(): void {
   const listHtml = conversations.listHtml();
   if (conversations.current() !== was) return renderDiplo();
   const list = document.querySelector('#diplo .dp-cvlist');
-  if (list) list.outerHTML = listHtml;
+  if (list) {
+    const scrolled = list.scrollLeft;
+    list.outerHTML = listHtml;
+    const fresh = document.querySelector('#diplo .dp-cvlist');
+    if (fresh) fresh.scrollLeft = scrolled;
+  }
   const box = document.querySelector('#diplo .dp-tdip');
   if (box) box.outerHTML = threadDiploHtml(conversations.current());
 }
@@ -825,6 +854,7 @@ export function initDiploWindow(host: DiploWindowHost): void {
       if (row?.dataset.seat) {
         diploExpanded = diploExpanded === row.dataset.seat ? null : row.dataset.seat;
         renderDiplo();
+        revealExpanded();
       }
     });
     diploEl.addEventListener('input', (e) => {

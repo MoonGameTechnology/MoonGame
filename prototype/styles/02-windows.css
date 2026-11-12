@@ -178,6 +178,8 @@
 .dp-search{display:flex;flex-direction:column;gap:6px;color:var(--ink);font-size:var(--fs-caption);}
 .dp-search input{width:100%;box-sizing:border-box;min-height:36px;padding:8px 10px;border:1px solid var(--line-hi);
   border-radius:6px;background:var(--glass);color:var(--ink);font:inherit;font-size:var(--fs-body);}
+/* The phone hides the label and shows this placeholder instead; a visible label needs no echo. */
+body:not(.mobile-ui) #dp-search::placeholder{color:transparent;}
 .dp-sorts,.dp-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--fs-caption);color:var(--dim);}
 .dp-sortb,.dp-fchip,.dp-fclear{min-height:32px;padding:6px 10px;}
 .dp-fsep{width:1px;height:20px;background:var(--line-hi);}

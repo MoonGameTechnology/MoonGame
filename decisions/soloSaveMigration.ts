@@ -714,14 +714,26 @@ export const SCHEDULE_ORDER_SOLO_MIGRATION = {
   toDataHash: BROOD_HOLD_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: `auto-rally` 1.4.0 and `movement` 1.10.0 — a rally point may aim at any
+ *  world except visibly closed territory, and its ships stop at such a border on the way.
+ *  The catalogue is unchanged and a saved point keeps its shape, so a saved world reads as is. */
+export const RALLY_ANY_WORLD_SOLO_MIGRATION = {
+  fromRules: SCHEDULE_ORDER_SOLO_MIGRATION.toRules,
+  fromData: SCHEDULE_ORDER_SOLO_MIGRATION.toData,
+  fromDataHash: SCHEDULE_ORDER_SOLO_MIGRATION.toDataHash,
+  toRules: '1b563be4dcc083',
+  toData: SCHEDULE_ORDER_SOLO_MIGRATION.toData,
+  toDataHash: SCHEDULE_ORDER_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** Rules-only pair: espionage 2.3.0 — a turned agent asks its catcher to take it in (for
  *  good) or flees, instead of serving it for a day. The catalogue is unchanged; a saved
  *  world's turned agent (`turnedUntil`) serves out its term. */
 export const SPY_DEFECTOR_SOLO_MIGRATION = {
-  fromRules: SCHEDULE_ORDER_SOLO_MIGRATION.toRules,
-  fromData: SCHEDULE_ORDER_SOLO_MIGRATION.toData,
-  fromDataHash: SCHEDULE_ORDER_SOLO_MIGRATION.toDataHash,
-  toRules: '1ad45e650c402b',
+  fromRules: RALLY_ANY_WORLD_SOLO_MIGRATION.toRules,
+  fromData: RALLY_ANY_WORLD_SOLO_MIGRATION.toData,
+  fromDataHash: RALLY_ANY_WORLD_SOLO_MIGRATION.toDataHash,
+  toRules: '1f5a277badc3ab',
   toData: SPY_LEVELS_SOLO_MIGRATION.toData,
   toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
 } as const;
@@ -788,6 +800,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   FORCED_MARCH_PACE_SOLO_MIGRATION,
   BROOD_HOLD_SOLO_MIGRATION,
   SCHEDULE_ORDER_SOLO_MIGRATION,
+  RALLY_ANY_WORLD_SOLO_MIGRATION,
   SPY_DEFECTOR_SOLO_MIGRATION,
 ];
 

@@ -18,6 +18,7 @@ import type { Fleet, GameState, ShuttleStrike, Squadron, StrikeBase } from '../.
 import {
   abilityRange,
   estimateTravelHours,
+  knownClosed,
   legEndT,
   planRoute,
   roadAhead,
@@ -43,17 +44,18 @@ import { engageRoster } from '../../decisions/engageRoster';
 import { nearestHit } from '../../decisions/pointerPick';
 import { relocateTargets, type RelocateTarget } from '../../decisions/relocateTargets';
 import { tapRadius } from '../../decisions/tapPriority';
+import { rallyRouteHops } from '../../decisions/rallyPoint';
 import { ringed, ringsShown } from './assaultRings';
 import { mobileDraftPoint } from './cmdActions';
 import { fleetAnchor, fleetOriginPx, laneAim, nearestLanePoint, selectedFleetIds, strikeBasePos, strikeWorldPos } from './fleetGeometry';
 import { fmtHrs } from './format';
 import { ctx, data, type MapNode } from './game';
 import { fxBlur } from './graphicsPrefs';
-import { aiming, assaultAim, engageAim, heroAim, merging, mobileDraft, strikeAim } from './interaction';
+import { aiming, assaultAim, engageAim, heroAim, merging, mobileDraft, rallyAim, strikeAim } from './interaction';
 import { unworld, world, worldDist } from './mapCamera';
 import { fleetNode, fleetSeen } from './mapFog';
-import { aimPointer, tapByTouch } from './mapInput';
-import { drawAbilityCircle, drawPatrolCircle, targetBrackets, type AimedSquadron } from './mapOverlays';
+import { aimPointer, rallyDrag, tapByTouch } from './mapInput';
+import { drawAbilityCircle, drawPatrolCircle, drawRallyFlag, RALLY_PIN_LIFT, targetBrackets, type AimedSquadron } from './mapOverlays';
 import { CAST_FAR, CAST_REACH, HOSTILE, LOCK, R_ARTY, R_WING, TAU } from './mapPalette';
 
 /** Что прицелам нужно от игры. */
@@ -435,4 +437,52 @@ export function drawAimPreview(now: number) {
   cx.restore();
   // Поверх пути, чтобы пунктир не перечёркивал цифры прогноза.
   if (foeAim) drawEngageForecast(foeAim.fleet, foeAim.x, foeAim.y);
+}
+
+/**
+ * RALLY-2 (заказ владельца 2026-11-12): пока точка сбора взведена или её тянут, путь от
+ * мира-верфи к миру под указателем — тем же пунктиром по дорогам, что у приказа «Курс».
+ * Путь обрывается перед видимой закрытой границей (`rallyRouteHops`): там корабли встанут.
+ * Закрытый мир под указателем — красные уголки, как у цели, которую не примут.
+ */
+export function drawRallyAim(now: number): void {
+  if (!rallyAim || !aimPointer) return;
+  const s = game.world();
+  const me = game.me();
+  const source = s.planets[rallyAim];
+  const hit = nearestHit(game.nodes(), (n) => world(n), aimPointer.x, aimPointer.y, tapRadius('node', tapByTouch));
+  // Флажок, который несут, едет под пальцем, пока под ним нет мира.
+  if (!hit && rallyDrag) drawRallyFlag(aimPointer.x, aimPointer.y - RALLY_PIN_LIFT);
+  if (!source || !hit || hit.id === rallyAim) return;
+  const end = world(hit);
+  if (knownClosed(s, me, hit.id)) {
+    targetBrackets(end.x, end.y, 22, now, HOSTILE);
+    return;
+  }
+  const closed = (id: string) => knownClosed(s, me, id);
+  const route = planRoute(s, rallyAim, hit.id) ?? [];
+  const hops = rallyRouteHops(route, planRoute(s, rallyAim, hit.id, closed), closed);
+  if (!hops.length) return;
+  const road = roadAhead(
+    s,
+    { from: rallyAim, to: hops[0]!, path: hops.slice(1), endT: legEndT(s, rallyAim, hops[0]!, hops[1], 0, 1) },
+    0,
+  ).map((p) => world(p));
+  const cx = game.ctx();
+  cx.save();
+  cx.strokeStyle = rgba(LOCK, 0.6);
+  cx.lineWidth = 1.4;
+  cx.setLineDash([3, 5]);
+  cx.shadowColor = LOCK;
+  cx.shadowBlur = fxBlur(6);
+  cx.beginPath();
+  road.forEach((p, i) => (i ? cx.lineTo(p.x, p.y) : cx.moveTo(p.x, p.y)));
+  cx.stroke();
+  cx.setLineDash([]);
+  const stop = road[road.length - 1]!;
+  cx.beginPath();
+  cx.arc(stop.x, stop.y, targetPipRadius(false), 0, TAU);
+  cx.stroke();
+  cx.restore();
+  drawRallyFlag(end.x, end.y - RALLY_PIN_LIFT); // точка встанет на цель, даже если путь короче
 }

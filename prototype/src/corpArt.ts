@@ -40,6 +40,24 @@ import techSupplyCenter3 from '../art/corp/high-tech/supply_center-3.webp';
 import techEngineeringComplex1 from '../art/corp/high-tech/engineering_complex-1.webp';
 import techEngineeringComplex2 from '../art/corp/high-tech/engineering_complex-2.webp';
 import techEngineeringComplex3 from '../art/corp/high-tech/engineering_complex-3.webp';
+import sovietHeadquarters1 from '../art/corp/soviet-retrofuturism/headquarters-1.webp';
+import sovietHeadquarters2 from '../art/corp/soviet-retrofuturism/headquarters-2.webp';
+import sovietHeadquarters3 from '../art/corp/soviet-retrofuturism/headquarters-3.webp';
+import sovietSupplyCenter1 from '../art/corp/soviet-retrofuturism/supply_center-1.webp';
+import sovietSupplyCenter2 from '../art/corp/soviet-retrofuturism/supply_center-2.webp';
+import sovietSupplyCenter3 from '../art/corp/soviet-retrofuturism/supply_center-3.webp';
+import sovietEngineeringComplex1 from '../art/corp/soviet-retrofuturism/engineering_complex-1.webp';
+import sovietEngineeringComplex2 from '../art/corp/soviet-retrofuturism/engineering_complex-2.webp';
+import sovietEngineeringComplex3 from '../art/corp/soviet-retrofuturism/engineering_complex-3.webp';
+import imperialHeadquarters1 from '../art/corp/imperial/headquarters-1.webp';
+import imperialHeadquarters2 from '../art/corp/imperial/headquarters-2.webp';
+import imperialHeadquarters3 from '../art/corp/imperial/headquarters-3.webp';
+import imperialSupplyCenter1 from '../art/corp/imperial/supply_center-1.webp';
+import imperialSupplyCenter2 from '../art/corp/imperial/supply_center-2.webp';
+import imperialSupplyCenter3 from '../art/corp/imperial/supply_center-3.webp';
+import imperialEngineeringComplex1 from '../art/corp/imperial/engineering_complex-1.webp';
+import imperialEngineeringComplex2 from '../art/corp/imperial/engineering_complex-2.webp';
+import imperialEngineeringComplex3 from '../art/corp/imperial/engineering_complex-3.webp';
 import expansion from '../art/corp/expansion/manifest.json';
 import extraHeadquarters from '../art/corp/expansion/headquarters.webp';
 import warehouse from '../art/corp/expansion/warehouse.webp';
@@ -97,6 +115,26 @@ const STYLES: Readonly<Record<string, StyleArt>> = {
       engineering_complex: [techEngineeringComplex1, techEngineeringComplex2, techEngineeringComplex3],
     },
   },
+  // Листы владельца рисуют в этих стилях только штаб I–III, центр снабжения и инженерный
+  // комплекс; штаб IV–V и здания дополнения стоят в стандартном виде (corpArt).
+  soviet_retrofuturism: {
+    nameKey: 'corp.style.soviet-retrofuturism',
+    folder: 'soviet-retrofuturism',
+    levels: {
+      headquarters: [sovietHeadquarters1, sovietHeadquarters2, sovietHeadquarters3],
+      supply_center: [sovietSupplyCenter1, sovietSupplyCenter2, sovietSupplyCenter3],
+      engineering_complex: [sovietEngineeringComplex1, sovietEngineeringComplex2, sovietEngineeringComplex3],
+    },
+  },
+  imperial: {
+    nameKey: 'corp.style.imperial',
+    folder: 'imperial',
+    levels: {
+      headquarters: [imperialHeadquarters1, imperialHeadquarters2, imperialHeadquarters3],
+      supply_center: [imperialSupplyCenter1, imperialSupplyCenter2, imperialSupplyCenter3],
+      engineering_complex: [imperialEngineeringComplex1, imperialEngineeringComplex2, imperialEngineeringComplex3],
+    },
+  },
 };
 
 // Вызовы в теле модуля помечены чистыми: без вкладки «Корпорация» модуль выпадает из сборки
@@ -133,7 +171,9 @@ export function corpStyleName(style: string): string {
 export function corpArt(id: string, level: number, style: string = CORP_STYLE_STANDARD): CorpArt | null {
   const art = styleArt(style);
   const knownStyle = Object.hasOwn(STYLES, style) ? style : CORP_STYLE_STANDARD;
-  const extras = (expansion as Readonly<Record<string, Readonly<Record<string, readonly Omit<CorpArt, 'src'>[]>>>>)[knownStyle]?.[id];
+  const atlas = expansion as Readonly<Record<string, Readonly<Record<string, readonly Omit<CorpArt, 'src'>[]>>>>;
+  // Стиль без рисунков дополнения строит эти здания стандартными.
+  const extras = (atlas[knownStyle] ?? atlas[CORP_STYLE_STANDARD])?.[id];
   if (extras && (id !== 'headquarters' || level >= 4)) {
     const sprites: Readonly<Record<string, string>> = { headquarters: extraHeadquarters, warehouse, hall_of_fame: hall, operations_center: operations, monument };
     const frame = extras[Math.min(Math.max(Math.trunc(level) - (id === 'headquarters' ? 4 : 1), 0), extras.length - 1)];

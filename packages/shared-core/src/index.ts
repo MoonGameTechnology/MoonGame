@@ -257,6 +257,7 @@ export {
 export { CLOAK_BREAK_MS, CLOAK_CAP, cloakBroken, fleetCloak, fleetCloakRating } from './state/cloak';
 // FOG-LEAK: чей мир в глазах игрока — право прохода и окно войны судят по нему.
 export { knownOwner } from './state/knownOwner';
+export { knownClosed } from './state/rightOfWay';
 export type { SeenSortie } from './state/aircraftSight';
 export { signatureSize, fleetSignalStrength, radarThreshold, SIG_MEDIUM, SIG_LARGE, SIGNAL_CLUSTER_RADIUS } from './state/radarSignals';
 export { viewSightCircles, sharedRadarSources, type SensorView, type RadarFootprint } from './state/sensorView';
