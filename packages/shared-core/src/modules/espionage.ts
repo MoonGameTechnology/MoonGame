@@ -1,8 +1,10 @@
 import { hoursToMs } from '../action/types';
+import type { Action } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
+import { noteJourney, noteScouted, spyKnownOwner, unguardedBy } from '../state/spyKnowledge';
+import { identifiedNodes } from '../state/visibility';
 import { getStance } from '../state/diplomacy';
 import { coalitionOf } from '../state/coalition';
-import { buildingLevel, type GameData, type ResourceBag } from '../data/schemas';
 import type { GameState, IntelGrant, Spy, SpyOp } from '../state/gameState';
 import {
   aggressive,
@@ -28,11 +30,11 @@ import {
   type SpyStep,
 } from '../util/spyLife';
 import { DEFECTOR_HOURS, registerDefectorActions, turnAgent } from './espionage/defector';
-import { recordValues } from '../util/records';
-import { planetDevelopment } from '../state/development';
+import { counterIntelOf, developmentShare } from '../state/spyWorld';
 import { canAfford, payCost } from '../util/treasury';
+import { registerEspionageEconomy } from './espionage/economy';
+export { SPY_SALARY, paidSpies, spySalary } from './espionage/economy';
 import {
-  DISRUPT_FACTOR,
   delayQueue,
   disrupt,
   sabotage,
@@ -41,6 +43,7 @@ import {
   theft,
 } from '../util/spyDeeds';
 export { THEFT_CAP } from '../util/spyDeeds';
+export { counterIntelOf, developmentShare } from '../state/spyWorld';
 
 /**
  * Espionage: an agent is sent to ONE PLANET on an operation (SPY-8, owner's
@@ -229,43 +232,6 @@ const COUNTER_CATCH = 0.2;
 export const MAX_AGENTS_PER_WORLD = 3;
 export const CREW_BONUS = 0.1;
 
-/** The victim's counter-intelligence: the largest `field` bonus among the buildings
- *  on the worlds they own (SPY-7). 0 without such a building. */
-export function counterIntelOf(
-  data: GameData,
-  state: GameState,
-  playerId: string,
-  field: 'spyDetectBonus' | 'spyKillBonus' | 'spyTurnChance',
-): number {
-  let best = 0;
-  for (const planet of recordValues(state.planets)) {
-    if (planet.owner !== playerId) continue;
-    for (const b of planet.buildings) {
-      const def = data.buildings[b.type];
-      if (def) best = Math.max(best, buildingLevel(def, b.level)[field]);
-    }
-  }
-  return best;
-}
-
-/**
- * SPY-21: how developed `planetId` is against the other worlds of its owner, in [0,1] — its
- * development over the most developed one's (owner's resolution 2026-11-03). The scale is
- * the civilisation's own: a lone capital, or two equal worlds, are 1 however little is
- * built; a civilisation with nothing built at all counts every world as 1. A world without
- * an owner is 0. Counter-intelligence buildings count like any other (owner's resolution
- * 2026-11-03): a bureau protects the whole civilisation far more than it adds to a theft.
- */
-export function developmentShare(data: GameData, state: GameState, planetId: string): number {
-  const planet = state.planets[planetId];
-  if (!planet || planet.owner === null) return 0;
-  let best = 0;
-  for (const p of recordValues(state.planets)) {
-    if (p.owner === planet.owner) best = Math.max(best, planetDevelopment(data, p));
-  }
-  return best > 0 ? planetDevelopment(data, planet) / best : 1;
-}
-
 /** The base odds of a resolving mission: SPY-17's wave bonus, and SPY-21's — a theft is
  *  likelier from a world developed against its own civilisation — and how well the spy
  *  does its deed (`espionage.quality`). */
@@ -306,16 +272,17 @@ interface ResolvePayload extends SpyStep {
   crew?: number;
 }
 
-/** Why `owner` cannot aim `op` at `planetId`'s owner — `null` when nothing stands in the
- *  way: someone else's active world (a guard may stand on its owner's own), outside the
- *  owner's coalition for an aggressive op. Moving needs no target. */
-function targetError(h: HandlerContext, owner: string, op: SpyOp, planetId: string): string | null {
-  const planet = h.state.planets[planetId];
-  if (!planet) return 'E_NO_PLANET';
+/** Why `owner` cannot aim `op` at a world held by `target` — `null` when nothing stands in
+ *  the way: someone else's active world (a guard may stand on its owner's own), outside the
+ *  owner's coalition for an aggressive op. Moving needs no target, and recon may look at a
+ *  world nobody holds too (SPY-24). `target` is whoever the check believes holds the world:
+ *  at the order, the owner the player knows (`spyKnownOwner`), on the spot the real one. */
+function targetError(h: HandlerContext, owner: string, op: SpyOp, target: string | null): string | null {
   if (op === 'relocate') return null;
-  if (planet.owner === null || (planet.owner === owner && op !== 'counter')) return 'E_BAD_TARGET';
-  if (h.state.players[planet.owner]?.status !== 'active') return 'E_NO_PLAYER';
-  if (op !== 'counter' && coalitionOf(h.state, owner)?.members.includes(planet.owner))
+  if (op === 'recon' && unguardedBy(h.state, target)) return null;
+  if (target === null || (target === owner && op !== 'counter')) return 'E_BAD_TARGET';
+  if (h.state.players[target]?.status !== 'active') return 'E_NO_PLAYER';
+  if (op !== 'counter' && coalitionOf(h.state, owner)?.members.includes(target))
     return 'E_BAD_TARGET';
   return null;
 }
@@ -387,6 +354,7 @@ function rollExposure(
 /** `owner`'s spy at the end of a journey: home → it rests; out on an order → it starts
  *  the deed if it still can, else waits there for orders. */
 function arrive(h: HandlerContext, owner: string, spy: Spy): void {
+  noteJourney(h.state, owner, spy, h.ctx.now);
   if (spy.state === 'return') {
     if (reachHome(h, owner, spy, arrive))
       h.emit('espionage.home', { owner, spyId: spy.id, planetId: spy.location });
@@ -398,9 +366,11 @@ function arrive(h: HandlerContext, owner: string, spy: Spy): void {
     h.emit('espionage.arrived', { owner, spyId: spy.id, planetId: spy.location });
     return;
   }
+  const holder = h.state.planets[spy.location]?.owner ?? null;
   if (
-    targetError(h, owner, op, spy.location) !== null ||
-    hostileOwner(h, owner, op, spy.location) === null ||
+    targetError(h, owner, op, holder) !== null ||
+    (!(op === 'recon' && unguardedBy(h.state, holder)) &&
+      hostileOwner(h, owner, op, spy.location) === null) ||
     crowded(h, owner, op, spy.location, spy)
   ) {
     const planetId = spy.location;
@@ -490,6 +460,102 @@ function outcome(h: HandlerContext, owner: string, spy: Spy, killed: boolean): v
   else goHome(h, owner, spy, arrive);
 }
 
+/** `espionage.spy`: send a free spy — the one named, or else the closest — to a world on an
+ *  operation, the fee paid up front (SPY-6/22/23). */
+function orderSpy(action: Action, h: HandlerContext): void {
+  const p = action.payload as SpyPayload;
+  if (
+    typeof p?.op !== 'string' ||
+    !SPY_OPS.has(p.op) ||
+    typeof p.planetId !== 'string' ||
+    (p.spyId !== undefined && !Number.isInteger(p.spyId))
+  ) {
+    return h.reject('E_BAD_PAYLOAD');
+  }
+  const owner = action.playerId;
+  const actor = h.state.players[owner];
+  if (!actor || actor.status !== 'active') return h.reject('E_FORBIDDEN');
+  const op = p.op as SpyOp;
+  const planetId = p.planetId;
+  const planet = h.state.planets[planetId];
+  if (!planet) return h.reject('E_NO_PLANET');
+  // SPY-24: the order is checked against the owner the player KNOWS (`spyKnownOwner`). A
+  // world they do not see and no spy of theirs has been to takes only recon or a move:
+  // refusing or taking anything else there would tell them its hidden owner. What is
+  // really there, the spy meets on arrival.
+  const known =
+    op === 'relocate'
+      ? undefined
+      : spyKnownOwner(h.state, owner, planetId, identifiedNodes(h.state, owner, h.ctx.data));
+  if (op !== 'relocate' && op !== 'recon' && known === undefined) return h.reject('E_UNSCOUTED');
+  const target = known?.owner ?? null;
+  const refused = targetError(h, owner, op, target);
+  if (refused !== null) return h.reject(refused);
+
+  // SPY-6/22: the order needs a free spy — the one named, or else the one closest to
+  // the world (ties: the lowest id). Checked before the fee, so a refusal costs nothing.
+  const free = rosterOf(h, owner).filter(
+    (s) => isFree(s) && (p.spyId === undefined || s.id === p.spyId),
+  );
+  if (free.length === 0) return h.reject('E_NO_AGENT');
+  let spy: Spy | null = null;
+  let ms: number | null = null;
+  for (const s of free) {
+    const t = journeyMs(h, owner, s, s.location, planetId);
+    if (t !== null && (ms === null || t < ms)) [spy, ms] = [s, t];
+  }
+  if (spy === null || ms === null) return h.reject('E_NO_ROUTE');
+  if (crowded(h, owner, op, planetId, spy)) return h.reject('E_BAD_TARGET');
+
+  if (op !== 'relocate') {
+    const fee = h.hook<Record<string, number>>(
+      'espionage.cost',
+      { credits: SPY_OP_COST[op] },
+      {
+        playerId: owner,
+        target,
+        kind: op,
+        spyId: spy.id,
+      },
+    );
+    if (!canAfford(actor.resources, fee)) return h.reject('E_INSUFFICIENT');
+    // Paid up front (owner's resolution 2026-11-10): what changes on the way is the
+    // spy's problem, and a failure burns the fee too — spying is a gamble.
+    payCost(actor.resources, fee);
+  }
+
+  const from = spy.location;
+  spy.mission = nextMission(h.state, owner);
+  spy.op = op;
+  delete spy.posted;
+  delete spy.postedAt;
+  const arrivesAt = h.ctx.now + ms;
+  h.emit('espionage.sent', {
+    owner,
+    spyId: spy.id,
+    planetId,
+    op,
+    arrivesAt,
+    ...(op === 'relocate' ? {} : { until: arrivesAt + hoursToMs(h.ctx, MISSION_HOURS) }),
+  });
+  setOff(h, owner, spy, from, planetId, 'travel', ms, arrive);
+}
+
+/** SPY-24: recon of a world nobody can catch a spy on (`unguardedBy`). Nothing is rolled: the
+ *  spy takes a plain look of `BASE_DURATION_HOURS`, notes whose the world is and heads home.
+ *  It does not stay on post — there is no owner to dig into, and a post without risk would
+ *  be free experience. */
+function lookUnguarded(h: HandlerContext, owner: string, spy: Spy, planetId: string): void {
+  const until = h.ctx.now + hoursToMs(h.ctx, BASE_DURATION_HOURS);
+  const mine = ((h.state.intel ??= {})[owner] ??= []);
+  mine.push({ kind: 'planet', target: planetId, until });
+  while (mine.length > MAX_GRANTS) mine.shift(); // oldest window evicted first
+  noteScouted(h.state, owner, planetId, h.ctx.now);
+  goHome(h, owner, spy, arrive);
+  const target = h.state.planets[planetId]?.owner ?? null;
+  h.emit('intel.stolen', { owner, spyId: spy.id, target, kind: 'recon', planetId, until });
+}
+
 export const espionageModule: GameModule = {
   id: 'espionage',
   // 1.1.0: саботаж и кража ресурсов (SPY-9). 1.2.0: кража исследований (SPY-10).
@@ -501,96 +567,14 @@ export const espionageModule: GameModule = {
   // 1.13.0: кража вернее и богаче с развитого мира своей цивилизации (SPY-21).
   // 1.14.0: раскрытие шпиона больше не объявляет войну.
   // 2.0.0: именные шпионы летят до мира, ждут там приказа и возвращаются в столицу (SPY-23).
-  // 2.1.0: перевербованный просит перейти — принять навсегда или отказать (он сбегает).
-  version: '2.1.0',
+  // 2.1.0: шпионы получают зарплату в кредитах (хук `economy.upkeep`).
+  // 2.2.0: приказ сверяется с тем, что игрок знает о мире; разведка и ничейных миров (SPY-24).
+  // 2.3.0: перевербованный просит перейти — принять навсегда или отказать (он сбегает).
+  version: '2.3.0',
   setup(api) {
-    // SPY-15: a disrupted world produces `DISRUPT_FACTOR` of its output. A span never
-    // runs across the end (it is a scheduled event), so «until ≥ now» at the span's end
-    // means the whole span was disrupted.
-    api.hook<ResourceBag>('economy.production', (bag, args, h) => {
-      const planetId = (args as { planetId?: string } | undefined)?.planetId;
-      const until = planetId ? h.state.planets[planetId]?.disruptedUntil : undefined;
-      if (until === undefined || until < h.ctx.now) return bag;
-      const out: Record<string, number> = {};
-      for (const res of Object.keys(bag)) out[res] = (bag[res] ?? 0) * DISRUPT_FACTOR;
-      return out;
-    });
+    registerEspionageEconomy(api);
 
-    api.on('espionage.disrupt.end', (event, h) => {
-      const planet = h.state.planets[(event.payload as { planetId: string }).planetId];
-      // An extended term leaves this end early: the cut stays until its own end fires.
-      if (planet?.disruptedUntil !== undefined && planet.disruptedUntil <= h.ctx.now)
-        delete planet.disruptedUntil;
-    });
-
-    api.onAction('espionage.spy', (action, h) => {
-      const p = action.payload as SpyPayload;
-      if (
-        typeof p?.op !== 'string' ||
-        !SPY_OPS.has(p.op) ||
-        typeof p.planetId !== 'string' ||
-        (p.spyId !== undefined && !Number.isInteger(p.spyId))
-      ) {
-        return h.reject('E_BAD_PAYLOAD');
-      }
-      const owner = action.playerId;
-      const actor = h.state.players[owner];
-      if (!actor || actor.status !== 'active') return h.reject('E_FORBIDDEN');
-      const op = p.op as SpyOp;
-      const planetId = p.planetId;
-      const planet = h.state.planets[planetId];
-      if (!planet) return h.reject('E_NO_PLANET');
-      const refused = targetError(h, owner, op, planetId);
-      if (refused !== null) return h.reject(refused);
-
-      // SPY-6/22: the order needs a free spy — the one named, or else the one closest to
-      // the world (ties: the lowest id). Checked before the fee, so a refusal costs nothing.
-      const free = rosterOf(h, owner).filter(
-        (s) => isFree(s) && (p.spyId === undefined || s.id === p.spyId),
-      );
-      if (free.length === 0) return h.reject('E_NO_AGENT');
-      let spy: Spy | null = null;
-      let ms: number | null = null;
-      for (const s of free) {
-        const t = journeyMs(h, owner, s, s.location, planetId);
-        if (t !== null && (ms === null || t < ms)) [spy, ms] = [s, t];
-      }
-      if (spy === null || ms === null) return h.reject('E_NO_ROUTE');
-      if (crowded(h, owner, op, planetId, spy)) return h.reject('E_BAD_TARGET');
-
-      if (op !== 'relocate') {
-        const fee = h.hook<Record<string, number>>(
-          'espionage.cost',
-          { credits: SPY_OP_COST[op] },
-          {
-            playerId: owner,
-            target: planet.owner,
-            kind: op,
-            spyId: spy.id,
-          },
-        );
-        if (!canAfford(actor.resources, fee)) return h.reject('E_INSUFFICIENT');
-        // Paid up front (owner's resolution 2026-11-10): what changes on the way is the
-        // spy's problem, and a failure burns the fee too — spying is a gamble.
-        payCost(actor.resources, fee);
-      }
-
-      const from = spy.location;
-      spy.mission = nextMission(h.state, owner);
-      spy.op = op;
-      delete spy.posted;
-      delete spy.postedAt;
-      const arrivesAt = h.ctx.now + ms;
-      h.emit('espionage.sent', {
-        owner,
-        spyId: spy.id,
-        planetId,
-        op,
-        arrivesAt,
-        ...(op === 'relocate' ? {} : { until: arrivesAt + hoursToMs(h.ctx, MISSION_HOURS) }),
-      });
-      setOff(h, owner, spy, from, planetId, 'travel', ms, arrive);
-    });
+    api.onAction('espionage.spy', orderSpy);
 
     api.on('espionage.arrive', (event, h) => {
       const step = event.payload as SpyStep;
@@ -653,6 +637,9 @@ export const espionageModule: GameModule = {
       if (spy?.state !== 'work' || spy.posted) return; // called off, or an older save's step
       const { spy: owner, planetId, op, crew = 1 } = step;
       const now = h.ctx.now;
+      const holder = h.state.planets[planetId]?.owner ?? null;
+      if (op === 'recon' && unguardedBy(h.state, holder) && h.state.players[owner]?.status === 'active')
+        return lookUnguarded(h, owner, spy, planetId);
       const victim = hostileOwner(h, owner, op, planetId);
       if (victim === null) {
         // The world is no longer a target: no damage or RNG draws; the spy waits there.
@@ -786,6 +773,7 @@ export const espionageModule: GameModule = {
       const mine = ((h.state.intel ??= {})[owner] ??= []);
       mine.push(grant);
       while (mine.length > MAX_GRANTS) mine.shift(); // oldest window evicted first
+      noteScouted(h.state, owner, planetId, now);
       h.emit('intel.stolen', {
         owner,
         spyId: spy.id,

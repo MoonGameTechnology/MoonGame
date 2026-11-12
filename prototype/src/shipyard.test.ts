@@ -9,6 +9,7 @@ import { act, buildShip } from '../../decisions/actions';
 import { data } from './gameData';
 import type { Action, ArsenalItem, GameState } from '../../packages/shared-core/src/index';
 import { matchUnitHours } from '../../packages/shared-core/src/index';
+import { heroFlagshipUnit } from '../../packages/shared-core/src/state/heroFlagship';
 import {
   statBarHtml,
   originTagHtml,
@@ -648,6 +649,38 @@ describe('верфь — окно', () => {
     toggleLaneStrip();
     expect(strip).not.toContain('<div hidden');
     expect(strip).toContain(t('production.queue.less'));
+  });
+
+  it('a hero in the mobilization queue has a ready time, and so do the orders behind it', () => {
+    const s = rich();
+    const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
+    const hero = Object.values(s.heroes!)[0]!;
+    const heroMs = matchUnitHours(s, data.units[heroFlagshipUnit(hero, data)]?.buildTimeHours || 10) * HOUR;
+    const militiaMs = matchUnitHours(s, data.units.militia!.buildTimeHours) * HOUR;
+    hero.mobilization = { target: home, startedAt: s.time, readyAt: 0, queued: true, orderId: 5 };
+    s.planets[home]!.buildQueue = [{ id: 9, kind: 'unit', playerId: 'p1', unit: 'militia', count: 1 }];
+    let strip = laneStripHtml(s, home, 'mobilization');
+    expect(strip).toContain(`data-at="${s.time + heroMs}"`);
+    expect(strip).toContain(`data-at="${s.time + heroMs + militiaMs}"`);
+    // Идущая мобилизация героя — с полосой, как любой идущий заказ.
+    hero.mobilization = { target: home, startedAt: s.time, readyAt: s.time + heroMs };
+    strip = laneStripHtml(s, home, 'mobilization');
+    expect(strip).toMatch(/class="pw-job run".*<progress/);
+    expect(productionLanesHtml(s, home, null)).toMatch(/data-pw-lane="mobilization".*<progress/);
+  });
+
+  it('an unfolded queue folds again on another lane', () => {
+    let s = rich();
+    const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
+    for (let i = 0; i < 3; i++) s = applyOrder(s, buildShip('p1', home, 'frigate', 1, []), s.time).state;
+    s.planets[home]!.buildQueue!.push(
+      ...[91, 92, 93].map((id) => ({ id, kind: 'unit' as const, playerId: 'p1', unit: 'interceptor', count: 1 })),
+    );
+    laneStripHtml(s, home, 'ships');
+    toggleLaneStrip();
+    expect(laneStripHtml(s, home, 'ships')).not.toContain('<div hidden');
+    expect(laneStripHtml(s, home, 'shuttles')).toContain('<div hidden');
+    expect(laneStripHtml(s, home, 'ships')).toContain('<div hidden');
   });
 
   it('refreshes completed and next orders on Heroes without replacing the hero pane', () => {

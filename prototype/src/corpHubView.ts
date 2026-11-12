@@ -416,7 +416,7 @@ function buildingCardHtml(view: CorpInfrastructureView, b: CorpBuildingView, ela
     b.level > 0 ? effects(b.levels[b.level - 1]) : t('corp.hub.gives', { what: effects(b.levels[0]) });
   return (
     `<button type="button" class="cb-bc ${st} s-${status.kind}" data-corpbld="${esc(b.id)}">` +
-    `<span class="cb-art">${corpSprite(b.id, b.level, st, style)}</span>` +
+    `<span class="cb-art">${corpSprite(b.id, b.level, st, style, false, true)}</span>` +
     `<span class="cb-bc-b"><span class="cb-bc-n"><b>${esc(t(b.nameKey))}</b></span>` +
     `<span class="cb-bc-l">${pips(b.level, max, st === 'build')}<span>${esc(
       b.level > 0 ? t('corp.hub.level-of', { n: b.level, max }) : t('corp.hub.not-built'),
@@ -597,7 +597,7 @@ function noneHtml(p: CorpHubPaint): string {
     )
     .join('');
   return (
-    `<div class="cb-nc"><section class="cb-nc-hero"><div class="cb-art">${corpSprite(CORP_HQ, 3, 'built')}</div>` +
+    `<div class="cb-nc"><section class="cb-nc-hero"><div class="cb-art">${corpSprite(CORP_HQ, 3, 'built', undefined, false, true)}</div>` +
     `<div class="cb-nc-b"><h2>${esc(t('corp.hub.none.title'))}</h2><p>${esc(t('corp.hub.none.text'))}</p>` +
     `<p class="cb-note">${esc(t('corp.create.generated'))}</p>` +
     corpEmblemPicker(p.draftEmblem ?? 'falcon', p.busy, true) +
@@ -723,12 +723,12 @@ function buildingSheetHtml(p: CorpHubPaint, view: CorpInfrastructureView, b: Cor
     .map(
       (l, i) =>
         `<figure class="cb-lt${i + 1 === b.level ? ' cur' : ''}${i + 1 > b.level ? ' fut' : ''}">` +
-        `<div class="cb-art">${corpSprite(b.id, i + 1, 'built', style)}</div>` +
+        `<div class="cb-art">${corpSprite(b.id, i + 1, 'built', style, false, b.levels.length)}</div>` +
         `<figcaption><b>${i + 1}</b>${esc(effects(l) || t('corp.hub.level', { n: i + 1 }))}</figcaption></figure>`,
     )
     .join('');
   return (
-    `<div class="cb-art cb-bs-art ${st}">${corpSprite(b.id, b.level, st, style)}</div>` +
+    `<div class="cb-art cb-bs-art ${st}">${corpSprite(b.id, b.level, st, style, false, true)}</div>` +
     `<div class="cb-bs-head"><h3 id="cb-sheet-title">${esc(t(b.nameKey))}</h3><span class="cb-lvtag">${esc(tag)}</span></div>` +
     `<p class="cb-bs-d">${esc(t(b.descriptionKey))}</p>` +
     `<div class="cb-cmp"><div><small>${esc(t('corp.buildings.current'))}</small><b>${esc(
@@ -815,7 +815,7 @@ function styleSheetHtml(p: CorpHubPaint, view: MetaCorpStyleView): string {
     const card = corpStyleCard(view, id);
     const act = lookActHtml(p, card, id);
     return (
-      `<figure class="cb-sty${card === 'applied' ? ' cur' : ''}"><div class="cb-art">${corpSprite(CORP_HQ, 3, 'built', id)}</div>` +
+      `<figure class="cb-sty${card === 'applied' ? ' cur' : ''}"><div class="cb-art">${corpSprite(CORP_HQ, 3, 'built', id, false, true)}</div>` +
       `<figcaption><b>${esc(t(corpStyleName(id)))}</b>${act}</figcaption></figure>`
     );
   }).join('');

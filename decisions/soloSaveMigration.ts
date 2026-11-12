@@ -654,14 +654,38 @@ export const SPY_LEVELS_SOLO_MIGRATION = {
   toDataHash: SPY_TRAVEL_SOLO_MIGRATION.toDataHash,
 } as const;
 
-/** Rules-only pair: espionage 2.1.0 — a turned agent asks its catcher to take it in (for
- *  good) or flees, instead of serving it for a day. The catalogue is unchanged; a saved
- *  world's turned agent (`turnedUntil`) serves out its term. */
-export const SPY_DEFECTOR_SOLO_MIGRATION = {
+/** Rules-only pair: `economy` 1.5.0 and `espionage` 2.1.0 — spies are paid a salary in
+ *  credits with the daily upkeep. The catalogue is unchanged; a saved world's spies go on
+ *  the payroll from the first settlement after loading. */
+export const SPY_SALARY_SOLO_MIGRATION = {
   fromRules: SPY_LEVELS_SOLO_MIGRATION.toRules,
   fromData: SPY_LEVELS_SOLO_MIGRATION.toData,
   fromDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
-  toRules: '1244137840a54b',
+  toRules: '1bff113e714514',
+  toData: SPY_LEVELS_SOLO_MIGRATION.toData,
+  toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
+} as const;
+
+/** Rules-only pair: espionage 2.2.0 checks a spy order against what the player knows of the
+ *  world and lets recon look at unclaimed worlds (SPY-24). The catalogue is unchanged; a saved
+ *  world has no spy records yet (`scouted`): a fogged world takes deeds once a spy gets there. */
+export const SPY_FOG_SOLO_MIGRATION = {
+  fromRules: SPY_SALARY_SOLO_MIGRATION.toRules,
+  fromData: SPY_SALARY_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_SALARY_SOLO_MIGRATION.toDataHash,
+  toRules: '010f60df85806f',
+  toData: SPY_LEVELS_SOLO_MIGRATION.toData,
+  toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
+} as const;
+
+/** Rules-only pair: espionage 2.3.0 — a turned agent asks its catcher to take it in (for
+ *  good) or flees, instead of serving it for a day. The catalogue is unchanged; a saved
+ *  world's turned agent (`turnedUntil`) serves out its term. */
+export const SPY_DEFECTOR_SOLO_MIGRATION = {
+  fromRules: SPY_FOG_SOLO_MIGRATION.toRules,
+  fromData: SPY_FOG_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_FOG_SOLO_MIGRATION.toDataHash,
+  toRules: '0dbf4739644430',
   toData: SPY_LEVELS_SOLO_MIGRATION.toData,
   toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
 } as const;
@@ -723,6 +747,8 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   ACCRETION_DISK_SOLO_MIGRATION,
   SPY_TRAVEL_SOLO_MIGRATION,
   SPY_LEVELS_SOLO_MIGRATION,
+  SPY_SALARY_SOLO_MIGRATION,
+  SPY_FOG_SOLO_MIGRATION,
   SPY_DEFECTOR_SOLO_MIGRATION,
 ];
 

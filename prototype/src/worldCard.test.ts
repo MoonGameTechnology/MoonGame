@@ -531,7 +531,11 @@ describe('мир вне зрения', () => {
     expect(html).toContain('data-codex="b:mine:1"');
     // Доход чужой постройки разведка не знает.
     expect(html).not.toContain('class="inc"');
-    expect(html).toContain(act('spymenu', 'N'));
+    // SPY-24: мир помнится, но свой шпион его не разведывал — только разведка, без заданий.
+    expect(html).toContain(act('spyplanet', 'recon'));
+    expect(html).not.toContain(act('spyplanet', 'theft'));
+    env.s.scouted = { p1: { N: { owner: 'p2', at: 0 } } };
+    expect(m.unknownPlanetHtml(env.s.planets.N!)).toContain(act('spymenu', 'N'));
     m.toggleSpyMenu('N');
     const opened = m.unknownPlanetHtml(env.s.planets.N!);
     expect(opened).toContain(act('spyplanet', 'recon'));
@@ -557,8 +561,12 @@ describe('мир вне зрения', () => {
     const html = m.unknownPlanetHtml(env.s.planets.Z!);
     expect(html).toContain(t('side.notelemetry.title'));
     expect(html).toContain(act('ping', ''));
+    // SPY-24: разведка — единственный приказ миру, которого игрок не видел.
+    expect(html).toContain(act('spyplanet', 'recon'));
+    expect(html).not.toContain(act('spyplanet', 'theft'));
     env.hidden = true;
     expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain('data-act="ping"');
+    expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain('data-act="spyplanet"');
   });
 
   it('провинция, куда залетал корабль, называет свой тип, но не хозяина', async () => {

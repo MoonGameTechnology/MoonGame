@@ -8,6 +8,7 @@ import { spyPath, spyRoster, spyTerritoryFactor, spyTravelMs, SPY_SPEED } from '
 import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, ApplyResult, Context, DomainEvent } from '../action/types';
 import type { GameModule } from '../kernel/module';
+import { scoutedAll } from '../testkit/spies';
 
 // SPY-23 (owner's resolution 2026-11-10): a spy flies to its world, works there, waits for
 // orders when it cannot, and always comes home to the capital.
@@ -56,7 +57,7 @@ function planet(id: string, owner: string | null, x: number, links: string[]): P
  */
 function baseState(): GameState {
   const s = createInitialState({ seed: 'travel', version: { data: '0.1.0', manifest: '1' } });
-  return {
+  return known({
     ...s,
     players: { p1: player('p1'), p2: player('p2') },
     planets: {
@@ -67,8 +68,10 @@ function baseState(): GameState {
       F: planet('F', 'p2', 1920, ['E']),
     },
     capital: { p1: 'H', p2: 'F' },
-  };
+  });
 }
+/** The players know whose each world is (SPY-24: an order is checked against that). */
+const known = (s: GameState): GameState => ({ ...s, scouted: scoutedAll(s) });
 /** H → N: 320 at home + 320 over N at ¾ = 1⅙ h. N → E: 320 at ¾ + 320 at war at ½ = 1⅔ h. */
 const H_N = Math.round(((320 + 320 / 0.75) / SPY_SPEED) * HOUR);
 const H_E = Math.round(((320 + 320 / 0.75 + 320 / 0.75 + 320 / 0.5) / SPY_SPEED) * HOUR);

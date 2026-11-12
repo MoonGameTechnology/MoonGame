@@ -282,19 +282,22 @@ export function taskGroupPanelHtml(group: Fleet[]): string {
     t('side.group.sub', { f: totals.fleets, s: totals.ships, tr: totals.troops }),
   );
   h += `<div class="hint">${t('side.group.hint')}</div>`;
+  // Флот и место называются так же, как везде на экране (имя флота, `planetName.ts`), а не
+  // внутренним id: игрок не знает, что такое «p1_3» над «n42».
+  const at = (id: string): string => esc(placeName(id));
   for (const f of group) {
     const where = fleetWhere(f);
     const loc =
       where.kind === 'orbit'
-        ? where.at
+        ? at(where.at)
         : where.kind === 'transit'
-          ? `${where.from}→${where.to}`
+          ? `${at(where.from)}→${at(where.to)}`
           : where.kind === 'lane'
-            ? `⟜ ${where.from}–${where.to}`
+            ? `⟜ ${at(where.from)}–${at(where.to)}`
             : '—';
     const nShips = sumUnits(f.units);
     const nTr = sumUnits(f.landing ?? []);
-    h += `<div class="row" style="color:${ownerColor(f.owner)}">▲ ${f.id} <span class="dim">${loc}</span> · ${nShips}${nTr ? '+' + nTr : ''}</div>`;
+    h += `<div class="row" style="color:${ownerColor(f.owner)}">▲ ${esc(fleetTitleOf(f.id))} <span class="dim">${loc}</span> · ${nShips}${nTr ? '+' + nTr : ''}</div>`;
   }
   h += btn('cancel', '', t('side.group.clear'), true);
   return h;
@@ -764,7 +767,10 @@ function fleetHeroName(f: Fleet): string | null {
   const s = game.world();
   const NAME = game.names();
   if (!f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('hero'))) return null;
-  const hero = Object.values(s.heroes ?? {}).find((x) => x.owner === f.owner);
+  // Героев у игрока до трёх: назвать нужно того, кто ведёт ЭТОТ флот (`Hero.fleetId`), а не
+  // первого по списку. Без отметки (старое сохранение) — прежний выбор по владельцу.
+  const heroes = Object.values(s.heroes ?? {}).filter((x) => x.owner === f.owner);
+  const hero = heroes.find((x) => x.fleetId === f.id) ?? heroes.find((x) => x.fleetId === undefined);
   return hero ? heroDisplayName(hero) : (NAME[f.owner] ?? f.owner);
 }
 

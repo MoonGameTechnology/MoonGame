@@ -283,6 +283,14 @@ export interface IntelGrant {
   mission?: number;
 }
 
+/** What a player's spy found on a world it has been to (SPY-24). */
+export interface ScoutedWorld {
+  /** Whose the world was; `null` — unclaimed. */
+  owner: PlayerId | null;
+  /** World-time (ms) it was found so. */
+  at: number;
+}
+
 export type { Spy, SpyOffer, SpyOp, SpyState } from './spy';
 
 export type MatchStatus = 'ongoing' | 'ended';
@@ -1102,6 +1110,13 @@ export interface GameState {
   /** Turned enemy agents waiting for each player's answer (`SpyOffer`, owner's resolution
    *  2026-11-11). PRIVATE like `spies`: who caught whom is the catcher's secret. */
   spyOffers?: Record<PlayerId, SpyOffer[]>;
+  /** SPY-24: the worlds each player's spies have been to — on an order, on the way to one or
+   *  on recon — and whose they found each to be (`null` — unclaimed) and when
+   *  (`espionageModule`). Out of sight, such a world takes an order the way the player last
+   *  knew it; a world the player neither sees nor has had a spy at takes only recon or a move
+   *  (fog of war: an accepted order would tell its owner). PRIVATE like `intel`: a viewer's
+   *  projection carries only their own record. */
+  scouted?: Record<PlayerId, Record<PlanetId, ScoutedWorld>>;
   /** Session resource market: a public per-match order book maintained by
    *  `marketModule`. Sellers escrow a resource at a price; buyers pay money. */
   market?: MarketOrder[];

@@ -29,12 +29,20 @@ export function sovereignChipHtml(n: number | null, attr: string): string {
   );
 }
 
+/** Фиолетовая плашка Варрантов с клавишей «Аукцион» — одна на главный экран и «Арсенал»;
+ *  `attr` — её метка нажатия. */
+export function warrantsChipHtml(n: number, attr: string): string {
+  const war = kfmt(n);
+  return (
+    `<button type="button" class="tw-cur tw-warrants" ${attr} title="${t('hub.wallet.auction', { n: war })}" aria-label="${t('hub.wallet.auction', { n: war })}">` +
+    `<i aria-hidden="true">⌖</i>${war}<span class="hw-go" aria-hidden="true">${t('hub.tile.auction')}</span></button>`
+  );
+}
+
 export function hubWalletHtml(w: HubWallet): string {
-  const war = kfmt(w.warrants);
   return (
     sovereignChipHtml(w.sovereigns, 'data-hub-wallet="donate"') +
-    `<button type="button" class="tw-cur tw-warrants" data-hub-wallet="auction" title="${t('hub.wallet.auction', { n: war })}" aria-label="${t('hub.wallet.auction', { n: war })}">` +
-    `<i aria-hidden="true">⌖</i>${war}<span class="hw-go" aria-hidden="true">${t('hub.tile.auction')}</span></button>`
+    warrantsChipHtml(w.warrants, 'data-hub-wallet="auction"')
   );
 }
 

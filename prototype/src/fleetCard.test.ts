@@ -29,6 +29,7 @@ import type { Dossier } from './dossiers';
 import { liveRender, liveText } from './liveTimers.fixture';
 import type { SectorType } from './map';
 import { HOUR } from './time';
+import { worldName } from './planetName';
 
 // Под Node нет языка браузера: рантайм свалился бы в EN, и подписи разъехались бы с ожиданиями.
 beforeAll(() => setLocale('ru'));
@@ -491,6 +492,18 @@ describe('свой флот', () => {
     expect(html).toContain(t('side.fleet.hero-aura'));
   });
 
+  it('из нескольких героев назван тот, кто ведёт этот флот', async () => {
+    const { env, card, put } = await boot();
+    env.s.heroes = {
+      H1: { id: 'H1', owner: 'p1', fleetId: 'F9' },
+      H2: { id: 'H2', owner: 'p1', fleetId: 'F3' },
+    } as unknown as GameState['heroes'];
+    put(fleet('F3', 'p1', 'Z', [{ unit: 'hero', count: 1 }]));
+    const html = card('F3');
+    expect(html).toContain('♔ герой H2');
+    expect(html).not.toContain('герой H1');
+  });
+
   it('в пути — цель и срок прибытия заглушкой под живой патч', async () => {
     const { env, card, put } = await boot();
     const now = env.s.time;
@@ -666,9 +679,12 @@ describe('карточка группы', () => {
     ];
     const html = m.taskGroupPanelHtml(group);
     expect(html).toContain(t('side.group.sub', { f: 3, s: 4, tr: 4 }));
-    expect(html).toContain('▲ F1 <span class="dim">A</span> · 2</div>');
-    expect(html).toContain('▲ F3 <span class="dim">A→Z</span> · 1+4</div>');
-    expect(html).toContain('▲ F4 <span class="dim">⟜ Z–N</span> · 1</div>');
+    // Флот — его именем, место — именем мира, а не внутренними id.
+    const at = (id: string) => worldName(env.s, id);
+    expect(html).toContain(`▲ Флот «F1» <span class="dim">${at('A')}</span> · 2</div>`);
+    expect(html).toContain(`▲ Флот «F3» <span class="dim">${at('A')}→${at('Z')}</span> · 1+4</div>`);
+    expect(html).toContain(`▲ Флот «F4» <span class="dim">⟜ ${at('Z')}–${at('N')}</span> · 1</div>`);
+    expect(at('A')).not.toBe('A');
     expect(html).toContain(act('cancel'));
   });
 });

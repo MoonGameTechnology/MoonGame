@@ -117,7 +117,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 (инвариант #6), сторож — `moduleManifest.test.ts`. Счётчик живёт в `docs/state.md` §9.
 Таблица идёт в порядке `GAME_MODULES` (номер — место в массиве) и собрана grep'ом по
 `api.onAction`/`api.on`/`api.hook`/`api.provideCapability`/`h.emit`/`h.schedule` в файле
-модуля (имена из констант и циклов раскрыты); события, которые модуль шлёт через общие
+модуля и его папки (имена из констант и циклов раскрыты); события, которые модуль шлёт через общие
 утилиты, сюда не попадают.
 
 Пометка `sched:` в колонке emit — событие ставится в `state.scheduled` через
@@ -142,7 +142,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 15 | `intercept` | `intercept.ts` | — | `fleet.leg`, `fleet.parked`, `battle.started` | — | — | sched: `fleet.intercept`, `fleet.meet` |
 | 16 | `capture-on-arrival` | `captureOnArrival.ts` | — | `fleet.arrived`, `fleet.transit` | — | — | `planet.captured` |
 | 17 | `salvage` | `salvage.ts` | — | `unit.died`, `battle.resolved`, `station.destroyed`, `time.advanced` | — | — | `salvage.paid` |
-| 18 | `construction` | `construction.ts` | `building.construct`, `building.upgrade`, `building.repair`, `unit.build`, `construction.cancel`, `construction.resume` | `construction.complete`, `construction.queue.pump`, `building.repair.complete`, `station.destroyed`, `control.changed`, `planet.captured`, `combat.round`, `planet.bombarded`, `time.advanced` | `combat.mitigation` | `building.damage` | `construction.queued`, `construction.queue.dropped`, `construction.started`, `building.destroyed`, `construction.cancelled`, `construction.resumed`, `building.constructed`, `building.upgraded`, `unit.built`, `hero.mobilization.pump`, `building.repair.started`, `building.repaired`, `fleet.arrived`, `fleet.parked` · sched: `construction.complete`, `construction.queue.pump`, `building.repair.complete` |
+| 18 | `construction` | `construction.ts` + `construction/` | `building.construct`, `building.upgrade`, `building.repair`, `unit.build`, `construction.cancel`, `construction.resume` | `construction.complete`, `construction.queue.pump`, `building.repair.complete`, `station.destroyed`, `control.changed`, `planet.captured`, `combat.round`, `planet.bombarded`, `time.advanced` | `combat.mitigation` | `building.damage` | `construction.queued`, `construction.queue.dropped`, `construction.started`, `building.destroyed`, `construction.cancelled`, `construction.resumed`, `building.constructed`, `building.upgraded`, `unit.built`, `hero.mobilization.pump`, `building.repair.started`, `building.repaired`, `fleet.arrived`, `fleet.parked` · sched: `construction.complete`, `construction.queue.pump`, `building.repair.complete` |
 | 19 | `arsenal-sync` | `arsenalSync.ts` | `arsenal.sync` | — | — | — | — |
 | 20 | `station` | `station.ts` | `station.deploy`, `station.repair` | `station.complete`, `station.repair.complete`, `construction.started`, `construction.cancelled`, `construction.resumed`, `time.advanced`, `building.constructed`, `building.upgraded`, `building.destroyed`, `fleet.destroyed`, `planet.captured`, `player.eliminated` | `combat.mitigation` | — | `fleet.parked`, `fleet.arrived`, `station.destroyed`, `station.deployed`, `station.completed`, `station.repair.started`, `station.repaired` |
 | 21 | `technology` | `technology.ts` | `technology.research`, `technology.boost`, `technology.queue`, `technology.dequeue`, `technology.queue.move` | `time.advanced`, `technology.complete`, `technology.queue.pump` | `construction.requirement`, `economy.production`, `control.limit`, `economy.unitUpkeep`, `fleet.speed`, `combat.damage.parallel` | `technology.grant` | `technology.research.started`, `technology.research.boosted`, `technology.researched`, `technology.queued`, `technology.dequeued`, `technology.queue.moved`, `technology.queue.dropped` · sched: `technology.complete`, `technology.queue.pump` |
@@ -166,7 +166,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 39 | `market` | `market.ts` | `market.list`, `market.take`, `market.cancel` | — | — | — | `market.listed`, `market.traded`, `market.cancelled` |
 | 40 | `capital` | `capital.ts` | `capital.designate` | — | — | — | `capital.designated` |
 | 41 | `standing-orders` | `standingOrders.ts` | `order.auto`, `order.retreat`, `order.chain`, `chain.stamp` | `time.advanced` | — | — | — |
-| 42 | `shuttle` | `shuttle.ts` | `shuttle.strike`, `shuttle.patrol`, `shuttle.recall`, `shuttle.redirect`, `shuttle.hold`, `shuttle.relocate`, `shuttle.split`, `shuttle.merge`, `shuttle.load`, `shuttle.unload` | `shuttle.arrived`, `shuttle.patrol.resume`, `shuttle.chase`, `shuttle.patrol.tick`, `time.advanced`, `planet.captured`, `station.destroyed`, `pd.reload` | — | `missile.flew` | `shuttle.repelled`, `beachhead.landed`, `planet.captured`, `shuttle.landed`, `shuttle.lost`, `shuttle.diverted`, `shuttle.launched`, `fleet.destroyed`, `shuttle.missileDowned`, `shuttle.hit`, `shuttle.mineCleared`, `pd.mineCleared`, `shuttle.hold.ended`, `shuttle.intercepted`, `planet.bombarded`, `squadron.split`, `squadron.merged`, `shuttle.loaded`, `shuttle.unloaded`, `pd.fired`, `career.casualty` · sched: `shuttle.arrived`, `shuttle.chase`, `shuttle.patrol.tick`, `shuttle.patrol.resume`, `pd.reload` |
+| 42 | `shuttle` | `shuttle.ts` + `shuttle/` | `shuttle.strike`, `shuttle.patrol`, `shuttle.recall`, `shuttle.redirect`, `shuttle.hold`, `shuttle.relocate`, `shuttle.split`, `shuttle.merge`, `shuttle.load`, `shuttle.unload` | `shuttle.arrived`, `shuttle.patrol.resume`, `shuttle.chase`, `shuttle.patrol.tick`, `time.advanced`, `planet.captured`, `station.destroyed`, `pd.reload` | — | `missile.flew` | `shuttle.repelled`, `beachhead.landed`, `planet.captured`, `shuttle.landed`, `shuttle.lost`, `shuttle.diverted`, `shuttle.launched`, `fleet.destroyed`, `shuttle.missileDowned`, `shuttle.hit`, `shuttle.mineCleared`, `pd.mineCleared`, `shuttle.hold.ended`, `shuttle.intercepted`, `planet.bombarded`, `squadron.split`, `squadron.merged`, `shuttle.loaded`, `shuttle.unloaded`, `pd.fired`, `career.casualty` · sched: `shuttle.arrived`, `shuttle.chase`, `shuttle.patrol.tick`, `shuttle.patrol.resume`, `pd.reload` |
 | 43 | `forced-march` | `forcedMarch.ts` | `fleet.forcemarch` | `time.advanced`, `fleet.arrived` | `fleet.speed` | — | — |
 | 44 | `instant-repair` | `instantRepair.ts` | `fleet.instantRepair`, `fleet.premiumRepair` | — | — | — | `fleet.instantRepaired` |
 | 45 | `effects` | `effects.ts` | — | `planet.captured`, `time.advanced` | — | — | `effect.applied` |
@@ -192,7 +192,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `combat.damage.parallel` | `faction` → `heroEffects` → `technology` | `util/combat.ts` |
 | `combat.mitigation` | `sector` → `planet-type` → `veteran` → `construction` → `station` | `util/combat.ts` |
 | `combat.retreatToll` | `loadoutEffects` | `modules/combat.ts` |
-| `construction.requirement` | `faction` → `control` → `integration` → `technology` | `modules/construction.ts`, `modules/hero.ts`, `modules/station.ts` |
+| `construction.requirement` | `faction` → `control` → `integration` → `technology` | `modules/construction/kit.ts`, `modules/construction/controlRecheck.ts`, `modules/hero/deployment.ts`, `modules/station.ts` |
 | `control.limit` | `technology` | `modules/control.ts` |
 | `economy.production` | `sector` → `planet-type` → `tax` → `faction` → `control` → `integration` → `technology` → `espionage` | `modules/economy.ts` (аргументы `planetId`, `from`, `to`; у мира со стройкой за порогом — мгновение, `from === to`) |
 | `economy.unitUpkeep` | `technology` | `modules/economy.ts` (множитель содержания войск, база 1, аргумент `playerId`) |
@@ -203,7 +203,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `espionage.duration` | — (шов, никто не регистрирует) | `modules/espionage.ts` |
 | `espionage.kill` | — (шов, никто не регистрирует) | `modules/espionage.ts` |
 | `fleet.speed` | `sector` → `faction` → `hero` → `combat` → `technology` → `pve` → `forced-march` | `modules/movement.ts` |
-| `fort.garrisonCap` | `faction` | `modules/construction.ts` |
+| `fort.garrisonCap` | `faction` | `modules/construction/kit.ts` |
 | `research.slots` | `scientist` | `modules/technology.ts` |
 | `salvage.share` | `hero` → `loadoutEffects` | `modules/salvage.ts` |
 | `time.stop` | `visibility` → `rocketMines` | `kernel/kernel.ts` (режет отрезок `advanceTo` шагом `time.stopped`) |
@@ -503,6 +503,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 |---|---|---|
 | `main.ts` | `startServer({sendRecoveryMail})` | запуск сервера: Fastify + WS + persist + clockDriver; адаптеры и fatal handlers подключает внешний `scripts/server.ts` |
 | `matchRoom.ts` | `MatchRoom` | advance → applyAction → per-player fog deltas; durable persist |
+| `roomSocial.ts` | `RoomSocial` | метки союзников и чат сессии одной комнаты: права, лимиты, история; сокеты, часы и союзы даёт `MatchRoom` |
 | `scenario.ts` | `DEV_MODULES`, `MODULE_MANIFEST_VERSION`, `createDevMatch`, `loadShippedData` | модуль-манифест + посев матча |
 | `matchRegistry.ts` | `MatchRegistry`, `sessionMeta`, `MATCH_ARCHIVE_MS` | лента матчей, автоматический архив участников и срок просмотра |
 | `matchArchive.ts` | `ArchiveRoomCache`, `archiveExpired` | ограниченные загрузки замерших карт по запросу, общий лимит комнат и проверка срока |
@@ -654,3 +655,13 @@ conserved hull/internal damage shared by live combat and forecasts:
 Owned helpers keep the module graph unchanged: `modules/station/lifecycle.ts`
 registers station assembly/repairs; `modules/construction/maintenance.ts` registers
 construction maintenance at the original point in setup.
+
+Big modules live in a folder next to their entry file (SLIM): `modules/shuttle.ts` only
+declares the module and calls `shuttle/orders.ts`, `shuttle/events.ts` and
+`shuttle/defense.ts` in the original order; their helpers are `shuttle/kit.ts` (bases,
+squadrons, ids), `shuttle/flight.ts` (strike outcome, landing, ferry, missiles, mines) and
+`shuttle/aloft.ts` (held patrol, aim, out leg, orders in the air). Likewise
+`modules/construction.ts` calls `construction/orders.ts` and `construction/events.ts`,
+with shared rules (prices, requirements, building damage, lane queues) in
+`construction/kit.ts`. A part may import the other parts of its own folder, never a
+sibling module (ESLint).

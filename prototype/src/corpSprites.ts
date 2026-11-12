@@ -115,8 +115,8 @@ function wins(
 const PLAIN_LOT: CorpLot = { x: 0, y: 0, w: 200, h: 170 };
 const PLAIN = bx(40, 90, 110, 72, 12) + wins(52, 104, 4, 2, 24, 22, 10, 8);
 
-const svg = (lot: CorpLot, body: string): string =>
-  `<svg class="spr" viewBox="0 0 ${lot.w} ${lot.h}" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${body}</svg>`;
+const svg = (lot: CorpLot, body: string, view = `0 0 ${lot.w} ${lot.h}`): string =>
+  `<svg class="spr" viewBox="${view}" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${body}</svg>`;
 
 const n = (v: number): number => Math.round(v * 10) / 10;
 
@@ -155,6 +155,7 @@ function artSprite(
   { lot, top, current, x, y, w, h, drawn }: Placed,
   mode: CorpLotState,
   hit: boolean,
+  fit: Frame | null,
 ): string {
   const image = (art: CorpArt, attrs = ''): string => {
     const f = art.frame;
@@ -176,20 +177,42 @@ function artSprite(
   const zone = hit
     ? `<g><rect class="hit" x="${n(x0)}" y="${n(y0)}" width="${n(x1 - x0)}" height="${n(y1 - y0)}"/></g>`
     : '';
-  return svg(lot, zone + body);
+  if (!fit) return svg(lot, zone + body);
+  // Портрет: окно — рамка с полями в 4 % её ширины, низ — линия земли.
+  const [f0, f1, f2] = fit;
+  const pad = (f2 - f0) * 0.04;
+  return svg(lot, zone + body, `${n(f0 - pad)} ${n(f1 - pad)} ${n(f2 - f0 + 2 * pad)} ${n(lot.h - f1 + pad)}`);
+}
+
+type Frame = readonly [number, number, number, number];
+
+/** Рамка всех рисунков уровней 1…`levels` в единицах участка: одно окно на полосу уровней,
+ *  чтобы рост здания был виден. */
+function levelsFrame(id: string, levels: number, style: string): Frame | null {
+  let f: [number, number, number, number] | null = null;
+  for (let l = 1; l <= levels; l++) {
+    const d = place(id, l, 'built', style)?.drawn;
+    if (!d) continue;
+    f = f ? [Math.min(f[0], d[0]), Math.min(f[1], d[1]), Math.max(f[2], d[2]), Math.max(f[3], d[3])] : [...d];
+  }
+  return f;
 }
 
 /** Здание уровня `level` в состоянии участка `mode` и в стиле базы `style`. `hit` — прозрачная
- *  зона нажатия по нарисованному (только на панораме, где участки перекрываются). */
+ *  зона нажатия по нарисованному (только на панораме, где участки перекрываются). `fit` —
+ *  портрет для карточки: `true` — окно по нарисованному, число N — общее окно уровней 1…N
+ *  (полоса уровней); без него — весь участок, как на панораме. */
 export function corpSprite(
   id: string,
   level: number,
   mode: CorpLotState,
   style: string = CORP_STYLE_STANDARD,
   hit = false,
+  fit: boolean | number = false,
 ): string {
   const placed = place(id, level, mode, style);
-  if (placed) return artSprite(placed, mode, hit);
+  if (placed)
+    return artSprite(placed, mode, hit, fit === true ? placed.drawn : fit ? levelsFrame(id, fit, style) : null);
   const solid = mode === 'built' || (mode === 'build' && level > 0) ? PLAIN : '';
   const ghost = mode === 'built' ? '' : PLAIN;
   return svg(

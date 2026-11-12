@@ -863,6 +863,8 @@ export {
   MAX_AGENTS_PER_WORLD,
   TURNED_HOURS,
   counterIntelOf,
+  SPY_SALARY,
+  paidSpies,
 } from './modules/espionage';
 export {
   spyPath,

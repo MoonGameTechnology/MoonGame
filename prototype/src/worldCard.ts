@@ -385,14 +385,20 @@ export function unknownPlanetHtml(p: Planet): string {
     }
     if (toolShown('pings', sectorZeroToolsHidden()))
       acts.push(btn('ping', '', t('side.world.ping'), true));
-    if (mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden()))
+    // SPY-24: out of sight, the deeds need a world one of the player's spies has been to
+    // (`state.scouted`) — a world only remembered from sight takes recon or a move first, as
+    // the core demands; recon goes to an unclaimed world too.
+    const deeds = !!mem.owner && !!game.world().scouted?.[ME]?.[p.id];
+    if (mem.owner !== ME && espionageShown(sectorZeroToolsHidden()))
       acts.push(
         ...spyMenuHtml(p.id, [
-          spyOddsHtml(p.id, mem.owner),
+          ...(deeds ? [spyOddsHtml(p.id, mem.owner!)] : []),
           btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon')),
-          ...HOSTILE_OPS.map((op) =>
-            btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), spyReady(op)),
-          ),
+          ...(deeds
+            ? HOSTILE_OPS.map((op) =>
+                btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), spyReady(op)),
+              )
+            : []),
         ]),
       );
     // Возраст снимка (правило 4 `decisions/planetDossier.ts`); снимок без времени — словами.
@@ -415,6 +421,11 @@ export function unknownPlanetHtml(p: Planet): string {
     : '';
   // No «Снять выделение» on planet cards: it only clears FLEET selection (selPlanet
   // stays, the card would not even close) — the ✕ in the corner is the real close.
+  // SPY-24: recon is the one order a world never seen takes — it is what finds out whose it is.
+  const spyRow = espionageShown(sectorZeroToolsHidden())
+    ? `<div class="row">${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }),
+        myAgents(game.world(), ME).free > 0 && afford({ credits: SPY_COST.recon }))}</div>`
+    : '';
   return (
     cardHeader('#5f8f8c', placeName(p.id), t('side.notelemetry.title')) +
     `<div class="pscan">` +
@@ -422,6 +433,7 @@ export function unknownPlanetHtml(p: Planet): string {
     typeRow +
     `<div class="hint">${t('side.notelemetry.hint')}</div>` +
     ping +
+    spyRow +
     `</div>`
   );
 }
@@ -456,14 +468,15 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   // resources or of a technology. В забеге Sector Zero шпионажа нет (`espionageShown`).
   if (espionageShown(sectorZeroToolsHidden())) {
     const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
-    // Свой и ничейный мир не шпионят; нехватка кредитов или свободных агентов (SPY-6)
-    // гасит кнопку, но не прячет её.
+    // Свой мир не шпионят; ничейный только разведывают (SPY-24); нехватка кредитов или
+    // свободных агентов (SPY-6) гасит кнопку, но не прячет её.
     const free = myAgents(s, ME).free > 0;
     const ready = (op: SpyOp) => free && afford({ credits: SPY_COST[op] });
-    const spy = spyOffer(mine, !!p.owner, !!live, ready('recon'));
+    const spy = spyOffer(mine, !!live, ready('recon'));
+    const deeds = spy !== 'none' && !!p.owner;
     // Приказы шпионов копятся отдельно: больше одного — под кнопку «Шпионаж», шанс — первым (UIX-10.11).
     const ops: string[] = [];
-    if (spy !== 'none') ops.push(spyOddsHtml(p.id, p.owner!));
+    if (deeds) ops.push(spyOddsHtml(p.id, p.owner!));
     // SPY-13: a posted agent — its layers and «Отозвать» (`intelRowsHtml`).
     if (spy === 'window' && live && live.layer !== undefined) ops.push(...intelRowsHtml(live));
     else if (spy === 'window' && live) {
@@ -473,7 +486,7 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
     } else if (spy !== 'none') {
       ops.push(btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spy === 'buy'));
     }
-    if (spy !== 'none')
+    if (deeds)
       for (const op of HOSTILE_OPS) ops.push(btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), ready(op)));
     // SPY-11: a guard for any owned world, your own too; posted or en route → «Отозвать».
     const guard = myAgents(s, ME).away.some((a) => a.op === 'counter' && a.planetId === p.id);

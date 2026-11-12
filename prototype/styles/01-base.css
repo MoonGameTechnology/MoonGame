@@ -171,18 +171,18 @@ body.app-startup-failed > :not(#startup-error):not(#dev-badge){display:none!impo
 #tbwallet[hidden]{display:none;}
 /* Валюта — кнопка: тап раскрывает её описание (.tw-info). Значок крупный, шапке забега места
    хватает (заказ владельца 2026-09-24: «увеличить иконки, а то вон сколько места»). */
-:is(#tbwallet,#hubwallet) .tw-cur{display:inline-flex;align-items:center;gap:6px;padding:3px 12px 3px 9px;border:1px solid currentColor;border-radius:999px;
+:is(#tbwallet,#hubwallet,.ar-wallet) .tw-cur{display:inline-flex;align-items:center;gap:6px;padding:3px 12px 3px 9px;border:1px solid currentColor;border-radius:999px;
   background:color-mix(in srgb,currentColor 12%,transparent);font:600 var(--fs-body)/1.4 var(--sf-font);font-variant-numeric:tabular-nums;font-variant-numeric:tabular-nums;
   cursor:pointer;}
-:is(#tbwallet,#hubwallet) .tw-cur i{font-style:normal;font-size:19px;line-height:1;}
+:is(#tbwallet,#hubwallet,.ar-wallet) .tw-cur i{font-style:normal;font-size:19px;line-height:1;}
 #tbwallet .tw-cur[aria-expanded="true"]{box-shadow:0 0 0 2px color-mix(in srgb,currentColor 45%,transparent);}
-:is(#tbwallet,#hubwallet) .tw-cur:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
+:is(#tbwallet,#hubwallet,.ar-wallet) .tw-cur:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
 #tbwallet .tw-info{position:absolute;top:calc(100% + 6px);right:0;z-index:40;margin:0;width:max-content;
   max-width:min(320px,calc(100vw - 24px));padding:10px 14px;border-radius:10px;border:1px solid currentColor;
   background:rgba(4,14,18,.97);box-shadow:0 6px 20px rgba(0,0,0,.5);font:500 var(--fs-body)/1.45 system-ui,sans-serif;white-space:normal;}
 #tbwallet .tw-info.tw-sovereigns{color:#ffd978;border-color:rgba(255,207,98,.8);}
 #tbwallet .tw-data{color:var(--cur-data);}
-:is(#tbwallet,#hubwallet) .tw-warrants{color:var(--cur-warrants);}
+:is(#tbwallet,#hubwallet,.ar-wallet) .tw-warrants{color:var(--cur-warrants);}
 /* Суверены в кошельке — та же золотая стеклянная плашка, что фишка на карте (.dl-donate,
    заказ владельца 2026-09-24 «сделай красивой»): тёмное стекло, золотая кромка, светящийся
    самоцвет, число золотым градиентом; «+» — золотая клавиша, приставленная к плашке. */
