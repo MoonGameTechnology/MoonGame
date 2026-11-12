@@ -34,7 +34,7 @@ import {
   type TerritoryPalette,
 } from '../../packages/client/src/territory';
 import { placePoly, TerritoryGeometryCache, type ShapePlacement, type TerritoryShape } from '../../packages/client/src/territoryGeometry';
-import { borderTolerance } from '../../packages/client/src/territoryLod';
+import { borderTolerance, fillTolerance } from '../../packages/client/src/territoryLod';
 import { t } from '../../localization/runtime';
 import { framedRect, intersectRect, uncoveredRects } from '../../decisions/livingBorderLayer';
 import {
@@ -728,7 +728,7 @@ function environmentOf(geo: MapLayerGeometry, roads: RoadDrawing): TerrainEnviro
  * Returns the terrain fields it met there: the frame draws their live glints.
  */
 function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: boolean, preparing: boolean,
-  geo = measureMapLayer()): TerrainField[] {
+  geo = measureMapLayer(), density = game.dpr()): TerrainField[] {
   const s = game.world();
   const DPR = game.dpr();
   const galaxyOutline = game.outline();
@@ -763,11 +763,11 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
     // карта запекает её ниже, из классов, общих для всех выпечек.
     strokeBorders: false,
   };
-  // Only the cells the view meets — the renderer's own test (by vertices, pad 1), made here
-  // by box — with the owner and kind the viewer knows. They stay in the shape's space: the
-  // fill places each point as it traces it (`geo.place`), no placed copy is made.
+  // Only the cells the view meets (the renderer's test, by box), with the owner and kind the viewer
+  // knows, in the shape's space: the fill places each point as it traces it (`geo.place`), and
+  // takes only the points a pixel of `density` shows (`territoryLod.ts`, rule 4).
   const cells: TerritoryCell[] = [];
-  geo.shape.cells.forEach((cell, i) => {
+  territoryGeometry.cellsAt(geo.shape, fillTolerance(density * geo.place.scale)).forEach((cell, i) => {
     if (!meets(i, 1)) return;
     const seed = geo.seeds[cell.idx]!;
     cells.push({ poly: cell.poly, tags: cell.tags, owner: seed.owner, kind: seed.kind, idx: cell.idx });
@@ -968,7 +968,7 @@ function bakeMapLayer(content: string, zooming: boolean, preparing = false, draf
   publishMapGeometry(geo);
   if (draft) terrainRaster.beginFrame(0);
   terrainFields = paintMapLayer(mapLayerX, { x0: -margin.x, y0: -margin.y, x1: VW + margin.x, y1: VH + margin.y },
-    zooming, preparing, geo);
+    zooming, preparing, geo, density);
   if (!preparing) {
     // Rule 8: the raster is four fifths of a bake, and it would land in the frame that shows the
     // bake anyway: made here, it is counted in the bake's cost. A draft's cost is not the bake's.
@@ -1014,7 +1014,7 @@ function paintMapLayerRect(r: PixelRect, geo: MapLayerGeometry, zooming: boolean
   g.clip();
   g.setTransform(d, 0, 0, d, o.x, o.y);
   const view = { x0: (r.x - o.x) / d, y0: (r.y - o.y) / d, x1: (r.x + r.width - o.x) / d, y1: (r.y + r.height - o.y) / d };
-  for (const field of paintMapLayer(g, view, zooming, false, geo))
+  for (const field of paintMapLayer(g, view, zooming, false, geo, d))
     if (!met.has(field.id)) {
       met.add(field.id);
       fields.push(field);

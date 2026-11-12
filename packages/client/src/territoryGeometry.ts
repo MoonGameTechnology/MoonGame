@@ -193,6 +193,15 @@ export class TerritoryGeometryCache {
     return this.detail.weights;
   }
 
+  /**
+   * The cells of `shape` with the points their borders can spare at `tolerance` (local units,
+   * `territoryLod.ts`), the same ones on both sides of each border; 0 — the shape's own cells.
+   * Each cell keeps its place in `shape.cells`, so `shape.boxes` still holds its box.
+   */
+  cellsAt(shape: TerritoryShape, tolerance: number): readonly ShapeCell[] {
+    return tolerance > 0 ? this.simplified(shape, tolerance) : shape.cells;
+  }
+
   private simplified(shape: TerritoryShape, tolerance: number): readonly ShapeCell[] {
     const weights = this.weighBorders(shape);
     const levels = this.detail!.levels;

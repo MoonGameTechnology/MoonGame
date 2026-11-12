@@ -8,6 +8,8 @@ import {
   BORDER_TOLERANCE_PX,
   borderTolerance,
   borderWeights,
+  FILL_TOLERANCE_PX,
+  fillTolerance,
   simplifyBorderCells,
 } from './territoryLod';
 import { waveCells, type WaveConfig } from './territoryWave';
@@ -100,6 +102,25 @@ describe('border detail by zoom: the tolerance', () => {
     expect(borderTolerance(0, 1)).toBe(0);
     expect(borderTolerance(Number.NaN, 1)).toBe(0);
     expect(borderTolerance(2, 0)).toBe(0);
+  });
+});
+
+describe('fill detail by zoom: the tolerance (rule 4)', () => {
+  it('is the largest power of two within a pixel, at any zoom: the fill has no piece length to wait for', () => {
+    for (const ppu of [0.7, 1, 1.5, 2, 2.6, 3, 4.2, 16, 40]) {
+      const tol = fillTolerance(ppu);
+      expect(Number.isInteger(Math.log2(tol))).toBe(true);
+      expect(tol * ppu).toBeLessThanOrEqual(FILL_TOLERANCE_PX);
+      expect(tol * ppu).toBeGreaterThan(FILL_TOLERANCE_PX / 2);
+      expect(tol).toBeGreaterThanOrEqual(borderTolerance(ppu, 1));
+    }
+  });
+
+  it('keeps every point on nonsense input', () => {
+    expect(fillTolerance(0)).toBe(0);
+    expect(fillTolerance(-1)).toBe(0);
+    expect(fillTolerance(Number.NaN)).toBe(0);
+    expect(fillTolerance(Infinity)).toBe(0);
   });
 });
 
@@ -257,6 +278,28 @@ describe('border detail by zoom: the geometry cache', () => {
     } finally {
       weigh.mockRestore();
     }
+  });
+
+  it('cellsAt: the shape itself at no tolerance; otherwise its cells in their places, fewer points, once per level', () => {
+    const { seeds, clip } = field();
+    const cache = new TerritoryGeometryCache();
+    const { shape } = cache.shape(seeds, clip, 1, cfg);
+    expect(cache.cellsAt(shape, 0)).toBe(shape.cells);
+    const fill = cache.cellsAt(shape, 2);
+    expect(cache.cellsAt(shape, 2)).toBe(fill);
+    expect(fill.map((c) => c.idx)).toEqual(shape.cells.map((c) => c.idx));
+    const points = (cells: readonly ShapeCell[]): number =>
+      cells.reduce((n, c) => n + c.poly.length, 0);
+    expect(points(fill)).toBeLessThan(points(shape.cells));
+    // A kept point is one of the cell's own, so the shape's box of each cell still holds it.
+    fill.forEach((cell, i) => {
+      for (const [x, y] of cell.poly) {
+        expect(x).toBeGreaterThanOrEqual(shape.boxes[i * 4]!);
+        expect(y).toBeGreaterThanOrEqual(shape.boxes[i * 4 + 1]!);
+        expect(x).toBeLessThanOrEqual(shape.boxes[i * 4 + 2]!);
+        expect(y).toBeLessThanOrEqual(shape.boxes[i * 4 + 3]!);
+      }
+    });
   });
 
   it('a new shape is weighed again and does not reuse the old classes', () => {
