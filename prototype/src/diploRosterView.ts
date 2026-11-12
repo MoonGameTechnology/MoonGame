@@ -13,6 +13,8 @@ interface RosterView extends DiploRosterOptions {
   rows: DiploParticipant[];
   total: number;
   expanded: string | null;
+  /** Phone: sorting and filters sit behind one button; PC shows them always and ignores this. */
+  toolsOpen: boolean;
   ownerColor(id: string): string;
   stanceCol(stance: DiplomaticStance): string;
   stanceLabel(stance: DiplomaticStance): string;
@@ -75,9 +77,14 @@ export function diploRosterHtml(view: RosterView): string {
       );
     })
     .join('');
+  const active = view.stances.size + view.kinds.size;
+  const toggle =
+    `<button class="dp-ftoggle btn-second${view.toolsOpen ? ' on' : ''}" aria-expanded="${view.toolsOpen}">` +
+    `${t('diplo.filter')}${active ? ` <b>${active}</b>` : ''}</button>`;
   return (
-    `<div class="dp-tools">` +
+    `<div class="dp-tools${view.toolsOpen ? ' open' : ''}${filtered ? ' filtered' : ''}">` +
     `<label class="dp-search"><span>${t('diplo.search')}</span><input id="dp-search" type="search" autocomplete="off" maxlength="120" placeholder="${t('diplo.search')}" value="${esc(view.query)}"></label>` +
+    toggle +
     `<div class="dp-sorts" role="group" aria-label="${t('diplo.sort')}"><span>${t('diplo.sort')}</span>` +
     sortBtn('name', t('diplo.sort.name')) +
     sortBtn('worlds', t('diplo.sort.provinces')) +
@@ -105,7 +112,9 @@ export function rememberRosterUi(root: HTMLElement, resetScroll: boolean): () =>
         ? `[${attr}="${CSS.escape(focused!.getAttribute(attr)!)}"]`
         : focused?.classList.contains('dp-fclear')
           ? '#dp-search'
-          : null;
+          : focused?.classList.contains('dp-ftoggle')
+            ? '.dp-ftoggle'
+            : null;
   const start = focused?.selectionStart;
   const end = focused?.selectionEnd;
   const scroll = resetScroll ? 0 : (root.querySelector<HTMLElement>('.dp-list')?.scrollTop ?? 0);

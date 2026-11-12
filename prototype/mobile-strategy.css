@@ -274,7 +274,9 @@ body.mobile-ui #diplo .dp-tab {
   padding: 6px 2px;
   font-size: var(--fs-caption);
 }
-body.mobile-ui #diplo .dp-tools { padding: 8px; gap: 6px; }
+/* Tools: the search field and one «Фильтр» button; sorting and filters open under them. */
+body.mobile-ui #diplo .dp-tools { flex-direction: row; flex-wrap: wrap; padding: 6px; gap: 6px; }
+body.mobile-ui #diplo .dp-search { flex: 1 1 0; min-width: 0; }
 /* The label stays for screen readers; the field shows it as a placeholder. */
 body.mobile-ui #diplo .dp-search > span {
   position: absolute;
@@ -284,6 +286,12 @@ body.mobile-ui #diplo .dp-search > span {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+body.mobile-ui #diplo .dp-ftoggle { display: block; flex: none; padding-inline: 12px; }
+body.mobile-ui #diplo .dp-ftoggle > b { color: var(--cyan); }
+body.mobile-ui #diplo :is(.dp-sorts, .dp-filters, .dp-summary) { flex: 1 1 100%; }
+body.mobile-ui #diplo .dp-tools:not(.open) :is(.dp-sorts, .dp-filters) { display: none; }
+/* Collapsed, the counter line stays only while something narrows the list (it carries «Сброс»). */
+body.mobile-ui #diplo .dp-tools:not(.open):not(.filtered) .dp-summary { display: none; }
 body.mobile-ui #diplo .dp-sorts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 body.mobile-ui #diplo .dp-sorts > span { display: none; }
 body.mobile-ui #diplo .dp-sortb { padding-inline: 4px; white-space: nowrap; }
@@ -296,24 +304,35 @@ body.mobile-ui #diplo .dp-filters {
   overscroll-behavior-x: contain;
 }
 body.mobile-ui #diplo .dp-fchip { flex: 1 0 auto; padding-inline: 8px; }
-body.mobile-ui #diplo :is(.dp-sortb, .dp-fchip, .dp-fclear, .dp-expand, .dp-search input) {
+body.mobile-ui #diplo :is(.dp-sortb, .dp-fchip, .dp-fclear, .dp-ftoggle, .dp-expand, .dp-search input) {
   min-height: 44px;
   min-width: 44px;
 }
 body.mobile-ui #diplo .dp-fsep { display: none; }
 body.mobile-ui #diplo .dp-summary { min-height: 20px; }
 body.mobile-ui #diplo .dp-summary .dp-fclear { padding-block: 0; }
-body.mobile-ui #diplo .dp-list { flex: 1; padding: 6px; gap: 5px; }
+body.mobile-ui #diplo .dp-list { flex: 1; padding: 6px; gap: 4px; }
+/* One line per player: icon, name with the house after it, provinces, stance, arrow. */
 body.mobile-ui #diplo .dp-row {
   grid-template-columns: 20px minmax(0, 1fr) auto auto 40px;
-  gap: 2px 8px;
-  padding: 4px 4px 4px 8px;
+  gap: 0 8px;
+  padding: 1px 2px 1px 8px;
 }
-body.mobile-ui #diplo .dp-name { gap: 0; }
+body.mobile-ui #diplo .dp-name {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+body.mobile-ui #diplo .dp-name em { margin-left: 4px; }
 /* The nick opens the profile; the whole row stays the big target, so the link needs no 44px box. */
 body.mobile-ui #diplo .dp-prof { min-height: 28px; min-width: 0; }
 body.mobile-ui #diplo .dp-expand { width: 40px; min-width: 40px; }
-body.mobile-ui #diplo .dp-row .dp-fav { padding: 0 8px 4px 0; }
+/* A bot's favour is a thin coloured line under the row; the opened row spells it out. */
+body.mobile-ui #diplo .dp-row .dp-fav { margin: -3px 8px 3px 0; }
+body.mobile-ui #diplo .dp-row:not(.open) .dp-fav :is(.dp-fav-cap, .dp-fav-lbl) { display: none; }
+body.mobile-ui #diplo .dp-row:not(.open) .dp-fav-track { height: 3px; }
+body.mobile-ui #diplo .dp-row.open .dp-fav { margin: 0 8px 6px 0; }
 body.mobile-ui #diplo .dp-actions { padding: 4px 8px 8px; }
 body.mobile-ui #diplo .dp-intel { padding: 0 8px 8px; }
 body.mobile-ui #diplo .dp-convo {
@@ -363,15 +382,9 @@ body.mobile-ui #diplo .dp-compose input {
 }
 
 @media (max-height: 520px) {
-  /* Landscape: two rows: search with the counter, then sorting with the filters. */
-  body.mobile-ui #diplo .dp-tools {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: center;
-    padding-block: 6px;
-  }
-  body.mobile-ui #diplo .dp-search { grid-area: 1 / 1; }
-  body.mobile-ui #diplo .dp-summary { grid-area: 1 / 2; }
+  /* Landscape: the opened sorting and filters share one row. */
+  body.mobile-ui #diplo .dp-sorts { flex: 1 1 40%; }
+  body.mobile-ui #diplo .dp-filters { flex: 1 1 50%; }
   body.mobile-ui #constructor .cn-tabs {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }

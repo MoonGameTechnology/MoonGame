@@ -129,6 +129,7 @@ export let diploTab: 'diplo' | 'msgs' = 'diplo';
 let diploSort: DiploSortOrder = { key: 'stance', direction: 'asc' };
 let diploQuery = '';
 let diploExpanded: string | null = null; // participant row showing its action buttons
+let diploToolsOpen = false; // phone: the sorting/filter panel under the search field
 // Roster filters (alongside sort): show only seats matching the picked stance(s) and
 // type(s). Empty set = no constraint from that category. They AND across categories,
 // OR within one. A stance filter excludes your own seat (you have no self-stance).
@@ -578,7 +579,7 @@ function diploRoster(): string {
     kinds: diploTypeFilter, locale: LOCALE };
   const rows = selectDiploRoster(all, options);
   if (diploExpanded && !rows.some((row) => row.id === diploExpanded)) diploExpanded = null;
-  return diploRosterHtml({ ...options, rows, total: all.length, expanded: diploExpanded,
+  return diploRosterHtml({ ...options, rows, total: all.length, expanded: diploExpanded, toolsOpen: diploToolsOpen,
     ownerColor: (id) => game.ownerColor(id), stanceCol: (st) => game.stanceCol(st),
     stanceLabel: stanceRu, badge: seatBadge, favour: favourBarHtml, actions: seatDiploActionsHtml });
 }
@@ -786,6 +787,11 @@ export function initDiploWindow(host: DiploWindowHost): void {
       const tab = (tg.closest('.dp-tab') as HTMLElement | null)?.dataset.tab;
       if (tab) {
         diploTab = tab as 'diplo' | 'msgs';
+        renderDiplo();
+        return;
+      }
+      if (tg.closest('.dp-ftoggle')) {
+        diploToolsOpen = !diploToolsOpen;
         renderDiplo();
         return;
       }

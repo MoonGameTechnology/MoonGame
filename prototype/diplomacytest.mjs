@@ -90,6 +90,14 @@ try {
           .locator('#diplo .dp-row')
           .evaluateAll((rows) => rows.map((row) => row.dataset.rosterSeat));
       assert.deepEqual(await ids(), ['p1', 'p3', 'p2', 'p4']);
+      if (phone) {
+        // Phone: sorting and filters sit behind one button, closed until asked for.
+        assert.equal(await page.locator('[data-sort="name"]').isVisible(), false);
+        await press('.dp-ftoggle');
+        assert.equal(await page.locator('.dp-ftoggle').getAttribute('aria-expanded'), 'true');
+      } else {
+        assert.equal(await page.locator('.dp-ftoggle').isVisible(), false);
+      }
       for (const [key, expected] of [
         ['name', ['p4', 'p3', 'p2', 'p1']],
         ['name', ['p1', 'p2', 'p3', 'p4']],
