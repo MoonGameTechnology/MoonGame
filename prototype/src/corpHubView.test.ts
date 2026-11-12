@@ -275,12 +275,14 @@ describe('вкладка «Корпорация»: состав', () => {
     expect(html).not.toContain('data-corpconfirm="leave"');
   });
 
-  it('необратимый приказ просит второго нажатия: взведённая кнопка задаёт вопрос', () => {
+  it('необратимый приказ исполняется удержанием: взведённая кнопка задаёт вопрос', () => {
     const calm = corpHubHtml(paint({ section: 'settings' }));
-    expect(calm).toContain(`>${t('corp.disband')}</button>`);
+    expect(calm).toContain(`<span class="hold-label">${t('corp.disband')}</span>`);
+    expect(calm).toMatch(/class="btn-second danger holdable" data-corpact="disband"/);
+    expect(calm).toContain('data-hold="disband"');
     const armed = corpHubHtml(paint({ section: 'settings', armed: 'disband' }));
-    expect(armed).toMatch(/class="btn-second danger armed" data-corpact="disband"/);
-    expect(armed).toContain(t('corp.hub.disband.confirm'));
+    expect(armed).toMatch(/class="btn-second danger holdable armed" data-corpact="disband"/);
+    expect(armed).toContain(`<span class="hold-ask">${t('corp.hub.disband.confirm')}<small>`);
   });
 
   it('лист участника: роль, передача и исключение; исключение тоже переспрашивает', () => {

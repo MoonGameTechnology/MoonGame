@@ -100,10 +100,11 @@ describe('окно деления — разметка', () => {
     moduleName: (m: string) => `мод:${m}`,
   };
 
-  it('у каждой строки все четыре шага увода', () => {
+  it('у каждой строки шаги ±1, «Все» и ползунок от 0 до всех кораблей строки', () => {
     const html = splitDialogHtml(модель('f1', [{ unit: 'fighter', count: 5 }]), hooks);
-    for (const n of ['dec', 'inc', 'all']) expect(html).toContain(`data-sx="${n}"`);
-    expect(html).toContain('data-n="10"');
+    for (const n of ['dec', 'inc', 'all', 'set']) expect(html).toContain(`data-sx="${n}"`);
+    expect(html).toMatch(/type="range" data-sx="set" data-key="[^"]+" min="0" max="5" step="1" value="0"/);
+    expect(html).not.toContain('data-n="10"');
   });
 
   it('НАЧИНКА ВИДНА В СТРОКЕ: иначе два одинаковых имени неразличимы', () => {

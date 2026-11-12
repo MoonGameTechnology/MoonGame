@@ -85,8 +85,6 @@ import {
   setRallyPoint,
   splitFleet,
   splitSquadron,
-  recallSpy,
-  spyOn,
   unloadShuttle,
 } from './game';
 import { pcUi } from './graphicsPrefs';
@@ -139,10 +137,12 @@ import { splitOne } from './squadronPanel';
 import { cursorTipPos } from './tipPlacement';
 import { arrivalHours } from './travelEta';
 import { toggleWingMore } from './wingOrders';
-import { forkPanelHtml, planetPanelHtml, toggleSpyMenu, unknownPlanetHtml } from './worldCard';
+import { forkPanelHtml, planetPanelHtml, unknownPlanetHtml } from './worldCard';
+import { openSpyWindow } from './spyWindow';
 import { toggleDossierBlock } from './dossierFolds';
 import { enqueueBuild, timeLeft } from './worldQueries';
 import { openFortressDialog } from './fortressDialog';
+import { morphInto } from './domMorph';
 
 /** Что листу нужно от игры. Мир, выбор, эскадры, досье и окна — в `main.ts`. */
 export interface SidePanelHost {
@@ -220,6 +220,8 @@ export function initSidePanel(host: SidePanelHost): void {
   topEl = $('top');
   objTipEl = document.getElementById('objtip');
   splitdlg.addEventListener('click', onSplitClick);
+  // Ползунок строки: сколько кораблей уходит в новый флот (границы держит `normalizeSlotTake`).
+  splitdlg.addEventListener('input', (ev) => { const r = ev.target as HTMLInputElement; if (splitState && r.dataset.sx === 'set') { splitState.take[r.dataset.key ?? ''] = Number(r.value); renderSplitDialog(); } });
   side.addEventListener('keydown', onSideKeydown);
   side.addEventListener('click', onSideClick);
   side.addEventListener('pointermove', onSidePointerMove);
@@ -504,12 +506,7 @@ export function renderSplitDialog(): void {
   const slots = fleetSplitSlots(f);
   // Состав живой: отбор пересчитывается под него на каждой перерисовке (`splitPlan.ts`).
   plan.take = normalizeSlotTake(plan.take, slots);
-  const cargo = cargoSplit(
-    slots,
-    plan.take,
-    stackCargoCapacity,
-    (u) => data.units[u]?.stats.cargoSize ?? 1,
-  );
+  const cargo = cargoSplit(slots, plan.take, stackCargoCapacity, (u) => data.units[u]?.stats.cargoSize ?? 1);
   const html = splitDialogHtml(
     {
       fleetId: plan.fleetId,
@@ -527,7 +524,7 @@ export function renderSplitDialog(): void {
     },
   );
   if (html !== lastSplitHtml) {
-    splitdlg.innerHTML = html;
+    morphInto(splitdlg, html); // узлы живут: ползунок не теряет палец посреди протяжки
     lastSplitHtml = html;
   }
   splitdlg.style.display = 'flex';
@@ -853,21 +850,8 @@ function onSideClick(ev: MouseEvent): void {
     if (pick) {
       playerOrder((up ? loadShuttle : unloadShuttle)(ME, arg, pick.squadronId, at?.fortress ? at.id : undefined));
     }
-  } else if (act === 'spyplanet') {
-    if (
-      arg === 'recon' ||
-      arg === 'sabotage' ||
-      arg === 'delay' ||
-      arg === 'disrupt' ||
-      arg === 'theft' ||
-      arg === 'research' ||
-      arg === 'counter'
-    )
-      playerOrder(spyOn(ME, selPlanet!, arg));
-  } else if (act === 'spymenu') {
-    if (arg) toggleSpyMenu(arg);
-  } else if (act === 'spyrecall') {
-    playerOrder(recallSpy(ME, selPlanet!, arg === 'recon' ? 'recon' : undefined));
+  } else if (act === 'spyagents') {
+    if (selPlanet) openSpyWindow(selPlanet);
   } else if (act === 'ping') {
     game.pings()?.openMenu();
   } else if (act === 'seat') {

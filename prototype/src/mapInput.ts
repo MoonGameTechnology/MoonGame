@@ -128,6 +128,7 @@ import { battleKnown, fleetSeen } from './mapFog';
 import { playerOrder } from './orderPipeline';
 import { plainTapSelect } from './mapTapSelect';
 import { fromScreen } from './screenAnchor';
+import { spyPickTap, spyPicking } from './spyWindow';
 
 /** Что вводу на карте нужно от игры. */
 export interface MapInputHost {
@@ -930,6 +931,11 @@ function endPointer(ev: PointerEvent) {
   });
   if (single && p && commits) {
     tapByTouch = ev.pointerType === 'touch';
+    // Окно «Шпионаж» выбирает мир для задания: тап — это мир под пальцем, не выделение.
+    if (spyPicking()) {
+      const n = nearestHit(game.nodes(), (nn) => world(nn), p.x, p.y, tapRadius('node', tapByTouch));
+      return spyPickTap(n?.id ?? null);
+    }
     selectAt(p.x, p.y);
   }
 }

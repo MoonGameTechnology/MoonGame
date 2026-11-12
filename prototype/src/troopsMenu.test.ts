@@ -283,8 +283,8 @@ describe('troopsMenuHtml — разметка поповера', () => {
   it('строка на тип несёт кнопки шага и пресетов с id юнита', () => {
     const html = troopsMenuHtml(troopsModel(input()), opts);
     expect(html).toContain('class="cmdpop tpop"');
-    expect(html).toContain('data-cmd="tstep" data-unit="militia" data-group="militia" data-n="1"');
-    expect(html).toContain('data-cmd="tstep" data-unit="militia" data-group="militia" data-n="-1"');
+    expect(html).toContain('data-cmd="tstep" data-repeat data-unit="militia" data-group="militia" data-n="1"');
+    expect(html).toContain('data-cmd="tstep" data-repeat data-unit="militia" data-group="militia" data-n="-1"');
     expect(html).toContain(
       'data-cmd="tmax" class="tall btn-quiet" data-unit="militia" data-group="militia" data-dir="1"',
     );

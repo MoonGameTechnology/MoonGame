@@ -191,6 +191,22 @@ const DATA_KEY_GAPS = new Set<string>([]);
 
 const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
   {
+    prefix: 'spy.callsign.',
+    built_by: 'spyWindow.ts: callsignIndex(id, gen) → позывной; checked by spyWindow.test.ts',
+  },
+  {
+    prefix: 'spy.task.',
+    built_by: 'spyWindow.ts: SPY_TASKS → name/desc; checked by spyWindow.test.ts',
+  },
+  {
+    prefix: 'spy.block.',
+    built_by: 'spyWindow.ts: TaskBlock → причина серой карточки; checked by spyWindow.test.ts',
+  },
+  {
+    prefix: 'spy.status.',
+    built_by: 'spyWindow.ts: SpyStatus → чем занят шпион; checked by spyWindow.test.ts',
+  },
+  {
     prefix: 'onb.guide.',
     built_by: 'firstMatchTour.ts: step id → copy; checked by tourCopy.test.ts',
   },
