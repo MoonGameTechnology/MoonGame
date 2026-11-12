@@ -678,14 +678,26 @@ export const SPY_FOG_SOLO_MIGRATION = {
   toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: forcedMarch 1.2.0 + movement 1.9.0 — a forced march switched on or off
+ *  in flight re-times the current leg at once. The catalogue is unchanged; a saved fleet keeps
+ *  its leg as it was, and only a later switch re-times it. */
+export const FORCED_MARCH_PACE_SOLO_MIGRATION = {
+  fromRules: SPY_FOG_SOLO_MIGRATION.toRules,
+  fromData: SPY_FOG_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_FOG_SOLO_MIGRATION.toDataHash,
+  toRules: '1ed425397264f6',
+  toData: SPY_FOG_SOLO_MIGRATION.toData,
+  toDataHash: SPY_FOG_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** Rules-only pair: espionage 2.3.0 — a turned agent asks its catcher to take it in (for
  *  good) or flees, instead of serving it for a day. The catalogue is unchanged; a saved
  *  world's turned agent (`turnedUntil`) serves out its term. */
 export const SPY_DEFECTOR_SOLO_MIGRATION = {
-  fromRules: SPY_FOG_SOLO_MIGRATION.toRules,
-  fromData: SPY_FOG_SOLO_MIGRATION.toData,
-  fromDataHash: SPY_FOG_SOLO_MIGRATION.toDataHash,
-  toRules: '0dbf4739644430',
+  fromRules: FORCED_MARCH_PACE_SOLO_MIGRATION.toRules,
+  fromData: FORCED_MARCH_PACE_SOLO_MIGRATION.toData,
+  fromDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
+  toRules: '12ac50d760b645',
   toData: SPY_LEVELS_SOLO_MIGRATION.toData,
   toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
 } as const;
@@ -749,6 +761,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_LEVELS_SOLO_MIGRATION,
   SPY_SALARY_SOLO_MIGRATION,
   SPY_FOG_SOLO_MIGRATION,
+  FORCED_MARCH_PACE_SOLO_MIGRATION,
   SPY_DEFECTOR_SOLO_MIGRATION,
 ];
 

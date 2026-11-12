@@ -20,7 +20,9 @@ export const FORCED_MARCH_WEAR = 0.05; // share of max HP per game-hour
 export const forcedMarchModule: GameModule = {
   id: 'forced-march',
   // 1.1.0: мине приказы не отдаются (`E_MINE_PASSIVE`, ревью #1411).
-  version: '1.1.0',
+  // 1.2.0: переключение в пути объявляет `fleet.paceChanged` — движение пересчитывает
+  // текущий отрезок, и марш ускоряет его сразу, а выключенный марш перестаёт ускорять.
+  version: '1.2.0',
   setup(api) {
     api.onAction('fleet.forcemarch', (action, h) => {
       const p = action.payload as { fleetId?: unknown; on?: unknown };
@@ -29,12 +31,17 @@ export const forcedMarchModule: GameModule = {
       // Absent OR not-yours → one opaque code (A06 — no fleet-existence probing).
       if (!f || f.owner !== action.playerId) return h.reject('E_NO_FLEET');
       rejectMine(h, f);
+      const was = h.state.forcedMarch?.[f.id] === true;
       if (p.on) {
         (h.state.forcedMarch ??= {})[f.id] = true;
       } else if (h.state.forcedMarch) {
         delete h.state.forcedMarch[f.id];
         if (Object.keys(h.state.forcedMarch).length === 0) delete h.state.forcedMarch;
       }
+      // The speed of a leg is fixed when it starts. Without this a march switched on in
+      // flight only wore the hull until the next node, and one switched off right after
+      // departure kept the fast leg with no wear at all.
+      if (was !== p.on) h.emit('fleet.paceChanged', { fleetId: f.id });
     });
     // The speed pipeline contribution — same contract as retreat-haste / faction
     // passives: multiply and pass on (order commutes, invariant #6 intact).
