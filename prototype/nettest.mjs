@@ -165,19 +165,27 @@ const rejections = () => links.flatMap((l) => l.got.filter((m) => m.type === 're
 const overlay = () =>
   page.evaluate(() => getComputedStyle(document.getElementById('connect')).display);
 
-/** Первое доступное исследование в окне технологий — с обходом вкладок. */
+/** Первый приказ из окна технологий — с обходом вкладок. Начать исследование, если на
+ *  него хватает ресурсов, иначе поставить тему в очередь (RQ-1): это тоже приказ серверу.
+ *  Цены основной игры выше каталожных (×3 кредиты, PR #1722), и стартовой казны хватает
+ *  на одну тему — второй и третий приказ смоука уходят постановкой в очередь. */
 async function pickResearch() {
   const tabs = await page.$$eval('.tt-tab[data-ttab]', (els) => els.map((e) => e.dataset.ttab));
-  for (const tab of [null, ...tabs]) {
-    if (tab) await page.click(`.tt-tab[data-ttab="${tab}"]`);
-    const take = page.locator('.tt-take:not([disabled])').first();
-    if (await take.count()) return { take, tech: await take.getAttribute('data-go') };
+  for (const [selector, attr, state] of [
+    ['.tt-take:not([disabled])', 'data-go', 'res'],
+    ['.tt-qadd', 'data-q', 'queued'],
+  ]) {
+    for (const tab of [null, ...tabs]) {
+      if (tab) await page.click(`.tt-tab[data-ttab="${tab}"]`);
+      const take = page.locator(selector).first();
+      if (await take.count()) return { take, tech: await take.getAttribute(attr), state };
+    }
   }
-  throw new Error('в окне технологий нечего исследовать — стартовых ресурсов не хватает');
+  throw new Error('в окне технологий нельзя ни начать исследование, ни поставить его в очередь');
 }
-/** Исследование идёт на экране — значит, ответ сервера вернулся в клиент. */
-const researching = (tech) =>
-  page.locator(`.tt-item.st-res[data-tech="${tech}"]`).waitFor({ state: 'attached' });
+/** Приказ на экране — исследование идёт или тема в очереди: ответ сервера вернулся в клиент. */
+const researching = (order) =>
+  page.locator(`.tt-item.st-${order.state}[data-tech="${order.tech}"]`).waitFor({ state: 'attached' });
 /** Окно технологий; первое открытие показывает поверх него карточку-вводную (ONB-3). */
 async function openTech() {
   await page.click('#holo-tech');
@@ -271,7 +279,7 @@ try {
     await openTech();
     const order1 = await pickResearch();
     await order1.take.click();
-    await researching(order1.tech);
+    await researching(order1);
     assert.equal(envelopes(first).length, 1, 'приказ ушёл одним конвертом гейта');
     assert.deepEqual(rejections(), [], 'сервер приказ не отверг');
     console.log(`✓ приказ: исследование ${order1.tech} принято сервером и идёт на экране`);
@@ -310,7 +318,7 @@ try {
     const third = live()[2];
     assert.match(third.url, /[?&]ticket=/, 'дозвон предъявляет билет места');
     assert.equal(welcomeOf(third).playerId, welcome.playerId, 'дозвон вернул в то же место');
-    await researching(order2.tech);
+    await researching(order2);
     await page.locator('#banner').waitFor({ state: 'hidden' });
     assert.equal(envelopes(third).length, 1, 'отложенный приказ ушёл по новому соединению');
     const after = await health();
