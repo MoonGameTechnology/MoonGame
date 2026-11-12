@@ -13,11 +13,12 @@
  * 2. **Сдвиг стойки и ВХОДЯЩЕЕ предложение идут в ТРИ места:** лента, тред переписки с
  *    этой стороной и счётчик непрочитанных. Лента коротка и переполняется боем, поэтому
  *    тред хранит то же самое надолго, а счётчик — единственное, что позовёт туда игрока.
- * 3. **Своё ИСХОДЯЩЕЕ предложение — только лента.** В тред оно не пишется, и непрочитанным
- *    не считается: собственное действие игрок и так помнит, а бейдж «есть новое» на нём
- *    просто врал бы.
- * 4. **Автор реплики в треде — ДРУГАЯ сторона.** Это её ход в вашем разговоре; запиши его
- *    от себя — и тред превратится в монолог о собеседнике.
+ * 3. **Своё ИСХОДЯЩЕЕ предложение — лента и тред, но НЕ непрочитанное.** В треде оно
+ *    висит запросом «ждём ответа» рядом с перепиской (как входящее висит с «принять /
+ *    отказаться»); бейдж «есть новое» на собственном действии просто врал бы.
+ * 4. **Автор реплики в треде — тот, чей это ход.** Сдвиг стойки и входящее предложение —
+ *    ход ДРУГОЙ стороны; запиши его от себя — и тред превратится в монолог о
+ *    собеседнике. Своё предложение — от меня.
  * 5. **Реплика в тред короче строки ленты: она называет только СТОЙКУ.** Имя собеседника
  *    стоит в заголовке треда, и повторять его в каждой строке — тратить ширину экрана на
  *    уже известное.
@@ -34,20 +35,29 @@ export interface DiploDelivery {
   noteKey: 'comms.war-declared' | 'comms.stance-changed' | 'log.diplo.offer' | 'log.diplo.sent';
   /** Нужна ли строке ленты подстановка стойки (у войны её нет — правило 1). */
   noteNeedsStance: boolean;
-  /** Реплика в тред: ключ и её автор; `null` — в тред не идёт (правило 3). */
-  message: { key: 'comms.stance-changed.short' | 'log.diplo.offer.short'; from: string } | null;
+  /** Реплика в тред: ключ, автор и, у предложения, его стойка (строка-запрос). */
+  message: {
+    key: 'comms.stance-changed.short' | 'log.diplo.offer.short';
+    from: string;
+    offer: boolean;
+  };
   /** Считать ли событие непрочитанным (правило 3). */
   unread: boolean;
 }
 
 /** Куда доставить событие (правила 1–5). */
-export function diploDelivery(kind: DiploKind, stance: string, other: string): DiploDelivery {
+export function diploDelivery(
+  kind: DiploKind,
+  stance: string,
+  other: string,
+  me: string,
+): DiploDelivery {
   if (kind === 'stance') {
     const war = stance === 'war';
     return {
       noteKey: war ? 'comms.war-declared' : 'comms.stance-changed',
       noteNeedsStance: !war,
-      message: { key: 'comms.stance-changed.short', from: other },
+      message: { key: 'comms.stance-changed.short', from: other, offer: false },
       unread: true,
     };
   }
@@ -55,10 +65,15 @@ export function diploDelivery(kind: DiploKind, stance: string, other: string): D
     return {
       noteKey: 'log.diplo.offer',
       noteNeedsStance: true,
-      message: { key: 'log.diplo.offer.short', from: other },
+      message: { key: 'log.diplo.offer.short', from: other, offer: true },
       unread: true,
     };
   }
-  // своё исходящее — только уведомление
-  return { noteKey: 'log.diplo.sent', noteNeedsStance: true, message: null, unread: false };
+  // своё исходящее — лента и тред от меня, но не непрочитанное
+  return {
+    noteKey: 'log.diplo.sent',
+    noteNeedsStance: true,
+    message: { key: 'log.diplo.offer.short', from: me, offer: true },
+    unread: false,
+  };
 }

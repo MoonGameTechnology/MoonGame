@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { newGame } from './game';
-import { getStance, pairKey, type GameState } from '../../packages/shared-core/src/index';
+import { getStance, pairKey, setOffer, type GameState } from '../../packages/shared-core/src/index';
 import {
   initConversations,
   COALITION,
@@ -37,6 +37,8 @@ function hostOf(over: Partial<ConversationsHost> = {}): ConversationsHost {
     fmtStamp: (at) => `T${at}`,
     ownerColor: () => '#0ff',
     threadDiploHtml: (id) => `<div class="tdip-${id}"></div>`,
+    offerControlsHtml: (seat, st, mine) => (mine ? `<i>wait-${st}</i>` : `<i>answer-${seat}-${st}</i>`),
+    stanceLabel: (st) => `[${st}]`,
     ...over,
   };
 }
@@ -262,5 +264,57 @@ describe('конверсации — список и заголовок', () => 
     const html = initConversations(hostOf()).threadHtml();
     expect(html).toContain('id="dp-text"');
     expect(html).toContain('dp-send');
+  });
+});
+
+describe('конверсации — предложение стойки запросом в личке', () => {
+  const offerLine = (from: string, to: string, offer: 'peace' | 'pact', at = 1): SessionMsg =>
+    msg({ at, from, to, text: `Предложение: ${offer}`, sys: true, offer });
+
+  it('висящее входящее — строка с ответом; ответили — строка истории без кнопок', () => {
+    const state: GameState = newGame();
+    const log = [offerLine('p2', 'p2', 'peace')];
+    const c = initConversations(hostOf({ state: () => state, messages: () => log }));
+    setOffer(state, 'p2', 'p1', 'peace');
+    expect(c.feedInnerHtml('p2')).toContain('answer-p2-peace');
+    expect(c.feedInnerHtml('p2')).toContain('dp-line offer live');
+    state.diplomacyOffers = {};
+    expect(c.feedInnerHtml('p2')).not.toContain('answer-');
+    expect(c.feedInnerHtml('p2')).toContain('Предложение: peace');
+  });
+
+  it('своё висящее — «ждём ответа» в моей строке', () => {
+    const state: GameState = newGame();
+    setOffer(state, 'p1', 'p2', 'pact');
+    const log = [offerLine('p1', 'p2', 'pact')];
+    const html = initConversations(hostOf({ state: () => state, messages: () => log })).feedInnerHtml('p2');
+    expect(html).toContain('wait-pact');
+    expect(html).toContain('dp-line offer me live');
+  });
+
+  it('кнопки только у ПОСЛЕДНЕЙ строки, и только если она про то же, что висит', () => {
+    const state: GameState = newGame();
+    setOffer(state, 'p2', 'p1', 'pact');
+    const log = [offerLine('p2', 'p2', 'pact', 1), offerLine('p2', 'p2', 'peace', 2)];
+    const html = initConversations(hostOf({ state: () => state, messages: () => log })).feedInnerHtml('p2');
+    // последняя строка — про мир, а висит пакт: обе строки — история, запрос встаёт в конец
+    expect(html.match(/answer-p2-pact/g)).toHaveLength(1);
+    expect(html.indexOf('answer-p2-pact')).toBeGreaterThan(html.indexOf('Предложение: peace'));
+  });
+
+  it('предложение без строки в журнале (перезагрузка) всё равно ждёт ответа в конце', () => {
+    const state: GameState = newGame();
+    setOffer(state, 'p2', 'p1', 'peace');
+    const html = initConversations(hostOf({ state: () => state })).feedInnerHtml('p2');
+    expect(html).toContain('answer-p2-peace');
+    expect(html).toContain('[peace]');
+    expect(html).not.toContain('dp-empty');
+  });
+
+  it('в групповом канале строк-запросов не бывает', () => {
+    const state: GameState = newGame();
+    setOffer(state, 'p2', 'p1', 'peace');
+    const html = initConversations(hostOf({ state: () => state })).feedInnerHtml(COALITION);
+    expect(html).not.toContain('answer-');
   });
 });

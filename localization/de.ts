@@ -1876,6 +1876,7 @@ export const de: Record<string, string> = {
   'diplo.win.title': 'Diplomatie',
   'diplo.offer.in': '{who} schlägt vor: {what}',
   'diplo.offer.out': 'Sie haben vorgeschlagen: {what}. Warten auf Antwort',
+  'diplo.offer.waiting': 'warten auf Antwort',
   'diplo.offer.accept': 'Annehmen',
   'diplo.offer.decline': 'Ablehnen',
   'diplo.offer.make': 'Vorschlagen:',

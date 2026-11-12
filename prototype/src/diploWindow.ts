@@ -57,7 +57,7 @@ import {
 } from './game';
 import { grantLeftMs } from './intel';
 import { selPlanet } from './interaction';
-import { dispatchChat, markUnread, pushMsg, readMessages, sessionMessages } from './messageLog';
+import { dispatchChat, markUnread, pushMsg, pushOffer, readMessages, sessionMessages } from './messageLog';
 import { offerAffordance, offerClass, offerDisabled, offerMark } from './offerAffordance';
 import { pingRoute } from './relayIntake';
 import { seatBadgeOf, seatKind } from './seatBadge';
@@ -320,9 +320,11 @@ export function diffNetDiplomacy(prev: GameState, next: GameState): boolean {
     // Куда уходит событие и какими словами — `diploDelivery.ts` (REFM-174): война зовётся
     // своим текстом, сдвиг и ВХОДЯЩЕЕ предложение идут в ленту, в тред и в счётчик
     // непрочитанных, а своё ИСХОДЯЩЕЕ — только в ленту.
-    const d = diploDelivery(ev.kind, ev.stance, ev.other);
+    const d = diploDelivery(ev.kind, ev.stance, ev.other, game.me());
     game.note(d.noteNeedsStance ? t(d.noteKey, { who, stance }) : t(d.noteKey, { who }));
-    if (d.message) pushMsg(ev.other, t(d.message.key, { stance }), true, d.message.from);
+    const line = t(d.message.key, { stance });
+    if (d.message.offer) pushOffer(ev.other, ev.stance, d.message.from, line);
+    else pushMsg(ev.other, line, true, d.message.from);
     if (d.unread) markUnread();
   }
   // Перерисовку ростера решает вызывающий — ОДИН раз на всю пачку, а не на событие.
@@ -500,8 +502,9 @@ function stanceButtonsHtml(id: string): string {
   );
 }
 /**
- * COAL-1: дипломатия внутри лички. Входящее предложение — карточка с «принять» и
- * «отказаться», своё — пометка «ждём ответа»; ниже кнопки нового предложения.
+ * COAL-1: дипломатия внутри лички над полем ввода: висящий обмен картами (карточка с
+ * «принять/отказаться» или «ждём ответа») и кнопки нового предложения. Предложение
+ * СТОЙКИ сюда не выводится: оно стоит запросом в самой переписке (`offerControlsHtml`).
  */
 function threadDiploHtml(id: string): string {
   const s = game.state();
@@ -513,20 +516,6 @@ function threadDiploHtml(id: string): string {
     `<div class="dp-offer in"><span>${t('diplo.offer.in', { who, what })}</span>` +
     accept +
     `<button class="dp-dec" data-decline="${kind}" data-seat="${id}">✕ ${t('diplo.offer.decline')}</button></div>`;
-  const inSt = getOffer(s, id, ME);
-  if (inSt) {
-    // Союз сверх вместимости или с членом чужой коалиции ядро отобьёт: кнопка гаснет
-    // с той же причиной, что и кнопка союза в ростере.
-    const bar = inSt === 'alliance' ? allianceBar(id) : coalitionTreatyLocked(s, ME, id) ? 'err.coalition-leaving' : null;
-    const barAttr = bar ? ` disabled title="${esc(t(bar))}"` : '';
-    cards.push(
-      incoming(
-        stanceRu(inSt),
-        `<button class="dp-act dp-acc" data-stance="${inSt}" data-seat="${id}" style="--sc:${game.stanceCol(inSt)}"${barAttr}>✓ ${t('diplo.offer.accept')}</button>`,
-        'stance',
-      ),
-    );
-  }
   if (hasMapShareOffer(s, id, ME) && !hasMapShare(s, ME, id)) {
     cards.push(
       incoming(
@@ -536,11 +525,6 @@ function threadDiploHtml(id: string): string {
       ),
     );
   }
-  const outSt = getOffer(s, ME, id);
-  if (outSt)
-    cards.push(
-      `<div class="dp-offer out">⏳ ${t('diplo.offer.out', { what: stanceRu(outSt) })}</div>`,
-    );
   if (hasMapShareOffer(s, ME, id)) {
     cards.push(
       `<div class="dp-offer out">⏳ ${t('diplo.offer.out', { what: t('comms.mapshare') })}</div>`,
@@ -549,6 +533,21 @@ function threadDiploHtml(id: string): string {
   return (
     `<div class="dp-tdip">${cards.join('')}` +
     `<div class="dp-propose"><span>${t('diplo.offer.make')}</span>${stanceButtonsHtml(id)}</div></div>`
+  );
+}
+/** Ответ на висящее предложение стойки прямо в строке переписки: входящее — «принять /
+ *  отказаться» (те же кнопки и запреты, что в ростере), своё — «ждём ответа». */
+function offerControlsHtml(id: string, st: DiplomaticStance, mine: boolean): string {
+  if (mine) return `<span class="dp-wait">⏳ ${t('diplo.offer.waiting')}</span>`;
+  const s = game.state();
+  const ME = game.me();
+  // Союз сверх вместимости или с членом чужой коалиции ядро отобьёт: кнопка гаснет
+  // с той же причиной, что и кнопка союза в ростере.
+  const bar = st === 'alliance' ? allianceBar(id) : coalitionTreatyLocked(s, ME, id) ? 'err.coalition-leaving' : null;
+  const barAttr = bar ? ` disabled title="${esc(t(bar))}"` : '';
+  return (
+    `<button class="dp-act dp-acc" data-stance="${st}" data-seat="${id}" style="--sc:${game.stanceCol(st)}"${barAttr}>✓ ${t('diplo.offer.accept')}</button>` +
+    `<button class="dp-dec" data-decline="stance" data-seat="${id}">✕ ${t('diplo.offer.decline')}</button>`
   );
 }
 /** COAL-1: отказ от предложения места — стойки или обмена картами. */
@@ -598,6 +597,8 @@ export const conversations = initConversations({
   fmtStamp,
   ownerColor: (owner) => game.ownerColor(owner),
   threadDiploHtml,
+  offerControlsHtml,
+  stanceLabel: stanceRu,
 });
 
 export function renderDiplo(resetRosterScroll = false): void {
@@ -661,6 +662,8 @@ export function refreshThreadDiplo(): void {
   }
   const box = document.querySelector('#diplo .dp-tdip');
   if (box) box.outerHTML = threadDiploHtml(conversations.current());
+  // Запросы в самой переписке тоже живые: принятое или отозванное гасит свои кнопки.
+  renderDiploFeed();
 }
 /** Patch just the open thread's feed (so a new line doesn't wipe a half-typed reply). */
 export function renderDiploFeed(): void {

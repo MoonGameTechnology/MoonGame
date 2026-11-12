@@ -24,6 +24,7 @@ import type {
   MultiplayerClient,
   MultiplayerPing,
 } from '../../packages/client/src/index';
+import type { DiplomaticStance } from '../../packages/shared-core/src/index';
 import { CH_GLOBAL, CH_SESSION, COALITION, type SessionMsg } from './conversations';
 import { relayIntake } from './relayIntake';
 
@@ -73,6 +74,12 @@ export function pushMsg(
   pingKind?: PingMarkerKind,
 ): void {
   add({ at: game.now(), from, to, text, sys, ping, ...(pingKind ? { pingKind } : {}), realAt: Date.now() });
+}
+
+/** Строка предложения стойки в личке с `seat`: входящее пишется от собеседника, своё —
+ *  от меня. Пока предложение висит, переписка рисует строку запросом с ответом. */
+export function pushOffer(seat: string, stance: DiplomaticStance, from: string, text: string): void {
+  add({ at: game.now(), from, to: seat, text, sys: true, offer: stance, realAt: Date.now() });
 }
 
 /** Метка от сервера — союзника или эхо своей (её прячут от врагов, решает сервер).
