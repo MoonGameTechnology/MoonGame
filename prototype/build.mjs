@@ -365,7 +365,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <div class="cstack">
           <button id="clogin" class="cbtn btn-second" type="button" data-i18n="welcome.login"></button>
         </div>
-        <form class="authform" onsubmit="return false">
+        <form class="authform">
           <div id="cwlogin" class="cwlogin" style="display:none">
             <input id="cwnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
             <button id="cwgo" class="cbtn btn-second" type="button" data-i18n="welcome.go"></button>
@@ -381,7 +381,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <button id="crback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
         <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.register.title"></b></div>
         <p class="csub" data-i18n="welcome.register.sub"></p>
-        <form class="authform" onsubmit="return false">
+        <form class="authform">
           <label class="cfield"><span data-i18n="welcome.register.nick"></span>
             <input id="crnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
           </label>
@@ -421,7 +421,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div id="creset" style="display:none">
         <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.reset.title"></b></div>
         <p class="csub" data-i18n="welcome.reset.sub"></p>
-        <form class="authform" onsubmit="return false">
+        <form class="authform">
           <!-- Hidden username: a password form without one leaves the manager unable to
                tell WHICH account the new password belongs to (Chrome: «Password forms
                should have (optionally hidden) username fields»). Filled from the saved
@@ -451,7 +451,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         </div>
         <!-- Позывной приходит со входа, а не со страницы (UIX-17.1): поле — спрятанный носитель
              состояния, его читают разбор адреса и вход в партию. Пароль спрашивает только карточка входа. -->
-        <form class="mcarry" hidden onsubmit="return false">
+        <form class="mcarry" hidden>
           <input id="cnick" type="text" autocomplete="off" maxlength="24">
         </form>
         ${matchTabs()}
@@ -484,7 +484,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             </div>
           </div>
           <!-- Вход по номеру партии (плейтест 2026-10-17): номер диктуют и копируют вместо адреса. -->
-          <form id="mnum" class="mnum" style="display:none" onsubmit="return false">
+          <form id="mnum" class="mnum" style="display:none">
             <input id="mnum-in" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="80" data-i18n-ph="browser.number.ph" data-i18n-aria="browser.number.ph">
             <button id="mnum-go" class="mbtn btn-second" type="submit" data-i18n="browser.join"></button>
           </form>
