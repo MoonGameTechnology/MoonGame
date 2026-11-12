@@ -19,8 +19,18 @@
  *    sides do not match point for point keeps all its points.
  * 2. **Corners stay.** A point where the neighbour changes is where two edges meet; the next
  *    edge's line starts there, so it is never dropped. Neither is a point of the map's edge.
- * 3. **Only the borders use it.** Fill, hit tests and the capture flash keep the full
- *    polygon, so a tap lands where it always did.
+ * 3. **Hit tests keep every point.** Hit tests and the capture flash keep the full polygon, so
+ *    a tap lands where it always did.
+ * 4. **The fill takes its own, coarser level** ({@link fillTolerance}): its edge strays from
+ *    the border by no more than {@link FILL_TOLERANCE_PX}. That edge lies under the border's
+ *    stroke, or between two fills of one colour, and rule 1 makes neighbouring fills meet with
+ *    no gap and no overlap. A software raster pays for every point of a filled path: the wave
+ *    gives a province about 66 of them, and on a phone with a CPU four times slower the fill
+ *    of 240 such provinces is ~40 ms of a bake, ~10 ms at a dozen points each. On FFA-50 the
+ *    bake at the playing zoom fills 4.7 thousand points instead of 21 thousand, and a bake in
+ *    a pinch on such a phone costs 43 ms instead of 51 (thread «Сделать карту плавной на
+ *    слабых телефонах», 2026-11-12). Screenshots of the whole map differ by at most 10 of
+ *    255 in a channel, along the borders.
  */
 import { BOUNDARY } from './territory';
 import type { ShapeCell } from './territoryGeometry';
@@ -41,6 +51,19 @@ export const BORDER_LOD_SEGMENT_PX = 6;
 export function borderTolerance(pxPerUnit: number, segment: number): number {
   if (!(pxPerUnit > 0) || !(segment > 0) || segment * pxPerUnit >= BORDER_LOD_SEGMENT_PX) return 0;
   return 2 ** Math.floor(Math.log2(BORDER_TOLERANCE_PX / pxPerUnit));
+}
+
+/** How far a province's fill edge may stray from its border, in device pixels (rule 4). */
+export const FILL_TOLERANCE_PX = 1;
+
+/**
+ * The tolerance, in local units, for a fill drawn at `pxPerUnit` device pixels per local unit
+ * (rule 4): the largest power of two within {@link FILL_TOLERANCE_PX}, so a zoom changes it
+ * only at each doubling. 0 — no scale to judge by: every point.
+ */
+export function fillTolerance(pxPerUnit: number): number {
+  if (!(pxPerUnit > 0) || !Number.isFinite(pxPerUnit)) return 0;
+  return 2 ** Math.floor(Math.log2(FILL_TOLERANCE_PX / pxPerUnit));
 }
 
 /** A run of a cell's points facing one neighbour: from `start`, `interior` points follow it,
