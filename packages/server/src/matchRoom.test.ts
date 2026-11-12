@@ -13,7 +13,8 @@ import {
   type GameState,
   type Player,
 } from '@void/shared-core';
-import { MatchRoom, OWNER_ONLY_EVENTS, type RoomObservation, type RoomPeer } from './matchRoom';
+import { OWNER_ONLY_EVENTS } from './eventFog';
+import { MatchRoom, type RoomObservation, type RoomPeer } from './matchRoom';
 import type { ServerMessage } from './protocol';
 
 class MemoryPeer implements RoomPeer {

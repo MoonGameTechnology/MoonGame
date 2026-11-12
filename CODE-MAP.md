@@ -503,7 +503,9 @@ Recovery-письма обоих хостов форматирует `scripts/re
 |---|---|---|
 | `main.ts` | `startServer({sendRecoveryMail})` | запуск сервера: Fastify + WS + persist + clockDriver; адаптеры и fatal handlers подключает внешний `scripts/server.ts` |
 | `matchRoom.ts` | `MatchRoom` | advance → applyAction → per-player fog deltas; durable persist |
+| `matchRoomTypes.ts` | `MatchRoomOptions`, `RoomPeer`, `RoomObservation`, `SubmitResult`, `ActionReceipt` | публичные типы комнаты (опции, сокет, поток наблюдений); `matchRoom.ts` их реэкспортирует |
 | `roomSocial.ts` | `RoomSocial` | метки союзников и чат сессии одной комнаты: права, лимиты, история; сокеты, часы и союзы даёт `MatchRoom` |
+| `eventFog.ts` | `eventVisibleTo`, `OWNER_ONLY_EVENTS`, `PUBLIC_EVENTS` | фог событий: кому из игроков рассылка `MatchRoom` отдаёт доменное событие; ключи payload сверяет `eventFogContract.test.ts` |
 | `scenario.ts` | `DEV_MODULES`, `MODULE_MANIFEST_VERSION`, `createDevMatch`, `loadShippedData` | модуль-манифест + посев матча |
 | `matchRegistry.ts` | `MatchRegistry`, `sessionMeta`, `MATCH_ARCHIVE_MS` | лента матчей, автоматический архив участников и срок просмотра |
 | `matchArchive.ts` | `ArchiveRoomCache`, `archiveExpired` | ограниченные загрузки замерших карт по запросу, общий лимит комнат и проверка срока |

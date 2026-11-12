@@ -203,6 +203,22 @@ describe('FRIENDS-1 — предел списка', () => {
     expect(await service.accept(me, b)).toEqual({ ok: false, code: 'E_LIMIT' });
   });
 
+  it('заявка не проводит отправителя за предел: на принятии считается и его список', async () => {
+    const users = new MemoryUserStore();
+    for (const l of ['Me', 'A', 'B']) await users.createUser(l, 'h');
+    const id = async (l: string): Promise<string> => (await users.findUser(l))!.userId;
+    const [me, a, b] = [await id('Me'), await id('A'), await id('B')];
+    const friends = new MemoryFriendStore();
+    const service = new FriendService({ friends, users, limit: 1, now: () => 1 });
+    // Пока друзей нет, обе заявки уходят.
+    await service.request({ accountId: me, login: 'Me' }, 'A');
+    await service.request({ accountId: me, login: 'Me' }, 'B');
+    expect(await service.accept(a, me)).toEqual({ ok: true });
+    // У отправителя предел уже выбран: вторая дружба не возникает.
+    expect(await service.accept(b, me)).toEqual({ ok: false, code: 'E_LIMIT' });
+    expect((await service.list(me)).filter((e) => e.kind === 'friend')).toHaveLength(1);
+  });
+
   it('незакрытые заявки места не занимают', async () => {
     const users = new MemoryUserStore();
     for (const l of ['Me', 'A', 'B']) await users.createUser(l, 'h');
