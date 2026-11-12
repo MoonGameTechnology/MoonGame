@@ -23,6 +23,11 @@ const data = parseGameData({
       stats: { hp: 16, attack: 8, defense: 5, speed: 1, cargoSize: 1 },
       cost: { biomass: 20, metal: 8, microelectronics: 2 },
     },
+    drone: {
+      faction: 'neutral',
+      traits: ['shuttle'],
+      stats: { hp: 4, attack: 1, defense: 1, speed: 1, cargoSize: 1 },
+    },
   },
   modules: {
     brood: {
@@ -97,6 +102,27 @@ describe('onboard brood growth', () => {
     const grown = advance(prime(s), first);
     expect(grown.fleets.f!.landing![0]!.count).toBe(7);
     expect(grown.players.p!.resources.biomass).toBe(180);
+    const full = advance(grown, first + 3 * HOUR);
+    expect(full.fleets.f!.landing![0]!.count).toBe(7);
+    expect(full.players.p!.resources).toEqual(grown.players.p!.resources);
+  });
+  it('counts shuttles in the hangar and out on a strike against the shared hold', () => {
+    const s = world();
+    s.fleets.f!.landing = [{ unit: 'lander', count: 5 }];
+    s.fleets.f!.hangar = [{ id: 'sq1', units: [{ unit: 'drone', count: 1 }] }];
+    const grown = advance(prime(s), first);
+    // Трюм 8: 5 десанта + 1 машина в ангаре — места на два организма.
+    expect(grown.fleets.f!.landing![0]!.count).toBe(7);
+    // Эскадра улетела в вылет — её место за ней (SHU-5.1), трюм полон.
+    grown.fleets.f!.hangar = [{ id: 'sq1', units: [{ unit: 'drone', count: 0 }] }];
+    grown.strikes = [
+      {
+        id: 'st1',
+        owner: 'p',
+        base: { kind: 'fleet', id: 'f' },
+        units: [{ unit: 'drone', count: 1 }],
+      } as unknown as NonNullable<GameState['strikes']>[number],
+    ];
     const full = advance(grown, first + 3 * HOUR);
     expect(full.fleets.f!.landing![0]!.count).toBe(7);
     expect(full.players.p!.resources).toEqual(grown.players.p!.resources);

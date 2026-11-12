@@ -690,16 +690,28 @@ export const FORCED_MARCH_PACE_SOLO_MIGRATION = {
   toDataHash: SPY_FOG_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: fleetBrood 1.3.0 — onboard brood measures the hold shared with shuttles in
+ *  the hangar and out on a strike (SHU-5.1). The catalogue is unchanged; organisms already
+ *  aboard stay, and only later cycles see the shuttles. */
+export const BROOD_HOLD_SOLO_MIGRATION = {
+  fromRules: FORCED_MARCH_PACE_SOLO_MIGRATION.toRules,
+  fromData: FORCED_MARCH_PACE_SOLO_MIGRATION.toData,
+  fromDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
+  toRules: '0b513e5c40130b',
+  toData: FORCED_MARCH_PACE_SOLO_MIGRATION.toData,
+  toDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** Rules-only pair: `auto-rally` 1.4.0 and `movement` 1.10.0 — a rally point may aim at any
  *  world except visibly closed territory, and its ships stop at such a border on the way.
  *  The catalogue is unchanged and a saved point keeps its shape, so a saved world reads as is. */
 export const RALLY_ANY_WORLD_SOLO_MIGRATION = {
-  fromRules: FORCED_MARCH_PACE_SOLO_MIGRATION.toRules,
-  fromData: FORCED_MARCH_PACE_SOLO_MIGRATION.toData,
-  fromDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
-  toRules: '0e3a544a6374ac',
-  toData: FORCED_MARCH_PACE_SOLO_MIGRATION.toData,
-  toDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
+  fromRules: BROOD_HOLD_SOLO_MIGRATION.toRules,
+  fromData: BROOD_HOLD_SOLO_MIGRATION.toData,
+  fromDataHash: BROOD_HOLD_SOLO_MIGRATION.toDataHash,
+  toRules: '1863ce045bd0d2',
+  toData: BROOD_HOLD_SOLO_MIGRATION.toData,
+  toDataHash: BROOD_HOLD_SOLO_MIGRATION.toDataHash,
 } as const;
 
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
@@ -762,6 +774,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_SALARY_SOLO_MIGRATION,
   SPY_FOG_SOLO_MIGRATION,
   FORCED_MARCH_PACE_SOLO_MIGRATION,
+  BROOD_HOLD_SOLO_MIGRATION,
   RALLY_ANY_WORLD_SOLO_MIGRATION,
 ];
 
