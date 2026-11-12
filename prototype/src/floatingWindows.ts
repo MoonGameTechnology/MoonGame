@@ -25,6 +25,22 @@ const WINDOWS = [
   ['pingmenu', '.pm-box', '.pm-head'],
 ] as const;
 
+/** Окна, которые открываются по центру экрана, а не там, где стояли в прошлый раз (заказ
+ *  владельца 2026-11-12: «Построить» открывает «Производство» в центре). Перетащенное
+ *  игроком окно стоит, где его поставили, пока открыто. */
+const CENTERED: ReadonlySet<string> = new Set(['constructor']);
+
+/** Центр экрана под хромом HUD: по горизонтали — середина, по вертикали — середина места
+ *  ниже `top`. Не влезает — прижимается так же, как любое окно ({@link fitWindowPosition}). */
+export function centeredWindowPosition(
+  size: { width: number; height: number }, viewport: { width: number; height: number }, top = 12,
+): HoloPoint {
+  return fitWindowPosition(
+    { x: (viewport.width - size.width) / 2, y: top + (viewport.height - top - size.height) / 2 },
+    size, viewport, top,
+  );
+}
+
 /** Keep the complete window reachable; oversized content scrolls inside its frame.
  *  `top` is where the HUD chrome ends (resources, tabs, objectives): a window whose title
  *  slid under it could be neither dragged back nor used — owner's report 2026-09-25, the
@@ -326,6 +342,11 @@ export function initFloatingWindows() {
         if (entry.dirty || resized || !entry.visible) {
           const r = node.getBoundingClientRect();
           entry.size = { width: r.width, height: r.height };
+          if (CENTERED.has(entry.id)) {
+            if (!entry.visible) entry.userPlaced = false;
+            if (!entry.userPlaced && (!entry.visible || entry.refit || resized))
+              entry.point = centeredWindowPosition(entry.size, viewport, topInset);
+          }
           // Growing/shrinking information must never drag a window after the fleet.
           // Only a user gesture, viewport resize or a new layout (`refit`) clamps the
           // remembered position.

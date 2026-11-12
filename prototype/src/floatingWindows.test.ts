@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitWindowPosition, onWindowEdge, zoomedPlacement } from './floatingWindows';
+import { centeredWindowPosition, fitWindowPosition, onWindowEdge, zoomedPlacement } from './floatingWindows';
 
 describe('movable windows stay reachable without camera input', () => {
   const viewport = { width: 1400, height: 960 };
@@ -57,5 +57,14 @@ describe('окно под зумом ПК встаёт туда, куда его
   it('место под окном не меньше 80 px, нулевой зум считается за 1', () => {
     expect(zoomedPlacement({ x: 10, y: 1070 }, 1080, 1.25).room).toBe(80);
     expect(zoomedPlacement({ x: 500, y: 200 }, 768, 0)).toEqual({ left: 500, top: 200, room: 556 });
+  });
+});
+
+describe('centeredWindowPosition', () => {
+  it('puts a window in the middle of the room below the HUD chrome', () => {
+    expect(centeredWindowPosition({ width: 400, height: 300 }, { width: 1440, height: 900 }, 100)).toEqual({ x: 520, y: 350 });
+  });
+  it('keeps an oversized window reachable, under the chrome', () => {
+    expect(centeredWindowPosition({ width: 1600, height: 1000 }, { width: 1440, height: 900 }, 100)).toEqual({ x: 12, y: 100 });
   });
 });
