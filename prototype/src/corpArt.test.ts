@@ -43,11 +43,28 @@ describe('стили базы (CORP-14)', () => {
     ) as { store: { offers: Record<string, { corpStyle?: string }> } };
     const sold = Object.values(catalog.store.offers).flatMap((o) => (o.corpStyle ? [o.corpStyle] : []));
     expect([...CORP_STYLES].sort()).toEqual(['standard', ...sold].sort());
+    const stages = (id: string): number[] =>
+      Array.from({ length: id === 'headquarters' ? 5 : id === 'monument' ? 1 : 3 }, (_, i) => i + 1);
     const srcs = new Set<string>();
     for (const style of CORP_STYLES)
       for (const id of CORP_ART_BUILDINGS)
-        for (const level of Array.from({ length: id === 'headquarters' ? 5 : id === 'monument' ? 1 : 3 }, (_, i) => i + 1)) srcs.add(JSON.stringify(corpArt(id, level, style)));
-    expect(srcs.size).toBe(CORP_STYLES.length * 21);
+        for (const level of stages(id)) {
+          const art = corpArt(id, level, style);
+          expect(art, `${style} ${id} ${level}`).not.toBeNull();
+          srcs.add(JSON.stringify(art));
+        }
+    // Дополнение (штаб IV–V и четыре здания, 12 этапов) нарисовано не во всех стилях: без него
+    // стиль строит эти здания стандартными, а свои — штаб I–III и два здания, 9 этапов.
+    const drawn = Object.keys(expansion).length;
+    expect(srcs.size).toBe(CORP_STYLES.length * 9 + drawn * 12);
+  });
+
+  it('стиль без рисунков дополнения строит его здания стандартными', () => {
+    for (const style of CORP_STYLES.filter((s) => !Object.hasOwn(expansion, s))) {
+      expect(corpArt('headquarters', 5, style)).toEqual(corpArt('headquarters', 5));
+      expect(corpArt('warehouse', 2, style)).toEqual(corpArt('warehouse', 2));
+      expect(corpArt('headquarters', 3, style)).not.toEqual(corpArt('headquarters', 3));
+    }
   });
 
   it('стиль без рисунков в этой сборке рисуется и называется стандартным', () => {
