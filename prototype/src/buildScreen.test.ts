@@ -106,6 +106,16 @@ describe('окно построек — строка эффекта', () => {
 });
 
 describe('окно построек — состояние строки от пробы ядра', () => {
+  it('сетевая проба «можно всё» не предлагает «Строить» у стоящего здания', () => {
+    const s = newGame();
+    const pid = home(s);
+    const standing = s.planets[pid]!.buildings[0]!;
+    const yes = (): string | null => null; // сетевой матч: клиент не вето-ирует приказы сервера
+    expect(buildRowState(s, 'p1', pid, standing.type, yes, noQueue)).toMatchObject({
+      st: 'built',
+      up: { up: 'ready', affordable: true },
+    });
+  });
   it('hides retired choices but preserves standing and pending legacy buildings', () => {
     const s = newGame();
     const pid = home(s);

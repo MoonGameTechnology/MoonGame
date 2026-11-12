@@ -176,7 +176,18 @@ export function buildRowState(
   // после постройки (`station.deploy`).
   if (node && mine.length === 0 && !canBuildHere(node, id, data, feedsOnBiomass(state, me, data)))
     return { st: 'hidden' };
+  const built = (): BuildRowSt => ({
+    st: 'built',
+    level: Math.max(...mine.map((b) => b.level)),
+    count: mine.length,
+    up: upgradeState(probe(upgradeBuilding(me, planetId, id)), waiting('upgrade')),
+  });
   const code = probe(buildBuilding(me, planetId, id));
+  // Все экземпляры уже стоят, а проба говорит «можно»: так отвечает сетевой матч, где
+  // клиент не судит приказы сервера. Строка предлагала «Строить» у готового здания, и
+  // сервер отказывал «уже построено». Предел экземпляров берём из данных.
+  const full = mine.length >= (data.buildings[id]?.maxPerPlanet ?? 1);
+  if (full && (code === null || code === 'E_INSUFFICIENT')) return built();
   if (code === null) return { st: 'avail', affordable: true };
   if (code === 'E_INSUFFICIENT') return { st: 'avail', affordable: false };
   if (code === 'E_ALREADY_QUEUED' || code === 'E_ALREADY_PAUSED')
@@ -190,13 +201,7 @@ export function buildRowState(
   // ростере ни одной крепости — его ставит `station.deploy`; сообщение владельца 2026-10-03
   // «нет возможности строить на крепости»), кончившиеся места, технологию. Строка с
   // такой причиной прятала главное — уровень и путь к следующему.
-  if (mine.length > 0)
-    return {
-      st: 'built',
-      level: Math.max(...mine.map((b) => b.level)),
-      count: mine.length,
-      up: upgradeState(probe(upgradeBuilding(me, planetId, id)), waiting('upgrade')),
-    };
+  if (mine.length > 0) return built();
   // Достроится — станет built.
   if (code === 'E_ALREADY_BUILT') return { st: 'queued', waiting: false };
   return { st: 'lock', code }; // незнакомый отказ показываем причиной, не прячем
