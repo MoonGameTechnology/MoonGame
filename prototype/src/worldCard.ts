@@ -7,7 +7,7 @@
  * строками патрулей. Её рисует и карточка флота, поэтому секция экспортируется.
  *
  * Правила того, ЧТО показать, живут в чистых модулях рядом (`planetTabs.ts`, `hangarPanel.ts`,
- * `squadronPanel.ts`, `conveyorView.ts`, `catalogTile.ts`, `spyOffer.ts`) и в решениях
+ * `squadronPanel.ts`, `conveyorView.ts`, `catalogTile.ts`) и в решениях
  * `decisions/` (`worldFacts`, `worldOrders`, `rallyPoint`, `fortressRaise`); здесь только
  * разметка. Мир на экране, своё место, имена, плитки гарнизона и карта
  * узлов живут в `main.ts`; модуль получает их хуками {@link initWorldCard}: импорт оттуда был
@@ -18,7 +18,6 @@ import type {
   IntelGrant,
   PausedConstructionSite,
   Planet,
-  SpyOp,
   StrikeBase,
   UnitStack,
 } from '../../packages/shared-core/src/index';
@@ -43,7 +42,7 @@ import { espionageShown, toolShown, victoryPointsShown } from '../../decisions/s
 import { medalBadges } from '../../decisions/unitMedals';
 import { worldFacts, type WorldFact } from '../../decisions/worldFacts';
 import { intelLayers } from '../../decisions/intelLayers';
-import { knownBureau, oddsPct, spyOdds } from '../../decisions/spyOdds';
+import { knownBureau, spyOdds, type SpyOdds } from '../../decisions/spyOdds';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import type { BuildLane } from './buildQueue';
 import { shownProductionLanes } from '../../decisions/productionLanes';
@@ -59,7 +58,7 @@ import { fortressStatusHtml, fortressServicesHtml } from './fortressView';
 import { pcUi } from './graphicsPrefs';
 import { hasHangar, planetHangar, type HangarView } from './hangarPanel';
 import { BUILD_ICON, KIND_ICON, unitIconHtml } from './icons';
-import { myAgents, SPY_COST } from './intel';
+import { myAgents } from './intel';
 import { liveTimerHtml } from './liveTimers';
 import { SECTOR_TYPES, type SectorType } from './map';
 import { known, memory, myIntel, surveyed } from './mapFog';
@@ -74,9 +73,7 @@ import { worldName } from './planetName';
 import { seatNick } from './seatNicks';
 import { isGroundUnit, planetSummary } from './planetSummary';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
-import { spyMenuHtml } from './spyMenu';
-export { toggleSpyMenu } from './spyMenu';
-import { spyOffer } from './spyOffer';
+import { SPY_GLYPH_SVG } from './spyPortrait';
 import {
   squadronCallsignOf,
   squadronCards,
@@ -86,7 +83,6 @@ import {
 import { HOUR } from './time';
 import {
   activeConstruction,
-  afford,
   buildCost,
   buildDurationHours,
   constructionLabel,
@@ -376,8 +372,6 @@ export function unknownPlanetHtml(p: Planet): string {
     // Espionage from memory: an agent goes to the WORLD itself (SPY-8), not to its
     // owner — if the world changed hands, the kernel targets whoever holds it now.
     // В забеге Sector Zero шпионажа нет и здесь (`espionageShown`).
-    const free = myAgents(game.world(), ME).free > 0;
-    const spyReady = (op: SpyOp) => free && afford({ credits: SPY_COST[op] });
     const acts: string[] = [];
     if (mem.owner && mem.owner !== ME) {
       const name = seatNick(mem.owner) ?? NAME[mem.owner] ?? mem.owner;
@@ -385,22 +379,7 @@ export function unknownPlanetHtml(p: Planet): string {
     }
     if (toolShown('pings', sectorZeroToolsHidden()))
       acts.push(btn('ping', '', t('side.world.ping'), true));
-    // SPY-24: out of sight, the deeds need a world one of the player's spies has been to
-    // (`state.scouted`) — a world only remembered from sight takes recon or a move first, as
-    // the core demands; recon goes to an unclaimed world too.
-    const deeds = !!mem.owner && !!game.world().scouted?.[ME]?.[p.id];
-    if (mem.owner !== ME && espionageShown(sectorZeroToolsHidden()))
-      acts.push(
-        ...spyMenuHtml(p.id, [
-          ...(deeds ? [spyOddsHtml(p.id, mem.owner!)] : []),
-          btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spyReady('recon')),
-          ...(deeds
-            ? HOSTILE_OPS.map((op) =>
-                btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), spyReady(op)),
-              )
-            : []),
-        ]),
-      );
+    if (espionageShown(sectorZeroToolsHidden())) acts.push(spyButtonHtml());
     // Возраст снимка (правило 4 `decisions/planetDossier.ts`); снимок без времени — словами.
     const age = scanAgeHtml(mem.at, game.world().time);
     const neutral = mem.owner ? '' : `<span class="pfact">${esc(t('side.neutral'))}</span>`;
@@ -421,10 +400,10 @@ export function unknownPlanetHtml(p: Planet): string {
     : '';
   // No «Снять выделение» on planet cards: it only clears FLEET selection (selPlanet
   // stays, the card would not even close) — the ✕ in the corner is the real close.
-  // SPY-24: recon is the one order a world never seen takes — it is what finds out whose it is.
+  // SPY-24: recon is the one order a world never seen takes — it is what finds out whose it
+  // is; the spy window greys the rest (`decisions/spyTasks.ts`).
   const spyRow = espionageShown(sectorZeroToolsHidden())
-    ? `<div class="row">${btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }),
-        myAgents(game.world(), ME).free > 0 && afford({ credits: SPY_COST.recon }))}</div>`
+    ? `<div class="row">${spyButtonHtml()}</div>`
     : '';
   return (
     cardHeader('#5f8f8c', placeName(p.id), t('side.notelemetry.title')) +
@@ -441,7 +420,7 @@ export function unknownPlanetHtml(p: Planet): string {
 /**
  * Действия в строке статуса мира: ник хозяина, «Пинг», разведка. Столица, точка удержания и
  * точка сбора — приказы миру, они в окне «Построить» (`worldOrdersPane.ts`, UIX-10.12).
- * ЧТО предлагать, решает `spyOffer.ts` (REFM-92), здесь только кнопки. На телефоне «Пинг»,
+ * Шпионаж — одна кнопка, приказы шпионам в их окне (`spyWindow.ts`). На телефоне «Пинг»,
  * «Построить» и ник хозяина стоят в нижней полосе листа, и в шапке их прячет CSS: кнопки остаются в разметке, потому что полоса листа показывается по их наличию.
  */
 function worldActionsHtml(p: Planet, mine: boolean): string {
@@ -463,36 +442,18 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   // Tactical ping — mark this province and share it (coalition chat, or a player's DM).
   if (toolShown('pings', sectorZeroToolsHidden()))
     out.push(btn('ping', '', t('side.world.ping'), true));
-  // Espionage: a 12h mission to this enemy world (SPY-8/9/10) — recon opens a 24h intel
-  // window (while it lives its countdown replaces the recon button), sabotage, theft of
-  // resources or of a technology. В забеге Sector Zero шпионажа нет (`espionageShown`).
+  // Шпионаж (заказ владельца 2026-11-10): вместо приказов одна кнопка с силуэтом шпиона,
+  // она открывает список шпионов с этим миром целью (`spyWindow.ts`). Окно разведки,
+  // которое держит свой разведчик на посту, видно здесь же (SPY-13). В забеге Sector Zero
+  // шпионажа нет (`espionageShown`).
   if (espionageShown(sectorZeroToolsHidden())) {
     const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
-    // Свой мир не шпионят; ничейный только разведывают (SPY-24); нехватка кредитов или
-    // свободных агентов (SPY-6) гасит кнопку, но не прячет её.
-    const free = myAgents(s, ME).free > 0;
-    const ready = (op: SpyOp) => free && afford({ credits: SPY_COST[op] });
-    const spy = spyOffer(mine, !!live, ready('recon'));
-    const deeds = spy !== 'none' && !!p.owner;
-    // Приказы шпионов копятся отдельно: больше одного — под кнопку «Шпионаж», шанс — первым (UIX-10.11).
-    const ops: string[] = [];
-    if (deeds) ops.push(spyOddsHtml(p.id, p.owner!));
-    // SPY-13: a posted agent — its layers and «Отозвать» (`intelRowsHtml`).
-    if (spy === 'window' && live && live.layer !== undefined) ops.push(...intelRowsHtml(live));
-    else if (spy === 'window' && live) {
-      ops.push(
+    if (live && live.layer !== undefined) out.push(...intelRowsHtml(live));
+    else if (live)
+      out.push(
         `<span class="pfact cyan">${t('side.world.spy-window')} ${t('side.world.spy-window.left', { left: liveTimerHtml(live.until) })}</span>`,
       );
-    } else if (spy !== 'none') {
-      ops.push(btn('spyplanet', 'recon', t('side.scan.spy', { c: SPY_COST.recon }), spy === 'buy'));
-    }
-    if (deeds)
-      for (const op of HOSTILE_OPS) ops.push(btn('spyplanet', op, t(SCAN_KEY[op], { c: SPY_COST[op] }), ready(op)));
-    // SPY-11: a guard for any owned world, your own too; posted or en route → «Отозвать».
-    const guard = myAgents(s, ME).away.some((a) => a.op === 'counter' && a.planetId === p.id);
-    if (p.owner && guard) ops.push(btn('spyrecall', '', t('side.scan.recall'), true));
-    else if (p.owner) ops.push(btn('spyplanet', 'counter', t('side.scan.counter', { c: SPY_COST.counter }), ready('counter')));
-    out.push(...spyMenuHtml(p.id, ops));
+    out.push(spyButtonHtml());
     // SPY-15: the owner sees its own world's economy sabotaged and for how long.
     if (mine && (p.disruptedUntil ?? 0) > s.time)
       out.push(`<span class="pfact">${t('side.world.disrupted', { left: liveTimerHtml(p.disruptedUntil!) })}</span>`);
@@ -500,12 +461,19 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
 }
 
+/** Кнопка «Шпионы» карточки мира: силуэт в шляпе (`spyPortrait.ts`). */
+function spyButtonHtml(): string {
+  return `<button class="b btn-second spy-btn" data-act="spyagents" title="${esc(t('side.world.spies'))}">${SPY_GLYPH_SVG}<span>${t('side.world.spies')}</span></button>`;
+}
+
 /** SPY-19: the odds of an aggressive operation on this world, from what the player knows —
  *  their own wave on the way there and the owner's bureaus they see or remember
- *  (`decisions/spyOdds.ts`). */
-function spyOddsHtml(planetId: string, owner: string): string {
+ *  (`decisions/spyOdds.ts`). `null` — the world has no owner to spy on. */
+export function spyOddsFor(planetId: string): SpyOdds | null {
   const s = game.world();
   const ME = game.me();
+  const owner = s.planets[planetId]?.owner ?? memory.get(planetId)?.owner ?? null;
+  if (!owner || owner === ME) return null;
   const wave = myAgents(s, ME).away.filter(
     (a) => a.planetId === planetId && !a.posted && a.op !== undefined && a.op !== 'counter',
   ).length;
@@ -514,19 +482,8 @@ function spyOddsHtml(planetId: string, owner: string): string {
     const mem = memory.get(w.id);
     return mem && mem.owner === owner ? mem.buildings : [];
   });
-  const o = spyOdds(wave + 1, knownBureau(seenBuildings, data));
-  return `<span class="pfact" title="${esc(t('side.scan.odds.hint'))}">${t('side.scan.odds', { s: oddsPct(o.success), r: oddsPct(o.risk) })}</span>`;
+  return spyOdds(wave + 1, knownBureau(seenBuildings, data));
 }
-
-/** The aggressive operations after recon, in button order, and their button keys. */
-const HOSTILE_OPS = ['sabotage', 'delay', 'disrupt', 'theft', 'research'] as const;
-const SCAN_KEY = {
-  sabotage: 'side.scan.sabotage',
-  delay: 'side.scan.delay',
-  disrupt: 'side.scan.disrupt',
-  theft: 'side.scan.theft',
-  research: 'side.scan.research',
-} as const;
 
 const STANCE_KEY = {
   war: 'diplo.stance.war',
@@ -561,7 +518,6 @@ function intelRowsHtml(grant: IntelGrant): string[] {
     );
     rows.push(row(t('side.world.intel.offers', { list: list(names) })));
   }
-  rows.push(btn('spyrecall', 'recon', t('side.scan.recall.recon'), true));
   return rows;
 }
 

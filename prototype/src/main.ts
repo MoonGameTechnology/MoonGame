@@ -47,12 +47,10 @@ import {
   openDiplo,
   openPlayerCard,
   openSeatCard,
-  refreshIntelTab,
+  spyWindow,
   renderDiplo,
   renderDiploFeed,
-  restoreSpyArchive,
   seatBadge,
-  spyArchive,
   worldsOf,
 } from './diploWindow';
 import { closeCoalitions, coalOpen, initCoalitionWindow, syncCoalitions } from './coalitionWindow';
@@ -488,7 +486,7 @@ import {
   BANNER_FORGOTTEN,
   bannerOffersRestart,
 } from './matchExits';
-import { INTEL_MS, PROGRESS_MS, intelVisible, repaintDue } from './liveWindows';
+import { INTEL_MS, PROGRESS_MS, repaintDue } from './liveWindows';
 import {
   anyArmed,
   arm,
@@ -3123,7 +3121,9 @@ const BACK_LAYERS: BackLayer[] = [
       if (el) delete el.dataset.seat;
     },
   }, // z50
+  { id: 'spypick', isOpen: spyWindow.pickOpen, close: spyWindow.close }, // z60, выбор мира для шпиона
   { id: 'diplo', isOpen: () => diploOpen, close: () => closeDiplo() }, // z49
+  { id: 'spywin', isOpen: spyWindow.winOpen, close: spyWindow.close }, // z49, окно «Шпионаж»
   { id: 'coalwin', isOpen: () => coalOpen, close: () => closeCoalitions() }, // z49, окно коалиций
   // Проба по состоянию, а не по классу: `orderPromptOpen` (запрос войны или окно погрузки) — источник истины, класс лишь его
   // отражение. Back здесь обязан вести в ОТМЕНУ: подтверждение объявляет войну, и вешать
@@ -3250,6 +3250,7 @@ const PHONE_WINDOW_LAYER: Record<Exclude<PhoneItemId, 'diplomacy' | 'mail'>, str
   dossier: 'swarm-dossier',
   codex: 'codexhub',
   settings: 'settings',
+  espionage: 'spywin',
 };
 /** Открыто ли окно пункта: по нему раздел панели подсвечен. */
 function phoneWindowOpen(id: PhoneItemId): boolean {
@@ -3353,7 +3354,7 @@ function soloSaveHost(): Omit<SoloSave, 'state'> {
     normalSpeed: Number($('spd-play').dataset.speed) / PLAY_BASE,
     fastSpeed: Number($('spd-fast').dataset.speed) / PLAY_BASE,
     autoAssault: [...soloAutoAssault], memory: memory.dump(),
-    spyArchive: spyArchive(),
+    spyArchive: spyWindow.archive(),
   };
 }
 initSoloCheckpoint({
@@ -3375,7 +3376,7 @@ initSoloCheckpoint({
     installMatch(save.state, new Map(save.ai), save.state.modeId);
     restoreAutoAssault(save.autoAssault);
     restoreFogMemory(save.memory);
-    restoreSpyArchive(save.spyArchive);
+    spyWindow.restore(save.spyArchive);
     applyTimeSpeed(save.normalSpeed, save.fastSpeed);
     speed = 0;
     for (const x of Array.from(document.querySelectorAll('[data-speed]')))
@@ -3827,9 +3828,9 @@ function frame(nowReal: number, nativeGap: number) {
     lastBattleWinAt = nowReal;
     battleWindow.repaint();
   }
-  if (repaintDue(intelVisible(diploOpen, diploTab), nowReal, lastIntelAt, INTEL_MS)) {
+  if (repaintDue(spyWindow.live(), nowReal, lastIntelAt, INTEL_MS)) {
     lastIntelAt = nowReal;
-    refreshIntelTab();
+    spyWindow.refresh();
   }
 }
 

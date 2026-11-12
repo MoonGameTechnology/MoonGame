@@ -879,6 +879,7 @@ export {
   SPY_NEUTRAL_FACTOR,
   SPY_ENEMY_FACTOR,
 } from './state/spyTravel';
+export { spyKnownOwner } from './state/spyKnowledge';
 export { diplomacyModule } from './modules/diplomacy';
 export { botDiplomacyModule } from './modules/botDiplomacy';
 export {

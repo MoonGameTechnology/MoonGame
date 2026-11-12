@@ -18,26 +18,14 @@
  * вкладки показывает последние строки.
  */
 import {
-  SPY_OP_COST,
   spyRoster,
   type GameState,
   type IntelGrant,
-  type SpyOp,
 } from '../../packages/shared-core/src/index';
 import { spyAgents, type SpyAgents } from '../../decisions/spyAgents';
 
-/** Базовая цена операции (SPY-12) — та же таблица ядра `SPY_OP_COST`. Это ПОДПИСЬ на
- *  кнопке: авторитетно ядро, оно же отвергает попытку с `E_INSUFFICIENT`, когда денег мало. */
-export const SPY_COST: Readonly<Record<SpyOp, number>> = SPY_OP_COST;
-
-/** Разброс цен для сводки во вкладке «Шпионаж»: «50–400» (бесплатный переезд не в счёт). */
-export function spyCostRange(): string {
-  const all = Object.values(SPY_COST).filter((c) => c > 0);
-  return `${Math.min(...all)}–${Math.max(...all)}`;
-}
-
-/** Сеть шпионов игрока сейчас (SPY-6/22) — реестр ядра или стартовая сеть в столице: как
- *  и `SPY_COST`, это ПОДПИСЬ, авторитетно ядро (оно отвергает попытку с `E_NO_AGENT`). */
+/** Сеть шпионов игрока сейчас (SPY-6/22) — реестр ядра или стартовая сеть в столице: это
+ *  ПОДПИСЬ, авторитетно ядро (оно отвергает попытку с `E_NO_AGENT`). */
 export function myAgents(s: GameState, me: string): SpyAgents {
   return spyAgents(spyRoster(s, me));
 }

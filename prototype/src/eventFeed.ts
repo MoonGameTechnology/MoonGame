@@ -27,7 +27,6 @@ import {
   inVisionBloc,
   medalsOf,
   MISSILE_TRAIT,
-  MISSION_HOURS,
   TURNED_HOURS,
   unitHasTrait,
 } from '../../packages/shared-core/src/index';
@@ -65,6 +64,7 @@ import {
   renderDiplo,
   stanceRu,
 } from './diploWindow';
+import { tellSpyJourney } from './spyWindow';
 import { syncCoalitions } from './coalitionWindow';
 import { isMine, seen, seenTail } from './eventVisibility';
 import { aaImpact } from './fireEffects';
@@ -401,6 +401,7 @@ export function handleEvents(events: DomainEvent[]) {
     const p = e.payload as Record<string, unknown>;
     const ordnanceKey = ordnanceLogKey(e.type, p, ME);
     if (ordnanceKey) note(t(ordnanceKey, { damage: Math.round(Number(p.damage) || 0) }));
+    if (tellSpyJourney(e.type, p, note)) continue; // SPY-8/23: отправка и путь своего шпиона
     switch (e.type) {
       case 'battle.started':
         // Видимость события — `eventVisibility.ts` (REFM-86): своё всегда, чужое только
@@ -519,13 +520,6 @@ export function handleEvents(events: DomainEvent[]) {
       // кражи ростер перерисовывается ПОСЛЕ проверки адресата (появилась своя строка
       // разведки), у обнаружения — ДО неё (расположение бота двигается в любом случае).
       // SPY-8: агент уходит на задание к миру, итог приходит в конце задания.
-      case 'espionage.sent':
-        if (p.owner === ME) {
-          const at = game.placeName(String(p.planetId));
-          note(t('log.spy.sent', { at, n: MISSION_HOURS }));
-          pushSpyLog(t('log.spy.sent.short', { at }), e.type, p);
-        }
-        break;
       case 'espionage.aborted':
         if (p.owner === ME) {
           const at = game.placeName(String(p.planetId));

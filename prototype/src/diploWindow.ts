@@ -1,15 +1,15 @@
 /**
  * Окно дипломатии и связи — у одного владельца (REFM-214, второй PR): ростер мест с
  * сортировкой и фильтрами, полоса расположения бота, кнопки стоек и договора карт,
- * карточка места и своя карточка, вкладка и журнал разведки, вкладка сообщений с
+ * карточка места и своя карточка, вкладка сообщений с
  * составлением реплики и метки, разница дипломатии между снимками сервера.
  *
  * Всё это жило в `main.ts` пятью кусками. Состояние окна (открыто ли, вкладка, сортировка,
  * раскрытая строка, фильтры) теперь пишут только функции модуля: `main.ts` читает
  * {@link diploOpen} и {@link diploTab} живыми привязками (`export let`), а открывает и
- * закрывает окно дверями {@link openDiplo} и {@link closeDiplo}. Архив донесений пишет
- * одна дверь {@link pushSpyLog}, сейв читает и ставит его {@link spyArchive} и
- * {@link restoreSpyArchive}.
+ * закрывает окно дверями {@link openDiplo} и {@link closeDiplo}. Шпионаж ушёл в своё окно
+ * (`spyWindow.ts`, заказ владельца 2026-11-10): окно дипломатии поднимает его в
+ * {@link initDiploWindow} теми же хуками и передаёт дальше его двери.
  *
  * Ленту сообщений модуль не держит: ею владеет `messageLog.ts` (первый PR кирпича), окно
  * её только читает и пишет через двери владельца.
@@ -25,8 +25,7 @@
 import { selectDiploRoster, nextDiploSort, type DiploParticipant, type DiploSortOrder, type DiploSort } from '../../decisions/diploRoster';
 import { diploRosterHtml, rememberRosterUi } from './diploRosterView';
 import { coalitionInviteBlock, coalitionTreatyLocked } from '../../decisions/coalitionCreation';
-import { pushSpyRecord, spyOpGlyph, spyRecordOf, type SpyRecord } from '../../decisions/spyArchive';
-import { espionageShown, victoryPointsShown } from '../../decisions/sectorZeroTools';
+import { victoryPointsShown } from '../../decisions/sectorZeroTools';
 import { LOCALE, t, tData } from '../../localization/runtime';
 import {
   getOffer,
@@ -56,15 +55,15 @@ import {
   HOUR,
   shareMap,
 } from './game';
-import { grantLeftMs, myAgents, spyCostRange } from './intel';
+import { grantLeftMs } from './intel';
 import { selPlanet } from './interaction';
-import { liveTimerHtml, patchLiveTimers, type LiveFormats } from './liveTimers';
 import { dispatchChat, markUnread, pushMsg, readMessages, sessionMessages } from './messageLog';
 import { offerAffordance, offerClass, offerDisabled, offerMark } from './offerAffordance';
 import { pingRoute } from './relayIntake';
 import { seatBadgeOf, seatKind } from './seatBadge';
 import { factionBonusLine } from './setupScreen';
 import { houseDisplayName } from './setupSeats';
+import { initSpyWindow } from './spyWindow';
 
 /** Что окну нужно от игры. Мир, имена, цвета, приказы и карта живут в `main.ts`. */
 export interface DiploWindowHost {
@@ -126,7 +125,7 @@ const sumUnits = (stacks: ReadonlyArray<{ count: number }>): number =>
   stacks.reduce((a, s) => a + s.count, 0);
 
 export let diploOpen = false;
-export let diploTab: 'diplo' | 'msgs' | 'intel' = 'diplo';
+export let diploTab: 'diplo' | 'msgs' = 'diplo';
 let diploSort: DiploSortOrder = { key: 'stance', direction: 'asc' };
 let diploQuery = '';
 let diploExpanded: string | null = null; // participant row showing its action buttons
@@ -136,22 +135,15 @@ let diploExpanded: string | null = null; // participant row showing its action b
 const diploStanceFilter = new Set<DiplomaticStance>();
 const diploTypeFilter = new Set<'human' | 'ai'>();
 
-// SPY-20: архив донесений шпионажа (моих и контрразведки по мне) — питает вкладку
-// «Шпионаж» в дипломатии; новые сверху, правила — `decisions/spyArchive.ts`. Событие
-// `type`/`payload` даёт записи мир и вид операции.
-let spyLog: SpyRecord[] = [];
-export function pushSpyLog(text: string, type = '', payload: Record<string, unknown> = {}): void {
-  spyLog = pushSpyRecord(spyLog, spyRecordOf(type, payload, game.state().time, text));
-  if (diploOpen && diploTab === 'intel') renderDiplo();
-}
-/** Архив для сейва схватки. */
-export function spyArchive(): SpyRecord[] {
-  return [...spyLog];
-}
-/** Поставить архив: из сейва — его записи, в новой партии — пустой. */
-export function restoreSpyArchive(records: readonly SpyRecord[] = []): void {
-  spyLog = [...records];
-}
+// Шпионаж живёт в своём окне (`spyWindow.ts`); его двери идут дальше отсюда, чтобы
+// `main.ts`, лента событий и сейв не меняли адрес.
+export {
+  pushSpyLog,
+  refreshSpyWindow as refreshIntelTab,
+  restoreSpyArchive,
+  spyArchive,
+  spyWindow,
+} from './spyWindow';
 
 // --- player card (tap the top-left crest) ------------------------------------
 /** Your dossier in this session: faction, worlds, fleets, score, and the treasury.
@@ -366,7 +358,7 @@ function toggleMapShare(target: string): void {
   game.playerOrder(shareMap(ME, target, !hasMapShare(s, ME, target)));
 }
 
-export function openDiplo(tab: 'diplo' | 'msgs' | 'intel'): void {
+export function openDiplo(tab: 'diplo' | 'msgs'): void {
   diploOpen = true;
   diploTab = tab;
   game.refreshNicks(); // кто-то мог сесть в партию, пока окно было закрыто
@@ -436,8 +428,8 @@ function intelRowHtml(target: string): string {
   return `<div class="dp-intel">🕵 ${bits.join(' · ')}</div>`;
 }
 /** The diplomacy affordances for one other seat `id`: stance proposals (with the
- *  consent state — их предложение ✓ / наше ⏳), the two spy buttons, and the DM
- *  button, followed by the live intel row. Shared by the roster's expanded row and
+ *  consent state — их предложение ✓ / наше ⏳) and the DM button (spy orders live in
+ *  `spyWindow.ts`), followed by the live intel row. Shared by the roster's expanded row and
  *  the player card opened from a chat nick, so both stay in lockstep. */
 /**
  * MAPSHARE-1 — кнопка договора об обмене картами. Отдельная от лестницы стоек, потому
@@ -607,99 +599,23 @@ export const conversations = initConversations({
   threadDiploHtml,
 });
 
-/** Таймеры «Шпионажа» — целые часы вверх, как и до живых узлов. */
-const INTEL_LIVE: LiveFormats = { hceil: (ms) => t('fmt.hours', { n: Math.ceil(ms / HOUR) }) };
-
-/** SPY-UX (плейтест, вариант 1): весь шпионаж в одном месте — сеть агентов, активные
- *  окна интела с таймерами и сессионный журнал попыток. Агента отправляют с карточки
- *  чужого мира (SPY-8: цель шпиона — мир), вкладка ведёт к ней подсказкой. Таймеры — живые
- *  узлы (`liveTimers.ts`): в разметке срок, и она не меняется с часами. */
-function intelTabHtml(): string {
-  const s = game.state();
-  const ME = game.me();
-  const rows = game
-    .myIntel()
-    .sort((a, b) => a.until - b.until)
-    .map((g) => {
-      const label = t('log.spy.what.world', { at: game.placeName(g.target) });
-      return (
-        `<div class="in-row" data-iw="${esc(g.target)}"><span class="in-k">🗝</span><b>${esc(label)}</b>` +
-        `<span class="in-t">⏳ ${liveTimerHtml(g.until, 'hceil')}</span><span class="in-go">↪</span></div>`
-      );
-    })
-    .join('');
-  // SPY-6: сеть агентов — сколько свободно и когда вернутся остальные; агент на задании
-  // (SPY-8) называет мир, к которому ушёл.
-  const net = myAgents(s, ME);
-  const agents = net.away
-    .map((a) => {
-      // SPY-11: a counter-intelligence agent is away until recalled — no countdown.
-      const guard = a.op === 'counter';
-      const left = guard ? '' : `⏳ ${liveTimerHtml(a.until, 'hceil')}`;
-      const what = a.lost
-        ? t('spy.agent.lost')
-        : a.planetId
-          ? t(a.posted ? 'spy.agent.post' : 'spy.agent.mission', { at: game.placeName(a.planetId) })
-          : t('spy.agent.busy');
-      return `<div class="in-row"><span class="in-k">${a.lost ? '✖' : guard ? '🛡' : '🕵'}</span><b>${esc(what)}</b><span class="in-t">${left}</span></div>`;
-    })
-    .join('');
-  // SPY-20: запись с миром ведёт к нему тем же переходом, что и окно разведки.
-  const log = spyLog
-    .map(
-      (e) =>
-        `<div class="in-log"${e.planetId ? ` data-iw="${esc(e.planetId)}"` : ''}>` +
-        `<span class="in-k">${spyOpGlyph(e.op)}</span> ${gameStamp(e.at)} · ${esc(e.text)}` +
-        `${e.planetId ? ' <span class="in-go">↪</span>' : ''}</div>`,
-    )
-    .join('');
-  return (
-    `<div class="dp-list in-list">` +
-    `<div class="in-hint">${t('spy.note', { c: spyCostRange() })}</div>` +
-    `<div class="in-sec">${t('spy.agents.title', { free: net.free, total: net.total })}</div>` +
-    agents +
-    `<div class="in-sec">${t('spy.windows.title')}</div>` +
-    (rows || `<div class="in-empty">${t('spy.windows.empty')}</div>`) +
-    `<div class="in-sec">${t('spy.log.title')}</div>` +
-    (log || `<div class="in-empty">${t('spy.log.empty')}</div>`) +
-    `</div>`
-  );
-}
-/** Нарисованная вкладка «Шпионаж»; пусто — открыта другая. */
-let intelHtml = '';
-/** Перерисовка «Шпионажа» по таймеру (`liveWindows.ts`): вкладка пересобирается, только когда
- *  изменилась, а отсчёты ставит живой патч. Пересборка каждые пять секунд пересоздавала
- *  строки миров и крестик под курсором: наведение мигало, а нажатие терялось. */
-export function refreshIntelTab(): void {
-  if (!diploOpen || diploTab !== 'intel') return;
-  if (!espionageShown(game.sectorZeroToolsHidden()) || intelTabHtml() !== intelHtml) return renderDiplo();
-  const el = document.getElementById('diplo');
-  if (el) patchLiveTimers(el, game.state().time, INTEL_LIVE);
-}
 export function renderDiplo(resetRosterScroll = false): void {
   const el = document.getElementById('diplo');
   if (!el) return;
   const restoreUi = diploTab === 'diplo' ? rememberRosterUi(el, resetRosterScroll) : () => {};
-  // Вкладки «Шпионаж» в забеге Sector Zero нет: открытая до забега не переживает вход в него.
-  const spyTab = espionageShown(game.sectorZeroToolsHidden());
-  if (!spyTab && diploTab === 'intel') diploTab = 'diplo';
-  const tabBtn = (k: 'diplo' | 'msgs' | 'intel', label: string) =>
+  const tabBtn = (k: 'diplo' | 'msgs', label: string) =>
     `<button class="dp-tab${diploTab === k ? ' on' : ''}" data-tab="${k}">${label}</button>`;
   const body =
     diploTab === 'diplo'
       ? diploRoster()
-      : diploTab === 'intel'
-        ? intelTabHtml()
-        : `<div class="dp-convo">${conversations.listHtml()}${conversations.threadHtml()}</div>`;
-  intelHtml = diploTab === 'intel' ? body : '';
+      : `<div class="dp-convo">${conversations.listHtml()}${conversations.threadHtml()}</div>`;
   el.innerHTML =
     `<div class="dpbox">` +
-    `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}${spyTab ? tabBtn('intel', t('diplo.tab.espionage')) : ''}<button class="dp-close btn-x">✕</button></div>` +
+    `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}<button class="dp-close btn-x">✕</button></div>` +
     body +
     `</div>`;
   restoreUi();
   if (diploTab === 'msgs') scrollFeedToEnd();
-  if (intelHtml) patchLiveTimers(el, game.state().time, INTEL_LIVE);
 }
 /** COAL-1: после дипломатического пакета — список чатов и карточки предложений в
  *  открытой личке, не трогая поле ввода (полу-набранная реплика переживает). */
@@ -772,6 +688,7 @@ function pingSelected(): void {
  *  `main.ts` один раз. */
 export function initDiploWindow(host: DiploWindowHost): void {
   game = host;
+  initSpyWindow(host);
   const playerCardEl = document.getElementById('playercard');
   if (playerCardEl) {
     playerCardEl.addEventListener('click', (e) => {
@@ -839,7 +756,7 @@ export function initDiploWindow(host: DiploWindowHost): void {
       }
       const tab = (tg.closest('.dp-tab') as HTMLElement | null)?.dataset.tab;
       if (tab) {
-        diploTab = tab as 'diplo' | 'msgs' | 'intel';
+        diploTab = tab as 'diplo' | 'msgs';
         renderDiplo();
         return;
       }
@@ -884,12 +801,6 @@ export function initDiploWindow(host: DiploWindowHost): void {
         if (intent.kind === 'stance') proposeStance(intent.seat, intent.stance as DiplomaticStance);
         else if (intent.kind === 'map') toggleMapShare(intent.seat);
         renderDiplo();
-        return;
-      }
-      const iw = (tg.closest('[data-iw]') as HTMLElement | null)?.dataset.iw;
-      if (iw) {
-        closeDiplo(); // карта должна быть видна — перелетаем к миру из окна интела
-        game.focusWorld(iw);
         return;
       }
       if (intent?.kind === 'message') {

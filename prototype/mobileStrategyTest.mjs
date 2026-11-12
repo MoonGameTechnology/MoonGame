@@ -362,9 +362,6 @@ export async function checkMobileStrategy(browser, url) {
             await page.locator('#diplo [data-tab="msgs"]').tap();
             await fits('#diplo .dp-convo');
             await fits('#diplo .dp-compose');
-            await page.locator('#diplo [data-tab="intel"]').tap();
-            await dismissIntro();
-            await fits('#diplo .dpbox');
           }
           if (locale === 'ru' && viewport.width === 390)
             await page.screenshot({ path: 'prototype/dist/mobile-strategy-' + id + '.png' });
