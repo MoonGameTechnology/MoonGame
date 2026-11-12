@@ -219,7 +219,7 @@ Energy в `arrears` → радары **×0.5** дальности и ПВО **×
 
 ### ECON-6 · Экономические метрики `[srv]` — S · ✅ (2026-07-22)
 
-**Как легло:** `RoomObservation` += kind `economy` (тип в matchRoom.ts; комната его
+**Как легло:** `RoomObservation` += kind `economy` (тип в matchRoomTypes.ts; комната его
 не эмитит — источник хостовый); чистый `economySnapshot(state)` в game.ts (казна
 копией + `netIncome` + arrears per player, `atTime = state.time`); эмит в
 `netserver.onWake` раз в игровой час (`lastEconAt`); JSONL несёт кривые

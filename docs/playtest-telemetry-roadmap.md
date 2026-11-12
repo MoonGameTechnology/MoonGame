@@ -29,7 +29,7 @@ PTM-2.1. Центральный raw ingest ждёт lifecycle PTM-3.1; нова�
 
 **Что уже есть и работает на проде.** Контейнер запускает `prototype/netserver.ts`
 (`Dockerfile`: `CMD ["packages/server/dist/proto-server.mjs"]`). Его поток наблюдений
-`RoomObservation` (`packages/server/src/matchRoom.ts`) пишется в JSONL
+`RoomObservation` (`packages/server/src/matchRoomTypes.ts`) пишется в JSONL
 (до PTM-0.1 — `playtest-logs/proto-<время старта>.jsonl`; `netserver.ts`, функция `observe`) и лежит на
 томе `void-logs` (`deploy/docker-compose.yml`). В потоке: вход и выход места (`join`/`leave`),
 действия с кодами отказа, доменные события (бои, захваты), рассинхрон (`desync`), клиентский

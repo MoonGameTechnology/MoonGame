@@ -162,7 +162,8 @@ computeSpeed(флот):
 
 ### События и фог: конвенция имён ключей payload
 
-События тоже проходят фог (`MatchRoom.eventVisibleTo`): сервер решает, кому показать
+События тоже проходят фог (`eventVisibleTo` в `packages/server/src/eventFog.ts`, его
+зовёт рассылка `MatchRoom`): сервер решает, кому показать
 событие, **по именам ключей его payload**. Действующая конвенция (проверено по коду):
 
 - **адресат** — `owner`, `playerId`, `a`, `b`, `from`, `to`, `buyer`, `seller`:
@@ -173,9 +174,9 @@ computeSpeed(флот):
 - **бой** — `battleId`: видно тому, кто видит этот бой в своей проекции (участник видит
   свой бой всегда — `engagementOf`), в том числе кадром раньше: `battle.resolved`
   приходит, когда боя в состоянии уже нет;
-- `time.advanced`, `match.*` и публичные новости (`PUBLIC_EVENTS` в `matchRoom.ts`: сейчас
+- `time.advanced`, `match.*` и публичные новости (`PUBLIC_EVENTS` в `eventFog.ts`: сейчас
   только `espionage.exposed`, раскрытый шпион) — глобальные (видны всем); `hero.*` — строго owner-only;
-  разведданные (`OWNER_ONLY_EVENTS` в `matchRoom.ts`) — тоже только владельцу, даже на
+  разведданные (`OWNER_ONLY_EVENTS` в `eventFog.ts`) — тоже только владельцу, даже на
   опознанном мире. Это стройка, ремонт и производство (`building.constructed`, `building.upgraded`,
   `building.repair.started`, `station.repair.started`, `unit.built`, `army.load.cancelled`,
   `army.unload.cancelled`): результат наблюдатель видит

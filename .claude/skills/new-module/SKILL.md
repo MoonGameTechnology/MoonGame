@@ -129,7 +129,7 @@ export const beaconModule: GameModule = {
 ## 7. Имена ключей в payload события — это контракт фога
 
 Сервер решает, кому показать событие, **по именам ключей payload**
-(`MatchRoom.eventVisibleTo`, `packages/server/src/matchRoom.ts`):
+(`eventVisibleTo`, `packages/server/src/eventFog.ts`):
 адресат — `owner`/`playerId`/`a`/`b`/`from`/`to`/`buyer`/`seller`; место —
 `location`/`planetId`/`at`; владение флотом — `fleetId`; бой — `battleId`. Назовёшь
 адресата `target` или `recipient` — событие скроется от игрока (fail-closed: утечки нет,

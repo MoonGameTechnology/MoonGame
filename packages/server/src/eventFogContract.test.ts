@@ -2,18 +2,18 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { OWNER_ONLY_EVENTS, PUBLIC_EVENTS } from './matchRoom';
+import { OWNER_ONLY_EVENTS, PUBLIC_EVENTS } from './eventFog';
 
 /**
  * AUD-2 — the fog-routing contract, enforced.
  *
- * `MatchRoom.eventVisibleTo` decides who may see a domain event by reading the KEY NAMES
+ * `eventVisibleTo` (`eventFog.ts`) decides who may see a domain event by reading the KEY NAMES
  * of its payload: there is no schema, no registry, just a convention every core module is
  * expected to follow. A module that names its addressee `target` or `recipient` gets its
  * events silently HIDDEN from that player — fail-closed, so nothing leaks, but the
  * mechanic simply never reaches the person it was written for. Nothing catches that
  * today: the reducer is happy, the tests are green, the event just evaporates on the way
- * out. `matchRoom.ts` asks for this test in its own comment ("extend the lists below
+ * out. `eventFog.ts` asks for this test in its own comment ("extend the lists below
  * together with a test in matchRoom.test.ts").
  *
  * WHY A SOURCE SCAN AND NOT A RUNTIME SWEEP. Collecting events from a simulated match
@@ -29,7 +29,7 @@ import { OWNER_ONLY_EVENTS, PUBLIC_EVENTS } from './matchRoom';
 
 const MODULES_DIR = fileURLToPath(new URL('../../shared-core/src/modules', import.meta.url));
 
-/** Keys `eventVisibleTo` routes by. Mirrors `matchRoom.ts` — the two are meant to be read
+/** Keys `eventVisibleTo` routes by. Mirrors `eventFog.ts` — the two are meant to be read
  *  side by side, and this test is what makes them stay together. */
 const AUDIENCE = ['owner', 'playerId', 'a', 'b', 'from', 'to', 'buyer', 'seller'] as const;
 const PLACE = ['location', 'planetId', 'at'] as const;
