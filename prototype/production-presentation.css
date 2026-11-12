@@ -481,3 +481,13 @@ body.holo-ui #constructor.pw-production .pw-lane-card.on { background:rgba(14,43
 body.holo-ui #constructor.pw-production :is(.pw-lane-art,.pw-catalog-tile > .ship-art,.pw-catalog-visual > .ship-art) { background:rgba(4,19,28,calc(.7 * var(--holo-window-alpha,.94))); }
 body.holo-ui #constructor.pw-production :is(.pw-building,.pw-hero-fold,.cnbox > .pw-context .pw-income) { background:rgba(9,29,40,calc(.82 * var(--holo-window-alpha,.94))); }
 body.holo-ui #constructor.pw-production :is(.pw-catalog-tile .pw-catalog-actions > .cn-hbtn,.pw-catalog-heading button,.pw-requirement-row > button,.pw-building-action .bw-st) { background:rgba(10,32,44,calc(.85 * var(--holo-window-alpha,.94))); }
+/* Крестик «снять» в углу плитки (модуль в отсеке, способность и модуль героя): один вид —
+   внутри рамки, не поверх значка и не на кромке. Палец попадает по невидимой зоне 44px. */
+#constructor.pw-production .pw-bays .cn-bay .cn-tx,
+#constructor.pw-production #herobody .hx-bays [data-hunequip],
+#constructor.pw-production .pw-hardware-remove { position:absolute; top:4px; right:4px; left:auto; transform:none; width:22px; min-width:22px; height:22px; min-height:22px; padding:0; border-radius:6px; font-size:13px; line-height:1; display:grid; place-items:center; }
+#constructor.pw-production .pw-bays .cn-bay .cn-tx::after,
+#constructor.pw-production #herobody .hx-bays [data-hunequip]::after,
+#constructor.pw-production .pw-hardware-remove::after { content:''; position:absolute; inset:-11px; pointer-events:auto; }
+/* Отсек узкий (80px): крестик меньше и ближе к углу, чтобы не касаться значка модуля. */
+#constructor.pw-production .pw-bays .cn-bay .cn-tx { top:3px; right:3px; width:20px; min-width:20px; height:20px; min-height:20px; font-size:12px; }
