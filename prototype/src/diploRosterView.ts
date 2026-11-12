@@ -77,7 +77,7 @@ export function diploRosterHtml(view: RosterView): string {
     .join('');
   return (
     `<div class="dp-tools">` +
-    `<label class="dp-search"><span>${t('diplo.search')}</span><input id="dp-search" type="search" autocomplete="off" maxlength="120" value="${esc(view.query)}"></label>` +
+    `<label class="dp-search"><span>${t('diplo.search')}</span><input id="dp-search" type="search" autocomplete="off" maxlength="120" placeholder="${t('diplo.search')}" value="${esc(view.query)}"></label>` +
     `<div class="dp-sorts" role="group" aria-label="${t('diplo.sort')}"><span>${t('diplo.sort')}</span>` +
     sortBtn('name', t('diplo.sort.name')) +
     sortBtn('worlds', t('diplo.sort.provinces')) +
