@@ -532,8 +532,13 @@ describe('мир вне зрения', () => {
     const html = m.unknownPlanetHtml(env.s.planets.Z!);
     expect(html).toContain(t('side.notelemetry.title'));
     expect(html).toContain(act('ping', ''));
+    // SPY-24: разведка идёт и на мир, которого игрок не видел: кнопка шпиона на месте,
+    // окно заданий гасит остальное (`decisions/spyTasks.ts`).
+    expect(html.match(/data-act="spyagents"/g)).toHaveLength(1);
+    expect(html).not.toContain('data-act="spyplanet"');
     env.hidden = true;
     expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain('data-act="ping"');
+    expect(m.unknownPlanetHtml(env.s.planets.Z!)).not.toContain('data-act="spyagents"');
   });
 
   it('провинция, куда залетал корабль, называет свой тип, но не хозяина', async () => {

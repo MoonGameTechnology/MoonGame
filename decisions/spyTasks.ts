@@ -9,11 +9,16 @@
  *    ресурсов, срыв стройки, подрыв экономики, саботаж.
  * 2. **Передислоцироваться можно на любой мир, кроме того, где шпион уже стоит.**
  *    Ничейный мир тоже годится: шпион просто ждёт там следующего задания.
- * 3. **Контрразведка нужна миру с владельцем.** Своему или чужому (решение владельца
+ * 3. **Мира в тумане, о котором игрок ничего не знает, — только разведка и переезд**
+ *    (SPY-24). Знает он свой мир, мир коалиции, мир в обзоре и мир, где бывал его шпион
+ *    (`spyKnownOwner` ядра); остальные задания ядро отвергло бы одинаково для чужого и
+ *    ничейного мира, иначе отказ выдал бы хозяина.
+ * 4. **Разведка идёт и на ничейный мир** (SPY-24): без бросков, суточное окно.
+ * 5. **Контрразведка нужна миру с владельцем.** Своему или чужому (решение владельца
  *    2026-11-10: «оставь контрразведку на вражеской планете»), но не ничейному.
- * 4. **Остальные задания только против чужого мира.** Свой, ничейный и мир участника
+ * 6. **Остальные задания только против чужого мира.** Свой, ничейный и мир участника
  *    своей коалиции гасят их: ядро такую попытку отвергнет.
- * 5. **Мир не выбран — гаснет только то, что гасит сам шпион.** Окно «Дать задание» из
+ * 7. **Мир не выбран — гаснет только то, что гасит сам шпион.** Окно «Дать задание» из
  *    вкладки открывается до выбора планеты, и тогда серыми не бывает ничего.
  */
 import type { SpyOp } from '../packages/shared-core/src/index';
@@ -35,21 +40,28 @@ export const SPY_TASKS: readonly SpyTask[] = [
 
 /** Что карточке нужно знать о выбранном мире. */
 export interface TaskWorld {
-  /** Хозяин мира; `null` — ничейный. */
-  owner: string | null;
+  /** Хозяин мира, каким его знает игрок; `null` — ничейный, `undefined` — игрок не знает
+   *  (правило 3). */
+  owner: string | null | undefined;
   /** Хозяин мира состоит в одной коалиции с игроком. */
   coalitionMate: boolean;
 }
 
 /** Почему карточка серая. `null` — задание можно дать. */
-export type TaskBlock = 'here' | 'no-owner' | 'own-world' | 'coalition' | null;
+export type TaskBlock = 'here' | 'unscouted' | 'no-owner' | 'own-world' | 'coalition' | null;
 
-/** Правила 2–5. `world` — выбранный мир (`null`, пока не выбран), `here` — шпион уже
+/** Правила 2–7. `world` — выбранный мир (`null`, пока не выбран), `here` — шпион уже
  *  стоит на этом мире. */
-export function taskBlock(task: SpyTask, world: TaskWorld | null, me: string, here: boolean): TaskBlock {
+export function taskBlock(
+  task: SpyTask,
+  world: TaskWorld | null,
+  me: string,
+  here: boolean,
+): TaskBlock {
   if (task === 'relocate') return here ? 'here' : null;
   if (!world) return null;
-  if (world.owner === null) return 'no-owner';
+  if (world.owner === undefined) return task === 'recon' ? null : 'unscouted';
+  if (world.owner === null) return task === 'recon' ? null : 'no-owner';
   if (task === 'counter') return null;
   if (world.owner === me) return 'own-world';
   return world.coalitionMate ? 'coalition' : null;

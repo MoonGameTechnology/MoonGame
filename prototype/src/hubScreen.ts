@@ -201,6 +201,7 @@ export function hubTab(tab: string): void {
   if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
   if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
   if (tab === 'arsenal' && arsenal) detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
+  if (tab === 'arsenal' && metaMarket) detach('хаб: кошелёк аукциона', metaMarket.sync()); // the head's warrants chip
   if (tab !== 'arsenal') arsenal?.close(); // the phone sheet lives over the hub, not in the tab
   if (tab === 'auction' && metaMarket) detach('хаб: аукцион', metaMarket.refresh());
   if (tab === 'supply' && metaEconomy) detach('хаб: снабжение', metaEconomy.refresh());
@@ -521,6 +522,7 @@ export function initHubScreen(host: HubScreenHost): void {
         fillWelcome((readLocal('void.nick') ?? '').trim(), 'show');
       },
       openAuction: () => hubTab('auction'),
+      warrants: () => metaMarket?.balance() ?? 0,
       openHeroMatch: () => hubTab('games'),
       sell: (itemId) => {
         metaMarket?.focusSell(itemId);
@@ -547,7 +549,7 @@ export function initHubScreen(host: HubScreenHost): void {
       note: (message) => {
         hubNote.textContent = message;
       },
-      changed: () => hubWallet?.render(),
+      changed: () => void (hubWallet?.render(), arsenal?.repaint()),
       inventoryChanged: async () => {
         await arsenal?.refresh();
       },

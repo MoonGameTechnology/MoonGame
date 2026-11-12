@@ -61,9 +61,10 @@ setLocale(new URLSearchParams(location.search).get('lang') || 'ru');
 let actor='alice', cache=[]; const history=new Map(); const rewards=initModuleRewards({identity:()=>actor,visible:()=>true,read:k=>history.get(k),write:(k,v)=>history.set(k,v)}); const auth=async()=>({base:location.origin,token:actor});
 const arRoot=document.querySelector('#hp-arsenal'), mmRoot=document.querySelector('#hp-auction');
 const showMarket=async()=>{arsenal.close();arRoot.hidden=true;mmRoot.hidden=false;document.querySelector('#hub').dataset.panel='auction';await market.refresh();};
-const arsenal=initArsenal({root:()=>arRoot,sheet:()=>document.querySelector('#arsenal-sheet'),narrow:()=>innerWidth<700,readCache:()=>cache,writeCache:i=>{cache=i;},confirmed:i=>rewards.observe(i),authorizedBase:auth,canSignIn:()=>false,signIn:()=>{},openCodex:()=>{},openSeason:()=>{},openStore:()=>{},openAuction:showMarket,sell:id=>{market.focusSell(id);void showMarket();}});
-const market=initMetaMarket({root:()=>mmRoot,arsenal:()=>arsenal.items(),authorizedBase:auth,note:m=>{document.querySelector('#notice').textContent=m;},inventoryChanged:()=>arsenal.refresh()});
-window.moduleChain={ready:arsenal.refresh(),showMarket,actor:async id=>{actor=id;cache=[];arsenal.forget();await arsenal.refresh();await showMarket();}};
+const arsenal=initArsenal({root:()=>arRoot,sheet:()=>document.querySelector('#arsenal-sheet'),narrow:()=>innerWidth<700,readCache:()=>cache,writeCache:i=>{cache=i;},confirmed:i=>rewards.observe(i),authorizedBase:auth,canSignIn:()=>false,signIn:()=>{},openCodex:()=>{},openSeason:()=>{},openStore:()=>{},openAuction:showMarket,warrants:()=>market.balance(),sell:id=>{market.focusSell(id);void showMarket();}});
+const market=initMetaMarket({root:()=>mmRoot,arsenal:()=>arsenal.items(),authorizedBase:auth,note:m=>{document.querySelector('#notice').textContent=m;},changed:()=>arsenal.repaint(),inventoryChanged:()=>arsenal.refresh()});
+const showArsenal=()=>{mmRoot.hidden=true;arRoot.hidden=false;document.querySelector('#hub').dataset.panel='arsenal';};
+window.moduleChain={ready:arsenal.refresh().then(()=>market.sync()),showMarket,showArsenal,actor:async id=>{actor=id;cache=[];arsenal.forget();await arsenal.refresh();await showMarket();}};
 `,
     loader: 'ts',
   },
@@ -109,6 +110,11 @@ try {
     try {
       await page.goto(url + '/?lang=' + lang);
       await page.evaluate(() => window.moduleChain.ready);
+      // Фиолетовая плашка Варрантов в шапке арсенала — та же дверь в аукцион, что на главном экране.
+      await page.screenshot({ path: resolve(out, `arsenal-head-${width}.png`) });
+      await page.locator('#hp-arsenal .ar-head [data-ar-auction]').click();
+      await page.locator('#hp-auction .mm-dock').waitFor();
+      await page.evaluate(() => window.moduleChain.showArsenal());
       await page.locator('[data-ar-module="cargo_bay"]').click();
       await page.locator('[data-ar-select="target"]').click();
       await page.waitForFunction(

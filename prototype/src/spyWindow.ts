@@ -18,8 +18,10 @@
  */
 import {
   coalitionOf,
+  identifiedNodes,
   MISSION_HOURS,
   SPY_OP_COST,
+  spyKnownOwner,
   spyRoster as spiesOf,
   spyTravelMs,
   type Action,
@@ -39,6 +41,7 @@ import { liveTimerHtml, patchLiveTimers, type LiveFormats } from './liveTimers';
 import { spyPortraitSvg } from './spyPortrait';
 import { spyOddsFor } from './worldCard';
 import { ctx } from './game';
+import { data } from './gameData';
 
 /** Что окну нужно от игры. */
 export interface SpyWindowHost {
@@ -91,9 +94,12 @@ const costOf = (task: SpyTask) => (SPY_OP_COST as Readonly<Record<string, number
 function blockOf(task: SpyTask, spy: number, planetId: string | null): TaskBlock {
   const s = game.state();
   const me = game.me();
-  const planet = planetId ? s.planets[planetId] : undefined;
-  const world = planet
-    ? { owner: planet.owner, coalitionMate: !!planet.owner && !!coalitionOf(s, me)?.members.includes(planet.owner) }
+  // SPY-24: the card greys what the core would refuse, so it reads the owner as the player
+  // knows it — a world in the fog is unknown until a spy of theirs has been there.
+  const known = planetId && s.planets[planetId] ? spyKnownOwner(s, me, planetId, identifiedNodes(s, me, data)) : null;
+  const owner = known?.owner;
+  const world = planetId && s.planets[planetId]
+    ? { owner, coalitionMate: !!owner && !!coalitionOf(s, me)?.members.includes(owner) }
     : null;
   return taskBlock(task, world, me, !!planetId && spyById(spy)?.location === planetId);
 }

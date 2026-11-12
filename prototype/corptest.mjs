@@ -168,6 +168,7 @@ try {
       const overflow = await page.$eval('#hp-corp', (el) => el.scrollWidth > el.clientWidth + 1);
       assert.equal(overflow, false, 'the corporation tab must not overflow horizontally');
       await page.screenshot({ path: `.playwright-mcp/corporation-${locale}-queue.png` });
+      await page.locator('#hp-corp .cb-blds').screenshot({ path: `.playwright-mcp/corporation-${locale}-buildings.png` });
       for (const section of ['members', 'treasury', 'battles', 'settings']) {
         await page.click(`#hp-corp [data-corpsec="${section}"]`);
         await page.locator(`#hp-corp [data-corpsec="${section}"][aria-selected="true"]`).waitFor();

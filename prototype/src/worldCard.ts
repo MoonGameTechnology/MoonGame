@@ -400,6 +400,11 @@ export function unknownPlanetHtml(p: Planet): string {
     : '';
   // No «Снять выделение» on planet cards: it only clears FLEET selection (selPlanet
   // stays, the card would not even close) — the ✕ in the corner is the real close.
+  // SPY-24: recon is the one order a world never seen takes — it is what finds out whose it
+  // is; the spy window greys the rest (`decisions/spyTasks.ts`).
+  const spyRow = espionageShown(sectorZeroToolsHidden())
+    ? `<div class="row">${spyButtonHtml()}</div>`
+    : '';
   return (
     cardHeader('#5f8f8c', placeName(p.id), t('side.notelemetry.title')) +
     `<div class="pscan">` +
@@ -407,6 +412,7 @@ export function unknownPlanetHtml(p: Planet): string {
     typeRow +
     `<div class="hint">${t('side.notelemetry.hint')}</div>` +
     ping +
+    spyRow +
     `</div>`
   );
 }

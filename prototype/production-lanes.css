@@ -31,12 +31,12 @@ body:not(.mobile-ui) #constructor.pw-production .cnbox > .pw-context .pw-stock {
 #constructor.pw-production .pw-lane-art .holo-icon svg { width:22px; height:22px; }
 #constructor.pw-production .pw-lane-text { display:flex; flex-direction:column; gap:2px; min-width:0; }
 #constructor.pw-production .pw-lane-text > small { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#39d4df; }
-#constructor.pw-production .pw-lane-text > b { display:-webkit-box; overflow:hidden; font-size:13px; line-height:1.25; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
+#constructor.pw-production .pw-lane-text > b { display:-webkit-box; overflow:hidden; font-size:13px; line-height:1.25; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:break-word; }
 #constructor.pw-production .pw-lane-text > b.pw-lane-free { color:#e2b45c; }
 #constructor.pw-production .pw-lane-text > progress { width:100%; height:3px; margin-top:2px; appearance:none; border:0; border-radius:2px; background:#1e3e4a; color:#39d4df; }
 #constructor.pw-production .pw-lane-text > progress::-webkit-progress-bar { background:#1e3e4a; }
 #constructor.pw-production .pw-lane-text > progress::-webkit-progress-value { background:#39d4df; }
-#constructor.pw-production .pw-lane-end { display:flex; align-items:center; gap:6px; font-size:12px; font-variant-numeric:tabular-nums; color:#94afb9; white-space:nowrap; }
+#constructor.pw-production .pw-lane-end { display:flex; flex-direction:column; align-items:flex-end; gap:2px; font-size:12px; font-variant-numeric:tabular-nums; color:#94afb9; white-space:nowrap; }
 #constructor.pw-production .pw-lane-more { padding:1px 6px; border:1px solid #2f5462; border-radius:999px; font-size:11px; color:#e1f0f3; }
 #constructor.pw-production .pw-lane-end > .holo-icon { display:grid; place-items:center; width:30px; height:30px; border:1px solid #376270; border-radius:8px; color:#39d4df; }
 #constructor.pw-production .pw-lane-end > .holo-icon svg { width:18px; height:18px; }

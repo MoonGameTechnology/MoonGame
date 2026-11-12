@@ -13,7 +13,11 @@ interface El {
   id: string;
   innerHTML: string;
   classes: Set<string>;
-  classList: { add(c: string): void; remove(c: string): void; toggle(c: string, on?: boolean): void };
+  classList: {
+    add(c: string): void;
+    remove(c: string): void;
+    toggle(c: string, on?: boolean): void;
+  };
   style: Record<string, string>;
   addEventListener(type: string, fn: (ev: unknown) => void): void;
   fire(type: string, ev?: unknown): void;
@@ -70,7 +74,7 @@ afterEach(() => {
   vi.doUnmock('./worldCard');
 });
 
-async function boot(spies: SpyRecordView[]) {
+async function boot(spies: SpyRecordView[], opts?: { fog?: boolean }) {
   vi.resetModules();
   // Шанс считает карточка мира по туману; здесь он — база ядра.
   vi.doMock('./worldCard', () => ({ spyOddsFor: () => ({ success: 0.6, risk: 0.35 }) }));
@@ -83,6 +87,8 @@ async function boot(spies: SpyRecordView[]) {
   });
   const mine = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
   const enemy = Object.values(s.planets).find((p) => p.owner === 'p2')!.id;
+  // SPY-24: the enemy capital is out of sight; a spy of p1 has been there, so p1 knows it.
+  if (!opts?.fog) s.scouted = { p1: { [enemy]: { owner: 'p2', at: s.time } } };
   const env = {
     s: { ...s, spies: { p1: spies } } as GameState,
     orders: [] as Action[],
@@ -112,7 +118,8 @@ describe('тексты окна заведены', () => {
     for (let i = 0; i < SPY_CALLSIGNS; i++) expect(hasKey(`spy.callsign.${i}`)).toBe(true);
     for (const st of ['rest', 'wait', 'travel', 'work', 'return', 'recruit', 'hidden'])
       expect(hasKey(`spy.status.${st}`)).toBe(true);
-    for (const b of ['here', 'no-owner', 'own-world', 'coalition']) expect(hasKey(`spy.block.${b}`)).toBe(true);
+    for (const b of ['here', 'unscouted', 'no-owner', 'own-world', 'coalition'])
+      expect(hasKey(`spy.block.${b}`)).toBe(true);
   });
 });
 
@@ -160,6 +167,17 @@ describe('окно «Шпионаж»', () => {
     expect(el('spypick').classes.has('show')).toBe(false);
   });
 
+  it('SPY-24: мир в тумане, где не бывал свой шпион, — только разведка и переезд', async () => {
+    const { win, enemy } = await boot([{ id: 1, state: 'rest', location: 'cap' }], { fog: true });
+    win.openSpyWindow(enemy);
+    tap('spywin', { '[data-spy-assign]': { spyAssign: '1' } });
+    const cards = el('spywin').innerHTML;
+    expect(cards).toContain('data-spy-task="theft" disabled');
+    expect(cards).toContain('data-spy-task="counter" disabled');
+    expect(cards).not.toContain('data-spy-task="recon" disabled');
+    expect(cards).not.toContain('data-spy-task="relocate" disabled');
+  });
+
   it('невозможный мир объясняется в ленте, а «Отменить выдачу» закрывает выбор', async () => {
     const { win, env, mine } = await boot([{ id: 1, state: 'rest', location: 'cap' }]);
     el('rail-spy').click();
@@ -190,7 +208,9 @@ describe('окно «Шпионаж»', () => {
   });
 
   it('«Отменить задание» спрашивает и только после «Да» отдаёт приказ', async () => {
-    const { env } = await boot([{ id: 3, state: 'work', location: 'w9', op: 'counter', arrivesAt: Number.MAX_SAFE_INTEGER }]);
+    const { env } = await boot([
+      { id: 3, state: 'work', location: 'w9', op: 'counter', arrivesAt: Number.MAX_SAFE_INTEGER },
+    ]);
     el('rail-spy').click();
     tap('spywin', { '[data-spy-cancel]': { spyCancel: '3' } });
     expect(el('spywin').innerHTML).toContain('data-spy-yes');
@@ -206,9 +226,14 @@ describe('окно «Шпионаж»', () => {
     expect(win.spyJourneyLine('espionage.arrived', { owner: 'p1', spyId: 1, planetId: 'w9' })).toBe(
       t('log.spy.arrived', { who: t('spy.callsign.0'), at: '«w9»', task: '' }),
     );
-    expect(win.spyJourneyLine('espionage.waiting', { owner: 'p1', spyId: 1, planetId: 'w9', kind: 'theft' })).toContain(
-      t('spy.task.theft.name'),
-    );
+    expect(
+      win.spyJourneyLine('espionage.waiting', {
+        owner: 'p1',
+        spyId: 1,
+        planetId: 'w9',
+        kind: 'theft',
+      }),
+    ).toContain(t('spy.task.theft.name'));
     expect(win.spyJourneyLine('espionage.home', { owner: 'p2', spyId: 1 })).toBeNull();
   });
 });

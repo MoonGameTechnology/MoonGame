@@ -16,27 +16,40 @@ describe('spyTasks — карточки окна «Дать задание»', (
   });
 
   it('правило 2: передислоцироваться можно куда угодно, кроме места, где шпион стоит', () => {
-    for (const w of [enemy, own, neutral, mate]) expect(taskBlock('relocate', w, 'p1', false)).toBeNull();
+    for (const w of [enemy, own, neutral, mate])
+      expect(taskBlock('relocate', w, 'p1', false)).toBeNull();
     expect(taskBlock('relocate', enemy, 'p1', true)).toBe('here');
   });
 
-  it('правило 3: контрразведка на своём и на чужом мире, но не на ничейном', () => {
+  it('правило 3: мир, о котором игрок ничего не знает, — только разведка и переезд', () => {
+    const fog = { owner: undefined, coalitionMate: false };
+    expect(taskBlock('relocate', fog, 'p1', false)).toBeNull();
+    expect(taskBlock('recon', fog, 'p1', false)).toBeNull();
+    for (const op of ['counter', 'research', 'theft', 'delay', 'disrupt', 'sabotage'] as const)
+      expect(taskBlock(op, fog, 'p1', false)).toBe('unscouted');
+  });
+
+  it('правило 4: разведка идёт и на ничейный мир', () => {
+    expect(taskBlock('recon', neutral, 'p1', false)).toBeNull();
+  });
+
+  it('правило 5: контрразведка на своём и на чужом мире, но не на ничейном', () => {
     expect(taskBlock('counter', own, 'p1', false)).toBeNull();
     expect(taskBlock('counter', enemy, 'p1', false)).toBeNull();
     expect(taskBlock('counter', neutral, 'p1', false)).toBe('no-owner');
   });
 
-  it('правило 4: агрессивные задания только против чужого мира вне своей коалиции', () => {
+  it('правило 6: агрессивные задания только против чужого мира вне своей коалиции', () => {
     for (const op of AGGRESSIVE) {
       expect(taskBlock(op, enemy, 'p1', false)).toBeNull();
       expect(taskBlock(op, enemy, 'p1', true)).toBeNull();
       expect(taskBlock(op, own, 'p1', false)).toBe('own-world');
-      expect(taskBlock(op, neutral, 'p1', false)).toBe('no-owner');
+      if (op !== 'recon') expect(taskBlock(op, neutral, 'p1', false)).toBe('no-owner');
       expect(taskBlock(op, mate, 'p1', false)).toBe('coalition');
     }
   });
 
-  it('правило 5: без выбранного мира всё доступно', () => {
+  it('правило 7: без выбранного мира всё доступно', () => {
     for (const task of SPY_TASKS) expect(taskBlock(task, null, 'p1', false)).toBeNull();
   });
 });

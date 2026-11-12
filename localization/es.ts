@@ -2914,6 +2914,7 @@ export const es: Record<string, string> = {
   'err.no-range': 'el escuadrón carece de alcance de ataque',
   'err.no-right-of-way': 'sin paso: la ruta cruza un imperio en paz',
   'err.no-route': 'no hay ruta',
+  'err.unscouted': 'ninguno de tus espías ha estado aquí',
   'err.no-ships': 'no hay naves',
   'err.no-shipyard': 'se requiere astillero',
   'err.yard-too-small': 'astillero insuficiente — se requiere una grada superior',
