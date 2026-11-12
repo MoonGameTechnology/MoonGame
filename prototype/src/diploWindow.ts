@@ -130,6 +130,8 @@ let diploSort: DiploSortOrder = { key: 'stance', direction: 'asc' };
 let diploQuery = '';
 let diploExpanded: string | null = null; // participant row showing its action buttons
 let diploToolsOpen = false; // phone: the sorting/filter panel under the search field
+/** Phone: «Сообщения» is two screens, the chat list and one open chat (PC shows both). */
+let msgsView: 'list' | 'thread' = 'list';
 // Roster filters (alongside sort): show only seats matching the picked stance(s) and
 // type(s). Empty set = no constraint from that category. They AND across categories,
 // OR within one. A stance filter excludes your own seat (you have no self-stance).
@@ -364,6 +366,7 @@ function toggleMapShare(target: string): void {
 export function openDiplo(tab: 'diplo' | 'msgs'): void {
   diploOpen = true;
   diploTab = tab;
+  if (tab === 'msgs') msgsView = 'list'; // a caller that opens one chat sets 'thread' after
   game.refreshNicks(); // кто-то мог сесть в партию, пока окно было закрыто
   renderDiplo();
   document.getElementById('diplo')?.classList.add('show');
@@ -610,17 +613,14 @@ export function renderDiplo(resetRosterScroll = false): void {
   const body =
     diploTab === 'diplo'
       ? diploRoster()
-      : `<div class="dp-convo">${conversations.listHtml()}${conversations.threadHtml()}</div>`;
+      : `<div class="dp-convo ${msgsView}">${conversations.listHtml()}${conversations.threadHtml()}</div>`;
   el.innerHTML =
     `<div class="dpbox">` +
     `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}<button class="dp-close btn-x">✕</button></div>` +
     body +
     `</div>`;
   restoreUi();
-  if (diploTab === 'msgs') {
-    scrollFeedToEnd();
-    showOpenChat();
-  }
+  if (diploTab === 'msgs') scrollFeedToEnd();
 }
 /** An opened row near the list's bottom would hide its treaty buttons below the fold:
  *  scroll the list (only the list) until they show, never past the row's own top. */
@@ -636,13 +636,6 @@ function revealExpanded(): void {
   const room = row.getBoundingClientRect().top - box.top;
   if (below > 0) list.scrollTop += Math.min(below + 6, room);
 }
-/** Phone: the chats are a horizontal strip, so bring the open one into view (PC: no-op). */
-function showOpenChat(): void {
-  const list = document.getElementById('diplo')?.querySelector?.<HTMLElement>('.dp-cvlist');
-  const on = list?.querySelector<HTMLElement>('.dp-cv.on');
-  if (!list || !on || list.scrollWidth <= list.clientWidth) return;
-  list.scrollLeft = on.offsetLeft - (list.clientWidth - on.offsetWidth) / 2;
-}
 /** COAL-1: после дипломатического пакета — список чатов и карточки предложений в
  *  открытой личке, не трогая поле ввода (полу-набранная реплика переживает). */
 export function refreshThreadDiplo(): void {
@@ -655,10 +648,10 @@ export function refreshThreadDiplo(): void {
   if (conversations.current() !== was) return renderDiplo();
   const list = document.querySelector('#diplo .dp-cvlist');
   if (list) {
-    const scrolled = list.scrollLeft;
+    const scrolled = list.scrollTop;
     list.outerHTML = listHtml;
     const fresh = document.querySelector('#diplo .dp-cvlist');
-    if (fresh) fresh.scrollLeft = scrolled;
+    if (fresh) fresh.scrollTop = scrolled;
   }
   const box = document.querySelector('#diplo .dp-tdip');
   if (box) box.outerHTML = threadDiploHtml(conversations.current());
@@ -760,6 +753,7 @@ export function initDiploWindow(host: DiploWindowHost): void {
         delete playerCardEl.dataset.seat;
         openDiplo('msgs'); // hand off to the full message thread
         conversations.open(intent.seat);
+        msgsView = 'thread';
         renderDiplo();
       }
     });
@@ -844,12 +838,19 @@ export function initDiploWindow(host: DiploWindowHost): void {
       if (intent?.kind === 'message') {
         conversations.open(intent.seat);
         diploTab = 'msgs';
+        msgsView = 'thread';
         renderDiplo();
         return;
       }
       const convo = (tg.closest('.dp-cv') as HTMLElement | null)?.dataset.convo;
       if (convo) {
         conversations.open(convo);
+        msgsView = 'thread';
+        renderDiplo();
+        return;
+      }
+      if (tg.closest('.dp-back')) {
+        msgsView = 'list';
         renderDiplo();
         return;
       }

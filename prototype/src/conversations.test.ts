@@ -318,3 +318,21 @@ describe('конверсации — предложение стойки зап�
     expect(html).not.toContain('answer-');
   });
 });
+
+describe('конверсации — список чатов', () => {
+  it('чат, где ждут моего ответа на предложение, — первым среди личек и с меткой', () => {
+    const state: GameState = newGame();
+    state.players.p3 = { ...structuredClone(state.players.p2!), id: 'p3' };
+    const log = [msg({ at: 5, from: 'p1', to: 'p3', text: 'свежее' })];
+    setOffer(state, 'p2', 'p1', 'peace');
+    const host = hostOf({ state: () => state, messages: () => log, seats: () => ['p1', 'p2', 'p3'] });
+    const html = initConversations(host).listHtml();
+    expect(html.indexOf('data-convo="p2"')).toBeLessThan(html.indexOf('data-convo="p3"'));
+    expect(html).toContain('dp-cv ask');
+    expect(html.match(/dp-cv-ask/g)).toHaveLength(1);
+  });
+
+  it('у переписки есть «←» к списку (видна только на телефоне)', () => {
+    expect(initConversations(hostOf()).threadHtml()).toContain('class="dp-back');
+  });
+});

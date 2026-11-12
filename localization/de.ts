@@ -778,6 +778,7 @@ export const de: Record<string, string> = {
   'cost.free': 'kostenlos',
   'cost.short': '{n} mehr benötigt',
   'chat.coalition.empty': 'Der Koalitions-Chat ist leer.<br>Markieren Sie eine Provinz mit einem Ping 📍 oder schreiben Sie etwas.',
+  'chat.back': 'Alle Chats',
   'chat.empty': 'Noch keine Nachrichten vorhanden.',
   'chat.dm.none': 'Noch keine Direktnachrichten. Tippen Sie im Reiter Diplomatie auf ✉, um einem Spieler zu schreiben.',
   'chat.head.coalition': '⚡ Koalition · {n} {n|Mitglied|Mitglieder}',

@@ -1048,6 +1048,7 @@ export const en: Record<string, string> = {
   // --- chat / spy — Переписка (сессия и коалиция) и вкладка шпионажа.
   'chat.coalition.empty':
     'The coalition chat is empty.<br>Mark a province with a ping 📍 or write something.',
+  'chat.back': 'All chats',
   'chat.empty': 'No messages yet.',
   'chat.dm.none': 'No direct chats yet. To message a player, tap ✉ on the Diplomacy tab.',
   'chat.head.coalition': '⚡ Coalition · {n} {n|member|members}',

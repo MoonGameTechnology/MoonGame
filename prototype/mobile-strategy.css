@@ -341,34 +341,43 @@ body.mobile-ui #diplo .dp-convo {
   height: auto;
   flex-direction: column;
 }
-/* Chats are one horizontal strip of chips; the open one is scrolled into view. */
+/* Two screens, as in a messenger: the full list of chats, then one chat with «←». A long
+   list scrolls; nothing is squeezed into a strip. */
+body.mobile-ui #diplo .dp-convo.list .dp-thread,
+body.mobile-ui #diplo .dp-convo.thread .dp-cvlist { display: none; }
 body.mobile-ui #diplo .dp-cvlist {
-  display: flex;
-  flex: none;
-  flex-direction: row;
-  position: relative;
+  flex: 1;
   width: 100%;
-  gap: 6px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  overscroll-behavior-x: contain;
+  min-height: 0;
+  max-height: none;
+  padding: 6px;
+  gap: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-right: 0;
-  border-bottom: 1px solid var(--line-hi);
 }
 body.mobile-ui #diplo .dp-cv,
 body.mobile-ui #diplo .dp-cv.coal {
-  flex: 0 0 auto;
-  width: auto;
-  max-width: 180px;
-  padding: 4px 10px 4px 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
-body.mobile-ui #diplo .dp-cv.on { border-color: var(--cyan-dim); }
-body.mobile-ui #diplo .dp-cvnone { padding: 4px 6px; align-self: center; }
-/* The highlighted chip already names the open chat. */
-body.mobile-ui #diplo .dp-thhead { display: none; }
+body.mobile-ui #diplo .dp-convo.list .dp-cv.on:not(.ask) { border-color: var(--line); background: transparent; }
+body.mobile-ui #diplo .dp-cv.ask { border-color: var(--amber); }
+body.mobile-ui #diplo .dp-cv-ic { font-size: 18px; width: 22px; }
+body.mobile-ui #diplo .dp-cv-nm { flex: 1; }
+body.mobile-ui #diplo .dp-cv-nm em { max-width: none; }
+body.mobile-ui #diplo .dp-cvnone { padding: 8px 6px; }
+body.mobile-ui #diplo .dp-thhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 4px 8px 4px 4px;
+}
+body.mobile-ui #diplo .dp-back { display: block; flex: none; font-size: 20px; }
 body.mobile-ui #diplo .dp-thread {
   min-height: 0;
 }

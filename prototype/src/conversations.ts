@@ -225,6 +225,9 @@ export function initConversations(host: ConversationsHost): {
       offered,
     }).sort(
       (a, b) =>
+        // чат, где ждут МОЕГО ответа на предложение, — наверху: длинный список его не прячет
+        Number(getOffer(host.state(), b, host.me()) !== null) -
+          Number(getOffer(host.state(), a, host.me()) !== null) ||
         (convoLast(b)?.at ?? -1) - (convoLast(a)?.at ?? -1) ||
         host.nameOf(a).localeCompare(host.nameOf(b)),
     );
@@ -250,10 +253,16 @@ export function initConversations(host: ConversationsHost): {
                 (last.ping ? pingGlyph(last.pingKind) + ' ' + last.ping : last.text),
             )
           : '—';
+        // Входящее предложение ждёт ответа — чат видно в списке сразу, не открывая его.
+        const asked = getOffer(host.state(), id, host.me());
+        const ask = asked !== null;
+        const flag = ask
+          ? `<span class="dp-cv-ask" title="${esc(t('diplo.offer.in', { who: host.nameOf(id), what: host.stanceLabel(asked) }))}">●</span>`
+          : '';
         return (
-          `<button class="dp-cv${convoOpen === id ? ' on' : ''}" data-convo="${id}">` +
+          `<button class="dp-cv${convoOpen === id ? ' on' : ''}${ask ? ' ask' : ''}" data-convo="${id}">` +
           `<span class="dp-cv-ic" style="color:${host.ownerColor(id)}">${host.seatBadge(id).icon}</span>` +
-          `<span class="dp-cv-nm">${esc(host.nameOf(id))}<em>${prev}</em></span></button>`
+          `<span class="dp-cv-nm">${esc(host.nameOf(id))}<em>${prev}</em></span>${flag}</button>`
         );
       })
       .join('');
@@ -277,7 +286,8 @@ export function initConversations(host: ConversationsHost): {
     const compose = `<div class="dp-compose">${pingBtn}<input id="dp-text" maxlength="160" placeholder="${t('chat.input.ph')}" autocomplete="off"><button class="dp-send">▶</button></div>`;
     return (
       `<div class="dp-thread">` +
-      `<div class="dp-thhead">${title}</div>` +
+      // «←» видна только на телефоне: там список чатов и переписка — два экрана.
+      `<div class="dp-thhead"><button class="dp-back btn-quiet" aria-label="${t('chat.back')}">←</button><span>${title}</span></div>` +
       `<div class="dp-feed" id="dp-feed">${convoFeedInnerHtml(convoOpen)}</div>` +
       (GROUP_CHANNELS.has(convoOpen) ? '' : host.threadDiploHtml(convoOpen)) +
       compose +
