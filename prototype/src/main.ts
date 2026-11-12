@@ -177,7 +177,7 @@ import { measureViewport } from './viewport';
 import { hideMapLoading, initMapLoading, leaveLoadingMap, mapPreparation, needMapPreparation, prepareEnteringMap } from './mapLoading';
 import { forgetBorderLayer, initBorderLayer } from './borderLayer';
 import { drawAbilityRings, drawCombatRanges, drawSelectionBox, drawCorridors, drawFleetRoutes, drawPatrolRings, drawRallyPoint, drawSeenAircraft, drawStrikeTrails, drawSwarmNet, initMapOverlays } from './mapOverlays';
-import { drawAimPreview, drawAssaultTargets, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
+import { drawAimPreview, drawRallyAim, drawAssaultTargets, drawCastAim, drawEngageTargets, drawPatrolAim, drawRelocateTargets, engageCandidates, initMapAim, relocateSpotPx, squadronRelocateSpots } from './mapAim';
 import { drawFlak, drawGoFlash, drawMineFlashes, drawNoticeFlashes, flashGo, flashProvince, initMapEffects } from './mapEffects';
 import { chainHits, drawAllyMarks, drawBombardTimers, drawChainOverlay, drawDevourSieges, drawMinefields, drawMissiles, drawMissionTargets, drawPings, drawTroopTransferTimers, initMapMarks, pingHits } from './mapMarks';
 import { drawSweepAfterglow, drawWorlds, initMapWorlds, prepareWorldArt } from './mapWorlds';
@@ -1637,6 +1637,7 @@ function renderMap(now: number) {
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
   drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром
   drawAimPreview(lastReal);
+  drawRallyAim(lastReal); // RALLY-2: путь к будущей точке сбора — как у «Курса»
   drawCastAim(); // CAST-UX: дальность каста + область действия
   drawPatrolAim(); // SHU-6.3: круг патруля под указателем
   drawRelocateTargets(lastReal); // SHU-6.5: базы, куда эскадра перелетит

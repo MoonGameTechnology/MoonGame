@@ -24,6 +24,8 @@ import type {
   Squadron,
   StrikeBase,
 } from '../../packages/shared-core/src/index';
+import { knownClosed } from '../../packages/shared-core/src/index';
+import { rallyPin } from './mapOverlays';
 import { isMissileFleet, isOrdnanceFleet } from '../../packages/shared-core/src/state/ordnance';
 import { t } from '../../localization/runtime';
 import {
@@ -350,6 +352,114 @@ function rightClick(ev: MouseEvent): void {
 }
 
 // Tap/click selection at a screen point (drag-aware — see the pointer handlers).
+// ГЛАВА IV (PVR-7.5) — ПРИКАЗ СОЮЗНИКУ ВЗВЕДЁН: тап выбирает цель операции. «Охранять» ищет
+// сперва свой или союзный флот, «Атаковать» — вражеский, потом мир; «Разведать» — только мир.
+// Годится ли цель, решает ЯДРО (`ally.order`): отказ приходит объяснением (`errText`), а не
+// молчанием. Промах мимо всего снимает прицел.
+function allyOrderTap(kind: NonNullable<typeof allyAim>, mx: number, my: number, rFleet: number, rNode: number): void {
+  const s = game.world();
+  const ME = game.me();
+  const MAP = game.nodes();
+  drop('allyAim');
+  const ally = linkedAlly(s, ME);
+  // Цель — только видимый флот, как у «Атаки» и удара челноков (ревью #1411). Ракета
+  // (SM-3.7b) целью приказа не бывает (`ally.order`): тап по ней ищет мир под ней.
+  const fleets = Object.values(s.fleets).filter((f) => fleetSeen(f) && !isMissileFleet(f, data));
+  const pool =
+    kind === 'guard'
+      ? fleets.filter((f) => f.owner === ME || f.owner === ally)
+      : kind === 'attack'
+        ? hostileFleets(fleets, ME)
+        : [];
+  const hit = pool.length ? nearestHit(pool, fleetAnchor, mx, my, rFleet) : null;
+  const node = hit ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+  if (!ally || (!hit && !node)) game.note(t('ally.pick-missed'));
+  else if (playerOrder(allyOrder(ME, ally, kind, hit ? { fleet: hit.id } : { planet: node!.id })))
+    game.note(t('ally.ordered'));
+  game.invalidatePanel();
+}
+// RALLY-1 — ТОЧКА СБОРА ВЗВЕДЕНА из панели мира: тап по другому миру ставит её (RALLY-2:
+// любой, кроме видимой закрытой территории). Закрытый мир и сам мир-верфь объясняются
+// правилом, промах снимает прицел с нотой.
+function rallyTap(from: string, mx: number, my: number, rNode: number): void {
+  const s = game.world();
+  const ME = game.me();
+  const MAP = game.nodes();
+  drop('rallyAim');
+  const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+  const hit = n ? { id: n.id, closed: knownClosed(s, ME, n.id) } : null;
+  const pick = rallyPick(from, hit);
+  if (pick === 'order') playerOrder(setRallyPoint(ME, from, hit!.id));
+  else game.note(t(pick === 'closed' ? 'hint.rally-closed' : pick === 'same' ? 'hint.rally-same' : 'hint.rally-cancelled'));
+  game.invalidatePanel();
+}
+// SHU-3.1 — УДАР ВЗВЕДЁН: следующий тап выбирает цель вылета. Сначала ищем чужой
+// ФЛОТ (по нему бьют `attack`), потом чужой МИР (по нему — здания). Тап по пустому
+// месту снимает прицел: взведённый режим обязан иметь выход без приказа.
+//
+// ЧТО поднять, решать уже не нужно: с SHU-4.3 прицел взводит КОНКРЕТНАЯ карточка и
+// несёт id своей эскадры. Дальность, топливо, враждебность цели и вместимость
+// проверяет ЯДРО: свою копию этих правил интерфейс не заводит, он показывает отказ
+// (`errText`).
+function strikeTap(aim: NonNullable<typeof strikeAim>, mx: number, my: number, rFleet: number, rNode: number): void {
+  const s = game.world();
+  const ME = game.me();
+  const MAP = game.nodes();
+  const { from, squadronId, patrol, relocate, strikeId, missile } = aim;
+  drop('strikeAim');
+  // SHU-6.14 — прицел ЭСКАДРЫ В ВОЗДУХЕ: цели те же, но приказ — новый для вылета.
+  if (strikeId) {
+    aloftAimTap(strikeId, !!patrol, !!relocate, mx, my, rFleet, rNode);
+    game.invalidatePanel();
+    return;
+  }
+  // SHU-6.3 — ПАТРУЛЬ: тап и есть точка. Дальность ядро меряет от живой позиции базы
+  // (`E_OUT_OF_RANGE`), поэтому тап мимо круга приходит отказом, а не тишиной.
+  if (patrol) {
+    if (!game.squadronAt(squadronId)) game.note(t('hint.wing-empty'));
+    else playerOrder(patrolShuttle(ME, from, squadronId, unworld({ x: mx, y: my })));
+    game.invalidatePanel();
+    return;
+  }
+  // SHU-6.5 — ПЕРЕЛЁТ: тап ловится только по базе в уголках — по той, что примет ядро.
+  // Мимо них — отмена, как у удара: взведённый режим обязан иметь выход без приказа.
+  if (relocate) {
+    const found = game.squadronAt(squadronId);
+    const spots = found ? game.squadronRelocateSpots(found.sq, from) : [];
+    const hit = nearestHit(spots, (spot) => game.relocateSpotPx(spot.base), mx, my, rNode);
+    if (!found) game.note(t('hint.wing-empty'));
+    else if (!hit) game.note(t('hint.wing-relocate-cancelled'));
+    else
+      playerOrder(
+        relocateShuttle(
+          ME,
+          from,
+          squadronId,
+          hit.base.kind === 'planet' ? { toPlanetId: hit.base.id } : { toFleetId: hit.base.id },
+        ),
+      );
+    game.invalidatePanel();
+    return;
+  }
+  // Только то, что игрок видит: невидимую мину (SM-3.6) палец не находит (ревью #1411).
+  const foe = nearestHit(
+    hostileFleets(Object.values(s.fleets).filter(fleetSeen), ME),
+    fleetAnchor,
+    mx,
+    my,
+    rFleet,
+  );
+  const node = foe ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+  if (!game.squadronAt(squadronId)) {
+    game.note(t('hint.wing-empty')); // звено исчезло между наводкой и тапом
+  } else if (foe || node) {
+    const target = foe ? { targetFleetId: foe.id } : { targetPlanetId: node!.id };
+    playerOrder(hangarAimOrder(from, squadronId, target, missile));
+  } else {
+    game.note(t('hint.wing-cancelled'));
+  }
+  game.invalidatePanel();
+}
 export function selectAt(mx: number, my: number) {
   const s = game.world();
   const ME = game.me();
@@ -399,109 +509,9 @@ export function selectAt(mx: number, my: number) {
     game.invalidatePanel();
     return;
   }
-  // ГЛАВА IV (PVR-7.5) — ПРИКАЗ СОЮЗНИКУ ВЗВЕДЁН: тап выбирает цель операции. «Охранять» ищет
-  // сперва свой или союзный флот, «Атаковать» — вражеский, потом мир; «Разведать» — только мир.
-  // Годится ли цель, решает ЯДРО (`ally.order`): отказ приходит объяснением (`errText`), а не
-  // молчанием. Промах мимо всего снимает прицел.
-  if (owner === 'ally-order' && allyAim) {
-    const kind = allyAim;
-    drop('allyAim');
-    const ally = linkedAlly(s, ME);
-    // Цель — только видимый флот, как у «Атаки» и удара челноков (ревью #1411). Ракета
-    // (SM-3.7b) целью приказа не бывает (`ally.order`): тап по ней ищет мир под ней.
-    const fleets = Object.values(s.fleets).filter((f) => fleetSeen(f) && !isMissileFleet(f, data));
-    const pool =
-      kind === 'guard'
-        ? fleets.filter((f) => f.owner === ME || f.owner === ally)
-        : kind === 'attack'
-          ? hostileFleets(fleets, ME)
-          : [];
-    const hit = pool.length ? nearestHit(pool, fleetAnchor, mx, my, rFleet) : null;
-    const node = hit ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
-    if (!ally || (!hit && !node)) game.note(t('ally.pick-missed'));
-    else if (playerOrder(allyOrder(ME, ally, kind, hit ? { fleet: hit.id } : { planet: node!.id })))
-      game.note(t('ally.ordered'));
-    game.invalidatePanel();
-    return;
-  }
-  // RALLY-1 — ТОЧКА СБОРА ВЗВЕДЕНА из панели мира: тап по другому своему миру ставит её.
-  // Чужой мир и сам мир-верфь объясняются правилом, промах снимает прицел молча-с-нотой.
-  if (owner === 'rally-point' && rallyAim) {
-    const from = rallyAim;
-    drop('rallyAim');
-    const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
-    const hit = n ? { id: n.id, owner: s.planets[n.id]?.owner ?? null } : null;
-    const pick = rallyPick(from, hit, ME);
-    if (pick === 'order') playerOrder(setRallyPoint(ME, from, hit!.id));
-    else game.note(t(pick === 'not-own' ? 'hint.rally-own' : 'hint.rally-cancelled'));
-    game.invalidatePanel();
-    return;
-  }
-  // SHU-3.1 — УДАР ВЗВЕДЁН: следующий тап выбирает цель вылета. Сначала ищем чужой
-  // ФЛОТ (по нему бьют `attack`), потом чужой МИР (по нему — здания). Тап по пустому
-  // месту снимает прицел: взведённый режим обязан иметь выход без приказа.
-  //
-  // ЧТО поднять, решать уже не нужно: с SHU-4.3 прицел взводит КОНКРЕТНАЯ карточка и
-  // несёт id своей эскадры. Дальность, топливо, враждебность цели и вместимость
-  // проверяет ЯДРО: свою копию этих правил интерфейс не заводит, он показывает отказ
-  // (`errText`).
-  if (owner === 'shuttle-strike' && strikeAim) {
-    const { from, squadronId, patrol, relocate, strikeId, missile } = strikeAim;
-    drop('strikeAim');
-    // SHU-6.14 — прицел ЭСКАДРЫ В ВОЗДУХЕ: цели те же, но приказ — новый для вылета.
-    if (strikeId) {
-      aloftAimTap(strikeId, !!patrol, !!relocate, mx, my, rFleet, rNode);
-      game.invalidatePanel();
-      return;
-    }
-    // SHU-6.3 — ПАТРУЛЬ: тап и есть точка. Дальность ядро меряет от живой позиции базы
-    // (`E_OUT_OF_RANGE`), поэтому тап мимо круга приходит отказом, а не тишиной.
-    if (patrol) {
-      if (!game.squadronAt(squadronId)) game.note(t('hint.wing-empty'));
-      else playerOrder(patrolShuttle(ME, from, squadronId, unworld({ x: mx, y: my })));
-      game.invalidatePanel();
-      return;
-    }
-    // SHU-6.5 — ПЕРЕЛЁТ: тап ловится только по базе в уголках — по той, что примет ядро.
-    // Мимо них — отмена, как у удара: взведённый режим обязан иметь выход без приказа.
-    if (relocate) {
-      const found = game.squadronAt(squadronId);
-      const spots = found ? game.squadronRelocateSpots(found.sq, from) : [];
-      const hit = nearestHit(spots, (spot) => game.relocateSpotPx(spot.base), mx, my, rNode);
-      if (!found) game.note(t('hint.wing-empty'));
-      else if (!hit) game.note(t('hint.wing-relocate-cancelled'));
-      else
-        playerOrder(
-          relocateShuttle(
-            ME,
-            from,
-            squadronId,
-            hit.base.kind === 'planet' ? { toPlanetId: hit.base.id } : { toFleetId: hit.base.id },
-          ),
-        );
-      game.invalidatePanel();
-      return;
-    }
-    // Только то, что игрок видит: невидимую мину (SM-3.6) палец не находит (ревью #1411).
-    const foe = nearestHit(
-      hostileFleets(Object.values(s.fleets).filter(fleetSeen), ME),
-      fleetAnchor,
-      mx,
-      my,
-      rFleet,
-    );
-    const node = foe ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
-    if (!game.squadronAt(squadronId)) {
-      game.note(t('hint.wing-empty')); // звено исчезло между наводкой и тапом
-    } else if (foe || node) {
-      const target = foe ? { targetFleetId: foe.id } : { targetPlanetId: node!.id };
-      playerOrder(hangarAimOrder(from, squadronId, target, missile));
-    } else {
-      game.note(t('hint.wing-cancelled'));
-    }
-    game.invalidatePanel();
-    return;
-  }
+  if (owner === 'ally-order' && allyAim) return allyOrderTap(allyAim, mx, my, rFleet, rNode);
+  if (owner === 'rally-point' && rallyAim) return rallyTap(rallyAim, mx, my, rNode);
+  if (owner === 'shuttle-strike' && strikeAim) return strikeTap(strikeAim, mx, my, rFleet, rNode);
   // «Отступить» взведено: тап по миру — точка отхода. Дорогу, право прохода и то, что флот
   // всё ещё в бою, проверяет ЯДРО: недостижимая точка оставляет флот в бою и приходит
   // отказом (`errText`), а не молчаливым расцеплением. Промах мимо мира снимает прицел.
@@ -705,6 +715,8 @@ export function selectAt(mx: number, my: number) {
 
 // Camera control: drag-pan, pinch-zoom, wheel-zoom, tap-select.
 
+/** RALLY-2: флажок точки сбора под пальцем — мир-верфь, чью точку сейчас тянут. */
+export let rallyDrag: string | null = null;
 /** Set per tap: hit radii in selectAt widen for a finger (44px-target rule). */
 export let tapByTouch = false;
 
@@ -801,16 +813,20 @@ function pointerDown(ev: PointerEvent): void {
       ctrl: ev.ctrlKey,
       meta: ev.metaKey,
       overOwnFleet,
-      orderArmed: !!(aiming || merging || chainMode || (MOBILE && mobileOrderKind())),
+      orderArmed: !!(aiming || merging || chainMode || rallyAim || (MOBILE && mobileOrderKind())),
     });
     additive = intent.additive;
     boxSelecting = intent.boxSelect;
     selectionBox = boxSelecting ? { x1: p.x, y1: p.y, x2: p.x, y2: p.y } : null;
     dragged = false;
-    if (aiming || assaultAim || strikeAim?.patrol) aimPointer = p; // the aim preview starts under the finger at once
+    // RALLY-2: флажок точки сбора тянут к новому миру или тапом поднимают; камера стоит.
+    const pin = rallyPin();
+    rallyDrag = pin && Math.hypot(p.x - pin.x, p.y - pin.y) <= tapRadius('node', tapByTouch) ? pin.from : null;
+    if (rallyDrag) arm('rallyAim', rallyDrag);
+    if (aiming || assaultAim || strikeAim?.patrol || rallyAim) aimPointer = p; // the aim preview starts under the finger at once
     // Touch long-press: a still finger for ~350ms picks a fleet ADDITIVELY (the
     // Ctrl-click of phones) or opens a BOX-SELECT from empty space (the Shift-drag).
-    if (intent.longPress) {
+    if (intent.longPress && !rallyDrag) {
       cancelLongPress();
       mapHold = press(p);
       longPressTimer = window.setTimeout(() => {
@@ -859,6 +875,11 @@ function pointerMove(ev: PointerEvent): void {
   pointers.set(ev.pointerId, p);
   const moved = movedBeyondSlop(dragStart, p, ev.pointerType === 'touch');
   if (moved) cancelLongPress(); // a moving finger is a drag, not a long-press
+  if (rallyDrag && pointers.size === 1) {
+    aimPointer = p; // тянут флажок точки сбора, а не карту
+    if (moved) dragged = true;
+    return;
+  }
   // `dragIntent.ts`: два пальца — щипок. На телефоне один палец двигает карту
   // даже при выборе цели; приказы подтверждает кнопка. Планшет сохраняет drag-aim,
   // PC — прицел наведением и панораму перетаскиванием.
@@ -919,6 +940,13 @@ function endPointer(ev: PointerEvent) {
   const spent = consumeClick(mapHold);
   mapHold = spent.next;
   if (spent.eat) return;
+  // RALLY-2: тянули флажок — точка встаёт на мир под пальцем; тап — поднят до следующего тапа.
+  if (rallyDrag) {
+    rallyDrag = null;
+    if (single && p && dragged && !multiTouched) selectAt(p.x, p.y);
+    else game.note(t('hint.rally-pick'));
+    return;
+  }
   // Коммитит ли это отпускание вооружённый приказ — правило целиком в `aimGesture.ts`
   // (там же его сторож): на нём ввод ломался дважды и оба раза молча.
   const commits = releaseCommits({
@@ -937,6 +965,7 @@ function cancelPointer(ev: PointerEvent): void {
   if (!pointers.has(ev.pointerId)) return;
   cancelLongPress();
   mapHold = IDLE; // жест отменён системой — отпускания не будет, и съедать нечего
+  rallyDrag = null; // точка остаётся поднятой: поставит её следующий тап
   pointers.delete(ev.pointerId);
   rebasePinch();
   if (!pointers.size) releaseCam();

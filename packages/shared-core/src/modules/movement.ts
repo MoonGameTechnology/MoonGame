@@ -12,8 +12,7 @@ import { legT } from '../state/fleetPosition';
 import { fleetTravelSpeed, planRoute, routeDistance } from '../state/route';
 import { forkAt, forkTAtStart, laneRoadLength, legEndT, snapToFork } from '../state/roads';
 import { corridorVeto, isCorridorEdge } from '../state/corridor';
-import { getStance } from '../state/diplomacy';
-import { knownOwner } from '../state/knownOwner';
+import { knownClosed } from '../state/rightOfWay';
 
 /**
  * Контракт возможности `fleet.course` (RETR-1): «дай этому флоту курс на узел».
@@ -26,9 +25,12 @@ import { knownOwner } from '../state/knownOwner';
  * после выигранной встречи должен довести флот до той же точки, а не до узла рядом.
  */
 export type FleetCourse = (
-  args: { fleetId: string; playerId: PlayerId } & FleetResume,
+  args: { fleetId: string; playerId: PlayerId; stopAtBorder?: boolean } & FleetResume,
   h: HandlerContext,
 ) => string | null;
+// `stopAtBorder` (RALLY-2, заказ владельца 2026-11-12): обхода закрытой ВИДИМОЙ границы нет —
+// флот летит своим кратчайшим путём до последнего мира перед ней и встаёт там, вместо отказа.
+// Граница прямо у старта — отказ, как без флага: лететь некуда.
 
 /** A target a `fleet.move` can aim at: a node, or a continuous point on a lane. */
 interface MovePayload {
@@ -74,32 +76,6 @@ class RouteCache {
     this.cache.set(key, result);
     return result ? [...result] : null;
   }
-}
-
-/** Is `owner`'s territory closed to `playerId` — a player it is at PEACE with (D2)? */
-function closedTo(state: GameState, playerId: PlayerId, owner: PlayerId | null): boolean {
-  return owner !== null && owner !== playerId && getStance(state, playerId, owner) === 'peace';
-}
-
-/** The world's REAL owner closes it to the mover — the rule the flight itself obeys. */
-function trulyClosed(state: GameState, playerId: PlayerId, id: PlanetId): boolean {
-  return closedTo(state, playerId, state.planets[id]?.owner ?? null);
-}
-
-/**
- * FOG-LEAK (owner's report 2026-10-17): an ORDER is refused only for a border the
- * player can SEE — closed both on their own map (`knownOwner`) and in truth. Judged by
- * the real owner alone, «нет права прохода» to an unexplored province told the player
- * that somebody's territory lay there, and the solo war prompt even named whose.
- *
- * Requiring both halves keeps the order gate strictly MORE permissive than before:
- * nothing that used to pass is refused now, so bots and scripts lose no moves. A
- * border the player cannot see is met in flight instead (`haltAtBorder`).
- */
-function knownClosed(state: GameState, playerId: PlayerId, id: PlanetId): boolean {
-  return (
-    trulyClosed(state, playerId, id) && closedTo(state, playerId, knownOwner(state, playerId, id))
-  );
 }
 
 /** True when any hop enters a border closed to its mover that the mover can see
@@ -447,7 +423,8 @@ export const movementModule: GameModule = {
   id: 'movement',
   // 1.6.0 — unknown territory is explored in flight; only discovered borders halt it.
   // 1.7.0 — a fleet mid-landing may take a course; leaving cancels the landing.
-  version: '1.8.0',
+  // 1.9.0 — RALLY-2: `fleet.course` may stop at a known closed border (`stopAtBorder`).
+  version: '1.9.0',
   setup(api) {
     // Closure-scoped cache, shared across actions; keyed by `state.topology` so a
     // hero temp lane mutating `links` invalidates stale routes (see RouteCache).
@@ -471,6 +448,7 @@ export const movementModule: GameModule = {
       fleet: Fleet,
       payload: MovePayload,
       playerId: PlayerId,
+      stopAtBorder = false,
     ): string | null => {
       // In battle → not free to re-task. A landing does NOT hold the fleet any more (owner,
       // 2026-11-01: «отмена высадки — так же, как с погрузкой»): departure is the cancel
@@ -531,6 +509,7 @@ export const movementModule: GameModule = {
       // path outright (the pre-fix behaviour) cut fleets off from the entire map as
       // soon as bots' walk-in captures peppered the lanes — one peace-owned node on
       // the unique shortest path read as «no route anywhere», even to own worlds.
+      let shortOf = false; // RALLY-2: the course ends at the border, not at `payload.to`
       if (crossesPeace(h.state, playerId, plan.hops)) {
         const detour = planJourney(h.state, routes, fleet, payload as MovePayload, (id) =>
           knownClosed(h.state, playerId, id),
@@ -538,10 +517,14 @@ export const movementModule: GameModule = {
         // Re-check the detour: the veto exempts the DESTINATION node on purpose
         // (landing on a peace-locked world must reject as right-of-way, so the
         // client can offer the war declaration — not as a bogus «no route»).
-        if (detour === null || 'error' in detour || crossesPeace(h.state, playerId, detour.hops)) {
-          return 'E_NO_RIGHT_OF_WAY';
+        if (detour !== null && !('error' in detour) && !crossesPeace(h.state, playerId, detour.hops)) {
+          plan = detour;
+        } else {
+          const open = plan.hops.findIndex((hop) => knownClosed(h.state, playerId, hop));
+          if (!stopAtBorder || open <= 0) return 'E_NO_RIGHT_OF_WAY';
+          plan = { ...plan, hops: plan.hops.slice(0, open), parkT: 1 };
+          shortOf = true;
         }
-        plan = detour;
       }
       const origin = fleet.location ?? fleet.edge?.from ?? null;
       // A known border may have closed while a course was being retasked. Unknown
@@ -557,7 +540,7 @@ export const movementModule: GameModule = {
       h.emit('fleet.departed', {
         fleetId: fleet.id,
         from: origin,
-        to: payload.to ?? plan.hops[plan.hops.length - 1],
+        to: shortOf ? plan.hops[plan.hops.length - 1] : (payload.to ?? plan.hops[plan.hops.length - 1]),
         path: plan.hops,
       });
       return null;
@@ -575,7 +558,7 @@ export const movementModule: GameModule = {
       if (!fleet || fleet.owner !== playerId) return 'E_NO_FLEET';
       const target: MovePayload =
         'toEdge' in args ? { fleetId, toEdge: args.toEdge } : { fleetId, to: args.to };
-      return setCourse(h, fleet, target, playerId);
+      return setCourse(h, fleet, target, playerId, args.stopAtBorder === true);
     });
 
     api.onAction('fleet.move', (action, h) => {

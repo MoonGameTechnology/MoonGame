@@ -141,7 +141,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 105: членство — `missiles` 1.0.0 перед `auto-merge`, пуск ракет из ангара; rocketMines 3.4.0
 // — ракета самонаводящаяся, промах только за дальностью от точки пуска (2026-11-09).
 // 106: членство — `spy-levels` 1.0.0 сразу за `espionage`: опыт и уровни шпионов.
-const PINNED_FOR_VERSION = '106';
+// 107: порядок тот же; auto-rally 1.4.0 и movement 1.9.0 — точка сбора на любой мир (RALLY-2).
+const PINNED_FOR_VERSION = '107';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

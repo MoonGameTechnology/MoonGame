@@ -27,10 +27,10 @@ import { fleetOriginPx, fleetPos, selectedFleetIds, strikeBasePos, strikeWorldPo
 import { countdownHMS, fmtHrs } from './format';
 import { HOUR, data } from './game';
 import { fxBlur, fxBreath } from './graphicsPrefs';
-import { selFleet, selFleets, selPlanet, selStrike, strikeAim } from './interaction';
+import { rallyAim, selFleet, selFleets, selPlanet, selStrike, strikeAim } from './interaction';
 import { cam, visible, world, worldDist } from './mapCamera';
 import { known, vision } from './mapFog';
-import { ABILITY_RING, CORR_LIVE, CORR_ONCE, LOCK, R_AA, R_ARTY, R_WING, TAU, ownerColor } from './mapPalette';
+import { ABILITY_RING, CORR_LIVE, CORR_ONCE, LOCK, R_AA, R_ARTY, RALLY, R_WING, TAU, ownerColor } from './mapPalette';
 import { bracketStrokes } from './mapShapes';
 import { squadronCallsignOf } from './squadronPanel';
 import { strikeTrails } from './strikeTrail';
@@ -215,34 +215,72 @@ export function drawFleetRoutes() {
   }
 }
 
-/**
- * Точка сбора ВЫБРАННОГО мира-верфи (RALLY-1): прямой пунктир от мира к цели и кольцо на
- * цели. Только у выбранного мира, как точка сбора здания в RTS: на большой карте линии
- * всех верфей разом читались бы шумом. Прямая, а не путь по дорогам: это назначение, а не
- * маршрут, — путь каждого вылета рисует `drawFleetRoutes`.
- */
-export function drawRallyPoint(): void {
-  if (!selPlanet) return;
+/** Флажок точки сбора стоит над целью, а не на ней: тап по самому миру выбирает мир,
+ *  а по флажку — точку (RALLY-2). Смещение — в пикселях экрана, при любом зуме. */
+export const RALLY_PIN_LIFT = 22;
+
+/** Где флажок точки сбора ВЫБРАННОГО мира на экране (`null` — точки нет). Его берут и
+ *  рисунок, и тап: палец ловит ровно то место, где флажок нарисован. */
+export function rallyPin(): { from: string; x: number; y: number } | null {
+  if (!selPlanet) return null;
   const s = game.world();
   const to = rallyPointOf(s, game.me(), selPlanet);
-  const from = s.planets[selPlanet];
   const dest = to ? s.planets[to] : undefined;
-  if (!from || !dest) return;
-  const a = world(from.position);
+  if (!dest) return null;
   const b = world(dest.position);
+  return { from: selPlanet, x: b.x, y: b.y - RALLY_PIN_LIFT };
+}
+
+/**
+ * Точка сбора ВЫБРАННОГО мира-верфи (RALLY-1): прямая от мира к цели и флажок над целью.
+ * Только у выбранного мира, как точка сбора здания в RTS: на большой карте линии всех
+ * верфей разом читались бы шумом. Прямая, а не путь по дорогам: это назначение, а не
+ * маршрут, — путь каждого вылета рисует `drawFleetRoutes`, а путь при выборе точки —
+ * `drawRallyAim`. Оранжевым (RALLY-2, заказ владельца 2026-11-12). Пока точку переносят,
+ * старую прямую не рисуем: на экране один ответ «куда полетят».
+ */
+export function drawRallyPoint(): void {
+  const pin = rallyPin();
+  if (!pin || rallyAim === pin.from) return;
+  const s = game.world();
+  const from = s.planets[pin.from];
+  if (!from) return;
+  const a = world(from.position);
+  const b = { x: pin.x, y: pin.y + RALLY_PIN_LIFT };
   const cx = game.ctx();
   cx.save();
-  cx.strokeStyle = rgba(LOCK, 0.8);
-  cx.lineWidth = 1.5;
-  cx.setLineDash([2, 6]);
+  cx.strokeStyle = rgba(RALLY, 0.85);
+  cx.fillStyle = rgba(RALLY, 0.9);
+  cx.lineWidth = 1.6;
   cx.beginPath();
   cx.moveTo(a.x, a.y);
   cx.lineTo(b.x, b.y);
   cx.stroke();
-  cx.setLineDash([]);
   cx.beginPath();
   cx.arc(b.x, b.y, 10, 0, TAU);
   cx.stroke();
+  cx.restore();
+  drawRallyFlag(pin.x, pin.y);
+}
+
+/** Флажок точки сбора: древко вниз к цели и полотнище вправо. `x, y` — верх древка над
+ *  целью (`rallyPin`); его же рисует перенос точки под пальцем (`drawRallyAim`). */
+export function drawRallyFlag(x: number, y: number): void {
+  const cx = game.ctx();
+  cx.save();
+  cx.strokeStyle = rgba(RALLY, 0.85);
+  cx.fillStyle = rgba(RALLY, 0.9);
+  cx.lineWidth = 2;
+  cx.beginPath();
+  cx.moveTo(x, y + RALLY_PIN_LIFT - 10);
+  cx.lineTo(x, y - 8);
+  cx.stroke();
+  cx.beginPath();
+  cx.moveTo(x, y - 8);
+  cx.lineTo(x + 11, y - 4);
+  cx.lineTo(x, y);
+  cx.closePath();
+  cx.fill();
   cx.restore();
 }
 
