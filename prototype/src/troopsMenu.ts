@@ -208,7 +208,7 @@ const stepBtn = (
   off: boolean,
   group = unit,
 ): string =>
-  `<button class="btn-second" data-cmd="tstep" data-unit="${esc(unit)}" data-group="${esc(group)}" data-n="${n}" title="${esc(title)}" aria-label="${esc(title)}"${off ? ' disabled' : ''}>${glyph}</button>`;
+  `<button class="btn-second" data-cmd="tstep" data-repeat data-unit="${esc(unit)}" data-group="${esc(group)}" data-n="${n}" title="${esc(title)}" aria-label="${esc(title)}"${off ? ' disabled' : ''}>${glyph}</button>`;
 
 /** Пресет «до упора»: набить трюм этим типом (dir=1) / высадить всё своё (dir=-1).
  *  Треугольник против «+/−» — намеренная разница формы: крайние значения и мелкий

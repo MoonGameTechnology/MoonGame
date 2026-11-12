@@ -130,6 +130,7 @@ import { battleKnown, fleetSeen } from './mapFog';
 import { playerOrder } from './orderPipeline';
 import { plainTapSelect } from './mapTapSelect';
 import { fromScreen } from './screenAnchor';
+import { spyPickTap, spyPicking } from './spyWindow';
 
 /** Что вводу на карте нужно от игры. */
 export interface MapInputHost {
@@ -352,10 +353,8 @@ function rightClick(ev: MouseEvent): void {
 }
 
 // Tap/click selection at a screen point (drag-aware — see the pointer handlers).
-// ГЛАВА IV (PVR-7.5) — ПРИКАЗ СОЮЗНИКУ ВЗВЕДЁН: тап выбирает цель операции. «Охранять» ищет
-// сперва свой или союзный флот, «Атаковать» — вражеский, потом мир; «Разведать» — только мир.
-// Годится ли цель, решает ЯДРО (`ally.order`): отказ приходит объяснением (`errText`), а не
-// молчанием. Промах мимо всего снимает прицел.
+// ГЛАВА IV (PVR-7.5) — ПРИКАЗ СОЮЗНИКУ: «Охранять» ищет свой/союзный флот, «Атаковать» —
+// вражеский, потом мир; «Разведать» — мир. Цель судит ЯДРО (`ally.order`, отказ — `errText`).
 function allyOrderTap(kind: NonNullable<typeof allyAim>, mx: number, my: number, rFleet: number, rNode: number): void {
   const s = game.world();
   const ME = game.me();
@@ -393,14 +392,9 @@ function rallyTap(from: string, mx: number, my: number, rNode: number): void {
   else game.note(t(pick === 'closed' ? 'hint.rally-closed' : pick === 'same' ? 'hint.rally-same' : 'hint.rally-cancelled'));
   game.invalidatePanel();
 }
-// SHU-3.1 — УДАР ВЗВЕДЁН: следующий тап выбирает цель вылета. Сначала ищем чужой
-// ФЛОТ (по нему бьют `attack`), потом чужой МИР (по нему — здания). Тап по пустому
-// месту снимает прицел: взведённый режим обязан иметь выход без приказа.
-//
-// ЧТО поднять, решать уже не нужно: с SHU-4.3 прицел взводит КОНКРЕТНАЯ карточка и
-// несёт id своей эскадры. Дальность, топливо, враждебность цели и вместимость
-// проверяет ЯДРО: свою копию этих правил интерфейс не заводит, он показывает отказ
-// (`errText`).
+// SHU-3.1 — УДАР ВЗВЕДЁН (эскадрой карточки, SHU-4.3): тап — чужой ФЛОТ (`attack`), потом
+// чужой МИР (здания); пустота снимает прицел. Дальность, топливо и цель проверяет ЯДРО
+// (отказ — `errText`), своей копии правил интерфейс не заводит.
 function strikeTap(aim: NonNullable<typeof strikeAim>, mx: number, my: number, rFleet: number, rNode: number): void {
   const s = game.world();
   const ME = game.me();
@@ -958,6 +952,11 @@ function endPointer(ev: PointerEvent) {
   });
   if (single && p && commits) {
     tapByTouch = ev.pointerType === 'touch';
+    // Окно «Шпионаж» выбирает мир для задания: тап — это мир под пальцем, не выделение.
+    if (spyPicking()) {
+      const n = nearestHit(game.nodes(), (nn) => world(nn), p.x, p.y, tapRadius('node', tapByTouch));
+      return spyPickTap(n?.id ?? null);
+    }
     selectAt(p.x, p.y);
   }
 }

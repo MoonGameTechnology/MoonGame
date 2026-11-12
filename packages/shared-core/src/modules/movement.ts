@@ -315,6 +315,31 @@ function targetsOf(state: GameState, payload: MovePayload): Target[] | { error: 
   return { error: 'E_BAD_PAYLOAD' };
 }
 
+/** D2 right of way for a planned journey: a route through a VISIBLE closed border is
+ *  replanned around it; with no clean detour the order is refused — or, with
+ *  `stopAtBorder` (RALLY-2), cut to the last world before that border (`shortOf`). */
+function rightOfWayPlan(
+  state: GameState,
+  routes: RouteCache,
+  fleet: Fleet,
+  payload: MovePayload,
+  playerId: PlayerId,
+  plan: Journey,
+  stopAtBorder: boolean,
+): { plan: Journey; shortOf: boolean } | 'E_NO_RIGHT_OF_WAY' {
+  if (!crossesPeace(state, playerId, plan.hops)) return { plan, shortOf: false };
+  const detour = planJourney(state, routes, fleet, payload, (id) => knownClosed(state, playerId, id));
+  // Re-check the detour: the veto exempts the DESTINATION node on purpose
+  // (landing on a peace-locked world must reject as right-of-way, so the
+  // client can offer the war declaration — not as a bogus «no route»).
+  if (detour !== null && !('error' in detour) && !crossesPeace(state, playerId, detour.hops)) {
+    return { plan: detour, shortOf: false };
+  }
+  const open = plan.hops.findIndex((hop) => knownClosed(state, playerId, hop));
+  if (!stopAtBorder || open <= 0) return 'E_NO_RIGHT_OF_WAY';
+  return { plan: { ...plan, hops: plan.hops.slice(0, open), parkT: 1 }, shortOf: true };
+}
+
 /**
  * Plans the shortest journey for `fleet` to a node or a point on a lane,
  * considering every origin/target endpoint pairing (so a parked fleet may reverse
@@ -423,8 +448,9 @@ export const movementModule: GameModule = {
   id: 'movement',
   // 1.6.0 — unknown territory is explored in flight; only discovered borders halt it.
   // 1.7.0 — a fleet mid-landing may take a course; leaving cancels the landing.
-  // 1.9.0 — RALLY-2: `fleet.course` may stop at a known closed border (`stopAtBorder`).
-  version: '1.9.0',
+  // 1.9.0 — `fleet.paceChanged` re-times the current leg (forced march switched in flight).
+  // 1.10.0 — RALLY-2: `fleet.course` may stop at a known closed border (`stopAtBorder`).
+  version: '1.10.0',
   setup(api) {
     // Closure-scoped cache, shared across actions; keyed by `state.topology` so a
     // hero temp lane mutating `links` invalidates stale routes (see RouteCache).
@@ -509,23 +535,10 @@ export const movementModule: GameModule = {
       // path outright (the pre-fix behaviour) cut fleets off from the entire map as
       // soon as bots' walk-in captures peppered the lanes — one peace-owned node on
       // the unique shortest path read as «no route anywhere», even to own worlds.
-      let shortOf = false; // RALLY-2: the course ends at the border, not at `payload.to`
-      if (crossesPeace(h.state, playerId, plan.hops)) {
-        const detour = planJourney(h.state, routes, fleet, payload as MovePayload, (id) =>
-          knownClosed(h.state, playerId, id),
-        );
-        // Re-check the detour: the veto exempts the DESTINATION node on purpose
-        // (landing on a peace-locked world must reject as right-of-way, so the
-        // client can offer the war declaration — not as a bogus «no route»).
-        if (detour !== null && !('error' in detour) && !crossesPeace(h.state, playerId, detour.hops)) {
-          plan = detour;
-        } else {
-          const open = plan.hops.findIndex((hop) => knownClosed(h.state, playerId, hop));
-          if (!stopAtBorder || open <= 0) return 'E_NO_RIGHT_OF_WAY';
-          plan = { ...plan, hops: plan.hops.slice(0, open), parkT: 1 };
-          shortOf = true;
-        }
-      }
+      const legal = rightOfWayPlan(h.state, routes, fleet, payload as MovePayload, playerId, plan, stopAtBorder);
+      if (typeof legal === 'string') return legal;
+      plan = legal.plan;
+      const shortOf = legal.shortOf; // RALLY-2: the course ends at the border, not at `payload.to`
       const origin = fleet.location ?? fleet.edge?.from ?? null;
       // A known border may have closed while a course was being retasked. Unknown
       // territory is explored in flight; visibility owns that discovery.
@@ -617,6 +630,11 @@ export const movementModule: GameModule = {
       for (const id of [from, to]) {
         if (typeof id === 'string') retimeLeg(h, h.state.fleets[id]);
       }
+    });
+    // A speed modifier switched under way (forced march): the rest of the leg at the new pace.
+    api.on('fleet.paceChanged', (event, h) => {
+      const id = (event.payload as { fleetId?: unknown }).fleetId;
+      if (typeof id === 'string') retimeLeg(h, h.state.fleets[id]);
     });
 
     // Visibility owns discovery; movement reacts after its memory is committed. The

@@ -776,6 +776,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #splitdlg .sstays{justify-self:center;padding:0 8px;color:var(--dim);font-size:var(--fs-caption);}
 #splitdlg .ssub.shero{margin-top:-6px;color:#e6c77a;}
 #splitdlg .sbtns button{min-width:34px;height:30px;padding:0 7px;border-radius:2px;font-size:var(--fs-caption);}
+/* Ползунок строки: доля, уходящая в новый флот, закрашена зелёным, как «→ N» справа. Высота 28
+   px — под палец; дорожка рисуется фоном самого input, без лишних узлов. */
+#splitdlg .srange{grid-column:1 / -1;width:100%;height:28px;margin:0;background:transparent;accent-color:var(--grn);cursor:pointer;
+  touch-action:pan-y;}
+#splitdlg .srange::-webkit-slider-runnable-track{height:6px;border-radius:3px;
+  background:linear-gradient(90deg,var(--grn) var(--fill,0%),var(--line) var(--fill,0%));}
+#splitdlg .srange::-moz-range-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--grn) var(--fill,0%),var(--line) var(--fill,0%));}
 #splitdlg .sfoot{margin:13px 0 2px;color:var(--dim);font-size:var(--fs-body);text-align:center;}
 #splitdlg .sfoot b{color:#eafffb;}
 #splitdlg .sactions{display:flex;gap:10px;justify-content:center;margin-top:10px;}
@@ -835,3 +842,16 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #herobody .hx-badge{font-size:var(--fs-caption);border:1px solid var(--line-hi);border-radius:5px;padding:2px 6px;color:var(--dim);white-space:nowrap;}
 #herobody .hx-badge.on{border-color:#7df0d0;color:#9ff0da;}
 #herobody .hx-badge.cd{border-color:#e2a15a;color:#e2a15a;}
+/* Кнопка необратимого действия (`holdButton.ts`): исполняется удержанием. Взведённая или
+   удерживаемая показывает вопрос; полоса растёт слева направо одним transform, без
+   перерисовки разметки. Полоса — сам ответ «сколько ещё держать», поэтому reduced motion
+   её не гасит. */
+.holdable{position:relative;overflow:hidden;isolation:isolate;}
+.holdable .hold-ask{display:none;}
+.holdable.armed .hold-label,.holdable.sure .hold-label,.holdable.holding .hold-label{display:none;}
+.holdable.armed .hold-ask,.holdable.sure .hold-ask,.holdable.holding .hold-ask{display:inline;}
+.holdable .hold-ask small{display:block;font-size:var(--fs-caption);font-weight:600;opacity:.75;}
+.holdable::after{content:'';position:absolute;inset:0;z-index:-1;background:currentColor;opacity:.22;
+  transform:scaleX(0);transform-origin:left;pointer-events:none;}
+.holdable.holding::after{animation:hold-fill var(--hold-ms,1000ms) linear var(--hold-at,0ms) forwards;}
+@keyframes hold-fill{to{transform:scaleX(1);}}

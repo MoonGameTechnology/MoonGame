@@ -129,6 +129,35 @@ describe('forcedMarch — fleet.speed hook', () => {
     expect(advanced.state.fleets.f1?.units[0]?.hp).toBeCloseTo(200 - expectedWear, 5);
   });
 
+  it('switched in flight, the march re-times the leg at once: on speeds it up, off slows it down', () => {
+    const kernel = createKernel([sectorModule, planetTypeModule, movementModule, forcedMarchModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 0, 0, ['B']), planet('B', 100, 0, ['A'])],
+      fleets: [fleet('f1', 'p1', 'A', [['cruiser', 2, 200]])],
+    });
+    let r = okApply(
+      kernel.applyAction(
+        s,
+        { id: 'a:p1:1', type: 'fleet.move', playerId: 'p1', payload: { fleetId: 'f1', to: 'B' }, issuedAt: 0 },
+        ctx,
+      ),
+    );
+    const H = 3_600_000;
+    const baseHours = 100 / 10;
+    // Two hours out at base speed, 8 hours of road left: the march covers it in 8/1.5.
+    const at2h = { ...ctx, now: 2 * H };
+    r = okApply(kernel.applyAction(okAdvance(kernel.advanceTo(r.state, at2h)).state, act('f1', true), at2h));
+    expect(r.state.fleets.f1!.movement!.arrivesAt).toBeCloseTo(2 * H + ((baseHours - 2) / FORCED_MARCH_MULT) * H, -1);
+    // Switched off one hour later: the rest goes at base speed again — no fast leg for free.
+    const at3h = { ...ctx, now: 3 * H };
+    r = okApply(kernel.applyAction(okAdvance(kernel.advanceTo(r.state, at3h)).state, act('f1', false), at3h));
+    const left = baseHours - 2 - FORCED_MARCH_MULT; // road hours left at base speed
+    expect(r.state.fleets.f1!.movement!.arrivesAt).toBeCloseTo(3 * H + left * H, -1);
+    const done = okAdvance(kernel.advanceTo(r.state, { ...ctx, now: 3 * H + left * H + 1 }));
+    expect(done.state.fleets.f1!.location).toBe('B');
+  });
+
   it('a fleet not on the list travels at base speed and takes no wear', () => {
     const kernel = createKernel([sectorModule, planetTypeModule, movementModule, forcedMarchModule]);
     const s = stateWith({

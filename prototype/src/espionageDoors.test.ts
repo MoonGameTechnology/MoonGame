@@ -10,30 +10,21 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 /** Файлы, где рисуются кнопки шпионажа: карточка мира (`worldCard.ts`, REFM-223) — живого и
- *  памятного. С SPY-8 агент идёт на мир, так что кнопок в окне дипломатии
- *  (`diploWindow.ts`, REFM-214) больше нет, но новая там обязана спросить режим.
- *  `main.ts` остаётся в списке: новая дверь там тоже обязана спросить режим. */
-const FILES = ['main.ts', 'worldCard.ts', 'diploWindow.ts'];
+ *  памятного — и окно «Шпионаж» (`spyWindow.ts`, заказ владельца 2026-11-10). В окне
+ *  дипломатии (`diploWindow.ts`, REFM-214) их больше нет, но новая там обязана спросить
+ *  режим. `main.ts` остаётся в списке: новая дверь там тоже обязана спросить режим. */
+const FILES = ['main.ts', 'worldCard.ts', 'diploWindow.ts', 'spyWindow.ts'];
 const src = Object.fromEntries(
   FILES.map((f) => [f, readFileSync(new URL(`./${f}`, import.meta.url), 'utf8').split('\n')]),
 );
 
-/** Строки, где рисуется кнопка шпионажа: разведка мира и операции ростера. */
+/** Строки, где рисуется кнопка шпионажа: «Шпионы» карточки мира и старые приказы. */
 const doors = FILES.flatMap((file) =>
   src[file]!.map((line, i) => ({ file, line, i })).filter(
-    ({ line }) => line.includes("btn('spyplanet'") || line.includes('class="dp-spy"'),
+    ({ line }) =>
+      /\.push\(spyButtonHtml\(\)\)/.test(line) || line.includes("btn('spyplanet'") || line.includes('class="dp-spy"'),
   ),
 );
-
-/** Имя функции верхнего уровня, внутри которой стоит строка `i` файла `file`. */
-function enclosingFunction(file: string, i: number): string | null {
-  const lines = src[file]!;
-  for (let k = i; k >= 0; k--) {
-    const m = /^(?:export )?function (\w+)/.exec(lines[k]!);
-    if (m) return m[1]!;
-  }
-  return null;
-}
 
 describe('двери шпионажа спрашивают режим', () => {
   it('кнопок шпионажа несколько — сторожу есть что держать', () => {
@@ -43,8 +34,6 @@ describe('двери шпионажа спрашивают режим', () => {
   it('каждую кнопку рисует ветка под espionageShown (или флагом вкладки из него)', () => {
     const unguarded = doors
       .filter(({ file, i }) => {
-        // Вкладка «Шпионаж» (`intelTabHtml`) рисуется, только когда есть её кнопка (`spyTab`).
-        if (enclosingFunction(file, i) === 'intelTabHtml') return false;
         return !src[file]!.slice(Math.max(0, i - 25), i + 1)
           .join('\n')
           .includes('espionageShown(');
@@ -53,9 +42,9 @@ describe('двери шпионажа спрашивают режим', () => {
     expect(unguarded).toEqual([]);
   });
 
-  it('вкладка «Шпионаж» закрыта в экспедиции', () => {
-    const win = src['diploWindow.ts']!.join('\n');
-    expect(win).toContain("if (!spyTab && diploTab === 'intel') diploTab = 'diplo';");
-    expect(win).toContain("${spyTab ? tabBtn('intel'");
+  it('окно «Шпионаж» и его кнопка в меню закрыты в экспедиции', () => {
+    const win = src['spyWindow.ts']!.join('\n');
+    expect(win).toContain("if (!espionageShown(game.sectorZeroToolsHidden())) return;");
+    expect(win).toContain("if (!espionageShown(game.sectorZeroToolsHidden())) return closeSpyWindow();");
   });
 });

@@ -101,7 +101,7 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
 export const MODULE_MANIFEST_VERSION = '107'; // RALLY-2: порядок тот же; `auto-rally` 1.4.0 —
-// точка сбора на любой мир, кроме видимой закрытой территории; `movement` 1.9.0 — путь точки
+// точка сбора на любой мир, кроме видимой закрытой территории; `movement` 1.10.0 — путь точки
 // встаёт у закрытой границы. Партия на 106 сняла бы точку при смене хозяина цели.
 // export const MODULE_MANIFEST_VERSION = '106'; // ЧЛЕНСТВО — `spy-levels` 1.0.0 сразу за
 // `espionage`: опыт и уровни шпионов (резолюция владельца 2026-11-10). Партия на 105 не знала
