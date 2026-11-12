@@ -79,7 +79,7 @@ import { heroDiedNews, heroRespawnedNews } from './heroNews';
 import { unworld } from './mapCamera';
 import { addFlak, flashLanding, flashMines, flashProvince, noticeFlash } from './mapEffects';
 import { admits, fleetKnown, fleetNode, known, rememberScan, vision } from './mapFog';
-import { markUnread, pushMsg } from './messageLog';
+import { markUnread, pushMsg, pushOffer } from './messageLog';
 import { EVENT_LOG_MAX, isRepeat, LOG_LINES, pushBounded } from './noteLog';
 import { playerOrder, tellBuild, tellHero, tellSteward } from './orderPipeline';
 import type { RecapEvent } from './recap';
@@ -735,7 +735,7 @@ export function handleEvents(events: DomainEvent[]) {
               stance: stanceRu(st),
             }),
           );
-          pushMsg(from, t('log.diplo.offer.short', { stance: stanceRu(st) }), true, from);
+          pushOffer(from, st, from, t('log.diplo.offer.short', { stance: stanceRu(st) }));
         } else if (heard === 'sent') {
           note(
             t('log.diplo.sent', {
@@ -743,6 +743,8 @@ export function handleEvents(events: DomainEvent[]) {
               stance: stanceRu(st),
             }),
           );
+          // Своё предложение тоже ложится в личку — запросом «ждём ответа» до ответа.
+          pushOffer(to, st, ME, t('log.diplo.offer.short', { stance: stanceRu(st) }));
         }
         if (offerUnread(heard)) markUnread();
         if (diploOpen && diploTab === 'diplo') renderDiplo();

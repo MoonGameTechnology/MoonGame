@@ -18,6 +18,7 @@ import {
   getOffer,
   getStance,
   hasMapShareOffer,
+  type DiplomaticStance,
   type GameState,
 } from '../../packages/shared-core/src/index';
 import { coalitionChatShown, shownDms } from '../../decisions/diploChats';
@@ -40,6 +41,8 @@ export type SessionMsg = {
   pingExpiresAt?: number;
   chatId?: string;
   realAt?: number;
+  /** Строка предложения стойки (в личке): пока оно висит, строка — запрос с ответом. */
+  offer?: DiplomaticStance;
 };
 
 /** Какие поля отметки времени показывать (чат передаёт свои переключатели). */
@@ -72,6 +75,11 @@ export interface ConversationsHost {
   /** COAL-1: дипломатия внутри лички — висящие предложения с «принять/отказаться» и
    *  кнопки нового предложения. Разметку даёт окно дипломатии: кнопки у них общие. */
   threadDiploHtml(id: string): string;
+  /** Ответ на живое предложение в ленте лички: входящее — «принять/отказаться»,
+   *  своё — «ждём ответа». Кнопки у окна дипломатии общие с ростером. */
+  offerControlsHtml(seat: string, stance: DiplomaticStance, mine: boolean): string;
+  /** Подпись стойки на языке игрока. */
+  stanceLabel(stance: DiplomaticStance): string;
 }
 
 /** Собрать вкладку. Возвращает разметку её частей и управление тем, что открыто. */
@@ -160,9 +168,41 @@ export function initConversations(host: ConversationsHost): {
       return `<div class="dp-line sys"><span class="dp-when">${stampTxt}</span>${esc(m.text)}</div>`;
     return `<div class="dp-line${m.from === host.me() ? ' me' : ''}"><span class="dp-when">${stampTxt}</span>${nickHtml(m.from)}<b>:</b> ${esc(m.text)}</div>`;
   }
+  /** Строка предложения. Живое (висит и это последняя такая строка своей стороны) —
+   *  запрос с ответом прямо в переписке; прошлое — просто строка истории. */
+  function offerLineHtml(m: SessionMsg | null, seat: string, stance: DiplomaticStance, mine: boolean, live: boolean): string {
+    const stamp = m ? `<span class="dp-when">${host.fmtStamp(m.at)}</span>` : '';
+    const from = mine ? host.me() : seat;
+    const text = m ? esc(m.text) : esc(t('log.diplo.offer.short', { stance: host.stanceLabel(stance) }));
+    const ctl = live ? `<span class="dp-offer-ctl">${host.offerControlsHtml(seat, stance, mine)}</span>` : '';
+    return `<div class="dp-line offer${mine ? ' me' : ''}${live ? ' live' : ''}">${stamp}<span>${nickHtml(from)}<b>:</b> ${text}</span>${ctl}</div>`;
+  }
   function convoFeedInnerHtml(key: string): string {
     const msgs = convoMessages(key);
-    if (msgs.length) return msgs.map((m) => convoLineHtml(m)).join('');
+    const me = host.me();
+    const s = host.state();
+    const dm = !GROUP_CHANNELS.has(key) && key !== me && !!s.players[key];
+    const liveIn = dm ? getOffer(s, key, me) : null;
+    const liveOut = dm ? getOffer(s, me, key) : null;
+    let lastIn = -1;
+    let lastOut = -1;
+    msgs.forEach((m, i) => {
+      if (!m.offer) return;
+      if (m.from === me) lastOut = i;
+      else lastIn = i;
+    });
+    const inShown = liveIn !== null && lastIn >= 0 && msgs[lastIn]?.offer === liveIn;
+    const outShown = liveOut !== null && lastOut >= 0 && msgs[lastOut]?.offer === liveOut;
+    const lines = msgs.map((m, i) =>
+      m.offer && dm
+        ? offerLineHtml(m, key, m.offer, m.from === me, (i === lastIn && inShown) || (i === lastOut && outShown))
+        : convoLineHtml(m),
+    );
+    // Предложение без своей строки (журнал сессии не переживает перезагрузку и держит
+    // последние 300 строк) всё равно ждёт ответа: запрос встаёт в конец переписки.
+    if (liveIn !== null && !inShown) lines.push(offerLineHtml(null, key, liveIn, false, true));
+    if (liveOut !== null && !outShown) lines.push(offerLineHtml(null, key, liveOut, true, true));
+    if (lines.length) return lines.join('');
     const hint =
       key === COALITION
         ? t('chat.coalition.empty')

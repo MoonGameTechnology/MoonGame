@@ -374,6 +374,14 @@ body:not(.mobile-ui) #dp-search::placeholder{color:transparent;}
   color:var(--cyan);font-variant-emoji:text;}
 .dp-line.me b{color:var(--cyan);}
 .dp-line.ping{cursor:pointer;color:var(--amber);}
+/* Предложение стойки в переписке: строка-запрос; пока висит — с ответом справа. */
+.dp-line.offer{color:var(--amber);}
+.dp-line.offer.live{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:6px 8px;
+  border:1px solid var(--amber);border-radius:7px;background:rgba(255,190,77,.07);color:var(--ink);}
+.dp-line.offer.live.me{border-color:var(--line-hi);background:transparent;}
+.dp-line.offer.live .dp-when{min-width:0;}
+.dp-offer-ctl{display:flex;gap:6px;margin-left:auto;align-items:center;}
+.dp-wait{font-size:var(--fs-caption);color:var(--dim);}
 .dp-line.ping:hover{text-decoration:underline;}
 .dp-jump{font-size:var(--fs-caption);color:var(--dim);border:1px solid var(--line);border-radius:3px;
   padding:1px 4px;margin-left:5px;white-space:nowrap;}
