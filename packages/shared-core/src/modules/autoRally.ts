@@ -23,14 +23,16 @@
  * the tag, so a build never silently merges into one of them. The stack is pulled
  * loadout-keyed (BF-29) so paid modules ride along instead of being stripped.
  *
- * ТОЧКА СБОРА (RALLY-1, заказ владельца 2026-10-14 «как во всяких RTS»): мир-верфи можно
- * назначить свой же мир (`rally.point`), и тогда каждый готовый заказ кораблей не ложится
+ * ТОЧКА СБОРА (RALLY-1, заказ владельца 2026-10-14 «как во всяких RTS»): миру-верфи можно
+ * назначить другой мир — с RALLY-2 (2026-11-12) любой, кроме видимой закрытой территории
+ * (`rally.point`), и тогда каждый готовый заказ кораблей не ложится
  * в орбитальный флот, а сразу вылетает туда СВОИМ флотом. На месте его подхватывает
  * автослияние — подкрепления собираются во флот, который стоит у цели. Корабли, что уже
  * стояли на орбите, точка не трогает: она про новостройки, как в RTS. Курс прокладывает
  * модуль движения (возможность `fleet.course`, тот же маршрутизатор, что у приказа
- * «Курс»), поэтому правила пути общие: мир соседа по миру не пропустит. Курса нет (пути
- * нет, нет модуля движения) — заказ остаётся на орбите, как без точки. Боя в мире-верфи
+ * «Курс»), поэтому правила пути общие: мир соседа по миру не пропустит — флот долетит до
+ * его границы и встанет. Курса нет (пути нет, граница у самой верфи, нет модуля
+ * движения) — заказ остаётся на орбите, как без точки. Боя в мире-верфи
  * здесь не проверяем: под боем верфь не выпускает заказ вовсе (`construction`, «узел не
  * работает»), так что осаждённый мир защитников не отсылает и так.
  */
@@ -40,6 +42,7 @@ import type { FleetCourse } from './movement';
 import type { BattleStandUp } from '../util/standUp';
 import { defHasTrait } from '../data/traits';
 import { rallyPointOf } from '../state/rallyPoint';
+import { knownClosed } from '../state/rightOfWay';
 import { nextFleetSeq } from '../util/fleet';
 import { addUnits, findHealthyStack } from '../util/stacks';
 
@@ -60,8 +63,8 @@ function newRallyFleet(h: HandlerContext, owner: PlayerId, at: PlanetId): Fleet 
   return fresh;
 }
 
-/** Убирает точки сбора, которые потеряли смысл: мир сменил хозяина — его точка у
- *  прежнего хозяина больше не действует, и не действуют точки, указывавшие на него. */
+/** Убирает точки сбора мира, сменившего хозяина: его точка у прежнего хозяина больше
+ *  не действует. Точки, НАЦЕЛЕННЫЕ на этот мир, остаются (RALLY-2): цель — любой мир. */
 function dropRallyPointsOf(state: GameState, planetId: PlanetId, keepOwner: PlayerId): void {
   const all = state.rallyPoints;
   if (!all) return;
@@ -70,7 +73,7 @@ function dropRallyPointsOf(state: GameState, planetId: PlanetId, keepOwner: Play
     const mine = all[owner];
     if (!mine) continue;
     for (const from of Object.keys(mine)) {
-      if (from === planetId || mine[from] === planetId) delete mine[from];
+      if (from === planetId) delete mine[from];
     }
     if (Object.keys(mine).length === 0) delete all[owner];
   }
@@ -80,9 +83,10 @@ function dropRallyPointsOf(state: GameState, planetId: PlanetId, keepOwner: Play
 export const autoRallyModule: GameModule = {
   id: 'auto-rally',
   // 1.1.0 RALLY-1: точка сбора (`rally.point`); 1.2.0: поднятый на орбиту корабль сходится с врагом.
-  version: '1.3.0',
+  // 1.4.0 RALLY-2: цель — любой мир, кроме видимой закрытой территории; путь встаёт у границы.
+  version: '1.4.0',
   setup(api) {
-    // RALLY-1: поставить (`to` — свой другой мир) или снять (`to: null`) точку сбора.
+    // RALLY-1: поставить (`to` — другой мир) или снять (`to: null`) точку сбора.
     api.onAction('rally.point', (action, h) => {
       const p = action.payload as { planetId?: unknown; to?: unknown };
       if (typeof p?.planetId !== 'string' || (p.to !== null && typeof p.to !== 'string')) {
@@ -103,9 +107,12 @@ export const autoRallyModule: GameModule = {
       if (p.to === p.planetId) return h.reject('E_SAME_LOCATION');
       const target = h.state.planets[p.to];
       if (!target) return h.reject('E_NO_PLANET');
-      // Точка сбора — только СВОЙ мир (решение 2026-10-14): подкрепления собираются в
-      // один флот у себя, а не летят в чужой мир по одному заказу.
-      if (target.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      // RALLY-2 (владелец 2026-11-12): целью годится любой мир, кроме закрытой территории —
+      // того, с кем у игрока мир (туда флот не пройдёт). Судим по тому, что игрок ВИДИТ
+      // (`knownClosed`, как у приказа «Курс»): отказ по неразведанному миру был бы
+      // разведкой. Закрытый, но скрытый туманом мир точку принимает; корабли встанут у
+      // границы, когда разглядят её в полёте.
+      if (knownClosed(h.state, action.playerId, p.to)) return h.reject('E_NO_RIGHT_OF_WAY');
       ((h.state.rallyPoints ??= {})[action.playerId] ??= {})[p.planetId] = p.to;
     });
 
@@ -160,7 +167,8 @@ export const autoRallyModule: GameModule = {
         const wave = newRallyFleet(h, p.owner, planet.id);
         addUnits(wave.units, p.unit, take, mods, stack.moduleStars, stack.moduleRarity, stack);
         const course = h.capability<FleetCourse>('fleet.course');
-        if (course?.({ fleetId: wave.id, playerId: p.owner, to }, h) === null) return;
+        // Обхода закрытой границы нет — флот долетает до неё и встаёт (RALLY-2).
+        if (course?.({ fleetId: wave.id, playerId: p.owner, to, stopAtBorder: true }, h) === null) return;
         delete h.state.fleets[wave.id];
       }
       let rally = Object.values(h.state.fleets).find(

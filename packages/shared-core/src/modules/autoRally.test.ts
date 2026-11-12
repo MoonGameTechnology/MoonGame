@@ -300,6 +300,7 @@ describe('autoRally — точка сбора (RALLY-1)', () => {
   }
   const apply = (s: GameState, a: Action) => full.applyAction(s, a, ctx(s.time));
   const pointed = (to: string, s = front()) => okApply(apply(s, rally('A', to))).state;
+  const atWar = (): GameState => ({ ...front(), diplomacy: { 'p1|p2': 'war' } });
   /** Заказ и выпуск в тот же миг: часы НЕ уходят вперёд, флот ещё в пути. */
   function launched(s: GameState, unit = 'cruiser', count = 1): GameState {
     const ordered = okApply(full.applyAction(s, build(unit, count), ctx(s.time)));
@@ -366,12 +367,45 @@ describe('autoRally — точка сбора (RALLY-1)', () => {
     expect(rallyFleets(s).map((f) => f.location)).toEqual(['A']);
   });
 
-  it('ставится только со своего мира на свой другой мир', () => {
-    expect(apply(front(), rally('A', 'C'))).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+  it('ставится только со своего мира; цель — любой другой мир (RALLY-2)', () => {
     expect(apply(front(), rally('C', 'A'))).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
     expect(apply(front(), rally('A', 'A'))).toMatchObject({ ok: false, code: 'E_SAME_LOCATION' });
     expect(apply(front(), rally('A', 'Z'))).toMatchObject({ ok: false, code: 'E_NO_PLANET' });
     expect(pointed('B').rallyPoints).toEqual({ p1: { A: 'B' } });
+    // Чужой мир, с которым война, — годится.
+    expect(pointed('C', atWar()).rallyPoints).toEqual({ p1: { A: 'C' } });
+  });
+
+  it('видимая закрытая территория (мир с хозяином) не годится; скрытая туманом — годится', () => {
+    const peace = (known: boolean): GameState => {
+      const s = front();
+      s.diplomacy = { 'p1|p2': 'peace' };
+      s.fog = { p1: known ? { C: { owner: 'p2', garrison: [], buildings: [], at: 0 } } : {} };
+      return s;
+    };
+    expect(apply(peace(true), rally('A', 'C'))).toMatchObject({ ok: false, code: 'E_NO_RIGHT_OF_WAY' });
+    // Отказ по неразведанному миру был бы разведкой: точка встаёт, как на ничью землю.
+    expect(okApply(apply(peace(false), rally('A', 'C'))).state.rallyPoints).toEqual({ p1: { A: 'C' } });
+  });
+
+  it('закрытая граница на пути без обхода: корабли долетают до неё и встают', () => {
+    // A — B — P (мир с p2) — T: обход через P не идёт, корабли встают в B.
+    const s0 = front();
+    s0.planets.B!.links = ['A', 'P'];
+    s0.planets.P = { ...planet('P', 'p2'), position: { x: 200, y: 0 }, links: ['B', 'T'] };
+    s0.planets.T = { ...planet('T', null), position: { x: 300, y: 0 }, links: ['P'] };
+    s0.diplomacy = { 'p1|p2': 'peace' };
+    const s1 = okApply(apply(s0, rally('A', 'T'))).state;
+    const [wave] = flying(launched(s1));
+    expect(wave?.movement?.destination).toBe('B');
+    const after = okAdvance(full.advanceTo(launched(s1), ctx(s1.time + 100 * HOUR))).state;
+    expect(flying(after)).toEqual([]);
+    expect(idleAt(after, 'B').flatMap((f) => f.units)).toEqual([{ unit: 'cruiser', count: 1 }]);
+    // Граница у самой верфи: лететь некуда — заказ ложится на орбиту.
+    const s2 = okApply(apply(s0, rally('A', 'T'))).state;
+    s2.planets.B!.owner = 'p2';
+    expect(flying(launched(s2))).toEqual([]);
+    expect(rallyFleets(launched(s2)).map((f) => f.location)).toEqual(['A']);
   });
 
   it('снятие точки убирает запись целиком', () => {
@@ -380,7 +414,7 @@ describe('autoRally — точка сбора (RALLY-1)', () => {
     expect(okApply(apply(front(), rally('A', null))).state.rallyPoints).toBeUndefined();
   });
 
-  it('потеря мира-верфи или цели снимает точку', () => {
+  it('потеря мира-верфи снимает точку, смена хозяина цели — нет', () => {
     const capture = (planetId: string): Action => ({
       id: `cap:${planetId}`,
       type: 'test.capture',
@@ -389,17 +423,18 @@ describe('autoRally — точка сбора (RALLY-1)', () => {
       issuedAt: 0,
     });
     const lostTarget = okApply(apply(pointed('B'), capture('B'))).state;
-    expect(lostTarget.rallyPoints).toBeUndefined();
+    expect(lostTarget.rallyPoints).toEqual({ p1: { A: 'B' } });
+    expect(rallyPointOf(lostTarget, 'p1', 'A')).toBe('B');
     const lostSource = okApply(apply(pointed('B'), capture('A'))).state;
     expect(lostSource.rallyPoints).toBeUndefined();
     // Захватчик не наследует чужую точку и не получает подкреплений.
     expect(rallyPointOf(lostSource, 'p2', 'A')).toBeNull();
   });
 
-  it('rallyPointOf не верит записи, ставшей чужой', () => {
+  it('rallyPointOf не верит записи мира, ставшего чужим', () => {
     const s = pointed('B');
     expect(rallyPointOf(s, 'p1', 'A')).toBe('B');
-    s.planets.B!.owner = 'p2'; // мир ушёл мимо события захвата
+    s.planets.A!.owner = 'p2'; // мир ушёл мимо события захвата
     expect(rallyPointOf(s, 'p1', 'A')).toBeNull();
   });
 });

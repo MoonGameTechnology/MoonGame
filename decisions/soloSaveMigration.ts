@@ -714,6 +714,18 @@ export const SCHEDULE_ORDER_SOLO_MIGRATION = {
   toDataHash: BROOD_HOLD_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: `auto-rally` 1.4.0 and `movement` 1.10.0 — a rally point may aim at any
+ *  world except visibly closed territory, and its ships stop at such a border on the way.
+ *  The catalogue is unchanged and a saved point keeps its shape, so a saved world reads as is. */
+export const RALLY_ANY_WORLD_SOLO_MIGRATION = {
+  fromRules: SCHEDULE_ORDER_SOLO_MIGRATION.toRules,
+  fromData: SCHEDULE_ORDER_SOLO_MIGRATION.toData,
+  fromDataHash: SCHEDULE_ORDER_SOLO_MIGRATION.toDataHash,
+  toRules: '1b563be4dcc083',
+  toData: SCHEDULE_ORDER_SOLO_MIGRATION.toData,
+  toDataHash: SCHEDULE_ORDER_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -776,6 +788,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   FORCED_MARCH_PACE_SOLO_MIGRATION,
   BROOD_HOLD_SOLO_MIGRATION,
   SCHEDULE_ORDER_SOLO_MIGRATION,
+  RALLY_ANY_WORLD_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
