@@ -32,7 +32,6 @@ import {
   matchUnitHours,
   thresholdRamp,
   signatureSize,
-  TURNED_HOURS,
   UNCONTROLLED_OUTPUT,
   unitTier,
   type GameState,
@@ -192,7 +191,7 @@ export function buildingDossier(id: string, level: number): Dossier | null {
           t('dossier.building.counterintel', { b: hl(pct(lv.spyDetectBonus)), k: hl(pct(lv.spyKillBonus)) }) +
           // SPY-18: the third level turns the spy it would kill.
           (lv.spyTurnChance > 0
-            ? ` ${t('dossier.building.counterintel.turn', { c: hl(pct(lv.spyTurnChance)), n: TURNED_HOURS })}`
+            ? ` ${t('dossier.building.counterintel.turn', { c: hl(pct(lv.spyTurnChance)) })}`
             : ''),
       };
     case 'farm':

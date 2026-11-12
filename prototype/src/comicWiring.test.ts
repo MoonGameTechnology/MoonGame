@@ -74,6 +74,6 @@ describe('комиксы глав — проводка', () => {
       ...[...block.matchAll(/\{\s*id: '([^']+)'/g)].map((m) => m[1]),
     ];
     expect(block.trimStart().startsWith('...NATIVE_BACK_LAYERS,')).toBe(true);
-    expect(ladder.slice(0, 5)).toEqual(['hero-reward', 'match-hero-reward', 'match-description', 'fortress-order', 'comic']);
+    expect(ladder.slice(0, 6)).toEqual(['hero-reward', 'match-hero-reward', 'match-description', 'fortress-order', 'defector-offer', 'comic']);
   });
 });

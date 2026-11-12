@@ -726,6 +726,18 @@ export const RALLY_ANY_WORLD_SOLO_MIGRATION = {
   toDataHash: SCHEDULE_ORDER_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: espionage 2.3.0 — a turned agent asks its catcher to take it in (for
+ *  good) or flees, instead of serving it for a day. The catalogue is unchanged; a saved
+ *  world's turned agent (`turnedUntil`) serves out its term. */
+export const SPY_DEFECTOR_SOLO_MIGRATION = {
+  fromRules: RALLY_ANY_WORLD_SOLO_MIGRATION.toRules,
+  fromData: RALLY_ANY_WORLD_SOLO_MIGRATION.toData,
+  fromDataHash: RALLY_ANY_WORLD_SOLO_MIGRATION.toDataHash,
+  toRules: '1f5a277badc3ab',
+  toData: SPY_LEVELS_SOLO_MIGRATION.toData,
+  toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -789,6 +801,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   BROOD_HOLD_SOLO_MIGRATION,
   SCHEDULE_ORDER_SOLO_MIGRATION,
   RALLY_ANY_WORLD_SOLO_MIGRATION,
+  SPY_DEFECTOR_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

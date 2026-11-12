@@ -71,6 +71,9 @@ export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new 
   ['espionage.cancelled', 'owner'],
   ['espionage.caught', 'owner'],
   ['espionage.recruited', 'owner'],
+  ['espionage.defector', 'owner'],
+  ['espionage.defector.joined', 'owner'],
+  ['espionage.defector.fled', 'owner'],
 ]);
 
 /** Events every player of the match receives, wherever they happen — public news. The

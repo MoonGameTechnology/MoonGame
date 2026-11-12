@@ -1189,6 +1189,9 @@ function project(
   // spies are says whom they spy on, turned agents — SPY-18 — who caught whom) and what the
   // spies found (SPY-24): only the viewer's own stays (`keepOwnSpying`).
   keepOwnSpying(view, viewerId);
+  const offers = view.spyOffers?.[viewerId];
+  if (offers?.length) view.spyOffers = { [viewerId]: offers };
+  else delete view.spyOffers;
   // Diplomatic OFFERS are private to the two negotiating parties (the committed
   // stances themselves are public): a third party must not see who is suing for
   // peace with whom. Keep only offers the viewer sends or receives; a map left

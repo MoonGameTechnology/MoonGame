@@ -250,7 +250,7 @@ describe('REFM-240 — стык с main.ts', () => {
       'world: () => s,',
       's = state;',
       'me: () => ME,',
-      'handleEvents,',
+      'handleEvents: handleFeed,',
       'note,',
       'placeName,',
       "refusalSound: () => snd.play('error'),",

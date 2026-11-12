@@ -11,7 +11,7 @@ import type { FleetChain } from './chain';
 import type { Coalition, CoalitionClock } from './coalition';
 import type { SightRules } from './sensorView';
 import type { SeenSortie } from './aircraftSight';
-import type { Spy } from './spy';
+import type { Spy, SpyOffer } from './spy';
 export type { SightRules } from './sensorView';
 
 /**
@@ -291,7 +291,7 @@ export interface ScoutedWorld {
   at: number;
 }
 
-export type { Spy, SpyOp, SpyState } from './spy';
+export type { Spy, SpyOffer, SpyOp, SpyState } from './spy';
 
 export type MatchStatus = 'ongoing' | 'ended';
 export type MatchEndReason =
@@ -1107,6 +1107,9 @@ export interface GameState {
    *  order; until then `spyRoster` reads the network as resting in the capital. PRIVATE like
    *  `intel`: a viewer's projection carries only their own network. */
   spies?: Record<PlayerId, Spy[]>;
+  /** Turned enemy agents waiting for each player's answer (`SpyOffer`, owner's resolution
+   *  2026-11-11). PRIVATE like `spies`: who caught whom is the catcher's secret. */
+  spyOffers?: Record<PlayerId, SpyOffer[]>;
   /** SPY-24: the worlds each player's spies have been to — on an order, on the way to one or
    *  on recon — and whose they found each to be (`null` — unclaimed) and when
    *  (`espionageModule`). Out of sight, such a world takes an order the way the player last
