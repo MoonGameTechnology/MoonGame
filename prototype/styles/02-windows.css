@@ -369,7 +369,10 @@ body:not(.mobile-ui) #dp-search::placeholder{color:transparent;}
 .dp-cv-nm{display:flex;flex-direction:column;min-width:0;font-size:var(--fs-body);color:#eafffb;font-weight:700;}
 .dp-cv-nm em{font-style:normal;font-weight:400;font-size:var(--fs-caption);color:var(--dim);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92px;}
+.dp-cv-ask{margin-left:auto;flex:none;color:var(--amber);font-size:12px;}
+.dp-cv.ask{border-color:var(--amber);}
 .dp-thread{flex:1;min-width:0;display:flex;flex-direction:column;}
+.dp-back{display:none;}
 .dp-thhead{padding:9px 12px;border-bottom:1px solid var(--line-hi);font-size:var(--fs-body);font-weight:700;
   color:var(--cyan);font-variant-emoji:text;}
 .dp-line.me b{color:var(--cyan);}

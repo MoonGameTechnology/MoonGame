@@ -779,6 +779,7 @@ export const es: Record<string, string> = {
   'cost.free': 'gratis',
   'cost.short': 'faltan {n}',
   'chat.coalition.empty': 'El chat de coalición está vacío.<br>Marca una provincia con un aviso 📍 o escribe.',
+  'chat.back': 'Todos los chats',
   'chat.empty': 'No hay mensajes todavía.',
   'chat.dm.none': 'Sin chats privados. Para escribir a un jugador, pulsa ✉ en «Diplomacia».',
   'chat.head.coalition': '⚡ Coalición · {n} {n|miembro|miembros}',
