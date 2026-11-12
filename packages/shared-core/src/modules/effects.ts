@@ -137,7 +137,8 @@ function capturingStacks(
 export const effectsModule: GameModule = {
   id: 'effects',
   // 0.2.0: захват плацдармом отдаёт правилам с трейтом состав взявших мир войск.
-  version: '0.2.0',
+  // 0.3.0: срабатывания по расписанию внутри одного отрезка — в порядке времени.
+  version: '0.3.0',
   setup(api) {
     api.on('planet.captured', (event, h) => {
       const p = event.payload as { planetId?: unknown; owner?: unknown; by?: unknown };
@@ -173,6 +174,11 @@ export const effectsModule: GameModule = {
       const players = Object.keys(h.state.players)
         .sort()
         .filter((id) => h.state.players[id]?.status === 'active');
+      // Все срабатывания отрезка — в порядке времени, а в один миг — по id правила: так
+      // идут и часы, шагающие по часу. Длинный отрезок (офлайн-догон) иначе прогонял
+      // правила целиком одно за другим, и штраф, срезанный в ноль, и броски шанса
+      // зависели от того, каким шагом звали `advanceTo`.
+      const firings: Array<{ at: number; ruleId: string; rule: EffectRule }> = [];
       for (const [ruleId, rule] of rules) {
         const cadence = rule.params['cadenceHours'];
         if (typeof cadence !== 'number' || !(cadence > 0)) continue; // no cadence → inert
@@ -184,10 +190,15 @@ export const effectsModule: GameModule = {
           k * stepMs <= span.to && fired < MAX_FIRINGS_PER_SPAN;
           k += 1, fired += 1
         ) {
-          for (const playerId of players) {
-            if (!h.rng.chance(rule.chance)) continue;
-            applyRule(h, { ruleId, rule, playerId });
-          }
+          firings.push({ at: k * stepMs, ruleId, rule });
+        }
+      }
+      // `rules` уже по id, а сортировка стабильна: в один миг порядок остаётся по id.
+      firings.sort((a, b) => a.at - b.at);
+      for (const { ruleId, rule } of firings) {
+        for (const playerId of players) {
+          if (!h.rng.chance(rule.chance)) continue;
+          applyRule(h, { ruleId, rule, playerId });
         }
       }
     });

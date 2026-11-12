@@ -702,6 +702,18 @@ export const BROOD_HOLD_SOLO_MIGRATION = {
   toDataHash: FORCED_MARCH_PACE_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: effects 0.3.0 — scheduled dark events inside one span fire in time order
+ *  (then by rule id), so an offline catch-up lands what the same hours stepped one by one would.
+ *  The catalogue is unchanged. */
+export const SCHEDULE_ORDER_SOLO_MIGRATION = {
+  fromRules: BROOD_HOLD_SOLO_MIGRATION.toRules,
+  fromData: BROOD_HOLD_SOLO_MIGRATION.toData,
+  fromDataHash: BROOD_HOLD_SOLO_MIGRATION.toDataHash,
+  toRules: '03926c569ac068',
+  toData: BROOD_HOLD_SOLO_MIGRATION.toData,
+  toDataHash: BROOD_HOLD_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -763,6 +775,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_FOG_SOLO_MIGRATION,
   FORCED_MARCH_PACE_SOLO_MIGRATION,
   BROOD_HOLD_SOLO_MIGRATION,
+  SCHEDULE_ORDER_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
