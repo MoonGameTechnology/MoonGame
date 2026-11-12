@@ -50,6 +50,12 @@ async function loadActiveLocale(): Promise<void> {
 }
 
 document.body.classList.add('app-starting');
+// Формы разметки ничего никуда не отправляют: их кнопки — `type="button"`, а Enter в поле
+// отправил бы форму неявно. Раньше это гасил `onsubmit="return false"` на каждой форме, но
+// политика документа инлайновые обработчики режет (`script-src-attr`, смоук `nettest.mjs`
+// видит нарушение), так что гасим здесь, одним слушателем на все формы. Свои слушатели
+// форм (`mnum`, друзья, удаление аккаунта) срабатывают раньше и работают как прежде.
+document.addEventListener('submit', (e) => e.preventDefault());
 if (!__SECTOR_ZERO_ONLY__) labelStaticDom();
 
 /**
