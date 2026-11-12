@@ -527,8 +527,9 @@ describe('REFM-235 — искусство секторов', () => {
     worlds.drawWorlds(0, LOD({ detail: 0.5 }));
     const half = 0.45 + 0.55 * 0.5;
     const hole = arcAt(frame.calls, c, 20 * half)!;
-    expect([hole.fill, hole.stroke, hole.width]).toEqual(['#03030a', '#8764ce', 3]);
-    expect(call(frame.calls, 'ellipse', c.x, c.y, 31 * half, 10 * half, -0.3)).toBeTruthy();
+    expect(hole.fill).toBe('#020207');
+    expect(arcAt(frame.calls, c, 20 * half * 1.04)?.stroke).toBe('#d9ccff');
+    expect(call(frame.calls, 'ellipse', c.x, c.y, 35 * half, 10 * half, -0.3)).toBeTruthy();
     expect(frame.named('fillText').some((k) => k.args[0] === name(next.id))).toBe(false);
     frame.calls.length = 0;
     asSector(next.id, 'empty');

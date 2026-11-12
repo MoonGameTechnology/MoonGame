@@ -168,3 +168,9 @@ export function terrainArtCentre<N extends CentredNode>(
   }
   return hole ?? node;
 }
+
+/** Kinds drawn by their own art over the province, not by the shared environment field:
+ *  the rift, the accretion disk and the black hole (`holographicTerrainArt.ts`). */
+const OWN_ART = new Set(['rift', 'accretion_disk', 'black_hole']);
+export const hasOwnTerrainArt = (kind: string | undefined): kind is string =>
+  kind !== undefined && OWN_ART.has(kind);

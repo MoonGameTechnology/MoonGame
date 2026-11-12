@@ -28,6 +28,7 @@ const COLORS: Readonly<Record<string, string>> = {
   asteroid_cluster: "#b7c4a1",
   rift: "#c7a0ed",
   accretion_disk: "#ffb26b",
+  black_hole: "#a98bff",
   dust_lane: "#baa7cc",
   depleted_system: "#7f99ab",
 };
@@ -38,6 +39,7 @@ const ANIMATED = new Set([
   "solar_flare",
   "rift",
   "accretion_disk",
+  "black_hole",
 ]);
 
 /** Smooth interior coverage, including concave boundaries. Outside is transparent. */
@@ -84,6 +86,48 @@ interface ArtPen {
   path: (points: readonly Point[], alpha?: number) => void;
   line: (a: Point, z: Point, alpha?: number) => void;
   random: () => number;
+}
+
+/** The black hole's own province: space bent round the hole. Lensing rings crowd towards
+ * the horizon (spacing shrinks as 1/r), the innermost bright one is the photon ring, and
+ * star trails curve into the hole along infall spirals. Round in box pixels, like the disk. */
+function blackHole({ marker, box: b, poly, path, line, random }: ArtPen): void {
+  const cx = marker[0] * b.width;
+  const cy = marker[1] * b.height;
+  let far = 0;
+  for (const [x, y] of poly) far = Math.max(far, Math.hypot(x * b.width - cx, y * b.height - cy));
+  const local = (r: number, a: number): Point => [
+    (cx + Math.cos(a) * r) / b.width,
+    (cy + Math.sin(a) * r) / b.height,
+  ];
+  const horizon = Math.min(b.width, b.height) * 0.11;
+  // Lensing rings: r_k = horizon / (1 - k·q) — evenly spaced in 1/r, so they crowd inward.
+  for (let k = 0; k < 14; k++) {
+    const r = horizon / (1 - k * 0.068);
+    if (r > far) break;
+    const wobble = (a: number): number => r * (1 + 0.012 * Math.sin(a * 5 + k));
+    path(Array.from({ length: 65 }, (_, j) => {
+      const a = (j / 64) * Math.PI * 2;
+      return local(wobble(a), a);
+    }), k === 0 ? 0.62 : Math.max(0.07, 0.34 - k * 0.022));
+  }
+  // Infall spirals: matter and light falling in, winding tighter near the horizon.
+  for (let arm = 0; arm < 9; arm++) {
+    const start = (arm / 9) * Math.PI * 2;
+    path(Array.from({ length: 40 }, (_, j) => {
+      const t = j / 39;
+      const r = far * (1 - t) + horizon * 1.05 * t;
+      return local(r, start + Math.log(far / r) * 1.25);
+    }), 0.16);
+  }
+  // Stretched starlight: short arcs skimming the rings, the background bent round the hole.
+  for (let i = 0; i < 34; i++) {
+    const r = horizon * (1.3 + random() * 4.5);
+    if (r > far) continue;
+    const a = random() * Math.PI * 2;
+    const span = (0.08 + random() * 0.2) * (horizon * 2.2 / r);
+    line(local(r, a), local(r, a + span), 0.42);
+  }
 }
 
 /** Plasma spiralling into the black hole: streaks circle the hole (the field's marker),
@@ -245,6 +289,8 @@ function geometry(field: TerrainArtField): Geometry {
           [x + side * 0.23, y - 0.075]], 0.15);
       }
     }
+  } else if (field.kind === "black_hole") {
+    blackHole({ marker, box: b, poly, path, line, random });
   } else if (field.kind === "accretion_disk") {
     accretionDisk({ marker, box: b, poly, path, line, random });
   } else if (field.kind === "dust_lane") {
