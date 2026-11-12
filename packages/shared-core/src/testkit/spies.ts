@@ -20,7 +20,9 @@ export const instantSpies: GameModule = {
 };
 
 /** `state` with every world linked to every other and each player's first world as capital
- *  (a capital already set stays). */
+ *  (a capital already set stays). Every player knows whose each world is, as if their spies
+ *  had reconnoitred it (`scouted`, SPY-24): a test about a deed is not a test about the fog —
+ *  those build their state with `unscouted`. */
 export function spyMap(state: GameState): GameState {
   const ids = Object.keys(state.planets).sort();
   const planets = Object.fromEntries(
@@ -31,5 +33,19 @@ export function spyMap(state: GameState): GameState {
     const owner = state.planets[id]!.owner;
     if (owner !== null && capital[owner] === undefined) capital[owner] = id;
   }
-  return { ...state, planets, capital };
+  return { ...state, planets, capital, scouted: scoutedAll({ ...state, planets }) };
+}
+
+/** Every player's record of every world's owner, as the worlds are held now (SPY-24). */
+export function scoutedAll(state: GameState): NonNullable<GameState['scouted']> {
+  const found = Object.fromEntries(
+    Object.values(state.planets).map((p) => [p.id, { owner: p.owner, at: state.time }]),
+  );
+  return Object.fromEntries(Object.keys(state.players).map((id) => [id, { ...found }]));
+}
+
+/** `state` with no spy's record of any world: only sight tells whose a world is. */
+export function unscouted(state: GameState): GameState {
+  const { scouted: _gone, ...rest } = state;
+  return rest;
 }

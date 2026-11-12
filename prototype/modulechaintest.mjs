@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global window, document, innerWidth */
+/* global window, document, innerWidth, getComputedStyle */
 /** Real economy services + production UI controllers, isolated localhost fixtures. */
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -60,10 +60,11 @@ import { setLocale } from './localization/runtime';
 setLocale(new URLSearchParams(location.search).get('lang') || 'ru');
 let actor='alice', cache=[]; const history=new Map(); const rewards=initModuleRewards({identity:()=>actor,visible:()=>true,read:k=>history.get(k),write:(k,v)=>history.set(k,v)}); const auth=async()=>({base:location.origin,token:actor});
 const arRoot=document.querySelector('#hp-arsenal'), mmRoot=document.querySelector('#hp-auction');
-const showMarket=async()=>{arsenal.close();arRoot.hidden=true;mmRoot.hidden=false;await market.refresh();};
-const arsenal=initArsenal({root:()=>arRoot,sheet:()=>document.querySelector('#arsenal-sheet'),narrow:()=>innerWidth<700,readCache:()=>cache,writeCache:i=>{cache=i;},confirmed:i=>rewards.observe(i),authorizedBase:auth,canSignIn:()=>false,signIn:()=>{},openCodex:()=>{},openSeason:()=>{},openStore:()=>{},openAuction:showMarket,sell:id=>{market.focusSell(id);void showMarket();}});
-const market=initMetaMarket({root:()=>mmRoot,arsenal:()=>arsenal.items(),authorizedBase:auth,note:m=>{document.querySelector('#notice').textContent=m;},inventoryChanged:()=>arsenal.refresh()});
-window.moduleChain={ready:arsenal.refresh(),showMarket,actor:async id=>{actor=id;cache=[];arsenal.forget();await arsenal.refresh();await showMarket();}};
+const showMarket=async()=>{arsenal.close();arRoot.hidden=true;mmRoot.hidden=false;document.querySelector('#hub').dataset.panel='auction';await market.refresh();};
+const arsenal=initArsenal({root:()=>arRoot,sheet:()=>document.querySelector('#arsenal-sheet'),narrow:()=>innerWidth<700,readCache:()=>cache,writeCache:i=>{cache=i;},confirmed:i=>rewards.observe(i),authorizedBase:auth,canSignIn:()=>false,signIn:()=>{},openCodex:()=>{},openSeason:()=>{},openStore:()=>{},openAuction:showMarket,warrants:()=>market.balance(),sell:id=>{market.focusSell(id);void showMarket();}});
+const market=initMetaMarket({root:()=>mmRoot,arsenal:()=>arsenal.items(),authorizedBase:auth,note:m=>{document.querySelector('#notice').textContent=m;},changed:()=>arsenal.repaint(),inventoryChanged:()=>arsenal.refresh()});
+const showArsenal=()=>{mmRoot.hidden=true;arRoot.hidden=false;document.querySelector('#hub').dataset.panel='arsenal';};
+window.moduleChain={ready:arsenal.refresh().then(()=>market.sync()),showMarket,showArsenal,actor:async id=>{actor=id;cache=[];arsenal.forget();await arsenal.refresh();await showMarket();}};
 `,
     loader: 'ts',
   },
@@ -80,12 +81,16 @@ const css =
     .sort()
     .map((f) => readFileSync('prototype/styles/' + f, 'utf8'))
     .join('\n');
-const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\nhtml,body{height:100%;overflow:auto}body{padding:20px;background:#06131d}#hp-arsenal,#hp-auction{display:flex;flex-direction:column;max-width:1200px;margin:auto;height:calc(100vh - 40px)}[hidden]{display:none!important}#notice{position:fixed;bottom:0}</style></head><body><section id="hp-arsenal"></section><section id="hp-auction" hidden></section><div id="arsenal-sheet"></div><div id="notice" role="status"></div><script src="/test.js"></script></body></html>`;
+// Разметка как в настоящем хабе: панели внутри прокручиваемого .hub-body над нижней навигацией.
+// Своя высота у панелей здесь спрятала бы баг ПК, где док аукциона уезжал под край окна.
+const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}\n[hidden]{display:none!important}#notice{position:fixed;bottom:0}</style></head><body><div id="hub" data-panel="arsenal" style="display:flex"><div class="hub-body"><section class="hub-panel" id="hp-arsenal"></section><section class="hub-panel" id="hp-auction" hidden></section></div><nav class="hub-nav" style="min-height:56px"></nav><div id="arsenal-sheet"></div></div><div id="notice" role="status"></div><script src="/test.js"></script></body></html>`;
 const browser = await launchBrowser();
 const results = [];
 try {
   for (const [width, height, lang] of [
     [1360, 1000, 'ru'],
+    [1920, 1080, 'ru'],
+    [1280, 640, 'ru'],
     [390, 844, 'en'],
   ]) {
     const f = await stand();
@@ -105,6 +110,11 @@ try {
     try {
       await page.goto(url + '/?lang=' + lang);
       await page.evaluate(() => window.moduleChain.ready);
+      // Фиолетовая плашка Варрантов в шапке арсенала — та же дверь в аукцион, что на главном экране.
+      await page.screenshot({ path: resolve(out, `arsenal-head-${width}.png`) });
+      await page.locator('#hp-arsenal .ar-head [data-ar-auction]').click();
+      await page.locator('#hp-auction .mm-dock').waitFor();
+      await page.evaluate(() => window.moduleChain.showArsenal());
       await page.locator('[data-ar-module="cargo_bay"]').click();
       await page.locator('[data-ar-select="target"]').click();
       await page.waitForFunction(
@@ -157,6 +167,24 @@ try {
       await page.locator('[data-mm-auction-open]').click();
       await page.locator('.mm-slot.used .mm-timer').waitFor();
       await page.screenshot({ path: resolve(out, `auction-shelf-${width}.png`) });
+      // Полка и склад не растягивают значки на ширину окна (на ПК они раздувались);
+      // размер считаем без зума хаба ПК (--pcz).
+      const bigIcon = await page.evaluate(() =>
+        Math.max(
+          ...[...document.querySelectorAll('#hp-auction .mm-ic')].map(
+            (el) =>
+              el.getBoundingClientRect().width /
+              (Number(getComputedStyle(document.querySelector('#hub')).zoom) || 1),
+          ),
+        ),
+      );
+      if (bigIcon > 120) throw new Error(`auction icon is ${Math.round(bigIcon)} px wide`);
+      // Док вкладок и категорий виден без прокрутки: прокручивается сам аукцион, а не хаб.
+      const dockBottom = await page.evaluate(
+        () => document.querySelector('#hp-auction .mm-dock').getBoundingClientRect().bottom,
+      );
+      if (dockBottom > height + 1)
+        throw new Error(`auction dock ends at ${dockBottom} > ${height}`);
       await page.evaluate(() => window.moduleChain.actor('bob'));
       await page.locator('[data-mm-tab="bids"]').click();
       await page.locator('[data-mm-open^="bid:"]').click();

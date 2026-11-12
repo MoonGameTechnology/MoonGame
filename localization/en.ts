@@ -3385,6 +3385,7 @@ export const en: Record<string, string> = {
   'err.no-range': 'the squadron has no strike range',
   'err.no-right-of-way': 'no right of way: every route crosses a power you are at peace with',
   'err.no-route': 'no route',
+  'err.unscouted': 'none of your spies has been here',
   'err.no-ships': 'no ships',
   'err.no-shipyard': 'needs a shipyard',
   'err.yard-too-small': 'the yard is too small for this hull — it needs a higher slipway',

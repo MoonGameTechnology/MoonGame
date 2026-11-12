@@ -2922,6 +2922,7 @@ export const pl: Record<string, string> = {
   'err.no-range': 'eskadra nie posiada zasięgu operacyjnego',
   'err.no-right-of-way': 'brak prawa przemarszu przez neutralne mocarstwo',
   'err.no-route': 'brak dostępnego szlaku',
+  'err.unscouted': 'żaden z twoich szpiegów tu nie był',
   'err.no-ships': 'brak dostępnych okrętów',
   'err.no-shipyard': 'wymagana jest stocznia kosmiczna',
   'err.yard-too-small': 'stocznia jest za mała — wymagana większa pochylnia',

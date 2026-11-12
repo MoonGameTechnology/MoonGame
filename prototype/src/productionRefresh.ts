@@ -75,6 +75,26 @@ export function initProductionRefresh(host: ProductionRefreshHost) {
     true,
   );
 
+  /** Заказ, который закончится раньше следующего ежесекундного обновления, окно снимает в
+   *  тот же миг, а не держит до секунды с нулём на таймере. Темп мира берётся из двух
+   *  соседних обновлений: на паузе он ноль, и ждать нечего. */
+  let last: { time: number; real: number } | null = null;
+  let early: ReturnType<typeof setTimeout> | null = null;
+  const watchCompletion = (refresh: () => void): void => {
+    const { time, scheduled } = host.state();
+    const real = performance.now();
+    const rate = last && real > last.real ? (time - last.time) / (real - last.real) : 0;
+    last = { time, real };
+    if (early !== null) clearTimeout(early);
+    early = null;
+    if (rate <= 0) return;
+    let next = Infinity;
+    for (const e of scheduled)
+      if ((e.type === 'construction.complete' || e.type === 'hero.mobilization.complete') && e.at > time && e.at < next) next = e.at;
+    const wait = (next - time) / rate;
+    if (wait < 1000) early = setTimeout(refresh, wait + 30);
+  };
+
   return {
     queueHtml,
     stripHtml,
@@ -105,9 +125,10 @@ export function initProductionRefresh(host: ProductionRefreshHost) {
           .find((el) => focusAttrs.every(([name, value]) => el.getAttribute(name) === value))
           ?.focus({ preventScroll: true });
     },
-    refreshQueue: () => {
+    refreshQueue: function refreshQueue(): void {
       const root = host.root();
       if (!root.classList.contains('show')) return;
+      watchCompletion(refreshQueue);
       refreshProductionStock(root, host.state(), host.me());
       if (scrolling) return;
       if (

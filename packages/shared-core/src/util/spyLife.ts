@@ -4,6 +4,7 @@ import type { GameState, PlanetId, PlayerId, Spy, SpyOp } from '../state/gameSta
 import { coalitionOf } from '../state/coalition';
 import { getStance } from '../state/diplomacy';
 import { spyHome, spyJourneyMs, spyPath, spyRoster, BASE_SPY_AGENTS } from '../state/spyTravel';
+import { noteScouted } from '../state/spyKnowledge';
 
 /**
  * The life of a named spy (SPY-23, owner's resolution 2026-11-10) — the espionage module's
@@ -302,11 +303,13 @@ export function exposed(h: HandlerContext, victim: string, spy: string, planetId
   h.emit('espionage.exposed', { a: victim, b: spy, planetId });
 }
 
-/** Close the intel a posted recon spy of `mission` held open (SPY-13). */
+/** Close the intel a posted recon spy of `mission` held open (SPY-13); what the spy last
+ *  saw of the world stays with its owner (SPY-24). */
 export function closeIntel(h: HandlerContext, spy: string, mission: number | undefined): void {
   const intel = h.state.intel;
   const mine = intel?.[spy];
   if (!intel || !mine || mission === undefined) return;
+  for (const g of mine) if (g.mission === mission) noteScouted(h.state, spy, g.target, h.ctx.now);
   const rest = mine.filter((g) => g.mission !== mission);
   if (rest.length > 0) intel[spy] = rest;
   else delete intel[spy];

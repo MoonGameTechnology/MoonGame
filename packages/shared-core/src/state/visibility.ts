@@ -1057,6 +1057,17 @@ export function visibleOrdnance(state: GameState, viewerId: PlayerId): GameState
   }
 }
 
+/** Strip every other player's intel windows, spies and reconnoitred worlds from `view` —
+ *  and the key entirely when the viewer has none: no empty-map blip in third-party deltas. */
+function keepOwnSpying(view: GameState, viewerId: PlayerId): void {
+  for (const key of ['intel', 'spies', 'scouted'] as const) {
+    const own: unknown = view[key]?.[viewerId];
+    const some = Array.isArray(own) ? own.length > 0 : !!own && Object.keys(own).length > 0;
+    if (some) (view as unknown as Record<string, unknown>)[key] = { [viewerId]: own };
+    else delete view[key];
+  }
+}
+
 /** The projection body, over a precomputed coverage (see `visibleView`). */
 function project(
   state: GameState,
@@ -1174,20 +1185,10 @@ function project(
     if (own !== undefined) view.match.battlePoints = { [viewerId]: own };
     else delete view.match.battlePoints;
   }
-  // Stolen intel is the thief's secret: strip everyone else's grants (and the key
-  // entirely when the viewer has none — no empty-map blip in third-party deltas).
-  if (view.intel) {
-    const own = view.intel[viewerId];
-    if (own?.length) view.intel = { [viewerId]: own };
-    else delete view.intel;
-  }
-  // The spy network (SPY-6) is as secret as the grants: where a rival's spies are says
-  // whom they spy on — and turned agents (SPY-18) say who caught whom.
-  if (view.spies) {
-    const own = view.spies[viewerId];
-    if (own?.length) view.spies = { [viewerId]: own };
-    else delete view.spies;
-  }
+  // Stolen intel is the thief's secret, and so are the spy network (SPY-6: where a rival's
+  // spies are says whom they spy on, turned agents — SPY-18 — who caught whom) and what the
+  // spies found (SPY-24): only the viewer's own stays (`keepOwnSpying`).
+  keepOwnSpying(view, viewerId);
   // Diplomatic OFFERS are private to the two negotiating parties (the committed
   // stances themselves are public): a third party must not see who is suing for
   // peace with whom. Keep only offers the viewer sends or receives; a map left
