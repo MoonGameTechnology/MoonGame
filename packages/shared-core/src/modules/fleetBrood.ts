@@ -2,7 +2,8 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Fleet } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { moduleAllowed } from '../util/loadout';
-import { addUnits, sumUnitStat } from '../util/stacks';
+import { addUnits } from '../util/stacks';
+import { fleetHoldFree } from '../state/shuttle';
 
 const CYCLE = 'fleet.brood.cycle';
 interface Cycle {
@@ -88,7 +89,8 @@ export const fleetBroodModule: GameModule = {
   id: 'fleetBrood',
   // 1.1.0 — PVR-4.7: `brood.count` — organisms per hull and cycle.
   // 1.2.0 — no growth while the fleet is landing an assault (Codex review on #1409).
-  version: '1.2.0',
+  // 1.3.0 — the hold is shared with shuttles in the hangar and out on a strike (SHU-5.1).
+  version: '1.3.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => seed(h));
     api.on('pve.wave.spawned', (_event, h) => seed(h));
@@ -103,14 +105,9 @@ export const fleetBroodModule: GameModule = {
       const player = h.state.players[fleet.owner];
       if (hulls <= 0 || !unit || unit.domain !== 'ground' || !player) return;
       if (!fleet.battleId && !fleet.assaultLanding && player.status === 'active') {
-        const reserved = (fleet.loading ?? []).reduce(
-          (n, claim) => n + claim.count * (h.ctx.data.units[claim.unit]?.stats.cargoSize ?? 1),
-          0,
-        );
-        const free =
-          sumUnitStat(fleet.units, h.ctx.data, 'cargoCapacity') -
-          sumUnitStat(fleet.landing ?? [], h.ctx.data, 'cargoSize') -
-          reserved;
+        // Трюм один на десант, заявки погрузки и шаттлы — в ангаре и в вылете (SHU-5.1):
+        // то же число, которым меряют погрузку десанта и шаттлов.
+        const free = fleetHoldFree(h.state, fleet, h.ctx.data);
         let count = Math.max(
           0,
           Math.min(hulls * brood.count, Math.floor(free / Math.max(1, unit.stats.cargoSize ?? 1))),
