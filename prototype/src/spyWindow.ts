@@ -209,7 +209,7 @@ function askHtml(): string {
   if (ask.kind === 'cancel') {
     return `<div class="sp-ask"><p>${t('spy.ask.cancel', { name })}</p>${askButtons()}</div>`;
   }
-  const odds = ask.task === 'relocate' ? null : spyOddsFor(ask.planetId);
+  const odds = spyOddsFor(ask.planetId, ask.task);
   const facts = [
     tripText(ask.spy, ask.planetId),
     costOf(ask.task) > 0 ? t('spy.task.cost', { c: costOf(ask.task) }) : '',

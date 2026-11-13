@@ -334,8 +334,11 @@ describe('действия мира', () => {
 
   it('шанс операции считается по известному: на чужом мире база ядра, на своём — нет', async () => {
     const { m } = await boot();
-    expect(m.spyOddsFor('N')).toEqual({ success: 0.6, risk: expect.closeTo(0.35, 5) });
-    expect(m.spyOddsFor('A')).toBeNull();
+    expect(m.spyOddsFor('N', 'sabotage')).toEqual({ success: 0.6, risk: expect.closeTo(0.35, 5) });
+    expect(m.spyOddsFor('A', 'sabotage')).toBeNull();
+    // Пост контрразведки и переход не разыгрываются: строки шанса у них нет.
+    expect(m.spyOddsFor('N', 'counter')).toBeNull();
+    expect(m.spyOddsFor('N', 'relocate')).toBeNull();
   });
 
   it('в забеге Sector Zero нет ни пинга, ни разведки', async () => {
