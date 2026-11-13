@@ -283,6 +283,9 @@ try {
     await player.keyboard.press('Space');
     assert.equal(await player.locator('#spd-pause.on').count(), 0, 'пробел без кнопки паузы молчит');
     assert(await memoShown(player), 'пробел без кнопки — не нажатая клавиша');
+    // Щелчок по карте выше выбрал провинцию, и её окно встало над памяткой: снять выбор.
+    await player.keyboard.press('Escape');
+    assert(await memoShown(player), 'Escape снимает выбор, а не памятку');
     await player.locator('#key-memo button').click();
     assert.equal(await memoShown(player), false, '✕ гасит памятку');
     await player.reload();

@@ -5,9 +5,13 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { launchBrowser, waitForApp, withDiagnostics } from './harnessKit.mjs';
 import { bundleNetserver } from './bundle-netserver.mjs';
+
+// Медаль «Вклад» III за регистрацию платит и сама (с 2026-10-30 `medals.sovereignsOnly` пуст,
+// `docs/meta-economy.md`): в профиле — опыт квитанции плюс опыт третьей степени медали.
+const MEDAL_XP = JSON.parse(readFileSync('data/metaEconomy.json', 'utf8')).medals.grades['3'].xp;
 
 await bundleNetserver();
 const picker = createServer();
@@ -107,7 +111,8 @@ try {
         const xp = (await receipt()).reward.xp;
         assert.equal(xp, 25);
         assert.match(await dialog.locator('.rw-xp').innerText(), /\+25/);
-        assert.equal((await profile()).xp, xp);
+        // Медаль оплачивает свой запрос (окно наград медалей), и он может прийти раньше или позже.
+        assert([xp, xp + MEDAL_XP].includes((await profile()).xp), 'the welcome award credits its XP once');
         await dialog.locator('img').evaluate((img) => img.decode());
         assert.equal(await dialog.locator('img').evaluate((img) => img.naturalWidth > 0), true);
         const fits = await dialog.evaluate((el) => {
@@ -135,12 +140,13 @@ try {
         // Closing is not acceptance; a reload restores the pending award with no extra XP.
         await dialog.locator('[data-reward="later"]').click();
         // Medal rewards: the window waits for the welcome award, then lists what the medal
-        // paid. «За вклад в развитие» is earned without playing: Sovereigns only.
+        // paid. «За вклад в развитие» pays all three since 2026-10-30 (`docs/meta-economy.md`).
         const medals = page.locator('#medal-rewards');
         await medals.waitFor({ state: 'visible' });
         const paid = await medals.innerText();
         assert.match(paid, /\+10 ◆/);
-        assert.doesNotMatch(paid, /⌖/);
+        assert.match(paid, /\+20 ⌖/);
+        assert.match(paid, new RegExp(`\\+${MEDAL_XP} `));
         assert.equal(
           (await (await fetch(base + '/meta-economy/me', { headers })).json()).sovereigns,
           10,
@@ -153,7 +159,7 @@ try {
         await waitForApp(page);
         await signBackIn();
         await dialog.waitFor({ state: 'visible' });
-        assert.equal((await profile()).xp, xp);
+        assert.equal((await profile()).xp, xp + MEDAL_XP);
 
         // The server commits, but the browser loses the response: retry must not pay/equip twice.
         const lostResponse = locale === 'en' && action === 'equip';
@@ -179,7 +185,7 @@ try {
         }
         await dialog.waitFor({ state: 'hidden' });
         const saved = await profile();
-        assert.equal(saved.xp, xp);
+        assert.equal(saved.xp, xp + MEDAL_XP);
         assert.equal(saved.progress.registered, 1);
         assert.equal(
           saved.slots.filter((id) => id === 'contribution').length,

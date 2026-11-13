@@ -53,7 +53,7 @@ export function initHolographicUi(host: HolographicHost) {
   // Replace only the decorative leading text, preserving labels, badges and listeners.
   const railIcons: Record<string, HoloIcon> = {
     'rail-diplo': 'handshake', 'rail-msgs': 'envelope-simple', 'rail-coal': 'shield',
-    'rail-pings': 'broadcast',
+    'rail-spy': 'detective', 'rail-pings': 'broadcast',
     'rail-tech': 'atom', 'rail-constructor': 'hammer', 'rail-steward': 'moon',
     'rail-market': 'arrows-left-right', 'rail-trader': 'arrows-left-right', 'rail-chat': 'chat-circle-text',
     'rail-log': 'list-bullets', 'rail-help': 'question', 'rail-settings': 'sliders-horizontal',

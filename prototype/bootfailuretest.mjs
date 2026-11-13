@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global window, localStorage, sessionStorage, Storage, DOMException -- browser fault injection */
+/* global window, localStorage, sessionStorage, Document -- browser fault injection */
 // Exercise the packaged entry point, including a synchronous failure before main
 // reaches its welcome-screen wiring. This is fault injection, not an Android emulator.
 import assert from 'node:assert/strict';
@@ -63,11 +63,11 @@ try {
           localStorage.setItem('void.nick', 'Boot probe');
           if (!sessionStorage.getItem('boot-probe-once')) {
             sessionStorage.setItem('boot-probe-once', '1');
-            const getItem = Storage.prototype.getItem;
-            Storage.prototype.getItem = function (key) {
-              if (key === 'void.server')
-                throw new DOMException('injected storage denial', 'SecurityError');
-              return getItem.call(this, key);
+            // Отказ хранилища старт теперь переживает (\`localStore.ts\`), поэтому сбой —
+            // синхронный, в самом \`main\`: меню языка входа не находит свой узел.
+            const byId = Document.prototype.getElementById;
+            Document.prototype.getElementById = function (id) {
+              return id === 'clang' ? null : byId.call(this, id);
             };
           }
         },
