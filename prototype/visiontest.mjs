@@ -47,7 +47,10 @@ window.__visionTest = (() => {
       bad.push('engaged');
     for (const id of f.identify) {
       const p = s.planets[id];
-      if (p && JSON.stringify(memory.get(id)) !== JSON.stringify(__snapshotOf(p))) {
+      // \`at\` — время опознания (окно «i» мира, UIX-10.12), а не свойство мира: сверяем без него.
+      const remembered = memory.get(id);
+      const { at: _at, ...seen } = remembered ?? {};
+      if (p && JSON.stringify(remembered && seen) !== JSON.stringify(__snapshotOf(p))) {
         bad.push('memory ' + id);
         break;
       }

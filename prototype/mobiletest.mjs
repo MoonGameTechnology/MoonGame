@@ -23,6 +23,7 @@ import { mobileDraft as __mobileDraft } from './interaction';
 import { aiming as __aiming, assaultAim as __assaultAim, engageAim as __engageAim, merging as __merging } from './interaction';
 // Малые вспышки — у владельца вспышек (REFM-234).
 import { noticeFlashes as __noticeFlashes } from './mapEffects';
+let __lockedTech = null;
 window.__mobileTest = {
   state: () => s,
   camera: () => ({...cam}),
@@ -33,7 +34,10 @@ window.__mobileTest = {
   notices: () => __noticeFlashes.length,
   // Стартовый разведчик без трюма (af394450): десант грузит фрегат — трюм на одно место.
   addHold: id => { s.fleets[id].units.push({ unit: 'frigate', count: 1 }); invalidatePanel(); },
-  emit: events => handleEvents(events),
+  emit: events => handleFeed(events),
+  // Каталог «Производства» прячет заказ, пока корпус не выбран, а корпуса заперты техами (×10 цен).
+  unlockTech: () => { const p = s.players[ME]; __lockedTech ??= { technologies: p.technologies }; p.technologies = { completed: Object.keys(data.technologies) }; shipyard.render(); },
+  relockTech: () => { if (__lockedTech) Object.assign(s.players[ME], __lockedTech); __lockedTech = null; shipyard.render(); },
 };`;
 // Корень — игра с хуками; `/built` и `/player` — сборки как есть, без инструментовки.
 const site = await serve({
@@ -334,10 +338,12 @@ try {
     const up = p.locator(`[data-cmd="tmax"][data-dir="1"][data-unit="${unit}"]`);
     if (await up.isEnabled()) await up.tap();
   }
-  assert(
-    await p.locator('.tdelta.pos').count(),
-    'the max preset plans at least one unit for the hold',
-  );
+  // Окно погрузки само предлагает набор (поля `input.tdelta`), так что «▲» может уже погаснуть:
+  // проверяем сам план, а не то, что его набрал робот.
+  const planned = await p
+    .locator('input.tdelta')
+    .evaluateAll((els) => els.reduce((sum, e) => sum + (Number(e.value) || 0), 0));
+  assert(planned > 0, 'the max preset plans at least one unit for the hold');
   await p.locator('[data-cmd="tok"]').tap();
   // Панель скорости на телефоне прячется под открытой карточкой.
   await p.locator('[data-mobile="close"]').tap();

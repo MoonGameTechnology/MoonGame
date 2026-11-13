@@ -122,9 +122,10 @@ try {
     "INSERT INTO arsenal(item_id,account_id,kind,form,def_id,grade,soulbound,durability,origin,acquired_at) VALUES($1,$2,'hull','instance','cruiser',0,false,5,'drop',0)",
     [`inventory-${suffix}`, registered.body.accountId],
   );
-  assert.equal(
-    (await request(gamePort, '/arsenal/me', token)).body.items[0].itemId,
-    `inventory-${suffix}`,
+  // У новой учётки в арсенале уже лежат стартовые корпуса (\`starter:…\`): ищем свой предмет среди них.
+  assert(
+    (await request(gamePort, '/arsenal/me', token)).body.items.some((item) => item.itemId === `inventory-${suffix}`),
+    'the arsenal reads the inserted item',
   );
   await stop(corp);
   const unavailable = await request(gamePort, '/corps/me', token);
