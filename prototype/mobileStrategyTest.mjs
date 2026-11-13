@@ -7,10 +7,35 @@ import { enterSkirmish, pressSpeed } from './harnessKit.mjs';
  *  Открыть линию `id`, затем нажать `taps` внутри её каталога. */
 async function openLane(page, id, ...taps) {
   if (!(await page.locator(`#constructor .pw-catalog[data-lane="${id}"]`).count())) {
-    if (await page.locator('#constructor .pw-lane-back').count()) await page.locator('#constructor .pw-lane-back').tap();
+    // В альбомной раскладке список линий стоит рядом с каталогом, и «←» спрятана.
+    if (await page.locator('#constructor .pw-lane-back').isVisible()) await page.locator('#constructor .pw-lane-back').tap();
     await page.locator(`[data-pw-lane="${id}"]`).tap();
   }
   for (const sel of taps) await page.locator(`#constructor ${sel}`).first().tap();
+}
+
+/** «Производство» на телефоне: каталоги линий влезают, заказ и «✕» — цели под палец. */
+async function checkProductionWindow(page, { fits, touchTarget, dismissIntro }) {
+  for (const [id, ...tab] of [['ships', '[data-ctab="ships"]'], ['shuttles'], ['mobilization', '[data-ctab="infantry"]'], ['mobilization', '[data-ctab="vehicles"]'], ['mobilization', '[data-ctab="heroes"]']]) {
+    await openLane(page, id, ...tab);
+    await dismissIntro();
+    await fits('#constructorbody');
+  }
+  // Кнопка заказа живёт в оснастке корпуса: каталог её не показывает (окно «Производство», #2069).
+  await openLane(page, 'ships');
+  await page.evaluate(() => window.__mobileTest.unlockTech());
+  await page.locator('#constructor [data-cnhull="frigate"]').tap();
+  await page.locator('.cn-build').scrollIntoViewIfNeeded();
+  // Кнопка может быть выключена (заказ проверяет мир симуляции, а не правку робота):
+  // проверяем место и размер, без пробного нажатия.
+  await fits('.cn-build');
+  const build = await page.locator('.cn-build').boundingBox();
+  assert(build.width >= 43 && build.height >= 43, '.cn-build is a 44px touch target');
+  // В оснастке телефона «✕» оснастки лежит над «✕» окна: сначала закрыть оснастку.
+  await touchTarget('#constructor [data-pw-fit-close]');
+  await page.locator('#constructor [data-pw-fit-close]').tap();
+  await touchTarget('#constructor .cn-close');
+  await page.evaluate(() => window.__mobileTest.relockTech());
 }
 
 /** Real phone layouts and actions through the existing controllers/reducer. */
@@ -344,15 +369,7 @@ export async function checkMobileStrategy(browser, url) {
             await fits('#tech .tt-mbtn');
             await page.locator('#tech .tt-mx').tap();
           } else if (id === 'constructor') {
-            for (const [id, ...tab] of [['ships', '[data-ctab="ships"]'], ['shuttles'], ['mobilization', '[data-ctab="infantry"]'], ['mobilization', '[data-ctab="vehicles"]'], ['mobilization', '[data-ctab="heroes"]']]) {
-              await openLane(page, id, ...tab);
-              await dismissIntro();
-              await fits('#constructorbody');
-            }
-            await openLane(page, 'ships');
-            await page.locator('.cn-build').scrollIntoViewIfNeeded();
-            await touchTarget('.cn-build');
-            await touchTarget('#constructor .cn-close');
+            await checkProductionWindow(page, { fits, touchTarget, dismissIntro });
           } else if (id === 'market') {
             for (const tab of ['metal', 'food', 'energy', 'microelectronics']) {
               await page.locator(`[data-mtab="${tab}"]`).tap();

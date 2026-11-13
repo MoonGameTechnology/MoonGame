@@ -83,7 +83,7 @@ window.__szTest = {
   speed: () => speed,
   // Подготовка карты закончилась: пока она идёт, Escape — это «уйти, пока карта готовится».
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
-  // Захват Роем провинции игрока — тем же путём событий, что в игре (handleEvents).
+  // Захват Роем провинции игрока — тем же путём событий, что в игре (handleFeed).
   farthestWorld: () => {
     const home = Object.values(s.planets).find((p) => p.owner === ME && p.kind === 'planet');
     const far = Object.values(s.planets)
@@ -98,7 +98,7 @@ window.__szTest = {
     const owner = s.pve.npcPlayerId;
     s.planets[id].owner = owner;
     forgetVision();
-    handleEvents([{ type: 'planet.captured', payload: { planetId: id, owner } }]);
+    handleFeed([{ type: 'planet.captured', payload: { planetId: id, owner } }]);
     return owner;
   },
   knownOwner: (id) => __knownOwner(id),
