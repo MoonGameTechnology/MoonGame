@@ -2685,6 +2685,7 @@ export const pl: Record<string, string> = {
   'split.hero': 'Okręt flagowy bohatera pozostaje w tej flocie. Aby bohater poleciał sam, oddziel pozostałe jednostki.',
   'split.hold': 'ładownia — nowa flota: {a} · pierwotna: {b}',
   'split.hold.over': 'desant się nie mieści',
+  'split.hold.full': 'brak miejsca w ładowni',
   'split.note': 'Wydziel okręty do nowej floty — pozostanie ona w tym samym sektorze. Co najmniej jeden okręt musi zostać; desant w ładowni jest dzielony proporcjonalnie do okrętów.',
   'split.preview': 'nowa flota: {a} {a|okręt|okręty|okrętów} · w pierwotnej pozostanie {b}',
   'split.section.landing': 'Desant w ładowni',

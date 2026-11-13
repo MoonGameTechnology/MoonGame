@@ -93,6 +93,13 @@ export function fleetAloftPlaces(state: GameState, fleet: Fleet, data: GameData)
   );
 }
 
+/** Places the fleet's shuttles take in the shared hold (SHU-5.1): those in the hangar
+ * plus those out on a sortie. A split leaves them all with the fleet that keeps its name,
+ * which is what the core checks the kept half against. */
+export function fleetMachinePlaces(state: GameState, fleet: Fleet, data: GameData): number {
+  return hangarSize(fleet, data) + fleetAloftPlaces(state, fleet, data);
+}
+
 /** A timed lift as the fleet stores it (`loading` and `unloading` claims). */
 type LiftClaim = { unit: string; count: number; startAt: number; doneAt: number };
 

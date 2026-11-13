@@ -3195,6 +3195,7 @@ export const en: Record<string, string> = {
   'split.hero': "The hero's flagship stays in this fleet. To send the hero off alone, split off the other ships.",
   'split.hold': 'hold — new fleet: {a} · original: {b}',
   'split.hold.over': 'the troops do not fit',
+  'split.hold.full': 'not enough room in the hold',
   'split.note':
     'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops are split along with the ships.',
   'split.preview': 'new fleet: {a} {a|ship|ships} · original keeps {b}',

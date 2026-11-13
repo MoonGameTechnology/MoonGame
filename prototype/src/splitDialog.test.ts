@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { splitDialogLives, splitRows, splitDialogHtml } from './splitDialog';
 import { cargoSplit, splitSlots } from '../../decisions/splitPlan';
+import { t } from '../../localization/runtime';
 
 /** Флот без трюма и без десанта — фон для проверок, где важны только корабли. */
 const пусто = cargoSplit([], {}, () => 0, () => 1);
@@ -152,6 +153,22 @@ describe('окно деления — разметка', () => {
       hooks,
     );
     expect(html).toMatch(/data-sx="confirm"[^>]*disabled/);
+  });
+
+  it('ШАТТЛЫ БЕЗ ДЕСАНТА: трюм виден, и перегруз назван местом, а не десантом', () => {
+    // Носитель уходит, а ангар остаётся на корабле без трюма: сервер такое отклонит.
+    const slots = splitSlots([
+      { unit: 'carrier', count: 1 },
+      { unit: 'scout', count: 1 },
+    ]);
+    const take = { [slots[0]!.key]: 1 };
+    const cargo = cargoSplit(slots, take, (u) => (u === 'carrier' ? 4 : 0), () => 1, 3);
+    const html = splitDialogHtml({ fleetId: 'f1', rows: splitRows(slots, take), cargo }, hooks);
+    expect(html).toMatch(/data-sx="confirm"[^>]*disabled/);
+    expect(html).toContain(t('split.hold.full'));
+    expect(html).not.toContain(t('split.hold.over'));
+    // Без шаттлов и без десанта строки трюма нет вовсе.
+    expect(splitDialogHtml(модель('f1', [{ unit: 'scout', count: 2 }]), hooks)).not.toContain('scargo');
   });
 
   it('имя флота и имена юнитов экранируются — они попадают в разметку', () => {

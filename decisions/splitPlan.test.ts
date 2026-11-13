@@ -199,6 +199,28 @@ describe('трюм при делении', () => {
     const take = { [ships]: 1, [troops]: 2 };
     expect(canConfirmSplit(slots, take, cargoSplit(slots, take, capacity, size))).toBe(true);
   });
+
+  it('ШАТТЛЫ ОСТАЮТСЯ В ИСХОДНОМ (правило 9): увести носитель, бросив на скауте ангар, нельзя', () => {
+    const ships2 = splitSlots([
+      { unit: 'cruiser', count: 1 },
+      { unit: 'scout', count: 1 },
+    ]);
+    const take = { [ships2[0]!.key]: 1 };
+    const c = cargoSplit(ships2, take, capacity, size, 2);
+    expect(c).toMatchObject({ keptUsed: 2, keptCapacity: 0, keptMachines: 2, fits: false });
+    expect(canConfirmSplit(ships2, take, c)).toBe(false);
+    // Носитель остался — шаттлы с ним, деление проходит.
+    const back = { [ships2[1]!.key]: 1 };
+    expect(canConfirmSplit(ships2, back, cargoSplit(ships2, back, capacity, size, 2))).toBe(true);
+  });
+
+  it('правило 9: шаттлы и десант делят трюм остающегося', () => {
+    // Крейсер (2) остаётся с одним солдатом и одним шаттлом — ровно полон; второй солдат — перегруз.
+    const take = { [ships]: 1, [troops]: 2 };
+    expect(cargoSplit(slots, take, capacity, size, 1)).toMatchObject({ keptUsed: 2, fits: true });
+    const more = { [ships]: 1, [troops]: 1 };
+    expect(cargoSplit(slots, more, capacity, size, 1)).toMatchObject({ keptUsed: 3, fits: false });
+  });
 });
 
 describe('флагман героя остаётся (правило 8, сообщение владельца 2026-09-24)', () => {

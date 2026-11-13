@@ -58,6 +58,7 @@ import type {
 import { assaultSteps } from '../../../decisions/assaultOrder';
 import { worldCapitalOffer, holdOffer, type CapitalOffer, type HoldOffer } from '../../../decisions/worldOrders';
 import { mergePlan } from '../../../decisions/mergeOrders';
+import { fleetMachinePlaces } from '../../../decisions/fleetHolds';
 import {
   canConfirmSplit,
   cargoSplit,
@@ -570,6 +571,7 @@ export function createSplitModel(
       );
     },
     (unit) => data.units[unit]?.stats.cargoSize ?? 1,
+    fleetMachinePlaces(state, fleet, data), // шаттлы остаются в исходном (SHU-5.1)
   );
   const { takeTotal, total } = shipTotals(slots, normalized);
   return {

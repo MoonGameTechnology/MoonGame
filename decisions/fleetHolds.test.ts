@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseGameData, type Fleet, type GameState } from '../packages/shared-core/src/index';
-import { fleetAloftPlaces, fleetHolds, holdBadgePosition, holdProgress } from './fleetHolds';
+import { fleetAloftPlaces, fleetHolds, fleetMachinePlaces, holdBadgePosition, holdProgress } from './fleetHolds';
 
 const data = parseGameData({
   version: '0.1.0',
@@ -93,6 +93,8 @@ describe('fleet hold occupancy', () => {
     } as unknown as GameState;
     const aloft = fleetAloftPlaces(state, f, data);
     expect(aloft).toBe(3);
+    // Деление оставляет исходному флоту и ангар, и места улетевших (splitPlan, правило 9).
+    expect(fleetMachinePlaces(state, f, data)).toBe(4);
     expect(fleetAloftPlaces({ strikes: [] } as unknown as GameState, f, data)).toBe(0);
     expect(fleetHolds(f, data, aloft)).toMatchObject([
       { kind: 'troops', used: 0, capacity: 6, free: 6 },

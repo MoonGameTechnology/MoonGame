@@ -27,6 +27,10 @@
  *    деления флотов не работает»). Такой стек в отбор не попадает, но в остатке
  *    считается: увести всех остальных можно — герой полетит один, ровно то, чего игрок
  *    и добивался.
+ * 9. **Шаттлы остаются в трюме исходного флота (SHU-5.1).** Ангар и места эскадр,
+ *    улетевших в вылет, едут в том же трюме, что десант, и ядро оставляет их флоту,
+ *    который сохраняет имя: увести корпуса, бросив на оставшихся шаттлы, — такой же
+ *    перегруз, как бросить десант. Без них кнопка горела, а сервер отвечал отказом.
  */
 
 /** Стопка кораблей одного типа в составе флота. */
@@ -176,23 +180,27 @@ export interface CargoSplit {
   takenCapacity: number;
   keptUsed: number;
   keptCapacity: number;
+  /** Места шаттлов, которые остаются в исходном флоте (правило 9); входят в `keptUsed`. */
+  keptMachines: number;
   /** Влезает ли десант в обе половины. */
   fits: boolean;
 }
 
 /** Трюм обеих половин по текущему отбору. `capacity`/`size` читают данные игры
  *  (вместимость корпуса с его начинкой и объём наземного юнита) — сам модуль остаётся
- *  чистой арифметикой и в тесте обходится двумя функциями. */
+ *  чистой арифметикой и в тесте обходится двумя функциями. `keptMachines` — места
+ *  шаттлов флота (ангар и вылеты, `fleetMachinePlaces`): они остаются в исходном (правило 9). */
 export function cargoSplit(
   slots: readonly SplitSlot[],
   take: Readonly<Record<string, number>>,
   capacity: (unit: string, modules?: readonly string[]) => number,
   size: (unit: string) => number,
+  keptMachines = 0,
 ): CargoSplit {
   let takenCapacity = 0;
   let keptCapacity = 0;
   let takenUsed = 0;
-  let keptUsed = 0;
+  let keptUsed = keptMachines;
   for (const slot of slots) {
     const tk = clampTake(take[slot.key] ?? 0, takeable(slot));
     const stay = slot.have - tk;
@@ -209,6 +217,7 @@ export function cargoSplit(
     takenCapacity,
     keptUsed,
     keptCapacity,
+    keptMachines,
     fits: takenUsed <= takenCapacity && keptUsed <= keptCapacity,
   };
 }
