@@ -42,7 +42,8 @@ import { espionageShown, toolShown, victoryPointsShown } from '../../decisions/s
 import { medalBadges } from '../../decisions/unitMedals';
 import { worldFacts, type WorldFact } from '../../decisions/worldFacts';
 import { intelLayers } from '../../decisions/intelLayers';
-import { knownBureau, spyOdds, type SpyOdds } from '../../decisions/spyOdds';
+import { hasOdds, joinsWave, knownBureau, knownDevelopment, spyOdds, type SpyOdds } from '../../decisions/spyOdds';
+import type { SpyTask } from '../../decisions/spyTasks';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import type { BuildLane } from './buildQueue';
 import { shownProductionLanes } from '../../decisions/productionLanes';
@@ -466,23 +467,27 @@ function spyButtonHtml(): string {
   return `<button class="b btn-second spy-btn" data-act="spyagents" title="${esc(t('side.world.spies'))}">${SPY_GLYPH_SVG}<span>${t('side.world.spies')}</span></button>`;
 }
 
-/** SPY-19: the odds of an aggressive operation on this world, from what the player knows —
- *  their own wave on the way there and the owner's bureaus they see or remember
- *  (`decisions/spyOdds.ts`). `null` — the world has no owner to spy on. */
-export function spyOddsFor(planetId: string): SpyOdds | null {
+/** SPY-19: the odds of operation `task` on this world, from what the player knows — their
+ *  own aggressive wave on the way there, the owner's bureaus they see or remember and, for
+ *  a theft or research, how developed the world is against the owner's known worlds
+ *  (`decisions/spyOdds.ts`). `null` — the task rolls nothing, or the world has no owner. */
+export function spyOddsFor(planetId: string, task: SpyTask): SpyOdds | null {
+  if (!hasOdds(task)) return null;
   const s = game.world();
   const ME = game.me();
   const owner = s.planets[planetId]?.owner ?? memory.get(planetId)?.owner ?? null;
   if (!owner || owner === ME) return null;
   const wave = myAgents(s, ME).away.filter(
-    (a) => a.planetId === planetId && !a.posted && a.op !== undefined && a.op !== 'counter',
+    (a) => a.planetId === planetId && !a.posted && joinsWave(a.op),
   ).length;
-  const seenBuildings = Object.values(s.planets).flatMap((w) => {
-    if (known(w.id)) return w.owner === owner ? w.buildings : [];
-    const mem = memory.get(w.id);
-    return mem && mem.owner === owner ? mem.buildings : [];
+  const buildingsOf = (id: string) => (known(id) ? s.planets[id]?.buildings : memory.get(id)?.buildings) ?? null;
+  const owned = Object.values(s.planets).flatMap((w) => {
+    const ownerNow = known(w.id) ? w.owner : memory.get(w.id)?.owner;
+    const bs = ownerNow === owner ? buildingsOf(w.id) : null;
+    return bs ? [bs] : [];
   });
-  return spyOdds(wave + 1, knownBureau(seenBuildings, data));
+  const target = buildingsOf(planetId);
+  return spyOdds(wave + 1, knownBureau(owned.flat(), data), knownDevelopment(task, target, owned, data));
 }
 
 const STANCE_KEY = {
