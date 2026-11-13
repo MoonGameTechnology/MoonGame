@@ -77,6 +77,7 @@ export function notifySessionChanged(): void { game?.sessionChanged?.(); }
 const JOIN_REASON: Record<Exclude<JoinOutcome, 'ok'>, string> = {
   'session-expired': 'acc.session-expired',
   'entry-closed': 'acc.join-closed',
+  'not-rostered': 'corp.combat.not-rostered',
   'seats-full': 'acc.seats-full',
   'house-unavailable': 'acc.house-unavailable',
   failed: 'acc.join-failed',

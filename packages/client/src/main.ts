@@ -18,7 +18,7 @@ import { clampCam, zoomAt, type Cam, type Viewport, type Bounds } from './camera
 import { renderMap } from './mapRender';
 import { openLiveMatch } from './net';
 import { nearestPlanet, myFleetAt } from './matchInput';
-import { browserIo, createSession, type NetSession } from './session';
+import { browserIo, createSession, JOIN_REASON_KEY, type NetSession } from './session';
 import { startPlayerActivity } from './playerActivity';
 import { anyToken } from '../../../decisions/sessionStore';
 import { httpBase } from '../../../decisions/matchQuery';
@@ -476,16 +476,7 @@ async function joinMatch(matchId: string): Promise<void> {
     connectLive(res.wsUrl);
     return;
   }
-  // Каждая причина названа отдельно: «вход просрочен» чинится повторным входом, «мест
-  // нет» — другой партией, «сервер недоступен» — повтором. Общее «не вышло» не помогло бы.
-  const TEXT: Record<string, string> = {
-    'session-expired': 'client.join.expired',
-    'entry-closed': 'net.join-closed',
-    'seats-full': 'net.match-full',
-    offline: 'client.join.offline',
-    failed: 'client.join.failed',
-  };
-  setStatus(t(TEXT[res.reason] ?? 'client.join.failed'));
+  setStatus(t(JOIN_REASON_KEY[res.reason]));
   // Сессии больше нет — на карточку входа, иначе игрок жмёт по списку впустую.
   if (res.reason === 'session-expired') {
     render(welcome);

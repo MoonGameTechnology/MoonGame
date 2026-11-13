@@ -36,6 +36,12 @@ describe('вход в матч — что делать с сессией', () =>
 });
 
 describe('отказ выбранного дома', () => {
+  it('правило 2а: «нет в составе» битвы корпораций — своя причина, не «вход закрыт», сессия цела', () => {
+    expect(joinOutcome(403, 'E_NOT_ROSTERED')).toBe('not-rostered');
+    expect(joinOutcome(403, 'E_ENTRY_CLOSED')).toBe('entry-closed');
+    expect(dropsSession('not-rostered')).toBe(false);
+  });
+
   it('отличает изменившийся дом от других ошибок и сохраняет сессию', () => {
     expect(joinOutcome(400, 'E_UNKNOWN_FACTION')).toBe('house-unavailable');
     expect(dropsSession(joinOutcome(400, 'E_UNKNOWN_FACTION'))).toBe(false);
