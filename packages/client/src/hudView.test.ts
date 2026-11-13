@@ -399,7 +399,7 @@ describe('деление и слияние (MIG-9)', () => {
     rows: [{ key: 'ship:frigate|', unit: 'frigate', have: 3, kind: 'ship', take: 1 }],
     takeTotal: 1,
     total: 3,
-    cargo: { takenUsed: 0, takenCapacity: 0, keptUsed: 0, keptCapacity: 0, fits: true },
+    cargo: { takenUsed: 0, takenCapacity: 0, keptUsed: 0, keptCapacity: 0, keptMachines: 0, fits: true },
     canConfirm: true,
     ...over,
   });
@@ -424,7 +424,7 @@ describe('деление и слияние (MIG-9)', () => {
   it('трюм показан только когда он есть, и отмечен, когда не сходится', () => {
     expect(splitHtml(sp())).not.toContain(t('hud.split.hold', { taken: '0/0', kept: '0/0' }));
     const tight = splitHtml(
-      sp({ cargo: { takenUsed: 3, takenCapacity: 1, keptUsed: 0, keptCapacity: 2, fits: false } }),
+      sp({ cargo: { takenUsed: 3, takenCapacity: 1, keptUsed: 0, keptCapacity: 2, keptMachines: 0, fits: false } }),
     );
     expect(tight).toContain('class="memory"'); // тот же приём, что у памяти тумана: это предупреждение
   });

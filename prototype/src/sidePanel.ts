@@ -38,6 +38,7 @@ import {
   splitAloft,
 } from '../../decisions/actions';
 import { canBuildHere } from '../../decisions/buildGate';
+import { fleetMachinePlaces } from '../../decisions/fleetHolds';
 import { changeSectorZeroProgress, sovereignRepairCost } from '../../decisions/sectorZeroProgress';
 import {
   cargoSplit,
@@ -506,7 +507,13 @@ export function renderSplitDialog(): void {
   const slots = fleetSplitSlots(f);
   // Состав живой: отбор пересчитывается под него на каждой перерисовке (`splitPlan.ts`).
   plan.take = normalizeSlotTake(plan.take, slots);
-  const cargo = cargoSplit(slots, plan.take, stackCargoCapacity, (u) => data.units[u]?.stats.cargoSize ?? 1);
+  const cargo = cargoSplit(
+    slots,
+    plan.take,
+    stackCargoCapacity,
+    (u) => data.units[u]?.stats.cargoSize ?? 1,
+    fleetMachinePlaces(s, f, data),
+  );
   const html = splitDialogHtml(
     {
       fleetId: plan.fleetId,

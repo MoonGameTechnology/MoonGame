@@ -2682,6 +2682,7 @@ export const de: Record<string, string> = {
   'split.hero': 'Das Flaggschiff des Helden verbleibt in dieser Flotte. Um den Helden allein zu entsenden, spalten Sie die anderen Schiffe ab.',
   'split.hold': 'Frachtraum — neue Flotte: {a} · Original: {b}',
   'split.hold.over': 'Truppen passen nicht hinein',
+  'split.hold.full': 'nicht genug Platz im Frachtraum',
   'split.note': 'Schiffe in eine neue Flotte abtrennen — sie verbleibt im selben Sektor. Mindestens ein Schiff muss zurückbleiben; transportierte Truppen werden aufgeteilt.',
   'split.preview': 'neue Flotte: {a} {a|Schiff|Schiffe} · Original behält {b}',
   'split.section.landing': 'Truppen an Bord',

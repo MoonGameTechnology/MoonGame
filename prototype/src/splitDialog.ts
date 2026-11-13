@@ -156,13 +156,18 @@ export function splitDialogHtml(m: SplitDialogModel, hooks: SplitDialogHooks): s
   const { takeTotal, total } = shipTotals(slots, take);
   const valid = canConfirmSplit(slots, take, m.cargo);
   const c = m.cargo;
+  // Трюм виден, когда в нём что-то едет: десант или шаттлы (правило 9 `splitPlan.ts`).
+  const over = c.keptMachines > 0 ? t('split.hold.full') : t('split.hold.over');
+  const cargoLine = `<div class="scargo${c.fits ? '' : ' bad'}">${t('split.hold', {
+    a: `<b>${c.takenUsed}/${c.takenCapacity}</b>`,
+    b: `<b>${c.keptUsed}/${c.keptCapacity}</b>`,
+  })}${c.fits ? '' : ` — ${over}`}</div>`;
   const hold = landing.length
     ? `<div class="shead2">${t('split.section.landing')}</div>${landing.map((r) => rowHtml(r, hooks)).join('')}
-    <div class="scargo${c.fits ? '' : ' bad'}">${t('split.hold', {
-      a: `<b>${c.takenUsed}/${c.takenCapacity}</b>`,
-      b: `<b>${c.keptUsed}/${c.keptCapacity}</b>`,
-    })}${c.fits ? '' : ` — ${t('split.hold.over')}`}</div>`
-    : '';
+    ${cargoLine}`
+    : c.keptMachines > 0
+      ? cargoLine
+      : '';
   return `<div class="sbox">
     <div class="shead">${t('split.title')} <b>${esc(m.fleetName ?? m.fleetId)}</b></div>
     <div class="ssub">${t('split.note')}</div>${

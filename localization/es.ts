@@ -2685,6 +2685,7 @@ export const es: Record<string, string> = {
   'split.hero': 'La nave insignia del héroe permanece en esta flota. Para que viaje solo, separa las demás naves.',
   'split.hold': 'bodega — nueva flota: {a} · original: {b}',
   'split.hold.over': 'las tropas no caben',
+  'split.hold.full': 'no hay sitio en la bodega',
   'split.note': 'Separa naves en una nueva flota: permanecerá en el mismo sector. Al menos una nave debe quedarse; el desembarco en bodega se divide en proporción a las naves.',
   'split.preview': 'nueva flota: {a} {a|nave|naves} · en la original quedarán {b}',
   'split.section.landing': 'Tropas en bodega',
