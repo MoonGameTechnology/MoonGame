@@ -25,4 +25,16 @@ describe('bounded operator journal', () => {
       expect((await jsonlTail(file, 20)).recent).toEqual([]);
     } finally { await rm(dir, { recursive: true, force: true }); }
   });
+  it('reads a day file that has no lines yet (right after UTC midnight) as an empty window', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'tail-'));
+    try {
+      expect(await jsonlTail(join(dir, 'journal-2026-11-14.jsonl'), 20)).toEqual({
+        total: 0,
+        recent: [],
+        truncated: false,
+      });
+      // Any other failure still refuses: a directory is not a journal.
+      await expect(jsonlTail(dir, 20)).rejects.toThrow();
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
 });
