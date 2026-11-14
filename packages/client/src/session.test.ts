@@ -238,6 +238,13 @@ describe('занятие места', () => {
     }
   });
 
+  it('«нет в составе» битвы корпораций — своя причина, а не «вход закрыт»; сессия цела', async () => {
+    const net = io({ 'GET /matches/m1/join': fail(403, 'E_NOT_ROSTERED') });
+    seated(net);
+    expect(await createSession(BASE, net).join('m1')).toEqual({ ok: false, reason: 'not-rostered' });
+    expect(net.mem.size).toBe(1);
+  });
+
   it('несостоявшийся вход — «сервер недоступен», а не «пароль не тот»', async () => {
     const net = io({ 'POST /auth/login': null });
     expect(await createSession(BASE, net).signIn('Ash', 'orbit-longenough')).toEqual({ kind: 'offline' });

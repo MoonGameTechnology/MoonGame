@@ -12,6 +12,10 @@
  * 2. **Отказы различимы.** «Окно входа закрыто» (403), «мест нет» (409) и «что-то
  *    пошло не так» — три разных сообщения, и слить их в одно значит заставить игрока
  *    гадать, ждать ему или искать другой матч.
+ * 2а. **«Вас нет в составе» — не «вход закрыт».** Битву корпораций (AvA) сервер отказывает
+ *    тем же 403, но с кодом `E_NOT_ROSTERED`: матч идёт и принимает своих, а этого игрока
+ *    глава не внёс в состав. «Окно приёма истекло» отправило бы его ждать следующего матча,
+ *    хотя дело решается у главы корпорации.
  * 3. **Пустые параметры не попадают в запрос.** `?slot=&faction=` — не то же, что их
  *    отсутствие: сервер читает пустую строку как заданное значение и отвечает отказом
  *    на месте, которого игрок не выбирал.
@@ -22,6 +26,7 @@ export type JoinOutcome =
   | 'ok'
   | 'session-expired' // 401: сессию надо забыть и попросить пароль заново
   | 'entry-closed' // 403: окно входа в этот матч закрыто (SES-2.3)
+  | 'not-rostered' // 403 E_NOT_ROSTERED: игрока нет в составе битвы корпораций
   | 'seats-full' // 409: свободных мест нет
   | 'house-unavailable' // 400: the offered house changed before admission
   | 'failed'; // прочее
@@ -30,7 +35,7 @@ export type JoinOutcome =
 export function joinOutcome(status: number, error?: unknown): JoinOutcome {
   if (status === 400 && error === 'E_UNKNOWN_FACTION') return 'house-unavailable';
   if (status === 401) return 'session-expired';
-  if (status === 403) return 'entry-closed';
+  if (status === 403) return error === 'E_NOT_ROSTERED' ? 'not-rostered' : 'entry-closed';
   if (status === 409) return 'seats-full';
   return status >= 200 && status < 300 ? 'ok' : 'failed';
 }

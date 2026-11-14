@@ -94,7 +94,24 @@ export type SignInResult =
 
 export type JoinAttempt =
   | { ok: true; wsUrl: string; playerId: string }
-  | { ok: false; reason: JoinOutcome | 'offline' };
+  | { ok: false; reason: JoinRefusal };
+
+/** Why a seat was not taken: the server's refusal, or no answer at all. */
+export type JoinRefusal = Exclude<JoinOutcome, 'ok'> | 'offline';
+
+/** Отказ во входе → ключ подписи. Каждая причина названа отдельно: «вход просрочен»
+ *  чинится повторным входом, «мест нет» — другой партией, «нет в составе» — у главы
+ *  корпорации, «сервер недоступен» — повтором. Общее «не вышло» не помогло бы. Полная
+ *  карта по типу: новая причина без подписи не соберётся. */
+export const JOIN_REASON_KEY: Readonly<Record<JoinRefusal, string>> = {
+  'session-expired': 'client.join.expired',
+  'entry-closed': 'net.join-closed',
+  'not-rostered': 'corp.combat.not-rostered',
+  'house-unavailable': 'acc.house-unavailable',
+  'seats-full': 'net.match-full',
+  offline: 'client.join.offline',
+  failed: 'client.join.failed',
+};
 
 export interface MatchesResult {
   outcome: QueryOutcome;
@@ -273,7 +290,7 @@ export function createSession(base: string, io: SessionIo): NetSession {
       // "this match said no" and answers by picking a different one — the wrong move when
       // the whole server is unreachable.
       if (!res) return { ok: false, reason: 'offline' };
-      const outcome = joinOutcome(res.status);
+      const outcome = joinOutcome(res.status, (res.body as { error?: unknown } | null)?.error);
       if (outcome !== 'ok') {
         // An expired session must be FORGOTTEN, or the client keeps knocking with a dead
         // pass and the player reads the same opaque error forever (joinRules, rule 1).
