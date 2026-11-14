@@ -14,7 +14,17 @@ export async function jsonlTail(file: string, n: number): Promise<{
   total: number; recent: unknown[]; truncated: boolean;
 }> {
   if (!Number.isInteger(n) || n < 1 || n > 200) throw new Error('E_BAD_REQUEST');
-  const handle = await open(file, 'r');
+  // A daily journal has no file until its first line: right after UTC midnight the
+  // current day's file does not exist yet. That is an empty window, not a broken journal.
+  let handle;
+  try {
+    handle = await open(file, 'r');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { total: 0, recent: [], truncated: false };
+    }
+    throw error;
+  }
   try {
     const { size } = await handle.stat();
     const start = Math.max(0, size - 1024 * 1024);
