@@ -1,9 +1,9 @@
 # APK на собственном HTTPS-сервере
 
 Общий источник настроек — `mobile/distribution.json`: точный HTTPS origin,
-префикс `/downloads/android` и SHA-256 действующего sideload-сертификата. Ключ и
-applicationId не меняются. Это playtest/debug-профили; RuStore остаётся отдельным
-каналом. [Мобильный клиент](../../mobile/README.md), [политика версий](../../docs/versioning.md).
+префикс `/downloads/android`, SHA-256 действующего release-сертификата APK
+(`signerSha256`) и прежнего отладочного (`previousSignerSha256`). applicationId не
+меняются. Это playtest-профили; RuStore остаётся отдельным каналом. [Мобильный клиент](../../mobile/README.md), [политика версий](../../docs/versioning.md).
 
 Текущий бесплатный hostname `77-221-140-87.sslip.io` привязан к IP VPS и запечён
 в APK. Это осознанное ограничение текущего плейтеста без собственного домена:
@@ -27,8 +27,10 @@ applicationId не меняются. Это playtest/debug-профили; RuSto
 - Кнопка хаба и QR всегда ведут на **player/latest.apk**. Параметры ПК не берутся
   из произвольного ввода игрока. SVG генерируется локально из этой же ссылки.
 
-`android.yml` собирает оба профиля с прежним сертификатом APK. Build-job имеет только
-`contents: read`, не получает приватный ключ и сохраняет APK-кандидат без манифеста.
+`android.yml` собирает оба профиля как неподписанный release APK без флага debuggable.
+Build-job имеет только `contents: read`, не получает приватных ключей и сохраняет
+неподписанный кандидат без манифеста. APK подписывает только publish-job ключом из
+`APK_RELEASE_KEYSTORE_*` и останавливается, если сертификат не совпал с `signerSha256`.
 Отдельный publish-job запускается только с `main`, использует Environment
 `android-release`, повторно проверяет APK из того же workflow run через apksigner/aapt
 и создаёт подписанный version.json. Только этот job получает запись релизов и OIDC.
@@ -41,9 +43,8 @@ rolling release сохраняется, чтобы уже установленн
 
 ## Почему VPS не может подменить обновление
 
-Ключ подписи APK публичный (`mobile/debug.keystore`), поэтому правило Android «тот же
-подписант» не отличит нашу сборку от чужой. Доверие держится на ключе манифеста, которого
-на VPS нет. Приложение принимает `latest.json`, только если подпись сходится с
+На VPS нет ни ключа подписи APK, ни ключа манифеста. Доверие держится на ключе
+манифеста. Приложение принимает `latest.json`, только если подпись сходится с
 `manifestPublicKey`, вшитым в сборку. Затем нативный мост сам скачивает APK в закрытый
 кэш приложения, сверяет SHA-256 с подписанным, проверяет package name и лишь потом
 открывает системную установку. Взломанный VPS может только не отдать обновление.
@@ -78,6 +79,31 @@ APK примут только после ручной установки сбо�
 5. Повторить branch APK build. Canary передаёт процессу только булево значение и
    требует отсутствия repository/org-копии. Сам private PEM доступен лишь protected
    publish-job. Кандидат проверяет SDK/Java; пользователям раздаётся только main-релиз.
+
+### Release-ключ APK
+
+Ключ подписи APK создаёт владелец на своей машине (нужен JDK или Android Studio):
+
+```bash
+keytool -genkeypair -storetype PKCS12 -keystore void-release.p12 -alias void-release \
+  -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Void Dominion"
+base64 -w0 void-release.p12 > void-release.p12.b64      # macOS: base64 -i void-release.p12
+keytool -list -v -keystore void-release.p12 -alias void-release | grep SHA256
+```
+
+В окружение `android-release` — два секрета: `APK_RELEASE_KEYSTORE_BASE64` (содержимое
+`.b64`) и `APK_RELEASE_KEYSTORE_PASSWORD` (пароль, введённый в keytool; alias всегда
+`void-release`). Отпечаток SHA256 — публичный: строчными буквами без двоеточий он
+записывается в `signerSha256`. Копию `.p12` и пароль хранить офлайн. **Потеря ключа
+означает, что всем игрокам придётся удалить приложение и поставить его заново**, как
+при самом переходе с отладочного ключа.
+
+Переход с отладочного ключа однократный. Старые APK видят новую версию, но Android
+откажется ставить её поверх («конфликт с другим пакетом»): игроку нужно один раз удалить
+приложение и установить его по кнопке или QR. `previousSignerSha256` нужен только
+publisher на VPS, чтобы прочитать уже опубликованную отладочную сборку и заменить её.
+После перехода на VPS нужно обновить `mobile/apk-manifest.mjs`, `mobile/apk-verify.mjs`,
+`mobile/distribution.json` и `deploy/apk/publish.mjs` (см. «Установка на VPS»).
 
 Политика окружения задаётся в GitHub, отдельно от YAML; одного `if: main` недостаточно.
 Перед выпуском проверить выбранную branch policy и отрицательный canary. После merge
