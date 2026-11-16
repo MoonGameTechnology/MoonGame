@@ -14,6 +14,8 @@
  * 5. **Вечная анимация меню не на композиторе.** Тень, цвет рамки, позиция фона и `left`
  *    перерисовывают кнопку главным потоком каждый кадр: кнопки APK и доната занимали так
  *    больше половины главного потока хаба.
+ * 6. **Карта в покое — каждый кадр экрана.** С выключенным движением, без ввода и с готовой
+ *    выпечкой кадр карты ждёт паузу (правило 10 `simClock.ts`), а ввод будит его сразу.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -48,15 +50,13 @@ describe('меню в покое — кадр (правило 9 `simClock.ts`)',
     const loop = body('frameLoop');
     // Дополнительные метрики кадра не меняют проверяемый порядок: рисование → меню.
     expect(loop).toMatch(/frame\(nowReal(?:,\s*[^)]+)?\);\s+covered = mapCovered\(\);/);
-    expect(loop).toContain('nextFrameDelay(covered)');
+    expect(loop).toContain('nextFrameDelay(covered, resting)');
     expect(loop).toContain('setTimeout(askFrame, wait)');
   });
 
-  it('касание, клавиша и смена любого экрана меню будят кадр сразу', () => {
-    expect(MAIN).toMatch(
-      /for \(const type of \['pointerdown', 'keydown'\] as const\)\s+addEventListener\(type, askFrame, \{ capture: true, passive: true \}\);/,
-    );
-    expect(MAIN).toContain('new MutationObserver(askFrame)');
+  it('касание, клавиша, колесо, ход мыши и смена любого экрана меню будят кадр сразу', () => {
+    // Сами события — `mapRest.test.ts`; здесь — что побудка заказывает кадр и ловит смену экрана.
+    expect(MAIN).toContain('new MutationObserver(wakeOnInput(askFrame))');
     // Те же экраны, что отличают меню от партии в `inMatch`.
     expect(MAIN).toContain("for (const screen of [connectEl, hubEl, setupEl, $('sector-zero')])");
     const inMatch = body('inMatch');
@@ -88,6 +88,18 @@ describe('меню в покое — кадр (правило 9 `simClock.ts`)',
     expect(MAIN).toMatch(
       /if \(fpsCounts\(dt, sinceMenu\)\) \{\s+fpsEma = fpsAfter\(fpsEma, dt, sinceMenu\);\s+countNetFrame\(dt\);\s+\}/,
     );
+  });});
+
+describe('карта в покое без движения — кадр (правило 10 `simClock.ts`)', () => {
+  it('покой решают движение, тишина ввода и готовая выпечка, а не меню', () => {
+    expect(body('frameLoop')).toContain(
+      'const resting = !covered && mapRestsAt(nowReal, { motion: motionOn(), mapIdle: mapLayerIdle && !mapMoving(nowReal) && !mapPreparation.active });',
+    );
+  });
+
+  it('разрыв после паузы покоя не идёт ни в средний FPS, ни в вердикт «слабое»', () => {
+    expect(body('frameLoop')).toContain('if (resting) sinceMenu = 0;');
+    expect(body('judgeMapSharpness')).toContain('|| sinceMenu < 2) return;');
   });
 });
 
