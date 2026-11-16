@@ -393,6 +393,9 @@ describe('REFM-232 — статический слой карты', () => {
 
   it('покой (правило 10 `simClock.ts`): слою нечего доделывать, только когда камера стоит и выпечка легла', async () => {
     const { ml, camera } = await boot();
+    // Часы стоят: на загруженном раннере CI выпечка выходила «дорогой» (правило 8) или не
+    // укладывалась в бюджет кадра, и слой не успокаивался к проверке покоя.
+    vi.stubGlobal('performance', { now: () => 0 });
     ml.blitStaticLayer(1000);
     expect(ml.mapLayerIdle).toBe(false); // камера только что сдвинулась
     ml.blitStaticLayer(1000 + SETTLE_MS);
