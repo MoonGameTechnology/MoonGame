@@ -29,7 +29,7 @@ import {
   stepSpy,
   type SpyStep,
 } from '../util/spyLife';
-import { DEFECTOR_HOURS, registerDefectorActions, turnAgent } from './espionage/defector';
+import { DEFECTOR_HOURS, MAX_ROSTER, registerDefectorActions, turnAgent } from './espionage/defector';
 import { counterIntelOf, developmentShare } from '../state/spyWorld';
 import { canAfford, payCost } from '../util/treasury';
 import { registerEspionageEconomy } from './espionage/economy';
@@ -256,6 +256,8 @@ function missionOdds(
 
 /** SPY-18: how long a turned agent waits for its catcher's answer, game-hours. */
 export const TURNED_HOURS = DEFECTOR_HOURS;
+/** SPY-18: past this many spies in the registry a defector is not taken in (`E_BAD_TARGET`). */
+export const MAX_SPY_ROSTER = MAX_ROSTER;
 
 interface SpyPayload {
   planetId?: string;

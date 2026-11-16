@@ -4286,6 +4286,7 @@ export const ru: Record<string, string> = {
   'spy.defector.pending': '🕵 {n} {n|перебежчик ждёт|перебежчика ждут|перебежчиков ждут} ответа',
   'spy.defector.refuse': 'Отказать — сбежит',
   'spy.defector.accept': 'Принять',
+  'spy.defector.full': 'Реестр шпионов полон ({n})',
   'spy.defector.left': 'Сбежит без ответа через {t}',
   'spy.defector.xp': 'Уровень {l} · опыт {n}',
   'spy.defector.body': 'Шпион игрока {who}, пойман на {at}, просит перейти к вам.',
