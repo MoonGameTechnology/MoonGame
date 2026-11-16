@@ -111,10 +111,10 @@ function nodeTileHtml(m: TechModel, id: string, sel: boolean): string {
   const pre = (td.prerequisites ?? []).filter((p) => m.techs[p] && branchOf(m.techs[p]!) === branchOf(td));
   const name = esc(tData(td.name));
   return (
-    `<button class="tt-item st-${st}${sel ? ' sel' : ''}" data-tech="${id}" data-pre="${pre.join(' ')}" ` +
+    `<button class="tt-item st-${st}${sel ? ' sel' : ''}" data-tech="${esc(id)}" data-pre="${esc(pre.join(' '))}" ` +
     `style="--bc:${BRANCH_COLOR[branchOf(td)]}" title="${name}">` +
     `<span class="tt-ico">${techKindSvg(techIconKind(td))}` +
-    (run ? `<i class="tt-ring" data-since="${run.startedAt}" data-at="${run.completesAt}"></i>` : '') +
+    (run ? `<i class="tt-ring" data-since="${Number(run.startedAt)}" data-at="${Number(run.completesAt)}"></i>` : '') +
     `</span><b>${name}</b><span class="tt-ist">${nodeStatus(m, id, st)}</span></button>`
   );
 }
@@ -178,7 +178,7 @@ function nodeModalHtml(m: TechModel, id: string): string {
   const mainBtn =
     st === 'avail'
       ? affordable && m.freeSlot
-        ? `<button class="tt-mbtn btn-main" data-go="${id}">🔬 ${t('tech.action.research')} · ${fmtDur(m.hours(id))}</button>`
+        ? `<button class="tt-mbtn btn-main" data-go="${esc(id)}">🔬 ${t('tech.action.research')} · ${fmtDur(m.hours(id))}</button>`
         : `<button class="tt-mbtn wait btn-main" disabled>${affordable ? t('tech.action.slots-full') : t('tech.action.no-resources')}</button>`
       : st === 'res' && run
         ? `<button class="tt-mbtn wait btn-main" disabled>⏳ ${t('tech.action.running-clock', { n: liveTimerHtml(run.completesAt, 'clock') })}</button>`
@@ -189,9 +189,9 @@ function nodeModalHtml(m: TechModel, id: string): string {
   // «убрать», если тема уже стоит в очереди.
   const qBtn =
     st === 'queued'
-      ? `<button class="tt-mq btn-second danger" data-dq="${id}">✕ ${t('tech.action.dequeue')}</button>`
+      ? `<button class="tt-mq btn-second danger" data-dq="${esc(id)}">✕ ${t('tech.action.dequeue')}</button>`
       : !(st === 'avail' && affordable && m.freeSlot) && m.canQueue(id)
-        ? `<button class="tt-mq btn-second" data-q="${id}">＋ ${t('tech.action.queue')}</button>`
+        ? `<button class="tt-mq btn-second" data-q="${esc(id)}">＋ ${t('tech.action.queue')}</button>`
         : '';
   const locked = st === 'chain' || st === 'gate' || st === 'cond';
   return (
