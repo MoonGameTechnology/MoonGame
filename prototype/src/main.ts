@@ -182,8 +182,9 @@ import { drawSweepAfterglow, drawWorlds, initMapWorlds, prepareWorldArt } from '
 import { drawBattles, drawBattleTracers, drawFleets, drawOrbitRings, initMapFleets } from './mapFleets';
 import { drawTroopTransferEffects } from './mapTransfers';
 import { drawMapSurface, initMapSurface, markSelection } from './mapSurface';
-import { backgroundContextEvents, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapMoving, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
+import { backgroundContextEvents, blitStaticLayer, forgetMapArt, forgetMapBake, initMapLayer, mapContextEvents, mapLayerForInput, mapLayerIdle, mapMoving, mapPreparationJobs, provinceAt, roadDrawingOf } from './mapLayer';
 import { blackBoxError, blackBoxFrame, startBlackBox } from './renderBlackBox';
+import { mapRestsAt, wakeOnInput } from './mapRest';
 import { skinIcon } from './holographicIcons';
 import type { PingMarkerKind } from '../../decisions/pingKind';
 import { initPingUi } from './pingUi';
@@ -3585,7 +3586,7 @@ function judgeMapSharpness(nowReal: number, dt: number): void {
     return;
   }
   if (sharpFrom < 0) sharpFrom = nowReal + JUDGE_WARMUP_MS;
-  if (nowReal < sharpFrom || !saneGap(dt)) return;
+  if (nowReal < sharpFrom || !saneGap(dt) || sinceMenu < 2) return; // a menu or rest pause is no measure
   const all = judgeGap('all', dt);
   // The gap is the frame that has just ended: it moved the camera, or a pinch is open.
   const gesture = mapMoving(nowReal - dt) ? judgeGap('gesture', dt) : null;
@@ -3867,8 +3868,10 @@ function frameLoop(nowReal: number) {
     if (frameErrs++ < FRAME_ERR_LOG_MAX) console.error('frame failed', err);
     else if (frameErrs === FRAME_ERR_LOG_MAX + 1) console.error('frame failing repeatedly — further errors muted');
   }
-  // За полноэкранным меню следующий кадр ждёт паузу (правило 9 `simClock.ts`).
-  const wait = nextFrameDelay(covered);
+  // За полноэкранным меню и в покое карты следующий кадр ждёт паузу (правила 9 и 10 `simClock.ts`).
+  const resting = !covered && mapRestsAt(nowReal, { motion: motionOn(), mapIdle: mapLayerIdle && !mapMoving(nowReal) && !mapPreparation.active });
+  if (resting) sinceMenu = 0; // разрыв после паузы покоя не идёт ни в средний FPS, ни в вердикт «слабое»
+  const wait = nextFrameDelay(covered, resting);
   if (wait > 0) menuPause = setTimeout(askFrame, wait);
   else askFrame();
 }
@@ -3878,7 +3881,7 @@ let frameSlot: FrameSlot | null = null;
 let lastRafAt = 0; // every native callback, including deliberately skipped frames
 let menuPause: ReturnType<typeof setTimeout> | undefined; // the menu's pause before the next one
 
-/** Заказать кадр к следующему кадру экрана: пауза меню, если ждала, снимается. */
+/** Заказать кадр к следующему кадру экрана: пауза меню или покоя, если ждала, снимается. */
 function askFrame(): void {
   clearTimeout(menuPause);
   menuPause = undefined;
@@ -4016,12 +4019,9 @@ startBlackBox({
   }),
 });
 askFrame();
-// Касание, клавиша и смена экрана будят кадр сразу (правило 9 `simClock.ts`): за меню он ждёт
-// паузу, а вход в партию ставит заставку первым же кадром, и Back взводится к кадру после
-// нажатия, открывшего окно.
-for (const type of ['pointerdown', 'keydown'] as const)
-  addEventListener(type, askFrame, { capture: true, passive: true });
-const screenWatch = new MutationObserver(askFrame);
+// Ввод и смена экрана будят кадр сразу (правила 9 и 10 `simClock.ts`, `mapRest.ts`): вход в
+// партию ставит заставку первым же кадром, и Back взводится к кадру после нажатия, открывшего окно.
+const screenWatch = new MutationObserver(wakeOnInput(askFrame));
 for (const screen of [connectEl, hubEl, setupEl, $('sector-zero')])
   screenWatch.observe(screen, { attributes: true, attributeFilter: ['style'] });
 

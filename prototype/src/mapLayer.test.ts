@@ -391,6 +391,30 @@ describe('REFM-232 — статический слой карты', () => {
     expect(spare.width).toBeGreaterThan(0);
   });
 
+  it('покой (правило 10 `simClock.ts`): слою нечего доделывать, только когда камера стоит и выпечка легла', async () => {
+    const { ml, camera } = await boot();
+    ml.blitStaticLayer(1000);
+    expect(ml.mapLayerIdle).toBe(false); // камера только что сдвинулась
+    ml.blitStaticLayer(1000 + SETTLE_MS);
+    expect(ml.mapLayerIdle).toBe(true);
+    camera.zoomAt(800, 450, 1.25);
+    ml.blitStaticLayer(2000);
+    expect(ml.mapLayerIdle).toBe(false);
+    const geo = ml.provinceGeometry;
+    let now = 2000 + SETTLE_MS;
+    ml.blitStaticLayer(now);
+    // Камера стоит, но резкость допекается в фоне: её полосы идут кадрами.
+    expect(ml.mapSettled).toBe(true);
+    expect(ml.mapLayerIdle).toBe(false);
+    let frames = 0;
+    while (ml.provinceGeometry === geo && frames++ < 2000) {
+      expect(ml.mapLayerIdle).toBe(false);
+      ml.blitStaticLayer((now += 16));
+    }
+    ml.blitStaticLayer(now + 16);
+    expect(ml.mapLayerIdle).toBe(true);
+  });
+
   it('медленное устройство: приближение в жесте растягивает выпечку, дальше печёт черновик, полосы ждут покоя', async () => {
     // Быстрое устройство: растянутую вчетверо выпечку жест перепекает сразу. Часы стоят:
     // цена выпечки не зависит от того, чем ещё занята машина с тестами.

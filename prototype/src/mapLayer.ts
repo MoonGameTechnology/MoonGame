@@ -254,6 +254,8 @@ let camMovedAt = -Infinity;
 export let provinceGeometry: MapLayerGeometry | null = null;
 /** The camera has rested `SETTLE_MS` (as {@link blitStaticLayer} judged this frame). */
 export let mapSettled = false;
+/** Rule 10 of `simClock.ts`: settled, and nothing is left to bake, sharpen or make at rest. */
+export let mapLayerIdle = false;
 /** The camera is moving at `now`: a pinch is open, or a frame saw it move less than `SETTLE_MS`
  *  ago. Judged at the moment asked, so a camera that stopped while the map was not drawn is not
  *  moving. */
@@ -1148,12 +1150,9 @@ function flushRaster(source: HTMLCanvasElement): void {
 /** A floor is the tile's drawing whatever the camera: any projection names its tile. */
 const FLOOR_PROJECTION = { scale: 1, x: 0, y: 0 };
 
-/**
- * The frames at rest make the floors the known map still lacks (`terrainRasterCache.ts`): of the
- * tiles exploration revealed since the loading, a few per frame in the share of the frame a
- * bake in the background gets. Then a later zoom out finds every known tile at least soft,
- * never missing. `true` — they are all made, and this frame made none.
- */
+/** The frames at rest make the floors the known map still lacks (`terrainRasterCache.ts`), a few
+ *  per frame in a background bake's share, so a later zoom out finds every known tile at least
+ *  soft. `true` — they are all made, and this frame made none. */
 function prepareFloors(): boolean {
   const scene = provinceGeometry?.environment;
   if (!scene || mapLayerX.isContextLost?.()) return false;
@@ -1314,8 +1313,7 @@ function showMapLayer(g: CanvasRenderingContext2D, view: LayerTransform, plan: U
   }
   const sharp = mapLayerDensity === DPR;
   const exact = sharp && exactOffset(view, DPR);
-  // On its pixel grid the layer is a plain copy; otherwise it is resampled — for the
-  // frames of a gesture only, since a settled camera gets an exact bake (rules 4 and 8).
+  // On its pixel grid a plain copy; otherwise resampled, in a gesture only (rules 4 and 8).
   if (exact) g.drawImage(mapLayer, exact.x - ox, exact.y - oy);
   else {
     const k = (view.k * DPR) / mapLayerDensity;
@@ -1404,6 +1402,7 @@ export function blitStaticLayer(now: number): void {
   // A pinch stays open while its fingers pause: no bake at each intermediate scale.
   const settled = !mapMoving(now);
   mapSettled = settled;
+  mapLayerIdle = false;
   const costly = bakeCostMs > GESTURE_BAKE_MS;
   mapCostly = costly;
   const content = mapLayerSignature();
@@ -1489,12 +1488,11 @@ export function blitStaticLayer(now: number): void {
       view = { k: 1, tx: 0, ty: 0 };
     }
     if (terrainRefine >= 0 && view.k === 1 && !bakeJob) {
-      // Sharpen the terrain the last bake or move could not afford, without repainting the
-      // map: at rest in the share of the frame a bake in the background gets, in motion one
-      // raster a frame, since the frames of a gesture are the player's. Once all are sharp,
-      // paint what owes it one last time: the strips a move left without it, or the whole
-      // bake, in the background. Each raster is made here to the last pixel (`flushRaster`),
-      // not by the band that first draws it.
+      // Sharpen the terrain the last bake or move could not afford, without repainting the map:
+      // at rest in a background bake's share of the frame, in motion one raster a frame (a
+      // gesture's frames are the player's). Once all are sharp, paint what owes it one last
+      // time (a move's strips, or the whole bake in the background). Each raster is made here
+      // to the last pixel (`flushRaster`), not by the band that first draws it.
       const at = performance.now();
       const budget = settled ? bakeBudgetMs(game.fps()) : 0;
       let pixels = 0;
@@ -1567,6 +1565,8 @@ export function blitStaticLayer(now: number): void {
       if (mapLayerGeometry) drawLiveRings(bgx, mapLayerGeometry, mapView, true);
       if (!bgx.isContextLost?.()) bgComposite = key;
     }
+    mapLayerIdle = !bakeJob && !(costly && underJob) && terrainRefine < 0 && !mapLayerDraft &&
+      !(floorScene && floorNext < floorScene.tiles.length);
     cx.save();
     cx.setTransform(1, 0, 0, 1, 0, 0);
     // Replace the entire frame even if a backing store disappears between the

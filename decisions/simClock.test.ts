@@ -4,6 +4,9 @@ import {
   ADOPT_MOVING_MS,
   FPS_GAP_MS,
   MENU_FRAME_MS,
+  REST_AFTER_MS,
+  REST_FRAME_MS,
+  mapResting,
   adoptDue,
   advanceTarget,
   fpsAfter,
@@ -204,5 +207,36 @@ describe('часы кадра — кадр за полноэкранным ме�
   it('абсурдный разрыв не идёт в среднее и после меню (правило 4)', () => {
     expect(fpsCounts(FPS_GAP_MS, 2)).toBe(false);
     expect(fpsAfter(60, FPS_GAP_MS, 5)).toBe(60);
+  });
+});
+
+describe('часы кадра — карта в покое без движения (правило 10)', () => {
+  const still = { motion: false, quietMs: REST_AFTER_MS, mapIdle: true };
+
+  it('без движения, без ввода и с готовой выпечкой карта идёт редко', () => {
+    expect(mapResting(still)).toBe(true);
+    expect(nextFrameDelay(false, true)).toBe(REST_FRAME_MS);
+  });
+
+  it('С ДВИЖЕНИЕМ ПРАВИЛО МОЛЧИТ: кольца и пульсы дышат каждый кадр', () => {
+    expect(mapResting({ ...still, motion: true })).toBe(false);
+  });
+
+  it('недавний ввод держит каждый кадр экрана: касание не ждёт паузы', () => {
+    expect(mapResting({ ...still, quietMs: REST_AFTER_MS - 1 })).toBe(false);
+  });
+
+  it('камера в пути или недопечённая карта держат каждый кадр: работа выпечки идёт по кадрам', () => {
+    expect(mapResting({ ...still, mapIdle: false })).toBe(false);
+  });
+
+  it('меню важнее покоя: за ним кадр ждёт свою паузу', () => {
+    expect(nextFrameDelay(true, true)).toBe(MENU_FRAME_MS);
+  });
+
+  it('пауза покоя короче паузы меню и проходит проверку на правдоподобие', () => {
+    expect(REST_FRAME_MS).toBeGreaterThan(0);
+    expect(REST_FRAME_MS).toBeLessThan(MENU_FRAME_MS);
+    expect(saneGap(REST_FRAME_MS + 50)).toBe(true);
   });
 });
