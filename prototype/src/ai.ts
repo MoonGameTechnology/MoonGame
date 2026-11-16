@@ -253,7 +253,7 @@ function allySeatOrders(
   posture: StewardPosture | 'expand',
   profile: AiProfile,
 ): Action[] {
-  const captive = allyCaptiveOrders(state, ai);
+  const captive = allyCaptiveOrders(state, ai, data);
   const plan = planAllyOperation(state, ai, data);
   if (plan.step === 'idle' && captive.held.length === 0)
     return baseAiOrders(state, ai, posture, profile, new Set());

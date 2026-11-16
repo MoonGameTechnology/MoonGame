@@ -35,12 +35,12 @@ describe('кнопка погрузки', () => {
   it('до штурма кандидатов нет', () => {
     const s = start();
     s.fleets.p1_1 = { ...s.fleets.p1_1!, location: 'hideout' };
-    expect(captiveCandidates(s, 'p1')).toEqual([]);
+    expect(captiveCandidates(s, 'p1', data)).toEqual([]);
   });
 
   it('взят — свои флоты у убежища, не в пути и не в бою, с кораблём', () => {
     let s = taken('p1', 'strike');
-    expect(captiveCandidates(s, 'p1')).toEqual(['strike']);
+    expect(captiveCandidates(s, 'p1', data)).toEqual(['strike']);
     s.fleets.moving = {
       ...s.fleets.strike!,
       id: 'moving',
@@ -49,25 +49,36 @@ describe('кнопка погрузки', () => {
     s.fleets.fighting = { ...s.fleets.strike!, id: 'fighting', battleId: 'b1' };
     s.fleets.empty = { ...s.fleets.strike!, id: 'empty', units: [{ unit: 'cruiser', count: 0 }] };
     s.fleets.elsewhere = { ...s.fleets.strike!, id: 'elsewhere', location: 'w_rocks' };
-    expect(captiveCandidates(s, 'p1')).toEqual(['strike']);
+    expect(captiveCandidates(s, 'p1', data)).toEqual(['strike']);
     // Чужой флот у убежища — не кнопка игрока.
     s = taken('p1', 'strike');
     s.fleets.strike = { ...s.fleets.strike!, owner: 'ally' };
-    expect(captiveCandidates(s, 'p1')).toEqual([]);
+    expect(captiveCandidates(s, 'p1', data)).toEqual([]);
+  });
+
+  it('мина у убежища — не носитель: ядро ответит E_NO_SHIPS, кнопки нет', () => {
+    const s = taken('p1', 'strike');
+    s.fleets.mines = { ...s.fleets.strike!, id: 'mines', units: [{ unit: 'mine', count: 3 }] };
+    s.fleets.wrecked = {
+      ...s.fleets.strike!,
+      id: 'wrecked',
+      units: [{ unit: 'cruiser', count: 1, hp: 0 }],
+    };
+    expect(captiveCandidates(s, 'p1', data)).toEqual(['strike']);
   });
 
   it('на борту, доставлен или потерян — кнопки нет', () => {
     for (const patch of [{ carrier: 'strike', loadedAt: 0 }, { deliveredAt: 0 }, { lostAt: 0 }]) {
       const s = taken('p1', 'strike');
       s.captive = { ...s.captive!, ...patch };
-      expect(captiveCandidates(s, 'p1'), JSON.stringify(patch)).toEqual([]);
+      expect(captiveCandidates(s, 'p1', data), JSON.stringify(patch)).toEqual([]);
     }
   });
 
   it('взял союзник на связи — кнопка есть и у игрока: пленный общий', () => {
     const s = taken('ally', 'escort');
     s.fleets.mine = { ...s.fleets.escort!, id: 'mine', owner: 'p1' };
-    expect(captiveCandidates(s, 'p1')).toEqual(['mine']);
+    expect(captiveCandidates(s, 'p1', data)).toEqual(['mine']);
   });
 });
 
@@ -93,7 +104,7 @@ describe('предупреждение до удара', () => {
 describe('союзник, взявший убежище, сам довозит пленного', () => {
   it('грузит на флот у убежища и держит его', () => {
     const s = taken('ally', 'escort');
-    const { actions, held } = allyCaptiveOrders(s, 'ally');
+    const { actions, held } = allyCaptiveOrders(s, 'ally', data);
     expect(actions).toEqual([
       expect.objectContaining({
         playerId: 'ally',
@@ -107,14 +118,14 @@ describe('союзник, взявший убежище, сам довозит �
   it('на борту — ведёт носитель в безопасную зону; в пути и в бою приказов не дублирует', () => {
     const s = taken('ally', 'escort');
     s.captive = { ...s.captive!, carrier: 'escort', loadedAt: s.time };
-    expect(allyCaptiveOrders(s, 'ally').actions).toEqual([
+    expect(allyCaptiveOrders(s, 'ally', data).actions).toEqual([
       expect.objectContaining({
         type: 'fleet.move',
         payload: { fleetId: 'escort', to: 'staging' },
       }),
     ]);
     s.fleets.escort = { ...s.fleets.escort!, battleId: 'b1' };
-    expect(allyCaptiveOrders(s, 'ally')).toEqual({ actions: [], held: ['escort'] });
+    expect(allyCaptiveOrders(s, 'ally', data)).toEqual({ actions: [], held: ['escort'] });
   });
 
   it('пока десант союзника дерётся за убежище, корабли над ним ждут исхода', () => {
@@ -127,7 +138,7 @@ describe('союзник, взявший убежище, сам довозит �
       traits: [],
       units: [{ unit: 'cruiser', count: 1 }],
     };
-    expect(allyCaptiveOrders(s, 'ally')).toEqual({ actions: [], held: [] });
+    expect(allyCaptiveOrders(s, 'ally', data)).toEqual({ actions: [], held: [] });
     s.battles.b1 = {
       id: 'b1',
       location: 'hideout',
@@ -142,16 +153,16 @@ describe('союзник, взявший убежище, сам довозит �
         { ref: { kind: 'garrison', planetId: 'hideout' }, owner: 'covenant', role: 'defender' },
       ],
     };
-    expect(allyCaptiveOrders(s, 'ally')).toEqual({ actions: [], held: ['escort'] });
+    expect(allyCaptiveOrders(s, 'ally', data)).toEqual({ actions: [], held: ['escort'] });
     // Чужой штурм союзника не держит.
-    expect(allyCaptiveOrders(s, 'p1')).toEqual({ actions: [], held: [] });
+    expect(allyCaptiveOrders(s, 'p1', data)).toEqual({ actions: [], held: [] });
   });
 
   it('своего флота у убежища нет — посылает ближайший свободный и ждёт его', () => {
     const s = taken('ally', 'escort');
     delete s.fleets.escort;
     // Оба флота союзника стоят дома, путь равный — первый по id.
-    expect(allyCaptiveOrders(s, 'ally')).toEqual({
+    expect(allyCaptiveOrders(s, 'ally', data)).toEqual({
       actions: [
         expect.objectContaining({
           playerId: 'ally',
@@ -168,26 +179,34 @@ describe('союзник, взявший убежище, сам довозит �
       location: null,
       movement: { ...leg, destination: 'hideout' },
     };
-    expect(allyCaptiveOrders(s, 'ally')).toEqual({ actions: [], held: ['ally_2'] });
-    // Кораблей нет — посылать некого.
+    expect(allyCaptiveOrders(s, 'ally', data)).toEqual({ actions: [], held: ['ally_2'] });
+    // Кораблей нет — посылать некого. Мина союзника не в счёт: она не ходит.
     for (const id of ['ally_1', 'ally_2']) delete s.fleets[id];
-    expect(allyCaptiveOrders(s, 'ally')).toEqual({ actions: [], held: [] });
+    s.fleets.ally_mine = {
+      id: 'ally_mine',
+      owner: 'ally',
+      location: 'ally_base',
+      movement: null,
+      traits: [],
+      units: [{ unit: 'mine', count: 3 }],
+    };
+    expect(allyCaptiveOrders(s, 'ally', data)).toEqual({ actions: [], held: [] });
   });
 
   it('взятое игроком союзник не перехватывает; без пленного — ничего', () => {
     const s = taken('p1', 'strike');
     s.fleets.escort = { ...s.fleets.strike!, id: 'escort', owner: 'ally' };
-    expect(allyCaptiveOrders(s, 'ally')).toEqual({ actions: [], held: [] });
+    expect(allyCaptiveOrders(s, 'ally', data)).toEqual({ actions: [], held: [] });
     const none = start();
     delete none.captive;
-    expect(allyCaptiveOrders(none, 'ally')).toEqual({ actions: [], held: [] });
+    expect(allyCaptiveOrders(none, 'ally', data)).toEqual({ actions: [], held: [] });
   });
 
   it('доставленный и потерянный пленный союзника не занимает', () => {
     for (const patch of [{ deliveredAt: 1 }, { lostAt: 1 }]) {
       const s = taken('ally', 'escort');
       s.captive = { ...s.captive!, carrier: 'escort', ...patch };
-      expect(allyCaptiveOrders(s, 'ally'), JSON.stringify(patch)).toEqual({
+      expect(allyCaptiveOrders(s, 'ally', data), JSON.stringify(patch)).toEqual({
         actions: [],
         held: [],
       });

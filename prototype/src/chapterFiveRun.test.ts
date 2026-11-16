@@ -208,7 +208,7 @@ describe('глава V через дверь: «Разорванная сеть�
           phase = 'assault';
         } else if (phase === 'assault' && f?.location === 'hideout' && !f.movement) {
           if (cur.captive?.takenBy === 'p1') {
-            offered = captiveCandidates(cur, 'p1');
+            offered = captiveCandidates(cur, 'p1', data);
             apply(captiveLoad('p1', 'p1_1'));
             apply(moveFleet('p1', 'p1_1', 'staging'));
             phase = 'carry';
