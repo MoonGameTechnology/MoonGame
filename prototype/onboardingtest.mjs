@@ -78,6 +78,7 @@ const controls = {
   'tech-menu': '[data-phone-tab="more"]',
   tech: '#holo-tech:visible, #rail-tech:visible, [data-phone-tab="science"]:visible, [data-phone-more="science"]:visible',
   'research-tab': '#tech [data-ttab="space"]',
+  'research-node': '#tech [data-tech="frigate_design"]',
   research: '#tech [data-go="frigate_design"]',
   'research-close': '#tech .tw-close',
   yard: '[data-act="openbuild"], [data-lift="openbuild"]',

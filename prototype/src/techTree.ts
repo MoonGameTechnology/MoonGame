@@ -195,7 +195,7 @@ function nodeModalHtml(m: TechModel, id: string): string {
         : '';
   const locked = st === 'chain' || st === 'gate' || st === 'cond';
   return (
-    `<div class="tt-modal"><div class="tt-mback" data-mclose="1"></div>` +
+    `<div class="tt-modal" data-tech-modal="${esc(id)}"><div class="tt-mback" data-mclose="1"></div>` +
     `<div class="tt-mwin" role="dialog" aria-label="${name}">` +
     `<button class="tt-mx btn-x" data-mclose="1" aria-label="${esc(t('card.close'))}">✕</button>` +
     `<div class="tt-mhead"><span class="tt-mico" style="--bc:${BRANCH_COLOR[branchOf(td)]}">${techKindSvg(techIconKind(td))}</span><div>` +
@@ -423,6 +423,9 @@ export function initTechTree(host: TechHost): {
     // «Исследовать» есть и в окошке узла (.tt-mbtn), и в строке очереди (.tt-qgo) —
     // спрашиваем по САМОМУ приказу (data-go), а не по классу кнопки.
     const go = (tg.closest('[data-go]') as HTMLElement | null)?.dataset.go;
+    // Приказ из окошка узла закрывает его: игрок сразу видит кольцо на плитке.
+    if ((go || (tg.closest('[data-q]') as HTMLElement | null)) && tg.closest('.tt-modal'))
+      modalId = null;
     if (go) {
       queueOrder(researchTech(host.me(), go), go); // узел тут же перекрашивается в «исследуется»
       return;

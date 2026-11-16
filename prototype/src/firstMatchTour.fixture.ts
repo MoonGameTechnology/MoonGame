@@ -48,6 +48,7 @@ export function firstMatchFixture() {
     techOpen: false,
     techAccessible: false,
     spaceTabOpen: false,
+    techNodeOpen: false,
     researchStarted: false,
     researchDone: false,
     shipListOpen: false,

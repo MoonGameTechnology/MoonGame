@@ -267,6 +267,7 @@ export function startGuidedMatch(): void {
             document.querySelectorAll('[data-phone-tab="science"], [data-phone-more="science"]'),
           ).some((el) => el.getBoundingClientRect().width > 0),
         spaceTabOpen: () => !!windowEl('tech').querySelector('[data-ttab="space"].on'),
+        techNodeOpen: () => !!windowEl('tech').querySelector(`.tt-modal[data-tech-modal="${GUIDE_TECH}"]`),
         researchStarted: () =>
           researchDone() ||
           live().players[me()]?.technologies?.active?.some((r) => r.technology === GUIDE_TECH) ===

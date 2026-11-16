@@ -370,6 +370,12 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       'research',
       'space',
       '#tech [data-ttab="space"]',
+      visible('#tech [data-tech="orbital_defense_grid"]'),
+    ),
+    step(
+      'research',
+      'node',
+      '#tech [data-tech="orbital_defense_grid"]',
       visible('#tech [data-go="orbital_defense_grid"]'),
     ),
     step(

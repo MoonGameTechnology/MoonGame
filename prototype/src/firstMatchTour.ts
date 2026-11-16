@@ -20,6 +20,8 @@ export interface FirstMatchDeps {
   techOpen: () => boolean;
   techAccessible: () => boolean;
   spaceTabOpen: () => boolean;
+  /** The frigate's node card is open, so its «Research» button is on screen. */
+  techNodeOpen: () => boolean;
   researchStarted: () => boolean;
   researchDone: () => boolean;
   /** Раздел кораблей окна «Построить» открыт: фрегат виден. */
@@ -97,6 +99,8 @@ export function buildFirstMatchTour(d: FirstMatchDeps): SpotlightStep[] {
       d.techOpen,
     ),
     step('research-tab', '#tech [data-ttab="space"]', d.spaceTabOpen),
+    // Узел открывает окошко, «Исследовать» живёт в нём (TT-5).
+    step('research-node', '#tech [data-tech="frigate_design"]', () => d.techNodeOpen() || d.researchStarted()),
     step('research', '#tech [data-go="frigate_design"]', d.researchStarted),
     step('research-wait', '#tech [data-tech="frigate_design"]', d.researchDone, { gate: false }),
     step('research-close', '#tech .tw-close', () => !d.techOpen()),

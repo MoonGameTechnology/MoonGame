@@ -66,7 +66,8 @@ describe('guided first match', () => {
     advance('dossierClosed', 'mine-wait');
     advance('mineImproved', 'tech');
     advance('techOpen', 'research-tab');
-    advance('spaceTabOpen', 'research');
+    advance('spaceTabOpen', 'research-node');
+    advance('techNodeOpen', 'research');
     advance('researchStarted', 'research-wait');
     advance('researchDone', 'research-close');
     facts.techOpen = false;
