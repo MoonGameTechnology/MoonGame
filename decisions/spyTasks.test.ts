@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { SPY_TASKS, taskBlock } from './spyTasks';
 
-const enemy = { owner: 'p2', coalitionMate: false };
-const own = { owner: 'p1', coalitionMate: false };
-const neutral = { owner: null, coalitionMate: false };
-const mate = { owner: 'p3', coalitionMate: true };
+const enemy = { owner: 'p2', coalitionMate: false, ownerOut: false };
+const own = { owner: 'p1', coalitionMate: false, ownerOut: false };
+const neutral = { owner: null, coalitionMate: false, ownerOut: false };
+const mate = { owner: 'p3', coalitionMate: true, ownerOut: false };
 const AGGRESSIVE = ['recon', 'research', 'theft', 'delay', 'disrupt', 'sabotage'] as const;
 
 describe('spyTasks — карточки окна «Дать задание»', () => {
@@ -22,7 +22,7 @@ describe('spyTasks — карточки окна «Дать задание»', (
   });
 
   it('правило 3: мир, о котором игрок ничего не знает, — только разведка и переезд', () => {
-    const fog = { owner: undefined, coalitionMate: false };
+    const fog = { owner: undefined, coalitionMate: false, ownerOut: false };
     expect(taskBlock('relocate', fog, 'p1', false)).toBeNull();
     expect(taskBlock('recon', fog, 'p1', false)).toBeNull();
     for (const op of ['counter', 'research', 'theft', 'delay', 'disrupt', 'sabotage'] as const)
@@ -47,6 +47,14 @@ describe('spyTasks — карточки окна «Дать задание»', (
       if (op !== 'recon') expect(taskBlock(op, neutral, 'p1', false)).toBe('no-owner');
       expect(taskBlock(op, mate, 'p1', false)).toBe('coalition');
     }
+  });
+
+  it('правило 8: хозяин выбыл — разведка и переезд, остальное ядро отвергнет', () => {
+    const gone = { owner: 'p2', coalitionMate: false, ownerOut: true };
+    expect(taskBlock('relocate', gone, 'p1', false)).toBeNull();
+    expect(taskBlock('recon', gone, 'p1', false)).toBeNull();
+    for (const op of ['counter', 'research', 'theft', 'delay', 'disrupt', 'sabotage'] as const)
+      expect(taskBlock(op, gone, 'p1', false)).toBe('owner-out');
   });
 
   it('правило 7: без выбранного мира всё доступно', () => {

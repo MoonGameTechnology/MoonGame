@@ -20,6 +20,10 @@
  *    своей коалиции гасят их: ядро такую попытку отвергнет.
  * 7. **Мир не выбран — гаснет только то, что гасит сам шпион.** Окно «Дать задание» из
  *    вкладки открывается до выбора планеты, и тогда серыми не бывает ничего.
+ * 8. **Хозяин, каким его знает игрок, выбыл из игры — только разведка и переезд.**
+ *    Сведения в тумане старые: мир помнится за игроком, который с тех пор выбыл. Ловить
+ *    шпиона там некому, поэтому разведка идёт без бросков, а остальное ядро отвергнет
+ *    (`E_NO_PLAYER`), контрразведку тоже.
  */
 import type { SpyOp } from '../packages/shared-core/src/index';
 
@@ -45,12 +49,15 @@ export interface TaskWorld {
   owner: string | null | undefined;
   /** Хозяин мира состоит в одной коалиции с игроком. */
   coalitionMate: boolean;
+  /** Хозяин мира выбыл из игры (правило 8). */
+  ownerOut: boolean;
 }
 
 /** Почему карточка серая. `null` — задание можно дать. */
-export type TaskBlock = 'here' | 'unscouted' | 'no-owner' | 'own-world' | 'coalition' | null;
+export type TaskBlock =
+  'here' | 'unscouted' | 'no-owner' | 'owner-out' | 'own-world' | 'coalition' | null;
 
-/** Правила 2–7. `world` — выбранный мир (`null`, пока не выбран), `here` — шпион уже
+/** Правила 2–8. `world` — выбранный мир (`null`, пока не выбран), `here` — шпион уже
  *  стоит на этом мире. */
 export function taskBlock(
   task: SpyTask,
@@ -62,6 +69,7 @@ export function taskBlock(
   if (!world) return null;
   if (world.owner === undefined) return task === 'recon' ? null : 'unscouted';
   if (world.owner === null) return task === 'recon' ? null : 'no-owner';
+  if (world.ownerOut) return task === 'recon' ? null : 'owner-out';
   if (task === 'counter') return null;
   if (world.owner === me) return 'own-world';
   return world.coalitionMate ? 'coalition' : null;

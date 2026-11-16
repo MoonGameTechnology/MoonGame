@@ -1156,6 +1156,7 @@ export const en: Record<string, string> = {
   'spy.block.unscouted': 'None of your spies has been here',
   'spy.block.here': 'The spy is already here',
   'spy.block.no-owner': 'The world has no owner',
+  'spy.block.owner-out': 'The owner is out of the game',
   'spy.block.own-world': 'This is your world',
   'spy.btn.assign': 'Give an assignment',
   'spy.btn.cancel': 'Cancel assignment',

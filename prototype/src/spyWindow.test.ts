@@ -118,7 +118,7 @@ describe('тексты окна заведены', () => {
     for (let i = 0; i < SPY_CALLSIGNS; i++) expect(hasKey(`spy.callsign.${i}`)).toBe(true);
     for (const st of ['rest', 'wait', 'travel', 'work', 'return', 'recruit', 'hidden'])
       expect(hasKey(`spy.status.${st}`)).toBe(true);
-    for (const b of ['here', 'unscouted', 'no-owner', 'own-world', 'coalition'])
+    for (const b of ['here', 'unscouted', 'no-owner', 'owner-out', 'own-world', 'coalition'])
       expect(hasKey(`spy.block.${b}`)).toBe(true);
   });
 });
@@ -174,6 +174,19 @@ describe('окно «Шпионаж»', () => {
     const cards = el('spywin').innerHTML;
     expect(cards).toContain('data-spy-task="theft" disabled');
     expect(cards).toContain('data-spy-task="counter" disabled');
+    expect(cards).not.toContain('data-spy-task="recon" disabled');
+    expect(cards).not.toContain('data-spy-task="relocate" disabled');
+  });
+
+  it('хозяин мира выбыл — только разведка и переезд: остальное ядро отвергнет (E_NO_PLAYER)', async () => {
+    const { win, env, enemy } = await boot([{ id: 1, state: 'rest', location: 'cap' }]);
+    env.s.players.p2!.status = 'defeated';
+    win.openSpyWindow(enemy);
+    tap('spywin', { '[data-spy-assign]': { spyAssign: '1' } });
+    const cards = el('spywin').innerHTML;
+    expect(cards).toContain('data-spy-task="theft" disabled');
+    expect(cards).toContain('data-spy-task="counter" disabled');
+    expect(cards).toContain(t('spy.block.owner-out'));
     expect(cards).not.toContain('data-spy-task="recon" disabled');
     expect(cards).not.toContain('data-spy-task="relocate" disabled');
   });
