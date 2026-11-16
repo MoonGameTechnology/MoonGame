@@ -30,7 +30,8 @@ function setup() {
   let tab = 'ships',
     heroHtml = 'old',
     renderedHero = 'old',
-    paints = 0;
+    paints = 0,
+    unchanged = false;
   const refresh = initProductionRefresh({
     root: () => root,
     state: () => state,
@@ -41,9 +42,11 @@ function setup() {
     heroPaneHtml: () => heroHtml,
     renderedHeroBody: () => renderedHero,
     paint: () => {
+      if (unchanged) return false;
       paints++;
       renderedHero = heroHtml;
       refresh.painted();
+      return true;
     },
   });
   refresh.painted();
@@ -63,6 +66,9 @@ function setup() {
     },
     heroHtml: (value: string) => {
       heroHtml = value;
+    },
+    unchanged: (value: boolean) => {
+      unchanged = value;
     },
   };
 }
@@ -120,4 +126,19 @@ it('keeps the existing touch scrolling idle guard for automatic repaints', () =>
   vi.advanceTimersByTime(180);
   f.refresh.refreshQueue();
   expect(f.paints()).toBe(1);
+});
+
+it('an unchanged catalog keeps its nodes: the queue and stock still update in place', () => {
+  // Телефон, 2026-11-16: «Построить» космопорт срабатывало с третьего нажатия — каталог
+  // построек пересобирался каждую секунду и кнопка под пальцем сменялась между касанием и отпусканием.
+  const f = setup();
+  f.tab('buildings');
+  f.unchanged(true);
+  const beforeQueue = f.queue.innerHTML;
+  f.state.players.p1!.resources.credits = 12345;
+  f.world.buildQueue = [{ id: 1, kind: 'unit', playerId: 'p1', unit: 'frigate', count: 1 }];
+  f.refresh.refreshQueue();
+  expect(f.paints()).toBe(0);
+  expect(f.stock.innerHTML).toContain('12345');
+  expect(f.queue.innerHTML).not.toBe(beforeQueue);
 });
