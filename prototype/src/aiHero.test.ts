@@ -220,6 +220,17 @@ describe('AI-BAL-8 — железо корабля (`hero.install`)', () => {
     }
   });
 
+  it('героя, которого поднимает в этот же тик, не оснащает — после подъёма он уже в поле', () => {
+    // Ядро применяет приказы хода по порядку: `hero.install` после `hero.spawn` того же
+    // героя получил бы `E_HERO_DEPLOYED`.
+    const s = rich(game2());
+    const out = orders(s);
+    const spawned = new Set(payloads<{ heroId: string }>(out, 'hero.spawn').map((p) => p.heroId));
+    expect(spawned.size).toBeGreaterThan(0);
+    for (const m of payloads<{ heroId: string }>(out, 'hero.install'))
+      expect(spawned.has(m.heroId)).toBe(false);
+  });
+
   it('маскировочное поле не ставит, даже когда другого модуля в арсенале нет (SM-4.3)', () => {
     const s = docked(rich(game2()));
     const arsenal = s.players.p2!.arsenal;
@@ -294,6 +305,17 @@ describe('AI-BAL-8 — способности (`hero.ability`)', () => {
     const staged = withHero(s, hero.id, { cooldowns: { 'fx:aura': s.time + 3_600_000 } });
     const casts = payloads<{ abilityId: string }>(orders(staged), 'hero.ability');
     expect(casts.map((c) => data.heroAbilities[c.abilityId]!.type)).not.toContain('aura');
+  });
+
+  it('кастуется только НАДЕТАЯ способность: открытую, но снятую ядро отбило бы', () => {
+    // HPR-1.2: ядро кастует то, что герой носит (`E_NOT_EQUIPPED`). Бот перебирал всё
+    // открытое, и снятая аура забирала ход героя отказом вместо надетой.
+    const s = heroInBattle(rich(game2()));
+    const hero = mainHero(s, 'p2');
+    const staged = withHero(s, hero.id, { abilities: ['rally', 'bulwark'], equipped: ['bulwark'] });
+    const casts = payloads<{ heroId: string; abilityId: string }>(orders(staged), 'hero.ability')
+      .filter((c) => c.heroId === hero.id);
+    expect(casts.map((c) => c.abilityId)).toEqual(['bulwark']);
   });
 
   it('одна способность на героя за тик', () => {

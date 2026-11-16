@@ -35,7 +35,7 @@ import { pickHoldFleet } from '../../../decisions/holdPick';
 import { holdsPatrol } from '../../../decisions/patrolMarks';
 import { frontRebase } from '../../../decisions/frontRebase';
 import { isLander } from '../../../decisions/landerTroops';
-import { canOrder } from '../protoKernel';
+import { canOrder, canOrderAll } from '../protoKernel';
 import { data } from '../gameData';
 import { STRIKE_SHUTTLES } from './rules';
 import { missileSalvo } from './missiles';
@@ -119,6 +119,14 @@ function loadCarrier(bot: AiTurn): HoldPick {
   // ремонтным ангаром (эскадры на его борту чинятся в походе), потом свободный трюм.
   // Раньше лучший флот выбирался ДО порта и трюма, и полный или стоящий не у порта
   // лидер останавливал погрузку совсем.
+  // Приказы, которые этот ход уже отдал флоту. Ядро применяет их по порядку, поэтому
+  // погрузка пробуется ПОСЛЕ них: после курса она получила бы `E_FLEET_BUSY`, после
+  // слияния в другой флот — `E_NO_FLEET`, после погрузки десанта трюма может не хватить.
+  const priorFor = (fleetId: string): Action[] =>
+    out.filter((a) => {
+      const p = a.payload as { fleetId?: unknown; from?: unknown; into?: unknown };
+      return p.fleetId === fleetId || p.from === fleetId || p.into === fleetId;
+    });
   const holdPick = pickHoldFleet(
     Object.values(state.fleets).flatMap((f) => {
       if (f.owner !== ai || f.movement || f.battleId || f.location === null) return [];
@@ -133,6 +141,9 @@ function loadCarrier(bot: AiTurn): HoldPick {
           stacksSize(sq.units, data) <= room,
       );
       if (!liftable) return [];
+      const prior = priorFor(f.id);
+      if (prior.length > 0 && canOrderAll(state, [...prior, loadShuttle(ai, f.id, liftable.id)]) !== null)
+        return [];
       return [
         {
           id: f.id,
@@ -333,8 +344,14 @@ function landingSortie(bot: AiTurn, s: Sorties): boolean {
     );
     const intel = target ? knownGarrison(state, ai, target.id, data, identified) : null;
     const plan = target && intel ? planDrop(landers, intel.units, data) : null;
-    if (target && plan) {
-      out.push(strikeShuttle(ai, pad.base, plan.squadronId, { targetPlanetId: target.id }));
+    const order = target && plan
+      ? strikeShuttle(ai, pad.base, plan.squadronId, { targetPlanetId: target.id })
+      : null;
+    // Вылет — только если его примет ядро: у базы на перезарядке (`E_NO_FUEL`) или с
+    // разбитым портом бот иначе слал бы отбиваемый приказ каждый тик и не пробовал
+    // следующую базу (тот же `canOrder`, что у перелёта и патруля ниже).
+    if (plan && order && canOrder(state, order) === null) {
+      out.push(order);
       launched.add(pad.key);
       taken.add(plan.squadronId);
       return true;
@@ -352,7 +369,7 @@ function landingSortie(bot: AiTurn, s: Sorties): boolean {
 // поднимается, остальные ждут следующего тика. Базы перебираются все по порядку
 // (SHU-6.8): эскадра в тылу без цели не держит удар эскадры у фронта.
 function strikerSortie(bot: AiTurn, s: Sorties): void {
-  const { ai, out, d } = bot;
+  const { state, ai, out, d } = bot;
   const {
     launched,
     taken,
@@ -386,7 +403,9 @@ function strikerSortie(bot: AiTurn, s: Sorties): void {
           ? { targetPlanetId: foeWorld.id }
           : null;
       if (!target) continue;
-      out.push(strikeShuttle(ai, pad.base, squad.id, target));
+      const order = strikeShuttle(ai, pad.base, squad.id, target);
+      if (canOrder(state, order) !== null) continue; // как у высадки выше: база без вылета
+      out.push(order);
       launched.add(pad.key);
       taken.add(squad.id);
       return;

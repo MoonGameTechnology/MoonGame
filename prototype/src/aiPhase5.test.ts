@@ -85,26 +85,43 @@ describe('SHU-5.6 — шаттлы в трюме корабля', () => {
     passes(s, loads[0]!);
   });
 
+  /** Ход бота целиком, по порядку, как его применяет хост: погрузка обязана пройти ядро
+   *  ПОСЛЕ остальных приказов хода (два транспорта у одного порта этим ходом сливаются). */
+  const playTurn = (s: GameState): GameState => {
+    const orders = aiOrders(s, 'p2', 'expand', 'strong');
+    expect(only(orders, 'shuttle.load').length).toBeLessThanOrEqual(1);
+    let st = s;
+    for (const a of orders) {
+      const r = kernel.applyAction(st, a, ctx(st.time));
+      if (a.type === 'shuttle.load') expect(r.ok, r.ok ? '' : r.code).toBe(true);
+      if (r.ok) st = r.state;
+    }
+    return st;
+  };
+  const carrierOf = (s: GameState, squadronId: string) =>
+    Object.values(s.fleets).find((f) => (f.hangar ?? []).some((q) => q.id === squadronId));
+
   it('из двух транспортов выбирается флот с РЕМОНТНЫМ АНГАРОМ, а не просторный трюм', () => {
     const { s, home } = staged();
     home.hangar = [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }];
+    for (const f of Object.values(s.fleets)) if (f.owner === 'p2') delete s.fleets[f.id];
     fleetAt(s, 'p2_a', home.id, [{ unit: 'cruiser', count: 2 }]); // трюм 10
     fleetAt(s, 'p2_b', home.id, [{ unit: 'cruiser', count: 1, modules: ['repair_bay'] }]);
-    const loads = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.load');
-    expect((loads[0]?.payload as { fleetId: string }).fleetId).toBe('p2_b');
-    passes(s, loads[0]!);
+    const holder = carrierOf(playTurn(s), 'sq:b');
+    expect(holder?.units.some((st) => st.modules?.includes('repair_bay'))).toBe(true);
   });
 
   it('флот, в чей трюм эскадра не влезает, не останавливает погрузку в соседний', () => {
     const { s, home } = staged();
     home.hangar = [{ id: 'sq:h', units: [{ unit: 'heavy_striker', count: 2 }] }]; // 4 места
+    for (const f of Object.values(s.fleets)) if (f.owner === 'p2') delete s.fleets[f.id];
     // Ремонтный крейсер впереди по рангу, но его 5 мест заняты десантом.
     fleetAt(s, 'p2_full', home.id, [{ unit: 'cruiser', count: 1, modules: ['repair_bay'] }]);
     s.fleets.p2_full!.landing = [{ unit: 'militia', count: 4 }];
     fleetAt(s, 'p2_roomy', home.id, [{ unit: 'shuttle_carrier', count: 1 }]);
-    const loads = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.load');
-    expect((loads[0]?.payload as { fleetId: string }).fleetId).toBe('p2_roomy');
-    passes(s, loads[0]!);
+    // Этим ходом оба сливаются (приказ погрузки в уходящий флот ядро отбило бы), и
+    // эскадра встаёт в слитый флот следующим ходом.
+    expect(carrierOf(playTurn(playTurn(s)), 'sq:h')).toBeDefined();
   });
 });
 

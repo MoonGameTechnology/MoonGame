@@ -93,4 +93,23 @@ describe('AI legal planning regressions from FFA-20', () => {
     );
     expect(production.filter((a) => canOrder(state, a) === 'E_BOMBARDED')).toEqual([]);
   });
+
+  it('does not launch a fleet from a base whose garrison holds only infantry', () => {
+    // The core forms a fleet from units whose `domain` is not ground (`fleet.launch`).
+    // Fortress garrison and drop infantry carry no `ground` trait, and the bot used to
+    // count them as ships: `fleet.launch` → `E_NO_SHIPS` every tick.
+    const state = scenario();
+    const home = homeOf(state);
+    for (const f of Object.values(state.fleets)) if (f.owner === 'p2') delete state.fleets[f.id];
+    home.garrison = [
+      { unit: 'garrison', count: 2 },
+      { unit: 'drop_infantry', count: 2 },
+    ];
+    const launches = () =>
+      aiOrders(state, 'p2', 'expand', 'strong').filter((a) => a.type === 'fleet.launch');
+    expect(launches()).toEqual([]);
+    home.garrison.push({ unit: 'cruiser', count: 1 });
+    expect(launches()).toHaveLength(1);
+    expect(canOrder(state, launches()[0]!)).toBeNull();
+  });
 });

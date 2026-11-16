@@ -768,6 +768,7 @@ export {
   heroModuleSlots,
   HERO_ACTIVE_CAP,
   cooldownKey as heroCooldownKey,
+  equippedOf as heroEquipped,
 } from './modules/hero';
 export type { HeroEffect, HeroEffectArgs } from './modules/hero';
 export { heroEffectsModule } from './modules/heroEffects';
