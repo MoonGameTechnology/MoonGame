@@ -29,10 +29,12 @@ export function productionIncomeCard(state: GameState, me: string, world: string
   return `<h3>${t('production.planet-income')} · ${esc(worldName(state, world))}</h3><p>${flowWord()} · ${t('production.income-scope')}</p><table class="pw-income-table"><thead><tr><th>${t('production.income-resource')}</th><th>${t('production.income-gross')}</th><th>${t('production.income-upkeep')}</th><th>${t('production.income-net')}</th></tr></thead><tbody>${rates.resources.map(r => `<tr><th>${curIc(r)}<span>${esc(tData(r))}</span></th><td>${resChip(r, (rates.net[r] ?? 0) + (rates.upkeep[r] ?? 0), { per: 'h' })}</td><td>${resChip(r, -(rates.upkeep[r] ?? 0), { per: 'h' })}</td><td>${resChip(r, rates.net[r] ?? 0, { sign: true, per: 'h' })}</td></tr>`).join('')}</tbody></table>`;
 }
 
-/** Account stock, separate from this planet's production rates. */
+/** Account stock, separate from this planet's production rates. Whole units, rounded down:
+ *  income ticks would otherwise flicker tenths every second and shift the line's width, and
+ *  a rounded-up figure would promise a price the stock cannot pay yet. */
 export function productionStockHtml(state: GameState, me: string, contentsOnly = false): string {
   const stock = state.players[me]?.resources ?? {};
-  const contents = data.resources.filter(r => r !== 'biomass' || feedsOnBiomass(state, me, data) || !!stock[r]).map(r => resChip(r, stock[r] ?? 0)).join('');
+  const contents = data.resources.filter(r => r !== 'biomass' || feedsOnBiomass(state, me, data) || !!stock[r]).map(r => resChip(r, Math.floor(stock[r] ?? 0))).join('');
   return contentsOnly ? contents : `<div class="pw-stock">${contents}</div>`;
 }
 
