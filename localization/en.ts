@@ -4277,6 +4277,7 @@ export const en: Record<string, string> = {
   'spy.defector.pending': '🕵 {n} {n|defector awaits|defectors await} an answer',
   'spy.defector.refuse': 'Refuse — it flees',
   'spy.defector.accept': 'Accept',
+  'spy.defector.full': 'Spy registry full ({n})',
   'spy.defector.left': 'Flees unanswered in {t}',
   'spy.defector.xp': 'Level {l} · experience {n}',
   'spy.defector.body': 'An agent of {who}, caught on {at}, asks to join you.',

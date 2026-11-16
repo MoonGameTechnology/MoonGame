@@ -12,9 +12,12 @@
  *    операция с концом показывают отсчёт до `arrivesAt`. Пост контрразведчика и
  *    разведчика длится до отзыва: у него таймера нет.
  * 3. **Имя по номеру и поколению.** Шпиону с номером `id` поколения `gen` достаётся
- *    позывной `callsignIndex(id, gen)` из `SPY_CALLSIGNS`. Шпионов в сети не больше
- *    `SPY_SLOTS`, поэтому у двух живых шпионов позывные не совпадают никогда, а новичок
- *    на месте погибшего получает новый.
+ *    позывной `callsignIndex(id, gen)` из `SPY_CALLSIGNS`, новичок на месте погибшего
+ *    получает новый. Своих мест в сети не больше `SPY_SLOTS`, но перебежчики (SPY-18)
+ *    растят реестр до `MAX_SPY_ROSTER` ядра, и формула может дать двоим живым один
+ *    позывной (свой №1 второго поколения и перебежчик №9). Тогда шпион с бо́льшим номером
+ *    берёт следующий свободный: у живых позывные разные всегда, а имя меняется только у
+ *    того, кто иначе совпал бы с другим.
  * 4. **По номеру.** Строки идут по `id`, чтобы шпион не прыгал по списку, меняя занятие.
  */
 import type { SpyOp } from '../packages/shared-core/src/index';
@@ -72,13 +75,20 @@ function actionOf(status: SpyStatus): RosterAction {
 
 /** Правила 1–4. */
 export function spyRoster(spies: readonly SpyRecordView[] | undefined): RosterRow[] {
+  const taken = new Set<number>();
+  const callsign = (s: SpyRecordView): number => {
+    let idx = callsignIndex(s.id, s.gen);
+    for (let i = 0; i < SPY_CALLSIGNS && taken.has(idx); i++) idx = (idx + 1) % SPY_CALLSIGNS;
+    taken.add(idx);
+    return idx;
+  };
   return [...(spies ?? [])]
     .sort((a, b) => a.id - b.id)
     .map((s) => {
       const timed = s.state !== 'rest' && s.state !== 'wait' && s.state !== 'hidden' && s.arrivesAt !== undefined && s.arrivesAt < ENDLESS;
       return {
         id: s.id,
-        callsign: callsignIndex(s.id, s.gen),
+        callsign: callsign(s),
         status: s.state,
         location: s.location,
         task: s.state === 'travel' || s.state === 'work' ? (s.op ?? null) : null,

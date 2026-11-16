@@ -7,7 +7,7 @@
  * он стоит, пока в мире есть перебежчик без ответа (правило 1 решения), и открывает окно.
  */
 import type { Action, DomainEvent, GameState } from '../../packages/shared-core/src/index';
-import { TURNED_HOURS } from '../../packages/shared-core/src/index';
+import { MAX_SPY_ROSTER, TURNED_HOURS } from '../../packages/shared-core/src/index';
 import { answerDefector } from '../../decisions/actions';
 import { defectorCards, defectorNews, type DefectorCard } from '../../decisions/spyDefector';
 import { t } from '../../localization/runtime';
@@ -43,9 +43,12 @@ function cardHtml(host: DefectorHost, c: DefectorCard): string {
     `<p>${esc(t('spy.defector.body', { who, at: host.placeName(c.planetId) }))}</p>` +
     (c.xp > 0 ? `<p>${esc(t('spy.defector.xp', { l: c.level, n: c.xp }))}</p>` : '') +
     `<p>${esc(t('spy.defector.left', { t: countdownHMS(c.leftMs) }))}</p>` +
+    (c.full ? `<p>${esc(t('spy.defector.full', { n: MAX_SPY_ROSTER }))}</p>` : '') +
     `<div class="fortress-dialog-actions">` +
     `<button type="button" class="btn-second" data-defector-refuse="${c.offerId}">${esc(t('spy.defector.refuse'))}</button>` +
-    `<button type="button" class="btn-main" data-defector-accept="${c.offerId}">${esc(t('spy.defector.accept'))}</button>` +
+    (c.full
+      ? ''
+      : `<button type="button" class="btn-main" data-defector-accept="${c.offerId}">${esc(t('spy.defector.accept'))}</button>`) +
     `</div></div>`
   );
 }

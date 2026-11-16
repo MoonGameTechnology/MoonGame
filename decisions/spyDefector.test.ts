@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_SPY_ROSTER } from '../packages/shared-core/src/index';
 import { defectorCards, defectorNews } from './spyDefector';
 import type { GameState } from '../packages/shared-core/src/index';
 
@@ -27,9 +28,18 @@ describe('перебежчик — карточки окна', () => {
 
   it('правило 3: опыт и остаток — числа; срок вышел — ноль, а не минус', () => {
     expect(defectorCards(world([offer(1, 100, 3.5)]), 'me', 40)).toEqual([
-      { offerId: 1, from: 'p1', planetId: 'B', xp: 3.5, level: 2, leftMs: 60 },
+      { offerId: 1, from: 'p1', planetId: 'B', xp: 3.5, level: 2, leftMs: 60, full: false },
     ]);
     expect(defectorCards(world([offer(1, 100)]), 'me', 200)[0]).toMatchObject({ xp: 0, level: 0, leftMs: 0 });
+  });
+});
+
+describe('перебежчик — полный реестр (правило 5)', () => {
+  it('шпионов столько, сколько ядро держит, — принять нельзя; на одного меньше — можно', () => {
+    const spies = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i + 1 }));
+    const at = (n: number) => ({ ...world([offer(1, 100)]), spies: { me: spies(n) } }) as unknown as GameState;
+    expect(defectorCards(at(MAX_SPY_ROSTER), 'me', 0)[0]?.full).toBe(true);
+    expect(defectorCards(at(MAX_SPY_ROSTER - 1), 'me', 0)[0]?.full).toBe(false);
   });
 });
 

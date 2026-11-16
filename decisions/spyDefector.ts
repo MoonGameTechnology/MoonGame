@@ -11,8 +11,11 @@
  * 4. **Новость о перебежчике — только поймавшему,** одной строкой журнала на событие: просьба,
  *    принят, сбежал (отказ) или не дождался. Просьба идёт без тоста — к ответу и так зовёт
  *    значок; остальное — с тостом.
+ * 5. **Реестр полон — принять нельзя, отказать можно.** Ядро не берёт перебежчика сверх
+ *    `MAX_SPY_ROSTER` шпионов (`E_BAD_TARGET`); карточка говорит это заранее, а не кнопкой,
+ *    которая отскочит отказом.
  */
-import { spyLevel, type GameState } from '../packages/shared-core/src/index';
+import { MAX_SPY_ROSTER, spyLevel, type GameState } from '../packages/shared-core/src/index';
 
 /** Одна карточка перебежчика. */
 export interface DefectorCard {
@@ -27,10 +30,13 @@ export interface DefectorCard {
   level: number;
   /** Сколько осталось до побега, мс мирового времени (не меньше 0). */
   leftMs: number;
+  /** Реестр шпионов полон — «Принять» ядро отвергнет (правило 5). */
+  full: boolean;
 }
 
-/** Перебежчики, ждущие ответа игрока `me` в миг `now` (правила 1–2). */
+/** Перебежчики, ждущие ответа игрока `me` в миг `now` (правила 1–2, 5). */
 export function defectorCards(state: GameState, me: string, now: number): DefectorCard[] {
+  const full = (state.spies?.[me]?.length ?? 0) >= MAX_SPY_ROSTER;
   return [...(state.spyOffers?.[me] ?? [])]
     .sort((a, b) => a.until - b.until || a.id - b.id)
     .map((o) => ({
@@ -40,6 +46,7 @@ export function defectorCards(state: GameState, me: string, now: number): Defect
       xp: o.xp ?? 0,
       level: spyLevel(o.xp),
       leftMs: Math.max(0, o.until - now),
+      full,
     }));
 }
 

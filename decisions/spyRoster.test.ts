@@ -40,6 +40,16 @@ describe('spyRoster — список шпионов вкладки «Шпион�
     expect(callsignIndex(2, 1)).not.toBe(callsignIndex(2, 0));
   });
 
+  it('правило 3: перебежчик, чей позывной совпал бы со своим, берёт следующий свободный', () => {
+    // Свой №1 второго поколения и перебежчик №9 первого: формула даёт обоим 16.
+    expect(callsignIndex(1, 2)).toBe(callsignIndex(9, 1));
+    const roster = Array.from({ length: 16 }, (_, i) => spy({ id: i + 1, gen: i === 0 ? 2 : 1 }));
+    const rows = spyRoster(roster);
+    expect(new Set(rows.map((r) => r.callsign)).size).toBe(16);
+    expect(rows[0]!.callsign).toBe(callsignIndex(1, 2));
+    expect(rows[1]!.callsign).toBe(callsignIndex(2, 1));
+  });
+
   it('правило 4: строки идут по номеру', () => {
     const rows = spyRoster([spy({ id: 3 }), spy({ id: 1 }), spy({ id: 2 })]);
     expect(rows.map((r) => r.id)).toEqual([1, 2, 3]);
