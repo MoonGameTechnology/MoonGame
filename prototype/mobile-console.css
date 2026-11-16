@@ -928,7 +928,6 @@ body.mobile-ui #battlewinbody :is(.bw-actions, .bw-orders) button {
 }
 /* 8 px между соседними кнопками, чтобы палец не задевал соседнюю. Ячейки нижней панели и
    строки списков стоят встык: промежутка, куда можно промахнуться, у них нет. */
-body.mobile-ui #tech .tt-tabs,
 body.mobile-ui .cn-hulls,
 body.mobile-ui #battlewinbody .bw-tiles {
   gap: 8px;

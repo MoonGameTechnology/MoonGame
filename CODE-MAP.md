@@ -96,6 +96,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `src/protoKernel.ts` | сборка ядра прототипа на общем `GAME_MODULES` + `canOrder`/`canOrderAll` — проба правил с памятью ответов |
 | `src/rocketMinesUi.ts` · `minestest.mjs` | карточка ракетной мины и браузерный smoke; `packages/client/src/ordnanceView.ts` рисует отфильтрованные мины и ракеты |
 | `src/diploWindow.ts` · `src/diploRosterView.ts` · `diplomacytest.mjs` | окно дипломатии, поиск и список участников; сортировка/фильтры — `decisions/diploRoster.ts`, браузерная проверка — `pnpm smoke:diplomacy` |
+| `src/techTree.ts` · `src/techTreeModel.ts` · `src/techTreeSide.ts` · `src/techIcons.ts` | окно «Технологии»: плитки веток, дерево плиток с линиями и окошко узла; модель науки игрока; колонка слотов, очереди и совета (на телефоне — полоса и выдвижные панели); значки. Ряды дерева и вид значка — `decisions/techTreeLayout.ts` |
 | `build.mjs` | сборка клиента в самодостаточный HTML; `data-i18n` подставляется из `/localization` |
 | `selfplay.mjs` · `econplaytest.mjs` | боты друг против друга: баланс и экономика |
 | `perf.mjs` · `report.mjs` · `doctor.mjs` | профиль кадра; разбор JSONL-лога матча (`pnpm metrics`); проверка СВЯЗНОСТИ хоста — «почему не подключаются»: занят ли порт, какие адреса видны снаружи, не слушает ли он только loopback |

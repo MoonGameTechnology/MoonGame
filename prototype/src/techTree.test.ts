@@ -6,7 +6,7 @@ import { networkSeats } from './matchSetup';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { MAX_RESEARCH_QUEUE } from '../../packages/shared-core/src/index';
 import { queueTech } from '../../decisions/actions';
-import { esc, fmtEta } from './format';
+import { esc } from './format';
 import { liveRender, plainText } from './liveTimers.fixture';
 import {
   TECH_BRANCHES,
@@ -18,6 +18,7 @@ import {
   techCondOk,
   techFx,
   techTreeHtml,
+  techChipsHtml,
   initTechTree,
   type TechHost,
 } from './techTree';
@@ -46,10 +47,13 @@ function firstOf(branch: string): string {
     .sort((a, b) => (TECHS[a]!.dayGate ?? 0) - (TECHS[b]!.dayGate ?? 0))[0]!;
 }
 
-function fakeWin(): HTMLElement & { fire: (t: unknown) => void; shown: () => boolean } {
+function fakeWin(): HTMLElement & { fire: (t: unknown) => void; shown: () => boolean; chips: () => string } {
   let handler: ((ev: unknown) => void) | null = null;
   const classes = new Set<string>();
+  const chips = { innerHTML: '' };
   const el = {
+    querySelector: (sel: string) => (sel === '.tt-chips' ? chips : null),
+    chips: () => chips.innerHTML,
     classList: {
       add: (c: string) => classes.add(c),
       remove: (c: string) => classes.delete(c),
@@ -61,7 +65,7 @@ function fakeWin(): HTMLElement & { fire: (t: unknown) => void; shown: () => boo
     fire: (target: unknown) => handler?.({ target }),
     shown: () => classes.has('show'),
   };
-  return el as unknown as HTMLElement & { fire: (t: unknown) => void; shown: () => boolean };
+  return el as unknown as HTMLElement & { fire: (t: unknown) => void; shown: () => boolean; chips: () => string };
 }
 
 /** The body also answers `.tt-scroll` — the window saves/restores its scroll on repaint. */
@@ -125,9 +129,9 @@ describe('дерево технологий — слоты исследован�
   )!;
   /** Сколько слотов НАЗЫВАЕТ интерфейс — читаем из отрисованной пилюли. */
   const shownSlots = (s: GameState): number => {
-    const { api, body } = wire({}, s);
+    const { api, win } = wire({}, s);
     api.open();
-    const m = /слоты \d+\/(\d+)/.exec(body.html());
+    const m = /слоты \d+\/(\d+)/.exec(win.chips());
     if (!m) throw new Error('пилюля слотов не найдена в разметке');
     return Number(m[1]);
   };
@@ -224,21 +228,21 @@ describe('дерево технологий — линия Наместника 
   });
 
   it('без Куратора «Командование» ведёт Наместник: в ветке его линия', () => {
-    const head = (council: string[]): string => techTreeHtml(mainGame(council), 'p1', 'command', null);
-    expect(head(['viceroy', 'polymath'])).toContain(`${t('tech.curator')} <b>Наместник</b>`);
-    expect(head(['overseer', 'viceroy'])).toContain(`${t('tech.curator')} <b>Куратор</b>`);
-    expect(head(['void_admiral', 'polymath'])).toContain(t('tech.curator.none'));
+    const line = (council: string[], tab = 'command'): string =>
+      /<div class="tt-bline">(.*?)<\/div>/.exec(techTreeHtml(mainGame(council), 'p1', tab, null))?.[1] ?? '';
+    expect(line(['viceroy', 'polymath'])).toContain(`${t('tech.curator')} <b>Наместник</b>`);
+    expect(line(['overseer', 'viceroy'])).toContain(`${t('tech.curator')} <b>Куратор</b>`);
+    expect(line(['void_admiral', 'polymath'])).toContain(t('tech.curator.none'));
     // В чужой ветке своей линии у Наместника нет. Замков «учёный» в «Космосе» нет вовсе,
     // поэтому нет и предупреждения о них (UIX-10.7).
-    const space = techTreeHtml(mainGame(['viceroy', 'polymath']), 'p1', 'space', null);
+    const space = line(['viceroy', 'polymath'], 'space');
     expect(space).not.toContain('Наместник');
     expect(space).not.toContain('tt-lead');
   });
-
   it('предупреждение «без лидера» — только в ветке с замками «учёный» (UIX-10.7)', () => {
     const lead = (council: string[], tab: string): string => {
       const html = techTreeHtml(mainGame(council), 'p1', tab, null);
-      return /<div class="tt-lead[^"]*">(.*?)<\/div>/.exec(html)?.[1] ?? '';
+      return /<span class="tt-lead[^"]*">(.*?)<\/span>/.exec(html)?.[1] ?? '';
     };
     // Замки «учёный» стоят только в «Командовании».
     const gatedBranches = new Set(
@@ -248,10 +252,10 @@ describe('дерево технологий — линия Наместника 
     );
     expect([...gatedBranches]).toEqual(['command']);
     for (const b of TECH_BRANCHES.map((x) => x.key))
-      expect(lead(['polymath'], b)).toBe(b === 'command' ? `🔭 ${t('tech.curator.none')}` : '');
+      expect(lead(['polymath'], b)).toBe(b === 'command' ? t('tech.curator.none') : '');
     // Выбранный лидер ветки назван и там, где замков нет.
     expect(lead(['void_admiral', 'polymath'], 'space')).toBe(
-      `🧪 ${t('tech.curator')} <b>${tData(data.scientists.void_admiral!.name)}</b>`,
+      `${t('tech.curator')} <b>${tData(data.scientists.void_admiral!.name)}</b>`,
     );
   });
 });
@@ -336,12 +340,14 @@ describe('дерево технологий — условия узла', () => 
 describe('дерево технологий — разметка', () => {
   const s = newGame();
 
-  it('рисует вкладки всех веток и подсвечивает открытую', () => {
+  it('рисует плитки всех веток и подсвечивает открытую', () => {
     const html = techTreeHtml(s, 'p1', 'ground', null);
     for (const b of TECH_BRANCHES) expect(html).toContain(`data-ttab="${b.key}"`);
-    expect(html).toContain('<button class="tt-tab on" data-ttab="ground">');
+    expect(html).toContain('<button class="tt-tab on" data-ttab="ground"');
+    // У плитки — значок ветки, полное и короткое имя (телефон) и строка о ветке под плитками.
+    expect(html).toMatch(/data-ttab="ground"[^>]*>(?:<span[^>]*>[^<]*<\/span>)*<svg/);
+    expect(html).toContain(`<span class="tt-bdesc">${t('tech.branch.ground.desc')}</span>`);
   });
-
   it('вкладки идут СЕТКОЙ, а не лентой с прокруткой — все пять веток видны сразу', () => {
     // Сторож над CSS: у ленты вкладки уезжали за край и до дальних веток надо было
     // досвайпывать. `grid-template-columns` на `.tt-tabs` — то, что это чинит.
@@ -352,10 +358,10 @@ describe('дерево технологий — разметка', () => {
     expect(rule![1]).not.toContain('overflow-x:auto');
   });
 
-  it('вкладка несёт счётчик «готово/всего», и он двигается с исследованием', () => {
-    // Навигация без клика: где ещё осталось что исследовать — видно с вкладки.
-    const fresh = techTreeHtml(s, 'p1', 'space', null);
-    const m = fresh.match(/data-ttab="space"><span>[^<]*<\/span><i class="tt-cnt">(\d+)\/(\d+)<\/i>/);
+  it('плитка ветки несёт счётчик «готово/всего», и он двигается с исследованием', () => {
+    const cnt = (html: string): RegExpMatchArray | null =>
+      html.match(/data-ttab="space"[\s\S]*?<i class="tt-cnt">(\d+)\/(\d+)<\/i>/);
+    const m = cnt(techTreeHtml(s, 'p1', 'space', null));
     expect(m).not.toBeNull();
     expect(m![1]).toBe('0');
     const total = Number(m![2]);
@@ -366,45 +372,48 @@ describe('дерево технологий — разметка', () => {
       active: [],
       points: 0,
     } as never;
-    const after = techTreeHtml(st, 'p1', 'space', null);
-    expect(after).toContain(`<i class="tt-cnt">1/${total}</i>`);
+    expect(cnt(techTreeHtml(st, 'p1', 'space', null))![1]).toBe('1');
   });
-
-  it('узел «ждёт родителя» называет РОДИТЕЛЯ, а не просто «закрыто»', () => {
+  it('узел «ждёт родителя» заперт, а его окошко называет РОДИТЕЛЯ', () => {
     // Причины разные — и лекарства разные: исследовать родителя vs подождать день.
-    // Строка обязана назвать лекарство, иначе игроку снова придётся открывать досье.
-    const chained = Object.entries(data.technologies).find(
-      ([id, td]) => !id.startsWith('meta_') && (td.prerequisites ?? []).length > 0,
-    );
+    const chained = Object.entries(TECHS).find(([, td]) => (td.prerequisites ?? []).length > 0);
     expect(chained).toBeDefined();
     const [cid, ctd] = chained!;
     const parent = ctd.prerequisites![0]!;
     const html = techTreeHtml(s, 'p1', ctd.branch ?? 'space', null);
-    const at = html.indexOf(`data-tech="${cid}"`);
-    const node = html.slice(at - 80, at + 400);
-    expect(node).toContain('st-chain');
-    expect(node).toContain(tData(data.technologies[parent]!.name));
+    expect(html).toMatch(new RegExp(`class="tt-item st-chain[^"]*" data-tech="${cid}"`));
+    const modal = techTreeHtml(s, 'p1', ctd.branch ?? 'space', cid);
+    const why = /<div class="tt-mwhy">(.*?)<\/div>/.exec(modal)?.[1] ?? '';
+    expect(why).toContain(esc(tData(data.technologies[parent]!.name)));
+    // «Нужно» — ссылка на родителя: нажатие открывает его окошко.
+    expect(modal).toContain(`data-pick="${parent}"`);
   });
-
-  it('узлы сгруппированы ярусами, и заголовок яруса не повторяется', () => {
-    // TT-4: ярусы заменили рельсу дней. Порядок строк задаёт tier, поэтому дубль
-    // заголовка означал бы, что сортировка разъехалась и узлы одного яруса разбиты.
-    const html = techTreeHtml(s, 'p1', 'space', null);
-    const heads = [...html.matchAll(/<div class="tt-tierh">([^<]*)<\/div>/g)].map((m) => m[1]!);
-    expect(heads.length).toBeGreaterThan(1);
-    expect(new Set(heads).size).toBe(heads.length);
-    expect(heads[0]).toContain('I'); // римская цифра яруса, а не голое число
+  it('ветка — дерево: ряды по глубине, предок в ветке всегда выше потомка', () => {
+    for (const b of TECH_BRANCHES.map((x) => x.key)) {
+      const html = techTreeHtml(s, 'p1', b, null);
+      const rows = [...html.matchAll(/<div class="tt-row">(.*?)<\/div>(?=<div class="tt-row">|<\/div><\/div>)/g)].map(
+        (r) => [...r[1]!.matchAll(/data-tech="([^"]+)"/g)].map((x) => x[1]!),
+      );
+      expect(rows.length, b).toBeGreaterThan(0);
+      const rowOf = new Map(rows.flatMap((r, i) => r.map((id) => [id, i] as const)));
+      expect(rowOf.size, b).toBe(Object.keys(TECHS).filter((id) => (TECHS[id]!.branch ?? 'space') === b).length);
+      for (const [id, row] of rowOf)
+        for (const p of TECHS[id]!.prerequisites ?? [])
+          if (rowOf.has(p)) expect(rowOf.get(p)!, `${p} → ${id}`).toBeLessThan(row);
+    }
+    // Ярусов («Ярус I», «T1») больше нет: ярус ничего не запирает.
+    expect(techTreeHtml(s, 'p1', 'space', null)).not.toContain('tt-tierh');
   });
-
-  it('day-гейт не пропал вместе с рельсой — он назван ПРИЧИНОЙ замка в строке', () => {
-    const gated = Object.keys(TECHS).find((id) => (TECHS[id]!.dayGate ?? 0) > 0)!;
+  it('day-гейт назван на плитке узла: «день N»', () => {
+    const gated = Object.keys(TECHS).find((id) => (TECHS[id]!.dayGate ?? 0) > 0 && !(TECHS[id]!.prerequisites ?? []).length)
+      ?? Object.keys(TECHS).find((id) => (TECHS[id]!.dayGate ?? 0) > 0)!;
+    const st = newGame();
+    st.players.p1!.technologies = { completed: TECHS[gated]!.prerequisites ?? [], active: [], points: 0 } as never;
     const day = (TECHS[gated]!.dayGate ?? 0) + 1;
-    const html = techTreeHtml(s, 'p1', TECHS[gated]!.branch ?? 'space', null);
-    const row = html.slice(html.indexOf(`data-tech="${gated}"`));
-    expect(row.slice(0, 400)).toContain(String(day));
-    expect(html).toContain('tt-st lock');
+    const html = techTreeHtml(st, 'p1', TECHS[gated]!.branch ?? 'space', null);
+    const tile = html.slice(html.indexOf(`data-tech="${gated}"`));
+    expect(tile.slice(0, tile.indexOf('</button>'))).toContain(t('tech.node.day', { n: day }));
   });
-
   it('показывает узлы ТОЛЬКО открытой ветки', () => {
     const html = techTreeHtml(s, 'p1', 'command', null);
     expect(html).toContain('data-tech="ai_stewardship"'); // ветка «Командование»
@@ -420,34 +429,30 @@ describe('дерево технологий — разметка', () => {
     }
   });
 
-  it('досье закрытого узла предлагает НЕ кнопку исследования, а причину', () => {
+  it('окошко закрытого узла предлагает НЕ кнопку исследования, а причину', () => {
     const locked = Object.keys(TECHS).find((id) => (TECHS[id]!.dayGate ?? 0) > 0)!;
     const html = techTreeHtml(s, 'p1', TECHS[locked]!.branch ?? 'space', locked);
     expect(html).toContain('tt-modal');
-    expect(html).toContain('tt-mbtn wait');
+    expect(html).toContain('tt-mwhy');
     expect(html).not.toContain(`data-go="${locked}"`);
   });
-
-  it('исследованный узел уходит из списка (решение владельца 2026-09-26), досье его помнит', () => {
+  it('исследованный узел остаётся в дереве зелёным: без него рвались бы связи', () => {
     const st = newGame();
     const id = firstOf('space');
     st.players.p1!.technologies = { completed: [id], active: [], points: 0 } as never;
     const list = techTreeHtml(st, 'p1', 'space', null);
-    expect(list).not.toContain(`data-tech="${id}"`);
-    expect(list).not.toContain('st-done');
-    // Досье, открытое по ссылке (например, из «Хранителя»), честно пишет «изучено».
+    expect(list).toMatch(new RegExp(`class="tt-item st-done[^"]*" data-tech="${id}"`));
     const html = techTreeHtml(st, 'p1', 'space', id);
     expect(html).not.toContain(`data-go="${id}"`);
-    expect(html).toContain('tt-mbtn wait');
+    expect(html).toContain(`tt-mbtn wait btn-main" disabled>✓ ${t('tech.action.done')}`);
   });
-
-  it('ветка, изученная целиком, говорит об этом строкой, а не пустым списком', () => {
+  it('ветка, изученная целиком, — все плитки зелёные', () => {
     const st = newGame();
     const all = Object.keys(TECHS).filter((id) => (TECHS[id]!.branch ?? 'space') === 'space');
     st.players.p1!.technologies = { completed: all, active: [], points: 0 } as never;
-    expect(techTreeHtml(st, 'p1', 'space', null)).toContain(t('tech.branch.done'));
+    const html = techTreeHtml(st, 'p1', 'space', null);
+    expect(html.match(/class="tt-item st-done/g)?.length).toBe(all.length);
   });
-
   it('кнопка исследования гаснет, когда не хватает ресурсов', () => {
     const rich = newGame();
     const poor = newGame();
@@ -457,13 +462,14 @@ describe('дерево технологий — разметка', () => {
       Object.keys(cost).map((k) => [k, (cost[k] ?? 0) * 10]),
     );
     poor.players.p1!.resources = {};
-    const okHtml = techTreeHtml(rich, 'p1', 'space', id);
+    expect(techTreeHtml(rich, 'p1', 'space', id)).toContain(`tt-mbtn btn-main" data-go="${id}">`);
     const noHtml = techTreeHtml(poor, 'p1', 'space', id);
-    expect(okHtml).toMatch(new RegExp(`data-go="${id}"(?! disabled)`));
-    expect(noHtml).toMatch(new RegExp(`data-go="${id}" disabled`));
+    expect(noHtml).not.toContain(`data-go="${id}"`);
+    expect(noHtml).toContain(`disabled>${t('tech.action.no-resources')}`);
+    // На плитке — «нет ресурсов» вместо срока.
+    expect(techTreeHtml(poor, 'p1', 'space', null)).toContain(t('tech.node.no-res'));
   });
-
-  it('идущее исследование показывает полосу прогресса и ETA в часах', () => {
+  it('идущее исследование: слот с полосой и сроком, кольцо и срок на плитке', () => {
     const st = newGame();
     const id = firstOf('space');
     st.time = 10 * DAY;
@@ -476,46 +482,35 @@ describe('дерево технологий — разметка', () => {
     const html = techTreeHtml(st, 'p1', 'space', id);
     expect(html).toContain('st-res');
     expect(html).toContain('tt-mbtn wait'); // повторно запустить нельзя
+    expect(html).toContain(`<i class="tt-ring" data-since="${st.time - 5 * HOUR}" data-at="${st.time + 5 * HOUR}"></i>`);
     // Доля и сроки — живые узлы: игрок видит их после патча, а разметка с часами не меняется
     // (иначе окно пересобиралось бы каждые полсекунды вместе с кнопками под курсором).
     const seen = liveRender(html, st.time, TECH_LIVE);
-    expect(seen).toContain('style="width:50%"'); // полоса ровно посередине
-    expect(plainText(seen)).toContain(`⏳ ${t('tech.action.running', { n: 5 })}`); // 5 ч
-    // ETA видна прямо в СТРОКЕ, а не только в досье
-    expect(seen).toContain(`<span class="tt-st run">⚗ <span class="pn-timer" data-at="${st.time + 5 * HOUR}" data-fmt="hup">${fmtEta(5)}</span>`);
-    // …и вынесена в закреплённую шапку — ради неё экран и открывают повторно
-    expect(html).toContain('tt-now');
-    expect(seen).toContain('5:00:00');
+    expect(seen).toContain('style="width:50%"'); // полоса слота ровно посередине
+    expect(plainText(seen)).toContain(`⏳ ${t('tech.action.running-clock', { n: '5:00:00' })}`);
+    expect(seen).toContain(`data-now="${id}"`);
     st.time += 90 * 60_000;
     expect(techTreeHtml(st, 'p1', 'space', id)).toBe(html);
     expect(liveRender(html, st.time, TECH_LIVE)).toContain('3:30:00');
   });
-
-  it('без идущего исследования закреплённой шапки нет', () => {
-    expect(techTreeHtml(s, 'p1', 'space', null)).not.toContain('tt-now');
+  it('без идущего исследования все слоты свободны и зовут выбрать тему', () => {
+    const html = techTreeHtml(s, 'p1', 'space', null);
+    expect(html).not.toContain('data-now=');
+    expect(html).toContain(t('tech.slot.free.pick'));
   });
-
-  it('кнопка «исследовать» живёт в самой строке и гаснет без казны', () => {
-    // TT-4: раньше про доступность говорило свечение узла, а взять его можно было
-    // только через досье. Теперь приказ — в один тап из списка.
+  it('«Исследовать» в окошке узла; без казны — «В очередь», с полной очередью — причина', () => {
     const st = newGame();
     const id = firstOf('space');
     const td = data.technologies[id]!;
     st.players.p1!.resources = Object.fromEntries(
       Object.entries(td.cost).map(([k, v]) => [k, (v as number) * 2]),
     );
-    expect(techTreeHtml(st, 'p1', 'space', null)).toMatch(
-      new RegExp(`tt-take btn-main" data-go="${id}">`),
-    );
-    // Без казны — «＋ В очередь» вместо выключенной «Не хватает ресурсов»: нехватку уже
-    // называет цена красным «−N» (UIX-10.7).
+    expect(techTreeHtml(st, 'p1', 'space', id)).toContain(`tt-mbtn btn-main" data-go="${id}">`);
     st.players.p1!.resources = {};
-    const broke = techTreeHtml(st, 'p1', 'space', null);
+    const broke = techTreeHtml(st, 'p1', 'space', id);
     expect(broke).toContain(`data-q="${id}"`);
     expect(broke).not.toContain(`data-go="${id}"`);
-    expect(broke).not.toContain(t('tech.action.no-resources'));
-    // Очередь полна — поставить в план нельзя, и выключенная кнопка остаётся единственной
-    // причиной на плитке.
+    // Очередь полна — поставить в план нельзя, остаётся выключенная кнопка с причиной.
     const p1 = st.players.p1!;
     p1.technologies = {
       completed: p1.technologies?.completed ?? [],
@@ -523,21 +518,20 @@ describe('дерево технологий — разметка', () => {
         .filter((x) => x !== id)
         .slice(0, MAX_RESEARCH_QUEUE),
     };
-    const full = techTreeHtml(st, 'p1', 'space', null);
-    expect(full).toContain(`data-go="${id}" disabled`);
+    const full = techTreeHtml(st, 'p1', 'space', id);
+    expect(full).toContain(`disabled>${t('tech.action.no-resources')}`);
     expect(full).not.toContain(`data-q="${id}"`);
   });
-
   it('исчезнувший из данных узел не оставляет висящее досье', () => {
     // модалка чистится, если id больше нет в каталоге — окно не должно падать
     expect(() => techTreeHtml(s, 'p1', 'space', 'нет-такого-теха')).not.toThrow();
     expect(techTreeHtml(s, 'p1', 'space', 'нет-такого-теха')).not.toContain('tt-modal');
   });
 
-  it('пилюля слотов держит кламп ядра: 2 базовых, максимум 3', () => {
-    const html = techTreeHtml(s, 'p1', 'space', null);
-    expect(html).toMatch(/tt-slots/);
-    expect(html).toMatch(/[023]\s*\/\s*[23]|\/\s*[23]/);
+  it('чип слотов в шапке держит кламп ядра: 2 базовых, максимум 3', () => {
+    const chips = techChipsHtml(s, 'p1');
+    expect(chips).toMatch(/tt-chip/);
+    expect(chips).toMatch(/[023]\s*\/\s*[23]/);
   });
 });
 
@@ -558,7 +552,7 @@ describe('дерево технологий — окно', () => {
     const { api, body } = wire();
     const id = firstOf('command');
     api.open(id);
-    expect(body.html()).toContain('<button class="tt-tab on" data-ttab="command">');
+    expect(body.html()).toContain('<button class="tt-tab on" data-ttab="command"');
     expect(body.html()).toContain('tt-modal');
     expect(body.html()).toContain(esc(tData(data.technologies[id]!.name)));
     api.open();
@@ -570,9 +564,9 @@ describe('дерево технологий — окно', () => {
   it('переключение вкладки перерисовывает дерево другой ветки', () => {
     const { api, win, body } = wire();
     api.open();
-    expect(body.html()).toContain('<button class="tt-tab on" data-ttab="space">');
+    expect(body.html()).toContain('<button class="tt-tab on" data-ttab="space"');
     win.fire(ttClick('.tt-tab', { ttab: 'command' }));
-    expect(body.html()).toContain('<button class="tt-tab on" data-ttab="command">');
+    expect(body.html()).toContain('<button class="tt-tab on" data-ttab="command"');
   });
 
   it('тап по узлу открывает досье, крестик модалки его закрывает', () => {
@@ -768,27 +762,26 @@ describe('techTreeHtml — дерево забега (PVR-6.17)', () => {
     const commandIds = Object.keys(TECHS).filter(
       (id) => TECHS[id]!.branch === 'command' && id !== 'ai_stewardship',
     );
-    expect(html).toContain(`<i class="tt-cnt">0/${commandIds.length}</i></button>`);
+    expect(html).toContain(`<i class="tt-cnt">0/${commandIds.length}</i>`);
     // В сетевом матче узел на месте.
     expect(techTreeHtml(newGame(), 'p1', 'command', null)).toContain('data-tech="ai_stewardship"');
   });
 
   it('ни замка «нужен день N», ни счётчика дней', () => {
     const html = allTabs(run());
-    expect(html).not.toContain('tt-day');
     expect(html).not.toContain('st-gate');
-    // Досье узла с воротами дня: ни «открывается с дня», ни строки «📅 с дня».
+    expect(techChipsHtml(run(), 'p1')).not.toContain(t('tech.day', { n: 1 }));
+    // Окошко узла с воротами дня: ни «с дня N» в «Нужно», ни замка.
     const gated = Object.keys(TECHS).find(
       (id) => (TECHS[id]!.dayGate ?? 0) > 0 && !TECHS[id]!.prerequisites?.length && id !== 'ai_stewardship',
     )!;
     const dossier = techTreeHtml(run(), 'p1', TECHS[gated]!.branch ?? 'space', gated);
-    expect(dossier).toContain(`data-go="${gated}"`);
-    expect(dossier).not.toContain('📅');
+    expect(dossier).not.toContain('tt-mwhy');
+    expect(dossier).not.toContain('tt-cond');
     // Сетевой матч держит и то и другое.
-    expect(allTabs(newGame())).toContain('tt-day');
+    expect(techChipsHtml(newGame(), 'p1')).toContain(t('tech.day', { n: 1 }));
     expect(allTabs(newGame())).toContain('st-gate');
   });
-
   it('строки про лидера ветки нет, когда замков «учёный» в дереве не осталось', () => {
     expect(allTabs(run())).not.toContain('tt-lead');
     expect(allTabs(newGame())).toContain('tt-lead');
@@ -836,28 +829,25 @@ describe('дерево технологий — очередь исследов�
     expect(TECHS[grandchild]?.prerequisites).toEqual([child]);
   });
 
-  it('слоты заняты — в строке вместо «Исследовать» кнопка «В очередь»', () => {
-    const html = techTreeHtml(busy(), 'p1', 'space', null);
+  it('слоты заняты — в окошке вместо «Исследовать» кнопка «В очередь»', () => {
+    const html = techTreeHtml(busy(), 'p1', 'space', root);
     expect(html).toContain(`data-q="${root}"`);
-    expect(html).not.toMatch(new RegExp(`data-go="${root}">`));
+    expect(html).not.toContain(`data-go="${root}"`);
+    expect(html).toContain(t('tech.action.slots-full'));
   });
-
   it('свободный слот и казна — главная кнопка остаётся «Исследовать», без лишней очереди', () => {
-    const html = techTreeHtml(richGame(), 'p1', 'space', null);
-    expect(html).toMatch(new RegExp(`data-go="${root}">`));
+    const html = techTreeHtml(richGame(), 'p1', 'space', root);
+    expect(html).toContain(`data-go="${root}">`);
     expect(html).not.toContain(`data-q="${root}"`);
   });
-
-  it('без казны в строке «В очередь», а нехватку называет цена (UIX-10.7)', () => {
+  it('без казны в окошке «В очередь», а нехватку называет цена (UIX-10.7)', () => {
     const st = newGame();
     st.players.p1!.resources = {};
-    const html = techTreeHtml(st, 'p1', 'space', null);
-    const tile = new RegExp(`data-tech="${root}">(.*?)</div></div>`).exec(html)?.[1] ?? '';
-    expect(tile).toContain(`data-q="${root}"`);
-    expect(tile).not.toContain(`data-go="${root}"`);
-    expect(tile).toContain('class="lack"');
+    const html = techTreeHtml(st, 'p1', 'space', root);
+    expect(html).toContain(`data-q="${root}"`);
+    expect(html).not.toContain(`data-go="${root}"`);
+    expect(html).toContain('class="lack"');
   });
-
   it('очередь видна полосой: номер, имя и чего ждёт каждая тема', () => {
     const st = queued(busy(), root, child);
     const html = techTreeHtml(st, 'p1', 'ground', null); // полоса не зависит от вкладки
@@ -895,27 +885,24 @@ describe('дерево технологий — очередь исследов�
     expect(tag).toContain(tData(TECHS[grandchild]!.name));
   });
 
-  it('тема в очереди: строка называет место, досье предлагает убрать', () => {
+  it('тема в очереди: плитка называет место, окошко предлагает убрать', () => {
     const st = queued(busy(), root, child);
     const list = techTreeHtml(st, 'p1', 'space', null);
-    const row = list.slice(list.indexOf(`class="tt-item st-queued" data-tech="${child}"`));
-    expect(row.slice(0, 300)).toContain(t('tech.state.queued', { n: 2 }));
+    const tile = list.slice(list.indexOf(`class="tt-item st-queued" data-tech="${child}"`));
+    expect(tile.slice(0, tile.indexOf('</button>'))).toContain('№2');
     const dossier = techTreeHtml(st, 'p1', 'space', child);
+    expect(dossier).toContain(t('tech.state.queued', { n: 2 }));
     expect(dossier).toContain(`tt-mq btn-second danger" data-dq="${child}"`);
     expect(dossier).not.toContain(`data-q="${child}"`);
   });
-
   it('потомок темы из очереди предлагает «В очередь», не пряча причину замка', () => {
     const st = queued(busy(), root);
-    const html = techTreeHtml(st, 'p1', 'space', null);
-    const row = html.slice(html.indexOf(`data-tech="${child}"`));
-    expect(row.slice(0, 500)).toContain('tt-st lock');
-    expect(row.slice(0, 500)).toContain(`data-q="${child}"`);
+    const html = techTreeHtml(st, 'p1', 'space', child);
+    expect(html).toContain('tt-mwhy');
+    expect(html).toContain(`data-q="${child}"`);
     // Внук — нет: его предка нет ни в работе, ни в очереди (ядро ответит E_PREREQUISITE).
-    const g = html.slice(html.indexOf(`data-tech="${grandchild}"`));
-    expect(g.slice(0, 500)).not.toContain(`data-q="${grandchild}"`);
+    expect(techTreeHtml(st, 'p1', 'space', grandchild)).not.toContain(`data-q="${grandchild}"`);
   });
-
   it('кнопки очереди шлют приказы ядра от текущего игрока', () => {
     const st = queued(busy(), root, child);
     const { api, win, sent } = wire({}, st);
@@ -930,33 +917,28 @@ describe('дерево технологий — очередь исследов�
     ]);
   });
 
-  it('полоса сворачивается в одну строку: первая тема и счётчик, без строк и кнопок', () => {
+  it('телефон: очередь и совет выезжают снизу той же разметкой колонки', () => {
     const st = queued(busy(), root, child);
-    const open = techTreeHtml(st, 'p1', 'space', null);
-    expect(open).toContain('aria-expanded="true"');
-    expect(open).toContain('tt-qlist');
-    const folded = techTreeHtml(st, 'p1', 'space', null, { queueFolded: true });
-    expect(folded).toContain('tt-queue folded');
-    expect(folded).toContain('aria-expanded="false"');
-    expect(folded).toContain(`<span class="tt-qpeek">1 · ${tData(TECHS[root]!.name)}</span>`);
-    expect(folded).toContain(`<i>2/${MAX_RESEARCH_QUEUE}</i>`);
-    expect(folded).not.toContain('tt-qlist');
-    expect(folded).not.toContain('data-qmove');
+    const closed = techTreeHtml(st, 'p1', 'space', null);
+    expect(closed).toContain('<aside class="tt-side">');
+    expect(closed).not.toContain('tt-shade');
+    expect(closed).toContain(`data-sheet="queue">${t('tech.queue.title')} <i>2/${MAX_RESEARCH_QUEUE}</i>`);
+    const sheet = techTreeHtml(st, 'p1', 'space', null, { sheet: 'queue' });
+    expect(sheet).toContain('<aside class="tt-side sheet sheet-queue">');
+    expect(sheet).toContain('tt-shade');
   });
-
-  it('тап по заголовку очереди сворачивает и разворачивает её', () => {
+  it('тап по кнопке «Очередь» открывает панель, тень её закрывает', () => {
     const st = queued(busy(), root, child);
     const { api, win, body, sent } = wire({}, st);
     api.open();
-    expect(body.html()).toContain('tt-qlist');
-    win.fire(ttClick('[data-qfold]'));
-    expect(body.html()).toContain('tt-queue folded');
-    expect(body.html()).not.toContain('tt-qlist');
-    win.fire(ttClick('[data-qfold]'));
-    expect(body.html()).toContain('tt-qlist');
+    win.fire(ttClick('[data-sheet]', { sheet: 'queue' }));
+    expect(body.html()).toContain('sheet-queue');
+    win.fire(ttClick('[data-sheetclose]'));
+    expect(body.html()).not.toContain('sheet-queue');
+    win.fire(ttClick('[data-sheet]', { sheet: 'council' }));
+    expect(body.html()).toContain('sheet-council');
     expect(sent).toEqual([]); // это вид окна, а не приказ
   });
-
   it('тап по строке очереди открывает её кнопки, второй тап прячет (телефон)', () => {
     const st = queued(busy(), root, child);
     const { api, win, body, sent } = wire({}, st);
@@ -982,7 +964,61 @@ describe('дерево технологий — очередь исследов�
     st = advance(st, first.completesAt).state;
     expect(st.players.p1!.technologies!.queue ?? []).toEqual([]);
     const html = techTreeHtml(st, 'p1', 'space', null);
-    expect(html).not.toContain('tt-queue');
+    expect(html).not.toContain('data-qitem=');
     expect(html).toContain(`data-now="${root}"`);
+  });
+});
+
+// TT-5: совет учёных и «Наука уже даёт» в левой колонке говорят только то, что делает правило.
+describe('дерево технологий — совет и сумма бонусов (TT-5)', () => {
+  const withCouncil = (ids: string[]): GameState => {
+    const st = newGame({ mapId: 'ffa-4', seats: networkSeats('ffa', 'ffa-4') });
+    st.players.p1!.scientists = ids.map((id) => ({ id, level: 1 }));
+    return st;
+  };
+  const council = (ids: string[]): string =>
+    /<section class="tt-sec tt-council">(.*?)<\/section>/.exec(techTreeHtml(withCouncil(ids), 'p1', 'space', null))?.[1] ?? '';
+
+  it('эффект учёного — настоящий: слот, свои узлы или честное «эффекта нет»', () => {
+    expect(council(['polymath'])).toContain(t('tech.council.slot', { a: 2, b: 3 }));
+    expect(council(['overseer'])).toContain(tData(data.technologies.ai_stewardship!.name));
+    expect(council(['viceroy'])).toContain(tData(data.technologies.viceroyalties!.name));
+    const none = council(['void_admiral']);
+    expect(none).toContain('class="none"');
+    expect(none).toContain(t('tech.council.none', { b: branchLabel('space') }));
+  });
+
+  it('без совета (забег) нет ни секции, ни кнопки «Совет»', () => {
+    const st = newGame();
+    delete st.players.p1!.scientists;
+    const html = techTreeHtml(st, 'p1', 'space', null);
+    expect(html).not.toContain('tt-council');
+    expect(html).not.toContain('data-sheet="council"');
+  });
+
+  it('«Наука уже даёт» складывает изученные бонусы по виду', () => {
+    const st = newGame();
+    const fresh = /<section class="tt-sec tt-fxsum">(.*?)<\/section>/.exec(techTreeHtml(st, 'p1', 'space', null))?.[1];
+    expect(fresh).toContain(t('tech.fxsum.none'));
+    const prod = Object.keys(TECHS).filter((id) => TECHS[id]!.effects?.productionBonus);
+    expect(prod.length).toBeGreaterThan(1);
+    const sum = prod.reduce((a, id) => a + TECHS[id]!.effects!.productionBonus!, 0);
+    st.players.p1!.technologies = { completed: prod, active: [], points: 0 } as never;
+    expect(techTreeHtml(st, 'p1', 'space', null)).toContain(
+      `<b>+${Math.round(sum * 100)}%</b> ${t('tech.fx.production')}`,
+    );
+  });
+
+  it('ссылка «Нужно» в окошке открывает окошко предка на его ветке', () => {
+    const { api, win, body } = wire();
+    const child = Object.keys(TECHS).find((id) =>
+      (TECHS[id]!.prerequisites ?? []).some((p) => TECHS[p] && (TECHS[p]!.branch ?? 'space') !== (TECHS[id]!.branch ?? 'space')),
+    )!;
+    const parent = TECHS[child]!.prerequisites!.find((p) => (TECHS[p]!.branch ?? 'space') !== (TECHS[child]!.branch ?? 'space'))!;
+    api.open(child);
+    expect(body.html()).toContain(`data-pick="${parent}"`);
+    win.fire(ttClick('[data-pick]', { pick: parent }));
+    expect(body.html()).toContain(`<button class="tt-tab on" data-ttab="${TECHS[parent]!.branch ?? 'space'}"`);
+    expect(body.html()).toContain(`aria-label="${esc(tData(TECHS[parent]!.name))}"`);
   });
 });

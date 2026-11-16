@@ -171,14 +171,22 @@ const overlay = () =>
  *  на одну тему — второй и третий приказ смоука уходят постановкой в очередь. */
 async function pickResearch() {
   const tabs = await page.$$eval('.tt-tab[data-ttab]', (els) => els.map((e) => e.dataset.ttab));
+  // TT-5: приказ живёт в окошке узла — открываем доступные плитки по одной. Окошко прошлого
+  // приказа ещё открыто: закрываем, иначе оно накрывает плитки веток.
+  if (await page.locator('#tech .tt-modal').count()) await page.click('#tech .tt-mx');
   for (const [selector, attr, state] of [
-    ['.tt-take:not([disabled])', 'data-go', 'res'],
-    ['.tt-qadd', 'data-q', 'queued'],
+    ['#tech .tt-mbtn[data-go]:not([disabled])', 'data-go', 'res'],
+    ['#tech .tt-mq[data-q]', 'data-q', 'queued'],
   ]) {
-    for (const tab of [null, ...tabs]) {
-      if (tab) await page.click(`.tt-tab[data-ttab="${tab}"]`);
-      const take = page.locator(selector).first();
-      if (await take.count()) return { take, tech: await take.getAttribute(attr), state };
+    for (const tab of tabs) {
+      await page.click(`.tt-tab[data-ttab="${tab}"]`);
+      const tiles = await page.$$eval('#tech .tt-item.st-avail', (els) => els.map((e) => e.dataset.tech));
+      for (const id of tiles) {
+        await page.click(`#tech .tt-item[data-tech="${id}"]`);
+        const take = page.locator(selector).first();
+        if (await take.count()) return { take, tech: await take.getAttribute(attr), state };
+        await page.click('#tech .tt-mx');
+      }
     }
   }
   throw new Error('в окне технологий нельзя ни начать исследование, ни поставить его в очередь');

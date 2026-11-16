@@ -403,7 +403,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `*Html`. Владельцы: экран подключения — `connectScreen.ts`, настройки — `settingsView.ts` /
   `settingsOverlay.ts`, выбор — `sidePanel.ts`, жизненный цикл матча — `matchLifecycle.ts`,
   бой — `battleScreen.ts` + `battleView.ts` (прогноз — `decisions/battleForecast.ts`),
-  окна экспедиции — `expeditionWindows.ts`.
+  окна экспедиции — `expeditionWindows.ts`, «Технологии» (дерево плиток) — `techTree.ts`.
 - От 720 px — голографическая консоль ПК и планшета (`holographicUi.ts`, окна —
   `floatingWindows.ts`, масштаб — `decisions/pcScale.ts`); уже — телефон (`mobileHud.ts`,
   нижняя панель — `decisions/phoneNav.ts`, приказ — черновик цели `mobileOrders.ts`).
