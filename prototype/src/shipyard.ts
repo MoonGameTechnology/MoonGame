@@ -760,7 +760,7 @@ export function initShipyard(host: YardHost) {
   /** Открытая линия; `null` — окно стоит на списке линий, каталога нет. */
   let lane: ProductionLane | null = null;
   let category: BuildCategory | null = null;
-  let renderedHeroBody = '';
+  let renderedHeroBody = '', paintedKey = '';
   let draft: YardDraft = { hull: YARD_HULLS[0]!, modules: [], count: 1, planet: '' };
   /** Вкладка последней отрисовки: прокрутка переживает перерисовку только внутри вкладки. */
   let paintedTab: string | null = null;
@@ -771,7 +771,7 @@ export function initShipyard(host: YardHost) {
   const saveTemplates = (): void => writeRaw(TEMPLATES_KEY, JSON.stringify(templates));
   const refresh = initProductionRefresh({
     ...host, tab: () => (lane ? tab : ''), lane: () => lane, planet: () => draft.planet,
-    renderedHeroBody: () => renderedHeroBody, paint,
+    renderedHeroBody: () => renderedHeroBody, paint: () => paint(true),
   });
 
   const hullsOf = (): string[] => hullsOfTab(tab);
@@ -786,8 +786,8 @@ export function initShipyard(host: YardHost) {
   };
   const close = (): void => host.root().classList.remove('show', 'pw-fitting-open');
 
-  function paint(): void {
-    refresh.painted();
+  /** `passive` — ежесекундное обновление: та же разметка (запас, очередь и таймеры правят на месте) не пересобирается. */
+  function paint(passive = false): boolean {
     const state = host.state(), me = host.me();
     const worlds = productionWorlds(state, me);
     let body = '';
@@ -802,23 +802,25 @@ export function initShipyard(host: YardHost) {
     }
     // Перерисовка не сбрасывает прокрутку: поставил модуль внизу списка — там и остался.
     const painting = `${lane}/${tab}`;
-    const keep =
-      paintedTab === painting ? (host.root().querySelector('#constructorbody')?.scrollTop ?? 0) : 0;
+    const keep = paintedTab === painting ? (host.root().querySelector('#constructorbody')?.scrollTop ?? 0) : 0;
     const tplPane =
       lane && tplOpen && tab !== 'heroes' && tab !== 'buildings'
         ? templatesPaneHtml(state, me, templates, templateOf(tab, draft), host.youColor(), tab)
         : '';
+    const income = draft.planet ? productionIncomeHtml(state, me, draft.planet) : '', repeat = lane ? repeatOrderHtml(last, tab, draft) : '';
+    const world = productionWorldSelect(state, draft.planet, worlds), orders = draft.planet ? worldOrdersHtml(state, me, draft.planet) : '';
+    const key = [painting, body, order, repeat, tplPane, income, world, orders].join('\n');
+    if (passive && key === paintedKey) return false;
+    paintedKey = key; refresh.painted();
     const restoreDetails = rememberProductionDetails(host.root());
-    const context = `<div class="pw-context">${productionStockHtml(state, me)}${draft.planet ? productionIncomeHtml(state, me, draft.planet) : ''}</div>`;
-    host.root().innerHTML = yardBoxHtml(tab, body, order, lane ? repeatOrderHtml(last, tab, draft) : '', refresh.queueHtml(), tplPane, {
-      lane, context, strip: refresh.stripHtml(), world: productionWorldSelect(state, draft.planet, productionWorlds(state, me)),
-      orders: draft.planet ? worldOrdersHtml(state, me, draft.planet) : '',
-    });
+    const context = `<div class="pw-context">${productionStockHtml(state, me)}${income}</div>`;
+    host.root().innerHTML = yardBoxHtml(tab, body, order, repeat, refresh.queueHtml(), tplPane, { lane, context, strip: refresh.stripHtml(), world, orders });
     if (paintedTab === painting) restoreDetails();
     const scroller = host.root().querySelector('#constructorbody');
     paintedTab = painting;
     presentProduction(host.root()); patchLiveTimers(host.root(), state.time);
     if (scroller && keep) scroller.scrollTop = keep;
+    return true;
   }
 
   /** Открыть линию (или подвкладку внутри неё); `null` — вернуться к списку линий. */

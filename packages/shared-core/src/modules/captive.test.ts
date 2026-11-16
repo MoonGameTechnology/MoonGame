@@ -207,6 +207,9 @@ describe('пленный — погрузка', () => {
       fleet('away', 'p1', { location: 'base' }),
       fleet('fight', 'p1', { battleId: 'b1' }),
       fleet('troops', 'p1', { units: [{ unit: 'marine', count: 3 }] }),
+      // Своя неподвижная часть у убежища (мина, ракета, орудия крепости) — тоже космос, но
+      // пленный на ней не доехал бы до базы никогда.
+      fleet('docked', 'p1', { units: [{ unit: 'missile', count: 1 }] }),
       fleet('s1', 'swarm'),
     ]);
     expect(code({ ...s, captive: undefined }, { fleetId: 'f1' })).toBe('E_NO_CAPTIVE');
@@ -229,6 +232,7 @@ describe('пленный — погрузка', () => {
     expect(code(taken, { fleetId: 'away' })).toBe('E_NOT_AT_HIDEOUT');
     expect(code(taken, { fleetId: 'fight' })).toBe('E_IN_BATTLE');
     expect(code(taken, { fleetId: 'troops' })).toBe('E_NO_SHIPS');
+    expect(code(taken, { fleetId: 'docked' })).toBe('E_NO_SHIPS');
     // Хозяин сменился мимо захвата (страховка): грузить у чужого убежища нельзя.
     const held = structuredClone(taken);
     held.planets.hideout!.owner = 'covenant';

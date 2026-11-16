@@ -3468,7 +3468,7 @@ const missionPanel = initMissionPanel({
   extract: (fleetId) => {
     if (playerOrder(extractionStart(ME, fleetId))) note(t('chain.carrier-warning'));
   },
-  captiveLoaders: () => captiveCandidates(s, ME).map((id) => ({ id, label: fleetLabelOf(id) })),
+  captiveLoaders: () => captiveCandidates(s, ME, data).map((id) => ({ id, label: fleetLabelOf(id) })),
   loadCaptive: (fleetId) => {
     if (playerOrder(captiveLoad(ME, fleetId))) note(t('captive.carrier-warning'));
   },

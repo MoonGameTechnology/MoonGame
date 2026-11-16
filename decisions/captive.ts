@@ -7,7 +7,8 @@
  * показать кнопку, когда предупредить и какой приказ отдать. Окончательный ответ даёт ядро,
  * отказ приходит текстом.
  *
- * 1. **Кнопка погрузки** — свои флоты у взятого убежища: не в пути, не в бою, с кораблём.
+ * 1. **Кнопка погрузки** — свои флоты у взятого убежища: не в пути, не в бою, с живым
+ *    кораблём, который ходит (`canCarryCaptive` ядра: мина и ракета пленного не везут).
  * 2. **Предупреждение ДО удара** (§«Ход миссии»: «показывается до опасного приказа, а не
  *    после удара»): пока пленный в убежище, уничтожение этого мира губит его.
  * 3. **Союзник, взявший убежище, сам довозит пленного**: пока его десант дерётся за убежище,
@@ -17,9 +18,11 @@
  *    игроком союзник не перехватывает.
  */
 import {
+  canCarryCaptive,
   planRoute,
   type Action,
   type Fleet,
+  type GameData,
   type GameState,
   type PlayerId,
 } from '../packages/shared-core/src/index';
@@ -31,12 +34,12 @@ const boundFor = (f: Fleet): string | null =>
   f.movement ? (f.movement.destination ?? f.movement.to) : f.location;
 
 /** Свои флоты у взятого убежища, готовые принять пленного (правило 1). */
-export function captiveCandidates(state: GameState, me: PlayerId): string[] {
+export function captiveCandidates(state: GameState, me: PlayerId, data: GameData): string[] {
   const c = state.captive;
   if (!c || c.lostAt !== undefined || captiveStage(state, me) !== 1) return [];
   return Object.values(state.fleets)
     .filter((f) => f.owner === me && f.location === c.hideout && !f.movement && !f.battleId)
-    .filter((f) => f.units.some((u) => u.count > 0))
+    .filter((f) => canCarryCaptive(f, data))
     .map((f) => f.id)
     .sort();
 }
@@ -58,6 +61,7 @@ export function captiveAtRisk(state: GameState, planetId: string): boolean {
 export function allyCaptiveOrders(
   state: GameState,
   ally: PlayerId,
+  data: GameData,
 ): { actions: Action[]; held: string[] } {
   const c = state.captive;
   if (!c || c.deliveredAt !== undefined || c.lostAt !== undefined) return { actions: [], held: [] };
@@ -86,12 +90,12 @@ export function allyCaptiveOrders(
       return { actions: [], held: [carrier.id] };
     return { actions: [moveFleet(ally, carrier.id, c.zone)], held: [carrier.id] };
   }
-  const loader = captiveCandidates(state, ally)[0];
+  const loader = captiveCandidates(state, ally, data)[0];
   if (loader) return { actions: [captiveLoad(ally, loader)], held: [loader] };
   // Флот уже идёт к убежищу или стоит там в бою — ждём его. Иначе посылаем ближайший
   // свободный по числу переходов, при равенстве — первый по id.
   const ships = Object.values(state.fleets)
-    .filter((f) => f.owner === ally && f.units.some((u) => u.count > 0))
+    .filter((f) => f.owner === ally && canCarryCaptive(f, data))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const bound = ships.find((f) => boundFor(f) === c.hideout);
   if (bound) return { actions: [], held: [bound.id] };

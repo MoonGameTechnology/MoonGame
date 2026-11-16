@@ -286,6 +286,33 @@ describe('окно построек — состояние строки от п�
     expect(rowOf(out, 'refinery')).toContain('⏳ в очереди');
   });
 
+  // Телефон, сетевой матч, 2026-11-16: заказанный космопорт снова предлагал «Строить», сервер
+  // отказывал «уже в очереди». Сетевая проба отвечает «можно» на всё — судит состояние мира.
+  it('сетевая проба «можно всё»: идущая и ждущая стройка и улучшение не предлагают кнопку', () => {
+    const s0 = newGame();
+    const pid = home(s0);
+    const a = order(s0, buildBuilding('p1', pid, 'fort'), s0.time);
+    const b = order(a.state, buildBuilding('p1', pid, 'refinery'), a.state.time);
+    const c = order(b.state, upgradeBuilding('p1', pid, 'mine'), b.state.time);
+    expect([a.error, b.error, c.error]).toEqual([undefined, undefined, undefined]);
+    const s = c.state;
+    const yes = (): string | null => null;
+    expect(buildRowState(s, 'p1', pid, 'fort', yes, noQueue)).toEqual({ st: 'queued', waiting: false });
+    expect(buildRowState(s, 'p1', pid, 'refinery', yes, noQueue)).toEqual({ st: 'queued', waiting: true });
+    expect(buildRowState(s, 'p1', pid, 'mine', yes, noQueue)).toMatchObject({ st: 'built', up: { up: 'queued', waiting: true } });
+    const out = buildScreenHtml(s, 'p1', pid, yes, noQueue, lockText);
+    for (const id of ['fort', 'refinery', 'mine']) expect(rowOf(out, id), id).not.toMatch(/data-bw-(go|up)=/);
+  });
+
+  it('сетевая проба «можно всё»: здание на последнем уровне — «макс.», а не «Улучшить»', () => {
+    const s = newGame();
+    const pid = home(s);
+    const mine = s.planets[pid]!.buildings.find((b) => b.type === 'mine')!;
+    mine.level = 1 + (data.buildings.mine!.upgrades?.length ?? 0);
+    const yes = (): string | null => null;
+    expect(buildRowState(s, 'p1', pid, 'mine', yes, noQueue)).toMatchObject({ st: 'built', up: { up: 'max' } });
+  });
+
   it('стоящее здание остаётся построенным, чем бы ни отказала проба «поставить ещё одно»', () => {
     const s = newGame();
     const pid = home(s);

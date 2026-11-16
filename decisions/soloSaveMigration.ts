@@ -738,6 +738,18 @@ export const SPY_DEFECTOR_SOLO_MIGRATION = {
   toDataHash: SPY_LEVELS_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: captive 1.3.0 — an immobile fleet (mine, missile, fortress guns) does
+ *  not take the captive aboard (`E_NO_SHIPS`). The catalogue is unchanged; a captive already
+ *  aboard such a fleet stays where it is. */
+export const CAPTIVE_CARRIER_SOLO_MIGRATION = {
+  fromRules: SPY_DEFECTOR_SOLO_MIGRATION.toRules,
+  fromData: SPY_DEFECTOR_SOLO_MIGRATION.toData,
+  fromDataHash: SPY_DEFECTOR_SOLO_MIGRATION.toDataHash,
+  toRules: '1f9e1d06b0cbfa',
+  toData: SPY_DEFECTOR_SOLO_MIGRATION.toData,
+  toDataHash: SPY_DEFECTOR_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -802,6 +814,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SCHEDULE_ORDER_SOLO_MIGRATION,
   RALLY_ANY_WORLD_SOLO_MIGRATION,
   SPY_DEFECTOR_SOLO_MIGRATION,
+  CAPTIVE_CARRIER_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

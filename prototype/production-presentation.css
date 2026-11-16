@@ -464,7 +464,7 @@ body #codex.pw-entity-card .cxbox { width:min(550px,100%); max-height:100%; disp
 #codex.pw-entity-card .cx-close .holo-icon { display:inline-flex; align-items:center; justify-content:center; }
 
 /* Compact stock and contextual requirements, matching the mobile catalog. */
-#constructor.pw-production .pw-stock { display:flex; flex:1; flex-wrap:wrap; gap:4px 10px; align-items:center; min-width:0; font-size:12px; }
+#constructor.pw-production .pw-stock { display:flex; flex:1; flex-wrap:wrap; gap:4px 10px; align-items:center; min-width:0; font-size:12px; font-variant-numeric:tabular-nums; }
 #constructor.pw-production .pw-catalog-quote { display:flex; align-items:center; flex-wrap:wrap; gap:4px 8px; }
 #constructor.pw-production .pw-catalog-quote small { display:inline; margin:0 0 0 auto; white-space:nowrap; }
 #constructor.pw-production .pw-catalog-visual { display:grid; position:relative; margin-bottom:6px; }

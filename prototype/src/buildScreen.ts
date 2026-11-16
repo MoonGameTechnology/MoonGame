@@ -149,25 +149,23 @@ export function buildRowState(
   // Заказ ЖДЁТ в очереди мира (BLD-1), а не строится: строка говорит «в очереди», иначе
   // второй заказ подряд горел бы идущим, как первый.
   const waiting = (kind: 'building' | 'upgrade'): boolean =>
-    (node?.buildQueue ?? []).some((q) => q.kind === kind && q.building === id);
+    [...(node?.buildQueue ?? []), ...(node?.pausedConstruction ?? [])].some((q) => q.kind === kind && q.building === id);
+  // Идёт, ждёт или на паузе — по состоянию мира, а не по пробе: в сетевом матче проба
+  // отвечает «можно» на любой приказ сервера, и заказанное здание снова предлагало «Строить».
+  const underway = (kind: 'building' | 'upgrade'): boolean =>
+    waiting(kind) ||
+    state.scheduled.some((e) => {
+      if (e.type !== 'construction.complete') return false;
+      const q = e.payload as { kind?: string; planetId?: string; building?: string };
+      return q.kind === kind && q.planetId === planetId && q.building === id;
+    });
   // Очередь хоста знает и улучшения: у стоящего здания в ней лежит его следующий уровень,
-  // и строка горела «строится» с первым уровнем. Его состояние — проба улучшения ниже.
-  if (mine.length === 0 && localQueued(planetId, id))
+  // и строка горела «строится» с первым уровнем. Его состояние — `underway('upgrade')` ниже.
+  if (mine.length === 0 && (localQueued(planetId, id) || underway('building')))
     return { st: 'queued', waiting: waiting('building') };
   // Retired definitions still describe saved buildings and paid orders. Only a
   // fresh choice disappears; restoring an old match must not hide its work.
-  if (mine.length === 0 && data.buildings[id]?.retired) {
-    const paused = node?.pausedConstruction?.some(
-      (q) => q.kind === 'building' && q.building === id,
-    );
-    if (waiting('building') || paused) return { st: 'queued', waiting: true };
-    const active = state.scheduled.some((e) => {
-      if (e.type !== 'construction.complete') return false;
-      const q = e.payload as { kind?: string; planetId?: string; building?: string };
-      return q.kind === 'building' && q.planetId === planetId && q.building === id;
-    });
-    return active ? { st: 'queued', waiting: false } : { st: 'hidden' };
-  }
+  if (mine.length === 0 && data.buildings[id]?.retired) return { st: 'hidden' };
   // Вид провинции этого здания не пускает — строки нет вовсе, а не замок с причиной
   // (решение владельца 2026-09-26: «если в провинции по её типу нельзя что-то строить,
   // этого просто нет в выборе»). Спрашиваем воротами вида, а не кодом отказа: ядро
@@ -180,7 +178,11 @@ export function buildRowState(
     st: 'built',
     level: Math.max(...mine.map((b) => b.level)),
     count: mine.length,
-    up: upgradeState(probe(upgradeBuilding(me, planetId, id)), waiting('upgrade')),
+    up: underway('upgrade')
+      ? { up: 'queued', waiting: waiting('upgrade') }
+      : Math.max(...mine.map((b) => b.level)) >= buildingMaxLevel(data.buildings[id]!)
+        ? { up: 'max' }
+        : upgradeState(probe(upgradeBuilding(me, planetId, id)), waiting('upgrade')),
   });
   const code = probe(buildBuilding(me, planetId, id));
   // Все экземпляры уже стоят, а проба говорит «можно»: так отвечает сетевой матч, где

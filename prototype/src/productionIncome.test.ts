@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newGame } from './game';
 import { netIncome } from './economy';
-import { productionIncomeCard, productionIncomeDetails, productionIncomeHtml } from './productionIncome';
+import { productionIncomeCard, productionIncomeDetails, productionIncomeHtml, productionStockHtml } from './productionIncome';
 import { t } from '../../localization/runtime';
 
 describe('planet production readout', () => {
@@ -27,4 +27,13 @@ describe('planet production readout', () => {
     expect(productionIncomeHtml(state, 'p1', other.id)).toBe('');
     expect(productionIncomeCard(state, 'p1', other.id)).toContain(t('production.income-unavailable'));
   });
+});
+
+it('the stock line shows whole units rounded down, so income ticks do not flicker tenths', () => {
+  const state = newGame();
+  state.players.p1!.resources.credits = 149.96;
+  state.players.p1!.resources.metal = 20.4;
+  const html = productionStockHtml(state, 'p1', true);
+  expect(html).toContain('>149<');
+  expect(html).toContain('>20<');
 });

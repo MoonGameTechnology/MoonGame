@@ -15,12 +15,26 @@ window.__productionPickerScene = () => {
   second.owner = ME;
   shipyard.render();
 };
-window.__productionResourceTick = () => {
+window.__productionResourceTick = (add = 123) => {
   const player = s.players[ME];
   s = {...s, players: {...s.players, [ME]: {...player,
-    resources: {...player.resources, credits: (player.resources.credits ?? 0) + 123}}}};
+    resources: {...player.resources, credits: (player.resources.credits ?? 0) + add}}}};
   shipyard.refreshHeroes(); shipyard.refreshQueue();
 };
+window.__productionSpaceportScene = () => {
+  window.__spaceportBackup = structuredClone(s);
+  s.players[ME].resources = Object.fromEntries(data.resources.map(id => [id, 90000]));
+  s.players[ME].technologies = { completed: Object.keys(data.technologies) };
+  const world = Object.values(s.planets).find(p => p.owner === ME);
+  world.buildings = world.buildings.filter(b => b.type !== 'spaceport');
+  world.buildQueue = [];
+  window.__spaceportWorld = world.id;
+  s = { ...s }; // the probe memo is keyed by the state object
+  shipyard.render();
+};
+window.__productionSpaceportReset = () => { s = window.__spaceportBackup; shipyard.render(); };
+window.__spaceportOrdered = () => (s.planets[window.__spaceportWorld].buildQueue ?? []).some(q => q.building === 'spaceport') ||
+  s.scheduled.some(e => e.type === 'construction.complete' && e.payload.building === 'spaceport' && e.payload.planetId === window.__spaceportWorld);
 window.__productionFixture = (ready = true) => {
   s.players[ME].resources = Object.fromEntries(data.resources.map(id => [id, 90000]));
   s.players[ME].technologies = { completed: Object.keys(data.technologies) };
@@ -80,6 +94,22 @@ try {
     await page.evaluate(() => window.__productionBroke());
     const scrollAfter = await page.locator('#constructorbody').evaluate(el => el.scrollTop);
     assert.ok(Math.abs(scrollAfter - scrollBefore) <= 2, `building scroll reset: ${scrollBefore} -> ${scrollAfter}`);
+    // Телефон, 2026-11-16: «Построить» космопорт срабатывало с третьего касания — каталог
+    // пересобирался каждую секунду. Начисление не трогает кнопку, а запас — без десятых.
+    await page.evaluate(() => window.__productionSpaceportScene());
+    const go = page.locator('#constructor [data-bw-go="spaceport"]');
+    await go.waitFor();
+    await page.waitForTimeout(250); // past the scroll idle guard: ticks really refresh
+    await page.evaluate(() => {
+      window.__spaceportButton = document.querySelector('#constructor [data-bw-go="spaceport"]');
+      for (let i = 0; i < 3; i++) window.__productionResourceTick(0.37);
+    });
+    assert.equal(await page.evaluate(() => window.__spaceportButton.isConnected), true, 'income tick replaced the build button');
+    assert.doesNotMatch(await page.locator('#constructor .pw-stock').innerText(), /\d[.,]\d/, 'stock shows tenths');
+    if (width < 600) await go.tap(); else await go.click();
+    assert.equal(await page.evaluate(() => window.__spaceportOrdered()), true, 'first tap did not order the spaceport');
+    assert.equal(await go.count(), 0, 'ordered spaceport still offers «Build»');
+    await page.evaluate(() => window.__productionSpaceportReset());
     await openLane(page, 'ships');
     // Separate info action and research -> return to the same card.
     await page.locator('#constructor [data-pw-info="unit:heavy_cruiser"]').click();
@@ -244,7 +274,8 @@ try {
       assert.equal(await picker.inputValue(), selected);
       assert.notEqual(await page.locator('#constructor .pw-stock').innerText(), before);
       await page.locator('#constructor .cn-close').focus();
-      await page.evaluate(() => window.__productionResourceTick());
+      // Только сменившаяся разметка пересобирает окно: долг по цене меняет ценники.
+      await page.evaluate(() => window.__productionResourceTick(-1e9));
       if (tab !== 'heroes') assert.equal(await page.evaluate(() => window.__productionPicker.isConnected), false,
         `${tab}: deferred repaint did not resume after blur`);
       // A deliberate change repaints immediately and keeps the chosen world on later ticks.
@@ -253,6 +284,7 @@ try {
       await page.evaluate(() => window.__productionResourceTick());
       assert.equal(await picker.inputValue(), chosen);
       await picker.selectOption({ index: 0 });
+      await page.evaluate(() => window.__productionResourceTick(1e9));
     }
     results.push({ width, height, locale });
     await page.close();

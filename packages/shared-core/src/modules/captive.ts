@@ -10,8 +10,9 @@
  *    ({@link captiveSide}). Не прилёт, не радар и не гибель случайного корабля — захват мира
  *    (`planet.captured`). До погрузки пленный остаётся в захваченном узле.
  * 2. **Погрузка** (`captive.load {fleetId}`): флот стороны стоит у взятого убежища, не в
- *    пути и не в бою, с живым кораблём. Дальше пленный привязан к ОДНОМУ носителю:
- *    разделение оставляет его на исходном флоте, слияние переносит в принимающий.
+ *    пути и не в бою, с живым кораблём, который ходит (не мина и не ракета). Дальше
+ *    пленный привязан к ОДНОМУ носителю: разделение оставляет его на исходном флоте,
+ *    слияние переносит в принимающий.
  * 3. **Доставка.** Носитель прибыл в безопасную зону — задание выполнено, отметка
  *    `deliveredAt` одна на матч.
  * 4. **Потеря.** Убежище взял кто-то вне стороны людей (Рой проповедника не щадит) или мир
@@ -22,7 +23,8 @@
  * создают второго пленного: факт один и лежит в состоянии.
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { CaptiveState, GameState, PlayerId } from '../state/gameState';
+import type { GameData } from '../data/schemas';
+import type { CaptiveState, Fleet, GameState, PlayerId } from '../state/gameState';
 import { getStance } from '../state/diplomacy';
 import { fleetForOrder } from '../util/fleet';
 
@@ -46,6 +48,21 @@ export function captiveSide(state: GameState): Set<PlayerId> {
   return side;
 }
 
+/**
+ * Может ли флот везти пленного: в нём есть живой корабль, который ходит. Мина, ракета и
+ * орудия крепости — тоже космос, но неподвижны: пленный на таком «носителе» не доехал бы до
+ * базы никогда, и задание застряло бы до гибели мины. Клиент (`decisions/captive.ts`)
+ * показывает кнопку погрузки по этому же правилу.
+ */
+export function canCarryCaptive(fleet: Pick<Fleet, 'units'>, data: GameData): boolean {
+  return fleet.units.some((u) => {
+    const def = data.units[u.unit];
+    return (
+      u.count > 0 && (u.hp ?? 1) > 0 && def?.domain === 'space' && !def.traits.includes('immobile')
+    );
+  });
+}
+
 const open = (c: CaptiveState): boolean => c.deliveredAt === undefined && c.lostAt === undefined;
 
 function lose(h: HandlerContext, reason: 'hideout' | 'carrier'): void {
@@ -59,7 +76,8 @@ export const captiveModule: GameModule = {
   // 1.1.0: чужая ракета (SM-3.7b) для `captive.load` — как отсутствующий флот (`E_NO_FLEET`).
   // 1.2.0: любой чужой флот — `E_NO_FLEET`, а не `E_FORBIDDEN` (A06: разница кодов
   //        подтверждала флот в тумане).
-  version: '1.2.0',
+  // 1.3.0: неподвижный флот (мина, ракета, орудия крепости) пленного не берёт — `E_NO_SHIPS`.
+  version: '1.3.0',
   setup(api) {
     // Убежище сменило хозяина. Сторона людей — пленный взят (или остаётся у неё, если мир
     // перешёл от одного её участника к другому); кто-то ещё — пленный потерян.
@@ -99,12 +117,7 @@ export const captiveModule: GameModule = {
       if (fleet.movement) return h.reject('E_IN_TRANSIT');
       if (fleet.location !== c.hideout) return h.reject('E_NOT_AT_HIDEOUT');
       if (fleet.battleId) return h.reject('E_IN_BATTLE');
-      if (
-        !fleet.units.some(
-          (u) => u.count > 0 && (u.hp ?? 1) > 0 && h.ctx.data.units[u.unit]?.domain === 'space',
-        )
-      )
-        return h.reject('E_NO_SHIPS');
+      if (!canCarryCaptive(fleet, h.ctx.data)) return h.reject('E_NO_SHIPS');
       const holder = h.state.planets[c.hideout]?.owner ?? null;
       if (holder === null || !side.has(holder)) return h.reject('E_HIDEOUT_HELD');
       c.carrier = fleetId;
