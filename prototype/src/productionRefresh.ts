@@ -14,7 +14,8 @@ interface ProductionRefreshHost {
   planet(): string;
   heroPaneHtml(): string;
   renderedHeroBody(): string;
-  paint(): void;
+  /** Пересобрать окно, если его разметка сменилась; `false` — та же, ничего не тронуто. */
+  paint(): boolean;
 }
 
 function availability(host: ProductionRefreshHost): string {
@@ -134,11 +135,10 @@ export function initProductionRefresh(host: ProductionRefreshHost) {
       if (
         !selecting(root) &&
         host.tab() !== 'heroes' &&
-        (host.tab() === 'buildings' || availability(host) !== lastAvailability)
-      ) {
-        host.paint();
+        (host.tab() === 'buildings' || availability(host) !== lastAvailability) &&
+        host.paint()
+      )
         return;
-      }
       patch('#cn-queue', queueHtml);
       patch('.pw-lane-strip', stripHtml);
       patchLiveTimers(root, host.state().time);

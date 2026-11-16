@@ -331,18 +331,18 @@ describe('mapLayerView', () => {
     const draft = (over: Partial<MapLayerFrame>) => dense({ density: 1, draft: true, ...over });
 
     it('приближение посреди жеста растягивает выпечку, пока в ней не меньше MIN_GESTURE_DENSITY пикселей на точку', () => {
-      expect(MIN_GESTURE_DENSITY).toBe(0.5);
-      for (const k of [MAX_STRETCH * 1.01, 3, 4]) {
+      expect(MIN_GESTURE_DENSITY).toBe(0.25);
+      for (const k of [MAX_STRETCH * 1.01, 3, 4, 8]) {
         expect(mapLayerAction(frame({ dpr: 2, density: 2, transform: zoom(k) }))).toBe('rebake');
         expect(mapLayerAction(dense({ transform: zoom(k) }))).toBe('show');
       }
-      // Реже — черновик: растянутая вчетверо выпечка в пиксель на точку была мозаикой.
-      expect(mapLayerAction(dense({ transform: zoom(4.01) }))).toBe('rebake');
-      expect(mapLayerAction(draft({ transform: zoom(2) }))).toBe('show');
-      expect(mapLayerAction(draft({ transform: zoom(2.01) }))).toBe('rebake');
+      // Реже — черновик: растянутая в 15 раз выпечка рассыпалась мозаикой.
+      expect(mapLayerAction(dense({ transform: zoom(8.01) }))).toBe('rebake');
+      expect(mapLayerAction(draft({ transform: zoom(4) }))).toBe('show');
+      expect(mapLayerAction(draft({ transform: zoom(4.01) }))).toBe('rebake');
       // Экран с плотностью 1 печёт выпечку и черновик одной плотности.
-      expect(mapLayerAction(slow({ transform: zoom(2) }))).toBe('show');
-      expect(mapLayerAction(slow({ transform: zoom(2.01) }))).toBe('rebake');
+      expect(mapLayerAction(slow({ transform: zoom(4) }))).toBe('show');
+      expect(mapLayerAction(slow({ transform: zoom(4.01) }))).toBe('rebake');
     });
 
     it('в покое растянутая выпечка сменяется новой в фоне', () => {
@@ -400,7 +400,7 @@ describe('mapLayerView', () => {
     });
 
     it('посреди жеста фоновая не дописывается: перепечь сразу — значит испечь черновик', () => {
-      const layer = dense({ transform: zoom(4.5) });
+      const layer = dense({ transform: zoom(8.5) });
       expect(mapLayerAction(layer)).toBe('rebake');
       const job = {
         fresh: true,
@@ -411,7 +411,7 @@ describe('mapLayerView', () => {
       expect(bakeJobFate(layer, 'rebake', job)).toBe('drop');
       // В покое дописать её оставшиеся полосы дешевле, чем печь всё заново (правило 7).
       expect(bakeJobFate({ ...layer, settled: true }, 'rebake', job)).toBe('finish');
-      expect(bakeJobFate(frame({ dpr: 2, density: 2, transform: zoom(4.5) }), 'rebake', job)).toBe(
+      expect(bakeJobFate(frame({ dpr: 2, density: 2, transform: zoom(8.5) }), 'rebake', job)).toBe(
         'finish',
       );
     });
