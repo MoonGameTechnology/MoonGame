@@ -216,154 +216,149 @@
 #stewardbody .st-log-line{padding:4px 6px;border-left:2px solid rgba(53,214,230,.35);background:rgba(53,214,230,.05);border-radius:0 6px 6px 0;}
 #stewardbody .st-log-when{opacity:.55;margin-right:4px;}
 #stewardbody .st-note{margin-top:12px;font-size:var(--fs-caption);color:var(--dim);line-height:1.55;}
-/* TT-3.1 + TT-4: technology tree — tabs = branches, the branch's nodes as a
-   tier-grouped LIST (one full-width row per node: name, state, effect, cost, time),
-   tap → dossier modal. Сетка 52-пиксельных иконок вмещала больше узлов,
-   но про каждый молчала: что даёт «⚙», было видно только из досье. */
-#tech .twbox{position:relative;width:min(430px,94vw);}
-#techbody{padding:0;overflow:hidden;display:flex;flex-direction:column;}
-.tt-top{display:flex;align-items:center;justify-content:space-between;padding:9px 12px 0;flex:none;}
-.tt-day{font-size:var(--fs-caption);color:var(--grn);border:1px solid var(--grn-dim);border-radius:12px;padding:3px 10px;background:rgba(95,240,192,.06);}
-.tt-slots{font-size:var(--fs-caption);color:var(--cyan);margin-left:auto;}
-/* Ветки — СЕТКА 3×2, а не лента с прокруткой: пять веток влезают целиком, и «сколько
-   ещё осталось» видно по всем сразу, не досвайпывая до края. */
-.tt-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:9px 12px 8px;flex:none;}
-.tt-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  min-height:40px;padding:6px 4px;border:1px solid var(--line-hi);border-radius:9px;background:transparent;
-  color:var(--ink);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-.tt-tab>span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-/* Выбранная ветка — как включённый режим кнопки (UIX-11.1): мятная заливка спорила с главной
-   кнопкой «Исследовать» за взгляд. */
-.tt-tab.on{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
-/* «готово/всего» на вкладке: где ещё есть что исследовать — видно без обхода веток */
-.tt-cnt{font-style:normal;font-size:var(--fs-caption);color:var(--dim);}
-.tt-tab.on .tt-cnt{color:var(--sf-text);}
-.tt-lead{padding:0 12px 8px;font-size:var(--fs-caption);color:var(--dim);border-bottom:1px solid var(--line);flex:none;}
-.tt-lead b{color:#4fe0b0;}
-.tt-lead.closed{color:var(--amber);}
-.tt-scroll{flex:1;min-height:0;overflow:auto;touch-action:pan-x pan-y;}
-/* Закреплённая шапка «исследуется сейчас» — единственное, ради чего экран
-   открывают повторно; раньше это приходилось искать глазами по всей сетке. */
-.tt-now{flex:none;margin:0 12px 8px;padding:7px 9px;border:1px solid var(--amber-dim,rgba(255,180,58,.35));
-  border-radius:10px;background:rgba(255,180,58,.07);display:flex;flex-direction:column;gap:6px;}
-.tt-nowrow{position:relative;display:flex;align-items:center;gap:7px;padding-bottom:6px;font-size:var(--fs-caption);color:var(--ink);}
-.tt-nowrow b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;}
-.tt-nowdot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--amber);animation:ttpulse 1.6s ease-in-out infinite;}
-@keyframes ttpulse{0%,100%{opacity:.35;}50%{opacity:1;}}
-.tt-nowt{flex:none;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--amber);font-variant-numeric:tabular-nums;}
-/* Узлы — ПЛИТКАМИ (решение владельца 2026-09-26): сетка вместо столбца строк, ярус —
-   заголовком во всю ширину сетки. Эффект, цена и срок видны на плитке, как и в строке. */
-.tt-list{padding:0 12px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:7px;align-items:stretch;}
-/* Ярус вместо рельсы дней: day-гейт не пропал, он стал ПРИЧИНОЙ замка в самой строке */
-.tt-tierh{grid-column:1/-1;margin:9px 0 1px;font:800 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--dim);}
-.tt-list > .hint{grid-column:1/-1;}
-.tt-tierh:first-child{margin-top:2px;}
-.tt-item{position:relative;padding:9px 10px 10px;border:1px solid var(--line);border-radius:10px;
-  background:linear-gradient(180deg,rgba(12,32,38,.85),rgba(8,20,24,.85));cursor:pointer;}
-.tt-item:active{transform:scale(.995);}
-.tt-item{display:flex;flex-direction:column;}
-/* На плитке имя — сверху, состояние или кнопка — под ним во всю ширину. */
-.tt-ih{display:flex;flex-direction:column;align-items:stretch;gap:6px;}
-.tt-ih b{flex:none;min-width:0;font-size:var(--fs-body);font-weight:700;color:#eafffb;}
-.tt-ih .tt-st{max-width:none;text-align:left;}
-.tt-ifoot{margin-top:auto !important;padding-top:6px;}
-.tt-ifx{margin-top:4px;font-size:var(--fs-body);line-height:1.45;color:var(--dim);}
-.tt-ifoot{margin-top:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:var(--fs-caption);color:var(--dim);}
-.tt-idur{flex:none;font-variant-numeric:tabular-nums;}
-/* Правое поле строки — РОВНО ОДНО состояние: сделано / идёт / можно / причина замка */
-.tt-st{flex:none;max-width:56%;font-size:var(--fs-caption);line-height:1.3;text-align:right;color:var(--dim);}
-.tt-st.done{color:#4fe0b0;}
-.tt-st.run{color:var(--amber);font-weight:700;}
-/* Вид «Изучить» — классом .btn-main (UIX-11.1); здесь только размер и место. */
-.tt-take{flex:none;padding:6px 11px;border-radius:8px;font-size:var(--fs-body);white-space:nowrap;}
-/* Доступный И оплачиваемый узел дышит — то же правило, что зажигает кнопку в досье */
-.tt-item.st-avail{border-color:var(--cyan);}
-.tt-item.st-res{border-color:var(--amber);}
-.tt-item.st-done{opacity:.7;}
-.tt-item.st-gate,.tt-item.st-chain,.tt-item.st-cond{opacity:.62;}
-@media(hover:hover){
-  :where(.tt-item:hover){border-color:var(--line-hi);}
-}
-.tt-prog{position:absolute;left:9px;right:9px;bottom:4px;height:3px;border-radius:2px;background:rgba(255,180,58,.22);overflow:hidden;}
+/* TT-5 (макет владельца 2026-11-16): окно «Технологии» — слева слоты, очередь и совет;
+   справа шесть плиток веток, строка о ветке и дерево из плиток-узлов со связями; нажатие
+   на узел открывает окошко с подробностями. Узел — значок, имя и короткое состояние, всё
+   остальное в окошке: так ветка видна целиком, а не по три строки. */
+#tech .twbox{position:relative;width:min(980px,96vw);}
+#tech .lw-head{gap:8px;}
+.tt-chips{display:flex;gap:6px;align-items:center;min-width:0;}
+.tt-chip{border:1px solid var(--line-hi);border-radius:12px;padding:1px 9px;font-size:var(--fs-caption);color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums;}
+.tt-chip.free{border-color:color-mix(in srgb,var(--amber) 55%,transparent);color:var(--amber);}
+#techbody{padding:0;overflow:hidden;display:flex;flex-direction:column;position:relative;}
+.tt-body{flex:1;min-height:0;display:flex;}
+/* левая колонка */
+.tt-side{width:262px;flex:none;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;overflow:auto;overscroll-behavior:contain;}
+.tt-sec{padding:8px;display:grid;gap:5px;border-bottom:1px solid var(--line);}
+.tt-sec:last-child{border-bottom:0;}
+.tt-sech{display:flex;justify-content:space-between;align-items:center;font:700 var(--fs-caption) var(--sf-font);color:var(--sf-head);}
+.tt-sech span{font-weight:500;color:var(--dim);font-variant-numeric:tabular-nums;}
+.tt-nowrow{position:relative;display:flex;align-items:center;gap:6px;width:100%;padding:6px 8px 9px;border:1px solid var(--line);border-radius:8px;background:rgba(8,26,32,.8);color:var(--ink);text-align:left;font:inherit;cursor:pointer;}
+.tt-nowrow b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-caption);font-weight:700;}
+.tt-nowt{flex:none;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--amber);}
+.tt-prog{position:absolute;left:8px;right:8px;bottom:4px;height:3px;border-radius:2px;background:rgba(255,180,58,.18);overflow:hidden;}
 .tt-prog i{position:absolute;left:0;top:0;bottom:0;background:var(--amber);}
-.tt-nowrow .tt-prog{left:0;right:0;bottom:0;}
-/* RQ-1: очередь исследований — под «исследуется сейчас», в том же закреплённом верху. Своя
-   прокрутка с потолком высоты и сворачивание в одну строку: восемь тем не должны выдавить
-   список узлов с экрана телефона. На ПК строка темы — одна линия: имя, чего ждёт, кнопки. */
-.tt-queue{flex:none;margin:0 12px 8px;padding:5px 7px 6px;border:1px solid var(--line-hi);border-radius:10px;background:rgba(53,214,230,.05);}
-.tt-qhead{display:flex;align-items:center;gap:8px;min-height:26px;padding:0 2px 4px;font:800 var(--fs-caption) var(--sf-font);color:var(--cyan);cursor:pointer;}
-.tt-queue.folded .tt-qhead{padding-bottom:0;}
-.tt-qhead>span:first-child{flex:none;}
-.tt-qpeek{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;color:var(--ink);}
-.tt-qfold{margin-left:auto;flex:none;padding:3px 10px;border-radius:7px;font-size:var(--fs-caption);}
-.tt-qfold i{font-style:normal;font-variant-numeric:tabular-nums;}
-.tt-qlist{display:flex;flex-direction:column;gap:4px;max-height:min(28vh,220px);overflow-y:auto;touch-action:pan-y;}
-.tt-qrow{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;column-gap:6px;row-gap:2px;padding:3px 5px;border:1px solid var(--line);border-radius:8px;background:rgba(8,20,24,.7);}
-.tt-qrow>em{font:800 var(--fs-caption) var(--sf-font);font-style:normal;font-variant-numeric:tabular-nums;color:var(--cyan);text-align:center;}
-.tt-qmain{min-width:0;display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:1px;}
-.tt-qmain b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-caption);font-weight:700;color:var(--ink);}
-.tt-qwait{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-width:0;font-size:var(--fs-caption);color:var(--dim);}
-/* Ждёт денег — янтарём, как нехватка в цене: это единственное ожидание, которое лечит игрок. */
+.tt-slotfree{border:1px dashed color-mix(in srgb,var(--amber) 55%,transparent);border-radius:8px;padding:6px 8px;color:var(--amber);font-weight:700;font-size:var(--fs-caption);}
+.tt-slotfree small{display:block;margin-top:2px;color:var(--dim);font-weight:400;line-height:1.35;}
+.tt-qlist{display:grid;gap:4px;}
+.tt-empty{color:var(--dim);font-size:var(--fs-caption);}
+.tt-qrow{display:grid;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:6px;padding:4px 4px 4px 6px;border-radius:7px;background:rgba(8,20,24,.7);}
+.tt-qrow>em{font:700 var(--fs-caption) var(--sf-font);font-style:normal;font-variant-numeric:tabular-nums;color:var(--cyan);}
+.tt-qmain{min-width:0;display:grid;}
+.tt-qmain b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-caption);font-weight:700;color:var(--ink);}
+.tt-qwait{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;min-width:0;font-size:var(--fs-caption);color:var(--dim);}
 .tt-qrow.w-resources .tt-qwait{color:var(--amber);}
-.tt-qrow.w-starting{border-color:var(--cyan);}
-.tt-qbtns{display:flex;gap:4px;}
-/* Вид стрелок, крестика и сворачивания — классами (.btn-second, .btn-x, .btn-quiet); здесь
-   только размер. */
-.tt-qb,.tt-qx{width:28px;height:28px;display:grid;place-items:center;padding:0;border-radius:7px;font-size:12px;}
-.tt-qgo{padding:3px 9px;border-radius:7px;font-size:var(--fs-caption);}
-/* «＋ В очередь» — вторичная кнопка (.btn-second): это план, а не действие «сейчас». */
-.tt-qadd{align-self:flex-start;padding:5px 10px;border-radius:8px;font-size:var(--fs-caption);white-space:nowrap;}
-.tt-st.q{color:var(--cyan);font-weight:700;}
-.tt-item.st-queued{border-color:var(--cyan-dim,rgba(53,214,230,.45));border-style:dashed;}
-.tt-mq{margin-top:7px;width:100%;padding:9px;border-radius:10px;font-size:var(--fs-caption);}
-/* Отклик на приказ очереди — вспышка там, где тема оказалась. Живой ререндер пересоздаёт
-   узел, и techTree.ts продолжает вспышку отрицательной задержкой, а не играет её заново. */
+.tt-qrow.w-starting{box-shadow:inset 0 0 0 1px var(--cyan);}
+.tt-qbtns{display:flex;gap:2px;}
+.tt-qb,.tt-qx{width:22px;height:22px;display:grid;place-items:center;padding:0;border-radius:5px;font-size:var(--fs-caption);}
+.tt-qgo{padding:2px 8px;border-radius:6px;font-size:var(--fs-caption);}
+.tt-sci{display:grid;grid-template-columns:30px 1fr;gap:8px;align-items:start;border:1px solid var(--line);border-radius:8px;background:rgba(8,26,32,.8);padding:6px 8px;}
+.tt-av{width:30px;height:30px;border-radius:50%;background:#2a2140;border:1px solid #5a4880;display:grid;place-items:center;color:#c0a3f1;font-weight:700;}
+.tt-sci b{font-size:var(--fs-caption);color:var(--ink);}
+.tt-sci small{display:block;font-size:var(--fs-caption);line-height:1.35;}
+.tt-sci small.fx{color:#c0a3f1;}
+.tt-sci small.none{color:var(--amber);}
+.tt-fxsum>div:last-child{font-size:var(--fs-caption);color:var(--dim);line-height:1.5;}
+.tt-fxsum b{color:var(--grn);font-weight:600;}
+/* ветки */
+.tt-main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;}
+.tt-tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;padding:9px 10px 7px;border-bottom:1px solid var(--line);flex:none;}
+.tt-tab{--bc:var(--cyan);position:relative;display:grid;justify-items:center;gap:4px;min-width:0;padding:7px 4px 6px;
+  border:1px solid var(--line);border-radius:8px;color:var(--bc);font:600 var(--fs-caption) var(--sf-font);cursor:pointer;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--bc) 10%,#0b2229),#0b2229);transition:transform .12s,border-color .12s;}
+.tt-tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 4px color-mix(in srgb,var(--bc) 50%,transparent));}
+.tt-tname{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sf-text);}
+.tt-tname .short{display:none;}
+/* Узкая плитка (окно ПК поуже) берёт короткое имя ветки, как телефон: «Промышленно…» не читалось. */
+.tt-tname{container-type:inline-size;width:100%;text-align:center;font-size:var(--fs-caption);}
+@container (max-width:112px){.tt-tname .full{display:none;}.tt-tname .short{display:inline;}}
+.tt-tprog{display:flex;align-items:center;gap:4px;width:100%;padding:0 6px;}
+.tt-tbar{flex:1;height:3px;border-radius:2px;background:#1b3e48;overflow:hidden;}
+.tt-tbar i{display:block;height:100%;background:var(--bc);}
+.tt-cnt{font-style:normal;font-size:var(--fs-caption);color:var(--dim);font-variant-numeric:tabular-nums;}
+.tt-ready{position:absolute;top:4px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan);}
+.tt-tlead{position:absolute;top:-7px;left:6px;padding:0 4px;border-radius:7px;background:#2a2140;border:1px solid #5a4880;color:#c0a3f1;font-size:var(--fs-caption);line-height:16px;}
+.tt-tab.on{background:linear-gradient(180deg,color-mix(in srgb,var(--bc) 24%,transparent),color-mix(in srgb,var(--bc) 6%,transparent)),var(--sf-sel),#0b2229;border-color:var(--bc);
+  box-shadow:0 0 0 1px var(--bc) inset,0 4px 14px color-mix(in srgb,var(--bc) 25%,transparent);}
+.tt-tab.on .tt-tname{color:var(--bc);}
+@media(hover:hover){.tt-tab:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--bc) 60%,var(--line));}}
+.tt-bline{flex:none;padding:6px 12px;border-bottom:1px solid var(--line);font-size:var(--fs-caption);color:var(--dim);}
+.tt-bdesc{color:var(--sf-text);}
+.tt-lead{display:block;margin-top:2px;}
+.tt-lead b{color:#c0a3f1;}
+.tt-lead.closed{color:var(--amber);}
+/* дерево */
+.tt-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-x pan-y;}
+.tt-tree{position:relative;padding:12px 12px 16px;}
+.tt-lines{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.tt-lines path{fill:none;stroke:var(--line-hi);stroke-width:1.5;}
+.tt-lines path.ok{stroke:#2f6f62;}
+.tt-row{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:24px;}
+.tt-row:last-child{margin-bottom:0;}
+.tt-item{--bc:var(--cyan);position:relative;z-index:1;width:92px;display:grid;justify-items:center;align-content:start;gap:4px;padding:8px 4px 7px;
+  border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,#10303a,#0b2229);color:var(--ink);font:inherit;text-align:center;cursor:pointer;}
+.tt-item b{font-size:var(--fs-caption);font-weight:600;line-height:1.2;min-height:2.4em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;hyphens:auto;}
+.tt-ist{font-size:var(--fs-caption);color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.tt-ico{position:relative;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:var(--bc);
+  background:radial-gradient(circle at 50% 35%,color-mix(in srgb,var(--bc) 34%,transparent),color-mix(in srgb,var(--bc) 8%,#0b2229) 70%);
+  border:1px solid color-mix(in srgb,var(--bc) 50%,var(--line));box-shadow:0 0 12px color-mix(in srgb,var(--bc) 18%,transparent);}
+.tt-ico svg,.tt-mico svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+/* Кольцо прогресса идущей темы: доля --p ставит techTree.ts вместе с живыми таймерами. */
+.tt-ring{position:absolute;inset:-4px;border-radius:50%;--p:0;
+  background:conic-gradient(var(--amber) calc(var(--p) * 1turn),rgba(255,180,58,.18) 0);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));}
+.tt-item.st-avail{border-color:var(--cyan);}
+.tt-item.st-avail .tt-ist,.tt-item.st-queued .tt-ist{color:var(--cyan);}
+.tt-item.st-res{border-color:var(--amber);box-shadow:inset 0 0 0 1px rgba(255,180,58,.35);}
+.tt-item.st-res .tt-ist{color:var(--amber);}
+.tt-item.st-queued{border-style:dashed;border-color:var(--cyan);}
+.tt-item:is(.st-chain,.st-gate,.st-cond) b{color:var(--dim);}
+.tt-item:is(.st-chain,.st-gate,.st-cond) .tt-ico{filter:grayscale(.85);opacity:.7;}
+.tt-item.st-done{background:linear-gradient(180deg,#0e2a24,#0b2220);border-color:#24564c;}
+.tt-item.st-done .tt-ico{box-shadow:none;}
+.tt-item.st-done .tt-ist{color:var(--grn);}
+.tt-item.sel{box-shadow:0 0 0 2px var(--cyan);}
+@media(hover:hover){.tt-item:hover{border-color:var(--line-hi);}}
+/* RQ-1: вспышка там, где тема оказалась после приказа очереди. */
 .tt-flash{animation:ttflash .7s ease-out both;}
-@keyframes ttflash{0%{box-shadow:0 0 0 2px var(--cyan),0 0 14px rgba(53,214,230,.55);transform:scale(1.02);}100%{box-shadow:0 0 0 0 rgba(53,214,230,0);transform:scale(1);}}
-/* Телефон: кнопки здесь не меньше 44 px (body.mobile-ui), и три таких кнопки в каждой
-   строке съели бы экран. Поэтому строка — две линии текста (имя, «чего ждёт» во всю
-   ширину), а ▲▼✕ появляются у строки, по которой тапнули (.sel); «⋯» подсказывает тап. */
-@media(max-width:700px){
-  .tt-qrow{grid-template-areas:"n name btns" "n wait wait";cursor:pointer;}
-  .tt-qrow>em{grid-area:n;}
-  .tt-qmain{display:contents;}
-  .tt-qmain b{grid-area:name;}
-  .tt-qwait{grid-area:wait;}
-  .tt-qwait:empty{display:none;}
-  .tt-qbtns{grid-area:btns;}
-  .tt-qrow:not(.sel) .tt-qbtns{display:none;}
-  .tt-qrow:not(.sel)::after{content:'⋯';grid-area:btns;padding:0 4px;color:var(--dim);}
-  .tt-qrow.sel{border-color:var(--line-hi);background:rgba(53,214,230,.08);}
-  .tt-qadd{padding:7px 12px;}
-}
-@media(prefers-reduced-motion:reduce){.tt-flash{animation:none;}}
-/* dossier modal over the tree (inside .twbox, so Esc/back close the whole window) */
-.tt-modal{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;}
-.tt-mback{position:absolute;inset:0;background:rgba(1,6,8,.72);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
-.tt-mwin{position:relative;width:min(320px,calc(100% - 28px));background:linear-gradient(180deg,#0c2026,#081418);
-  border:1px solid var(--line-hi);border-radius:14px;padding:14px;}
-/* Появление анимируется КЛАССОМ, который ставится только на реальное открытие досье
-   (techTree.ts). На самом .tt-mwin анимации быть не должно: окно живо ререндерится
-   innerHTML'ом каждые ~500мс, пересозданный узел проигрывал бы ttpop заново — досье
-   «схлопывалось и выпрыгивало» дважды в секунду (баг живого плейтеста). */
+@keyframes ttflash{0%{box-shadow:0 0 0 2px var(--cyan),0 0 14px rgba(53,214,230,.55);}100%{box-shadow:0 0 0 0 rgba(53,214,230,0);}}
+/* окошко узла */
+.tt-modal{position:absolute;inset:0;z-index:8;display:grid;place-items:center;padding:16px;}
+.tt-mback{position:absolute;inset:0;background:rgba(1,6,8,.72);}
+.tt-mwin{position:relative;width:min(440px,100%);max-height:100%;overflow:auto;display:grid;gap:9px;padding:14px 16px 16px;
+  background:linear-gradient(180deg,#0c2026,#081418);border:1px solid var(--line-hi);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.8);}
+/* Появление — классом .pop только на реальное открытие: живой ререндер пересоздаёт узел. */
 .tt-mwin.pop{animation:ttpop .14s ease-out;}
 @keyframes ttpop{from{transform:scale(.94);opacity:.4;}to{transform:scale(1);opacity:1;}}
-.tt-mx{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:8px;}
-.tt-mhead{display:flex;gap:11px;align-items:center;padding-right:30px;}
-.tt-mico{flex:none;width:50px;height:50px;border-radius:11px;border:2px solid var(--line-hi);
-  background:linear-gradient(180deg,#0f2b31,#0a1a1f);display:grid;place-items:center;font-size:23px;font-variant-emoji:text;}
-.tt-mname{font-size:var(--fs-body);font-weight:800;color:#eafffb;}
-.tt-mname .tt-tier{font-size:var(--fs-caption);color:var(--dim);margin-left:6px;}
+.tt-mx{position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:6px;}
+.tt-mhead{display:flex;gap:12px;align-items:center;padding-right:30px;}
+.tt-mico{--bc:var(--cyan);flex:none;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;color:var(--bc);
+  background:radial-gradient(circle at 50% 35%,color-mix(in srgb,var(--bc) 38%,transparent),color-mix(in srgb,var(--bc) 8%,#0b2229) 70%);
+  border:1px solid color-mix(in srgb,var(--bc) 55%,var(--line));box-shadow:0 0 18px color-mix(in srgb,var(--bc) 25%,transparent);}
+.tt-mico svg{width:28px;height:28px;}
+.tt-mname{font-size:var(--fs-heading);font-weight:700;color:#eafffb;}
+.tt-msub{font-size:var(--fs-caption);color:var(--dim);}
 .tt-mtags{margin-top:4px;display:flex;flex-wrap:wrap;gap:5px;}
-.tt-tag{font-size:var(--fs-caption);font-weight:800;border-radius:5px;padding:2px 6px;color:#04231c;background:#4fe0b0;}
-.tt-tag.dim{background:#0a1a1f;color:var(--dim);border:1px solid var(--line-hi);}
-.tt-tag.amb{background:var(--amber);color:#2a1602;}
-.tt-mdesc{margin:10px 0 0;padding-left:10px;border-left:2px solid var(--line-hi);font-size:var(--fs-caption);line-height:1.55;color:var(--ink);}
-.tt-mstats{margin-top:10px;display:grid;grid-template-columns:1fr;gap:5px;font-size:var(--fs-caption);color:var(--dim);}
-.tt-mstats b{color:var(--ink);font-weight:600;}
-.tt-mbtn{margin-top:12px;width:100%;padding:10px;border-radius:10px;font-size:var(--fs-caption);}
-/* Состояние узла («идёт», «изучено», «закрыто») — ответ, а не запрет: курсор не спорит. */
+.tt-tag{font-size:var(--fs-caption);font-weight:600;border-radius:4px;padding:1px 6px;background:#123a2e;color:var(--grn);}
+.tt-tag.amb{background:#3a2e12;color:var(--amber);}
+.tt-tag.acc{background:#103440;color:var(--cyan);}
+.tt-tag.dim{background:#1a2a30;color:var(--dim);}
+.tt-mfx{font-size:var(--fs-body);font-weight:600;color:var(--sf-text);}
+.tt-mwhy{font-size:var(--fs-caption);border-left:2px solid var(--amber);padding-left:8px;color:var(--sf-text);}
+.tt-mrow{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:var(--fs-caption);}
+.tt-ml{color:var(--dim);min-width:62px;}
+.tt-mdur{color:var(--sf-text);font-variant-numeric:tabular-nums;}
+.tt-link{background:none;border:1px solid var(--line-hi);border-radius:12px;padding:1px 8px;font:inherit;font-size:var(--fs-caption);color:var(--sf-text);cursor:pointer;}
+.tt-link.ok,.tt-cond.ok{color:var(--grn);}
+.tt-link.no,.tt-cond.no{color:var(--amber);}
+.tt-mdesc{font-size:var(--fs-caption);color:var(--dim);line-height:1.45;}
+.tt-macts{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.tt-macts>:only-child{grid-column:1/-1;}
+.tt-mbtn,.tt-mq{width:100%;padding:9px 12px;border-radius:8px;font-size:var(--fs-caption);}
 .tt-mbtn.wait{cursor:default;}
+/* телефон: полоса слотов сверху вместо колонки (mobile-strategy.css её включает) */
+.tt-pstrip,.tt-shade{display:none;}
+@media(prefers-reduced-motion:reduce){.tt-flash,.tt-mwin.pop{animation:none;}.tt-tab{transition:none;}}
 /* BUILD-1: окно построек мира — список категориями, строки «имя+уровень / состояние /
    эффект / цена+срок» в том же языке, что список технологий (TT-4). */
 .bw-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:10px 12px 8px;flex:none;border-bottom:1px solid var(--line);}

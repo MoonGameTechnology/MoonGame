@@ -411,7 +411,9 @@ export async function checkMobileStrategy(browser, url) {
     const before = await page.evaluate(
       () => window.__mobileTest.state().players.p1.technologies?.active?.length ?? 0,
     );
-    await page.locator('#tech .tt-take:not(:disabled)').first().tap();
+    // TT-5: «Исследовать» — в окошке узла: доступная плитка, затем кнопка окошка.
+    await page.locator('#tech .tt-item.st-avail').first().tap();
+    await page.locator('#tech .tt-mbtn[data-go]:not(:disabled)').tap();
     await page.waitForFunction(
       (before) => (window.__mobileTest.state().players.p1.technologies?.active?.length ?? 0) === before + 1,
       before,

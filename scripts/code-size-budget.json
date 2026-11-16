@@ -51,7 +51,6 @@
     "packages/shared-core/src/state/buildFromMap.ts::validateMatchMap": 354,
     "packages/shared-core/src/modules/diplomacy.ts::diplomacyModule.setup": 342,
     "packages/server/src/authApi.ts::registerAuthApi": 338,
-    "prototype/src/techTree.ts::techTreeHtml": 335,
     "prototype/src/chatWindow.ts::initChat": 315
   }
 }
