@@ -78,64 +78,113 @@ body.mobile-ui :is(#marketbody, #constructorbody, .tt-scroll, .bw-scroll, .dp-li
   scroll-padding: 12px;
 }
 
-/* Branches stay visible together; long node titles have their own line. */
-body.mobile-ui #tech .tt-tab {
-  font-size: var(--fs-body);
-}
-body.mobile-ui #tech .tt-tab > span {
-  white-space: normal;
-}
-/* Телефон: плитки узлов — по две в ряд. */
-body.mobile-ui #tech .tt-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-/* Шапка плитки — столбец: перенос в ней выносил кнопку в соседний столбец, за край плитки. */
-body.mobile-ui #tech .tt-ih {
-  flex-wrap: nowrap;
-  gap: 8px;
-}
-body.mobile-ui #tech .tt-ih > b {
+/* TT-5: телефон. Колонки слотов нет: сверху полоса — что идёт, «Очередь» и «Совет»; эти
+   две выезжают снизу той же разметкой колонки (.tt-side.sheet-*). Плитки веток — короткие
+   имена в одну строку, узлы дерева — плитки поуже. */
+body.mobile-ui #tech .tt-chip { font-size:var(--fs-caption); }
+body.mobile-ui #tech .tt-pstrip {
+  display: grid;
+  gap: 5px;
   flex: none;
-  font-size: var(--fs-body);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
 }
-body.mobile-ui #tech :is(.tt-ifx, .tt-lead) {
-  font-size: var(--fs-body);
-  line-height: 1.5;
+body.mobile-ui #tech .tt-pslot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 0;
+  padding: 0 0 7px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-caption);
+  text-align: left;
 }
-/* Цена переносится внутри себя, а срок стоит справа от неё, как на ПК: перенос всего низа
-   плитки ставил срок отдельной строкой под ценой (UIX-10.7). */
-body.mobile-ui #tech .tt-ifoot > span:first-child {
+body.mobile-ui #tech .tt-pslot b {
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-body.mobile-ui #tech .tt-take {
-  width: 100%;
-  font-size: var(--fs-body);
-  /* «Не хватает ресурсов» в плитке на две колонки длиннее кнопки — переносится, а не вылезает. */
-  white-space: normal;
+body.mobile-ui #tech .tt-pslot .tt-prog { left: 0; right: 0; bottom: 1px; }
+body.mobile-ui #tech .tt-pslot.idle { color: var(--amber); font-weight: 700; padding: 0; }
+body.mobile-ui #tech .tt-pchips { display: flex; gap: 6px; flex-wrap: wrap; }
+body.mobile-ui #tech .tt-pchip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid var(--line-hi);
+  border-radius: 18px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-caption);
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
+body.mobile-ui #tech .tt-pchip i { font-style: normal; color: var(--dim); }
+body.mobile-ui #tech .tt-pchip.sci { border-color: #5a4880; color: #c0a3f1; flex: 1; min-width: 0; display: block; }
+body.mobile-ui #tech .tt-side { display: none; }
+body.mobile-ui #tech .tt-side.sheet {
+  display: flex;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 7;
+  width: auto;
+  max-height: 75%;
+  border: 0;
+  border-top: 1px solid var(--line-hi);
+  border-radius: 14px 14px 0 0;
+  background: #0b202e;
+  box-shadow: 0 -10px 30px #000c;
+  padding-bottom: 6px;
+}
+body.mobile-ui #tech .tt-side.sheet-queue > :not(.tt-queue),
+body.mobile-ui #tech .tt-side.sheet-council > :not(.tt-council, .tt-fxsum) { display: none; }
+body.mobile-ui #tech .tt-shade {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  background: #020a0e99;
+}
+body.mobile-ui #tech .tt-qb,
+body.mobile-ui #tech .tt-qx { width: 44px; height: 44px; font-size: 12px; }
+body.mobile-ui #tech .tt-tabs { gap: 4px; padding: 9px 8px 7px; }
+body.mobile-ui #tech .tt-tab { min-width: 0; padding: 6px 2px 5px; gap: 3px; }
+body.mobile-ui #tech .tt-tab svg { width: 20px; height: 20px; }
+body.mobile-ui #tech .tt-tname { font-size:var(--fs-caption); }
+body.mobile-ui #tech .tt-tname .full { display: none; }
+body.mobile-ui #tech .tt-tname .short { display: inline; }
+body.mobile-ui #tech .tt-tprog { padding: 0 4px; }
+body.mobile-ui #tech .tt-cnt { display: none; }
+body.mobile-ui #tech .tt-tree { padding: 8px 8px 14px; }
+body.mobile-ui #tech .tt-row { gap: 8px; margin-bottom: 18px; }
+body.mobile-ui #tech .tt-item { width: 76px; padding: 7px 3px 6px; }
+body.mobile-ui #tech .tt-item b { font-size:var(--fs-caption); }
+body.mobile-ui #tech .tt-ico { width: 40px; height: 40px; }
 body.mobile-ui #tech .tt-mwin {
-  width: calc(100% - 16px);
-  max-height: calc(100% - 16px);
-  overflow-y: auto;
+  width: calc(100% - 8px);
+  max-height: calc(100% - 8px);
   overscroll-behavior: contain;
   padding: 12px;
   background: #0b202e;
 }
-body.mobile-ui #tech .tt-mx {
-  position: sticky;
-  display: block;
-  top: 0;
-  margin: 0 0 6px auto;
-  background-color: #0b202e;
-  z-index: 1;
-}
-body.mobile-ui #tech :is(.tt-mdesc, .tt-mstats) {
-  font-size: var(--fs-body);
-  line-height: 1.5;
-}
-body.mobile-ui #tech .tt-mbtn {
-  white-space: normal;
-}
+body.mobile-ui #tech .tt-mx { width: 44px; height: 44px; top: 6px; right: 6px; }
+body.mobile-ui #tech :is(.tt-mdesc, .tt-mrow) { font-size: var(--fs-body); line-height: 1.5; }
+body.mobile-ui #tech .tt-link { min-height: 36px; min-width: 0; }
+body.mobile-ui #tech .tt-mbtn,
+body.mobile-ui #tech .tt-mq { white-space: normal; font-size: var(--fs-body); }
 
 /* Production uses one readable column even on a phone held sideways. */
 body.mobile-ui #constructor .cn-grid {
@@ -399,11 +448,5 @@ body.mobile-ui #diplo .dp-compose input {
   }
   body.mobile-ui #market .mk-tabs {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  body.mobile-ui #tech .tt-tabs {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-  body.mobile-ui #tech .tt-top {
-    padding-top: 4px;
   }
 }

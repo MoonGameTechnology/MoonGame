@@ -159,7 +159,8 @@ describe('три стиля кнопок (UIX-11.1)', () => {
     const tags = [...src.matchAll(/<button class="(tt-take|tt-mbtn|bw-take|cn-build)[^"]*"/g)].map(
       (m) => m[0],
     );
-    expect(tags.length).toBeGreaterThanOrEqual(10);
+    // TT-5: «Исследовать» живёт только в окошке узла, плитки дерева кнопок не несут.
+    expect(tags.length).toBeGreaterThanOrEqual(8);
     expect(tags.filter((tag) => !tag.includes('btn-main'))).toEqual([]);
     // «Исследовать» у запертой технологией строки — вторичная: это путь в другое окно, а
     // главная кнопка строки — «Строить», когда её откроет технология.
