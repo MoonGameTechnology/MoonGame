@@ -99,7 +99,11 @@ function blockOf(task: SpyTask, spy: number, planetId: string | null): TaskBlock
   const known = planetId && s.planets[planetId] ? spyKnownOwner(s, me, planetId, identifiedNodes(s, me, data)) : null;
   const owner = known?.owner;
   const world = planetId && s.planets[planetId]
-    ? { owner, coalitionMate: !!owner && !!coalitionOf(s, me)?.members.includes(owner) }
+    ? {
+        owner,
+        coalitionMate: !!owner && !!coalitionOf(s, me)?.members.includes(owner),
+        ownerOut: !!owner && s.players[owner]?.status !== 'active',
+      }
     : null;
   return taskBlock(task, world, me, !!planetId && spyById(spy)?.location === planetId);
 }

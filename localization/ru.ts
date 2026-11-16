@@ -1158,6 +1158,7 @@ export const ru: Record<string, string> = {
   'spy.block.unscouted': 'Ваши шпионы здесь не бывали',
   'spy.block.here': 'Шпион уже здесь',
   'spy.block.no-owner': 'У мира нет владельца',
+  'spy.block.owner-out': 'Владелец выбыл из игры',
   'spy.block.own-world': 'Это ваш мир',
   'spy.btn.assign': 'Дать задание',
   'spy.btn.cancel': 'Отменить задание',
