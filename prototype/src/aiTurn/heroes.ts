@@ -9,6 +9,7 @@ import {
   abilityRange,
   getStance,
   heroCooldownKey,
+  heroEquipped,
   knownSkillNodes,
   moduleAllowed,
   slotUsage,
@@ -77,12 +78,14 @@ export function heroOrders(bot: AiTurn, pl: Player): void {
   //    Кэп активных берётся из ядра (`heroActiveCap`), а не переписывается числом:
   //    иначе бот либо держал бы вторую копию правила, либо сыпал `E_HERO_CAP` каждые
   //    два часа. Респаун-кулдаун читается по тому же гроссбуху, что и гейт.
+  const spawning = new Set<string>();
   if (base) {
     let room = heroActiveCap(state, ai, data) - activeHeroCount(state, ai);
     for (const x of roster) {
       if (room <= 0) break;
       if (deployed(x) || x.mobilization || (x.cooldowns?.respawn ?? 0) > state.time) continue;
       out.push(spawnHero(ai, x.id, base.id));
+      spawning.add(x.id);
       room -= 1;
     }
   }
@@ -132,6 +135,9 @@ export function heroOrders(bot: AiTurn, pl: Player): void {
   );
   for (const x of roster) {
     if (x.fleetId !== undefined && state.fleets[x.fleetId] !== undefined) continue;
+    // Поднятый в этот же тик (п. 1) к установке уже развёрнут: ядро приказы применяет по
+    // порядку, и установка после подъёма получила бы тот же `E_HERO_DEPLOYED`.
+    if (spawning.has(x.id)) continue;
     const hull = heroFlagshipUnit(x, data);
     const hullDef = data.units[hull];
     if (!hullDef) continue;
@@ -173,8 +179,9 @@ export function heroOrders(bot: AiTurn, pl: Player): void {
     const node = fleet ? state.planets[heroNode(state, x)] : undefined;
     if (!fleet || !node) continue;
     const fighting = fleet.battleId != null;
-    for (const id of x.abilities ?? []) {
-      if (typeof id !== 'string') continue;
+    // Кастуется только НАДЕТОЕ (HPR-1.2): ядро отбивает открытую, но не надетую способность
+    // (`E_NOT_EQUIPPED`), а `break` ниже отдавал бы весь тик героя этому отказу.
+    for (const id of heroEquipped(x)) {
       const def = data.heroAbilities[id];
       if (!def) continue;
       // Кулдаун читается ТЕМ ЖЕ ключом, что ведёт гейт (`heroCooldownKey`): ключ

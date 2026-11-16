@@ -223,7 +223,7 @@ function decideOrders(
  *  него снимаются, остальные приказы идут как есть. Снимаем на выходе, а не в каждой из
  *  веток постройки: веток у бота несколько, а потолок один. */
 function capPirateFleet(state: GameState, ai: string, orders: Action[]): Action[] {
-  const isShip = (u: string): boolean => !!data.units[u] && !data.units[u]!.traits.includes('ground');
+  const isShip = (u: string): boolean => !!data.units[u] && data.units[u]!.domain !== 'ground';
   let room = pirateShipCap(state) - pirateShipCount(state, ai, isShip);
   return orders.filter((a) => {
     if (a.type !== 'unit.build') return true;

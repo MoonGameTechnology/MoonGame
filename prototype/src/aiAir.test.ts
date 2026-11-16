@@ -279,6 +279,22 @@ describe('SHU-3.2 — бот ПОДНИМАЕТ челноки: иначе он�
     expect(strikes(armed({ hangar: [] }))).toEqual([]);
   });
 
+  it('база на перезарядке не поднимает вылет — ядро отбило бы его `E_NO_FUEL` каждый тик', () => {
+    const s = armed();
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    home.sortie = { fuel: 0, rearming: 2 };
+    expect(canOrder(s, strikes(armed())[0]!)).toBe('E_NO_FUEL'); // тот же приказ — отказ
+    expect(strikes(s)).toEqual([]);
+  });
+
+  it('десантный вылет с базы на перезарядке тоже не уходит', () => {
+    const s = armed({
+      hangar: [{ id: 'sq:1', units: [{ unit: 'landing_shuttle', count: 2 }], cargo: [{ unit: 'tank', count: 2 }] }],
+    });
+    Object.values(s.planets).find((p) => p.owner === 'p2')!.sortie = { fuel: 0, rearming: 2 };
+    expect(strikes(s)).toEqual([]);
+  });
+
   it('слабый бот вылеты поднимает тоже (слабый знает то же, 2026-09-28)', () => {
     const s = atWeakTurn(armed(), 'full');
     expect(only(aiOrders(s, 'p2', 'expand'), 'shuttle.strike').length).toBeGreaterThan(0);
@@ -419,6 +435,8 @@ describe('SHU-2.1 — бот и НОСИТЕЛЬ челноков', () => {
     const s = withPort(rich(game2()));
     const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
     home.hangar = [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }];
+    // Свои флоты уходят из дома: носитель рядом с ними этим ходом сливался бы (ниже).
+    for (const f of Object.values(s.fleets)) if (f.owner === 'p2') delete s.fleets[f.id];
     carrierAt(s, home.id);
     const loads = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.load');
     expect(loads).toHaveLength(1);
@@ -426,6 +444,28 @@ describe('SHU-2.1 — бот и НОСИТЕЛЬ челноков', () => {
       fleetId: 'p2_carrier',
       squadronId: 'sq:b',
     });
+  });
+
+  it('погрузка пробуется ПОСЛЕ приказов хода тому же флоту — ядро не отбивает её', () => {
+    // Носитель у дома с флотом места этим ходом СЛИВАЕТСЯ с ним (`fleet.merge` from), и
+    // погрузка в носитель после слияния получила бы `E_NO_FLEET`. Ядро применяет приказы
+    // хода по порядку, поэтому весь набор проверяется так же, по порядку.
+    const s = withPort(rich(game2()));
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    home.hangar = [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }];
+    carrierAt(s, home.id);
+    const orders = aiOrders(s, 'p2', 'expand', 'strong');
+    const merged = only(orders, 'fleet.merge').map((a) => (a.payload as { from: string }).from);
+    expect(merged).toContain('p2_carrier'); // сцена та, что нужна
+    const loads = only(orders, 'shuttle.load');
+    expect(loads).toHaveLength(1);
+    expect((loads[0]!.payload as { fleetId: string }).fleetId).not.toBe('p2_carrier');
+    let st = s;
+    for (const a of orders) {
+      const r = kernel.applyAction(st, a, ctx(st.time));
+      if (a.type === 'shuttle.load') expect(r.ok, r.ok ? '' : r.code).toBe(true);
+      if (r.ok) st = r.state;
+    }
   });
 
   it('ПУСТОЙ порт грузить нечем — приказа нет', () => {

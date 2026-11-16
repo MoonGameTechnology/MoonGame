@@ -241,7 +241,10 @@ export function openTurn(
   // evacuates a wing the forecast says it would lose ≥ STEWARD_LOSS_LIMIT of, and —
   // under «Активная оборона» — counterstrikes what it beats cheaply on own soil.
   if (defensive) out.push(...stewardGuardOrders(state, ai, posture as StewardPosture));
-  const isShipUnit = (u: string): boolean => !data.units[u]?.traits.includes('ground');
+  // Корабль — то, что ядро считает кораблём: всё, что не `domain: 'ground'` (`fleet.launch`
+  // поднимает именно это). Трейт `ground` есть не у всей пехоты: у гарнизона крепости и у
+  // десанта его нет, и база с одной пехотой слала `fleet.launch` → `E_NO_SHIPS` каждый тик.
+  const isShipUnit = (u: string): boolean => data.units[u]?.domain !== 'ground';
   const capturable = (p: Planet): boolean => SECTOR_TYPES[p.kind ?? '']?.capturable ?? false;
   /** ORB-1: бомбардировать можно только узел с орбитальным слоем (планета и
    *  космическая крепость). Без этой проверки ИИ вставал бы над туманностью и
