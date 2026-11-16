@@ -404,8 +404,10 @@ describe('REFM-232 — статический слой карты', () => {
     fast.ml.blitStaticLayer(2000);
     expect(fast.ml.provinceGeometry).not.toBe(fastGeo);
     vi.resetModules();
-    // Экран с плотностью 2: целая выпечка — два пикселя на точку, черновик — один.
-    const { ml, camera, layer, spare, bg, drawn } = await boot({ dpr: 2 });
+    // Экран с плотностью 1 (так рисует и слабое устройство после вердикта): целая выпечка и
+    // черновик — пиксель на точку, у черновика запас меньше. Плотному экрану черновик нужен
+    // только дальше ×8, а камера этой карты так далеко не подходит.
+    const { ml, camera, layer, spare, bg, drawn } = await boot();
     // Каждое чтение часов — 60 мс: целая выпечка дороже GESTURE_BAKE_MS.
     let clock = 0;
     vi.stubGlobal('performance', { now: () => (clock += 60) });
@@ -413,9 +415,9 @@ describe('REFM-232 — статический слой карты', () => {
     ml.blitStaticLayer(1000 + SETTLE_MS);
     expect(ml.mapCostly).toBe(true);
     const sharp = layer.width;
-    expect(sharp).toBeGreaterThan(2 * 1600);
+    expect(sharp).toBeGreaterThan(1.4 * 1600);
     const geo = ml.provinceGeometry;
-    // Вчетверо — полпикселя выпечки на точку экрана: она ещё растянута, а не перепечена.
+    // Вчетверо — четверть пикселя выпечки на точку экрана: она ещё растянута, а не перепечена.
     camera.zoomAt(800, 450, 4);
     ml.blitStaticLayer(2000);
     expect(ml.provinceGeometry).toBe(geo);

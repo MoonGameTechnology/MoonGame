@@ -450,17 +450,13 @@ describe('REFM-232 — слой живых границ', () => {
     let [b] = blits();
     let [, , , sw, , , , dw] = b!.args as number[];
     expect(dw! / sw!).toBeCloseTo(2, 6);
-    // Дальше линии слоя толще настоящих: в этом кадре карта перепеклась черновиком, и слой
-    // ждёт следующего растянутым, а в нём рисуется заново на текущей камере.
+    // Дальше линии слоя толще настоящих: карта ещё растянута (черновик ей нужен только дальше
+    // MIN_GESTURE_DENSITY пикселя на точку, здесь — дальше ×4), а слой рисуется заново на
+    // текущей камере.
     const geo = ml.provinceGeometry;
     camera.zoomAt(800, 450, 1.25);
     expect(show(2016)).toBe(true);
-    expect(ml.provinceGeometry).not.toBe(geo);
-    expect(painted()).toEqual({ whole: 0, rects: 0 });
-    [b] = blits();
-    [, , , sw, , , , dw] = b!.args as number[];
-    expect(dw! / sw!).toBeCloseTo(2.5, 6);
-    expect(show(2032)).toBe(true);
+    expect(ml.provinceGeometry).toBe(geo);
     expect(painted().whole).toBe(1);
     [b] = blits();
     [, , , sw, , , , dw] = b!.args as number[];
