@@ -1,6 +1,7 @@
 import { nativeAdPreviewError, nativeAdPreviewOutcome } from '../../decisions/nativeAdPreview';
 import { t } from '../../localization/runtime';
 import { currentBuild, isRuStoreBuild } from './updater';
+import { createNativeAdDiagnostics } from './nativeAdDiagnostics';
 
 interface PreviewBridge {
   show(request: { placement: 'main.supply'; requestId: string }): Promise<unknown>;
@@ -32,6 +33,7 @@ export function initNativeAdPreview(): void {
   status.hidden = true;
   panel.append(button, status);
   root.prepend(panel);
+  const diagnostics = createNativeAdDiagnostics();
 
   let busy = false;
   button.addEventListener('click', async () => {
@@ -41,9 +43,13 @@ export function initNativeAdPreview(): void {
     panel.setAttribute('aria-busy', 'true');
     status.hidden = false;
     status.textContent = t('hub.ad-preview.loading');
+    let requestId = '';
+    const started = performance.now();
     try {
-      const requestId = 'preview_' + crypto.randomUUID();
+      requestId = 'preview_' + crypto.randomUUID();
+      diagnostics.requested(requestId);
       const result = await native.show({ placement: 'main.supply', requestId });
+      diagnostics.finished(requestId, result, performance.now() - started);
       switch (nativeAdPreviewOutcome(result, requestId)) {
         case 'earned': status.textContent = t('hub.ad-preview.earned'); break;
         case 'cancelled': status.textContent = t('hub.ad-preview.cancelled'); break;
@@ -54,6 +60,7 @@ export function initNativeAdPreview(): void {
         }
       }
     } catch {
+      diagnostics.failed(requestId, performance.now() - started);
       status.textContent = t('hub.ad-preview.error.app', { code: 'E_AD_CLIENT' });
     } finally {
       busy = false;

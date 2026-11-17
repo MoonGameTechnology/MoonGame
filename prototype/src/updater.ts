@@ -18,7 +18,7 @@ declare const __PLAYER_BUILD__: boolean | undefined;
 export const RELEASE_LANE = typeof __PLAYER_BUILD__ !== 'undefined' && __PLAYER_BUILD__ === true ? 'player' : 'alpha';
 export const DOWNLOAD_ROOT = `${distribution.origin}${distribution.basePath}`;
 export const VERSION_URL = `${DOWNLOAD_ROOT}/${RELEASE_LANE}/latest.json`;
-const APP_IDS = { alpha: 'com.voiddominion.prototype', player: 'com.voiddominion.player' } as const;
+export const APP_IDS = { alpha: 'com.voiddominion.prototype', player: 'com.voiddominion.player' } as const;
 const validCode = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n > 0 && n <= 2100000000;
 interface GlobalWithBuild {
   __BUILD__?: { versionCode?: unknown; versionName?: unknown; sha?: unknown; server?: unknown; channel?: unknown; privacyUrl?: unknown };

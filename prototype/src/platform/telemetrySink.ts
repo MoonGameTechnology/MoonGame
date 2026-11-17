@@ -186,6 +186,9 @@ function installId(): string {
   }
 }
 
+// Multiple receivers on one page must not invent extra installs or page visits.
+let browserIdentity: { install: string; session: string } | undefined;
+
 /** Сток для настоящей страницы: адрес, сессия и отправка — из браузера. */
 export function createBrowserTelemetrySink(opts: {
   /** Читается на каждом пакете: игрок мог сменить сервер на экране входа. */
@@ -193,13 +196,14 @@ export function createBrowserTelemetrySink(opts: {
   token: (base: string) => string | null;
   build: string;
 }): TelemetrySink {
+  const identity = browserIdentity ??= { install: installId(), session: randomId() };
   return createTelemetrySink({
     target: () => {
       const target = opts.target();
       return target === null ? null : { url: target.url, token: opts.token(target.base) };
     },
-    install: installId(),
-    session: randomId(),
+    install: identity.install,
+    session: identity.session,
     build: opts.build,
     now: () => Date.now(),
     newId: randomId,

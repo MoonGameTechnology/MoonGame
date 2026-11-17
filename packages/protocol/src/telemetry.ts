@@ -23,7 +23,7 @@ export const TELEMETRY_EVENTS = [
   'iap_started',
   'iap_completed',
   'meta_unlock',
-  // PTM-1.3: an uncaught error in the browser — type and place only, never the message.
+  // PTM-1.3: browser/SDK failures — type and place only, never the raw message.
   'client_error',
   // PTM-1.2: the path from opening the page to a match, and the link's health.
   'app_loaded',

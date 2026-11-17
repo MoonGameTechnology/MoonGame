@@ -7,8 +7,8 @@
 > [до 2026-10-19](archive/state-2026-10-19.md), [до 2026-11-09](archive/state-2026-11-09.md).
 
 **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check).
-**Последний полный локальный прогон: 15 767 тестов прошли**
-(236 skip; 1306 файлов прошли, 10 skip; на основе `main` `911b38c`,
+**Последний полный локальный прогон: 15 838 тестов прошли**
+(236 skip; 1310 файлов прошли, 10 skip; на основе `main` `0d96e92`,
 без PostgreSQL; сборка прототипа проверена отдельно). CI и merge queue проверяют PR вместе с `main`.
 
 **Быстрый старт сессии** (только указатели, факты живут в секциях):
@@ -516,7 +516,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   (`decisions/adPlacements.ts`), облако — `decisions/cloudSync.ts`.
 - APK — Capacitor (`mobile/`): подписанные Ed25519 обновления с VPS с прогрессом по байтам
   ([ранбук](../deploy/apk/README.md)), кнопка скачивания — `decisions/apkOffer.ts`.
-  VK Rewarded 2111707: в APK кнопка «Проверить рекламу» с кодом отказа, без награды; сетевое начисление закрыто
+  VK Rewarded 2111707: в APK проверка без награды, с кодом отказа и журналом SDK; сетевое начисление закрыто
   до подтверждения провайдера ([README](../mobile/README.md)); RuStore закрыт до [решений оператора](security/rustore-preparation.md).
 - ПК — Electron (`desktop/`, [README](../desktop/README.md)): тот же архив Sector Zero, без
   CI-ленты и Steam.

@@ -40,7 +40,7 @@ export function nativeAdPreviewError(value: unknown, requestId: string): { key: 
     case 'E_AD_LOAD_TIMEOUT': case 'E_AD_SHOW_TIMEOUT': case 'E_AD_BRIDGE_TIMEOUT':
       return { key: 'hub.ad-preview.error.timeout', code: errorCode };
     case 'E_AD_SHOW': return { key: 'hub.ad-preview.error.show', code: errorCode };
-    case 'E_AD_INIT': case 'E_AD_BRIDGE': case 'E_AD_ORIGIN': case 'E_AD_BACKGROUND':
+    case 'E_AD_INIT': case 'E_AD_BRIDGE': case 'E_AD_ORIGIN': case 'E_AD_BACKGROUND': case 'E_AD_CLIENT':
     case 'E_AD_REQUEST': case 'E_AD_BUSY': case 'E_AD_DESTROYED': case 'E_AD_REPLY':
       return { key: 'hub.ad-preview.error.app', code: errorCode };
     default: return fallback;
