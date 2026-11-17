@@ -558,7 +558,7 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .ptile.ship .pt-mod .module-pictogram small{display:none;}
 .ptile.ship .pt-free{width:5px;height:5px;margin:0 4px;border:1px solid var(--line-hi);border-radius:50%;}
 .ptile.ship .pt-more{font-size:var(--fs-caption);line-height:1;color:var(--dim);}
-.ptile.ship .pt-hp{width:100%;margin-top:auto;}
+.ptile.ship .pt-hp{width:60%;margin-top:auto;}
 /* подпись построенного здания: имя обязано читаться, поэтому плитка растягивается под
    него и переносит длинное имя в две строки, а не режет многоточием — обрезанное
    «Salvage Metal…» отвечает на вопрос «что это» не лучше голой иконки */
