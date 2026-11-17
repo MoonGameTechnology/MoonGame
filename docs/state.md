@@ -413,7 +413,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   (`decisions/bombardCommand.ts` и соседи). Интерфейс в целом — [hud-inmatch.md](hud-inmatch.md).
 - Эскадры: значок «◇ N» у мира и носителя (`mapHangars.ts`, `decisions/hangarBadge.ts`),
   список «◇ Авиация» (`aviationPanel.ts`); приказы эскадре — только в её карточке
-  (`squadronCardView.ts`), плитками, как у флота (`wingOrders.ts`).
+  (`squadronCardView.ts`), плитками, как у флота (`wingOrders.ts`); «Слить» — только у готовой базы.
 - «Производство» (`shipyard.ts`): открывается списком четырёх линий мира, каталог линии —
   по нажатию на неё (`decisions/productionSections.ts`), над каталогом очередь линии строками со сроком каждого заказа, свёрнутая до «+N»
   (`decisions/laneQueue.ts`); мир с

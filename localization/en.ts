@@ -1130,7 +1130,7 @@ export const en: Record<string, string> = {
   'side.squad.port': 'In port at {name}',
   'side.squad.hold': 'Aboard “{name}”',
   'side.squad.ready': 'ready',
-  'side.squad.ready.fuel': 'ready · sorties {n}/{max}',
+  'side.squad.ready.fuel': 'sorties {n}/{max}',
   'side.squad.no-fuel': 'no sorties left',
   'side.squad.busy': 'carrier in battle',
   'side.squad.siblings': 'Also here',

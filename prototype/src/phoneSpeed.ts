@@ -47,6 +47,8 @@ export function initPhoneSpeed() {
     /** Кадр: есть ли кнопка (телефон, партия, управление временем) и что на ней. */
     sync(on: boolean, tempo: Tempo | null, mult: number | null): void {
       if (button.hidden === on) button.hidden = !on;
+      // Кнопки нет (сетевая партия: времени там не управляют) — её место у края занимают соседи.
+      body.classList.toggle('phone-speed-on', on);
       if (!on) {
         setOpen(false);
         return;

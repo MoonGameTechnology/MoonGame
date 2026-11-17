@@ -18,17 +18,17 @@
 .av-empty{padding:14px 12px;font-size:var(--fs-body);}
 #avia-fab{display:none;}
 
-/* UIX-10.15: список «◇ Авиация» на телефоне — лист на нижние 56% экрана над нижней панелью
-   (карта сверху видна), вход — плавающая кнопка справа над кнопкой скорости, пока ничего не
-   выделено. */
+/* UIX-10.15: список «◇ Авиация» на телефоне — лист над нижней панелью ростом по списку,
+   не выше 56% экрана (карта сверху видна); вход — плавающая кнопка справа над кнопкой
+   скорости, пока ничего не выделено. */
 body.mobile-ui #aviapanel {
   left: max(8px, env(safe-area-inset-left));
   right: max(8px, env(safe-area-inset-right));
   top: auto;
   bottom: calc(var(--phone-navh) + 8px);
   width: auto;
-  height: 56dvh;
-  max-height: calc(100dvh - var(--tbh) - var(--phone-navh) - 16px);
+  /* Лист по росту списка, но не выше 56% экрана: три эскадры не закрывают полкарты пустотой. */
+  max-height: min(56dvh, calc(100dvh - var(--tbh) - var(--phone-navh) - 16px));
   border-radius: 18px;
   /* Над кнопкой скорости и стопкой сообщений (z 40), под окнами (44+). */
   z-index: 41;
@@ -37,9 +37,13 @@ body.mobile-ui .av-row {
   min-height: 48px;
   padding: 8px 14px;
 }
+/* Крестик — как у листа выбора (`.mobile-close`): тот же размер и скругление. */
 body.mobile-ui .av-head .btn-x {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background-color: #0c1b2b;
+  font: 24px/1 sans-serif;
 }
 body.mobile-ui #avia-fab:not([hidden]) {
   display: inline-flex;
@@ -60,8 +64,12 @@ body.mobile-ui #avia-fab:not([hidden]) {
   font: 700 16px var(--sf-font);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
-body.mobile-ui:is(.aim-mode, .chain-mode, .sheet-open) #avia-fab {
+body.mobile-ui:is(.aim-mode, .chain-mode, .sheet-open, :has(#mobile-sheet.choosing)) #avia-fab {
   display: none;
+}
+/* Сетевая партия: кнопки скорости нет вовсе, и «◇ N» встаёт на её место у нижней панели. */
+body.mobile-ui:not(.phone-speed-on) #avia-fab:not([hidden]) {
+  bottom: calc(var(--phone-navh) + 12px);
 }
 
 /* Приказы эскадры плитками, как ряд команд флота (wingOrders.ts, заказ владельца 2026-11-09):
@@ -86,3 +94,29 @@ body.mobile-ui #mobile-sheet #side .aloft-acts.wing-orders > button .cl{font-siz
 body.mobile-ui #mobile-sheet:not(.expanded) #side .wing-orders:not(.open) > .extra,
 body.mobile-ui #mobile-sheet.expanded #side .wing-orders > .wing-more{display:none;}
 body.mobile-ui #mobile-sheet #side .wing-orders > .wing-more{order:1;}
+
+/* «Ещё здесь» — соседние эскадры базы отдельным блоком под приказами (тест владельца
+   2026-11-15: имя соседки в ряду приказов читалось как приказ). Плитка повторяет значок
+   ангара на карте: бирюзовая рамка, «◇ имя», под ним число бортов. */
+#side .row.wing-sibs{display:grid;grid-template-columns:repeat(3,minmax(min-content,1fr));gap:8px;margin:10px 0 4px;}
+#side .wing-sibs > .fc-title{grid-column:1/-1;}
+#side .wing-sibs > .wing-sib{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;
+  min-width:0;min-height:44px;margin:0;padding:6px 8px;border-radius:6px;border-color:rgba(95,224,208,.55);
+  background:rgba(2,9,13,.82);color:#5fe0d0;text-align:left;white-space:normal;line-height:1.2;}
+#side .wing-sibs > .wing-sib.into{border-color:var(--amber);color:var(--amber);}
+#side .wing-sib .ws-name{font-size:var(--fs-body);font-weight:700;overflow-wrap:anywhere;}
+#side .wing-sib .ws-sub{font-size:var(--fs-caption);color:var(--dim);}
+/* Телефон: блок виден и в свёрнутом листе, под рядом приказов, со своей подписью. */
+body.mobile-ui #mobile-sheet #side .aloft-acts.wing-sibs{margin-top:8px;}
+body.mobile-ui #mobile-sheet #side .aloft-acts.wing-sibs > .fc-title{margin:0;min-height:0;}
+body.mobile-ui #mobile-sheet #side .aloft-acts.wing-sibs > .fc-title b{font-size:var(--fs-caption);font-weight:400;color:var(--dim);}
+body.mobile-ui #mobile-sheet #side .aloft-acts.wing-sibs > .wing-sib{border-radius:11px;padding:5px 8px;}
+/* Значки приказов эскадры на телефоне — те же рисунки, что на ПК (тест владельца 2026-11-15:
+   «✳ ◎ ⇄» на телефоне и перекрестие, круг, стрелки на ПК учили игрока дважды). */
+body.mobile-ui #side .wing-orders > button .ci .holo-icon{display:inline-flex;}
+body.mobile-ui #side .wing-orders > button .ci .simple-icon{display:none;}
+body.mobile-ui #side .wing-orders > button .ci svg{width:22px;height:22px;fill:currentColor;}
+/* Телефон: плитки соседок в две колонки — «◇ HARPOON 1» помещается в строку. Под открытым
+   листом «Авиация» кнопка скорости не просвечивает. */
+body.mobile-ui #mobile-sheet.aloft #side .aloft-acts.wing-sibs{grid-template-columns:repeat(2,minmax(0,1fr));}
+body.mobile-ui:has(#aviapanel.show) #phone-speed{display:none;}

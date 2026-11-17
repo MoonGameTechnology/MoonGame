@@ -222,7 +222,7 @@ export function note(msg: string, at?: string, opts?: { quiet?: boolean }) {
   if (!opts?.quiet) toast(msg, at);
 }
 
-export { toast } from './toastStack';
+export { aimHint, dropAimHint, toast } from './toastStack';
 
 /** Бои моего блока зрения, начало которых журнал уже показал: итог приходит, когда боя в
  *  состоянии нет, и спросить «мой ли он» тогда уже не у кого. */

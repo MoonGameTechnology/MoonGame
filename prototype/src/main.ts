@@ -117,7 +117,8 @@ import {
 import {
 } from './unitGlyphs';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
-import { drawHangarBadges, initMapHangars } from './mapHangars';
+import { drawHangarBadges, hangarBadgeEdge, initMapHangars } from './mapHangars';
+import { parkedPickText } from './squadronCardView';
 import { aviationCount, aviationOpen, closeAviation, initAviation, renderAviation, toggleAviation } from './aviationPanel';
 import { worldName } from './planetName';
 // «Производство» — экран заказа (REFM-13, ROS-3.1): окно целиком живёт в `shipyard.ts`, здесь
@@ -904,7 +905,7 @@ const holographic = initHolographicUi({
     const planet = selPlanet && s.planets[selPlanet];
     // Эскадра в воздухе (SHU-6.14) — её значок на трассе: нить окна идёт к нему.
     const aloft = selStrike ? strikeWorldPos(selStrike) : null;
-    const parked = selSquadron ? squadronSpotPx(selSquadron) : null;
+    const parked = selSquadron ? (hangarBadgeEdge(selSquadron) ?? squadronSpotPx(selSquadron)) : null;
     const at = aloft ? world(aloft) : parked ?? (fleet ? fleetAnchor(fleet) : planet ? world(planet.position) : null);
     return at ? toScreen(at, canvas.getBoundingClientRect(), VW, VH) : null;
   },
@@ -1896,7 +1897,7 @@ function updateMobileHud(): void {
       if (!st) continue;
       choices.push({ ...pick, title: strikeTitle(st), sub: t('side.aloft.sub') });
     } else if (pick.kind === 'squadron') {
-      choices.push({ ...pick, title: `${t('fleet.kind.shuttles')} «${fleetCallsign(pick.id)}»`, sub: t('side.squad.pick') });
+      choices.push({ ...pick, title: `${t('fleet.kind.shuttles')} «${fleetCallsign(pick.id)}»`, sub: parkedPickText(pick.id, { world: s, me: ME }) ?? t('side.squad.pick') });
     } else if (pick.kind === 'fleet') {
       const f = s.fleets[pick.id];
       if (!f || !fleetSeen(f)) continue;

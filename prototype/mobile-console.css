@@ -813,7 +813,8 @@ body.mobile-ui.phone-speed-open #phone-speed {
   border-color: #35d6e6;
   background: rgba(18, 52, 66, 0.96);
 }
-body.mobile-ui:is(.sheet-open, .aim-mode, .chain-mode) #phone-speed {
+/* `#mobile-sheet.choosing` — список «Выберите объект»: кнопка лежала поверх его нижней строки. */
+body.mobile-ui:is(.sheet-open, :has(#mobile-sheet.choosing), .aim-mode, .chain-mode) #phone-speed {
   display: none;
 }
 @media (max-width: 640px) {

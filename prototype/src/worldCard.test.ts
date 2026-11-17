@@ -626,6 +626,21 @@ describe('ангар', () => {
     expect(v.parkedSquadronHtml('sq:404', { world: env.s, me: 'p1' })).toBeNull();
   });
 
+  it('карточка эскадры: соседки — отдельный блок плиток под приказами, а не ещё один приказ', async () => {
+    const { env } = await boot();
+    const v = await import('./squadronCardView');
+    const html = v.parkedSquadronHtml('sq:1', { world: env.s, me: 'p1' })!;
+    const orders = html.slice(html.indexOf('wing-orders'), html.indexOf('wing-sibs'));
+    expect(orders).not.toContain('data-act="sqpick"');
+    const sibs = html.slice(html.indexOf('wing-sibs'));
+    expect(sibs).toContain(t('side.squad.siblings'));
+    expect(sibs).toContain(`class="btn-second wing-sib" ${act('sqpick', 'sq:2')}`);
+    // Строка списка «Выберите объект» называет состав и готовность, а не «на стоянке».
+    const pick = v.parkedPickText('sq:1', { world: env.s, me: 'p1' })!;
+    expect(pick.startsWith(`${t('avia.ships', { n: 2 })} · `)).toBe(true);
+    expect(v.parkedPickText('sq:404', { world: env.s, me: 'p1' })).toBeNull();
+  });
+
   it('карточка эскадры: перелёт — только когда есть куда', async () => {
     const { env } = await boot();
     const v = await import('./squadronCardView');

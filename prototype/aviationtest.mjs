@@ -130,10 +130,13 @@ try {
       ]);
       if (phone) {
         const box = await panel.boundingBox();
-        assert.ok(
-          Math.abs(box.height - viewport.height * 0.56) < 4,
-          `лист на 56% экрана (${box.height})`,
-        );
+        // Лист ростом по списку: три строки не тянут за собой полэкрана пустоты.
+        const need = await panel.evaluate((el) => {
+          const last = el.lastElementChild.getBoundingClientRect();
+          return last.bottom - el.getBoundingClientRect().top;
+        });
+        assert.ok(box.height <= viewport.height * 0.56 + 1, `лист не выше 56% экрана (${box.height})`);
+        assert.ok(box.height - need < 8, `под списком нет пустоты (${box.height} при списке ${need})`);
       }
       await shot('2-spisok');
 
