@@ -68,6 +68,8 @@ const LIVE: LiveFormats = { hceil: (ms) => t('fmt.hours', { n: Math.ceil(ms / HO
 /** Шаг окна: список, карточки заданий, выбор мира на карте. */
 type Step = { kind: 'closed' } | { kind: 'roster' } | { kind: 'tasks'; spy: number } | { kind: 'pick'; spy: number; task: SpyTask };
 let step: Step = { kind: 'closed' };
+/** Плитка, выбранная на телефоне в окне заданий; `null` — по умолчанию (`tileTask`). */
+let tileSel: SpyTask | null = null;
 /** Мир, с карточки которого открыто окно (правило 4); `null` — открыто из меню. */
 let target: string | null = null;
 /** Открытый вопрос «Да / Нет». */
@@ -204,21 +206,61 @@ function rosterHtml(): string {
   );
 }
 
+/** Разведка и контрразведка тихие; остальные операции ядро считает агрессивными. */
+const isHot = (task: SpyTask): boolean => task !== 'relocate' && task !== 'counter' && task !== 'recon';
+const glyphOf = (task: SpyTask): string => (task === 'relocate' ? '🧭' : spyOpGlyph(task));
+
 function cardHtml(task: SpyTask, spy: number): string {
   const block = blockOf(task, spy, target);
   const cost = costOf(task);
   const price = cost > 0 ? t('spy.task.cost', { c: cost }) : t('spy.task.free');
   const time = task === 'relocate' ? '' : ` · ${t('spy.task.hours', { n: MISSION_HOURS })}`;
-  // Разведка и контрразведка тихие; остальные операции ядро считает агрессивными.
-  const hot = task !== 'relocate' && task !== 'counter' && task !== 'recon';
-  const glyph = task === 'relocate' ? '🧭' : spyOpGlyph(task);
   return (
-    `<button class="sp-card"${hot ? ' data-hot' : ''} data-spy-task="${task}"${block ? ' disabled' : ''}>` +
-    `<span class="sp-glyph" aria-hidden="true">${glyph}</span>` +
+    `<button class="sp-card"${isHot(task) ? ' data-hot' : ''} data-spy-task="${task}"${block ? ' disabled' : ''}>` +
+    `<span class="sp-glyph" aria-hidden="true">${glyphOf(task)}</span>` +
     `<b>${esc(taskName(task))}</b>` +
     `<span class="sp-desc">${esc(t(`spy.task.${task}.desc`))}</span>` +
     `<span class="sp-cost">${block ? esc(t(`spy.block.${block}`)) : `${price}${time}`}</span>` +
     `</button>`
+  );
+}
+
+/**
+ * Телефон (заказ владельца 2026-11-17): восемь плиток 4×2 — значок, короткое имя, цена.
+ * Тап выбирает задание, панель ниже даёт описание, цену, срок и кнопку дальше. Задание,
+ * невозможное на выбранном мире, выбрать можно: панель скажет почему, кнопка погашена.
+ * На ПК плиток не видно (CSS), там карточки с описаниями.
+ */
+function tileTask(spy: number): SpyTask {
+  if (tileSel) return tileSel;
+  return (['recon', ...SPY_TASKS] as SpyTask[]).find((task) => !blockOf(task, spy, target)) ?? 'recon';
+}
+
+function tilesHtml(spy: number): string {
+  const sel = tileTask(spy);
+  const tiles = SPY_TASKS.map((task) => {
+    const cls = `sp-tile${task === sel ? ' sp-on' : ''}${blockOf(task, spy, target) ? ' sp-off' : ''}`;
+    return (
+      `<button class="${cls}"${isHot(task) ? ' data-hot' : ''} data-spy-sel="${task}" aria-pressed="${task === sel}">` +
+      `<span class="sp-glyph" aria-hidden="true">${glyphOf(task)}</span>` +
+      `<span class="sp-tn">${esc(t(`spy.task.${task}.short`))}</span>` +
+      `<span class="sp-tp">${t('spy.task.cost', { c: costOf(task) })}</span></button>`
+    );
+  }).join('');
+  const block = blockOf(sel, spy, target);
+  const cost = costOf(sel);
+  const chips =
+    `<span class="sp-chip">${cost > 0 ? t('spy.task.cost', { c: cost }) : t('spy.task.free')}</span>` +
+    (sel === 'relocate' ? '' : `<span class="sp-chip">${t('spy.task.hours', { n: MISSION_HOURS })}</span>`);
+  return (
+    `<div class="sp-tiles">${tiles}</div>` +
+    `<div class="sp-detail"${isHot(sel) ? ' data-hot' : ''}>` +
+    `<div class="sp-dh"><span aria-hidden="true">${glyphOf(sel)}</span><b>${esc(taskName(sel))}</b>` +
+    `<span class="sp-tag">${t(isHot(sel) ? 'spy.task.kind.hot' : 'spy.task.kind.quiet')}</span></div>` +
+    `<p class="sp-dd">${esc(t(`spy.task.${sel}.desc`))}</p>` +
+    (block ? `<p class="sp-why">${esc(t(`spy.block.${block}`))}</p>` : `<div class="sp-chips">${chips}</div>`) +
+    `<button class="b btn-main sp-go" data-spy-go="${sel}"${block ? ' disabled' : ''}>${t(target ? 'spy.btn.send' : 'spy.btn.pick-world')}</button>` +
+    `</div>`
   );
 }
 
@@ -230,7 +272,9 @@ function tasksHtml(spy: number): string {
     spyPortraitSvg(faceOf(spy), spyLevel(xpOf(spy))) +
     `<span class="sp-who"><b class="sp-title">${esc(nameOf(spy))}</b><span class="sp-sub">${esc(sub)}</span></span>` +
     `<button class="dp-close btn-x" data-spy-close>✕</button></div>` +
-    `<div class="sp-cards">${SPY_TASKS.map((task) => cardHtml(task, spy)).join('')}</div></div>`
+    `<div class="sp-cards">${SPY_TASKS.map((task) => cardHtml(task, spy)).join('')}</div>` +
+    tilesHtml(spy) +
+    `</div>`
   );
 }
 
@@ -428,6 +472,7 @@ function onClick(e: Event): void {
   const assign = data('[data-spy-assign]', 'spyAssign');
   if (assign) {
     step = { kind: 'tasks', spy: Number(assign) };
+    tileSel = null;
     return render();
   }
   const cancel = data('[data-spy-cancel]', 'spyCancel');
@@ -435,7 +480,12 @@ function onClick(e: Event): void {
     ask = { kind: 'cancel', spy: Number(cancel) };
     return render();
   }
-  const task = data('[data-spy-task]', 'spyTask');
+  const sel = data('[data-spy-sel]', 'spySel');
+  if (sel && step.kind === 'tasks' && (SPY_TASKS as readonly string[]).includes(sel)) {
+    tileSel = sel as SpyTask;
+    return render();
+  }
+  const task = data('[data-spy-task]', 'spyTask') ?? data('[data-spy-go]', 'spyGo');
   if (task && step.kind === 'tasks' && (SPY_TASKS as readonly string[]).includes(task)) {
     return chooseTask(task as SpyTask, step.spy);
   }

@@ -61,6 +61,28 @@
 #spywin .sp-card:disabled{cursor:default;opacity:.42;filter:grayscale(1);}
 #spywin .sp-card:disabled .sp-cost{color:var(--dim);}
 
+/* Телефон: плитки 4×2 и панель выбранного задания вместо карточек (на ПК скрыты) */
+#spywin .sp-tiles,#spywin .sp-detail{display:none;}
+#spywin .sp-tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:80px;padding:8px 3px 6px;
+  background:var(--sf-card);border:1px solid var(--sf-edge);border-radius:8px;color:#eafffb;cursor:pointer;overflow:hidden;
+  font:600 11px/1.15 var(--sf-font);text-align:center;--tone:var(--cyan);}
+#spywin .sp-tile[data-hot],#spywin .sp-detail[data-hot]{--tone:var(--amber);}
+#spywin .sp-tile::before{content:'';position:absolute;left:0;right:0;top:0;height:3px;background:var(--tone);opacity:.85;}
+#spywin .sp-tile .sp-glyph{font-size:21px;line-height:1.1;}
+#spywin .sp-tile .sp-tn{max-width:100%;hyphens:auto;-webkit-hyphens:auto;overflow-wrap:break-word;}
+#spywin .sp-tile .sp-tp{margin-top:auto;color:var(--amber);font-weight:500;font-variant-numeric:tabular-nums;}
+#spywin .sp-tile.sp-on{border-color:var(--tone);background:color-mix(in srgb,var(--tone) 16%,transparent);box-shadow:inset 0 -3px 0 var(--tone);}
+#spywin .sp-tile.sp-off{opacity:.45;filter:grayscale(1);}
+#spywin .sp-detail{flex-direction:column;gap:6px;margin:8px;padding:10px;border:1px solid var(--sf-edge);border-radius:8px;
+  background:var(--sf-inset);--tone:var(--cyan);}
+#spywin .sp-dh{display:flex;align-items:center;gap:8px;color:#eafffb;font-size:var(--fs-body);}
+#spywin .sp-tag{margin-left:auto;padding:1px 7px;border:1px solid var(--tone);border-radius:999px;color:var(--tone);font-size:11px;white-space:nowrap;}
+#spywin .sp-dd{margin:0;color:var(--sf-dim);font-size:var(--fs-caption);}
+#spywin .sp-why{margin:0;color:var(--amber);font-size:var(--fs-caption);}
+#spywin .sp-chips{display:flex;flex-wrap:wrap;gap:6px;}
+#spywin .sp-chip{padding:2px 8px;border:1px solid var(--line-hi);border-radius:999px;color:var(--amber);font-size:var(--fs-caption);font-variant-numeric:tabular-nums;}
+#spywin .sp-go{margin:0;min-height:44px;}
+
 /* Выбор мира на карте: полоса сверху с отменой */
 #spypick{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 58px);transform:translateX(-50%);z-index:60;
   display:none;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:8px 12px;background:var(--glass);
@@ -86,6 +108,8 @@
   #spywin .sp-place::before{content:'';}
   #spywin .sp-row .sp-time{justify-self:start;padding-left:13px;}
   #spywin .sp-row .sp-act{min-width:0;width:104px;min-height:44px;padding:6px 8px;font-size:var(--fs-caption);line-height:1.15;white-space:normal;}
-  #spywin .sp-cards{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px;}
+  #spywin .sp-cards{display:none;}
+  #spywin .sp-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px 8px 0;}
+  #spywin .sp-detail{display:flex;}
   #spypick{flex-wrap:wrap;justify-content:center;text-align:center;width:calc(100vw - 32px);}
 }

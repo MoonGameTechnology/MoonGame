@@ -164,6 +164,24 @@ describe('окно «Шпионаж»', () => {
     expect(html).toContain(t('spy.windows.empty'));
   });
 
+  it('телефон: плитка выбирает задание, кнопка панели ведёт к выбору мира', async () => {
+    const { win } = await boot([{ id: 1, state: 'rest', location: 'cap' }]);
+    el('rail-spy').click();
+    tap('spywin', { '[data-spy-assign]': { spyAssign: '1' } });
+    let html = el('spywin').innerHTML;
+    expect(html.match(/class="sp-tile[ "]/g)).toHaveLength(SPY_TASKS.length);
+    expect(html).toContain('data-spy-go="recon"'); // по умолчанию разведка
+    expect(html).toContain(t('spy.btn.pick-world'));
+    tap('spywin', { '[data-spy-sel]': { spySel: 'theft' } });
+    html = el('spywin').innerHTML;
+    expect(html).toContain('data-spy-go="theft"');
+    expect(html).toContain(t('spy.task.kind.hot'));
+    expect(win.spyPicking()).toBe(false); // выбор плитки ещё не отправляет
+    tap('spywin', { '[data-spy-go]': { spyGo: 'theft' } });
+    expect(win.spyPicking()).toBe(true);
+    expect(el('spypick').innerHTML).toContain(t('spy.task.theft.name'));
+  });
+
   it('из меню: задание → выбор мира на карте → «Нет» к выбору → «Да» отдаёт приказ', async () => {
     const { win, env, enemy } = await boot([{ id: 1, state: 'rest', location: 'cap' }]);
     el('rail-spy').click();
