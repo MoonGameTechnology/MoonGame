@@ -1,6 +1,7 @@
 {
   "id": "skirmish-1",
   "seed": "skirmish-1",
+  "edge": "hull",
   "time": 0,
   "sectors": {
     "nexus": {

@@ -227,8 +227,9 @@ export const MatchMapSchema = z.object({
    *  `pve_waves` mode used to both exist and never be introduced to each other. */
   mode: z.string().optional(),
   /** How the province mosaic ends (`mosaicClip`): absent — the padded bounding rectangle;
-   *  `'hull'` — the padded convex hull of the centres, for a round map whose rim provinces
-   *  would otherwise stretch into the rectangle's empty corners. It decides which rim
+   *  `'hull'` — the padded convex hull of the centres, so a rim province ends about as far
+   *  out as an inland one instead of stretching to the rectangle (every map but four
+   *  story chapters, owner 2026-11-17). It decides which rim
    *  worlds border each other, so it is pinned into the state (`GameState.mapEdge`). */
   edge: z.literal('hull').optional(),
   sectors: z.record(z.string(), MapSectorSchema),

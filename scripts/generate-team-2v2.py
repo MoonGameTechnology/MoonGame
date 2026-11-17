@@ -236,7 +236,7 @@ sectors[spent[0]].update(kind='planet', planetType='barren')
 sectors[spent[1]].update(planetType='dead_world')
 PLACED.update(spent)
 
-content = dict(id='team-2v2', seed='broken-reach-20261014', sectors=sectors,
+content = dict(id='team-2v2', seed='broken-reach-20261014', edge='hull', sectors=sectors,
     regions=[dict(id=name, sectors=ids) for name, ids in REGION_SECTORS.items()],
     players=players, slots=slots, fleets=fleets,
     pricing=json.loads((ROOT / 'data/maps/duel-1.json').read_text())['pricing'],

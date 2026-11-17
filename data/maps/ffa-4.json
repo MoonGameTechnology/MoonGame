@@ -1,6 +1,7 @@
 {
   "id": "ffa-4",
   "seed": "ffa-4",
+  "edge": "hull",
   "sectors": {
     "home_1": {
       "position": {

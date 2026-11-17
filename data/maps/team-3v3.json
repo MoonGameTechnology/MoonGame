@@ -1,6 +1,7 @@
 {
   "id": "team-3v3",
   "seed": "shattered-crown-20261014",
+  "edge": "hull",
   "sectors": {
     "home_1": {
       "position": {
