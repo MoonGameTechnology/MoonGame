@@ -209,6 +209,9 @@
   #side .ptiles{gap:5px;margin:3px 0 6px;}
   #side .ptile{min-width:46px;min-height:40px;padding:4px 5px;}
   #side .ptile .pt-ic{font-size:15px;}
+  /* плитка корабля держит четыре значка модулей — уже 70 px ей не стать */
+  #side .ptile.ship{min-width:70px;min-height:84px;padding:4px;}
+  #side .ptile.ship .uglyph{width:26px;height:26px;}
   #side .conveyor{margin:4px 0 6px;padding:6px;}
   #side .hint{font-size:var(--fs-caption);margin-top:6px;}
 }

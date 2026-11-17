@@ -14,7 +14,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-import { setLocale, t } from '../../localization/runtime';
+import { setLocale, t, tData } from '../../localization/runtime';
 import {
   createInitialState,
   type Fleet,
@@ -423,8 +423,47 @@ describe('свой флот', () => {
       fleet('F3', 'p1', 'Z', [{ unit: 'frigate', count: 1, battles: 12, modules: ['mine_layer'] }]),
     );
     const html = card('F3');
-    expect(html).toContain('class="ptile vet"');
+    expect(html).toContain('class="ptile ship vet"');
     expect(html).toContain('<span class="pt-mods">');
+  });
+
+  it('плитки кораблей — ровной сеткой: модуль значком, свободный отсек точкой', async () => {
+    const { card, put } = await boot();
+    put(
+      fleet('F3', 'p1', 'Z', [
+        { unit: 'frigate', count: 12 },
+        { unit: 'frigate', count: 1, modules: ['ablative_plating', 'repair_bay'] },
+      ]),
+    );
+    const html = card('F3');
+    expect(html).toContain('<div class="ptiles ships">');
+    // Счётчик стоит первым — в углу плитки, над силуэтом.
+    expect(html).toMatch(/class="ptile ship" data-shipcard="F3\|0"[^>]*><span class="pt-c">×12</);
+    const tiles = html.split('data-shipcard="F3|').slice(1);
+    // Голый фрегат — четыре точки, оснащённый — два значка и две точки.
+    expect(tiles[0]!.match(/class="pt-free"/g)).toHaveLength(4);
+    expect(tiles[0]).not.toContain('class="pt-mod"');
+    expect(tiles[1]!.match(/class="pt-mod"/g)).toHaveLength(2);
+    expect(tiles[1]!.match(/class="pt-free"/g)).toHaveLength(2);
+  });
+
+  it('модулей больше, чем мест в строке, — «+N» с именами спрятанных в подсказке', async () => {
+    const { env, card, put } = await boot();
+    // Прибавка слотов корпуса у владельца (Sector Zero) — те же отсеки, что видит карточка.
+    env.s.players.p1!.arsenal = { slots: { frigate: { utility: 2 } } } as never;
+    const six = [
+      'ablative_plating',
+      'repair_bay',
+      'long_range_optics',
+      'ion_engine',
+      'cargo_bay',
+      'radar_module',
+    ];
+    put(fleet('F3', 'p1', 'Z', [{ unit: 'frigate', count: 1, modules: six }]));
+    const html = card('F3');
+    expect(html.match(/class="pt-mod"/g)).toHaveLength(3);
+    expect(html).toContain(`title="${tData('Ion Engine')}, `);
+    expect(html).toContain('>+3</span>');
   });
 
   it('ремонт: только за кредиты — и у своей верфи, и вне дока (за металл снят)', async () => {

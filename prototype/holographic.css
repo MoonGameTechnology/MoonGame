@@ -548,6 +548,13 @@ body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile .pt-n{max-widt
 body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile .pt-c{font-size:var(--fs-body);color:var(--ink);}
 body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile .pt-hp{width:84%;height:4px;margin-top:3px;}
 body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile .pt-hpn{font-size:var(--fs-body);color:var(--ink);}
+/* Плитка корабля: полоска корпуса — у низа плитки, даже если имя ушло в две строки; значки
+   модулей на шаг крупнее под крупный текст консоли. */
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile.ship{min-height:0;padding:5px 5px 6px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile.ship .pt-hp{margin-top:auto;}
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile.ship .pt-mods{height:16px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile.ship .pt-mod,
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile.ship .pt-mod .module-pictogram{width:15px;height:15px;flex-basis:15px;}
 /* «Десант»: трюм заголовком колонки, таблица «кто где», ангар и погрузка. */
 body.holo-ui #holo-selection-window.fleet-console .fc-land{grid-column:land;grid-row:2;padding:12px 16px 14px;}
 body.holo-ui #holo-selection-window.fleet-console .fc-land .holdmeters{margin:0 0 10px;padding:0;border:0;background:none;gap:10px;}

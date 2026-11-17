@@ -29,6 +29,7 @@ import {
   type GameState,
   type Planet,
   type ShuttleStrike,
+  type SlotCounts,
   type Squadron,
   type StrikeBase,
   type UnitStack,
@@ -58,7 +59,8 @@ import {
   type StatBreakdown,
   type StatTone,
 } from '../../decisions/statModifiers';
-import { tileHp } from '../../decisions/unitTile';
+import { tileHp, tileModuleRow } from '../../decisions/unitTile';
+import { stackBonusSlots } from '../../decisions/shipCard';
 import { veteranMark } from '../../decisions/veteranMark';
 import { showsStarving } from './arrearsWarnings';
 import { marchFlagged } from './chainComposer';
@@ -305,7 +307,9 @@ export function taskGroupPanelHtml(group: Fleet[]): string {
 
 /** Тайлы состава Bytro-стиля: силуэт-архетип в цвете стороны (наземные — портрет
  *  с подписью имени), счётчик, мини-бар корпуса стека и его числа
- *  «осталось/всего» (`decisions/unitTile.ts`, заказ владельца 2026-09-25). Тап по кораблю
+ *  «осталось/всего» (`decisions/unitTile.ts`, заказ владельца 2026-09-25). У корабля
+ *  (`.ptile.ship`, заказ владельца 2026-11-17) счётчик в углу, силуэт крупнее, под ним —
+ *  строка маленьких значков модулей и точек свободных отсеков. Тап по кораблю
  *  флота — карточка стека с отсеками и надетыми модулями (`shipCard.ts`), по наземному и
  *  по гарнизону мира — досье юнита. */
 /** Даёт ли выслуга силу в этом матче — тот же конфиг, на котором считает ядро (VET-6). */
@@ -319,6 +323,7 @@ export function unitTileHtml(
   open: string,
   named = false,
   color = ownerColor(owner),
+  bonus?: Partial<SlotCounts>,
 ): string {
   const s = game.world();
   if (u.count <= 0) return '';
@@ -333,26 +338,40 @@ export function unitTileHtml(
     art ||
     (ground
       ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
-      : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: owner ? s.players[owner]?.faction : undefined, color, shield: (eff.shield ?? 0) > 0 })}</span>`);
+      : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: owner ? s.players[owner]?.faction : undefined, color, shield: (eff.shield ?? 0) > 0, px: 32 })}</span>`);
   // Наземные портреты сохраняют подпись; корабль узнаётся по силуэту, имя — в подсказке.
   // Окно флота на ПК (`named`) подписывает и корабли — так на макете владельца.
   const caption = ground || named ? `<span class="pt-n">${esc(name)}</span>` : '';
-  // Installed modules at a glance (RULES-2.1 / SM-0.3): two cruisers with different
-  // modules are separate stacks. Значками, как в конструкторе, — семипиксельные
-  // подписи не читались; имя модуля — в подсказке, полная картина — в карточке.
-  const modTags =
-    u.modules && u.modules.length > 0
-      ? `<span class="pt-mods">${u.modules
-          .map((m) => {
-            const mdef = data.modules[m];
-            const mname = mdef ? tData(mdef.name) : m;
-            return `<span class="pt-mod" title="${esc(mname)}" aria-label="${esc(mname)}">${moduleIcon(m)}</span>`;
-          })
-          .join('')}</span>`
-      : '';
   // Ветеран — своя плитка (стеки разной выслуги не сливаются) с шевронами степени.
   const vet = veteranMark(u, data, veteranPowerOn());
-  return `<button class="ptile${art ? ' with-art' : ''}${vet ? ' vet' : ''}" ${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}${vet ? veteranTag(vet, 'pt-vet') : ''}${caption}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${hp.low ? ' low' : ''}"><i style="width:${hp.pct}%"></i></span><span class="pt-hpn">${kfmt(hp.cur)}/${kfmt(hp.max)}</span></button>`;
+  const vetTag = vet ? veteranTag(vet, 'pt-vet') : '';
+  const count = `<span class="pt-c">×${u.count}</span>`;
+  const hpHtml = `<span class="pt-hp${hp.low ? ' low' : ''}"><i style="width:${hp.pct}%"></i></span><span class="pt-hpn">${kfmt(hp.cur)}/${kfmt(hp.max)}</span>`;
+  const attrs = `${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}"`;
+  if (ground) {
+    return `<button class="ptile${art ? ' with-art' : ''}${vet ? ' vet' : ''}" ${attrs}>${icon}${vetTag}${caption}${count}${hpHtml}</button>`;
+  }
+  return `<button class="ptile ship${vet ? ' vet' : ''}" ${attrs}>${count}${vetTag}${icon}${caption}${tileModulesHtml(u, bonus)}${hpHtml}</button>`;
+}
+/** Модули корабля на плитке (RULES-2.1 / SM-0.3: два крейсера с разными модулями — разные
+ *  стеки): что показать — `tileModuleRow`, рисунок — тот же, что в конструкторе, только
+ *  маленький и одного цвета. Имя модуля — в подсказке, полная картина — в карточке корабля.
+ *  Строка стоит и пустой: плитки одного ряда держат одну высоту. */
+function tileModulesHtml(u: UnitStack, bonus?: Partial<SlotCounts>): string {
+  const row = tileModuleRow(u, data, bonus);
+  const nameOf = (m: string): string => esc(data.modules[m] ? tData(data.modules[m].name) : m);
+  const marks = row.modules
+    .map(
+      (m) =>
+        `<span class="pt-mod" title="${nameOf(m)}" aria-label="${nameOf(m)}">${moduleIcon(m)}</span>`,
+    )
+    .join('');
+  const hidden = row.more.map(nameOf).join(', ');
+  const more =
+    row.more.length > 0
+      ? `<span class="pt-more" title="${hidden}" aria-label="${hidden}">+${row.more.length}</span>`
+      : '';
+  return `<span class="pt-mods">${marks}${'<span class="pt-free"></span>'.repeat(row.free)}${more}</span>`;
 }
 function fleetTilesHtml(f: Fleet, stacks: UnitStack[], named = false): string {
   const tiles = stacks
@@ -363,10 +382,14 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[], named = false): string {
         def.domain === 'space'
           ? `data-shipcard="${esc(f.id)}|${index}"`
           : `data-codex="u:${esc(u.unit)}"`;
-      return unitTileHtml(u, f.owner, open, named);
+      const bonus =
+        def.domain === 'ground' ? undefined : stackBonusSlots(game.world(), f.id, u, data);
+      return unitTileHtml(u, f.owner, open, named, ownerColor(f.owner), bonus);
     })
     .join('');
-  return tiles ? `<div class="ptiles">${tiles}</div>` : '';
+  // Корабли встают ровной сеткой одинаковых плиток; десант с портретами держит прежний ряд.
+  const ships = stacks.every((u) => data.units[u.unit]?.domain !== 'ground');
+  return tiles ? `<div class="ptiles${ships ? ' ships' : ''}">${tiles}</div>` : '';
 }
 /** Сводка армии (тап по имени в шапке карточки): состав по архетипам, боевой вес
  *  с капом, пулы корпуса/щита, скорость с активными множителями, трюм, радар,

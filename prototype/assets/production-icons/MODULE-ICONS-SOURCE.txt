@@ -17,6 +17,7 @@ Mapping:
   "ion_engine": "rocket",
   "radar_module": "broadcast",
   "compact_radar": "wifi-high",
+  "long_range_optics": "binoculars",
   "cargo_bay": "package",
   "repair_bay": "wrench",
   "siege_platform": "meteor",
