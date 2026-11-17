@@ -23,10 +23,12 @@ const COMMAND_ICONS: Record<string, HoloIcon> = {
   troops: 'arrows-down-up',
   more: 'dots-three',
   pick: 'plus-circle',
-  boost: 'lightning',
-  qauto: 'sword',
+  boost: 'fast-forward',
+  qauto: 'flag-banner',
   qretr: 'sign-out',
   stop: 'square',
+  bombard: 'crosshair',
+  'rocket-mine': 'bomb',
 };
 
 export function commandIcon(command: string, fallback: string): string {

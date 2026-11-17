@@ -404,9 +404,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `settingsOverlay.ts`, выбор — `sidePanel.ts`, жизненный цикл матча — `matchLifecycle.ts`,
   бой — `battleScreen.ts` + `battleView.ts` (прогноз — `decisions/battleForecast.ts`),
   окна экспедиции — `expeditionWindows.ts`, «Технологии» (дерево плиток) — `techTree.ts`.
-- От 720 px — голографическая консоль ПК и планшета (`holographicUi.ts`, окна —
-  `floatingWindows.ts`, масштаб — `decisions/pcScale.ts`); уже — телефон (`mobileHud.ts`,
-  нижняя панель — `decisions/phoneNav.ts`, приказ — черновик цели `mobileOrders.ts`).
+- От 720 px — консоль ПК и планшета (`holographicUi.ts`, окна — `floatingWindows.ts`, масштаб —
+  `decisions/pcScale.ts`); уже — телефон (`mobileHud.ts`, панель — `decisions/phoneNav.ts`, приказ —
+  черновик цели `mobileOrders.ts`, приказы — плитки-иконки, по удержанию памятка `cmdMemo.ts`).
 - Шапка матча (`matchTopBar.ts`) с чипом лимита управления (`decisions/controlCounter.ts`);
   карточки мира и флота (`worldFleetCard.ts`, `fleetCard.ts`), окно «i» мира только сообщает
   (`decisions/planetDossier.ts`); приказы флота показываются, только если ядро их примет
