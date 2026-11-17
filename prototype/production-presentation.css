@@ -491,3 +491,30 @@ body.holo-ui #constructor.pw-production :is(.pw-catalog-tile .pw-catalog-actions
 #constructor.pw-production .pw-hardware-remove::after { content:''; position:absolute; inset:-11px; pointer-events:auto; }
 /* Отсек узкий (80px): крестик меньше и ближе к углу, чтобы не касаться значка модуля. */
 #constructor.pw-production .pw-bays .cn-bay .cn-tx { top:3px; right:3px; width:20px; min-width:20px; height:20px; min-height:20px; font-size:12px; }
+/* Оснащение, 2026-11-17 (телефон владельца: плитки огромные, имя рвётся посреди слова,
+   изменение характеристик не видно). Строка характеристик над модулями; плитка — строкой:
+   значок слева, имя в две строки без разрыва слов, что станет с кораблём, цена. */
+#constructor.pw-production .pw-fit-strip { display:grid; grid-template-columns:repeat(auto-fill,minmax(66px,1fr)); gap:3px; margin-bottom:5px; }
+#constructor.pw-production .pw-fs { display:flex; flex-direction:column; align-items:center; min-width:0; padding:3px 2px; border:1px solid #1d3a45; border-radius:7px; background:#071923; font-size:10px; line-height:1.2; color:#94afb9; }
+#constructor.pw-production .pw-fs.changed { border-color:#2b7a66; }
+#constructor.pw-production .pw-fs > b { font-size:13px; color:#e1f0f3; font-variant-numeric:tabular-nums; }
+#constructor.pw-production .pw-fs-k { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#constructor.pw-production .pw-fitting-dialog .pw-up { color:var(--grn,#5ff0c0); font-weight:700; }
+#constructor.pw-production .pw-fitting-dialog .pw-down { color:var(--red,#ff5a4d); font-weight:700; }
+#constructor.pw-production .pw-fitting-dialog .cn-pal { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
+#constructor.pw-production .pw-fitting-dialog .cn-mod { display:grid; grid-template-columns:26px minmax(0,1fr); align-items:center; align-content:center; gap:1px 6px; min-height:0; padding:5px 6px; text-align:left; }
+#constructor.pw-production .pw-fitting-dialog .cn-mod > :not(.cn-mic) { grid-column:2; }
+#constructor.pw-production .pw-fitting-dialog .cn-mod .cn-mic { grid-row:1 / span 4; width:26px; height:26px; }
+#constructor.pw-production .pw-fitting-dialog .cn-mod .cn-mn { font-size:12px; line-height:1.25; overflow-wrap:normal; word-break:normal; hyphens:auto; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+#constructor.pw-production .pw-fitting-dialog .cn-mod .cn-mo { margin-left:4px; padding:0 4px; font-size:9px; white-space:nowrap; vertical-align:1px; }
+#constructor.pw-production .pw-fitting-dialog .cn-mod .cn-me { display:flex; flex-wrap:wrap; gap:0 6px; font-size:11px; line-height:1.3; }
+#constructor.pw-production .pw-fitting-dialog .cn-mod .cn-mc { font-size:11px; }
+#constructor.pw-production .pw-fitting-dialog .cn-mod .cn-mc .rcost { font-size:11px; }
+/* Широкое окно (ПК, планшет, телефон боком): корабль слева, характеристики и модули справа —
+   модули больше не уезжают под прокрутку под артом. */
+@media (min-width:760px) {
+  #constructor.pw-production .pw-fitting-dialog:has(.pw-fit-side) { width:min(900px,100%); }
+  #constructor.pw-production .pw-fitting-body:has(> .pw-fit-side) { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-rows:auto auto auto 1fr; column-gap:8px; align-items:start; }
+  #constructor.pw-production .pw-fitting-body:has(> .pw-fit-side) > :not(.pw-fit-side) { grid-column:1; grid-row:auto; }
+  #constructor.pw-production .pw-fitting-body > .pw-fit-side { grid-column:2; grid-row:1 / span 4; }
+}

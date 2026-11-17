@@ -45,6 +45,7 @@ import { moduleGroups } from '../../decisions/moduleGroups';
 import type { SlotCallout } from '../../decisions/slotCallouts';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
 import { effectChip, STAT_KEY } from './moduleEffect';
+import { fitStripHtml, swapChipsHtml } from './productionFitStats';
 import {
   effectiveStats,
   matchCost,
@@ -327,14 +328,13 @@ export function loadoutPaneHtml(
       );
     })
     .join('');
+  // Плитка показывает, что станет с ЭТИМ кораблём (замена в занятом отсеке — с минусами).
+  const swap = (id: string) => swapChipsHtml(data.units[m.unit]!, m.modules, m.slots[sel]?.moduleId, id, boosts, data);
   const paletteCard = (o: LoadoutModel['palette'][number]): string => {
-    const eff = Object.entries(o.effect)
-      .map(([k, v]) => effectChip(k, v))
-      .join(' ');
     if (o.installable) {
       return (
         `<button class="cn-mod r-${o.rarity}${o.id === m.slots[sel]?.moduleId ? ' on' : ''}" data-cnmod="${o.id}" aria-pressed="${o.id === m.slots[sel]?.moduleId}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
-        `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span>${moduleGradeHtml(o.rarity, o.star)}<span class="cn-me">${eff}</span><span class="cn-mc">${priceHtml(o.cost)}</span></button>`
+        `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span>${moduleGradeHtml(o.rarity, o.star)}<span class="cn-me">${swap(o.id)}</span><span class="cn-mc">${priceHtml(o.cost)}</span></button>`
       );
     }
     // Причина берётся из КОДА отказа ядра, а не гадается: «нет слота» и «не для
@@ -442,11 +442,11 @@ export function loadoutPaneHtml(
     `<details class="cn-side pw-fit-stats"><summary>${t('yard.stats')}</summary>${bars}${damage}` +
     (m.hasSlots ? `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div>` : '') +
     `</details>${troopRow}`;
-  // Раскладка (шаг 3): на ПК три колонки — корпуса, корабль с характеристиками, модули
-  // отсека; на телефоне одна колонка в том же порядке, модули сразу под артом. Корпус без
-  // отсеков — без колонки модулей.
+  // Окно оснащения: в широком окне слева корабль, справа строка характеристик и модули
+  // отсека; на телефоне одна колонка, строка характеристик прямо над модулями — тронул
+  // плитку, и видно, что изменилось. Корпус без отсеков — без колонки модулей.
   const card = `<div class="cn-card${m.hasSlots ? ' with-tiles' : ''}">${hullCard}<div class="pw-bays">${bays}</div></div>`;
-  const slotCol = panel ? `<div class="cn-slot">${panel}</div>` : '';
+  const slotCol = panel ? `<div class="pw-fit-side">${fitStripHtml(m.preview)}<div class="cn-slot">${panel}</div></div>` : '';
   return `<div class="cn-grid ${data.units[draft.hull]?.domain === 'ground' ? 'pw-ground' : ''} ${slotCol ? 'cn-g3' : 'cn-g2'}"><div class="cn-hulls">${productionCatalogHeading(view.section)}${hulls}</div>${fittingSheet(card + slotCol + stats, displayUnit(draft.hull), hullDef?.domain === 'ground')}</div>`;
 }
 

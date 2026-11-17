@@ -1264,6 +1264,17 @@ describe('производство — модули открытого отсе�
     expect(html).not.toContain(' — ');
   });
 
+  it('характеристики видны над модулями, а плитка говорит, что изменится у корабля', () => {
+    // Телефон владельца, 2026-11-17: «не показывает изменение в характеристиках».
+    const html = pane({ hull: 'heavy_cruiser', modules: ['targeting_array'], slot: 0 });
+    expect(html).toMatch(/<div class="pw-fit-side"><div class="pw-fit-strip"[^>]*>.*data-stat="attack".*<\/div><div class="cn-slot">/);
+    // Надетый модуль — своим вкладом, замена — с потерей того, что снимается.
+    const tile = (id: string) => html.match(new RegExp(`data-cnmod="${id}".*?</button>`))?.[0] ?? '';
+    expect(tile('targeting_array')).toContain(`<span class="pw-up">+2 ${t('div.stat.attack')}</span>`);
+    expect(tile('ablative_plating')).toContain(`<span class="pw-down">−2 ${t('div.stat.attack')}</span>`);
+    expect(tile('ablative_plating')).toContain(`<span class="pw-up">+6 ${t('stat.hp')}</span>`);
+  });
+
   it('нет ни одного модуля для отсека — так и сказано, а не пустая колонка', () => {
     const bare = rich();
     bare.players.p1!.arsenal = { hulls: ['cruiser'], modules: [] };
@@ -1455,12 +1466,14 @@ describe('производство — редкость и уровень про
   });
 
   it('забег: карточка звёздного модуля в колонке отсека — с его звёздами и числом', () => {
-    const s = seat({ cargo_bay: 1 });
+    // Плитка пишет, что получит корабль (2026-11-17), а целые статы ядро округляет: трюм
+    // 6 × 1.05 у корабля — те же 6, поэтому звезду видно на обзоре (20 × 1.05 = 21).
+    const s = seat({ long_range_optics: 1 });
     const d = normalizeDraft(s, 'p1', draftOf({ hull: 'frigate', modules: [], slot: 2 }), YARD_HULLS);
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
-    const c = card(html, 'cargo_bay');
+    const c = card(html, 'long_range_optics');
     expect(c).toContain('★</span>');
-    const cargo = data.modules.cargo_bay!.effects.stats.cargoCapacity!;
-    expect(c).toContain(`+${Math.round(cargo * 1.05 * 10) / 10} `);
+    const sight = data.modules.long_range_optics!.effects.stats.sightRange!;
+    expect(c).toContain(`+${Math.round(sight * 1.05)} `);
   });
 });
