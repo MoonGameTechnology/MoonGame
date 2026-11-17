@@ -514,10 +514,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   берёт Яндекс, только если поднят лоадер SDK ([platform-adapters.md](platform-adapters.md)).
 - Архив `dist/yandex/` — только Sector Zero и один язык; реклама только rewarded
   (`decisions/adPlacements.ts`), облако — `decisions/cloudSync.ts`.
-- APK — Capacitor (`mobile/`): обновления с VPS по манифесту, подписанному в CI (Ed25519,
-  `mobile/distribution.json`), с прогрессом по байтам ([ранбук](../deploy/apk/README.md));
-  кнопка «Скачать APK» — `decisions/apkOffer.ts`. RuStore закрыт до решений оператора
-  ([rustore-preparation.md](security/rustore-preparation.md)).
+- APK — Capacitor (`mobile/`): подписанные Ed25519 обновления с VPS с прогрессом по байтам
+  ([ранбук](../deploy/apk/README.md)), кнопка скачивания — `decisions/apkOffer.ts`.
+  VK Rewarded SDK со слотом 2111707 подключён без сетевого начисления до подтверждения провайдера
+  ([README](../mobile/README.md)); RuStore закрыт до [решений оператора](security/rustore-preparation.md).
 - ПК — Electron (`desktop/`, [README](../desktop/README.md)): тот же архив Sector Zero, без
   CI-ленты и Steam.
 

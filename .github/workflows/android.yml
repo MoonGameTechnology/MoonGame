@@ -173,6 +173,7 @@ jobs:
           # Wire the in-app updater (MainActivity VoidNative.open bridge) and stamp
           # versionCode/versionName (VOID_VC / VOID_VN from the env above).
           node patch-updater.mjs
+          node patch-vk-rewarded.mjs
 
       # Sign with a COMMITTED debug keystore (standard android/android credentials —
       # not a secret) so every build has the SAME signature. Without this, the Gradle

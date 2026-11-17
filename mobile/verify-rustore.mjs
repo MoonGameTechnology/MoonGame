@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { validateRelease, verifyPermissions, verifyPolicyDocument, verifySigningCertificate } from './rustore-config.mjs';
+import { verifyVkRewarded } from './patch-vk-rewarded.mjs';
 const config = validateRelease(JSON.parse(readFileSync(process.env.RUSTORE_CONFIG_FILE, 'utf8')));
 const apk = process.argv[2]; if (!apk) throw Error('E_RUSTORE_APK');
 const aapt = process.env.AAPT ?? 'aapt';
@@ -19,6 +20,7 @@ for (const name of ['allowBackup', 'usesCleartextTraffic']) if (!new RegExp(`and
 const signatures = run(process.env.APKSIGNER ?? 'apksigner', ['verify', '--verbose', '--print-certs', apk]);
 verifySigningCertificate(signatures, config.certificateSha256);
 const html = run('unzip', ['-p', apk, 'assets/public/index.html']);
+verifyVkRewarded(html, run('unzip', ['-p', apk, 'assets/public/vk-rewarded-bridge.js']), manifest);
 if (!html.includes('"channel":"rustore"') || !html.includes('"privacyUrl":"privacy.html"')) throw Error('E_RUSTORE_CHANNEL');
 const capacitor = JSON.parse(run('unzip', ['-p', apk, 'assets/capacitor.config.json']));
 if (capacitor.appId !== config.appId || capacitor.webDir !== 'www' ||
