@@ -449,9 +449,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   описание — `matchDescription.ts`), личный архив (`seats.archived`), битвы корпораций отдельной
   вкладкой. Создавать онлайн-сессии в проде могут UUID из `MATCH_CREATOR_ACCOUNT_IDS`
   (`GET /matches/capabilities`).
-- Арсенал (`arsenalScreen.ts`, `decisions/arsenalView.ts`), «Снабжение» и аукцион
-  (`metaEconomyScreen.ts`, `metaMarketScreen.ts`, `decisions/auctionHouse.ts`: купить, торги
-  со ставками, продать, заказы на покупку), магазин (`shopScreen.ts`, `decisions/shopView.ts`).
+- Арсенал (`arsenalScreen.ts`, `decisions/arsenalView.ts`), снабжение и аукцион (`metaEconomyScreen.ts`,
+  `metaMarketScreen.ts`, `decisions/auctionHouse.ts`), магазин (`shopScreen.ts`, `decisions/shopView.ts`).
+  Фиатные пакеты закрыты заглушкой; премиум, модули, материалы и стили доступны за Суверены.
 - «Корпорация» (`corpHubView.ts`, `decisions/corpHub.ts`): база-сцена (`corpSprites.ts`,
   `corpArt.ts`), битвы, состав, казна, настройки ([corporation-ui.md](corporation-ui.md)).
 - Аккаунт — `accountSession.ts`, `accountDeletion.ts`, «Восстановить доступ» — `signInPages.ts`;

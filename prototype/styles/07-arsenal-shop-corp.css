@@ -316,10 +316,12 @@ span.ar-fchip{cursor:default;}
 .sh-row2 > *{flex:1;}
 @container shop (min-width:700px){
   .sh-main{grid-template-columns:minmax(0,1fr) minmax(300px,350px);}
+  .sh-main.sh-fiat-closed{grid-template-columns:minmax(0,1fr);}
   .sh-tabs{grid-column:1 / -1;}
 }
 @container shop (min-width:980px){
   .sh-main{grid-template-columns:184px minmax(0,1fr) minmax(300px,360px);}
+  .sh-main.sh-fiat-closed{grid-template-columns:184px minmax(0,1fr);}
   .sh-tabs{grid-column:auto;position:sticky;top:0;flex-direction:column;}
   .sh-tab{flex:0 0 auto;justify-content:flex-start;}
 }
