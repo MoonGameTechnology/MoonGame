@@ -112,6 +112,18 @@ describe('SHU-4.3 — слияние двумя тапами', () => {
     expect(mergeTargets(v, 'a', data)).toEqual([]);
     expect(squadronCards(v, { mine: true, data })[0]?.canMerge).toBe(false);
   });
+
+  it('СВОДЯТСЯ ТОЛЬКО ГОТОВЫЕ: база заправляется или перезаряжается — плитки «Слить» нет', () => {
+    const pair = [sq('a', [['interceptor', 1]]), sq('b', [['bomber', 1]])];
+    const can = (blocked: HangarView['blocked']) =>
+      squadronCards(view(pair, { blocked }), { mine: true, data })[0]?.canMerge;
+    expect([can(null), can('rearming'), can('no-fuel'), can('busy')]).toEqual([true, false, false, false]);
+    // Ракетам топливо порта не нужно: им мешает только бой у базы.
+    const rockets = [sq('m', [['cruise_missile', 1]]), sq('n', [['cruise_missile', 1]])];
+    const canRockets = (blocked: HangarView['blocked']) =>
+      squadronCards(view(rockets, { blocked }), { mine: true, data })[0]?.canMerge;
+    expect([canRockets('rearming'), canRockets('busy')]).toEqual([true, false]);
+  });
 });
 
 describe('SHU-5.2 — десант в трюме только показывается', () => {
