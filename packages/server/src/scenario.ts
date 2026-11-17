@@ -100,7 +100,11 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '107'; // RALLY-2: порядок тот же; `auto-rally` 1.4.0 —
+export const MODULE_MANIFEST_VERSION = '108'; // FORT-5.17: порядок тот же; `orbital` 1.8.0 —
+// флак мира и обстрел флота ложатся в порядке времени при любой нарезке отрезка, залп флака метит
+// `lastDamagedAt` своим мгновением. Партия на 107 сперва стреляла бы всем флаком отрезка, потом
+// обстрелом, и мир после офлайна расходился бы с миром под присмотром.
+// export const MODULE_MANIFEST_VERSION = '107'; // RALLY-2: порядок тот же; `auto-rally` 1.4.0 —
 // точка сбора на любой мир, кроме видимой закрытой территории; `movement` 1.10.0 — путь точки
 // встаёт у закрытой границы. Партия на 106 сняла бы точку при смене хозяина цели.
 // export const MODULE_MANIFEST_VERSION = '106'; // ЧЛЕНСТВО — `spy-levels` 1.0.0 сразу за

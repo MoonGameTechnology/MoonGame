@@ -762,6 +762,19 @@ export const SQUADRON_REFUEL_SOLO_MIGRATION = {
   toDataHash: '0f85efc1673abe',
 } as const;
 
+/** Rules-only pair: orbital 1.8.0 — the world's flak and a fleet's bombardment land in the
+ *  order of time however the span is cut, and a flak volley stamps `lastDamagedAt` with its
+ *  own instant (FORT-5.17). The catalogue is unchanged and so is the saved shape: a saved
+ *  world reads as is, only later spans interleave the two fires. */
+export const ORBITAL_TIME_ORDER_SOLO_MIGRATION = {
+  fromRules: SQUADRON_REFUEL_SOLO_MIGRATION.toRules,
+  fromData: SQUADRON_REFUEL_SOLO_MIGRATION.toData,
+  fromDataHash: SQUADRON_REFUEL_SOLO_MIGRATION.toDataHash,
+  toRules: '1e9665469708f6',
+  toData: SQUADRON_REFUEL_SOLO_MIGRATION.toData,
+  toDataHash: SQUADRON_REFUEL_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -828,6 +841,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPY_DEFECTOR_SOLO_MIGRATION,
   CAPTIVE_CARRIER_SOLO_MIGRATION,
   SQUADRON_REFUEL_SOLO_MIGRATION,
+  ORBITAL_TIME_ORDER_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

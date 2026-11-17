@@ -114,13 +114,24 @@ function shipGroundPower(
   return groundVolley(fleet.units, planet.garrison, data, shipGroundDamage);
 }
 
-/** Resolves the orbital layer over one continuous time span: planetary AA fires
- *  at near-orbit attackers (unless a ground assault keeps it busy). Bombardment is
- *  not here: it fires on each fleet's own hourly clock ({@link fireBombardVolley}).
+/** A world whose flak may fire in this span: owned, with an orbit, not holding off a
+ *  ground assault, and armed at the span's start. Inside a span flak can only weaken —
+ *  shelling wrecks emplacements and thins the crews, while new guns and troops arrive with
+ *  an event, i.e. at a span's edge — so a world unarmed at the start stays silent to its end. */
+interface FlakBattery {
+  planetId: string;
+  owner: string;
+  /** Fleets on this node at the span's start: within the span they only leave it by dying. */
+  localFleets: Fleet[] | undefined;
+  /** ECON-2 «блэкаут» multiplier, fixed for the span like the arrears it reads. */
+  aaMult: number;
+}
+
+/** The worlds whose flak may fire in this span.
  *
  *  Optimized with a fleet-by-location index and a ground-assault set so the
  *  cost is O(planets + fleets + battles) instead of O(planets × fleets). */
-function runOrbital(h: HandlerContext, from: number, to: number): void {
+function flakBatteries(h: HandlerContext): FlakBattery[] {
   const data = h.ctx.data;
 
   // Pre-index fleets by location — O(fleets).
@@ -139,12 +150,12 @@ function runOrbital(h: HandlerContext, from: number, to: number): void {
     if (b.phase === 'ground') groundAssaults.add(b.location);
   }
 
+  const batteries: FlakBattery[] = [];
   for (const planetId of Object.keys(h.state.planets)) {
     const planet = h.state.planets[planetId];
     if (!planet) {
       continue;
     }
-    const localFleets = fleetsByLocation.get(planetId);
 
     // No orbital layer (asteroid field, nebula, dead world, debris) — nothing to
     // shell and nothing to shell FROM: neither AA nor bombardment happens here.
@@ -152,88 +163,105 @@ function runOrbital(h: HandlerContext, from: number, to: number): void {
       continue;
     }
 
-    // AA — anti-ship, only when not defending the ground. Two tiers, both firing
-    // discrete VOLLEYS on the world-time grid (a fleet slipping in and out of orbit
-    // BETWEEN volleys escapes untouched — timing a raid past the flak matters):
-    //   - ORBITAL (buildings): one full-strength volley per game-HOUR;
-    //   - CLOSE (garrison units): a quarter-strength volley every QUARTER-hour —
-    //     same hourly output, but only a 15-minute window to dodge.
-    // The quarter grid contains the hour grid, so one walk over quarter boundaries
-    // covers both; at a shared boundary the heavy orbital volley lands first.
-    if (planet.owner !== null && !groundAssaults.has(planetId)) {
-      // ECON-2 «блэкаут»: unpaid energy halves BOTH flak tiers until the bill is
-      // covered — same knob as the radar dim (BLACKOUT_MULT, visibility.ts).
-      const starved = h.state.players[planet.owner]?.arrears?.includes('energy') === true;
-      const aaMult = starved ? BLACKOUT_MULT : 1;
-      const aaOrbital = aaOrbitalAt(planet, data) * aaMult;
-      const aaClose = aaCloseAt(planet, data) * aaMult;
-      if (aaOrbital > 0 || aaClose > 0) {
-        const hourMs = hourIntervalMs(h.ctx); // one game-hour of world time
-        const quarterMs = hourMs / 4;
-        const firstQ = Math.floor(from / quarterMs) + 1;
-        const lastQ = Math.floor(to / quarterMs);
-        const volley = (damage: number, tier: 'orbital' | 'close'): boolean => {
-          // Re-aim every volley: a target destroyed mid-span frees its share of the
-          // next strike for the hostiles still hanging in orbit.
-          const targets = nearOrbitHostiles(h, planetId, planet.owner!, localFleets);
-          if (targets.length === 0) return false;
-          // MSB-7 — the volley is SPLIT over every hostile in near orbit, by the same
-          // shared rule the melee round runs (`splitVolley`). One gun, one firing
-          // solution, no target selection: the flak cannot be baited onto a decoy,
-          // and with one hostile the split degenerates into the old behaviour exactly.
-          const enemies = targets.map((f) => ({
-            ref: { kind: 'fleet' as const, fleetId: f.id },
-            owner: f.owner,
-          }));
-          for (const [i, share] of splitVolley(damage, enemies).entries()) {
-            const target = targets[i]!;
-            // CORE-DMG-1: flak runs through the SAME extension point as a melee round, so
-            // a technology bonus or faction passive reaches it. `phase` names the near-orbit
-            // layer and is never 'ground', so the fort / planet-type mitigations (which
-            // guard on the ground phase) stay out of the flak exchange.
-            // The hook is called PER SHARE, not once for the whole volley, for the reason
-            // the melee round calls it per pair: its subscribers measure the relation of
-            // two concrete owners, and one call would make their contributions
-            // indistinguishable.
-            // Scaled BEFORE the announcement: the tracer must carry the number that really
-            // lands, or the client draws one volley and the hull loses another.
-            const dealt = hookedDamage(h, share.damage, {
-              phase: 'orbital',
-              location: planetId,
-              attacker: planet.owner,
-              defender: target.owner,
-              // `attackerFleet` нет намеренно: стреляет МИР. Ауры героя — бонус флотам.
-              defenderFleet: target.id,
-            });
-            // Announce BEFORE applying: the client draws the flak burst planet→fleet
-            // even when this very volley destroys the target (H2 — visible AA fire).
-            // One tracer PER SHARE — a single event for a split volley would draw one
-            // burst where three hulls took damage.
-            h.emit('aa.fired', {
-              planetId,
-              owner: planet.owner,
-              fleetId: target.id,
-              by: target.owner,
-              damage: dealt,
-              tier,
-            });
-            applyDamageToSide(h, share.to, dealt, data, planetId, undefined, undefined, planet.owner);
-            removeIfWiped(h, target.id);
-          }
-          return true;
-        };
-        outer: for (let q = firstQ; q <= lastQ; q++) {
-          if (aaOrbital > 0 && q % 4 === 0) {
-            if (!volley(aaOrbital, 'orbital')) break outer;
-          }
-          if (aaClose > 0) {
-            if (!volley(aaClose / 4, 'close')) break outer;
-          }
-        }
-      }
+    // AA — anti-ship, only when not defending the ground.
+    if (planet.owner === null || groundAssaults.has(planetId)) {
+      continue;
     }
-
+    // ECON-2 «блэкаут»: unpaid energy halves BOTH flak tiers until the bill is
+    // covered — same knob as the radar dim (BLACKOUT_MULT, visibility.ts).
+    const starved = h.state.players[planet.owner]?.arrears?.includes('energy') === true;
+    const aaMult = starved ? BLACKOUT_MULT : 1;
+    if (aaOrbitalAt(planet, data) * aaMult > 0 || aaCloseAt(planet, data) * aaMult > 0) {
+      batteries.push({ planetId, owner: planet.owner, localFleets: fleetsByLocation.get(planetId), aaMult });
+    }
   }
+  return batteries;
+}
+
+/** One flak volley of `battery` at `instant`. False when there is no hostile left in
+ *  its orbit: then the world has nothing to shoot at for the rest of the span. */
+function flakVolley(
+  h: HandlerContext,
+  battery: FlakBattery,
+  damage: number,
+  tier: 'orbital' | 'close',
+  instant: number,
+): boolean {
+  const { planetId, owner } = battery;
+  // Re-aim every volley: a target destroyed mid-span frees its share of the
+  // next strike for the hostiles still hanging in orbit.
+  const targets = nearOrbitHostiles(h, planetId, owner, battery.localFleets);
+  if (targets.length === 0) return false;
+  // MSB-7 — the volley is SPLIT over every hostile in near orbit, by the same
+  // shared rule the melee round runs (`splitVolley`). One gun, one firing
+  // solution, no target selection: the flak cannot be baited onto a decoy,
+  // and with one hostile the split degenerates into the old behaviour exactly.
+  const enemies = targets.map((f) => ({
+    ref: { kind: 'fleet' as const, fleetId: f.id },
+    owner: f.owner,
+  }));
+  for (const [i, share] of splitVolley(damage, enemies).entries()) {
+    const target = targets[i]!;
+    // CORE-DMG-1: flak runs through the SAME extension point as a melee round, so
+    // a technology bonus or faction passive reaches it. `phase` names the near-orbit
+    // layer and is never 'ground', so the fort / planet-type mitigations (which
+    // guard on the ground phase) stay out of the flak exchange.
+    // The hook is called PER SHARE, not once for the whole volley, for the reason
+    // the melee round calls it per pair: its subscribers measure the relation of
+    // two concrete owners, and one call would make their contributions
+    // indistinguishable.
+    // Scaled BEFORE the announcement: the tracer must carry the number that really
+    // lands, or the client draws one volley and the hull loses another.
+    const dealt = hookedDamage(h, share.damage, {
+      phase: 'orbital',
+      location: planetId,
+      attacker: owner,
+      defender: target.owner,
+      // `attackerFleet` нет намеренно: стреляет МИР. Ауры героя — бонус флотам.
+      defenderFleet: target.id,
+    });
+    // Announce BEFORE applying: the client draws the flak burst planet→fleet
+    // even when this very volley destroys the target (H2 — visible AA fire).
+    // One tracer PER SHARE — a single event for a split volley would draw one
+    // burst where three hulls took damage.
+    h.emit('aa.fired', {
+      planetId,
+      owner,
+      fleetId: target.id,
+      by: target.owner,
+      damage: dealt,
+      tier,
+    });
+    const stamped = target.lastDamagedAt;
+    applyDamageToSide(h, share.to, dealt, h.ctx.data, planetId, undefined, undefined, owner);
+    // The shared damage path stamps a hit with `h.ctx.now` — the END of this span. The
+    // volley landed at `instant`, inside it: re-stamp, so a shield waits out its delay from
+    // the volley itself, however long the span (FORT-5.17).
+    if (target.lastDamagedAt !== stamped) target.lastDamagedAt = instant;
+    removeIfWiped(h, target.id);
+  }
+  return true;
+}
+
+/** One quarter-hour mark `q` of a world's flak, at `instant`. Two tiers, both firing
+ *  discrete VOLLEYS on the world-time grid (a fleet slipping in and out of orbit
+ *  BETWEEN volleys escapes untouched — timing a raid past the flak matters):
+ *    - ORBITAL (buildings): one full-strength volley per game-HOUR;
+ *    - CLOSE (garrison units): a quarter-strength volley every QUARTER-hour —
+ *      same hourly output, but only a 15-minute window to dodge.
+ *  The quarter grid contains the hour grid; at a shared mark the heavy orbital volley
+ *  lands first. Both tiers are read AT the mark: shelling earlier in the span may have
+ *  wrecked an emplacement or thinned the crews (FORT-5.17). False once the world has
+ *  nothing to shoot at or nothing left to shoot with — silent for the rest of the span. */
+function fireFlak(h: HandlerContext, battery: FlakBattery, q: number, instant: number): boolean {
+  const planet = h.state.planets[battery.planetId];
+  if (!planet) return false;
+  const aaOrbital = aaOrbitalAt(planet, h.ctx.data) * battery.aaMult;
+  const aaClose = aaCloseAt(planet, h.ctx.data) * battery.aaMult;
+  if (aaOrbital <= 0 && aaClose <= 0) return false;
+  if (aaOrbital > 0 && q % 4 === 0 && !flakVolley(h, battery, aaOrbital, 'orbital', instant)) return false;
+  if (aaClose > 0 && !flakVolley(h, battery, aaClose / 4, 'close', instant)) return false;
+  return true;
 }
 
 /** Start a fleet's bombardment clock: the first volley lands one game hour from now,
@@ -244,9 +272,9 @@ function armBombard(h: HandlerContext, fleet: Fleet): void {
 
 /** Every bombardment volley due in the span `(from, to]`, in (instant, fleet id) order.
  *  The clock is absolute (`fleet.bombardNextAt`), so one long span and many short ones
- *  land the same volleys at the same instants. A fleet that stopped bombarding drops its
+ *  see the same volleys at the same instants. A fleet that stopped bombarding drops its
  *  clock; one left bombarding without a clock (an old save) starts it at the span start. */
-function runBombardment(h: HandlerContext, from: number, to: number): void {
+function dueBombardVolleys(h: HandlerContext, from: number, to: number): Array<{ at: number; fleet: Fleet }> {
   const hourMs = hourIntervalMs(h.ctx);
   const due: Array<{ at: number; fleet: Fleet }> = [];
   for (const f of recordValues(h.state.fleets)) {
@@ -257,8 +285,34 @@ function runBombardment(h: HandlerContext, from: number, to: number): void {
     if (f.bombardNextAt === undefined) f.bombardNextAt = from + hourMs;
     for (let at = f.bombardNextAt; at <= to; at += hourMs) due.push({ at, fleet: f });
   }
-  due.sort((a, b) => a.at - b.at || (a.fleet.id < b.fleet.id ? -1 : a.fleet.id > b.fleet.id ? 1 : 0));
-  for (const { at, fleet } of due) {
+  return due.sort((a, b) => a.at - b.at || (a.fleet.id < b.fleet.id ? -1 : a.fleet.id > b.fleet.id ? 1 : 0));
+}
+
+/** The orbital layer over one continuous span `(from, to]`: the worlds' flak on the
+ *  quarter-hour grid and every fleet's bombardment volley on its own clock, IN THE ORDER
+ *  OF TIME (FORT-5.17). The span's length is not ours — an unwatched match sleeps to its
+ *  next event, a watched one ticks every second — so the two fires must interleave as they
+ *  would tick by tick: a shelled emplacement stops firing, a fleet downed by flak lands
+ *  the volleys it fired before, with the strength it had then. At one instant the flak
+ *  lands first, as it does in a span that ends on that instant. */
+function runOrbitalSpan(h: HandlerContext, from: number, to: number): void {
+  const hourMs = hourIntervalMs(h.ctx); // one game-hour of world time
+  const quarterMs = hourMs / 4;
+  let q = Math.floor(from / quarterMs) + 1;
+  const lastQ = Math.floor(to / quarterMs);
+  let batteries = q <= lastQ ? flakBatteries(h) : [];
+  const volleys = dueBombardVolleys(h, from, to);
+  let next = 0;
+  for (;;) {
+    const flakAt = batteries.length > 0 && q <= lastQ ? q * quarterMs : Infinity;
+    const shellAt = next < volleys.length ? volleys[next]!.at : Infinity;
+    if (flakAt === Infinity && shellAt === Infinity) return;
+    if (flakAt <= shellAt) {
+      const mark = q++;
+      batteries = batteries.filter((battery) => fireFlak(h, battery, mark, flakAt));
+      continue;
+    }
+    const { at, fleet } = volleys[next++]!;
     // A volley earlier in this span may have ended the bombardment (the fleet is gone
     // or no longer shelling): its later volleys do not land.
     if (h.state.fleets[fleet.id] !== fleet || !fleet.bombarding) continue;
@@ -310,8 +364,9 @@ function fireBombardVolley(h: HandlerContext, f: Fleet): void {
  * module along the bus seams. There is a SINGLE orbit: arriving stations a fleet
  * in it, a stationed fleet can bombard the world below and is exposed to the
  * planet's AA. AA fires discrete two-tier VOLLEYS on the world-time grid (hourly
- * orbital emplacements, quarter-hour close flak); bombardment accrues over
- * continuous time (`time.advanced`), like the economy. Degrades gracefully:
+ * orbital emplacements, quarter-hour close flak); bombardment fires a volley an hour
+ * on each fleet's own clock; within a span both land in the order of time
+ * ({@link runOrbitalSpan}). Degrades gracefully:
  * without this module fleets still fight (melee `combat`) — no AA, no bombardment.
  */
 export const orbitalModule: GameModule = {
@@ -323,7 +378,9 @@ export const orbitalModule: GameModule = {
   // 1.5.0: обстрел бьёт пехоту и технику разной долей атаки (ROS-1.6b).
   // 1.6.0: обстрел бьёт залпом раз в игровой час по своим часам флота, как атака в бою
   //        (`fleet.bombardNextAt`), а не непрерывно.
-  version: '1.7.0',
+  // 1.8.0: флак мира и обстрел ложатся в порядке времени, а не «весь флак отрезка, потом
+  //        весь обстрел»; залп флака метит `lastDamagedAt` своим мгновением (FORT-5.17).
+  version: '1.8.0',
   setup(api) {
     // A single orbit (GDD §7.4): arriving = stationed in orbit, not bombarding
     // until ordered. Registered BEFORE the melee module in the manifest, so this
@@ -395,8 +452,8 @@ export const orbitalModule: GameModule = {
       h.emit('fleet.bombard', { fleetId, on, owner: action.playerId });
     });
 
-    // The orbital layer accrues over continuous time, like the economy (AA fires
-    // in discrete volleys on the from→to grid; bombardment has its own volley clock).
+    // The orbital layer over a span: AA volleys on the world-time grid and each fleet's
+    // bombardment volleys on its own clock, interleaved in the order of time.
     // Its place in the manifest fixes the order in which the layers accrue
     // within one span (invariant #6).
     api.on('time.advanced', (event, h) => {
@@ -405,8 +462,7 @@ export const orbitalModule: GameModule = {
       if (span <= 0) {
         return;
       }
-      runOrbital(h, from, to);
-      runBombardment(h, from, to);
+      runOrbitalSpan(h, from, to);
     });
   },
 };
