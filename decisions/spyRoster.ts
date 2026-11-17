@@ -36,6 +36,8 @@ export interface SpyRecordView {
   /** Где стоит; в пути — куда летит. */
   location: string;
   op?: SpyDoing;
+  /** Начало текущего пути или дела. */
+  departedAt?: number;
   /** Конец пути, работы, возвращения или вербовки. */
   arrivesAt?: number;
 }
@@ -60,6 +62,8 @@ export interface RosterRow {
   task: SpyDoing | null;
   /** Конец отсчёта; `null` — без таймера. */
   until: number | null;
+  /** Начало отсчёта для полосы хода; `null` — таймера нет или ядро начала не записало. */
+  since: number | null;
   action: RosterAction;
 }
 
@@ -93,6 +97,7 @@ export function spyRoster(spies: readonly SpyRecordView[] | undefined): RosterRo
         location: s.location,
         task: s.state === 'travel' || s.state === 'work' ? (s.op ?? null) : null,
         until: timed ? s.arrivesAt! : null,
+        since: timed && s.departedAt !== undefined && s.departedAt < s.arrivesAt! ? s.departedAt : null,
         action: actionOf(s.state),
       };
     });

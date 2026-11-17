@@ -8,36 +8,58 @@
 #spywin .spbox{display:flex;flex-direction:column;width:min(720px,96vw);max-height:88vh;background:var(--glass);
   border:1px solid var(--cyan);border-radius:10px;overflow:hidden;
   box-shadow:0 0 44px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
-#spywin .sp-title{color:#eafffb;font-size:var(--fs-heading);margin-right:auto;}
-#spywin .sp-back{margin-right:4px;}
-.sp-list{padding:10px 12px;overflow-y:auto;}
-
-/* Строка: фото · имя · где · чем занят · таймер · кнопка */
-.sp-row{display:grid;grid-template-columns:52px minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr) 64px 150px;align-items:center;gap:10px;
-  padding:7px 9px;margin-bottom:6px;border:1px solid var(--line-hi);border-radius:8px;background:rgba(53,214,230,.04);}
+#spywin .sp-title{color:#eafffb;font-size:var(--fs-heading);}
+#spywin .sp-count{margin-left:8px;margin-right:auto;padding:2px 8px;border:1px solid var(--line-hi);border-radius:999px;
+  color:var(--ink);font-size:var(--fs-caption);white-space:nowrap;}
+#spywin .sp-back{margin:0 4px 0 0;}
+.sp-list{padding:8px 10px;overflow-y:auto;}
 .spy-photo{border-radius:12%;}
-.sp-row .spy-photo{width:52px;height:52px;display:block;}
-.sp-row .sp-name{color:#eafffb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.sp-row .sp-place,.sp-row .sp-doing{color:var(--ink);font-size:var(--fs-caption);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.sp-row .sp-time{color:var(--amber);font-size:var(--fs-caption);white-space:nowrap;}
-.sp-row .sp-act{justify-self:stretch;}
-/* Залёг на дно (столицы нет): серый, заданий не берёт */
-.sp-row.sp-hidden{opacity:.45;filter:grayscale(1);}
 
-/* Окно «Дать задание»: шпион сверху, карточки одного размера слева направо, сверху вниз */
-.sp-who{display:flex;align-items:center;gap:12px;padding:10px 12px;color:var(--ink);font-size:var(--fs-caption);}
-.sp-who .spy-photo{width:64px;height:64px;flex:0 0 auto;}
-.sp-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-rows:150px;gap:8px;
-  padding:0 12px 12px;overflow-y:auto;}
-.sp-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;height:100%;padding:10px;text-align:left;
-  background:rgba(53,214,230,.06);border:1px solid var(--line-hi);border-radius:8px;color:var(--ink);cursor:pointer;
-  font:var(--fs-caption)/1.35 var(--sf-font);overflow:hidden;}
-.sp-card b{color:#eafffb;font-size:var(--fs-body);}
-.sp-card .sp-desc{flex:1 1 auto;overflow:hidden;}
-.sp-card .sp-cost{color:var(--amber);}
-.sp-card:hover:not(:disabled),.sp-card:active:not(:disabled){border-color:var(--cyan);background:rgba(53,214,230,.14);}
-.sp-card:disabled{cursor:default;opacity:.42;filter:grayscale(1);}
-.sp-card:disabled .sp-cost{color:var(--dim);}
+/* Строка: фото · имя над «занятие · место» · таймер · кнопка; по низу полоса хода */
+#spywin .sp-row{position:relative;display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;
+  grid-template-areas:'photo name time act' 'photo line time act';align-items:center;column-gap:10px;row-gap:1px;
+  padding:6px 8px;margin-bottom:5px;border:1px solid var(--sf-edge);border-top:1px solid var(--sf-edge);border-radius:8px;
+  background:var(--sf-card);overflow:hidden;--st:var(--dim);}
+#spywin .sp-row:hover{border-color:var(--sf-edge-hi);}
+#spywin .sp-row .spy-photo{grid-area:photo;width:44px;height:44px;display:block;box-shadow:0 0 0 1px var(--st);}
+#spywin .sp-row .sp-name{grid-area:name;align-self:end;color:#eafffb;font-size:var(--fs-body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#spywin .sp-line{grid-area:line;align-self:start;display:flex;align-items:center;gap:6px;min-width:0;color:var(--ink);font-size:var(--fs-caption);}
+#spywin .sp-dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--st);box-shadow:0 0 6px var(--st);}
+#spywin .sp-doing{color:var(--st);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#spywin .sp-place{flex:0 1 auto;min-width:0;color:var(--sf-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#spywin .sp-place::before{content:'· ';color:var(--dim);}
+#spywin .sp-row .sp-time{grid-area:time;color:var(--amber);font-size:var(--fs-caption);font-variant-numeric:tabular-nums;white-space:nowrap;}
+#spywin .sp-row .sp-act{grid-area:act;margin:0;min-width:132px;}
+#spywin .sp-bar{position:absolute;left:0;bottom:0;height:2px;background:var(--st);opacity:.85;}
+/* Цвет занятия: свободен — зелёный, в пути — циан, на задании — янтарь, остальное тихое */
+#spywin .sp-st-rest,#spywin .sp-st-wait{--st:var(--grn);}
+#spywin .sp-st-travel{--st:var(--cyan);}
+#spywin .sp-st-work{--st:var(--amber);}
+#spywin .sp-st-return,#spywin .sp-st-recruit{--st:var(--sf-dim);}
+/* Залёг на дно (столицы нет): серый, заданий не берёт */
+#spywin .sp-row.sp-st-hidden{opacity:.45;filter:grayscale(1);}
+#spywin .in-sec{margin-top:8px;}
+
+/* Окно «Дать задание»: фото и занятие шпиона в шапке, карточки одного размера */
+#spywin .sp-head-who{padding:6px 10px;}
+#spywin .sp-head-who .spy-photo{width:36px;height:36px;flex:0 0 auto;}
+#spywin .sp-who{display:flex;flex-direction:column;min-width:0;margin-right:auto;line-height:1.2;}
+#spywin .sp-who .sp-title{font-size:var(--fs-body);}
+#spywin .sp-sub{color:var(--sf-dim);font-size:var(--fs-caption);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#spywin .sp-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:1fr;gap:6px;padding:10px;overflow-y:auto;}
+#spywin .sp-card{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:112px;padding:8px 9px 8px 11px;
+  text-align:left;background:var(--sf-card);border:1px solid var(--sf-edge);border-radius:8px;color:var(--ink);cursor:pointer;
+  font:var(--fs-caption)/1.3 var(--sf-font);overflow:hidden;--tone:var(--cyan);}
+#spywin .sp-card[data-hot]{--tone:var(--amber);}
+#spywin .sp-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tone);opacity:.8;}
+#spywin .sp-card .sp-glyph{position:absolute;right:7px;top:6px;font-size:16px;line-height:1;opacity:.85;}
+#spywin .sp-card b{padding-right:22px;color:#eafffb;font-size:var(--fs-body);line-height:1.2;overflow-wrap:anywhere;hyphens:auto;}
+#spywin .sp-card .sp-desc{flex:1 1 auto;color:var(--sf-dim);overflow:hidden;}
+#spywin .sp-card .sp-cost{align-self:stretch;padding-top:5px;border-top:1px solid var(--line);color:var(--amber);font-variant-numeric:tabular-nums;}
+#spywin .sp-card:hover:not(:disabled),#spywin .sp-card:active:not(:disabled){border-color:var(--tone);
+  background:color-mix(in srgb,var(--tone) 12%,transparent);}
+#spywin .sp-card:disabled{cursor:default;opacity:.42;filter:grayscale(1);}
+#spywin .sp-card:disabled .sp-cost{color:var(--dim);}
 
 /* Выбор мира на карте: полоса сверху с отменой */
 #spypick{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 58px);transform:translateX(-50%);z-index:60;
@@ -55,14 +77,15 @@
 .sp-yesno .b{flex:1 1 0;}
 
 @media (max-width:640px){
-  .sp-row{grid-template-columns:48px minmax(0,1fr) auto;grid-template-areas:'photo name time' 'photo place place' 'photo doing doing' 'act act act';row-gap:2px;}
-  .sp-row .spy-photo{grid-area:photo;width:48px;height:48px;align-self:start;}
-  .sp-row .sp-name{grid-area:name;}
-  .sp-row .sp-time{grid-area:time;}
-  .sp-row .sp-place{grid-area:place;}
-  .sp-row .sp-doing{grid-area:doing;}
-  .sp-row .sp-act{grid-area:act;margin-top:6px;}
-  .sp-row span.sp-act:empty{display:none;}
-  .sp-cards{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:168px;}
+  .sp-list{padding:8px;}
+  #spywin .sp-row{grid-template-columns:44px minmax(0,1fr) auto;grid-template-areas:'photo name act' 'photo line act' 'photo time act';
+    column-gap:8px;padding:7px 8px;}
+  #spywin .sp-row .sp-name{align-self:center;}
+  #spywin .sp-line{flex-wrap:wrap;row-gap:0;}
+  #spywin .sp-place{flex-basis:100%;padding-left:13px;}
+  #spywin .sp-place::before{content:'';}
+  #spywin .sp-row .sp-time{justify-self:start;padding-left:13px;}
+  #spywin .sp-row .sp-act{min-width:0;width:104px;min-height:44px;padding:6px 8px;font-size:var(--fs-caption);line-height:1.15;white-space:normal;}
+  #spywin .sp-cards{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px;}
   #spypick{flex-wrap:wrap;justify-content:center;text-align:center;width:calc(100vw - 32px);}
 }

@@ -18,6 +18,17 @@ describe('spyRoster — список шпионов вкладки «Шпион�
     expect(rows[6]).toMatchObject({ until: null, task: null });
   });
 
+  it('начало отсчёта: полоса хода есть только у таймера с записанным началом', () => {
+    const [trip, noStart, rest] = spyRoster([
+      spy({ id: 1, state: 'travel', op: 'recon', departedAt: 10, arrivesAt: 50 }),
+      spy({ id: 2, state: 'recruit', arrivesAt: 80 }),
+      spy({ id: 3, state: 'rest', departedAt: 10 }),
+    ]);
+    expect(trip).toMatchObject({ since: 10, until: 50 });
+    expect(noStart).toMatchObject({ since: null, until: 80 });
+    expect(rest).toMatchObject({ since: null, until: null });
+  });
+
   it('правило 2: пост до отзыва идёт без таймера, путь и вербовка — с ним', () => {
     const [post, trip, recruit] = spyRoster([
       spy({ id: 1, state: 'work', op: 'counter', arrivesAt: Number.MAX_SAFE_INTEGER }),

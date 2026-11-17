@@ -855,7 +855,6 @@ export const de: Record<string, string> = {
   'side.aloft.order.relocate': 'Verlegung: {name}',
   'side.aloft.order.home': 'Rückkehr: {name}',
   'side.aloft.returning': 'Erneuter Angriff nach Landung und Wiederbewaffnung möglich',
-  'spy.log.empty': 'noch keine Versuche',
   'spy.log.title': 'Protokoll',
   'spy.windows.empty': 'Keine aktiven Fenster — senden Sie einen Agenten mit der Schaltfläche 🕵 auf der Karte einer feindlichen Welt',
   'spy.windows.title': 'Aktive Informationsfenster',

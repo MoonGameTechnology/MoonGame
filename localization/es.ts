@@ -856,7 +856,6 @@ export const es: Record<string, string> = {
   'side.aloft.order.relocate': 'Traslado: {name}',
   'side.aloft.order.home': 'Regreso: {name}',
   'side.aloft.returning': 'Podrá volver a atacar tras aterrizar y rearmarse',
-  'spy.log.empty': 'sin intentos anteriores',
   'spy.log.title': 'Registro',
   'spy.windows.empty': 'sin ventanas de inteligencia activas: envía un agente con el botón 🕵 en la ficha de un mundo enemigo',
   'spy.windows.title': 'Ventanas de inteligencia activas',
