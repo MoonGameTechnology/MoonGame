@@ -43,8 +43,8 @@ const data: GameData = parseGameData({
         speed: 100,
         hp: 10,
         strikeRange: 180,
-        fuel: 2,
-        rearmRounds: 2,
+        // Заправка после посадки (решение владельца 2026-11-17).
+        refuelMinutes: 30,
         siegeDamage: 1,
         // SHU-1.3: ради этого он и охотник — урон ПО ЧУЖИМ ЧЕЛНОКАМ. Хватает,
         // чтобы двое сбили одну машину чужого вылета (корпус 10).
@@ -62,8 +62,6 @@ const data: GameData = parseGameData({
         speed: 100,
         hp: 16,
         strikeRange: 180,
-        fuel: 2,
-        rearmRounds: 3,
         siegeDamage: 8,
       },
     },
@@ -73,7 +71,7 @@ const data: GameData = parseGameData({
       faction: 'x',
       domain: 'space',
       traits: ['shuttle'],
-      stats: { attack: 6, defense: 3, speed: 100, hp: 10, strikeRange: 180, fuel: 2, rearmRounds: 2 },
+      stats: { attack: 6, defense: 3, speed: 100, hp: 10, strikeRange: 180 },
     },
   },
   factions: {},
@@ -251,16 +249,27 @@ describe('удар челноков — вылет (правила 1–2, 5)', (
     expect(s.strikes?.[0]?.leg).toBe('out');
   });
 
-  it('ТОПЛИВО ТРАТИТСЯ НА ВЫЛЕТ, а кончившись — запирает порт до перезарядки', () => {
-    // Топливо у ПОРТА, поэтому его жгут вылеты, а не машины: три эскадры по одной
-    // машине выжигают его ровно так же, как три вылета одной (SHU-1.2).
+  it('ОБЩЕГО ЗАПАСА ВЫЛЕТОВ НЕТ: эскадры базы взлетают одна за другой без счёта', () => {
+    // Решение владельца 2026-11-17: запас вылетов базы снят, мешает только заправка
+    // самой эскадры после посадки.
     let s = world({ hangar: 4 });
     s = apply(s, split([{ unit: 'interceptor', count: 1 }]));
     s = apply(s, split([{ unit: 'interceptor', count: 1 }]));
     const ids = (s.planets.A?.hangar ?? []).map((q) => q.id);
-    s = apply(s, strike({ targetFleetId: 'E1' }, ids[1])); // fuel 2 → 1
-    s = apply(s, strike({ targetFleetId: 'E1' }, ids[2])); // fuel 1 → 0, порт на перезарядке
-    expect(code(s, strike({ targetFleetId: 'E1' }, ids[0]))).toBe('E_NO_FUEL');
+    s = apply(s, strike({ targetFleetId: 'E1' }, ids[1]));
+    s = apply(s, strike({ targetFleetId: 'E1' }, ids[2]));
+    expect(code(s, strike({ targetFleetId: 'E1' }, ids[0]))).toBeNull();
+  });
+
+  it('СЕВШАЯ ЭСКАДРА ЗАПРАВЛЯЕТСЯ: до срока не взлетает, после — снова в строю', () => {
+    let s = apply(world(), strike({ targetFleetId: 'E1' }));
+    s = advance(s, 2.1); // долетела, ударила и только что села (посадка ~2 ч)
+    const sq = s.planets.A?.hangar?.[0];
+    expect(sq?.readyAt).toBeGreaterThan(s.time);
+    expect(code(s, strike({ targetFleetId: 'E1' }, sq?.id))).toBe('E_REFUELING');
+    const ready = kernel.advanceTo(s, { now: sq!.readyAt!, data });
+    if (!ready.ok) throw new Error(ready.code);
+    expect(code(ready.state, strike({ targetFleetId: 'E1' }, sq?.id))).toBeNull();
   });
 });
 
@@ -269,7 +278,9 @@ describe('перехват — свои челноки поднимаются н
   // чужому вылету было нечем вовсе — цель удара это флот или мир, — поэтому роль
   // существовала только на бумаге, а `shuttleDamage` некому было читать.
   /** Мир p2 с портом и перехватчиками в ангаре — он и будет перехватывать. */
-  const defended = (over: { hangar?: number; fuel?: number; attackers?: number } = {}): GameState => {
+  const defended = (
+    over: { hangar?: number; readyAt?: number; attackers?: number } = {},
+  ): GameState => {
     const s = world({ hangar: over.attackers ?? 2 });
     const b = s.planets.B!;
     const port = { type: 'spaceport', level: 1, hp: 30 };
@@ -280,8 +291,13 @@ describe('перехват — свои челноки поднимаются н
         B: {
           ...b,
           buildings: [...b.buildings, port],
-          hangar: [{ id: 'sq:defender', units: [{ unit: 'interceptor', count: over.hangar ?? 2 }] }],
-          ...(over.fuel === undefined ? {} : { sortie: { fuel: over.fuel, rearming: 0 } }),
+          hangar: [
+            {
+              id: 'sq:defender',
+              units: [{ unit: 'interceptor', count: over.hangar ?? 2 }],
+              ...(over.readyAt === undefined ? {} : { readyAt: over.readyAt }),
+            },
+          ],
         },
       },
     };
@@ -315,17 +331,17 @@ describe('перехват — свои челноки поднимаются н
     expect(result.events.filter(event => event.type === 'unit.died' && (event.payload as { owner?: string }).owner === 'p1')).toEqual([]);
   });
 
-  it('перехват тратит топливо базы — бесконечно поднимать нельзя', () => {
-    // Смотрим состояние СРАЗУ после перехвата: дальше вступает перезарядка (час мира =
-    // раунд), и через пару часов бак снова полон — это другой механизм, SHU-1.2.
-    const s = apply(defended({ fuel: 1 }), strike({ targetPlanetId: 'B' }));
+  it('перехватившая эскадра уходит на заправку — бесконечно поднимать нельзя', () => {
+    const s = apply(defended({ attackers: 3 }), strike({ targetPlanetId: 'B' }));
     const after = advance(s, 1);
-    expect(after.planets.B?.sortie?.fuel).toBe(0);
-    expect(after.planets.B?.sortie?.rearming).toBeGreaterThan(0);
+    expect(after.planets.B?.hangar?.[0]?.readyAt).toBeGreaterThan(s.time);
   });
 
-  it('без топлива перехвата НЕТ — удар доходит целиком', () => {
-    const s = apply(defended({ fuel: 0 }), strike({ targetPlanetId: 'B' }));
+  it('заправляющаяся эскадра не перехватывает — удар доходит целиком', () => {
+    const s = apply(
+      defended({ readyAt: Number.MAX_SAFE_INTEGER }),
+      strike({ targetPlanetId: 'B' }),
+    );
     const after = advance(s, 2);
     const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
     expect(mine?.hp).toBeCloseTo(20 - 2 * 0.9, 10); // оба челнока дошли: 2 × 1
@@ -439,30 +455,14 @@ describe('удар челноков — попадание и возврат (п
     expect(after.strikes ?? []).toHaveLength(0);
   });
 
-  it('ПЕРЕЗАРЯДКА ИДЁТ В ПОРТУ: отстоявшись, он снова выпускает', () => {
-    // Топливо принадлежит ПОРТУ, а не эскадре (SHU-1.2), поэтому два вылета подряд его
-    // и жгут — даже если летают разные соединения. Делёж вылетов не удваивает.
-    let s = world({ hangar: 4 });
-    s = apply(s, split([{ unit: 'interceptor', count: 2 }]));
-    const second = (s.planets.A?.hangar ?? []).find((q) => q.id !== 'sq:interceptor')!.id;
-    s = apply(s, strike({ targetFleetId: 'E1' }));
-    s = apply(s, strike({ targetFleetId: 'E1' }, second)); // топливо кончилось
-    s = advance(s, 4); // вернулись + отстояли перезарядку (rearmRounds 2 часа)
-    expect(code(s, strike({ targetFleetId: 'E1' }))).toBeNull();
-  });
-
-  it('ПЕРЕЗАРЯДКА НЕ ЗАВИСИТ ОТ НАРЕЗКИ ВРЕМЕНИ: десять минут шестью шагами — тот же час (AUD-27)', () => {
-    // Ядро режет время на отрезки у каждого запланированного события, и во время боёв
-    // они короче часа. Считай база часы отрезка по отдельности — перезарядка стояла бы.
-    let s = world({ hangar: 4 });
-    s = apply(s, split([{ unit: 'interceptor', count: 2 }]));
-    const second = (s.planets.A?.hangar ?? []).find((q) => q.id !== 'sq:interceptor')!.id;
-    s = apply(s, strike({ targetFleetId: 'E1' }));
-    s = apply(s, strike({ targetFleetId: 'E1' }, second));
+  it('ЗАПРАВКА НЕ ЗАВИСИТ ОТ НАРЕЗКИ ВРЕМЕНИ: срок — миг мира, а не счёт отрезков (AUD-27)', () => {
+    // Ядро режет время на отрезки у каждого запланированного события. Срок заправки —
+    // абсолютный миг (`readyAt`), поэтому нарезка его не сдвигает.
+    const s = apply(world(), strike({ targetFleetId: 'E1' }));
     const whole = advance(s, 4);
     let sliced = s;
     for (let i = 0; i < 24; i++) sliced = advance(sliced, 1 / 6);
-    expect(sliced.planets.A?.sortie).toEqual(whole.planets.A?.sortie);
-    expect(code(sliced, strike({ targetFleetId: 'E1' }))).toBeNull();
+    expect(sliced.planets.A?.hangar?.[0]?.readyAt).toBe(whole.planets.A?.hangar?.[0]?.readyAt);
+    expect(code(advance(sliced, 1), strike({ targetFleetId: 'E1' }))).toBeNull();
   });
 });

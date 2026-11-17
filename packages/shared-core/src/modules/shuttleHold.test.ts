@@ -43,12 +43,10 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 10,
       strikeRange: 180,
-      fuel: 3,
-      rearmRounds: 2,
       patrolHours: 4,
       patrolRadius: 60,
     }),
-    // Один вылет и десять часов перезарядки, 2 ч в круге: дома через 5 ч, а встать снова
+    // Пять часов заправки после посадки, 2 ч в круге: дома через 5 ч, а встать снова
     // может только в 10 ч — удержанию есть чего ждать.
     sentry: shuttle({
       attack: 4,
@@ -56,10 +54,9 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 10,
       strikeRange: 180,
-      fuel: 1,
-      rearmRounds: 10,
       patrolHours: 2,
       patrolRadius: 60,
+      refuelMinutes: 300,
     }),
   },
   factions: {},
@@ -239,26 +236,26 @@ describe('SHU-6.6 — приёмка: удерживаемый патруль с
     expect(again?.to).toEqual(P);
     expect(again?.patrol).toEqual({ hours: 4, radius: 60, hold: true });
     expect(hangarOf(state)).toEqual([]);
-    expect(state.planets.A?.sortie?.fuel).toBe(1); // второй вылет из трёх
   });
 
-  it('НЕТ ВЫЛЕТА — ЖДЁТ РОВНО КОНЦА ПЕРЕЗАРЯДКИ и встаёт без единого приказа', () => {
-    // Вылет в 0 ч сжёг единственное топливо: перезарядка 10 ч, до 10 ч. Точка в 125 ед —
-    // дома эскадра в 4,5 ч, посреди часа: полчаса перезарядки сверх целых часов уже
-    // отстояно (`carry`), и срок подъёма обязан их учесть, а не сдвинуться на 10,5 ч.
+  it('ЗАПРАВЛЯЕТСЯ — ЖДЁТ РОВНО КОНЦА ЗАПРАВКИ и встаёт без единого приказа', () => {
+    // Точка в 125 ед — дома эскадра в 4,5 ч, посреди часа; заправка 5 ч — до 9,5 ч, и
+    // срок подъёма — ровно конец заправки, а не ближайший целый час.
     const Q = { x: 125, y: 0 };
     const s = apply(world([sq('sq:s', 'sentry', 2)]), held('sq:s', Q));
-    const waiting = until(s, 9.99);
+    const waiting = until(s, 9.49);
     expect(waiting.strikes ?? []).toHaveLength(0);
-    expect(hangarOf(waiting)).toEqual([{ ...sq('sq:s', 'sentry', 2), hold: { at: Q } }]);
-    expect(resumes(waiting)).toEqual([10]);
+    expect(hangarOf(waiting)).toEqual([
+      { ...sq('sq:s', 'sentry', 2), hold: { at: Q }, readyAt: 9.5 * H },
+    ]);
+    expect(resumes(waiting)).toEqual([9.5]);
 
-    const { state, events } = run(s, 10); // один вызов: игрок не заходил ни разу
-    expect(patrolOf(state)?.departedAt).toBe(10 * H);
+    const { state, events } = run(s, 9.5); // один вызов: игрок не заходил ни разу
+    expect(patrolOf(state)?.departedAt).toBe(9.5 * H);
     expect(patrolOf(state)?.to).toEqual(Q);
     expect(hangarOf(state)).toEqual([]);
     expect(payloads(events, 'shuttle.launched')).toHaveLength(1);
-    // И так сутки подряд: встаёт в 10, 20 и 30 ч.
+    // И так сутки подряд: встаёт в 9,5, 19 и 28,5 ч.
     expect(payloads(run(s, 30).events, 'shuttle.launched')).toHaveLength(3);
   });
 
@@ -335,7 +332,6 @@ describe('SHU-6.6 — приёмка: удерживаемый патруль с
     for (let t = 0.1; t <= 26.0001; t += 0.1) sliced = until(sliced, Math.round(t * 10) / 10);
     expect(sliced.strikes ?? []).toEqual(whole.strikes ?? []);
     expect(sliced.planets.A?.hangar).toEqual(whole.planets.A?.hangar);
-    expect(sliced.planets.A?.sortie).toEqual(whole.planets.A?.sortie);
     // Третий круг (с 20 ч) отлетал и сел в 25 ч; следующий подъём — в 30 ч, при любой нарезке.
     expect(resumes(whole)).toEqual([30]);
     expect(resumes(sliced)).toEqual([30]);
@@ -351,13 +347,16 @@ describe('SHU-6.6 — приёмка: удерживаемый патруль с
 });
 
 describe('SHU-6.6 — что снимает удержание у эскадры дома', () => {
-  /** Эскадра дома с удержанием, ждёт перезарядки до 10 ч (вылет был в 0 ч, села в 5 ч). */
+  /** Эскадра дома с удержанием, ждёт конца заправки в 10 ч (вылет был в 0 ч, села в 5 ч). */
   const waiting = (hangar: Squadron[] = [sq('sq:s', 'sentry', 2)]): GameState =>
     until(apply(world(hangar), held('sq:s')), 6);
 
   it('СНЯТЬ ДОМА — и в 10 ч эскадра остаётся в ангаре', () => {
-    const off = apply(waiting(), act('shuttle.hold', { planetId: 'A', squadronId: 'sq:s', on: false }));
-    expect(hangarOf(off)).toEqual([sq('sq:s', 'sentry', 2)]);
+    const off = apply(
+      waiting(),
+      act('shuttle.hold', { planetId: 'A', squadronId: 'sq:s', on: false }),
+    );
+    expect(hangarOf(off)).toEqual([{ ...sq('sq:s', 'sentry', 2), readyAt: 10 * H }]);
     expect(until(off, 12).strikes ?? []).toHaveLength(0);
   });
 
@@ -406,7 +405,8 @@ describe('SHU-6.6 — что снимает удержание у эскадры
       },
     };
     const loaded = apply(s, act('shuttle.load', { fleetId: 'CV', squadronId: 'sq:s' }));
-    expect(hangarOf(loaded, 'CV')).toEqual([sq('sq:s', 'sentry', 2)]);
+    // Заправка переезжает вместе с эскадрой: она у машин, а не у базы.
+    expect(hangarOf(loaded, 'CV')).toEqual([{ ...sq('sq:s', 'sentry', 2), readyAt: 10 * H }]);
     expect(until(loaded, 12).strikes ?? []).toHaveLength(0);
   });
 
@@ -418,7 +418,18 @@ describe('SHU-6.6 — что снимает удержание у эскадры
     }));
     expect(hangarOf(split).map((q) => q.hold)).toEqual([undefined, undefined]);
     const pair = waiting([sq('sq:s', 'sentry', 2), sq('sq:t', 'sentry', 1)]);
-    const merged = apply(pair, act('shuttle.merge', { planetId: 'A', squadronId: 'sq:t', intoId: 'sq:s' }));
+    const merge = act('shuttle.merge', { planetId: 'A', squadronId: 'sq:t', intoId: 'sq:s' });
+    // Заправляющаяся с готовой не сливается (решение владельца 2026-11-17).
+    expect(code(pair, merge)).toBe('E_REFUELING');
+    // Заправка кончилась, а подъём ещё впереди (например, порт подбит): теперь можно.
+    const fuelled: GameState = {
+      ...pair,
+      planets: {
+        ...pair.planets,
+        A: { ...pair.planets.A!, hangar: hangarOf(pair).map(({ readyAt: _r, ...q }) => q) },
+      },
+    };
+    const merged = apply(fuelled, merge);
     expect(hangarOf(merged)).toEqual([sq('sq:s', 'sentry', 3)]);
     expect(until(merged, 12).strikes ?? []).toHaveLength(0);
   });

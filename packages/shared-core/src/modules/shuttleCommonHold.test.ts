@@ -36,12 +36,12 @@ const data: GameData = parseGameData({
     bomber: {
       faction: 'x',
       traits: ['shuttle'],
-      stats: { attack: 12, defense: 3, speed: 100, hp: 10, strikeRange: 180, fuel: 2, rearmRounds: 2, cargoSize: 1 },
+      stats: { attack: 12, defense: 3, speed: 100, hp: 10, strikeRange: 180, cargoSize: 1 },
     },
     heavy_striker: {
       faction: 'x',
       traits: ['shuttle'],
-      stats: { attack: 20, defense: 3, speed: 100, hp: 20, strikeRange: 180, fuel: 2, rearmRounds: 2, cargoSize: 2 },
+      stats: { attack: 20, defense: 3, speed: 100, hp: 20, strikeRange: 180, cargoSize: 2 },
     },
     infantry: { faction: 'x', domain: 'ground', stats: { attack: 1, defense: 1, speed: 1, hp: 10, cargoSize: 1 } },
   },

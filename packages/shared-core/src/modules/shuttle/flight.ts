@@ -4,7 +4,6 @@ import {
   type Flyer,
   absorbIntoStrike,
   baseOf,
-  baseSortieSpec,
   fleetBase,
   hourMs,
   nextStrikeId,
@@ -28,16 +27,13 @@ import type { GameData } from '../../data/schemas';
 import { type GroundVolley, groundVolley, shuttleGroundDamage } from '../../util/groundFire';
 import type { HandlerContext } from '../../kernel/module';
 import {
-  type SortieState,
-  canSortie,
-  freshSortie,
   hangarSize,
   hasMissiles,
   hullShare,
-  spendSortie,
   squadronFerryRange,
   squadronPatrol,
   squadronReach,
+  squadronRefueling,
   squadronSize,
   stacksSize,
   strikesReserved,
@@ -521,8 +517,8 @@ export function readySquadron(h: HandlerContext, base: BaseView, squadronId: unk
   return typeof ready === 'string' ? h.reject(ready) : ready;
 }
 
-/** Эскадра, готовая к вылету, и запас вылетов её базы. */
-type Ready = { squad: Squadron; spec: { maxFuel: number; rearmRounds: number }; sortie: SortieState };
+/** Эскадра, готовая к вылету. */
+type Ready = { squad: Squadron };
 
 /** Выпускает ли база вообще: есть, цела. Код отказа, а не бросок — тем же ответом
  *  удержание патруля (SHU-6.6) решает, ждать ему или снять удержание. */
@@ -532,13 +528,13 @@ export function baseBlock(base: BaseView): string | null {
   return null;
 }
 
-/** Готова ли эскадра и есть ли у базы вылет — без бросков, как {@link baseBlock}. */
-export function squadronReady(h: HandlerContext, base: BaseView, squad: Squadron): Ready | string {
+/** Готова ли эскадра — без бросков, как {@link baseBlock}. Общего запаса вылетов у базы
+ *  больше нет (решение владельца 2026-11-17): мешает только заправка самой эскадры
+ *  после посадки (`Squadron.readyAt`). */
+export function squadronReady(h: HandlerContext, _base: BaseView, squad: Squadron): Ready | string {
   if (squadronSize(squad) <= 0) return 'E_NOT_ENOUGH';
-  const spec = baseSortieSpec(base, h.state, h.ctx.data);
-  const sortie = base.sortie ?? freshSortie(spec.maxFuel);
-  if (!canSortie(sortie)) return 'E_NO_FUEL';
-  return { squad, spec, sortie };
+  if (squadronRefueling(squad, h.ctx.now)) return 'E_REFUELING';
+  return { squad };
 }
 
 /** Время полёта эскадры по прямой: самая медленная машина, урезанная в доле живого
@@ -568,8 +564,8 @@ function flightMs(
 
 /**
  * ВЗЛЁТ — один на удар, патруль и перелёт (SHU-6.2, SHU-6.4): эскадра покидает ангар,
- * база тратит вылет, в состоянии появляется летящий вылет. Id, снятие с ангара и расход
- * топлива у приказов не должны расходиться. Расписание (прибытие или погоню) ставит
+ * в состоянии появляется летящий вылет. Id и снятие с ангара у приказов не должны
+ * расходиться. Расписание (прибытие или погоню) ставит
  * вызывающий: оно у приказов разное.
  *
  * `dest` — у ПЕРЕЛЁТА: эскадра сразу идёт обратной ногой на новую базу, а база, с
@@ -583,11 +579,10 @@ export function launchFlight(
   flight: Pick<ShuttleStrike, 'target' | 'to' | 'arrivesAt'> &
     Partial<Pick<ShuttleStrike, 'at' | 'cargo' | 'patrol'>> & { dest?: StrikeBase },
 ): ShuttleStrike {
-  const { squad, spec, sortie } = ready;
+  const { squad } = ready;
   // Эскадра покидает ангар ЦЕЛИКОМ — с этой секунды её в базе нет. Груз уже в трюме
   // (SHU-4.2), брать с базы нечего: он ушёл из гарнизона при погрузке.
   base.setHangar(base.hangar.filter((q) => q.id !== squad.id));
-  base.setSortie(spendSortie(sortie, spec.rearmRounds));
   const strike: ShuttleStrike = {
     id: nextStrikeId(h, owner),
     owner,

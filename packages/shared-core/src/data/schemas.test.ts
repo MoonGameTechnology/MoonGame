@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.86'); // The accretion disk province kind round the Abyss black hole (ffa-50).
+    expect(data.version).toBe('0.1.87'); // Shuttles refuel per squadron (`refuelMinutes`) instead of the base sortie pool.
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -127,8 +127,7 @@ describe('game data schema (docs/architecture.md §2)', () => {
     // shuttles-roadmap SQ-0.1: a carrier-borne fighter shuttle + the new shuttle stats.
     expect(data.units.interceptor?.traits).toContain('shuttle');
     expect(data.units.interceptor?.stats.strikeRange).toBe(180); // Euclidean reach
-    expect(data.units.interceptor?.stats.fuel).toBe(3); // sorties before rearm
-    expect(data.units.interceptor?.stats.rearmRounds).toBe(2);
+    expect(data.units.interceptor?.stats.refuelMinutes).toBe(30); // refuel after landing
     expect(data.units.cruiser?.stats.strikeRange).toBe(0); // schema default (not a shuttle)
     // SHU-6.2: patrol hours and circle (owner resolution 2026-10-04; the self-play run of
     // SHU-6.9 raised the circle 60 → 90, the owner asked for a smaller one on 2026-11-01 and

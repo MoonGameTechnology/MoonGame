@@ -113,10 +113,22 @@ window.__patrolTest = {
   },
   marks: () => __patrolMarks(s.strikes, { me: ME, now: s.time }),
   // Мир доходит до конца ЭТОЙ ноги вылета: висение кончилось — разворот, вернулся — посадка
-  // (и у удерживаемого патруля — новый взлёт в ту же минуту).
+  // (удерживаемый патруль встанет снова, когда эскадра заправится — refuel).
   leg: (id) => {
     const st = s.strikes.find((x) => x.id === id);
     apply(advance(s, st.arrivesAt));
+    invalidatePanel();
+    renderPanel();
+  },
+  // Самый поздний срок заправки своих эскадр; 0 — никто не заправляется.
+  refuelAt: () => {
+    const homes = [...Object.values(s.planets), ...Object.values(s.fleets)];
+    const at = homes.flatMap((h) => (h.hangar ?? []).map((q) => q.readyAt ?? 0));
+    return Math.max(0, ...at.filter((t) => t > s.time));
+  },
+  // Мир доходит до конца заправки (решение владельца 2026-11-17).
+  refuel: () => {
+    apply(advance(s, window.__patrolTest.refuelAt()));
     invalidatePanel();
     renderPanel();
   },
@@ -261,9 +273,13 @@ try {
         await press(keep);
         assert.equal(await held(), true, 'и поставлено снова');
 
-        // Висение кончилось — домой; сел — и встал снова сам, игрок ничего не нажимал.
+        // Висение кончилось — домой; сел, заправился — и встал снова сам, игрок ничего не
+        // нажимал. До конца заправки в небе пусто.
         await page.evaluate((id) => window.__patrolTest.leg(id), flight.id);
         await page.evaluate((id) => window.__patrolTest.leg(id), flight.id);
+        assert.ok((await page.evaluate(() => window.__patrolTest.refuelAt())) > 0, 'севшая эскадра заправляется');
+        assert.deepEqual(await page.evaluate(() => window.__patrolTest.patrols()), [], 'до заправки не взлетает');
+        await page.evaluate(() => window.__patrolTest.refuel());
         const [again] = await page.evaluate(() => window.__patrolTest.patrols());
         assert.ok(again && again.id !== flight.id, 'удерживаемый патруль встал снова');
         assert.equal(again.leg, 'out');

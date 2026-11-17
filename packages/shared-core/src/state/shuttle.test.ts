@@ -6,22 +6,18 @@ import { loadGameData } from '../data/loadGameData';
 import type { GameData } from '../data/schemas';
 import type { Fleet } from './gameState';
 import {
-  sortieSpec,
-  freshSortie,
-  canSortie,
-  spendSortie,
-  tickRearm,
   shuttleTake,
   fleetHasShuttle,
   shuttleStrikeRange,
   withinRange,
   shuttleReaches,
-  type SortieState,
+  squadronRefueling,
+  squadronRefuelMinutes,
 } from './shuttle';
 
 // SQ-1.1/SQ-2.1/SQ-3.1 (shuttles-roadmap.md): 1:1 port of the prototype's
 // `shuttle.ts` pure math onto the real shipped bundle (`interceptor`
-// already ships with strikeRange/fuel/rearmRounds — canon just lacked this
+// already ships with strikeRange — canon just lacked this
 // module). Not wired into a `fleet.launch` action yet — pure math only.
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../data');
@@ -82,110 +78,39 @@ describe('fleetHasShuttle (real shipped data)', () => {
 // челнок живёт в `hangar` базы, а в `units` носителя стоит его КОРПУС, у которого
 // никакого `fuel` нет. Читая старое место, функция отвечала «топлива 0» на любой
 // носитель, и панель показывала полный ангар как сухой.
-describe('sortieSpec — топливо базы берётся из ангара', () => {
-  it('читает maxFuel + rearmRounds у машины В АНГАРЕ', () => {
-    const spec = sortieSpec({ hangar: [squadron([{ unit: shuttleUnit, count: 2 }])] }, data);
-    expect(spec.maxFuel).toBe(data.units[shuttleUnit]!.stats.fuel);
-    expect(spec.rearmRounds).toBe(data.units[shuttleUnit]!.stats.rearmRounds);
-    expect(spec.maxFuel).toBeGreaterThan(0); // у шипнутого перехватчика топливо есть
+describe('заправка эскадры (решение владельца 2026-11-17)', () => {
+  it('эскадра ждёт САМУЮ ДОЛГУЮ заправку своих живых машин', () => {
+    const slow = {
+      ...data,
+      units: {
+        ...data.units,
+        [shuttleUnit]: {
+          ...data.units[shuttleUnit]!,
+          stats: { ...data.units[shuttleUnit]!.stats, refuelMinutes: 45 },
+        },
+      },
+    } as GameData;
+    expect(
+      squadronRefuelMinutes(
+        [
+          { unit: shuttleUnit, count: 2 },
+          { unit: nonShuttleUnit, count: 1 },
+        ],
+        slow,
+      ),
+    ).toBe(45);
+    expect(squadronRefuelMinutes([{ unit: shuttleUnit, count: 0 }], slow)).toBe(0);
   });
 
-  it('НОСИТЕЛЬ ЧИТАЕТСЯ ТАК ЖЕ, КАК ПОРТ: корпус в `units` ответу не мешает', () => {
-    // Приёмка дефекта: у носителя в `units` стоит корпус без `fuel`, а машины — в
-    // ангаре. Пока функция смотрела в `units`, полный трюм читался как пустой бак.
-    const carrier: Fleet & { hangar?: ReturnType<typeof squadron>[] } = {
-      ...fleet([{ unit: nonShuttleUnit, count: 1 }]),
-      hangar: [squadron([{ unit: shuttleUnit, count: 2 }])],
-    };
-    expect(sortieSpec(carrier, data)).toEqual(
-      sortieSpec({ hangar: [squadron([{ unit: shuttleUnit, count: 2 }])] }, data),
-    );
-    expect(sortieSpec(carrier, data).maxFuel).toBeGreaterThan(0);
+  it('челноки в данных заправляются, ракеты и корабли — нет', () => {
+    expect(squadronRefuelMinutes([{ unit: 'interceptor', count: 1 }], data)).toBeGreaterThan(0);
+    expect(squadronRefuelMinutes([{ unit: nonShuttleUnit, count: 1 }], data)).toBe(0);
   });
 
-  it('ПУСТОЙ И ВЫБИТЫЙ АНГАР — нули, а не догадка по составу корабля', () => {
-    expect(sortieSpec({}, data)).toEqual({ maxFuel: 0, rearmRounds: 0 });
-    expect(sortieSpec({ hangar: [] }, data)).toEqual({ maxFuel: 0, rearmRounds: 0 });
-    expect(sortieSpec({ hangar: [squadron([{ unit: shuttleUnit, count: 0 }])] }, data)).toEqual({
-      maxFuel: 0,
-      rearmRounds: 0,
-    });
-    // Корабль С ЧЕЛНОКАМИ В СОСТАВЕ, но с пустым ангаром — тоже нули: состав больше
-    // не читается вовсе, иначе старое место осталось бы вторым источником правды.
-    expect(sortieSpec(fleet([{ unit: shuttleUnit, count: 2 }]), data)).toEqual({
-      maxFuel: 0,
-      rearmRounds: 0,
-    });
-  });
-});
-
-describe('sortie / rearm counter (SQ-2.1)', () => {
-  it('a fresh wing is fully fuelled and flight-ready', () => {
-    const s = freshSortie(3);
-    expect(s).toEqual({ fuel: 3, rearming: 0 });
-    expect(canSortie(s)).toBe(true);
-  });
-
-  it('each sortie burns one fuel', () => {
-    let s = freshSortie(3);
-    s = spendSortie(s, 2);
-    expect(s).toEqual({ fuel: 2, rearming: 0 });
-    expect(canSortie(s)).toBe(true);
-  });
-
-  it('the last drop of fuel drops the wing onto the rearm cooldown', () => {
-    let s: SortieState = { fuel: 1, rearming: 0 };
-    s = spendSortie(s, 2);
-    expect(s).toEqual({ fuel: 0, rearming: 2 });
-    expect(canSortie(s)).toBe(false); // grounded, rearming
-  });
-
-  it('cannot sortie while rearming (spend is a no-op)', () => {
-    const s: SortieState = { fuel: 0, rearming: 2 };
-    expect(canSortie(s)).toBe(false);
-    expect(spendSortie(s, 2)).toEqual(s); // unchanged
-  });
-
-  it('rearming counts down, then refuels to max and is flight-ready again', () => {
-    let s: SortieState = { fuel: 0, rearming: 2 };
-    s = tickRearm(s, 3);
-    expect(s).toEqual({ fuel: 0, rearming: 1 }); // still rearming
-    expect(canSortie(s)).toBe(false);
-    s = tickRearm(s, 3);
-    expect(s).toEqual({ fuel: 3, rearming: 0 }); // refuelled
-    expect(canSortie(s)).toBe(true);
-  });
-
-  it('tickRearm leaves a flight-ready (idle) wing untouched', () => {
-    const s = freshSortie(3);
-    expect(tickRearm(s, 3)).toEqual(s);
-  });
-
-  it('full cycle: N sorties → rearm → back in the fight', () => {
-    const max = 3;
-    const rearm = 2;
-    let s = freshSortie(max);
-    let sorties = 0;
-    while (canSortie(s)) {
-      s = spendSortie(s, rearm);
-      sorties++;
-    }
-    expect(sorties).toBe(max); // exactly maxFuel strikes before grounding
-    expect(s.rearming).toBe(rearm);
-    for (let i = 0; i < rearm; i++) {
-      expect(canSortie(s)).toBe(false);
-      s = tickRearm(s, max);
-    }
-    expect(canSortie(s)).toBe(true); // returned, ready to fly the next N
-    expect(s.fuel).toBe(max);
-  });
-
-  it('a zero-rearm config still recovers (clamped to at least one round)', () => {
-    let s: SortieState = { fuel: 1, rearming: 0 };
-    s = spendSortie(s, 0); // rearmRounds 0 would otherwise strand it at fuel 0
-    expect(s.rearming).toBe(1);
-    s = tickRearm(s, 2);
-    expect(canSortie(s)).toBe(true);
+  it('заправляется, пока срок впереди; без срока или в прошлом — готова', () => {
+    expect(squadronRefueling({ readyAt: 100 }, 99)).toBe(true);
+    expect(squadronRefueling({ readyAt: 100 }, 100)).toBe(false);
+    expect(squadronRefueling({}, 0)).toBe(false);
   });
 });
 

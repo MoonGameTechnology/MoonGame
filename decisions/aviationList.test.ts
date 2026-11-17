@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { aviationFabShown, aviationGroups, type AviationRow } from './aviationList';
-import type { BaseBlock } from './hangarBadge';
+import type { ParkedState } from './hangarBadge';
 
 const aloft = (strikeId: string, endsAt: number): AviationRow => ({
   kind: 'aloft',
@@ -9,40 +9,43 @@ const aloft = (strikeId: string, endsAt: number): AviationRow => ({
   ships: 2,
   endsAt,
 });
-const parked = (
-  squadronId: string,
-  block: BaseBlock,
-  rearmHours: number | null = null,
-): AviationRow => ({ kind: 'parked', squadronId, ships: 1, block, rearmHours });
+const READY: ParkedState = { kind: 'ready' };
+const BUSY: ParkedState = { kind: 'busy' };
+const fuel = (readyAt: number): ParkedState => ({ kind: 'refueling', readyAt });
+const parked = (squadronId: string, state: ParkedState): AviationRow => ({
+  kind: 'parked',
+  squadronId,
+  ships: 1,
+  state,
+});
 
 const ids = (rows: AviationRow[]) =>
   rows.map((r) => (r.kind === 'aloft' ? r.strikeId : r.squadronId));
 
 describe('список «◇ Авиация»', () => {
-  it('группы в порядке «в полёте», «готовы», «перезарядка»; пустых нет', () => {
-    const groups = aviationGroups([parked('a', 'rearming', 3), aloft('s1', 50), parked('b', null)]);
+  it('группы в порядке «в полёте», «готовы», «ждут»; пустых нет', () => {
+    const groups = aviationGroups([parked('a', fuel(3)), aloft('s1', 50), parked('b', READY)]);
     expect(groups.map((g) => g.id)).toEqual(['aloft', 'ready', 'waiting']);
-    expect(aviationGroups([parked('b', null)]).map((g) => g.id)).toEqual(['ready']);
+    expect(aviationGroups([parked('b', READY)]).map((g) => g.id)).toEqual(['ready']);
     expect(aviationGroups([])).toEqual([]);
   });
 
-  it('ждущие топлива и конца боя — в «перезарядке», после тех, у кого есть срок', () => {
+  it('заправка и бой носителя — в «ждут»; сначала скорая заправка, бой без срока в конце', () => {
     const [g] = aviationGroups([
-      parked('fuel', 'no-fuel'),
-      parked('long', 'rearming', 5),
-      parked('busy', 'busy'),
-      parked('short', 'rearming', 1),
+      parked('busy', BUSY),
+      parked('long', fuel(5)),
+      parked('short', fuel(1)),
     ]);
     expect(g!.id).toBe('waiting');
-    expect(ids(g!.rows)).toEqual(['short', 'long', 'fuel', 'busy']);
+    expect(ids(g!.rows)).toEqual(['short', 'long', 'busy']);
   });
 
   it('вылеты — по концу нынешней ноги; готовые — в порядке обхода баз', () => {
     const groups = aviationGroups([
       aloft('late', 900),
-      parked('x', null),
+      parked('x', READY),
       aloft('early', 100),
-      parked('y', null),
+      parked('y', READY),
     ]);
     expect(ids(groups[0]!.rows)).toEqual(['early', 'late']);
     expect(ids(groups[1]!.rows)).toEqual(['x', 'y']);

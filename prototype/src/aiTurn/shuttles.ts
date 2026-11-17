@@ -344,10 +344,11 @@ function landingSortie(bot: AiTurn, s: Sorties): boolean {
     );
     const intel = target ? knownGarrison(state, ai, target.id, data, identified) : null;
     const plan = target && intel ? planDrop(landers, intel.units, data) : null;
-    const order = target && plan
-      ? strikeShuttle(ai, pad.base, plan.squadronId, { targetPlanetId: target.id })
-      : null;
-    // Вылет — только если его примет ядро: у базы на перезарядке (`E_NO_FUEL`) или с
+    const order =
+      target && plan
+        ? strikeShuttle(ai, pad.base, plan.squadronId, { targetPlanetId: target.id })
+        : null;
+    // Вылет — только если его примет ядро: у заправляющейся эскадры (`E_REFUELING`) или с
     // разбитым портом бот иначе слал бы отбиваемый приказ каждый тик и не пробовал
     // следующую базу (тот же `canOrder`, что у перелёта и патруля ниже).
     if (plan && order && canOrder(state, order) === null) {
@@ -361,7 +362,7 @@ function landingSortie(bot: AiTurn, s: Sorties): boolean {
 }
 
 // ═══ УДАР СТРАЙКЕРОМ ═══
-// Один вылет за тик: топливо у базы общее, вторым приказом его не растянуть.
+// Один вылет за тик: так бот не поднимает всё небо разом одной базой.
 // Цель — чужой ФЛОТ (бомбардировщик бьёт корпуса) либо чужой МИР, ближайшая в
 // радиусе, тай-брейк по id: иначе выбор зависел бы от порядка ключей объекта.
 // SHU-5.6: машин две — тяжёлый и ударный страйкер (`STRIKERS`), и пробуются они

@@ -279,19 +279,20 @@ describe('SHU-3.2 — бот ПОДНИМАЕТ челноки: иначе он�
     expect(strikes(armed({ hangar: [] }))).toEqual([]);
   });
 
-  it('база на перезарядке не поднимает вылет — ядро отбило бы его `E_NO_FUEL` каждый тик', () => {
+  it('заправляющаяся эскадра не поднимает вылет — ядро отбило бы его `E_REFUELING` каждый тик', () => {
     const s = armed();
     const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
-    home.sortie = { fuel: 0, rearming: 2 };
-    expect(canOrder(s, strikes(armed())[0]!)).toBe('E_NO_FUEL'); // тот же приказ — отказ
+    for (const sq of home.hangar ?? []) sq.readyAt = s.time + 60_000;
+    expect(canOrder(s, strikes(armed())[0]!)).toBe('E_REFUELING'); // тот же приказ — отказ
     expect(strikes(s)).toEqual([]);
   });
 
-  it('десантный вылет с базы на перезарядке тоже не уходит', () => {
+  it('заправляющийся десант тоже не уходит', () => {
     const s = armed({
       hangar: [{ id: 'sq:1', units: [{ unit: 'landing_shuttle', count: 2 }], cargo: [{ unit: 'tank', count: 2 }] }],
     });
-    Object.values(s.planets).find((p) => p.owner === 'p2')!.sortie = { fuel: 0, rearming: 2 };
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    for (const sq of home.hangar ?? []) sq.readyAt = s.time + 60_000;
     expect(strikes(s)).toEqual([]);
   });
 

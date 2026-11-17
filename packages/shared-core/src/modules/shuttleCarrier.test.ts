@@ -43,7 +43,7 @@ const data: GameData = parseGameData({
       faction: 'x',
       traits: ['shuttle'],
       // speed 100 единиц карты в час, радиус 180.
-      stats: { attack: 12, defense: 3, speed: 100, hp: 10, strikeRange: 180, fuel: 2, rearmRounds: 2 },
+      stats: { attack: 12, defense: 3, speed: 100, hp: 10, strikeRange: 180 },
     },
   },
   factions: {},
@@ -224,20 +224,15 @@ describe('носитель — вылет и возврат (правила 3–
     expect(aboard(s)).toBe(2);
   });
 
-  it('топливо и перезарядка живут у НОСИТЕЛЯ, как у порта', () => {
-    // Грузим три: два уходят в вылеты, третий остаётся на борту — иначе пустой ангар
-    // отобьёт третий приказ раньше топлива (`E_NOT_ENOUGH`), и проверять было бы нечего.
+  it('у НОСИТЕЛЯ нет общего запаса вылетов, как и у порта: взлетают все три эскадры', () => {
+    // Решение владельца 2026-11-17: запас вылетов базы снят.
     let s = deploy(load(world(), 3));
     const strike = (n: number): Action =>
       act('shuttle.strike', { fleetId: 'CV', squadronId: `sq:${n}`, targetFleetId: 'E1' });
     s = apply(s, strike(1));
-    expect(s.fleets.CV?.sortie?.fuel).toBe(1);
     s = apply(s, strike(2));
-    expect(s.fleets.CV?.sortie).toEqual({ fuel: 0, rearming: 2 });
-    expect(code(s, strike(3))).toBe('E_NO_FUEL');
-    s = advance(s, 4); // вылеты вернулись, перезарядка отсчиталась
-    expect(s.fleets.CV?.sortie?.fuel).toBe(2);
     expect(code(s, strike(3))).toBe(null);
+    expect(s.fleets.CV?.sortie).toBeUndefined();
   });
 
   // Своя база в дальности перелёта нашлась бы — эскадра села бы на неё (SHU-6.4,

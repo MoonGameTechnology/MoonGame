@@ -512,13 +512,9 @@ export interface Planet {
   resources: ResourceBag;
   buildings: BuildingInstance[];
   garrison: UnitStack[];
-  /** Sortie readiness of the world's port (SHU-1.2): `fuel` strikes left before the
-   *  port must rearm, `rearming` hours left on that cooldown. Undefined = full.
-   *
-   *  Счётчик принадлежит ПОРТУ, а не отдельной машине: челноки в ангаре — стеки без
-   *  своей личности (они сливаются по юниту и лоадауту), и завести топливо на стек
-   *  значило бы запретить им сливаться вовсе. Игроку это ещё и понятнее: у порта одно
-   *  читаемое состояние «готов / перезаряжается», а не N счётчиков. */
+  /** УСТАРЕЛО: запас вылетов порта (SHU-1.2), снятый решением владельца 2026-11-17.
+   *  Ядро его больше не пишет и не читает; поле осталось ради старых сохранений, а
+   *  проекция по-прежнему вырезает его у чужих миров. */
   sortie?: { fuel: number; rearming: number; carry?: number };
   /** ЭСКАДРЫ, базирующиеся в космопорте мира (SHU-1.1, форма — SHU-4.2). НЕ флот и НЕ
    *  часть гарнизона: челнок стоит внутри порта, на орбите не появляется и в наземной
@@ -770,9 +766,7 @@ export interface Fleet {
    *  `cargoSize`; погибли корпуса — погибло и то, что не влезает, ровно как при потере порта.
    *  Undefined/пусто = на борту ничего не базируется. */
   hangar?: Squadron[];
-  /** Sortie budget of the shuttles based aboard (fuel + rearm countdown) — the
-   *  fleet-side twin of `Planet.sortie`, and for the same reason: the counter belongs
-   *  to the BASE, not to the machine, so stacks in the hangar stay mergeable. */
+  /** УСТАРЕЛО, как `Planet.sortie`: ядро не пишет и не читает, поле — для старых сохранений. */
   sortie?: { fuel: number; rearming: number; carry?: number };
   /** Set (`'near'`) while the fleet is stationed in orbit at a planet; undefined while
    *  in transit. There is a SINGLE orbit (GDD §7.4): a stationed fleet can bombard /
@@ -1636,6 +1630,12 @@ export interface Squadron {
    *  ФЛОТОВ трюм уезжает вместе с ним, и патруль встаёт над новым флотом.
    *  Undefined = эскадра ничего не держит. */
   hold?: { at?: { x: number; y: number } };
+  /** ЗАПРАВКА (решение владельца 2026-11-17, заменила общий запас вылетов базы): севшая
+   *  эскадра взлетит не раньше этого игрового мига — `refuelMinutes` её машин после
+   *  посадки. Держится у самой эскадры, поэтому видна на её карточке и переезжает с ней
+   *  при перегрузке; заправляющуюся с готовой не сливают. Undefined или в прошлом —
+   *  эскадра готова. */
+  readyAt?: number;
 }
 
 export interface ShuttleStrike {

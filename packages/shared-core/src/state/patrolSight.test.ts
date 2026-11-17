@@ -51,8 +51,6 @@ const data: GameData = parseGameData({
         speed: 100,
         hp: 10,
         strikeRange: 400,
-        fuel: 3,
-        rearmRounds: 2,
         shuttleDamage: 22,
         patrolHours: 4,
         patrolRadius: 60,

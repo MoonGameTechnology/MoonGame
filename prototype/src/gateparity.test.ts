@@ -37,7 +37,6 @@ import {
   unlockHeroSkill,
   installHeroModule,
   uninstallHeroModule,
-  freshSortie,
   orderChain,
   forceMarchFleet,
   instantRepairFleet,
@@ -115,13 +114,13 @@ describe('gate parity (REL-2) — the schemas cover every prototype intent', () 
     expect(rejected.map((a) => a.type)).toEqual([]);
   });
 
-  // SHU-2.2: `patrol.stamp` снят вместе с моделью «крыло как флот» — запас вылетов
-  // принадлежит БАЗЕ и тратится самим `shuttle.strike`, штамповать нечего. Гейт обязан
+  // SHU-2.2: `patrol.stamp` снят вместе с моделью «крыло как флот» — штамповать вылеты
+  // нечего (с 2026-11-17 общего запаса нет вовсе, эскадра заправляется сама). Гейт обязан
   // отбивать его и как СНЯТЫЙ тип, а не только как серверный.
   it('снятый patrol.stamp с провода не проходит', () => {
-    expect(isValidActionPayload('patrol.stamp', { fleetId: 'f1', sortie: freshSortie(3) })).toBe(
-      false,
-    );
+    expect(
+      isValidActionPayload('patrol.stamp', { fleetId: 'f1', sortie: { fuel: 3, rearming: 0 } }),
+    ).toBe(false);
   });
 
   // SHU-6.6: дежурный вылет снят целиком — его приказ с провода не проходит, как и любой

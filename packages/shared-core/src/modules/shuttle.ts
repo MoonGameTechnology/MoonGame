@@ -19,8 +19,7 @@
  * 3. **Порт — и дом, и условие.** Вылет невозможен без живого порта (повреждён больше
  *    чем на 30% — не выпускает), возврат идёт в него же, а не стало порта — стоящие в нём
  *    челноки гибнут вместе с ним. Летящие садятся на ближайшую свою базу в дальности
- *    перелёта, а нет такой — гибнут (SHU-6.4, `divert`). Топливо и перезарядка тоже
- *    принадлежат порту. Дом можно и сменить — перелётом (`shuttle.relocate`, SHU-6.4).
+ *    перелёта, а нет такой — гибнут (SHU-6.4, `divert`). Дом можно и сменить — перелётом (`shuttle.relocate`, SHU-6.4).
  *
  * Здесь же живёт ЗОНАЛЬНОЕ ПВО (`pointDefense`) — контрмера челнокам вместе с
  * перехватом (SHU-1.3). Не путать с ПКО (`aaDamage`): та бьёт по КОРАБЛЯМ на орбите.
@@ -34,7 +33,7 @@
 import type { GameModule } from '../kernel/module';
 import { registerLaunchOrders, registerSquadronOrders } from './shuttle/orders';
 import { registerFlightEvents, registerBaseUpkeep } from './shuttle/events';
-import { registerAirDefense, registerRearm } from './shuttle/defense';
+import { registerAirDefense } from './shuttle/defense';
 
 export type { MissileFlew } from './shuttle/aloft';
 
@@ -67,7 +66,9 @@ export const shuttleModule: GameModule = {
   // 1.17.0: урон удара по войскам мира делится поровну на каждого юнита, а не фокусом
   //         (ROS-1.6a, то же правило, что у обстрела с орбиты).
   // 1.18.0: удар по миру бьёт технику и пехоту разной долей атаки (ROS-1.6b).
-  version: '2.0.0',
+  // 2.1.0: запаса вылетов и перезарядки базы больше нет (решение владельца 2026-11-17):
+  //        взлёт и перехват ничего не тратят, `E_NO_FUEL` не бывает.
+  version: '2.1.0',
   setup(api) {
     // Порядок регистрации — прежний порядок в одном `setup`: несколько правил висят на
     // `time.advanced`, и их очередь в ядре задаётся именно им.
@@ -76,6 +77,5 @@ export const shuttleModule: GameModule = {
     registerFlightEvents(api);
     registerBaseUpkeep(api);
     registerAirDefense(api);
-    registerRearm(api);
   },
 };

@@ -13,6 +13,7 @@
  * эскадру в этот момент всё равно не разглядеть. Рисуется только то, что на экране.
  */
 import type { GameState } from '../../packages/shared-core/src/index';
+import { squadronRefueling } from '../../packages/shared-core/src/index';
 import type { MapLod } from '../../packages/client/src/mapLod';
 import { hangarBadge, type BadgeHit, type HangarBadge } from '../../decisions/hangarBadge';
 import { data } from './game';
@@ -87,7 +88,7 @@ export function drawHangarBadges(lod: MapLod): void {
   for (const p of Object.values(s.planets)) {
     if (p.owner !== me || !p.hangar?.length) continue;
     const view = planetHangar(p, data);
-    const badge = view && badgeOf(view);
+    const badge = view && badgeOf(view, s.time);
     if (!badge) continue;
     const c = world(p.position);
     if (!visible(c)) continue;
@@ -102,15 +103,19 @@ export function drawHangarBadges(lod: MapLod): void {
     if (f.owner !== me || !f.hangar?.length) continue;
     const box = fleetBadgeBox(f.id);
     const view = box && fleetHangar(f, data, s);
-    const badge = view && badgeOf(view);
+    const badge = view && badgeOf(view, s.time);
     if (!box || !badge) continue;
     chip(cx, f.id, badge, box.x + box.w + 3, box.y + box.h / 2);
   }
   cx.restore();
 }
 
-function badgeOf(view: HangarView) {
-  return hangarBadge({ squadronIds: view.squadrons.map((sq) => sq.id), blocked: view.blocked });
+function badgeOf(view: HangarView, now: number) {
+  return hangarBadge({
+    squadronIds: view.squadrons.map((sq) => sq.id),
+    blocked: view.blocked,
+    refueling: view.squadrons.filter((sq) => squadronRefueling(sq, now)).length,
+  });
 }
 
 /** Один значок «◇ N» левым краем в `x`, серединой по `y`; запоминает цель для тапа. */

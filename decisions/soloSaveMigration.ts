@@ -750,6 +750,18 @@ export const CAPTIVE_CARRIER_SOLO_MIGRATION = {
   toDataHash: SPY_DEFECTOR_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Catalogue 0.1.87 + shuttle 2.1.0: the base's shared sortie pool is gone; a squadron that
+ *  lands refuels for `refuelMinutes` (owner's decision 2026-11-17). A saved `sortie` counter
+ *  is left in place and ignored; squadrons already parked carry no `readyAt` and are ready. */
+export const SQUADRON_REFUEL_SOLO_MIGRATION = {
+  fromRules: CAPTIVE_CARRIER_SOLO_MIGRATION.toRules,
+  fromData: CAPTIVE_CARRIER_SOLO_MIGRATION.toData,
+  fromDataHash: CAPTIVE_CARRIER_SOLO_MIGRATION.toDataHash,
+  toRules: '12281b71e968af',
+  toData: '0.1.87',
+  toDataHash: '0f85efc1673abe',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -815,6 +827,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   RALLY_ANY_WORLD_SOLO_MIGRATION,
   SPY_DEFECTOR_SOLO_MIGRATION,
   CAPTIVE_CARRIER_SOLO_MIGRATION,
+  SQUADRON_REFUEL_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

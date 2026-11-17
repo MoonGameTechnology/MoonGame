@@ -51,8 +51,6 @@ const data: GameData = parseGameData({
         speed: 100,
         hp: 10,
         strikeRange: 300,
-        fuel: 4,
-        rearmRounds: 2,
       },
     },
     // Десантный борт: безоружный, с бойцом внутри (ROS-1.5, SHU-5.2).
@@ -66,8 +64,6 @@ const data: GameData = parseGameData({
         speed: 60,
         hp: 24,
         strikeRange: 300,
-        fuel: 4,
-        rearmRounds: 2,
       },
     },
   },
@@ -279,18 +275,15 @@ describe('SHU-4.2 — вылет идёт ЭСКАДРОЙ', () => {
 });
 
 describe('SHU-4.2 — порт, поднявший ВСЁ, не остаётся сухим навсегда', () => {
-  // Найденная ловушка, ставшая обычной именно из-за эскадры. Топливо и перезарядка
-  // базы читались у машин, СТОЯЩИХ в ангаре; пустой ангар давал maxFuel 0, а тик
-  // перезарядки «заправляет» базу ровно на эту величину — в ноль. Порт, поднявший всё,
-  // что у него было, больше не выпускал НИКОГДА. Раньше в это упирались редко (летала
-  // часть машин), теперь эскадра уходит целиком, и редкое стало обычным.
-  it('ВСЯ ЭСКАДРА В ВОЗДУХЕ — порт всё равно перезаряжается и снова выпускает', () => {
+  // Старая ловушка общего запаса базы: пустой ангар давал запас 0, и порт, поднявший
+  // всё, больше не выпускал. Запаса у базы больше нет — заправляется сама эскадра.
+  it('ВСЯ ЭСКАДРА В ВОЗДУХЕ — вернувшись и заправившись, взлетает снова', () => {
     let s: GameState = world([sq('sq:p1:1', [['interceptor', 2]])]);
     s = apply(s, act('shuttle.strike', { planetId: 'A', squadronId: 'sq:p1:1', targetFleetId: 'E1' }));
     expect(s.planets.A?.hangar ?? []).toHaveLength(0); // ангар пуст: машины летят
     const done = kernel.advanceTo(s, { now: s.time + 8 * HOUR, data });
     if (!done.ok) throw new Error(done.code);
-    expect(done.state.planets.A?.sortie?.fuel).toBeGreaterThan(0);
+    expect(done.state.planets.A?.sortie).toBeUndefined(); // общего запаса вылетов нет
     const again = kernel.applyAction(
       done.state,
       act('shuttle.strike', { planetId: 'A', squadronId: 'sq:p1:1', targetFleetId: 'E1' }),
