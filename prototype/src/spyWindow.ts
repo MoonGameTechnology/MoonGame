@@ -38,7 +38,7 @@ import { espionageShown } from '../../decisions/sectorZeroTools';
 import { t } from '../../localization/runtime';
 import { esc, gameStamp } from './format';
 import { liveTimerHtml, patchLiveTimers, type LiveFormats } from './liveTimers';
-import { spyPortraitSvg } from './spyPortrait';
+import { spyFaceIndexes, spyPortraitSvg } from './spyPortrait';
 import { spyOddsFor } from './worldCard';
 import { ctx } from './game';
 import { data } from './gameData';
@@ -122,6 +122,12 @@ function placeText(r: RosterRow): string {
   return r.status === 'travel' || r.status === 'return' ? `→ ${at}` : at;
 }
 
+/** Лицо каждого шпиона списка: по позывному, без повторов среди живых (`spyPortrait.ts`). */
+function faceOf(spy: number): number {
+  const list = rows();
+  return spyFaceIndexes(list.map((r) => r.callsign))[list.findIndex((r) => r.id === spy)] ?? 0;
+}
+
 function rowHtml(r: RosterRow): string {
   const btn =
     r.action === 'assign'
@@ -131,7 +137,7 @@ function rowHtml(r: RosterRow): string {
         : '<span class="sp-act"></span>';
   return (
     `<div class="sp-row${r.status === 'hidden' ? ' sp-hidden' : ''}" data-spy-row="${r.id}">` +
-    spyPortraitSvg(r.callsign, spyLevel(xpOf(r.id))) +
+    spyPortraitSvg(faceOf(r.id), spyLevel(xpOf(r.id))) +
     `<b class="sp-name">${esc(t(`spy.callsign.${r.callsign}`))}</b>` +
     `<span class="sp-place">${placeText(r)}</span>` +
     `<span class="sp-doing">${esc(statusText(r))}</span>` +
@@ -197,11 +203,10 @@ function cardHtml(task: SpyTask, spy: number): string {
 }
 
 function tasksHtml(spy: number): string {
-  const callsign = rows().find((r) => r.id === spy)?.callsign ?? 0;
   return (
     `<div class="dpbox spbox"><div class="dp-head"><button class="b btn-second sp-back" data-spy-back>‹</button>` +
     `<b class="sp-title">${esc(nameOf(spy))}</b><button class="dp-close btn-x" data-spy-close>✕</button></div>` +
-    `<div class="sp-who">${spyPortraitSvg(callsign, spyLevel(xpOf(spy)))}` +
+    `<div class="sp-who">${spyPortraitSvg(faceOf(spy), spyLevel(xpOf(spy)))}` +
     `<span>${esc(target ? t('spy.win.target', { at: game.placeName(target) }) : statusText(rows().find((r) => r.id === spy)!))}</span></div>` +
     `<div class="sp-cards">${SPY_TASKS.map((task) => cardHtml(task, spy)).join('')}</div></div>`
   );

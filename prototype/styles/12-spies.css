@@ -15,6 +15,7 @@
 /* Строка: фото · имя · где · чем занят · таймер · кнопка */
 .sp-row{display:grid;grid-template-columns:52px minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr) 64px 150px;align-items:center;gap:10px;
   padding:7px 9px;margin-bottom:6px;border:1px solid var(--line-hi);border-radius:8px;background:rgba(53,214,230,.04);}
+.spy-photo{border-radius:12%;}
 .sp-row .spy-photo{width:52px;height:52px;display:block;}
 .sp-row .sp-name{color:#eafffb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .sp-row .sp-place,.sp-row .sp-doing{color:var(--ink);font-size:var(--fs-caption);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
