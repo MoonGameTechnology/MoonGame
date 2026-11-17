@@ -455,3 +455,89 @@ describe('SHU-6.6 — что снимает удержание у эскадры
     expect(again.patrol?.hold).toBe(true);
   });
 });
+
+/** Чужой транспорт на своём узле в точке `at` — цель для броска патруля. */
+function withTarget(s: GameState, at: { x: number; y: number }): GameState {
+  const fleet: Fleet = {
+    id: 'E1',
+    owner: 'p2',
+    location: 'n:E1',
+    movement: null,
+    units: [{ unit: 'freighter', count: 1 }],
+    traits: [],
+    battleId: null,
+  };
+  return { ...s, planets: { ...s.planets, 'n:E1': planet('n:E1', null, at.x, at.y) }, fleets: { ...s.fleets, E1: fleet } };
+}
+const diving = (s: GameState) => (s.strikes ?? []).find((st) => st.target.kind === 'fleet');
+
+// SHU-6.18 (резолюция владельца 2026-11-17): удерживаемый патруль бросается на цель, летит
+// домой на заправку и встаёт снова — в ту точку, которую покинул ради броска.
+describe('SHU-6.18 — удерживаемый патруль после броска', () => {
+  // Транспорт в 20 от точки: его опознаёт ближняя половина круга (30). Тик 1,75 — бросок.
+  const scene = (extra: Record<string, unknown> = {}): GameState =>
+    apply(withTarget(world([sq('sq:s', 'sentry', 2)]), { x: 150, y: 20 }), act('shuttle.patrol', {
+      planetId: 'A',
+      squadronId: 'sq:s',
+      at: P,
+      hold: true,
+      ...extra,
+    }));
+
+  it('БРОСОК ПОМНИТ ТОЧКУ, после заправки патруль встаёт туда, а не над целью', () => {
+    const s = scene();
+    const dive = diving(until(s, 1.8));
+    expect(dive?.rejoin).toEqual({ at: P });
+    expect(dive?.patrol).toBeUndefined();
+
+    const landed = until(s, 4);
+    expect(landed.strikes ?? []).toHaveLength(0);
+    const parked = hangarOf(landed)[0];
+    expect(parked?.hold).toEqual({ at: P });
+    expect(parked?.readyAt).toBeGreaterThan(4 * H); // заправка
+
+    const again = patrolOf(until(s, parked!.readyAt! / H + 0.01));
+    expect(again?.to).toEqual(P);
+    expect(again?.patrol).toEqual({ hours: 2, radius: 60, hold: true });
+  });
+
+  it('ПРАВИЛО ЦЕЛЕЙ САДИТСЯ С ЭСКАДРОЙ И ВСТАЁТ С НЕЙ', () => {
+    const s = scene({ radar: true });
+    expect(diving(until(s, 1.8))?.rejoin).toEqual({ at: P, radar: true });
+    const parked = hangarOf(until(s, 4))[0];
+    expect(parked?.hold).toEqual({ at: P, radar: true });
+    expect(patrolOf(until(s, parked!.readyAt! / H + 0.01))?.patrol?.radar).toBe(true);
+  });
+
+  it('СНЯТЬ «ДЕРЖАТЬ» У БРОСИВШЕГОСЯ МОЖНО, ВКЛЮЧИТЬ — НЕЛЬЗЯ: точки у удара нет', () => {
+    const s = until(scene(), 1.8);
+    const id = diving(s)!.id;
+    const off = apply(s, holdStrike(id, false));
+    expect(diving(off)?.rejoin).toBeUndefined();
+    expect(code(off, holdStrike(id, true))).toBe('E_NOT_PATROLLING');
+    const later = until(off, 12);
+    expect(later.strikes ?? []).toHaveLength(0);
+    expect(hangarOf(later)[0]?.hold).toBeUndefined();
+  });
+
+  it('ОТЗЫВ БРОСИВШЕГОСЯ СНИМАЕТ УДЕРЖАНИЕ', () => {
+    const s = until(scene(), 1.8);
+    const back = apply(s, act('shuttle.recall', { strikeId: diving(s)!.id }));
+    expect(diving(back)?.rejoin).toBeUndefined();
+    expect(hangarOf(until(back, 12))[0]?.hold).toBeUndefined();
+  });
+
+  it('НОВАЯ ТОЧКА БРОСИВШЕМУСЯ: удержание и правило целей переезжают в неё', () => {
+    const s = until(scene({ radar: true }), 1.8);
+    const moved = apply(s, act('shuttle.redirect', { strikeId: diving(s)!.id, at: { x: 120, y: 0 } }));
+    const st = patrolOf(moved);
+    expect(st?.rejoin).toBeUndefined();
+    expect(st?.patrol).toEqual({ hours: 2, radius: 60, hold: true, radar: true });
+  });
+
+  it('ENGAGE У БРОСИВШЕГОСЯ — правило того патруля, в который он вернётся', () => {
+    const s = until(scene(), 1.8);
+    const on = apply(s, act('shuttle.engage', { strikeId: diving(s)!.id, radar: true }));
+    expect(diving(on)?.rejoin).toEqual({ at: P, radar: true });
+  });
+});

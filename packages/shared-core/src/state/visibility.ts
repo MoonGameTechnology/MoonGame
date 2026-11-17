@@ -9,6 +9,7 @@ import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { laneIsPublic } from './corridor';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
 import { hideSquadronPlans } from './shuttle';
+import { patrolRadarCircles, patrolRadarSources } from './patrolRadar';
 import { emptyOrdnance, inRadius, isMissileFleet, rocketMineModule } from './ordnance';
 import { cloakedReach, eyeReach, fleetCloak } from './cloak';
 import { fleetSightBonus } from './fleetSight';
@@ -298,7 +299,7 @@ function circlesByOwner(
     if (isMissileFleet(fleet, data)) continue;
     if (pos) circle(ownerId, { kind: 'fleet', id: fleet.id }, pos, rules.fleet + fleetSightBonus(fleet, data), fleetRadarRange(fleet, data) * mult);
   }
-  patrolEyes(state, byOwner);
+  for (const [ownerId, out] of byOwner) out.push(...patrolRadarCircles(state, ownerId, IDENTIFY_REACH_FRACTION));
   // HERO-FX3 `reveal` (scan): the owner's OWN living heroes' active time-boxed reveals
   // light a full-identify zone around their target node until it expires.
   for (const hero of recordValues(state.heroes ?? {})) {
@@ -325,37 +326,6 @@ function mineEye(fleet: Fleet, pos: { x: number; y: number }, data: GameData): S
         signature: rocket.def.radarRange,
       }
     : null;
-}
-
-/** Глаза висящих патрулей шаттлов — в списки владельцев из `byOwner`. */
-function patrolEyes(state: GameState, byOwner: Map<PlayerId, SightCircle[]>): void {
-  // SHU-6.7: висящий патруль шаттлов — глаза эскадры над её точкой. Круг тот же, в котором
-  // патруль бьёт (`patrol.radius`), и это глаза, а не радар: опознание и засечка совпадают,
-  // множители радара и блэкаут его не трогают. Только нога `patrol`: эскадра на пути к точке
-  // или домой карту не открывает.
-  for (const strike of state.strikes ?? []) {
-    const out = byOwner.get(strike.owner);
-    if (!out || strike.leg !== 'patrol' || !strike.patrol) continue;
-    const r = strike.patrol.radius;
-    if (r > 0) out.push({
-      owner: strike.owner, source: { kind: 'patrol', id: strike.id }, ...strike.to,
-      identify: r, signature: r,
-    });
-  }
-  // SHU-6.12: те же глаза у патруля СОЮЗНИКА в спроецированном мире. Проекция снимает чужие
-  // вылеты целиком, и висящий патруль партнёра по блоку доходит до клиента сети только
-  // строкой `seenPatrols` (точка и круг — ровно то, из чего круг выше и собран). Без этой
-  // ветки клиент сети не видел глазами союзного патруля, хотя сервер по ним уже прислал
-  // опознанные миры. В авторитетном мире поля нет, и ветка молчит: там патруль союзника
-  // уже учтён по `strikes`.
-  (state.seenPatrols ?? []).forEach((p, i) => {
-    const out = byOwner.get(p.owner);
-    if (!out || !(p.radius > 0)) return;
-    out.push({
-      owner: p.owner, source: { kind: 'patrol', id: `seen:${p.owner}:${i}` }, x: p.at.x, y: p.at.y,
-      identify: p.radius, signature: p.radius,
-    });
-  });
 }
 
 /** Все круги, которыми видит `viewerId`: его собственные и его блока зрения (союз, обмен
@@ -707,6 +677,7 @@ export function radarSources(
         if (def && stack.count > 0) add(at, stackRadarRange(def, stack, data), def.radarLevel);
       }
     }
+    sources.push(...patrolRadarSources(state, owner));
   }
   return sources;
 }

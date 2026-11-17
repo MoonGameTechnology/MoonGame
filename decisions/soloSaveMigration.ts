@@ -775,6 +775,20 @@ export const ORBITAL_TIME_ORDER_SOLO_MIGRATION = {
   toDataHash: SQUADRON_REFUEL_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: shuttle 2.2.0 — a patrol dives on a target in its circle with a full
+ *  strike and flies home to refuel; `patrol.radar` picks any radar blip over identified
+ *  targets only; a held patrol that dove keeps its point in `rejoin`; the patrol circle is a
+ *  radar, not eyes (SHU-6.18). The catalogue is unchanged and so is the saved shape: a saved
+ *  patrol has no `radar` and reads as «identified only», the owner's default. */
+export const PATROL_DIVE_SOLO_MIGRATION = {
+  fromRules: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toRules,
+  fromData: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toData,
+  fromDataHash: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toDataHash,
+  toRules: '00a22acf381e46',
+  toData: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toData,
+  toDataHash: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -842,6 +856,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   CAPTIVE_CARRIER_SOLO_MIGRATION,
   SQUADRON_REFUEL_SOLO_MIGRATION,
   ORBITAL_TIME_ORDER_SOLO_MIGRATION,
+  PATROL_DIVE_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

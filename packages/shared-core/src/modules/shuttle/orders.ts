@@ -26,7 +26,6 @@ import { distance } from '../../state/route';
 import {
   divideSquadron,
   nextSquadronId,
-  ownPatrol,
   ownStrike,
   reorder,
   requireSquadron,
@@ -106,9 +105,9 @@ export function registerLaunchOrders(api: ModuleSetupApi): void {
    * (SHU-6.2, резолюция владельца 2026-10-04, по образцу Conflict of Nations).
    *
    * Эскадра летит к точке как на удар — её видно, ПВО по трассе стреляет, — висит над
-   * ней `patrolHours` и каждые `PATROL_TICK_MINUTES` бьёт одну цель в круге
-   * `patrolRadius` (`patrolStrike`). Время вышло — домой, на обычную перезарядку;
-   * `shuttle.recall` возвращает раньше.
+   * ней `patrolHours` и каждые `PATROL_TICK_MINUTES` осматривает круг `patrolRadius`:
+   * нашлась цель — бросок полным ударом и домой на заправку (`patrolStrike`, SHU-6.18).
+   * Время вышло — домой; `shuttle.recall` возвращает раньше.
    *
    * База та же, что у удара, и обе её формы: мир с портом или ангаром крепости и любой
    * корабль с трюмом, в том числе идущий. Точка — в радиусе удара эскадры от базы: круг,
@@ -116,6 +115,7 @@ export function registerLaunchOrders(api: ModuleSetupApi): void {
    * единица запаса вылетов, как у удара.
    *
    * `hold: true` — «Держать патруль» (SHU-6.6): вернувшись, эскадра встанет снова сама.
+   * `radar: true` — бросаться и на метку радара, а не только на опознанную цель (SHU-6.18).
    */
   api.onAction('shuttle.patrol', (action, h: HandlerContext) => {
     const p = (action.payload ?? {}) as {
@@ -124,8 +124,10 @@ export function registerLaunchOrders(api: ModuleSetupApi): void {
       squadronId?: unknown;
       at?: { x?: unknown; y?: unknown } | null;
       hold?: unknown;
+      radar?: unknown;
     };
     if (p.hold !== undefined && typeof p.hold !== 'boolean') return h.reject('E_BAD_PAYLOAD');
+    if (p.radar !== undefined && typeof p.radar !== 'boolean') return h.reject('E_BAD_PAYLOAD');
     const base = baseFromPayload(h, action.playerId, p);
     const ready = readySquadron(h, base, p.squadronId);
     const x = p.at?.x;
@@ -136,7 +138,7 @@ export function registerLaunchOrders(api: ModuleSetupApi): void {
         : null;
     const route = patrolCheck(h, base.position, ready.squad, to);
     if (typeof route === 'string') return h.reject(route);
-    takeOffPatrol(h, action.playerId, base, ready, route, p.hold === true);
+    takeOffPatrol(h, action.playerId, base, ready, route, { hold: p.hold === true, radar: p.radar === true });
   });
 
   /**
@@ -160,6 +162,7 @@ export function registerLaunchOrders(api: ModuleSetupApi): void {
     if (here) strike.to = here;
     delete strike.at;
     delete strike.patrol?.hold;
+    delete strike.rejoin;
     reorder(strike);
     turnHome(h, strike);
   });
@@ -179,8 +182,9 @@ export function registerLaunchOrders(api: ModuleSetupApi): void {
    * Включить можно, пока патруль не повернул домой, — там же, где его можно вернуть:
    * повернувший по отзыву держать уже нечего, игрок сам вернул его. Снять можно всегда,
    * в том числе на обратной ноге, дома и на корабле в бою: снять стоячий приказ должно
-   * быть можно в любую минуту, как и любой другой. Дома включить нельзя — там нет
-   * патруля, у которого взять точку: для этого есть сам приказ патруля с `hold`.
+   * быть можно в любую минуту, как и любой другой, — и у патруля, бросившегося на флот
+   * (`rejoin`, SHU-6.18): тогда он вернётся домой и не встанет снова. Дома включить нельзя
+   * — там нет патруля, у которого взять точку: для этого есть сам приказ патруля с `hold`.
    */
   api.onAction('shuttle.hold', (action, h: HandlerContext) => {
     const p = (action.payload ?? {}) as {
@@ -195,7 +199,12 @@ export function registerLaunchOrders(api: ModuleSetupApi): void {
       if (typeof p.strikeId !== 'string' || p.squadronId !== undefined) {
         return h.reject('E_BAD_PAYLOAD');
       }
-      const strike = ownPatrol(h, action.playerId, p.strikeId);
+      const strike = ownStrike(h, action.playerId, p.strikeId);
+      if (!p.on && strike.rejoin) {
+        delete strike.rejoin;
+        return;
+      }
+      if (strike.target.kind !== 'point') return h.reject('E_NOT_PATROLLING');
       if (!p.on) delete strike.patrol?.hold;
       else if (strike.leg === 'back' || !strike.patrol) return h.reject('E_NOT_PATROLLING');
       else strike.patrol.hold = true;
@@ -220,6 +229,24 @@ export function registerLaunchOrders(api: ModuleSetupApi): void {
     const squad = hangar.find((q) => q.id === p.squadronId);
     if (!squad) return h.reject('E_NO_SQUADRON');
     delete squad.hold;
+  });
+
+  /**
+   * `shuttle.engage { strikeId, radar }` — ПРАВИЛО ЦЕЛЕЙ патруля в воздухе (SHU-6.18,
+   * резолюция владельца 2026-11-17): `true` — бросаться на любую метку радара в круге,
+   * `false` — только на опознанную цель (дефолт). Правило — у патруля: на пути к точке, над
+   * ней и на пути домой, если он удерживается и встанет снова; у бросившегося на флот —
+   * у патруля, в который он вернётся (`rejoin`). Удару приказом правило не нужно: его цель
+   * выбрал игрок.
+   */
+  api.onAction('shuttle.engage', (action, h: HandlerContext) => {
+    const p = (action.payload ?? {}) as { strikeId?: unknown; radar?: unknown };
+    if (typeof p.radar !== 'boolean') return h.reject('E_BAD_PAYLOAD');
+    const strike = ownStrike(h, action.playerId, p.strikeId);
+    const rule = strike.rejoin ?? (strike.target.kind === 'point' ? strike.patrol : undefined);
+    if (!rule) return h.reject('E_NOT_PATROLLING');
+    if (p.radar) rule.radar = true;
+    else delete rule.radar;
   });
 }
 

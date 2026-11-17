@@ -221,6 +221,7 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     squadronId: id,
     at: z.object({ x: z.number().finite(), y: z.number().finite() }),
     hold: z.boolean().optional(),
+    radar: z.boolean().optional(),
   }),
   // «Домой» эскадре в воздухе (SHU-6.2 — патруль, SHU-6.13 — любой вылет на пути туда) —
   // по id вылета: эскадры в ангаре нет, она в воздухе.
@@ -243,6 +244,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     squadronId: id.optional(),
     on: z.boolean(),
   }),
+  // ПРАВИЛО ЦЕЛЕЙ патруля в воздухе (SHU-6.18): любая метка радара или только опознанная.
+  'shuttle.engage': z.object({ strikeId: id, radar: z.boolean() }),
   // ПЕРЕЛЁТ на другую свою базу (SHU-6.4). И откуда, и куда — ровно одна база из двух
   // (мир или корабль): «обе или ни одной» схема не выражает, это гейт обработчика, как и
   // дальность перелёта. Две формы: эскадра ангара (база + `squadronId`) или эскадра в

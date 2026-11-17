@@ -31,12 +31,14 @@ import { t, tData } from '../../localization/runtime';
 import {
   repairStation,
   disarmRocketMine,
+  engagePatrol,
   holdPatrol,
   recallPatrol,
   releaseHold,
   setRocketMineMode,
   splitAloft,
 } from '../../decisions/actions';
+import { patrolToggles } from '../../decisions/aloftCard';
 import { canBuildHere } from '../../decisions/buildGate';
 import { fleetMachinePlaces } from '../../decisions/fleetHolds';
 import { changeSectorZeroProgress, sovereignRepairCost } from '../../decisions/sectorZeroProgress';
@@ -804,11 +806,13 @@ function onSideClick(ev: MouseEvent): void {
     // `arg` — id ВЫЛЕТА: патруль уже не в ангаре, и адресуется он так же, как его
     // принимает ядро (`shuttle.recall { strikeId }`).
     playerOrder(recallPatrol(ME, arg));
-  } else if (act === 'wingkeep') {
-    // «Держать патруль» (SHU-6.6) — `arg` это id ВЫЛЕТА, как у «Вернуть». Новое
-    // состояние берётся из самого патруля: строка могла устареть между отрисовкой и тапом.
-    const held = (s.strikes ?? []).find((st) => st.id === arg)?.patrol?.hold === true;
-    if (playerOrder(holdPatrol(ME, arg, !held)) && !held) note(t('hint.wing-keep'));
+  } else if (act === 'wingkeep' || act === 'wingradar') {
+    // «Держать патруль» (SHU-6.6) и «Бить по радару» (SHU-6.18): `arg` — id ВЫЛЕТА, как у
+    // «Вернуть»; шлётся обратное тому, что стоит у самого вылета (`patrolToggles`).
+    const on = patrolToggles((s.strikes ?? []).find((x) => x.id === arg));
+    if (act === 'wingradar') {
+      if (playerOrder(engagePatrol(ME, arg, !on.radar))) note(on.radar ? t('hint.wing-radar-off') : t('hint.wing-radar-on'));
+    } else if (playerOrder(holdPatrol(ME, arg, !on.hold)) && !on.hold) note(t('hint.wing-keep'));
   } else if (act === 'wingrelease') {
     // Снять удержание с эскадры, которая ждёт дома перезарядки (правило 8
     // `squadronPanel.ts`): `arg` — id эскадры, база выводится из состояния.

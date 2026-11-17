@@ -29,7 +29,10 @@ import { squadronHullPercent } from './squadronHull';
  *    (`squadronPatrol`) и пустой трюм, как в ангаре (правило 6 там). Десантный челнок
  *    кнопки не получает.
  * 5. **«Держать патруль» — у патруля**: на пути к точке и над ней; у обратной ноги
- *    держать уже нечего (`shuttle.hold` отбивает `E_NOT_PATROLLING`).
+ *    держать уже нечего (`shuttle.hold` отбивает `E_NOT_PATROLLING`). Патруль, бросившийся
+ *    на флот с удержанием (`rejoin`, SHU-6.18), показывает его включённым: снять можно, а
+ *    включить снова нельзя — точки у удара нет. Тем же правилом живёт переключатель целей
+ *    «Бить по радару» (`shuttle.engage`, SHU-6.18).
  * 6. **«Перебазировать» и «Разделить» спрашиваются у вызывающего.** Куда долетит
  *    эскадра, считает `relocateTargets.ts` по живым позициям, а что отделит один тап —
  *    правило ангара (`splitOne`): своей копии этих правил у карточки нет.
@@ -72,6 +75,21 @@ export interface AloftCard {
   canSplit: boolean;
   /** Удержание патруля: `null` — патруля нет, держать нечего (правило 5). */
   hold: boolean | null;
+  /** Правило целей патруля: `true` — любая метка радара, `false` — только опознанные,
+   *  `null` — патруля нет (правило 5). */
+  radar: boolean | null;
+}
+
+/**
+ * Что сейчас стоит у переключателей патруля (правило 5) — для тапа, который шлёт обратное.
+ * Читается из самого вылета, а не из карточки: строка могла устареть до тапа. Удержание —
+ * у висящего патруля на любой ноге и у бросившегося (`rejoin`); правило целей — у того же.
+ */
+export function patrolToggles(strike: ShuttleStrike | null | undefined): { hold: boolean; radar: boolean } {
+  return {
+    hold: strike?.patrol?.hold === true || strike?.rejoin !== undefined,
+    radar: (strike?.rejoin ?? strike?.patrol)?.radar === true,
+  };
 }
 
 /** Что эскадра делает — словами игрока (правило 7). */
@@ -106,6 +124,8 @@ export function aloftCard(
   const returning = strike.leg === 'back';
   const plan = squadronPatrol(strike, opts.data);
   const patrolling = strike.target.kind === 'point' && !returning && !!strike.patrol;
+  // Правило 5: патруль — свой или тот, в который бросившаяся эскадра вернётся.
+  const rule = returning ? undefined : patrolling ? strike.patrol : strike.rejoin;
   return {
     strikeId: strike.id,
     squadronId: strike.squadronId,
@@ -121,6 +141,8 @@ export function aloftCard(
     canRecall: !returning,
     canRelocate: opts.relocate, // правило 6
     canSplit: opts.split,
-    hold: patrolling ? strike.patrol?.hold === true : null, // правило 5
+    // Правило 5: у бросившегося патруля `rejoin` есть только при удержании.
+    hold: !rule ? null : patrolling ? strike.patrol?.hold === true : true,
+    radar: rule ? rule.radar === true : null,
   };
 }
