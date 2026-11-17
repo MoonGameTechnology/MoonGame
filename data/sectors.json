@@ -103,5 +103,29 @@
     "maxLinks": 2,
     "family": "asteroid",
     "corridors": 1
+  },
+  "yellow_dwarf": {
+    "name": "Yellow Dwarf",
+    "family": "star"
+  },
+  "red_giant": {
+    "name": "Red Giant",
+    "family": "star"
+  },
+  "blue_giant": {
+    "name": "Blue Giant",
+    "family": "star"
+  },
+  "white_dwarf": {
+    "name": "White Dwarf",
+    "family": "star"
+  },
+  "pulsar": {
+    "name": "Pulsar",
+    "family": "star"
+  },
+  "binary_star": {
+    "name": "Binary Star",
+    "family": "star"
   }
 }

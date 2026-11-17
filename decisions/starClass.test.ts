@@ -1,22 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { STAR_CLASSES, starClassAt } from './starClass';
+import { readFileSync } from 'node:fs';
+import { STAR_CLASSES, starClassOf } from './starClass';
 
-describe('starClassAt — the star at the heart of a solar-flare zone', () => {
-  it('is the same star for the same place, on every call', () => {
-    expect(starClassAt(1234, -567)).toBe(starClassAt(1234, -567));
-    expect(starClassAt(1234.2, -566.8)).toBe(starClassAt(1234, -567));
+const terrains = JSON.parse(
+  readFileSync(new URL('../data/sectors.json', import.meta.url), 'utf8'),
+) as Record<string, { family?: string }>;
+
+describe('starClassOf — the star a star province holds', () => {
+  it('reads the class from the terrain, and every star terrain of the data is a class it knows', () => {
+    const family = Object.keys(terrains).filter((t) => terrains[t]!.family === 'star');
+    expect(family.sort()).toEqual([...STAR_CLASSES].sort());
+    for (const cls of STAR_CLASSES) expect(starClassOf(cls)).toBe(cls);
   });
 
-  it('reaches every class over a map, with no class taking more than half of the places', () => {
-    const seen = new Map<string, number>();
-    for (let x = -2000; x <= 2000; x += 137) {
-      for (let y = -2000; y <= 2000; y += 151) {
-        const c = starClassAt(x, y);
-        seen.set(c, (seen.get(c) ?? 0) + 1);
-      }
-    }
-    expect([...seen.keys()].sort()).toEqual([...STAR_CLASSES].sort());
-    const total = [...seen.values()].reduce((a, b) => a + b, 0);
-    for (const n of seen.values()) expect(n / total).toBeLessThan(0.5);
+  it('draws a yellow dwarf for a terrain no class names, instead of nothing', () => {
+    expect(starClassOf(undefined)).toBe('yellow_dwarf');
+    expect(starClassOf('solar_flare_zone')).toBe('yellow_dwarf');
   });
 });
