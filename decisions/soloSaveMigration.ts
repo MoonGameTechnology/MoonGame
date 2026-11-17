@@ -750,6 +750,19 @@ export const CAPTIVE_CARRIER_SOLO_MIGRATION = {
   toDataHash: SPY_DEFECTOR_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: orbital 1.8.0 — the world's flak and a fleet's bombardment land in the
+ *  order of time however the span is cut, and a flak volley stamps `lastDamagedAt` with its
+ *  own instant (FORT-5.17). The catalogue is unchanged and so is the saved shape: a saved
+ *  world reads as is, only later spans interleave the two fires. */
+export const ORBITAL_TIME_ORDER_SOLO_MIGRATION = {
+  fromRules: CAPTIVE_CARRIER_SOLO_MIGRATION.toRules,
+  fromData: CAPTIVE_CARRIER_SOLO_MIGRATION.toData,
+  fromDataHash: CAPTIVE_CARRIER_SOLO_MIGRATION.toDataHash,
+  toRules: '0a0c1b95158f5b',
+  toData: CAPTIVE_CARRIER_SOLO_MIGRATION.toData,
+  toDataHash: CAPTIVE_CARRIER_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -815,6 +828,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   RALLY_ANY_WORLD_SOLO_MIGRATION,
   SPY_DEFECTOR_SOLO_MIGRATION,
   CAPTIVE_CARRIER_SOLO_MIGRATION,
+  ORBITAL_TIME_ORDER_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

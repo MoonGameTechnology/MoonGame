@@ -14,7 +14,7 @@ import {
   type Player,
 } from '../state/gameState';
 import { parseGameData, buildingLevel, type GameData } from '../data/schemas';
-import type { Action, AdvanceResult, ApplyResult, Context } from '../action/types';
+import type { Action, AdvanceResult, ApplyResult, Context, DomainEvent } from '../action/types';
 
 /** The combat family in canonical manifest order — the split of the old monolith
  *  (orbital stamps orbit before combat engages; orbital's AA/bombard span runs
@@ -260,6 +260,104 @@ describe('orbital — bombardment effects (GDD §7.4)', () => {
       const r = okAdvance(k.advanceTo(st, at(HOUR))).state;
       expect(depotHp(r)).toBe(25);
       expect(r.fleets.F?.bombardNextAt).toBe(2 * HOUR);
+    });
+  });
+
+  // FORT-5.17. Флак мира и обстрел флота — два огня одного отрезка `time.advanced`. Длина
+  // отрезка не наша: матч без зрителей спит до следующего события, под присмотром сервер
+  // тикает раз в секунду. Поэтому залпы обязаны лечь в порядке времени, а не «сперва весь
+  // флак отрезка, потом весь обстрел», иначе мир, на который смотрят, и мир, который
+  // догоняют после офлайна, расходятся. Эталон — мелкая нарезка: в ней каждый отрезок
+  // вмещает не больше одного мгновения залпа. В одно мгновение флак ложится раньше обстрела.
+  describe('флак и обстрел ложатся в порядке времени при любой нарезке (FORT-5.17)', () => {
+    const kernel = () => createKernel([...combatFamily, constructionModule]);
+    /** Довести мир до `to` шагами `steps` по кругу (последний шаг обрезан до `to`). */
+    const advanceIn = (st: GameState, to: number, steps: readonly number[]) => {
+      const k = kernel();
+      const events: DomainEvent[] = [];
+      let state = st;
+      for (let t = 0, i = 0; t < to; ) {
+        t = Math.min(to, t + steps[i++ % steps.length]!);
+        const r = okAdvance(k.advanceTo(state, at(t)));
+        state = r.state;
+        events.push(...r.events);
+      }
+      return { state, events };
+    };
+    /** Залпы обоих огней в том порядке, в каком они легли. */
+    const volleys = (events: DomainEvent[]) =>
+      events
+        .filter((e) => e.type === 'aa.fired' || e.type === 'planet.bombarded')
+        .map((e) => ({ type: e.type, payload: e.payload }));
+    const MINUTE = 60_000;
+
+    it('зенитка, снесённая залпом обстрела, следующий свой залп уже не даёт', () => {
+      const world = () => {
+        const st = stateWith({
+          // Орбитальная зенитка: 25 прочности, залп в 28 раз в игровой час, на отметке часа.
+          planets: [planet('P', 'p2', { buildings: [['flak', 1]] })],
+          // Осадная платформа бьёт по постройкам 30 за залп; её часы — на получасе.
+          fleets: [fleet('F', 'p1', 'P', [['siege', 1]], { orbit: 'near', bombarding: true })],
+        });
+        st.fleets.F!.bombardNextAt = HOUR / 2;
+        return st;
+      };
+      const long = advanceIn(world(), HOUR + 1000, [HOUR + 1000]);
+      // 0:30 — залп платформы сносит зенитку; в 1:00 стрелять уже некому.
+      expect(long.state.planets.P?.buildings).toEqual([]);
+      expect(long.events.map((e) => e.type)).not.toContain('aa.fired');
+      expect(long.state.fleets.F?.units).toEqual([{ unit: 'siege', count: 1 }]);
+      expect(long.state).toEqual(advanceIn(world(), HOUR + 1000, [MINUTE]).state);
+    });
+
+    it('флот, сбитый ближним флаком, успевает дать залп, который лёг до его гибели', () => {
+      const world = () => {
+        const st = stateWith({
+          // Три зенитных расчёта: ближний флак 3 × 14 / 4 = 10,5 каждые четверть часа.
+          planets: [planet('P', 'p2', { buildings: [['depot', 1]], garrison: [['aa', 3]] })],
+          // Крейсер: 40 корпуса, по постройкам 10 × 0,5 = 5 за залп целым корпусом.
+          fleets: [fleet('F', 'p1', 'P', [['cruiser', 1]], { orbit: 'near', bombarding: true })],
+        });
+        st.fleets.F!.bombardNextAt = HOUR / 2;
+        return st;
+      };
+      const long = advanceIn(world(), 2 * HOUR, [2 * HOUR]);
+      // 0:15 и 0:30 — два залпа флака (21 урона, корпус 19 из 40); в 0:30 следом залп крейсера
+      // долей корпуса: 5 × 19/40 = 2,375. В 1:00 четвёртый залп флака крейсер добивает.
+      expect(long.state.planets.P?.buildings[0]?.hp).toBeCloseTo(30 - 2.375, 9);
+      expect(long.state.fleets.F).toBeUndefined();
+      expect(long.state).toEqual(advanceIn(world(), 2 * HOUR, [MINUTE]).state);
+    });
+
+    it('смешанный бой над миром: любая нарезка — тот же мир и те же залпы в том же порядке', () => {
+      const world = () => {
+        const st = stateWith({
+          planets: [
+            planet('P', 'p2', {
+              buildings: [['flak', 1], ['depot', 1], ['mine', 1]],
+              garrison: [['aa', 2], ['marine', 2]],
+            }),
+          ],
+          fleets: [
+            fleet('F', 'p1', 'P', [['siege', 1], ['cruiser', 2]], { orbit: 'near', bombarding: true }),
+            fleet('G', 'p1', 'P', [['cruiser', 3]], { orbit: 'near', bombarding: true }),
+          ],
+        });
+        st.fleets.F!.bombardNextAt = 20 * MINUTE;
+        st.fleets.G!.bombardNextAt = 45 * MINUTE;
+        return st;
+      };
+      const to = 4 * HOUR + 1234;
+      const fine = advanceIn(world(), to, [MINUTE]);
+      // Бой содержательный: зенитку снесли, оба огня легли, флоты под флаком потрёпаны.
+      expect(fine.state.planets.P?.buildings.map((b) => b.type)).not.toContain('flak');
+      expect(volleys(fine.events).some((v) => v.type === 'planet.bombarded')).toBe(true);
+      expect(volleys(fine.events).some((v) => v.type === 'aa.fired')).toBe(true);
+      for (const steps of [[to], [HOUR], [15 * MINUTE], [7 * MINUTE, 13 * MINUTE + 17, MINUTE, 41 * MINUTE]]) {
+        const other = advanceIn(world(), to, steps);
+        expect(other.state).toEqual(fine.state);
+        expect(volleys(other.events)).toEqual(volleys(fine.events));
+      }
     });
   });
 
