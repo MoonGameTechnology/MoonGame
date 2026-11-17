@@ -203,19 +203,19 @@ describe('the glass rim and wave keep to the strip of the bake they can touch', 
   });
 });
 
-// Карта, что кончается по ободу (`state.mapEdge`): стекло — сам обод, а не пустые углы рамки
-// (владелец 2026-11-09: «чтоб рамки карты были»).
-describe('стекло по ободу карты', () => {
+// Карта, что кончается по своему контуру (`state.mapEdge`): рамка всё равно прямоугольная —
+// описанный прямоугольник контура; крайние провинции касаются её, но к ней не тянутся
+// (владелец 2026-11-17: «рамка квадратная», «провинции к рамке не надо связывать»).
+describe('рамка карты с контуром — прямоугольник', () => {
   const hex: Array<[number, number]> = [[100, 0], [300, 0], [400, 200], [300, 400], [100, 400], [0, 200]];
 
-  it('обод даёт стеклу свою форму и описанную рамку; без обода — прежний прямоугольник', () => {
-    const rimmed = glassFrame(hex, { x: -50, y: -50 }, { x: 450, y: 450 }, true);
-    expect(rimmed).toEqual({ x: 0, y: 0, width: 400, height: 400, outline: hex });
+  it('контур даёт стеклу описанный прямоугольник без своей формы; без контура — прежняя рамка', () => {
+    expect(glassFrame(hex, { x: -50, y: -50 }, { x: 450, y: 450 }, true)).toEqual({ x: 0, y: 0, width: 400, height: 400 });
     expect(glassFrame(hex, { x: -50, y: -50 }, { x: 450, y: 450 }, false))
       .toEqual({ x: -50, y: -50, width: 500, height: 500 });
   });
 
-  it('кайма идёт по ободу: каждая точка линии лежит на его гранях', () => {
+  it('кайма идёт по прямоугольнику: ни одна точка линии не срезает угол по контуру', () => {
     const points: Array<[number, number]> = [];
     const g = new Proxy({}, {
       get: (_, name) => (name === 'moveTo' || name === 'lineTo' ? (x: number, y: number) => { points.push([x, y]); }
@@ -224,12 +224,11 @@ describe('стекло по ободу карты', () => {
     }) as CanvasRenderingContext2D;
     drawGlassRim(g, glassFrame(hex, { x: 0, y: 0 }, { x: 0, y: 0 }, true), 0, false);
     expect(points.length).toBeGreaterThan(300);
-    // Кайма дрожит по нормали на доли процента короткой стороны: до грани — меньше 2 px.
-    const toEdge = ([x, y]: [number, number]): number => Math.min(...hex.map(([ax, ay], i) => {
-      const [bx, by] = hex[(i + 1) % hex.length]!;
-      const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
-      return Math.hypot(x - ax - t * (bx - ax), y - ay - t * (by - ay));
-    }));
-    for (const p of points.slice(0, 321)) expect(toEdge(p)).toBeLessThan(2);
+    // Кайма дрожит на доли процента стороны: каждая точка — у одной из сторон прямоугольника.
+    const toSide = ([x, y]: [number, number]): number => Math.min(Math.abs(x), Math.abs(x - 400), Math.abs(y), Math.abs(y - 400));
+    const nearSides = points.slice(0, 321).filter((p) => toSide(p) < 12);
+    expect(nearSides.length).toBeGreaterThan(300);
+    // Угол контура (0, 200)–(100, 0) срезал бы рамку: в эту четверть кайма не заходит.
+    expect(points.slice(0, 321).filter(([x, y]) => x > 20 && y > 20 && x < 80 && y < 80)).toEqual([]);
   });
 });
