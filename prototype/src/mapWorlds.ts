@@ -45,6 +45,8 @@ import { artScale, calloutAlpha, sphereBloom } from './semanticZoom';
 import { VOID_COLOR } from './sideColors';
 import { sweepPaint, sweepShows } from './sweepFx';
 import { drawBlackHole } from './blackHoleArt';
+import { drawStar } from './starArt';
+import { starClassAt } from '../../decisions/starClass';
 
 /** Что мирам карты нужно от игры. */
 export interface MapWorldsHost {
@@ -262,6 +264,27 @@ export function prepareWorldArt(): void {
  * значках (жалоба владельца на APK: на минимальном зуме искусство узла, бейджи и эффекты
  * ложились друг на друга).
  */
+/** A terrain province's selectable survey point. In a flare zone it is the star that throws
+ *  the flares (`starArt.ts`), its class fixed by the node's place (`decisions/starClass.ts`). */
+function drawSurveyPoint(
+  cx: CanvasRenderingContext2D,
+  c: { x: number; y: number },
+  n: { x: number; y: number },
+  sector: string,
+  col: string,
+  R: number,
+  clockMs: number,
+): void {
+  if (sector === 'solar_flare') {
+    drawStar(cx, c.x, c.y, R, starClassAt(n.x, n.y), clockMs && clockMs + phaseAt(n.x, n.y) * 400);
+    return;
+  }
+  cx.fillStyle = rgba(col, 0.7);
+  cx.beginPath();
+  cx.arc(c.x, c.y, 2.4, 0, TAU);
+  cx.fill();
+}
+
 export function drawWorlds(now: number, lod: MapLod): void {
   const s = game.world();
   const cx = game.ctx();
@@ -362,7 +385,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     if (n.sector === 'black_hole') {
       cx.save();
       const hs = ns * (p.size ?? 1); // the Abyss of ffa-50 is a size-2 hole, drawn twice as big
-      drawBlackHole(cx, c.x, c.y, 20 * hs);
+      drawBlackHole(cx, c.x, c.y, 20 * hs, hologramTime);
       cx.restore();
       continue;
     }
@@ -573,10 +596,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     if (holographicMapOn() && hasTerrainMaterial(sector) &&
       sector !== 'dead_world' && sector !== 'planet' && sector !== 'void_station') {
       // Terrain is the province's material; retain a precise selectable survey point.
-      cx.fillStyle = rgba(col, .7);
-      cx.beginPath();
-      cx.arc(c.x, c.y, 2.4, 0, TAU);
-      cx.fill();
+      drawSurveyPoint(cx, c, n, sector, col, R, stale ? 0 : hologramTime);
     } else if (sector === 'planet') {
       // A transparent rotating wire volume, with no opaque core obscuring its mesh.
       // The visual clock is independent of game speed and freezes on pause/reduced motion.
