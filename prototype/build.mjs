@@ -523,7 +523,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button id="ub-later" class="ub-later" type="button" data-i18n="upd.later"></button>
   </div>
 </div>
-<section id="sector-zero" aria-labelledby="sz-title"${entry === 'sector-zero' ? ' style="display:flex"' : ''}>
+<!--campaign-only--><section id="sector-zero" aria-labelledby="sz-title"${entry === 'sector-zero' ? ' style="display:flex"' : ''}>
   <div class="sz-shell">
     <div class="sz-topline"><span class="sz-mark" data-i18n="sector-zero.title"></span><div class="sz-topactions"><button id="sz-lang" class="sz-lang" type="button"></button><button id="sz-settings" class="sz-gear" type="button"><span class="sz-gear-ic" aria-hidden="true">⚙</span><span data-i18n="hub.tile.settings"></span></button></div></div>
     <div class="sz-main" id="sz-home">
@@ -614,7 +614,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <div id="sz-album-screen" hidden></div>
     <div class="sz-bottomline"><span data-i18n="sector-zero.title"></span><span aria-hidden="true">00 / ∞</span></div>
   </div>
-</section>
+</section><!--/campaign-only-->
 <!-- data-panel — видимая вкладка (hubScreen.ts ставит её при каждом переходе); с неё же
      CSS прячет шапку профиля и валют вне «Домой». -->
 <div id="hub" data-panel="home">
@@ -657,7 +657,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div class="hub-sec" data-i18n="hub.modes"></div>
       <button id="hub-solo" class="hub-mode" type="button"><b data-i18n="hub.solo"></b><span data-i18n="hub.solo.desc"></span></button>
       <button id="hub-play" class="hub-mode" type="button"><b data-i18n="hub.play"></b><span data-i18n="hub.play.desc"></span></button>
-      <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
+      <!--campaign-only--><button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button><!--/campaign-only-->
       <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
       <button id="hub-proving-ground" hidden style="display:none" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
@@ -877,6 +877,16 @@ const playerHtml = stripDevMarkup(page(playerJs));
 const sectorZeroHtml = stripDevMarkup(page(playerJs, 'sector-zero'));
 writeFileSync('prototype/dist/void-dominion.html', devHtml);
 writeFileSync('prototype/dist/void-dominion-player.html', playerHtml);
+// Separate store artifact: never repurpose the ordinary site/player build.
+const rustoreJs = (await build({ ...bundleOptions(true), plugins: [{
+  name: 'rustore-without-campaign',
+  setup(b) {
+    b.onResolve({ filter: /\/sectorZeroShell$/ }, () => ({ path: new URL('./src/rustoreSectorShell.ts', import.meta.url).pathname }));
+    b.onResolve({ filter: /\/comicArt$/ }, () => ({ path: new URL('./src/rustoreComicArt.ts', import.meta.url).pathname }));
+  },
+}] })).outputFiles[0].text;
+const rustoreHtml = stripDevMarkup(page(rustoreJs)).replace(/<!--campaign-only-->[\s\S]*?<!--\/campaign-only-->/g, '');
+writeFileSync('prototype/dist/void-dominion-rustore.html', rustoreHtml);
 writeFileSync('prototype/dist/sector-zero.html', sectorZeroHtml);
 // Файл потока — рядом с однофайловыми страницами: его забирают GitHub Pages и APK (сайт
 // Cloudflare берёт свою копию из `served/assets`). Поток прошлой сборки удаляется: страница его уже не позовёт.

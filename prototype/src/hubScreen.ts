@@ -716,7 +716,7 @@ export function initHubScreen(host: HubScreenHost): void {
     openSetup('hub');
   });
   $('hub-solo-continue').addEventListener('click', restoreSolo);
-  $('hub-sector-zero').addEventListener('click', () => openSectorZero());
+  $('hub-sector-zero')?.addEventListener('click', () => openSectorZero());
   $('hub-proving-ground').addEventListener('click', () => startProvingGround());
   $('hub-msg').addEventListener('click', () => {
     hubNote.textContent = t('hub.messages.soon');

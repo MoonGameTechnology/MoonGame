@@ -11,7 +11,7 @@ const auth = await fetch(new URL('/auth/status', config.server), { redirect: 'er
 if (!auth.ok) throw Error('E_RUSTORE_AUTH_HTTP');
 const status = await auth.json();
 if (status.enabled !== true || status.accountDeletion !== true) throw Error('E_RUSTORE_DELETION_UNAVAILABLE');
-execFileSync(process.execPath, ['sync-www.mjs', 'player'], { stdio: 'inherit' });
+execFileSync(process.execPath, ['sync-www.mjs', 'rustore'], { stdio: 'inherit' });
 let html = readFileSync('www/index.html', 'utf8');
 if (!html.includes('</head>') || html.includes('window.__BUILD__')) throw Error('E_RUSTORE_BUILD_STAMP');
 const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();

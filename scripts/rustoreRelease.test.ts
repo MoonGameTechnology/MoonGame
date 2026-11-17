@@ -147,3 +147,10 @@ it('verifies both apksigner 36 and 37 output without accepting extra or unknown 
     expect(() => invoke(output.replace('Number of signers: 1\n', ''))).toThrow();
   }
 });
+
+it('stages the dedicated network-only artifact and verifies no campaign UI in the APK', () => {
+  expect(readFileSync('mobile/prepare-rustore.mjs', 'utf8')).toContain("'sync-www.mjs', 'rustore'");
+  expect(readFileSync('mobile/verify-rustore.mjs', 'utf8')).toContain('E_RUSTORE_CAMPAIGN');
+  const stub = readFileSync('prototype/src/rustoreSectorShell.ts', 'utf8');
+  expect(stub).not.toContain("from './sectorZeroMenu'");
+});

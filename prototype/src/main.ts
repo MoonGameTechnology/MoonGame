@@ -2670,7 +2670,7 @@ initMatchBrowser({
 // входа и в меню Sector Zero. Выбор сохраняется, перезагрузка перестраивает все
 // рендеры на новом языке (кнопки живут только вне партии — терять нечего).
 for (const id of ['clang', 'sz-lang'])
-  mountLocaleMenu($(id), {
+  if ($(id)) mountLocaleMenu($(id), {
     current: () => LOCALE,
     pick: (locale) => {
       setLocale(locale);
@@ -4024,7 +4024,7 @@ askFrame();
 // партию ставит заставку первым же кадром, и Back взводится к кадру после нажатия, открывшего окно.
 const screenWatch = new MutationObserver(wakeOnInput(askFrame));
 for (const screen of [connectEl, hubEl, setupEl, $('sector-zero')])
-  screenWatch.observe(screen, { attributes: true, attributeFilter: ['style'] });
+  if (screen) screenWatch.observe(screen, { attributes: true, attributeFilter: ['style'] });
 
 // --- сохранение забега (PVR-0.3) --------------------------------------------
 // Страницу закрывают чаще, чем проходит такт записи, поэтому снимок берётся ещё и на
