@@ -856,7 +856,6 @@ export const pl: Record<string, string> = {
   'side.aloft.order.relocate': 'Przebazowanie: {name}',
   'side.aloft.order.home': 'Powrót: {name}',
   'side.aloft.returning': 'Ponowny atak możliwy po lądowaniu i przezbrojeniu',
-  'spy.log.empty': 'brak wcześniejszych prób',
   'spy.log.title': 'Dziennik',
   'spy.windows.empty': 'brak aktywnych okien wywiadowczych — wyślij agenta przyciskiem 🕵 na karcie wrogiego świata',
   'spy.windows.title': 'Aktywne okna wywiadowcze',
