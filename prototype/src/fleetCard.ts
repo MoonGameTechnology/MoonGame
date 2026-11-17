@@ -308,7 +308,7 @@ export function taskGroupPanelHtml(group: Fleet[]): string {
 /** Тайлы состава Bytro-стиля: силуэт-архетип в цвете стороны (наземные — портрет
  *  с подписью имени), счётчик, мини-бар корпуса стека и его числа
  *  «осталось/всего» (`decisions/unitTile.ts`, заказ владельца 2026-09-25). У корабля
- *  (`.ptile.ship`, заказ владельца 2026-11-17) счётчик в углу, силуэт крупнее, под ним —
+ *  (`.ptile.ship`, заказ владельца 2026-11-17) счётчик и силуэт в одной строке, под ними —
  *  строка маленьких значков модулей и точек свободных отсеков. Тап по кораблю
  *  флота — карточка стека с отсеками и надетыми модулями (`shipCard.ts`), по наземному и
  *  по гарнизону мира — досье юнита. */
@@ -338,7 +338,7 @@ export function unitTileHtml(
     art ||
     (ground
       ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
-      : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: owner ? s.players[owner]?.faction : undefined, color, shield: (eff.shield ?? 0) > 0, px: 32 })}</span>`);
+      : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: owner ? s.players[owner]?.faction : undefined, color, shield: (eff.shield ?? 0) > 0, px: 28 })}</span>`);
   // Наземные портреты сохраняют подпись; корабль узнаётся по силуэту, имя — в подсказке.
   // Окно флота на ПК (`named`) подписывает и корабли — так на макете владельца.
   const caption = ground || named ? `<span class="pt-n">${esc(name)}</span>` : '';
@@ -351,7 +351,9 @@ export function unitTileHtml(
   if (ground) {
     return `<button class="ptile${art ? ' with-art' : ''}${vet ? ' vet' : ''}" ${attrs}>${icon}${vetTag}${caption}${count}${hpHtml}</button>`;
   }
-  return `<button class="ptile ship${vet ? ' vet' : ''}" ${attrs}>${count}${vetTag}${icon}${caption}${tileModulesHtml(u, bonus)}${hpHtml}</button>`;
+  // Счётчик и шевроны — в одной строке с силуэтом, по бокам от него: своя строка под ×N
+  // делала плитку на треть выше (заказ владельца 2026-11-17 «ещё компактнее»).
+  return `<button class="ptile ship${vet ? ' vet' : ''}" ${attrs}><span class="pt-top">${count}${icon}${vetTag}</span>${caption}${tileModulesHtml(u, bonus)}${hpHtml}</button>`;
 }
 /** Модули корабля на плитке (RULES-2.1 / SM-0.3: два крейсера с разными модулями — разные
  *  стеки): что показать — `tileModuleRow`, рисунок — тот же, что в конструкторе, только

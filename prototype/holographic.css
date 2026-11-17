@@ -550,7 +550,7 @@ body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile .pt-hp{width:8
 body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile .pt-hpn{font-size:var(--fs-body);color:var(--ink);}
 /* Плитка корабля: полоска корпуса — у низа плитки, даже если имя ушло в две строки; значки
    модулей на шаг крупнее под крупный текст консоли. */
-body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile.ship{min-height:0;padding:5px 5px 6px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile.ship{min-height:0;padding:4px 4px 5px;gap:2px;}
 body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile.ship .pt-hp{margin-top:auto;}
 body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile.ship .pt-mods{height:16px;}
 body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile.ship .pt-mod,

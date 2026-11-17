@@ -543,11 +543,14 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
    точка — свободный отсек (`tileModuleRow` в decisions/unitTile.ts). Цвет слота остаётся
    в конструкторе и карточке корабля: на плитке он спорил бы с цветом стороны и корпусом. */
 .ptiles.ships{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));}
-.ptile.ship{justify-content:flex-start;gap:3px;min-width:70px;min-height:88px;padding:4px 4px 5px;border-radius:7px;
+.ptile.ship{justify-content:flex-start;gap:2px;min-width:70px;min-height:0;padding:3px 3px 4px;border-radius:7px;
   background-image:linear-gradient(180deg,rgba(53,214,230,.05),transparent);}
-.ptile.ship .pt-c{align-self:flex-start;line-height:1;font-weight:700;color:var(--ink);}
-.ptile.ship .pt-vet{top:4px;left:auto;right:4px;}
-.ptile.ship .pt-ic{line-height:0;}
+/* верхняя строка: ×N слева, силуэт по центру, шевроны справа; длинный счётчик сдвигает
+   силуэт, а не наезжает на него */
+.ptile.ship .pt-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;width:100%;}
+.ptile.ship .pt-c{justify-self:start;padding:1px 0 0 1px;line-height:1;font-weight:700;color:var(--ink);}
+.ptile.ship .pt-vet{position:static;grid-column:3;justify-self:end;}
+.ptile.ship .pt-ic{grid-column:2;line-height:0;}
 .ptile.ship .pt-mods{flex-wrap:nowrap;align-items:center;gap:3px;height:14px;max-width:none;}
 .ptile.ship .pt-mod{display:inline-flex;justify-content:center;width:13px;height:13px;padding:0;color:var(--ink);
   opacity:.72;font-size:var(--fs-caption);line-height:13px;}

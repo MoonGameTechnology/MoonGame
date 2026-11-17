@@ -437,8 +437,10 @@ describe('свой флот', () => {
     );
     const html = card('F3');
     expect(html).toContain('<div class="ptiles ships">');
-    // Счётчик стоит первым — в углу плитки, над силуэтом.
-    expect(html).toMatch(/class="ptile ship" data-shipcard="F3\|0"[^>]*><span class="pt-c">×12</);
+    // Счётчик стоит первым — слева в одной строке с силуэтом.
+    expect(html).toMatch(
+      /class="ptile ship" data-shipcard="F3\|0"[^>]*><span class="pt-top"><span class="pt-c">×12<\/span><span class="pt-ic">/,
+    );
     const tiles = html.split('data-shipcard="F3|').slice(1);
     // Голый фрегат — четыре точки, оснащённый — два значка и две точки.
     expect(tiles[0]!.match(/class="pt-free"/g)).toHaveLength(4);
