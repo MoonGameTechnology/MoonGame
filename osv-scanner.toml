@@ -1,0 +1,10 @@
+# OSV-Scanner exceptions for pnpm-lock.yaml (read by both blocking OSV steps:
+# `osv` in security.yml and «Dependency audit» in ci.yml). Every entry carries a
+# reason and an expiry; the triage record is in docs/security/pipeline.md
+# («Запись триажа (2026-11-17) — picomatch»). Delete the file when it is empty.
+
+[[IgnoredVulns]]
+# Also GHSA-fc5q-39xc-vjpf. ReDoS on attacker-supplied extglob patterns such as `+(*)`.
+id = "CVE-2026-112366"
+ignoreUntil = 2026-12-17
+reason = "No fixed picomatch exists: the advisory covers every release through 4.0.7, the latest on npm (checked 2026-11-17). Only dev tooling pulls it in (vite, vitest, @typescript-eslint via tinyglobby/fdir); our code never imports it and no player input ever becomes a glob pattern. Upgrade and drop this entry as soon as a fixed release ships."
