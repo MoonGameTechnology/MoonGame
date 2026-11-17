@@ -99,9 +99,12 @@ function click(sel: string, dataset: Record<string, string> = {}): unknown {
   return { closest: (q: string) => (q === sel ? { dataset } : null) };
 }
 
-/** Имена модулей, надетых в отсеки, — по строкам отсеков под карточкой корпуса. */
+/** Имена модулей, надетых в отсеки: по квадратам на выносках (подпись «Тип: Имя (ступень)»),
+ *  а у арта без точек — по плиткам отсеков под ним. */
 function worn(html: string): string[] {
-  return [...html.matchAll(/class="cn-bay filled[^"]*" data-cnsel="\d+"[^>]*>.*?class="cn-bn">([^<]+)/g)].map((x) => x[1]!);
+  const tiles = [...html.matchAll(/class="cn-tile filled[^"]*" data-cnsel="\d+"[^>]*aria-label="[^":]+: ([^"(]+) \(/g)];
+  const bays = [...html.matchAll(/class="cn-bay filled[^"]*" data-cnsel="\d+"[^>]*>.*?class="cn-bn">([^<]+)/g)];
+  return [...tiles, ...bays].map((x) => x[1]!);
 }
 
 function hostOf(over: Partial<YardHost> = {}): YardHost {
@@ -253,7 +256,7 @@ describe('верфь — панель конструктора', () => {
       view,
     );
     expect(html).toContain('data-cnhull="cruiser"');
-    expect(html).toContain('cn-bay');
+    expect(html).toContain('cn-tile');
     expect(html).toContain('data-cnmod=');
     // Заказ — не в прокручиваемом теле, а в полосе под ним (переделка окна, шаг 1).
     expect(html).not.toContain('data-cnbuild');
@@ -265,8 +268,11 @@ describe('верфь — панель конструктора', () => {
     const d = normalizeDraft(s, 'p1', draftOf({ modules: ['ion_engine'] }), YARD_HULLS);
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
     expect(worn(html)).toEqual([tData(data.modules.ion_engine!.name)]);
-    expect(html).toContain('data-cnrm="ion_engine"'); // крестик есть и у невыбранного отсека
-    const open = loadoutPaneHtml(s, 'p1', { ...d, slot: 2 }, YARD_HULLS, view);
+    // Крестик — в углу ОТКРЫТОГО квадрата (заказ 2026-11-01): у закрытого его нет, чтобы мелкие
+    // плитки на выносках не обрастали лишними кнопками.
+    expect(html).not.toContain('data-cnrm=');
+    const at = Number(html.match(/class="cn-tile filled[^"]*" data-cnsel="(\d+)"/)![1]);
+    const open = loadoutPaneHtml(s, 'p1', { ...d, slot: at }, YARD_HULLS, view);
     // Один установленный модуль — один крестик; текстовой копии действия нет.
     expect(open.match(/data-cnrm=/g)).toHaveLength(1);
     expect(open).toMatch(/<button class="cn-tx btn-x" data-cnrm="ion_engine"[^>]*>✕<\/button>/);
@@ -331,7 +337,7 @@ describe('верфь — панель конструктора', () => {
       YARD_HULLS,
       view,
     );
-    expect((html.match(/class="cn-bay/g) ?? []).length).toBe(4);
+    expect((html.match(/class="cn-(?:tile|bay) /g) ?? []).length).toBe(4);
   });
 
   // Решение владельца 2026-09-26: «усиленный крейсер, 4 слота под модули любые».
@@ -342,7 +348,7 @@ describe('верфь — панель конструктора', () => {
     const d = normalizeDraft(s, 'p1', draftOf({ hull: 'heavy_cruiser', modules: mods }), YARD_HULLS);
     expect(d.modules).toEqual(mods);
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
-    expect((html.match(/class="cn-bay/g) ?? []).length).toBe(4);
+    expect((html.match(/class="cn-(?:tile|bay) /g) ?? []).length).toBe(4);
     expect((html.match(new RegExp(t('yard.slot.universal'), 'g')) ?? []).length).toBeGreaterThanOrEqual(4);
     expect(worn(html).sort()).toEqual(mods.map((id) => tData(data.modules[id]!.name)).sort());
   });
@@ -1166,7 +1172,9 @@ describe('производство — единая сетка плиток от
   const slotCount = (hull: string): number =>
     Object.values(data.units[hull]!.slots ?? {}).reduce<number>((a, n) => a + (n ?? 0), 0);
 
-  it('у каждого корпуса ровно одна плитка на отсек, без дублирующих выносок', () => {
+  // Макет владельца 2026-11-17: отсеки снова квадратами на выносках к корпусу; строки отсеков —
+  // только у арта без точек. Одно из двух, а не оба сразу.
+  it('у каждого корпуса ровно одна плитка на отсек: квадрат на выноске или строка, не оба', () => {
     const s = rich();
     for (const list of [YARD_HULLS, YARD_SQUAD_HULLS]) {
       for (const hull of list) {
@@ -1174,9 +1182,11 @@ describe('производство — единая сетка плиток от
         expect(d.hull).toBe(hull);
         const html = loadoutPaneHtml(s, 'p1', d, list, view);
         const n = slotCount(hull);
-        expect((html.match(/class="cn-bay /g) ?? []).length, hull).toBe(n);
-        expect(html).not.toContain('cn-dot');
-        expect(html).not.toContain('cn-tile');
+        const tiles = (html.match(/class="cn-tile /g) ?? []).length;
+        const bays = (html.match(/class="cn-bay /g) ?? []).length;
+        expect(tiles + bays, hull).toBe(n);
+        expect(tiles === 0 || bays === 0, hull).toBe(true);
+        expect((html.match(/class="cn-dot/g) ?? []).length, hull).toBe(tiles);
       }
     }
   });
@@ -1187,10 +1197,11 @@ describe('производство — единая сетка плиток от
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
     const mod = data.modules.ion_engine!;
     // Плитки идут в порядке отсеков: оружие, защита, система; открыт первый пустой отсек.
-    expect(html).toContain(`class="cn-bay filled r-${mod.rarity}" data-cnsel="2"`);
+    expect(html).toContain(`class="cn-tile filled" data-cnsel="2"`);
+    expect(html).toContain(`--rar:var(--rar-${mod.rarity})`);
     expect(html).toContain(tData(mod.name));
-    expect(html).toContain('class="cn-bay empty sel" data-cnsel="0"');
-    expect(html).toContain('class="cn-bay empty" data-cnsel="1"');
+    expect(html).toContain('class="cn-tile empty sel" data-cnsel="0"');
+    expect(html).toContain('class="cn-tile empty" data-cnsel="1"');
     expect(html).toContain(t('yard.slot.weapon'));
   });
 
@@ -1201,7 +1212,7 @@ describe('производство — единая сетка плиток от
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     win.fire(click('[data-cnsel]', { cnsel: '2' }));
     const html = win.html();
-    expect(html).toContain(`class="cn-bay filled sel r-${data.modules.ion_engine!.rarity}" data-cnsel="2"`);
+    expect(html).toContain(`class="cn-tile filled sel" data-cnsel="2"`);
     expect(html).toContain(t('yard.modules.for-slot', { s: t('yard.slot.utility') }));
   });
 });
@@ -1296,7 +1307,7 @@ describe('производство — модули открытого отсе�
     const yard = initShipyard(hostOf({ root: () => win }));
     yard.open('ships');
     win.fire(click('.cn-mod', { cnmod: 'targeting_array' })); // в открытый отсек оружия
-    expect(win.html()).toContain('class="cn-bay filled sel r-unique" data-cnsel="0"');
+    expect(win.html()).toContain('class="cn-tile filled sel" data-cnsel="0"');
     expect(win.html()).toContain('data-cnmod="targeting_array" aria-pressed="true"');
     win.fire(click('[data-cnsel]', { cnsel: '0' }));
     win.fire(click('.cn-mod', { cnmod: 'siege_platform' }));
@@ -1330,7 +1341,7 @@ describe('производство — модули открытого отсе�
     win.fire(click('[data-cnrm]', { cnrm: 'cargo_bay' }));
     // Системы сдвинулись: двигатель и ремонт в отсеках 1–2, пуст и открыт третий.
     expect(worn(win.html())).toEqual(['ion_engine', 'repair_bay'].map((id) => tData(data.modules[id]!.name)));
-    expect(win.html()).toContain('class="cn-bay empty sel" data-cnsel="3"');
+    expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="3"');
   });
 
   it('смена корпуса и вкладки закрывает отсек и сворачивает неподходящие', () => {
@@ -1341,12 +1352,12 @@ describe('производство — модули открытого отсе�
     win.fire(click('[data-cnunfit]'));
     expect(win.html()).toContain(t('yard.modules.unfit-hide'));
     win.fire(click('.cn-hbtn', { cnhull: 'heavy_cruiser' }));
-    expect(win.html()).toContain('class="cn-bay empty sel" data-cnsel="0"');
+    expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="0"');
     expect(win.html()).not.toContain(t('yard.modules.unfit-hide'));
     win.fire(click('[data-cnsel]', { cnsel: '3' }));
     win.fire(click('.cn-tab', { ctab: 'squads' }));
     win.fire(click('.cn-tab', { ctab: 'ships' }));
-    expect(win.html()).toContain('class="cn-bay empty sel" data-cnsel="0"');
+    expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="0"');
   });
 
   it('после выбора модуля корабль возвращается на экран — видно, куда модуль встал', () => {
@@ -1455,9 +1466,12 @@ describe('производство — редкость и уровень про
   it('забег: звёзды и поднятая ступень на плитке, в строке отсека и в числах', () => {
     const s = seat({ ion_engine: 2 }, { ion_engine: 'unique' });
     // Открыт отсек двигателя: его строка видна вместе с плиткой.
-    const d = normalizeDraft(s, 'p1', draftOf({ hull: 'frigate', modules: ['ion_engine'], slot: 2 }), YARD_HULLS);
+    // Двигатель встаёт в первый отсек системы — квадрат 1 на выноске.
+    const d = normalizeDraft(s, 'p1', draftOf({ hull: 'frigate', modules: ['ion_engine'], slot: 1 }), YARD_HULLS);
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
-    expect(html).toContain('class="cn-bay filled r-unique"');
+    expect(html).toContain('class="cn-tile filled sel" data-cnsel="1"');
+    expect(html).toContain('<span class="cn-tst" aria-hidden="true">★2</span>');
+    expect(html).toContain('--rar:var(--rar-unique)');
     expect(html).toContain('★★</span>');
     expect(html).toContain(moduleGradeHtml('unique', 2));
     // ★2 = ×1.1 на вклад модуля и на параметр уникальной ступени: +1.1 скорости, +0.6 защиты.
