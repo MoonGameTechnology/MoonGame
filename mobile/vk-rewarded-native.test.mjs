@@ -49,7 +49,7 @@ const stubs = {
     public static void setSdkConfig(MyTargetConfig c){config=c;}
     public static void initSdk(android.content.Context c){initialized++;}
   }`,
-  'com/my/target/common/models/IAdLoadingError.java': 'package com.my.target.common.models; public interface IAdLoadingError {}',
+  'com/my/target/common/models/IAdLoadingError.java': 'package com.my.target.common.models; public interface IAdLoadingError { int getCode(); default String getMessage(){throw new AssertionError("Provider text must not be read");} }',
   'com/my/target/ads/Reward.java': 'package com.my.target.ads; public class Reward {}',
   'com/my/target/ads/RewardedAd.java': `package com.my.target.ads; public class RewardedAd {
     public static RewardedAd last; public static int created; public static boolean throwOnLoad;
@@ -69,15 +69,16 @@ import com.getcapacitor.*; import com.my.target.ads.*; import android.os.Handler
 public class RewardedHarness {
   static void check(boolean value){if(!value)throw new AssertionError();}
   static void outcome(PluginCall c,String expected){check(c.resolved==1);check(expected.equals(c.result.get("outcome")));check(Boolean.FALSE.equals(c.result.get("serverVerifiedRewards")));}
+  static void diagnostic(PluginCall c,String code){outcome(c,"unavailable");check(code.equals(c.result.get("errorCode")));check(!c.result.containsKey("message"));}
   public static void main(String[] args){
     VkRewardedAdsPlugin p=new VkRewardedAdsPlugin(); PluginCall c=new PluginCall();
     if(args[0].equals("status")){p.status(c);check(RewardedAd.created==0);check(com.my.target.common.MyTargetManager.initialized==0);check(c.result.get("slotId").equals(2111707));return;}
-    if(args[0].equals("invalid")){c.placement="run.sovereigns";p.show(c);outcome(c,"unavailable");check(RewardedAd.created==0);return;}
-    if(args[0].equals("remote")){android.webkit.WebView.url="https://example.com/";p.show(c);outcome(c,"unavailable");check(RewardedAd.created==0);return;}
-    if(args[0].equals("background")){androidx.lifecycle.Lifecycle.resumed=false;p.show(c);outcome(c,"unavailable");check(RewardedAd.created==0);return;}
+    if(args[0].equals("invalid")){c.placement="run.sovereigns";p.show(c);diagnostic(c,"E_AD_REQUEST");check(RewardedAd.created==0);return;}
+    if(args[0].equals("remote")){android.webkit.WebView.url="https://example.com/";p.show(c);diagnostic(c,"E_AD_ORIGIN");check(RewardedAd.created==0);return;}
+    if(args[0].equals("background")){androidx.lifecycle.Lifecycle.resumed=false;p.show(c);diagnostic(c,"E_AD_BACKGROUND");check(RewardedAd.created==0);return;}
     if(args[0].equals("exception"))RewardedAd.throwOnLoad=true;
     p.show(c);RewardedAd a=RewardedAd.last;
-    if(args[0].equals("exception")){outcome(c,"unavailable");check(a.destroyed);return;}
+    if(args[0].equals("exception")){diagnostic(c,"E_AD_INIT");check(a.destroyed);return;}
     check(!com.my.target.common.MyTargetPrivacy.consent);
     check(!com.my.target.common.MyTargetManager.config.environment && !com.my.target.common.MyTargetManager.config.location);
     RewardedAd.RewardedAdListener l=a.listener;
@@ -86,10 +87,12 @@ public class RewardedHarness {
       case "cancelled":l.onLoad(a);l.onDismiss(a);l.onReward(new Reward(),a);outcome(c,"cancelled");break;
       case "duplicate-load":l.onLoad(a);l.onLoad(a);check(a.shows==1);l.onDismiss(a);outcome(c,"cancelled");break;
       case "no-ad":l.onNoAd(null,a);outcome(c,"unavailable");break;
+      case "sdk-error":l.onNoAd(()->3003,a);diagnostic(c,"E_AD_SDK");check(c.result.get("sdkCode").equals(3003));break;
       case "show-failed":l.onLoad(a);l.onFailedToShow(a);outcome(c,"unavailable");break;
-      case "timeout":Handler.expire();l.onLoad(a);l.onReward(new Reward(),a);l.onDismiss(a);outcome(c,"unavailable");break;
+      case "timeout":Handler.expire();l.onLoad(a);l.onReward(new Reward(),a);l.onDismiss(a);diagnostic(c,"E_AD_LOAD_TIMEOUT");break;
+      case "show-timeout":l.onLoad(a);Handler.expire();l.onReward(new Reward(),a);l.onDismiss(a);diagnostic(c,"E_AD_SHOW_TIMEOUT");break;
       case "destroy":p.handleOnDestroy();l.onReward(new Reward(),a);l.onDismiss(a);outcome(c,"unavailable");break;
-      case "parallel":PluginCall other=new PluginCall();p.show(other);outcome(other,"unavailable");check(c.resolved==0);l.onDismiss(a);outcome(c,"cancelled");break;
+      case "parallel":PluginCall other=new PluginCall();p.show(other);diagnostic(other,"E_AD_BUSY");check(c.resolved==0);l.onDismiss(a);outcome(c,"cancelled");break;
       case "stale":Handler.expire();PluginCall next=new PluginCall();p.show(next);l.onReward(new Reward(),a);l.onDismiss(a);check(next.resolved==0);RewardedAd.last.listener.onDismiss(RewardedAd.last);outcome(next,"cancelled");break;
       case "background-load":androidx.lifecycle.Lifecycle.resumed=false;l.onLoad(a);outcome(c,"unavailable");check(a.shows==0);break;
       case "early-reward":l.onReward(new Reward(),a);l.onDismiss(a);outcome(c,"cancelled");break;
@@ -113,7 +116,7 @@ beforeAll(() => {
 }, 40_000);
 afterAll(() => { if (dir) rmSync(dir, { recursive: true, force: true }); });
 it.each(['status', 'invalid', 'remote', 'background', 'exception', 'earned', 'cancelled', 'duplicate-load',
-  'no-ad', 'show-failed', 'timeout', 'destroy', 'parallel', 'stale', 'background-load', 'early-reward'])(
+  'no-ad', 'sdk-error', 'show-failed', 'timeout', 'show-timeout', 'destroy', 'parallel', 'stale', 'background-load', 'early-reward'])(
   'native callback lifecycle: %s (SDK/Android test doubles, no network or entitlements)', scenario => {
     expect(() => execFileSync('java', ['-cp', join(dir, 'classes'), 'org.moongame.fixture.RewardedHarness', scenario],
       { timeout: 10_000, stdio: 'pipe' })).not.toThrow();

@@ -24,7 +24,8 @@ on:
   push:
     # Branch candidates compile with the real SDK but cannot sign site manifests.
     # Only the protected main publication job receives the release key.
-    branches: [main, claude/project-thread-asxd8m]
+    # Temporary read-only candidate for the owner's on-device ad diagnosis before a PR.
+    branches: [main, claude/project-thread-asxd8m, fix/vk-ad-diagnostics-20261117]
     paths:
       - 'prototype/**'
       - 'mobile/**'

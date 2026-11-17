@@ -26,7 +26,7 @@ public final class VkRewardedAdsPlugin extends Plugin {
     private RewardedAd active;
     private boolean earned;
     private boolean shown;
-    private final Runnable timeout = () -> finish("unavailable");
+    private final Runnable timeout = () -> finish("unavailable", shown ? "E_AD_SHOW_TIMEOUT" : "E_AD_LOAD_TIMEOUT", null);
 
     @PluginMethod
     public void status(PluginCall call) {
@@ -41,11 +41,13 @@ public final class VkRewardedAdsPlugin extends Plugin {
     public void show(PluginCall call) {
         getActivity().runOnUiThread(() -> {
             String requestId = call.getString("requestId", "");
-            if (!PLACEMENT.equals(call.getString("placement")) ||
-                !requestId.matches("[A-Za-z0-9_-]{16,128}") || pending != null || !visible() || !localPage()) {
-                reply(call, "unavailable");
+            if (!PLACEMENT.equals(call.getString("placement")) || !requestId.matches("[A-Za-z0-9_-]{16,128}")) {
+                reply(call, "unavailable", "E_AD_REQUEST", null);
                 return;
             }
+            if (pending != null) { reply(call, "unavailable", "E_AD_BUSY", null); return; }
+            if (!visible()) { reply(call, "unavailable", "E_AD_BACKGROUND", null); return; }
+            if (!localPage()) { reply(call, "unavailable", "E_AD_ORIGIN", null); return; }
             pending = call;
             earned = false;
             shown = false;
@@ -61,18 +63,18 @@ public final class VkRewardedAdsPlugin extends Plugin {
                     @Override public void onLoad(@NonNull RewardedAd ad) {
                         onMain(ad, () -> {
                             if (shown) return;
-                            if (!visible()) { finish("unavailable"); return; }
+                            if (!visible()) { finish("unavailable", "E_AD_BACKGROUND", null); return; }
                             shown = true;
                             handler.removeCallbacks(timeout);
                             handler.postDelayed(timeout, 300_000);
-                            try { ad.show(); } catch (RuntimeException e) { finish("unavailable"); }
+                            try { ad.show(); } catch (RuntimeException e) { finish("unavailable", "E_AD_SHOW", null); }
                         });
                     }
                     @Override public void onNoAd(@NonNull IAdLoadingError error, @NonNull RewardedAd ad) {
-                        onMain(ad, () -> finish("unavailable"));
+                        onMain(ad, () -> finish("unavailable", "E_AD_SDK", error == null ? null : error.getCode()));
                     }
                     @Override public void onFailedToShow(@NonNull RewardedAd ad) {
-                        onMain(ad, () -> finish("unavailable"));
+                        onMain(ad, () -> finish("unavailable", "E_AD_SHOW", null));
                     }
                     @Override public void onClick(@NonNull RewardedAd ad) {}
                     @Override public void onDisplay(@NonNull RewardedAd ad) {}
@@ -85,7 +87,7 @@ public final class VkRewardedAdsPlugin extends Plugin {
                 });
                 active.load();
             } catch (RuntimeException e) {
-                finish("unavailable");
+                finish("unavailable", "E_AD_INIT", null);
             }
         });
     }
@@ -106,16 +108,24 @@ public final class VkRewardedAdsPlugin extends Plugin {
         handler.post(() -> { if (current(ad)) callback.run(); });
     }
 
-    private void reply(PluginCall call, String outcome) {
+    private void reply(PluginCall call, String outcome, String errorCode, Integer sdkCode) {
         JSObject result = new JSObject();
         result.put("outcome", outcome);
         result.put("slotId", SLOT_ID);
         result.put("requestId", call.getString("requestId", ""));
         result.put("serverVerifiedRewards", false);
+        if ("unavailable".equals(outcome) && errorCode != null) {
+            result.put("errorCode", errorCode);
+            if (sdkCode != null) result.put("sdkCode", sdkCode);
+        }
         call.resolve(result);
     }
 
     private void finish(String outcome) {
+        finish(outcome, null, null);
+    }
+
+    private void finish(String outcome, String errorCode, Integer sdkCode) {
         PluginCall call = pending;
         RewardedAd ad = active;
         pending = null;
@@ -128,11 +138,11 @@ public final class VkRewardedAdsPlugin extends Plugin {
             try { ad.dismiss(); } catch (RuntimeException ignored) {}
             try { ad.destroy(); } catch (RuntimeException ignored) {}
         }
-        if (call != null) reply(call, outcome);
+        if (call != null) reply(call, outcome, errorCode, sdkCode);
     }
 
     @Override protected void handleOnDestroy() {
-        handler.post(() -> finish("unavailable"));
+        handler.post(() -> finish("unavailable", "E_AD_DESTROYED", null));
         super.handleOnDestroy();
     }
 }

@@ -516,7 +516,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   (`decisions/adPlacements.ts`), облако — `decisions/cloudSync.ts`.
 - APK — Capacitor (`mobile/`): подписанные Ed25519 обновления с VPS с прогрессом по байтам
   ([ранбук](../deploy/apk/README.md)), кнопка скачивания — `decisions/apkOffer.ts`.
-  VK Rewarded 2111707: в APK с VPS кнопка «Проверить рекламу» без награды; сетевое начисление закрыто
+  VK Rewarded 2111707: в APK кнопка «Проверить рекламу» с кодом отказа, без награды; сетевое начисление закрыто
   до подтверждения провайдера ([README](../mobile/README.md)); RuStore закрыт до [решений оператора](security/rustore-preparation.md).
 - ПК — Electron (`desktop/`, [README](../desktop/README.md)): тот же архив Sector Zero, без
   CI-ленты и Steam.

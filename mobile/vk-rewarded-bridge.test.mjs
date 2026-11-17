@@ -46,3 +46,15 @@ it('bounds an unresponsive native plugin and handles rejection', async () => {
   expect((await pending).outcome).toBe('unavailable');
   expect((await setup(async () => { throw Error('native detail'); }).show(request)).outcome).toBe('unavailable');
 });
+it('keeps only bounded diagnostic codes for the matching native request', async () => {
+  const value = { ...result('unavailable'), errorCode: 'E_AD_SDK', sdkCode: 3003,
+    message: '<script>private</script>', account: 'private' };
+  expect(await setup(async () => value).show(request)).toEqual({ ...result('unavailable'), errorCode: 'E_AD_SDK', sdkCode: 3003 });
+  expect(await setup(async () => ({ ...value, requestId: 'wrong' })).show(request))
+    .toEqual({ ...result('unavailable'), errorCode: 'E_AD_REPLY' });
+});
+it('distinguishes missing and rejected native bridges without leaking the exception', async () => {
+  expect(await setup().show(request)).toEqual({ ...result('unavailable'), errorCode: 'E_AD_BRIDGE' });
+  expect(await setup(async () => { throw Error('private bearer'); }).show(request))
+    .toEqual({ ...result('unavailable'), errorCode: 'E_AD_BRIDGE' });
+});

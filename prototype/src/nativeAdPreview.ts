@@ -1,4 +1,4 @@
-import { nativeAdPreviewOutcome } from '../../decisions/nativeAdPreview';
+import { nativeAdPreviewError, nativeAdPreviewOutcome } from '../../decisions/nativeAdPreview';
 import { t } from '../../localization/runtime';
 import { currentBuild, isRuStoreBuild } from './updater';
 
@@ -47,10 +47,14 @@ export function initNativeAdPreview(): void {
       switch (nativeAdPreviewOutcome(result, requestId)) {
         case 'earned': status.textContent = t('hub.ad-preview.earned'); break;
         case 'cancelled': status.textContent = t('hub.ad-preview.cancelled'); break;
-        case 'unavailable': status.textContent = t('hub.ad-preview.unavailable'); break;
+        case 'unavailable': {
+          const issue = nativeAdPreviewError(result, requestId);
+          status.textContent = t(issue.key, { code: issue.code });
+          break;
+        }
       }
     } catch {
-      status.textContent = t('hub.ad-preview.unavailable');
+      status.textContent = t('hub.ad-preview.error.app', { code: 'E_AD_CLIENT' });
     } finally {
       busy = false;
       button.disabled = false;

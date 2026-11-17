@@ -8,7 +8,7 @@ const marker = '// VOID_VK_REWARDED';
 
 export function rewardedBridge(slotId) {
   return readFileSync(new URL('./native/vk-rewarded-bridge.js', import.meta.url), 'utf8')
-    .replace('result.slotId !== 2111707', `result.slotId !== ${slotId}`);
+    .replace('const SLOT_ID = 2111707', `const SLOT_ID = ${slotId}`);
 }
 
 /** Check the packaged assets and the MERGED manifest, not just generator inputs. */
