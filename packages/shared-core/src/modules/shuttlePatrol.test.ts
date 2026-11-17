@@ -60,8 +60,6 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 10,
       strikeRange: 180,
-      fuel: 3,
-      rearmRounds: 2,
       shuttleDamage: 22,
       patrolHours: 4,
       patrolRadius: 60,
@@ -73,8 +71,6 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 10,
       strikeRange: 180,
-      fuel: 3,
-      rearmRounds: 2,
       shuttleDamage: 22,
       patrolHours: 4,
       patrolRadius: 60,
@@ -86,8 +82,6 @@ const data: GameData = parseGameData({
       hp: 16,
       strikeRange: 180,
       chaseRadius: 12,
-      fuel: 2,
-      rearmRounds: 3,
       siegeDamage: 8,
       patrolHours: 3,
       patrolRadius: 60,
@@ -99,8 +93,6 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 24,
       strikeRange: 120,
-      fuel: 2,
-      rearmRounds: 2,
     }),
   },
   factions: {},
@@ -236,7 +228,7 @@ const payloads = (events: DomainEvent[], type: string): Array<Record<string, unk
 const patrolOf = (s: GameState) => (s.strikes ?? []).find((st) => st.target.kind === 'point');
 
 describe('SHU-6.2 — приказ патруля', () => {
-  it('ПАТРУЛЬ УХОДИТ С МИРА: эскадра покидает ангар, база тратит один вылет', () => {
+  it('ПАТРУЛЬ УХОДИТ С МИРА: эскадра покидает ангар', () => {
     const s = apply(world([sq('sq:i', 'interceptor', 2)]), patrol('sq:i'));
     expect(ashore(s)).toBe(0);
     const st = patrolOf(s);
@@ -244,7 +236,6 @@ describe('SHU-6.2 — приказ патруля', () => {
     expect(st?.leg).toBe('out');
     expect(st?.patrol).toEqual({ hours: 4, radius: 60 });
     expect(st?.arrivesAt).toBe(1.5 * H);
-    expect(s.planets.A?.sortie?.fuel).toBe(2); // из трёх — один, как у удара
   });
 
   it('ЧАСЫ И КРУГ — ПО СЛАБОМУ ЗВЕНУ: перехватчик с ударным висят три часа, а не четыре', () => {
@@ -295,10 +286,9 @@ describe('SHU-6.2 — приказ патруля', () => {
     expect(code(s, patrol('sq:i', { x: Number.NaN, y: 0 }))).toBe('E_BAD_PAYLOAD');
   });
 
-  it('БЕЗ ТОПЛИВА БАЗЫ ПАТРУЛЬ НЕ ВЗЛЕТАЕТ — запас вылетов тот же, что у удара', () => {
-    const s = world([sq('sq:i', 'interceptor', 2)]);
-    s.planets.A!.sortie = { fuel: 0, rearming: 2 };
-    expect(code(s, patrol('sq:i'))).toBe('E_NO_FUEL');
+  it('ЗАПРАВЛЯЮЩАЯСЯ ЭСКАДРА В ПАТРУЛЬ НЕ ВЗЛЕТАЕТ — то же правило, что у удара', () => {
+    const s = world([{ ...sq('sq:i', 'interceptor', 2), readyAt: H }]);
+    expect(code(s, patrol('sq:i'))).toBe('E_REFUELING');
   });
 });
 

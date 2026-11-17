@@ -14,6 +14,7 @@
 import type { GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { aloftCard } from '../../decisions/aloftCard';
+import { parkedState } from '../../decisions/hangarBadge';
 import {
   aviationFabShown,
   aviationGroups,
@@ -26,7 +27,7 @@ import { esc } from './format';
 import { data } from './game';
 import { fleetHangar, planetHangar, type HangarView } from './hangarPanel';
 import { liveTimerHtml, patchLiveTimers } from './liveTimers';
-import { parkedStatusText } from './squadronCardView';
+import { parkedStatusHtml } from './squadronCardView';
 import { squadronCallsignOf } from './squadronPanel';
 
 /** Что списку нужно от игры. */
@@ -70,8 +71,12 @@ export function aviationRows(s: GameState, me: string): AviationRow[] {
     for (const sq of view?.squadrons ?? []) {
       const ships = sq.units.reduce((n, u) => n + u.count, 0);
       if (ships === 0) continue;
-      const rearmHours = view!.blocked === 'rearming' ? (view!.sortie?.rearming ?? null) : null;
-      rows.push({ kind: 'parked', squadronId: sq.id, ships, block: view!.blocked, rearmHours });
+      rows.push({
+        kind: 'parked',
+        squadronId: sq.id,
+        ships,
+        state: parkedState(view!.blocked, sq.readyAt, s.time),
+      });
     }
   };
   for (const p of Object.values(s.planets))
@@ -94,7 +99,7 @@ const GROUP_KEY: Record<AviationGroupId, string> = {
 };
 
 function statusHtml(row: AviationRow, s: GameState, me: string): string {
-  if (row.kind === 'parked') return esc(parkedStatusText(row.squadronId, { world: s, me }) ?? '');
+  if (row.kind === 'parked') return parkedStatusHtml(row.squadronId, { world: s, me }) ?? '';
   const st = (s.strikes ?? []).find((x) => x.id === row.strikeId);
   const card = st && aloftCard(st, { me, data, relocate: false, split: false });
   return card ? `${esc(aloftOrderText(card))} · ${liveTimerHtml(card.until)}` : '';

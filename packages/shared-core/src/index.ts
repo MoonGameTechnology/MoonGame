@@ -318,11 +318,6 @@ export {
 export { scanNodeThreats, type NodeThreat } from './state/threat';
 export {
   shuttleTake,
-  sortieSpec,
-  freshSortie,
-  canSortie,
-  spendSortie,
-  tickRearm,
   fleetHasShuttle,
   // SHU-3.1: интерфейс показывает ангар (порт мира и трюм носителя) и обязан считать
   // вместимость ТОЙ ЖЕ функцией, что и ядро, — своя копия разъехалась бы на первой правке.
@@ -355,7 +350,8 @@ export {
   squadronPatrol,
   // SHU-6.4: дальность перелёта — два радиуса удара; ей же меряется посадка без базы.
   squadronFerryRange,
-  type SortieState,
+  squadronRefueling,
+  squadronRefuelMinutes,
 } from './state/shuttle';
 export {
   BUILD_LANES,

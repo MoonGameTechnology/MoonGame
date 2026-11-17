@@ -32,12 +32,18 @@ export const STAT_KEY: Record<string, string> = {
   mineHit: 'loadout.stat.mine-hit',
 };
 
+/** Число стата без знака: доля в час — процентом («5%/ч»), прочее — до десятых. */
+const statAmount = (k: string, v: number): string | number =>
+  isPerHourShare(k)
+    ? t('loadout.stat.share-per-hour', { n: perHourPercent(v) })
+    : isPercentStat(k)
+      ? t('loadout.stat.percent', { n: perHourPercent(v) })
+      : Math.round(v * 10) / 10;
+
 /** Чип эффекта модуля: доля в час — процентом («+5%/ч»), прочее — как есть. */
 export const effectChip = (k: string, v: number): string =>
-  `+${
-    isPerHourShare(k)
-      ? t('loadout.stat.share-per-hour', { n: perHourPercent(v) })
-      : isPercentStat(k)
-        ? t('loadout.stat.percent', { n: perHourPercent(v) })
-        : Math.round(v * 10) / 10
-  } ${t(STAT_KEY[k] ?? k)}`;
+  `+${statAmount(k, v)} ${t(STAT_KEY[k] ?? k)}`;
+
+/** Изменение стата со знаком («−2 атака», «+6 корпус») — плитка модуля в окне оснащения. */
+export const deltaChip = (k: string, v: number): string =>
+  `${v < 0 ? '−' : '+'}${statAmount(k, Math.abs(v))} ${t(STAT_KEY[k] ?? k)}`;

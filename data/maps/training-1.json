@@ -1,6 +1,7 @@
 {
   "id": "training-1",
   "seed": "training-1",
+  "edge": "hull",
   "time": 0,
   "mode": "training",
   "sectors": {

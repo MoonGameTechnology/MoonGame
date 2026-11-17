@@ -108,7 +108,7 @@ export function presentProduction(root: HTMLElement): void {
     const saved = focused.get(root) ?? [];
     const candidate = saved.length ? Array.from(dialog?.querySelectorAll<HTMLElement>('button,select') ?? [])
       .find(el => saved.every(([key, value]) => el.getAttribute(key) === value)) : undefined;
-    (candidate ?? dialog?.querySelector<HTMLElement>('.cn-bay.sel,[data-cnmod],button'))?.focus({ preventScroll: true });
+    (candidate ?? dialog?.querySelector<HTMLElement>('.cn-tile.sel,.cn-bay.sel,[data-cnmod],button'))?.focus({ preventScroll: true });
   }
   const heroWorld = root.querySelector('.pw-hero-world');
   if (heroWorld) heroWorld.textContent = (root.querySelector('#cn-planet') as HTMLSelectElement | null)?.selectedOptions[0]?.textContent ?? '';
@@ -241,12 +241,12 @@ function compareHardwareStats(root: HTMLElement): void {
 /** Labels are text nodes: translations and slot counts never enter an HTML sink. */
 function appendFittingControls(card: Element): void {
   const doc = card.ownerDocument;
-  const bays = card.querySelectorAll('.cn-bay');
+  const bays = card.querySelectorAll('.cn-tile,.cn-bay');
   if (bays.length) {
     const caption = doc.createElement('div');
     caption.className = 'pw-fit-caption';
     for (const label of [t('production.fitting'), t('production.fitting-slots', {
-      u: card.querySelectorAll('.cn-bay.filled').length, n: bays.length,
+      u: card.querySelectorAll('.cn-tile.filled,.cn-bay.filled').length, n: bays.length,
     })]) {
       const span = doc.createElement('span');
       span.textContent = label;

@@ -367,6 +367,18 @@ describe('REFM-235 — мир на карте', () => {
     const c = at(node(home.id));
     expect(frame.named('drawImage').find((k) => k.args.length === 9)?.args.slice(5)).toEqual([c.x - 13, c.y - 13, 26, 26]);
   });
+
+  it('голографическая карта: в зоне вспышек вместо точки — звезда-каркас', async () => {
+    const { worlds, env, frame, next, node, at, asSector } = await boot();
+    env.holographic = true;
+    asSector(next.id, 'solar_flare');
+    worlds.drawWorlds(0, LOD());
+    const c = at(node(next.id));
+    expect(arcAt(frame.calls, c, 2.4)).toBeUndefined();
+    // The wire sphere: its outline ring and dozens of mesh segments round the node.
+    const mesh = frame.named('lineTo').filter((k) => Math.hypot((k.args[0] as number) - c.x, (k.args[1] as number) - c.y) < 13 * 2.6);
+    expect(mesh.length).toBeGreaterThan(40);
+  });
 });
 
 describe('REFM-235 — схема и области', () => {
@@ -528,8 +540,8 @@ describe('REFM-235 — искусство секторов', () => {
     const half = 0.45 + 0.55 * 0.5;
     const hole = arcAt(frame.calls, c, 20 * half)!;
     expect(hole.fill).toBe('#020207');
-    expect(arcAt(frame.calls, c, 20 * half * 1.04)?.stroke).toBe('#d9ccff');
-    expect(call(frame.calls, 'ellipse', c.x, c.y, 35 * half, 10 * half, -0.3)).toBeTruthy();
+    expect(arcAt(frame.calls, c, 20 * half * 1.12)?.stroke).toBe('rgba(217,204,255,0.9)');
+    expect(call(frame.calls, 'ellipse', c.x, c.y, 20 * half * 1.9, 20 * half * 1.9 * 0.3, -0.25)).toBeTruthy();
     expect(frame.named('fillText').some((k) => k.args[0] === name(next.id))).toBe(false);
     frame.calls.length = 0;
     asSector(next.id, 'empty');

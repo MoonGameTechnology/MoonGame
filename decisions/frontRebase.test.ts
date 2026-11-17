@@ -33,7 +33,7 @@ const data: GameData = parseGameData({
       stats: { attack: 0, defense: 9, speed: 30, hp: 40, cargoCapacity: 4 },
     },
     // Радиус удара 150 — перелёт 300, шаг к фронту 75.
-    striker: shuttle({ attack: 20, defense: 4, speed: 100, hp: 16, strikeRange: 150, fuel: 2 }),
+    striker: shuttle({ attack: 20, defense: 4, speed: 100, hp: 16, strikeRange: 150 }),
   },
   factions: {},
   buildings: {

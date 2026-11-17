@@ -2,6 +2,7 @@
   "id": "duel-1",
   "mode": "capital_duel",
   "seed": "duel-1",
+  "edge": "hull",
   "sectors": {
     "home_1": {
       "position": {

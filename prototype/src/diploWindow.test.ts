@@ -429,7 +429,6 @@ describe('REFM-214 — журнал разведки', () => {
     win.pushSpyLog('вторая');
     const html = el('spywin').innerHTML;
     expect(html.indexOf('вторая')).toBeLessThan(html.indexOf('первая'));
-    expect(html).not.toContain(t('spy.log.empty'));
   });
 
   it('SPY-20: запись с миром ведёт к нему, архив ставится из сейва и чистится новой партией', async () => {

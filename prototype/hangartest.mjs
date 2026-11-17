@@ -29,6 +29,7 @@ import {
 
 const hooks = `import { mapWasEntered as __mapWasEntered } from './mapLoading';
 import { hpOfLevel as __hpOfLevel } from './game';
+import { HOUR as __HOUR } from './time';
 import { hangarHits as __hangarHits, hangarBadgeRect as __hangarBadgeRect } from './mapHangars';
 window.__hangarTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
@@ -80,6 +81,19 @@ window.__hangarTest = {
     renderPanel();
     const wing = side.querySelector('[data-act="dossier"][data-arg="wing"]');
     if (wing.getAttribute('aria-expanded') !== 'true') wing.click();
+    invalidatePanel();
+    renderPanel();
+  },
+  // Эскадра только что села: заправка ещё minutes минут (решение владельца 2026-11-17);
+  // 0 — заправлена.
+  fuel: (id, minutes) => {
+    s = structuredClone(s);
+    for (const h of [...Object.values(s.planets), ...Object.values(s.fleets)])
+      for (const q of h.hangar ?? [])
+        if (q.id === id) {
+          if (minutes > 0) q.readyAt = s.time + (minutes / 60) * __HOUR;
+          else delete q.readyAt;
+        }
     invalidatePanel();
     renderPanel();
   },
@@ -174,6 +188,22 @@ try {
           `кнопка ${act}`,
         );
       }
+
+      // Заправка: строка состояния ведёт отсчёт, взлёта и слияния нет, погрузка и делёж есть.
+      await page.evaluate((q) => window.__hangarTest.fuel(q, 25), ids.a);
+      await frame();
+      if (phone && !(await page.locator('#side [data-act="wingsplit"]').isVisible()))
+        await page.locator('#mobile-sheet .mobile-info').tap();
+      assert.equal(await page.locator('#side .phead .pn-timer').count(), 1, 'отсчёт заправки в строке');
+      for (const [act, n] of [['wingstrike', 0], ['wingpatrol', 0], ['wingmerge', 0], ['sqload', 1], ['wingsplit', 1]])
+        assert.equal(
+          await page.locator(`#side [data-act="${act}"][data-arg="${ids.a}"]`).count(),
+          n,
+          `на заправке ${act}: ${n}`,
+        );
+      await shot('3b-zapravka');
+      await page.evaluate((q) => window.__hangarTest.fuel(q, 0), ids.a);
+      await frame();
 
       // На борт носителя и обратно — выбор держится на той же эскадре.
       await press(page.locator(`#side [data-act="sqload"][data-arg="${ids.a}"]`));

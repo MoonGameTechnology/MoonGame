@@ -42,7 +42,7 @@ const data: GameData = parseGameData({
       faction: 'x',
       domain: 'space',
       traits: ['shuttle'],
-      stats: { attack: 20, defense: 4, speed: 100, hp: 16, strikeRange: 180, fuel: 4, rearmRounds: 2 },
+      stats: { attack: 20, defense: 4, speed: 100, hp: 16, strikeRange: 180 },
     },
     missile: {
       faction: 'neutral',

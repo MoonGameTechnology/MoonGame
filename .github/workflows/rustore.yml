@@ -45,6 +45,7 @@ jobs:
           npm run assets
           node patch-android.mjs
           node patch-rustore.mjs
+          node patch-vk-rewarded.mjs
           cd android
           ./gradlew assembleRelease --no-daemon
       - name: Sign and verify APK

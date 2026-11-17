@@ -8,26 +8,30 @@
  *
  * 1. **Значок один на базу, а не на эскадру.** На карте на сто игроков отдельные значки
  *    забили бы экран; число эскадр в значке, имена — в карточке и в списке выбора.
- * 2. **Цвет говорит, можно ли лететь прямо сейчас.** Топливо и перезарядка принадлежат
- *    БАЗЕ (SHU-1.2), поэтому «готова» у всех эскадр места общее: значок яркий, когда
- *    база готова к вылету, и серый с жёлтой точкой, когда ждёт.
+ * 2. **Цвет говорит, можно ли лететь прямо сейчас.** Запаса вылетов у базы нет (решение
+ *    владельца 2026-11-17): севшая эскадра сама заправляется, а базе мешает только бой
+ *    носителя. Значок яркий, когда хоть одна эскадра места может взлететь, и серый с
+ *    жёлтой точкой, когда все заправляются или носитель в бою.
  * 3. **Порядок эскадр — порядок ангара.** Он одинаков на всех клиентах, и первый тап по
  *    значку с одной эскадрой выделяет именно её, без догадок.
  * 4. **Чужих значков нет.** Состав чужого порта скрыт туманом; значок рисуется только у
  *    своей базы, и решение об этом принимает вызывающий, передавая только свои места.
- * 5. **Строка состояния — одна на все карточки эскадры:** где стоит и можно ли лететь,
- *    с числом вылетов или часами перезарядки. Причина «нельзя» называется своим словом,
- *    как в ангаре (`hangarPanel.ts`, правило 3).
+ * 5. **Строка состояния — одна на все карточки эскадры:** где стоит и можно ли лететь.
+ *    Причина «нельзя» называется своим словом, как в ангаре (`hangarPanel.ts`, правило 3);
+ *    у заправки — срок, до которого она идёт (живой таймер рисует вызывающий). Бой
+ *    носителя важнее заправки: после неё взлететь всё равно нельзя, пока он не кончится.
  */
 
 /** Почему база не может поднять вылет; `null` — может (то же, что `HangarBlock`). */
-export type BaseBlock = 'empty' | 'busy' | 'rearming' | 'no-fuel' | null;
+export type BaseBlock = 'empty' | 'busy' | null;
 
 /** Что значок знает о месте. */
 export interface HangarSpotFacts {
   /** Живые эскадры места в порядке ангара. */
   squadronIds: readonly string[];
   blocked: BaseBlock;
+  /** Сколько из них ещё заправляется. */
+  refueling: number;
 }
 
 /** Значок ангара у базы. */
@@ -44,27 +48,27 @@ export function hangarBadge(spot: HangarSpotFacts): HangarBadge | null {
   if (spot.squadronIds.length === 0) return null;
   return {
     count: spot.squadronIds.length,
-    ready: spot.blocked === null,
+    ready: spot.blocked === null && spot.refueling < spot.squadronIds.length,
     squadronIds: spot.squadronIds,
   };
 }
 
 /** Что пишет строка состояния эскадры на стоянке (правило 5). */
 export type ParkedState =
-  | { kind: 'ready'; fuel: number | null; maxFuel: number | null }
-  | { kind: 'rearming'; hours: number }
-  | { kind: 'no-fuel' }
-  | { kind: 'busy' };
+  { kind: 'ready' } | { kind: 'busy' } | { kind: 'refueling'; readyAt: number };
 
-/** Состояние стоянки по ангару места. Пустого ангара здесь не бывает: в нём нет эскадры. */
+/**
+ * Состояние стоянки по ангару места и сроку заправки самой эскадры (`readyAt`, время
+ * игры). Пустого ангара здесь не бывает: в нём нет эскадры.
+ */
 export function parkedState(
   blocked: BaseBlock,
-  sortie: { fuel: number; maxFuel: number; rearming: number } | undefined,
+  readyAt: number | undefined,
+  now: number,
 ): ParkedState {
   if (blocked === 'busy') return { kind: 'busy' };
-  if (blocked === 'rearming') return { kind: 'rearming', hours: sortie?.rearming ?? 0 };
-  if (blocked === 'no-fuel') return { kind: 'no-fuel' };
-  return { kind: 'ready', fuel: sortie?.fuel ?? null, maxFuel: sortie?.maxFuel ?? null };
+  if (readyAt !== undefined && readyAt > now) return { kind: 'refueling', readyAt };
+  return { kind: 'ready' };
 }
 
 /** Точка значка на экране и эскадры за ним — то, что нарисовано в этом кадре. */

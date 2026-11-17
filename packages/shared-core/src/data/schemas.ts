@@ -114,12 +114,11 @@ export const UnitStatsSchema = z
      *  silent fallback would hide an underfilled hull. A squadron uses its
      *  TIGHTEST radius, the same weakest-link rule as `strikeRange` and `speed`. */
     chaseRadius: z.number().nonnegative().default(0),
-    /** Shuttle sorties before it must rearm (SQ-2.1). 0 = not a shuttle / no
-     *  sortie limit. Decrements per sortie; at 0 the shuttle goes to `rearmRounds`. */
-    fuel: z.number().nonnegative().default(0),
-    /** Combat rounds a spent shuttle sits rearming on its carrier before it can
-     *  sortie again (SQ-2.1). Deterministic cooldown, like a hero ability. */
-    rearmRounds: z.number().nonnegative().default(0),
+    /** Game minutes a shuttle refuels after it lands before its squadron may take off
+     *  again (decision of the owner 2026-11-17, replaced the base's shared sortie pool).
+     *  0 = ready at once. A squadron waits for its LONGEST time, the weakest-link rule
+     *  of `strikeRange` and `speed`. */
+    refuelMinutes: z.number().nonnegative().default(0),
     /** Game hours a shuttle loiters over a patrol point before it flies home to rearm
      *  (SHU-6.2). 0 = cannot patrol at all — the landing shuttle has none. A squadron
      *  loiters for its SHORTEST time, the same weakest-link rule as `strikeRange`. */

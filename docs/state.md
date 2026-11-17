@@ -7,8 +7,8 @@
 > [до 2026-10-19](archive/state-2026-10-19.md), [до 2026-11-09](archive/state-2026-11-09.md).
 
 **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check).
-**Последний полный локальный прогон: 15 682 теста прошли**
-(243 skip; 1298 файлов прошли, 10 skip; на основе `main` `a410385`,
+**Последний полный локальный прогон: 15 732 теста прошли**
+(243 skip; 1304 файла прошли, 10 skip; на основе `main` `c9d42f4`,
 без сборки прототипа и PostgreSQL). CI и merge queue проверяют PR вместе с `main`.
 
 **Быстрый старт сессии** (только указатели, факты живут в секциях):
@@ -261,8 +261,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - `missiles` — крылатая ракета стоит эскадрой в ангаре порта или трюме, `missile.launch` пускает
   её по одной или залпом; промах — только когда цель-флот дальше дальности от точки пуска.
   Бот ракетной доктрины строит их на войне и пускает залпом по флоту в дальности.
-- `shuttle` — шаттлы стоят в космопорте мира и бьют от своего узла; эскадры, патрули, перелёты
-  ([shuttles-roadmap.md](shuttles-roadmap.md)).
+- `shuttle` — шаттлы стоят в космопорте мира и бьют от своего узла; эскадры, патрули, перелёты;
+  севшая эскадра заправляется (`readyAt`) ([shuttles-roadmap.md](shuttles-roadmap.md)).
 - `loadoutEffects` — модули кораблей, которые меняют правило, а не число корпуса;
   `cloak-field` — поле флагмана героя (§«Туман» ниже).
 
@@ -347,11 +347,11 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   аккреционный диск, `disk` в генераторе, решение владельца 2026-11-10). Sector Zero — `training-1` и главы `pve-1`…`pve-6`. Битвы корпораций берут
   карту по формату (`data/avaFormats.json`, CORP-8). Служебные — `proving-ground` (скрытый
   «Полигон»), `duel-testbed`, `skirmish-1`; `data/frontier-50|100.json` — для старых партий.
-- **Край карты** — `mosaicClip` ядра, один на проходы и на оба рендера: по умолчанию рамка по
-  границам карты; `edge: "hull"` в карте даёт выпуклый обод вокруг крайних центров. Край
-  закреплён в `GameState.mapEdge`, стекло голограммы и его кайма идут по нему (`glassFrame`).
-  Сейчас обод не включён ни на одной карте: `ffa-50` вместо него стала квадратной (решение
-  владельца 2026-11-09), партии, начатые с ободом, сохраняют его.
+- **Край карты** — `mosaicClip` ядра, один на проходы и оба рендера, закреплён в `GameState.mapEdge`
+  (стекло голограммы идёт по нему). `edge: "hull"` — выпуклый контур в 0.6 шага от крайних центров,
+  без поля — рамка на 5% ширины. Контур на всех картах, кроме глав I, II, V, VI и старых
+  `ava-2v2-1`/`ava-duel-1` (владелец 2026-11-17: без растянутых крайних провинций; тест держит
+  крайнюю клетку меньше ×2.6 медианной); `ffa-50` остаётся квадратом. Старые партии — с рамкой.
 - **Цены и сроки основной игры** (решение владельца 2026-10-18) — поле `pricing` её шести карт,
   посев закрепляет его в `GameState.pricing`; расчёт — `util/pricing.ts` (`matchUnitCost` для
   корпусов, `matchCost` для прочего), одинаково для UI, бота, оплаты и отмены. Новые партии
@@ -429,8 +429,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - Дипломатия, коалиции (`coalitionWindow.ts`), метки (`pingUi.ts`,
   [ping-system.md](ping-system.md)).
 - Вкладка «Шпионаж» (`spyWindow.ts`, кнопка рядом с «Дипломатией» и «Сообщениями», на
-  телефоне — в «Ещё»): строка на шпиона — портрет с уровнем (`spyPortrait.ts`), позывной,
-  место, занятие, таймер и одна кнопка (`decisions/spyRoster.ts`); «Дать задание» — 8
+  телефоне — в «Ещё»): строка на шпиона — портрет с уровнем (`spyPortrait.ts`, 10 лиц в
+  `spyPortraitArt.ts`), позывной, место, занятие, таймер и кнопка (`decisions/spyRoster.ts`); «Дать задание» — 8
   карточек от передислокации до саботажа, невозможные на выбранном мире серые
   (`decisions/spyTasks.ts`); затем выбор мира на карте и вопрос «Да / Нет» с шансом и
   временем пути. На карточке мира — одна кнопка шпиона. Под списком — окна разведки и архив
@@ -449,9 +449,9 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   описание — `matchDescription.ts`), личный архив (`seats.archived`), битвы корпораций отдельной
   вкладкой. Создавать онлайн-сессии в проде могут UUID из `MATCH_CREATOR_ACCOUNT_IDS`
   (`GET /matches/capabilities`).
-- Арсенал (`arsenalScreen.ts`, `decisions/arsenalView.ts`), «Снабжение» и аукцион
-  (`metaEconomyScreen.ts`, `metaMarketScreen.ts`, `decisions/auctionHouse.ts`: купить, торги
-  со ставками, продать, заказы на покупку), магазин (`shopScreen.ts`, `decisions/shopView.ts`).
+- Арсенал (`arsenalScreen.ts`, `decisions/arsenalView.ts`), снабжение и аукцион (`metaEconomyScreen.ts`,
+  `metaMarketScreen.ts`, `decisions/auctionHouse.ts`), магазин (`shopScreen.ts`, `decisions/shopView.ts`).
+  Фиатные пакеты закрыты заглушкой; премиум, модули, материалы и стили доступны за Суверены.
 - «Корпорация» (`corpHubView.ts`, `decisions/corpHub.ts`): база-сцена (`corpSprites.ts`,
   `corpArt.ts`), битвы, состав, казна, настройки ([corporation-ui.md](corporation-ui.md)).
 - Аккаунт — `accountSession.ts`, `accountDeletion.ts`, «Восстановить доступ» — `signInPages.ts`;
@@ -514,10 +514,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   берёт Яндекс, только если поднят лоадер SDK ([platform-adapters.md](platform-adapters.md)).
 - Архив `dist/yandex/` — только Sector Zero и один язык; реклама только rewarded
   (`decisions/adPlacements.ts`), облако — `decisions/cloudSync.ts`.
-- APK — Capacitor (`mobile/`): обновления с VPS по манифесту, подписанному в CI (Ed25519,
-  `mobile/distribution.json`), с прогрессом по байтам ([ранбук](../deploy/apk/README.md));
-  кнопка «Скачать APK» — `decisions/apkOffer.ts`. RuStore закрыт до решений оператора
-  ([rustore-preparation.md](security/rustore-preparation.md)).
+- APK — Capacitor (`mobile/`): подписанные Ed25519 обновления с VPS с прогрессом по байтам
+  ([ранбук](../deploy/apk/README.md)), кнопка скачивания — `decisions/apkOffer.ts`.
+  VK Rewarded SDK со слотом 2111707 подключён без сетевого начисления до подтверждения провайдера
+  ([README](../mobile/README.md)); RuStore закрыт до [решений оператора](security/rustore-preparation.md).
 - ПК — Electron (`desktop/`, [README](../desktop/README.md)): тот же архив Sector Zero, без
   CI-ленты и Steam.
 

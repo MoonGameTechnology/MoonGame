@@ -16,7 +16,7 @@ import { hasMissiles, MISSILE_SALVO } from '../../packages/shared-core/src/index
 import { t } from '../../localization/runtime';
 import { parkedState } from '../../decisions/hangarBadge';
 import { fleetCallsign } from './fleetName';
-import { esc } from './format';
+import { esc, fmtEta } from './format';
 import { data, loadShuttle, unloadShuttle } from './game';
 import {
   dockedCarrier,
@@ -30,8 +30,9 @@ import { squadronRelocateSpots } from './mapAim';
 import { ownerColor } from './mapPalette';
 import { cardHeader } from './panelKit';
 import { worldName } from './planetName';
+import { HOUR } from './time';
 import { wingOrder, wingOrdersHtml, type WingOrder } from './wingOrders';
-import { unitRows } from './worldCard';
+import { refuelNoteHtml, unitRows } from './worldCard';
 import {
   mergeTargets,
   SQUADRON_KIND_KEY,
@@ -65,29 +66,38 @@ function spotOf(s: GameState, me: string, id: string): Spot | null {
   return null;
 }
 
-/** Можно ли лететь: «вылетов 3/3», «перезарядка: 2 ч»… (`hangarBadge.ts`, правило 5). */
-function stateText(view: HangarView, missiles: boolean): string {
-  const st = parkedState(view.blocked, view.sortie);
-  // Ракетам топливо порта не нужно: им важно одно — не в бою ли база.
-  if (missiles) return t(st.kind === 'busy' ? 'side.squad.busy' : 'side.missile.ready');
-  return st.kind === 'busy'
-    ? t('side.squad.busy')
-    : st.kind === 'rearming'
-      ? t('side.wing.rearming', { h: st.hours })
-      : st.kind === 'no-fuel'
-        ? t('side.squad.no-fuel')
-        : st.fuel !== null && st.maxFuel !== null
-          ? t('side.squad.ready.fuel', { n: st.fuel, max: st.maxFuel })
-          : t('side.squad.ready');
+/** Где в тексте встанет срок заправки — знак, которого нет ни в одной локали. */
+const LEFT = '\u0001';
+
+/** Можно ли лететь: «готова», «заправка 25м», «носитель в бою» (`hangarBadge.ts`,
+ *  правило 5). Срок заправки — на месте {@link LEFT}; `readyAt` — когда он кончится. */
+function stateText(
+  spot: Spot,
+  sq: Squadron | undefined,
+  deps: SquadronCardDeps,
+): { text: string; readyAt?: number } {
+  const st = parkedState(spot.view.blocked, sq?.readyAt, deps.world.time);
+  // Ракеты не заправляются: им важно одно — не в бою ли база.
+  if (sq && hasMissiles(sq, data))
+    return { text: t(st.kind === 'busy' ? 'side.squad.busy' : 'side.missile.ready') };
+  if (st.kind === 'busy') return { text: t('side.squad.busy') };
+  if (st.kind === 'ready') return { text: t('side.squad.ready') };
+  return { text: t('side.squad.refuel', { left: LEFT }), readyAt: st.readyAt };
 }
 
-/** Строка под именем: где стоит и можно ли лететь. */
-function statusLine(spot: Spot, deps: SquadronCardDeps, missiles: boolean): string {
+/** То же разметкой: срок — живой отсчёт. */
+function stateHtml(spot: Spot, sq: Squadron | undefined, deps: SquadronCardDeps): string {
+  const { text, readyAt } = stateText(spot, sq, deps);
+  return readyAt === undefined ? esc(text) : refuelNoteHtml(readyAt);
+}
+
+/** Строка под именем (разметка): где стоит и можно ли лететь. */
+function statusLineHtml(spot: Spot, deps: SquadronCardDeps, sq: Squadron | undefined): string {
   const where =
     spot.kind === 'port'
       ? t('side.squad.port', { name: worldName(deps.world, spot.planet.id) })
       : t('side.squad.hold', { name: fleetCallsign(spot.fleetId) });
-  return `${where} · ${stateText(spot.view, missiles)}`;
+  return `${esc(where)} · ${stateHtml(spot, sq, deps)}`;
 }
 
 function squadronOf(spot: Spot, deps: SquadronCardDeps, id: string): Squadron | undefined {
@@ -96,13 +106,13 @@ function squadronOf(spot: Spot, deps: SquadronCardDeps, id: string): Squadron | 
   return hangar?.find((q) => q.id === id);
 }
 
-/** Строка состояния своей эскадры на стоянке — та же, что под именем в её карточке;
- *  `null` — такой эскадры на стоянке нет. Её же читает список «◇ Авиация». */
-export function parkedStatusText(id: string, deps: SquadronCardDeps): string | null {
+/** Строка состояния своей эскадры на стоянке (разметка с живым отсчётом) — та же, что
+ *  под именем в её карточке; `null` — такой эскадры на стоянке нет. Её же читает список
+ *  «◇ Авиация». */
+export function parkedStatusHtml(id: string, deps: SquadronCardDeps): string | null {
   const spot = spotOf(deps.world, deps.me, id);
   if (!spot) return null;
-  const sq = squadronOf(spot, deps, id);
-  return statusLine(spot, deps, !!sq && hasMissiles(sq, data));
+  return statusLineHtml(spot, deps, squadronOf(spot, deps, id));
 }
 
 /** Строка эскадры в списке «Выберите объект»: сколько бортов и можно ли лететь. Где она
@@ -111,7 +121,10 @@ export function parkedPickText(id: string, deps: SquadronCardDeps): string | nul
   const spot = spotOf(deps.world, deps.me, id);
   const sq = spot && squadronOf(spot, deps, id);
   if (!spot || !sq) return null;
-  return `${boardsText(sq)} · ${stateText(spot.view, hasMissiles(sq, data))}`;
+  // Простой текст (его экранирует вызывающий): срок — остаток на момент мира.
+  const { text, readyAt } = stateText(spot, sq, deps);
+  const left = readyAt === undefined ? '' : fmtEta((readyAt - deps.world.time) / HOUR);
+  return `${boardsText(sq)} · ${text.replace(LEFT, left)}`;
 }
 
 function boardsText(sq: Squadron): string {
@@ -144,19 +157,20 @@ export function parkedSquadronHtml(id: string, deps: SquadronCardDeps): string |
     mine: true,
     data,
     relocate: (sq) => squadronRelocateSpots(sq, from).length > 0,
+    now: deps.world.time,
   });
   const card = cards.find((c) => c.id === id);
   if (!card) return null;
   const cargo = card.cargo.reduce((n, c) => n + c.count, 0);
   const notes = [
-    esc(statusLine(spot, deps, card.missiles)),
+    statusLineHtml(spot, deps, squadronOf(spot, deps, id)),
     ...(cargo > 0 ? [esc(t('side.wing.cargo', { n: cargo }))] : []),
     ...(card.hull !== null ? [esc(t('side.wing.hull', { p: card.hull }))] : []),
     ...(card.hold ? [esc(t('side.wing.holding'))] : []),
   ];
   const title = `${t(SQUADRON_KIND_KEY)} «${card.name}»`;
   let h =
-    // Точки строки состояния — с пробелами и на ПК: «В порту Бета · вылетов 3/3» читается
+    // Точки строки состояния — с пробелами и на ПК: «В порту Бета · готова» читается
     // словами, а сжатое «Бета·вылетов» слипалось (тест владельца 2026-11-15).
     cardHeader(ownerColor(deps.me), title, '', { subLive: notes.join(' · ') }) +
     unitRows(card.stacks);
@@ -164,7 +178,7 @@ export function parkedSquadronHtml(id: string, deps: SquadronCardDeps): string |
   // перелёта общая (`canStrike`), и серая плитка здесь обещала бы то, чего нет.
   const ready = card.canStrike;
   const merging = squadMerge?.from === card.id;
-  // Ракеты пускаются, пока база не в бою: топливо и перезарядка порта им не нужны.
+  // Ракеты пускаются, пока база не в бою: заправка им не нужна.
   const launch = card.missiles && spot.view.blocked !== 'busy';
   const salvo = Math.min(MISSILE_SALVO, card.machines);
   const orders = [
@@ -177,21 +191,21 @@ export function parkedSquadronHtml(id: string, deps: SquadronCardDeps): string |
     card.canSplit && wingOrder('split', 'wingsplit', id),
     // Слияние взведено — плитка горит, повторное нажатие его снимает.
     card.canMerge && wingOrder('merge', 'wingmerge', id, merging),
-    // Держит патруль и ждёт дома перезарядки: плитка горит, нажатие отпускает.
+    // Держит патруль и ждёт дома заправки: плитка горит, нажатие отпускает.
     card.hold && wingOrder('keep', 'wingrelease', id, true),
   ];
   h += wingOrdersHtml(orders, id);
-  h += siblingsHtml(spot.view, card.id, merging);
+  h += siblingsHtml(spot.view, card.id, merging, deps.world.time);
   return h;
 }
 
 /** «Ещё здесь»: остальные эскадры базы отдельным блоком плиток — не в ряду приказов, где
  *  имя соседки читалось как ещё один приказ. Плитка — тот же «◇», что на значке ангара, имя
  *  и число бортов; тап выделяет соседку. Пока взведено слияние — плитки тех, куда слить. */
-function siblingsHtml(view: HangarView, id: string, merging: boolean): string {
+function siblingsHtml(view: HangarView, id: string, merging: boolean, now: number): string {
   const others = view.squadrons.filter((sq) => sq.id !== id && sq.units.some((st) => st.count > 0));
   if (others.length === 0) return '';
-  const into = merging ? new Set(mergeTargets(view, id, data)) : new Set<string>();
+  const into = merging ? new Set(mergeTargets(view, id, data, now)) : new Set<string>();
   const tiles = others
     .map((sq) => {
       const [act, mark] = into.has(sq.id) ? ['wingmergeto', '⛬'] : ['sqpick', '◇'];

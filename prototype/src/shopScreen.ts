@@ -2,8 +2,8 @@
  * «Магазин» хаба (заказ владельца 2026-10-20, макет одобрен: «норм, реализовывай»; иконки
  * валют — имеющиеся, `SOV_SVG` и ⌖).
  *
- * Четыре полки: пакеты Суверенов (товары Commerce за деньги площадки — пока провайдера нет,
- * видны и недоступны), премиум, наборы модулей и материалы за ◆. Цены, запреты и бонусы
+ * Покупка Суверенов за деньги закрыта заглушкой; премиум, наборы модулей и материалы
+ * продаются за ◆. Цены, запреты и бонусы
  * премиума решает сервер (`/meta-economy/me` → `store`, `premiumDaily`, `ads`); что из этого
  * показать и что говорит кнопка — `decisions/shopView.ts`; здесь разметка и проводка.
  * Магазин — единственное место покупок: раздел «Магазин» ушёл из «Снабжения», а Арсенал
@@ -28,16 +28,13 @@ import type {
 import { t, tData } from '../../localization/runtime';
 import {
   adSupply,
-  bestPack,
   buyState,
   defaultPick,
   discountOf,
-  packTotal,
   premiumDaysLeft,
   premiumSavings,
   recipeCoverage,
   shelf,
-  sovereignPacks,
   SHOP_TABS,
   type ShopTab,
 } from '../../decisions/shopView';
@@ -75,10 +72,6 @@ const STYLE_BLOCKED_KEY: Record<Extract<StyleOfferState, { kind: 'blocked' }>['r
   head: 'shop.style.head',
   owned: 'corp.style.owned',
 };
-/** Подсказка под вкладкой — только то, что карточки не говорят сами. */
-const TAB_HINT: Partial<Record<ShopTab, string>> = {
-  sovereigns: 'shop.hint.sovereigns',
-};
 const BLOCKED_KEY: Record<NonNullable<MetaStoreOfferView['blocked']>, string> = {
   owned: 'shop.blocked.owned',
   limit: 'shop.blocked.limit',
@@ -103,9 +96,8 @@ const gem = (text: string): string =>
   esc(text).replace(/◆/g, `<i class="sh-gem" aria-hidden="true">${SOV_SVG}</i>`);
 const off = (disabled: boolean): string => (disabled ? ' disabled' : '');
 
-/** Одна карточка полки: пакет Суверенов, снабжение за рекламу или товар витрины. */
+/** Одна карточка полки: снабжение за рекламу или товар за Суверены. */
 type Entry =
-  | { kind: 'pack'; id: string; offer: CommerceOffer }
   | { kind: 'ad'; id: string; offer: CommerceOffer }
   | { kind: 'store'; id: string; offer: MetaStoreOfferView };
 
@@ -133,12 +125,8 @@ export interface ShopState {
 
 function entries(s: ShopState): Entry[] {
   if (!s.view) return [];
-  if (s.tab === 'sovereigns')
-    return sovereignPacks(s.offers).map((offer) => ({
-      kind: 'pack',
-      id: offer.productId,
-      offer,
-    }));
+  // Fiat sales are explicitly closed, even if Commerce advertises available packs.
+  if (s.tab === 'sovereigns') return [];
   const list: Entry[] = shelf(s.view.store ?? [], s.tab).map((offer) => ({
     kind: 'store',
     id: offer.id,
@@ -175,7 +163,6 @@ function storeTitle(view: MetaEconomyView, o: MetaStoreOfferView): string {
 }
 
 function entryTitle(view: MetaEconomyView, e: Entry): string {
-  if (e.kind === 'pack') return '';
   if (e.kind === 'ad') return t('shop.ad.name');
   return storeTitle(view, e.offer);
 }
@@ -206,10 +193,6 @@ function backdropArtHtml(backdrop: string): string {
 function artHtml(e: Entry, detail = false): string {
   if (e.kind === 'store' && e.offer.corpStyle) return styleArtHtml(e.offer.corpStyle, detail);
   if (e.kind === 'store' && e.offer.corpBackdrop) return backdropArtHtml(e.offer.corpBackdrop);
-  if (e.kind === 'pack') {
-    const n = Math.min(5, 1 + Math.floor(Math.log2(packTotal(e.offer) / 100 + 1)));
-    return `<span class="sh-art sh-art-sov" aria-hidden="true">${`<i>${SOV_SVG}</i>`.repeat(n)}</span>`;
-  }
   const materials = e.kind === 'ad' ? e.offer.contents.materials : e.offer.materials;
   if (materials)
     return `<span class="sh-art" aria-hidden="true">${Object.keys(materials)
@@ -251,13 +234,7 @@ function cardHtml(
   let tag = '';
   let sub = '';
   let price: string;
-  if (e.kind === 'pack') {
-    const c = e.offer.contents;
-    if (c.bonusSovereigns)
-      sub = t('shop.pack.gift', { base: nfmt(c.sovereigns ?? 0), bonus: nfmt(c.bonusSovereigns) });
-    if (bestPack(sovereignPacks(s.offers)) === e.id) tag = t('shop.tag.best');
-    price = `<span class="sh-pill">${t('shop.soon')}</span>`;
-  } else if (e.kind === 'ad') {
+  if (e.kind === 'ad') {
     const ads = view.ads;
     if (ads) sub = t('shop.ad.left', { n: Math.max(0, ads.limit - ads.used), m: ads.limit });
     price = `<span class="sh-pill free">${t('shop.free')}</span>`;
@@ -281,10 +258,7 @@ function cardHtml(
         : (o.fullPrice && o.fullPrice > o.price ? `<s>${nfmt(o.fullPrice)}</s>` : '') +
           sov(o.price));
   }
-  const title =
-    e.kind === 'pack'
-      ? `<span class="sh-nm sh-gold">${sov(packTotal(e.offer))}</span>`
-      : `<span class="sh-nm">${esc(entryTitle(view, e))}</span>`;
+  const title = `<span class="sh-nm">${esc(entryTitle(view, e))}</span>`;
   const dim = e.kind === 'store' && e.offer.blocked ? ' off' : '';
   return (
     `<button type="button" class="sh-card${dim}" data-sh-pick="${esc(e.id)}" aria-pressed="${selected}">` +
@@ -361,19 +335,19 @@ export function shopHtml(s: ShopState): string {
   if (s.guest || !view)
     return head + statusHtml(s.status, s.status?.error === true) + (s.guest ? guestHtml(s) : '');
   const picked = pickedEntry(s)?.id;
-  const hint = TAB_HINT[s.tab];
+  const fiatClosed = s.tab === 'sovereigns';
   const cards = entries(s)
     .map((e) => cardHtml(s, view, e, picked))
     .join('');
   return (
     head +
     statusHtml(s.status, s.status?.error === true) +
-    `<div class="sh-main"><nav class="sh-tabs" role="tablist" aria-label="${esc(t('shop.tabs'))}">${tabs}</nav>` +
+    `<div class="sh-main${fiatClosed ? ' sh-fiat-closed' : ''}"><nav class="sh-tabs" role="tablist" aria-label="${esc(t('shop.tabs'))}">${tabs}</nav>` +
     `<div class="sh-list" role="tabpanel">` +
+    (fiatClosed ? `<section class="sh-prem" role="status"><b>${t('shop.pay.soon')}</b><p class="sh-note">${t('shop.pay.closed')}</p></section>` : '') +
     (s.tab === 'premium' ? premiumBoxHtml(s, view) : '') +
-    (hint ? `<p class="sh-hint">${t(hint)}</p>` : '') +
-    `<div class="sh-grid">${cards}</div></div>` +
-    (s.wide ? `<aside class="sh-detail">${shopDetailHtml(s)}</aside>` : '') +
+    (fiatClosed ? '' : `<div class="sh-grid">${cards}</div>`) + '</div>' +
+    (s.wide && !fiatClosed ? `<aside class="sh-detail">${shopDetailHtml(s)}</aside>` : '') +
     '</div>'
   );
 }
@@ -437,16 +411,7 @@ export function shopDetailHtml(s: ShopState): string {
   let lines = '';
   let note = '';
   let action: string;
-  if (e.kind === 'pack') {
-    const c = e.offer.contents;
-    title = t('shop.pack.title', { n: nfmt(packTotal(e.offer)), count: packTotal(e.offer) });
-    lines =
-      line(t('shop.tab.sovereigns'), nfmt(c.sovereigns ?? 0)) +
-      (c.bonusSovereigns ? line(t('shop.detail.gift'), `+${nfmt(c.bonusSovereigns)}`) : '') +
-      line(t('shop.detail.after'), sov((view.sovereigns ?? 0) + packTotal(e.offer)));
-    note = t('shop.pay.note');
-    action = `<button type="button" class="btn-main" disabled>${t('shop.pay.soon')}</button>`;
-  } else if (e.kind === 'ad') {
+  if (e.kind === 'ad') {
     title = t('shop.ad.name');
     lines = Object.entries(e.offer.contents.materials ?? {})
       .map(([m, q]) => line(materialName(view, m), `×${nfmt(q)}`))
@@ -497,7 +462,7 @@ export function shopDetailHtml(s: ShopState): string {
     action = corpLook(o) ? styleHtml(s, view, o, title) : buyHtml(s, view, o, title);
   }
   return (
-    `<div class="sh-dt"><h3 id="sh-dt-title">${e.kind === 'pack' ? sov(packTotal(e.offer)) : esc(title)}</h3>` +
+    `<div class="sh-dt"><h3 id="sh-dt-title">${esc(title)}</h3>` +
     statusHtml(s.notice) +
     artHtml(e, true) +
     `<div class="sh-lines">${lines}</div>` +

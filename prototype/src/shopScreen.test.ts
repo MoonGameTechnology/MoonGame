@@ -166,18 +166,23 @@ const corp = (head: boolean, owned: string[] = [], active = 'standard'): MetaCor
 });
 
 describe('магазин — разметка', () => {
-  it('Суверены: пакеты видны, оплата честно недоступна, подарок и метка лучшей цены', () => {
-    const html = shopHtml(state());
-    expect(html).toContain('1\u00a0200 + 240 в подарок');
-    expect(html).toContain('Лучшая цена');
-    expect(html).toContain('Скоро');
-    expect(html).toContain('data-sh-pick="sovereigns_100"');
-    const detail = shopDetailHtml(state());
-    expect(detail).toContain('Оплата пока недоступна');
-    expect(detail).toMatch(/<button[^>]*disabled>Оплата пока недоступна/);
-    // Кошелёк: ◆ из ответа сервера и ⌖ аукциона.
+  it.each([true, false])('Суверены: вместо фиатных предложений заглушка (wide=%s)', (wide) => {
+    const s = state({ wide, pick: 'sovereigns_100', confirm: true,
+      offers: OFFERS.map(o => ({ ...o, available: true, unavailableReason: undefined })) });
+    const html = shopHtml(s);
+    expect(html).toContain('Покупки за реальные деньги временно недоступны.');
+    expect(html).toContain('role="status"');
+    expect(html).not.toContain('data-sh-pick=');
+    expect(html).not.toContain('data-sh-buy');
+    expect(html).not.toContain('sh-detail');
+    expect(html).not.toContain('Лучшая цена');
+    expect(html).not.toContain('в подарок');
+    expect(shopDetailHtml(s)).toBe('');
+    // The wallet and the remaining shop tabs stay accessible.
     expect(html).toMatch(/sh-cur sov[^]*300/);
     expect(html).toMatch(/sh-cur war[^]*340/);
+    for (const tab of ['premium', 'modules', 'materials', 'styles'])
+      expect(html).toContain(`data-sh-tab="${tab}"`);
   });
 
   it('модули: цена без уже открытых, скидка, «Уже есть» вместо кнопки', () => {
@@ -396,6 +401,23 @@ function server(
 }
 
 describe('магазин — вкладка', () => {
+  it.each([true, false])('фиатный товар не открывает шторку и не отправляет покупку (narrow=%s)', async (narrow) => {
+    const posts = server();
+    const host = hostOf({ narrow: () => narrow });
+    const shop = initShop(host);
+    // Also covers an old deep link asking for a paid pack before the account loads.
+    shop.show('sovereigns', 'sovereigns_100');
+    await shop.refresh();
+    host.root().fire({ shPick: 'sovereigns_100' });
+    host.root().fire({ shBuy: 'sovereigns_100' });
+    host.root().fire({ shBuyDo: 'sovereigns_100' });
+    expect(shop.isOpen()).toBe(false);
+    expect(host.sheet().innerHTML).toBe('');
+    expect(host.root().innerHTML).toContain('Покупки за реальные деньги временно недоступны.');
+    expect(posts).toEqual([]);
+    expect(shop.sovereigns()).toBe(300);
+  });
+
   it('гость: в сеть не ходит, кошелёк хаба узнаёт, что баланса нет', async () => {
     const fetcher = vi.fn();
     vi.stubGlobal('fetch', fetcher);

@@ -52,7 +52,7 @@ const data: GameData = parseGameData({
     },
     interceptor: {
       faction: 'x',
-      stats: { attack: 14, defense: 3, speed: 14, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2 },
+      stats: { attack: 14, defense: 3, speed: 14, hp: 10, strikeRange: 180 },
       cost: { metal: 90, credits: 40 },
       buildTimeHours: 2,
       traits: ['shuttle'],

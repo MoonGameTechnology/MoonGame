@@ -44,8 +44,6 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 10,
       strikeRange: 180,
-      fuel: 3,
-      rearmRounds: 2,
       shuttleDamage: 22,
       patrolHours: 4,
       patrolRadius: 60,
@@ -57,8 +55,6 @@ const data: GameData = parseGameData({
       hp: 16,
       strikeRange: 180,
       chaseRadius: 12,
-      fuel: 3,
-      rearmRounds: 3,
       siegeDamage: 8,
       patrolHours: 3,
       patrolRadius: 60,
@@ -69,8 +65,6 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 24,
       strikeRange: 180,
-      fuel: 2,
-      rearmRounds: 2,
     }),
   },
   factions: {},
@@ -214,7 +208,7 @@ describe('SHU-6.13 — «Домой» у любого вылета на пути
     expect(hits(r.events)).toEqual([]);
     expect(r.state.strikes ?? []).toHaveLength(0);
     expect(ashore(r.state)).toBe(2);
-    expect(r.state.planets.A?.sortie?.fuel).toBe(2); // вылет один — отзыв его не тратит
+    expect(r.state.planets.A?.sortie).toBeUndefined(); // общего запаса вылетов нет
   });
 
   it('ДЕСАНТ ВЕЗЁТ БОЙЦОВ ОБРАТНО В ТРЮМ', () => {
@@ -259,7 +253,7 @@ describe('SHU-6.13 — новая цель в воздухе', () => {
     expect(st.leg).toBe('out');
     expect(st.at).toEqual({ x: 50, y: 0 }); // путь — от точки смены, не от базы
     expect(st.to).toEqual({ x: 0, y: 100 });
-    expect(t.planets.A?.sortie?.fuel).toBe(2); // второй вылет не тратится
+    expect(t.planets.A?.sortie).toBeUndefined(); // общего запаса вылетов нет
     const r = run(t, 5);
     expect(hits(r.events)).toEqual(['F']); // прежнее прибытие к Z (1,5 ч) погасло
     expect(r.state.strikes ?? []).toHaveLength(0);
@@ -432,7 +426,7 @@ describe('SHU-6.13 — делёж в воздухе', () => {
       base: before.base,
     });
     expect(queued(t, 'shuttle.patrol.tick', other!.id)).toBe(1); // у половины свои тики
-    expect(t.planets.A?.sortie?.fuel).toBe(2); // вылет базы не тратится
+    expect(t.planets.A?.sortie).toBeUndefined(); // общего запаса вылетов нет
     const home = until(t, 9);
     expect(home.strikes ?? []).toHaveLength(0);
     expect(ashore(home)).toBe(3);

@@ -46,6 +46,7 @@ const MAPS = {
   20: {
     id: 'ffa-20',
     seed: 'twenty-lights-20261015',
+    edge: 'hull',
     perSeat: 16,
     pirates: 3,
     hives: 2,
@@ -84,6 +85,9 @@ const MAPS = {
   50: {
     id: 'ffa-50',
     seed: 'fifty-suns-square-5',
+    // The map ends at its outline, not at a padded frame (owner 2026-11-17: no stretched rim
+    // provinces): a rim cell then ends about as far out as an inland one.
+    edge: 'hull',
     perSeat: 16,
     pirates: 6,
     hives: 4,
@@ -197,8 +201,11 @@ const core = await loadCore();
 const data = core.shippedGameData();
 const factions = JSON.parse(readFileSync(ROOT + 'data/factions.json', 'utf8'));
 
-/** A map's identity and edge; no `edge` — the bounding rectangle. */
-const headOf = (cfg) => ({ id: cfg.id, seed: cfg.seed, edge: cfg.edge });
+/** A map's identity for the LAYOUT checks (rifts, inhabitants): lanes of the bounding
+ *  rectangle, as both maps were laid out before they took the outline (owner 2026-11-17).
+ *  Laying out on the outline would move inhabitants and rename them in every locale; the
+ *  published file carries `cfg.edge`, and the contracts below check its own lanes. */
+const headOf = (cfg) => ({ id: cfg.id, seed: cfg.seed });
 
 /**
  * The board's outline. `ellipse` (default): an ellipse with a wavy rim — space has no straight
@@ -826,7 +833,7 @@ function finish(seats, cfg, g) {
   const content = {
     id: cfg.id,
     seed: cfg.seed,
-    edge: cfg.edge, // undefined on ffa-20: JSON.stringify leaves the key out
+    edge: cfg.edge, // the published edge (see `headOf`)
     sectors,
     regions,
     players,

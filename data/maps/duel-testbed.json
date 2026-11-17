@@ -1,6 +1,7 @@
 {
   "id": "duel-testbed",
   "seed": "duel-testbed",
+  "edge": "hull",
   "time": 0,
   "sectors": {
     "home_a": {

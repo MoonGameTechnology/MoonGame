@@ -57,8 +57,6 @@ const data: GameData = parseGameData({
         speed: 100,
         hp: 10,
         strikeRange: 180,
-        fuel: 4,
-        rearmRounds: 2,
         siegeDamage: 1,
       },
     },

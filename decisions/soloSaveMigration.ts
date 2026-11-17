@@ -750,17 +750,29 @@ export const CAPTIVE_CARRIER_SOLO_MIGRATION = {
   toDataHash: SPY_DEFECTOR_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Catalogue 0.1.87 + shuttle 2.1.0: the base's shared sortie pool is gone; a squadron that
+ *  lands refuels for `refuelMinutes` (owner's decision 2026-11-17). A saved `sortie` counter
+ *  is left in place and ignored; squadrons already parked carry no `readyAt` and are ready. */
+export const SQUADRON_REFUEL_SOLO_MIGRATION = {
+  fromRules: CAPTIVE_CARRIER_SOLO_MIGRATION.toRules,
+  fromData: CAPTIVE_CARRIER_SOLO_MIGRATION.toData,
+  fromDataHash: CAPTIVE_CARRIER_SOLO_MIGRATION.toDataHash,
+  toRules: '12281b71e968af',
+  toData: '0.1.87',
+  toDataHash: '0f85efc1673abe',
+} as const;
+
 /** Rules-only pair: orbital 1.8.0 — the world's flak and a fleet's bombardment land in the
  *  order of time however the span is cut, and a flak volley stamps `lastDamagedAt` with its
  *  own instant (FORT-5.17). The catalogue is unchanged and so is the saved shape: a saved
  *  world reads as is, only later spans interleave the two fires. */
 export const ORBITAL_TIME_ORDER_SOLO_MIGRATION = {
-  fromRules: CAPTIVE_CARRIER_SOLO_MIGRATION.toRules,
-  fromData: CAPTIVE_CARRIER_SOLO_MIGRATION.toData,
-  fromDataHash: CAPTIVE_CARRIER_SOLO_MIGRATION.toDataHash,
-  toRules: '0a0c1b95158f5b',
-  toData: CAPTIVE_CARRIER_SOLO_MIGRATION.toData,
-  toDataHash: CAPTIVE_CARRIER_SOLO_MIGRATION.toDataHash,
+  fromRules: SQUADRON_REFUEL_SOLO_MIGRATION.toRules,
+  fromData: SQUADRON_REFUEL_SOLO_MIGRATION.toData,
+  fromDataHash: SQUADRON_REFUEL_SOLO_MIGRATION.toDataHash,
+  toRules: '1e9665469708f6',
+  toData: SQUADRON_REFUEL_SOLO_MIGRATION.toData,
+  toDataHash: SQUADRON_REFUEL_SOLO_MIGRATION.toDataHash,
 } as const;
 
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
@@ -828,6 +840,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   RALLY_ANY_WORLD_SOLO_MIGRATION,
   SPY_DEFECTOR_SOLO_MIGRATION,
   CAPTIVE_CARRIER_SOLO_MIGRATION,
+  SQUADRON_REFUEL_SOLO_MIGRATION,
   ORBITAL_TIME_ORDER_SOLO_MIGRATION,
 ];
 

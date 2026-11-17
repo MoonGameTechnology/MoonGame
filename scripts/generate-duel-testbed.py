@@ -190,7 +190,7 @@ for sid, p in P.items():
     sectors[sid] = sec
 
 m = collections.OrderedDict([
-    ('id', 'duel-testbed'), ('seed', 'duel-testbed'), ('time', 0),
+    ('id', 'duel-testbed'), ('seed', 'duel-testbed'), ('edge', 'hull'), ('time', 0),
     ('sectors', sectors),
     ('players', collections.OrderedDict([
         ('pirates', {'name': 'Pirate Base', 'faction': 'pirates', 'npc': 'pirate',

@@ -41,7 +41,7 @@ const data: GameData = parseGameData({
       faction: 'x',
       domain: 'space',
       traits: ['shuttle'],
-      stats: { attack: 14, defense: 3, speed: 14, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2 },
+      stats: { attack: 14, defense: 3, speed: 14, hp: 10, strikeRange: 180 },
     },
     hero: {
       faction: 'x',

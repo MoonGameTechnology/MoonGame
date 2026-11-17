@@ -8,6 +8,7 @@ import { isForkSite } from './forkSite';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { laneIsPublic } from './corridor';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
+import { hideSquadronPlans } from './shuttle';
 import { emptyOrdnance, inRadius, isMissileFleet, rocketMineModule } from './ordnance';
 import { cloakedReach, eyeReach, fleetCloak } from './cloak';
 import { fleetSightBonus } from './fleetSight';
@@ -1294,8 +1295,8 @@ function project(
       if (!queueSpied) delete planet.buildQueue;
       // SHU-6.6. «Держать патруль» — постоянный приказ эскадры, то же намерение, что
       // цепочки и авто-штурм: точка, где хозяин снова встанет кругом, — разведка планов.
-      // Ангар опознанного мира виден, флаг удержания в нём — нет.
-      for (const squad of planet.hangar ?? []) delete squad.hold;
+      // Ангар опознанного мира виден, флаг удержания и срок заправки в нём — нет.
+      for (const squad of planet.hangar ?? []) hideSquadronPlans(squad);
       // FOG-9. Приостановленная стройка — то же НАМЕРЕНИЕ, только с паузой: вид, уровень
       // и остаток цены рассказывают, что хозяин собирался тут поставить и сколько уже
       // вложил. Резалось всё вокруг (`scheduled`, цепочки приказов, очередь), а это
@@ -1465,7 +1466,7 @@ function project(
   // показывают ангар, но не планы.
   for (const fleet of Object.values(view.fleets)) {
     if (fleet.owner === viewerId) continue;
-    for (const squad of fleet.hangar ?? []) delete squad.hold;
+    for (const squad of fleet.hangar ?? []) hideSquadronPlans(squad);
     // Счётчик вылетов носителя — как у порта выше: по нему читался бы скрытый удар.
     delete fleet.sortie;
     // Маршрут чужого флота — тоже намерение, как цепочки приказов: виден текущий участок

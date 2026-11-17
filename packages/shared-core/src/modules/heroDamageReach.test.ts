@@ -67,7 +67,6 @@ const data: GameData = parseGameData({
         speed: 120,
         hp: 300,
         shuttleDamage: 30,
-        fuel: 3,
         strikeRange: 500,
       },
       line: 'front',

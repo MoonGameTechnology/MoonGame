@@ -59,6 +59,7 @@ import {
   squadronFerryRange,
   squadronReach,
   stacksSize,
+  squadronRefueling,
 } from '../../state/shuttle';
 import { hookedDamage, isHostile, mitigationFactor, ownFleet } from '../../util/combat';
 import { isForkSite } from '../../state/forkSite';
@@ -85,8 +86,8 @@ const HOLD_RETRY_HOURS = 1;
  *    там, где хост их крутил. Удержание — событие расписания: та же партия даёт тот же
  *    патруль на любом хосте и в реплее.
  * 2. **Проверки — те же, что у приказа** (`baseBlock`, `squadronReady`, `patrolCheck`).
- * 3. **Ждут только того, что пройдёт само.** Конец перезарядки известен — будим ровно
- *    тогда. Бой корабля и подбитый порт кончатся неизвестно когда — пробуем раз в час.
+ * 3. **Ждут только того, что пройдёт само.** Конец заправки эскадры известен — будим
+ *    ровно тогда. Бой корабля и подбитый порт кончатся неизвестно когда — пробуем раз в час.
  *    Остальное само не пройдёт (состав больше не висит, точка вне радиуса), и удержание
  *    снимается громко, событием `shuttle.hold.ended`, а не будит мир вечно.
  * 4. **Точка у мира прежняя, у корабля — над ним самим.** Корабль ходит, и точка,
@@ -103,7 +104,7 @@ export function resumeHold(h: HandlerContext, owner: string, squadronId: string)
   const ref = base.ref;
   const hold = squad.hold;
   const notNow = (why: string): void => {
-    const wait = holdWait(h, base, why);
+    const wait = holdWait(h, squad, why);
     if (wait !== null) {
       h.schedule(h.ctx.now + wait, 'shuttle.patrol.resume', { owner, squadronId });
       return;
@@ -137,15 +138,14 @@ function squadronHome(h: HandlerContext, owner: string, squadronId: string): Bas
 
 /** Сколько ждать до следующей попытки поднять удерживаемый патруль — или `null`, если
  *  помеха сама не пройдёт (правило 3 `resumeHold`). */
-function holdWait(h: HandlerContext, base: BaseView, why: string): number | null {
-  const hour = hourMs(h);
+function holdWait(h: HandlerContext, squad: Squadron, why: string): number | null {
   if (why === 'E_FLEET_BUSY' || why === 'E_PORT_DAMAGED') {
-    return Math.max(1, Math.round(HOLD_RETRY_HOURS * hour));
+    return Math.max(1, Math.round(HOLD_RETRY_HOURS * hourMs(h)));
   }
-  if (why !== 'E_NO_FUEL' || !base.sortie || base.sortie.rearming <= 0) return null;
-  // Перезарядка кончится, когда отстоит свои часы целиком: остаток сверх целых часов уже
-  // накоплен (`carry`), поэтому срок не зависит от того, как хост нарезал время.
-  return Math.max(1, Math.ceil(base.sortie.rearming * hour - (base.sortie.carry ?? 0)));
+  // Конец заправки известен — будим ровно тогда.
+  if (why === 'E_REFUELING' && squad.readyAt !== undefined)
+    return Math.max(1, squad.readyAt - h.ctx.now);
+  return null;
 }
 
 /**
@@ -624,7 +624,13 @@ export function mergeSquadrons(action: { playerId: string; payload: unknown }, h
   const into = requireSquadron(h, base, p.intoId);
   // Ракеты с челноками в одну эскадру не сводятся: такую эскадру нельзя было бы ни поднять,
   // ни пустить (решение владельца 2026-11-09).
-  if (hasMissiles(from, h.ctx.data) !== hasMissiles(into, h.ctx.data)) return h.reject('E_MISSILE_SQUADRON');
+  if (hasMissiles(from, h.ctx.data) !== hasMissiles(into, h.ctx.data))
+    return h.reject('E_MISSILE_SQUADRON');
+  // Заправляющаяся с готовой не сливается — только когда готовы обе (решение владельца
+  // 2026-11-17): иначе слияние обнуляло бы заправку или задерживало готовую.
+  if (squadronRefueling(from, h.ctx.now) || squadronRefueling(into, h.ctx.now)) {
+    return h.reject('E_REFUELING');
+  }
 
   const units = into.units.map((st) => ({ ...st }));
   for (const st of from.units) addUnits(units, st.unit, st.count, st.modules, st.moduleStars, st.moduleRarity);

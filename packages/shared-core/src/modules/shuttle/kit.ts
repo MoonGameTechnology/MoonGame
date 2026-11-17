@@ -13,12 +13,10 @@ import type { HandlerContext } from '../../kernel/module';
 import type { HookedDamage } from '../../util/combat';
 import { MS_PER_HOUR } from '../../util/time';
 import {
-  type SortieState,
   fleetShuttleBay,
-  hangarMachines,
-  isMissileStack,
   portDisabled,
   shuttleBayAt,
+  squadronRefuelMinutes,
 } from '../../state/shuttle';
 import { addUnits, cappedUnitStat } from '../../util/stacks';
 import { basePosition, strikePosition } from '../../state/strikePosition';
@@ -109,9 +107,6 @@ export interface BaseView {
   disabled: boolean;
   hangar: Squadron[];
   setHangar: (next: Squadron[]) => void;
-  sortie: SortieState | undefined;
-  /** `undefined` снимает счётчик: следующий вылет начнёт со свежего запаса. */
-  setSortie: (next: SortieState | undefined) => void;
 }
 
 export function planetBase(planet: Planet, data: GameData): BaseView {
@@ -124,11 +119,6 @@ export function planetBase(planet: Planet, data: GameData): BaseView {
     hangar: planet.hangar ?? [],
     setHangar: (next) => {
       planet.hangar = next;
-    },
-    sortie: planet.sortie,
-    setSortie: (next) => {
-      if (next) planet.sortie = next;
-      else delete planet.sortie;
     },
   };
 }
@@ -143,11 +133,6 @@ export function fleetBase(fleet: Fleet, state: GameState, data: GameData, now: n
     hangar: fleet.hangar ?? [],
     setHangar: (next) => {
       fleet.hangar = next;
-    },
-    sortie: fleet.sortie,
-    setSortie: (next) => {
-      if (next) fleet.sortie = next;
-      else delete fleet.sortie;
     },
   };
 }
@@ -171,35 +156,6 @@ export function baseOf(
   }
   const fleet = state.fleets[ref.id];
   return fleet ? fleetBase(fleet, state, data, now) : null;
-}
-
-/**
- * Топливо и перезарядка базы берутся у ЧЕЛНОКОВ ЭТОЙ БАЗЫ (первая машина): счётчик
- * принадлежит базе, а числа — машине.
- *
- * «Свои машины» — и те, что стоят в ангаре, И ТЕ, ЧТО СЕЙЧАС В ВОЗДУХЕ. Разница не
- * косметическая: пустой ангар давал `maxFuel: 0`, а `tickRearm` по окончании отсчёта
- * «заправляет» базу ровно на эту величину — то есть в ноль. Порт, поднявший всё, что у
- * него было, оставался сухим НАВСЕГДА: топлива нет, перезарядка кончилась, вылет уже
- * никогда не разрешится. До SHU-4.2 в это упирались редко (поднимали часть машин), а с
- * эскадрой вылет уходит соединением целиком — и редкий случай стал обычным.
- */
-export function baseSortieSpec(
-  base: BaseView,
-  state: GameState,
-  data: GameData,
-): { maxFuel: number; rearmRounds: number } {
-  const away = (state.strikes ?? []).find(
-    (s) => s.base.kind === base.ref.kind && s.base.id === base.ref.id,
-  );
-  const st =
-    hangarMachines({ hangar: base.hangar }).find((u) => !isMissileStack(u, data)) ??
-    away?.units.find((u) => u.count > 0);
-  const stats = st ? data.units[st.unit]?.stats : undefined;
-  return {
-    maxFuel: Math.max(0, Math.floor(stats?.fuel ?? 0)),
-    rearmRounds: Math.max(0, Math.floor(stats?.rearmRounds ?? 0)),
-  };
 }
 
 /** Убрать `amount` машин из вылета (сбитые зональным ПВО или перехватом), с хвоста. Пустой вылет исчезает. */
@@ -311,6 +267,15 @@ export function flightOf(h: HandlerContext, payload: unknown): ShuttleStrike | n
 /** Один игровой час в миллисекундах мира — с учётом ускорения времени матча. */
 export function hourMs(h: HandlerContext): number {
   return MS_PER_HOUR * timeScaleOf(h.ctx);
+}
+
+/** Срок заправки машин `units`, севших или отработавших прямо сейчас: `{ readyAt }` для
+ *  эскадры или пусто, если заправка им не нужна (решение владельца 2026-11-17). */
+export function refuelUntil(h: HandlerContext, units: readonly UnitStack[]): { readyAt?: number } {
+  const minutes = squadronRefuelMinutes(units, h.ctx.data);
+  return minutes > 0
+    ? { readyAt: h.ctx.now + Math.max(1, Math.round((minutes / 60) * hourMs(h))) }
+    : {};
 }
 
 /** Снять `count` челноков `unit` из ангара. */

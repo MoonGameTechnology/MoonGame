@@ -42,9 +42,10 @@ import { laneOfSection, sectionForLane, type ProductionLane, type ProductionSect
 import { buildScreenHtml, type BuildCategory } from './buildScreen';
 import { splitSupport } from '../../decisions/supportShips';
 import { moduleGroups } from '../../decisions/moduleGroups';
-import type { SlotCallout } from '../../decisions/slotCallouts';
+import { slotCallouts, type SlotCallout } from '../../decisions/slotCallouts';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
 import { effectChip, STAT_KEY } from './moduleEffect';
+import { fitStripHtml, swapChipsHtml } from './productionFitStats';
 import {
   effectiveStats,
   matchCost,
@@ -64,7 +65,7 @@ import { hoursLeft, unitLaneOrders } from './buildProgress';
 import { HOUR } from './time';
 import { motionOn } from './graphicsPrefs';
 import { unitIconHtml } from './icons';
-import { catalogPortraitHtml } from './shipArt';
+import { catalogPortraitHtml, portraitArt } from './shipArt';
 import { SECTOR_TYPES } from './map';
 import { worldName } from './planetName';
 import { productionWorldSelect } from './productionWorldPicker';
@@ -293,16 +294,17 @@ export function loadoutPaneHtml(
   if (!ed.ok) return `<div class="cn-soon">${t('yard.hull.unavailable')}</div>`;
   const m: LoadoutModel = ed;
   const hulls = [...ownedHulls].sort((a,b) => data.units[a]!.buildTimeHours - data.units[b]!.buildTimeHours || a.localeCompare(b)).map(h => productionCatalogTile(state, me, draft.planet, h, draft.hull)).join('');
-  // Открытый отсек (шаг 3 переделки окна): справа — его модули, а не весь каталог.
+  // Открытый отсек — его модули рядом. Отсеки — квадраты на выносках к точкам корпуса (макет
+  // владельца 2026-11-17); нет точек у арта — плитками под ним.
   const sel = selectedBay(m.slots, draft.slot);
   const portrait = catalogPortraitHtml('u', draft.hull, data);
-  const art = portrait ? `<div class="cn-art">${portrait}</div>` : '';
+  const callouts = portrait ? slotCallouts(portraitArt('u', draft.hull, data)?.key, m.slots) : null;
+  const art = portrait ? `<div class="cn-art">${portrait}${callouts ? slotLayerHtml(m.slots, callouts, sel, undefined, (sl) => `data-cnrm="${sl.moduleId}"`) : ''}</div>` : '';
   const slotsLine = slotCountText(m.slots);
   const hullCard =
     `<div class="cn-hull${portrait ? ' with-art' : ''}">${art}<div class="cn-hull-info"><div class="cn-hic">${unitIconHtml(draft.hull, data, view.youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(draft.hull))}</div>` +
     `${slotsLine ? `<div class="cn-hm">${slotsLine}</div>` : ''}</div></div></div>`;
-  // Строка отсека открывает его, как плитка на арте; снять модуль — крестиком у открытой
-  // плитки, а у корпуса без арта с плитками — кнопкой над модулями отсека.
+  // Отсеки плитками (арт без точек): плитка открывает отсек, крестик снимает модуль.
   const bays = m.slots
     .map((sl, i) => {
       const on = i === sel ? ' sel' : '';
@@ -327,14 +329,13 @@ export function loadoutPaneHtml(
       );
     })
     .join('');
+  // Плитка показывает, что станет с ЭТИМ кораблём (замена в занятом отсеке — с минусами).
+  const swap = (id: string) => swapChipsHtml(data.units[m.unit]!, m.modules, m.slots[sel]?.moduleId, id, boosts, data);
   const paletteCard = (o: LoadoutModel['palette'][number]): string => {
-    const eff = Object.entries(o.effect)
-      .map(([k, v]) => effectChip(k, v))
-      .join(' ');
     if (o.installable) {
       return (
         `<button class="cn-mod r-${o.rarity}${o.id === m.slots[sel]?.moduleId ? ' on' : ''}" data-cnmod="${o.id}" aria-pressed="${o.id === m.slots[sel]?.moduleId}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
-        `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span>${moduleGradeHtml(o.rarity, o.star)}<span class="cn-me">${eff}</span><span class="cn-mc">${priceHtml(o.cost)}</span></button>`
+        `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span>${moduleGradeHtml(o.rarity, o.star)}<span class="cn-me">${swap(o.id)}</span><span class="cn-mc">${priceHtml(o.cost)}</span></button>`
       );
     }
     // Причина берётся из КОДА отказа ядра, а не гадается: «нет слота» и «не для
@@ -442,11 +443,10 @@ export function loadoutPaneHtml(
     `<details class="cn-side pw-fit-stats"><summary>${t('yard.stats')}</summary>${bars}${damage}` +
     (m.hasSlots ? `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div>` : '') +
     `</details>${troopRow}`;
-  // Раскладка (шаг 3): на ПК три колонки — корпуса, корабль с характеристиками, модули
-  // отсека; на телефоне одна колонка в том же порядке, модули сразу под артом. Корпус без
-  // отсеков — без колонки модулей.
-  const card = `<div class="cn-card${m.hasSlots ? ' with-tiles' : ''}">${hullCard}<div class="pw-bays">${bays}</div></div>`;
-  const slotCol = panel ? `<div class="cn-slot">${panel}</div>` : '';
+  // Окно оснащения: широкое — корабль слева, характеристики и модули отсека справа; телефон —
+  // колонкой, характеристики прямо над модулями. Корпус без отсеков — без колонки модулей.
+  const card = `<div class="cn-card${m.hasSlots ? ' with-tiles' : ''}">${hullCard}<div class="pw-bays">${callouts ? '' : bays}</div></div>`;
+  const slotCol = panel ? `<div class="pw-fit-side">${fitStripHtml(m.preview)}<div class="cn-slot">${panel}</div></div>` : '';
   return `<div class="cn-grid ${data.units[draft.hull]?.domain === 'ground' ? 'pw-ground' : ''} ${slotCol ? 'cn-g3' : 'cn-g2'}"><div class="cn-hulls">${productionCatalogHeading(view.section)}${hulls}</div>${fittingSheet(card + slotCol + stats, displayUnit(draft.hull), hullDef?.domain === 'ground')}</div>`;
 }
 
@@ -499,9 +499,9 @@ export function slotLayerHtml(
   // по которым хозяин ловит клик. Не задан — крестика нет.
   remove?: (sl: LoadoutModel['slots'][number]) => string,
 ): string {
-  // Плитка не вылезает за картинку: центр не ближе половины плитки к краю.
+  // Плитка не вылезает за картинку, а крестик в её углу — за верх: центр не ближе 34px к верху.
   const at = ([x, y]: readonly [number, number]): string =>
-    `left:clamp(22px,${x}%,calc(100% - 22px));top:clamp(22px,${y}%,calc(100% - 22px))`;
+    `left:clamp(22px,${x}%,calc(100% - 22px));top:clamp(34px,${y}%,calc(100% - 22px))`;
   const lines = callouts
     .map((c) => `<line x1="${c.a[0]}%" y1="${c.a[1]}%" x2="${c.t[0]}%" y2="${c.t[1]}%"/>`)
     .join('');

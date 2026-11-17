@@ -207,7 +207,7 @@ for sid, (x, y, kind, terrain, owner, garr, blds) in P.items():
     sectors[sid] = sec
 
 m = collections.OrderedDict([
-    ('id', 'pve-4'), ('seed', 'pve-4'), ('time', 0), ('mode', 'pve_waves'),
+    ('id', 'pve-4'), ('seed', 'pve-4'), ('edge', 'hull'), ('time', 0), ('mode', 'pve_waves'),
     ('sectors', sectors),
     ('objectives', OBJECTIVES),
     ('objectiveSlots', OBJECTIVE_SLOTS),
