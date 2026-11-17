@@ -3854,6 +3854,12 @@ export const en: Record<string, string> = {
   'news.title': 'News',
   'news.when.yesterday': 'yesterday, {time}',
   // --- hub — Хаб (экран между матчами): шапка, карточки, плитки «Ещё», нижняя навигация.
+  'hub.ad-preview.action': 'Check ads',
+  'hub.ad-preview.cancelled': 'Viewing cancelled',
+  'hub.ad-preview.earned': 'Viewing completed',
+  'hub.ad-preview.hint': 'Watch without an in-game reward',
+  'hub.ad-preview.loading': 'Loading ad…',
+  'hub.ad-preview.unavailable': 'Ad unavailable. Try again later.',
   'hub.ally.corp': 'Corporation cabinet',
   'hub.avatar.title': 'Customize portrait and medals',
   'hub.back-to-bots': '⟳ Back to setup',
