@@ -152,7 +152,7 @@ describe('окно «Шпионаж»', () => {
           { id: 3, state: 'recruit', location: 'cap', arrivesAt: now + 3000 },
         ],
       },
-    } as GameState;
+    } as unknown as GameState;
     el('rail-spy').click();
     const html = el('spywin').innerHTML;
     expect(html).toContain(t('spy.win.free', { n: 1, m: 3 }));
