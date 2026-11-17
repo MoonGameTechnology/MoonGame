@@ -1,6 +1,7 @@
 {
   "id": "ffa-50",
   "seed": "fifty-suns-square-5",
+  "edge": "hull",
   "sectors": {
     "home_1": {
       "position": {

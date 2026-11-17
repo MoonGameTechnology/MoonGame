@@ -1,6 +1,7 @@
 {
   "id": "ffa-20",
   "seed": "twenty-lights-20261015",
+  "edge": "hull",
   "sectors": {
     "home_1": {
       "position": {

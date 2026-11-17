@@ -4,12 +4,15 @@ import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 import {
+  BOUNDARY,
   loadGameData,
   matchMapEdges,
-  mosaicBorderSegments,
   mosaicBorders,
+  mosaicClip,
   parseMatchMap,
+  SEED_WEIGHT,
 } from '../../packages/shared-core/src/index';
+import { computePowerCells } from '../../packages/client/src/territory';
 
 import {
   CLIP_PAD_MIN,
@@ -206,28 +209,63 @@ describe('СТОРОЖ: рендер рисует ту же мозаику, чт
 // Карта 50 мест — круглая. С прямоугольной рамкой её крайние провинции уходили в пустые
 // углы длинными клиньями, а их границы — длинными параллельными линиями через пустоту
 // (жалоба владельца 2026-11-09). Карта кончается по своему ободу (`edge: 'hull'`).
-describe('большая FFA — квадратное поле, заполненное до углов', () => {
+describe('край карты — по контуру провинций, без растянутых крайних (владелец 2026-11-17)', () => {
   const root = path.resolve(__dirname, '..', '..');
   const read = (id: string) =>
     parseMatchMap(JSON.parse(readFileSync(path.join(root, 'data', 'maps', `${id}.json`), 'utf8')));
-  const map = read('ffa-50');
-  const seeds = Object.keys(map.sectors)
-    .sort()
-    .map((id) => ({ id, ...map.sectors[id]!.position, size: map.sectors[id]!.size }));
+  const ids = readdirSync(path.join(root, 'data', 'maps'))
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => f.slice(0, -5));
+  /** Где край ещё рамка: главы, чьи проходы выверены под сюжет и волны (глава VI прячет
+   *  дрейф за внешней станцией, глава I — путь роя), и выведенные из пула малые карты AvA,
+   *  на которых доигрываются начатые бои. Контур передвинул бы их проходы и дороги. */
+  const FRAMED = ['pve-1', 'pve-2', 'pve-5', 'pve-6', 'ava-2v2-1', 'ava-duel-1'];
+  const seedsOf = (id: string) => {
+    const map = read(id);
+    return Object.keys(map.sectors)
+      .sort()
+      .map((k) => ({ id: k, ...map.sectors[k]!.position, size: map.sectors[k]!.size ?? 1 }));
+  };
+  /** Площадь каждой клетки, доля медианной, и стоит ли клетка на краю карты. */
+  const cellsOf = (id: string) => {
+    const seeds = seedsOf(id);
+    const cells = computePowerCells(
+      seeds.map((s) => ({ x: s.x, y: s.y, w: s.size * SEED_WEIGHT, owner: null, kind: '' })),
+      mosaicClip(seeds, read(id).edge),
+    );
+    const area = (poly: Array<[number, number]>): number =>
+      Math.abs(
+        poly.reduce((sum, [x, y], k) => {
+          const [nx, ny] = poly[(k + 1) % poly.length]!;
+          return sum + x * ny - nx * y;
+        }, 0),
+      ) / 2;
+    const areas = cells.map((c) => area(c.poly));
+    const median = [...areas].sort((a, b) => a - b)[areas.length >> 1]!;
+    return cells.map((c, k) => ({
+      id: seeds[c.idx]!.id,
+      share: areas[k]! / median,
+      rim: c.tags.includes(BOUNDARY),
+    }));
+  };
 
-  it('ffa-50 режется рамкой, и ни одна граница не длиннее пяти обычных', () => {
-    expect(map.edge).toBeUndefined();
-    const lengths = mosaicBorderSegments(seeds, map.edge)
-      .map((b) => b.length)
-      .sort((a, b) => a - b);
-    const median = lengths[lengths.length >> 1]!;
-    // У круглой галактики в рамке самая длинная граница была 4630 при медиане 348 (×13).
-    // У квадрата самые длинные — у угловых провинций: рамка отстоит от крайних центров на
-    // поле `mosaicFrame` (5% ширины), они чуть глубже прочих, но не клинья (×4.4).
-    expect(lengths.at(-1)!).toBeLessThan(median * 5);
+  it('каждая карта, кроме четырёх глав и двух старых карт AvA, кончается по контуру', () => {
+    for (const id of ids) expect(read(id).edge, id).toBe(FRAMED.includes(id) ? undefined : 'hull');
   });
 
-  it('в каждом углу поля стоит провинция', () => {
+  it('крайняя провинция не больше двух с половиной обычных — ни на одной карте', () => {
+    // С рамкой на 5% ширины крайние клетки ffa-50 были до ×6.9 медианной, ffa-20 — до ×19,
+    // командных карт — до ×4–5: рамка отстоит от крайних центров на сотни единиц.
+    for (const id of ids) {
+      const worst = cellsOf(id)
+        .filter((c) => c.rim)
+        .reduce((a, b) => (b.share > a.share ? b : a));
+      expect(worst.share, `${id}: ${worst.id}`).toBeLessThan(2.6);
+    }
+  });
+
+  it('ffa-50 остаётся квадратом, заполненным до углов', () => {
+    const seeds = seedsOf('ffa-50');
     const xs = seeds.map((s) => s.x),
       ys = seeds.map((s) => s.y);
     const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
@@ -239,15 +277,17 @@ describe('большая FFA — квадратное поле, заполнен
       [x1, y1],
     ])
       expect(seeds.some((s) => Math.hypot(s.x - cx!, s.y - cy!) < reach)).toBe(true);
+    // Контур квадрата — почти сам квадрат: углы срезаны лишь отступом.
+    const outline = mosaicClip(seeds, 'hull');
+    const ox = outline.map(([x]) => x),
+      oy = outline.map(([, y]) => y);
+    expect(Math.max(...ox) - Math.min(...ox)).toBeGreaterThan(x1 - x0);
+    expect(Math.max(...oy) - Math.min(...oy)).toBeGreaterThan(y1 - y0);
   });
 
-  it('новая партия на ffa-50 и старые карты остаются с рамкой', () => {
+  it('новая партия на ffa-50 и на дуэли берёт контур', () => {
     // Через настоящую сборку партии прототипа — тот же путь, что у игрока.
-    expect(
-      newGame({ mapId: 'ffa-50', seats: networkSeats('ffa', 'ffa-50') }).mapEdge,
-    ).toBeUndefined();
-    expect(
-      newGame({ mapId: 'duel-1', seats: networkSeats('ffa', 'duel-1') }).mapEdge,
-    ).toBeUndefined();
+    expect(newGame({ mapId: 'ffa-50', seats: networkSeats('ffa', 'ffa-50') }).mapEdge).toBe('hull');
+    expect(newGame({ mapId: 'duel-1', seats: networkSeats('ffa', 'duel-1') }).mapEdge).toBe('hull');
   });
 });

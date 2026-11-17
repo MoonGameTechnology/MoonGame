@@ -250,7 +250,7 @@ for sid, p in P.items():
     sectors[sid] = sec
 
 m = collections.OrderedDict([
-    ('id', 'proving-ground'), ('seed', 'proving-ground'), ('time', 0),
+    ('id', 'proving-ground'), ('seed', 'proving-ground'), ('edge', 'hull'), ('time', 0),
     ('sectors', sectors),
     ('regions', [{'id': name, 'sectors': ids} for name, ids in REGION_SECTORS.items()]),
     ('players', collections.OrderedDict([
