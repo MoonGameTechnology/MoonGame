@@ -880,6 +880,10 @@ describe('эскадра в воздухе', () => {
     );
     expect(subLine(held)).toMatch(new RegExp(`^${t('side.aloft.order.patrol')} · <span class="pn-timer"`));
     expect(held).toContain(`${order('wingkeep', 'P2')} title="${t('cmd.wing.keep')}" aria-pressed="true"`);
+    // Правило целей (SHU-6.18) — тоже переключатель: по умолчанию погашен.
+    expect(out).toContain(`${order('wingradar', 'P1')} title="${t('cmd.wing.radar')}" aria-pressed="false"`);
+    const radar = m.aloftPanelHtml(strike('P3', { target: { kind: 'point' }, patrol: { ...patrol, radar: true } }));
+    expect(radar).toContain(`${order('wingradar', 'P3')} title="${t('cmd.wing.radar')}" aria-pressed="true"`);
   });
 
   it('повернувшая домой: строка о возврате, бить и отзывать нечего', async () => {

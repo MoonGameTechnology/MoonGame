@@ -775,14 +775,28 @@ export const ORBITAL_TIME_ORDER_SOLO_MIGRATION = {
   toDataHash: SQUADRON_REFUEL_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: shuttle 2.2.0 — a patrol dives on a target in its circle with a full
+ *  strike and flies home to refuel; `patrol.radar` picks any radar blip over identified
+ *  targets only; a held patrol that dove keeps its point in `rejoin`; the patrol circle is a
+ *  radar, not eyes (SHU-6.18). The catalogue is unchanged and so is the saved shape: a saved
+ *  patrol has no `radar` and reads as «identified only», the owner's default. */
+export const PATROL_DIVE_SOLO_MIGRATION = {
+  fromRules: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toRules,
+  fromData: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toData,
+  fromDataHash: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toDataHash,
+  toRules: '00a22acf381e46',
+  toData: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toData,
+  toDataHash: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** Data 0.1.88: a new province kind, the star, and its six classes (owner 2026-11-17: a
  *  star stands in its own province with a ring its class makes). A saved world keeps its map
  *  and provinces: stars only appear in new matches. */
 export const STAR_PROVINCE_SOLO_MIGRATION = {
-  fromRules: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toRules,
-  fromData: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toData,
-  fromDataHash: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toDataHash,
-  toRules: '023a29acab842b',
+  fromRules: PATROL_DIVE_SOLO_MIGRATION.toRules,
+  fromData: PATROL_DIVE_SOLO_MIGRATION.toData,
+  fromDataHash: PATROL_DIVE_SOLO_MIGRATION.toDataHash,
+  toRules: '092a2fe87e2178',
   toData: '0.1.88',
   toDataHash: '1dc3f007dd5f9e',
 } as const;
@@ -854,6 +868,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   CAPTIVE_CARRIER_SOLO_MIGRATION,
   SQUADRON_REFUEL_SOLO_MIGRATION,
   ORBITAL_TIME_ORDER_SOLO_MIGRATION,
+  PATROL_DIVE_SOLO_MIGRATION,
   STAR_PROVINCE_SOLO_MIGRATION,
 ];
 

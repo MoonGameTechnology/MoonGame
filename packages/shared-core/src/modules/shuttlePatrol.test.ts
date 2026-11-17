@@ -1,11 +1,12 @@
 /**
- * ПАТРУЛЬ В ТОЧКЕ (SHU-6.2) — приёмка кирпича.
+ * ПАТРУЛЬ В ТОЧКЕ (SHU-6.2) — приёмка кирпича; бросок на цель — SHU-6.18.
  *
  * Резолюция владельца 2026-10-04 (`shuttles-roadmap.md` §0.7, по образцу Conflict of
- * Nations): эскадра летит к точке как на удар, висит над ней `patrolHours` и каждые 15
- * минут бьёт ОДНУ ближайшую враждебную цель в круге `patrolRadius` — флот, стоящий или
- * идущий мимо, или чужой вылет. За час патруль бьёт ровно как один удар, и цель огрызается
- * той же долей. Время вышло — домой; `shuttle.recall` возвращает раньше.
+ * Nations): эскадра летит к точке как на удар и висит над ней `patrolHours`, раз в 15
+ * минут осматривая круг `patrolRadius`. С SHU-6.18 (резолюция владельца 2026-11-17):
+ * нашлась враждебная цель — флот, стоящий или идущий мимо, или чужой вылет, — эскадра
+ * бросается на ближайшую полным ударом, как удар приказом, и летит домой на заправку.
+ * Время вышло — домой; `shuttle.recall` возвращает раньше.
  *
  * База — обе её формы (уточнение владельца: «учти наши базы, в виде трюмов»): мир с портом
  * и любой корабль с трюмом, в том числе идущий. Домой патруль летит на ЖИВУЮ позицию
@@ -38,7 +39,7 @@ const data: GameData = parseGameData({
     freighter: { faction: 'x', stats: { attack: 0, defense: 0, speed: 10, hp: 100 } },
     // Цель с пушками: огрызается долей своего огня (ROS-2.2) — 40 × 5% = 2 за удар.
     cruiser: { faction: 'x', stats: { attack: 40, defense: 5, speed: 10, hp: 100 } },
-    // Огрызается так, что патруль не переживает третьего тика.
+    // Огрызается так, что бросившийся патруль не переживает своего удара.
     dreadnought: { faction: 'x', stats: { attack: 1000, defense: 5, speed: 10, hp: 10000 } },
     // Зональное ПВО корабля: бьёт вылеты в радиусе 120 (`PD_RANGE`).
     picket: { faction: 'x', stats: { attack: 0, defense: 5, speed: 10, hp: 100, pointDefense: 2 } },
@@ -295,7 +296,8 @@ describe('SHU-6.2 — приказ патруля', () => {
 describe('SHU-6.2 — приёмка кирпича', () => {
   it('ПЕРЕХВАТЧИК В ПАТРУЛЕ БЬЁТ ЧУЖОЙ УДАР, ПРОХОДЯЩИЙ ЧЕРЕЗ КРУГ', () => {
     // Патруль в точке с 1,5 ч. Налёт уходит в 0,9 ч и дошёл бы до B в 2,7 ч; в круге он с
-    // 2 ч, и три тика по 11 (2 × 22 × ¼) сбивают оба корпуса по 16 раньше цели.
+    // 2 ч, и тик 2,0 бьёт его полным залпом 44 (2 × 22): оба корпуса по 16 сбиты раньше цели,
+    // а патруль летит домой (SHU-6.18).
     let s = apply(withRaid(world([sq('sq:i', 'interceptor', 2)])), patrol('sq:i'));
     const patrolId = patrolOf(s)!.id;
     s = apply(until(s, 0.9), raid());
@@ -308,7 +310,9 @@ describe('SHU-6.2 — приёмка кирпича', () => {
     ).toBe(true);
     expect(shots.reduce((n, p) => n + (p.downed as number), 0)).toBe(2);
     expect(payloads(events, 'shuttle.hit').filter((p) => p.targetId === 'B')).toHaveLength(0);
+    expect(shots).toHaveLength(1); // один залп — и домой
     expect(state.strikes?.map((st) => st.id)).toEqual([patrolId]); // налёта больше нет
+    expect(patrolOf(state)?.leg).toBe('back');
     expect(machines(patrolOf(state)?.units)).toBe(2); // и вылет не огрызается
   });
 
@@ -319,13 +323,14 @@ describe('SHU-6.2 — приёмка кирпича', () => {
     ).toHaveLength(1);
   });
 
-  it('СТРАЙКЕР В ПАТРУЛЕ БЬЁТ ФЛОТ, ИДУЩИЙ МИМО ПО ЛИНИИ', () => {
+  it('СТРАЙКЕР В ПАТРУЛЕ БРОСАЕТСЯ НА ФЛОТ, ИДУЩИЙ МИМО ПО ЛИНИИ, — один полный удар', () => {
     const s = passingConvoy();
     const { state, events } = run(apply(s, patrol('sq:b')), 6);
-    // В круге конвой с 0,8 по 3,2 ч; патруль висит с 1,5 ч. Тики 1,75 … 3,0 — шесть
-    // ударов по 10 (2 × 20 × ¼), дальше конвой ушёл из круга и больше не задет.
-    expect(payloads(events, 'shuttle.hit').filter((p) => p.targetId === 'E1')).toHaveLength(6);
-    expect(hullOf(state, 'E1')).toBe(40);
+    // В круге конвой с 0,8 по 3,2 ч; патруль висит с 1,5 ч. Первый тик 1,75 застаёт конвой в
+    // 12,5 от точки: бросок погоней и удар 40 (2 × 20), а дальше эскадра летит домой.
+    expect(payloads(events, 'shuttle.hit').filter((p) => p.targetId === 'E1')).toHaveLength(1);
+    expect(hullOf(state, 'E1')).toBe(60);
+    expect(ashore(state)).toBe(2);
   });
 
   it('УДАР НАЗЫВАЕТ ЖЕРТВУ КЛЮЧАМИ АУДИТОРИИ — иначе сервер не донёс бы его до неё', () => {
@@ -413,15 +418,16 @@ function passingConvoy(): GameState {
 }
 
 describe('SHU-6.2 — тик патруля', () => {
-  it('ОДНА ЦЕЛЬ ЗА ТИК — БЛИЖАЙШАЯ К ТОЧКЕ', () => {
+  it('ЦЕЛЬ — БЛИЖАЙШАЯ К ТОЧКЕ: бросок на неё, дальняя цела', () => {
     let s = withFleet(world([sq('sq:b', 'bomber', 2)]), 'E1', 'freighter', { x: 150, y: 10 });
     s = withFleet(s, 'E2', 'freighter', { x: 150, y: 40 });
-    const after = until(apply(s, patrol('sq:b')), 1.75); // первый тик
-    expect(hullOf(after, 'E1')).toBe(90);
+    const after = until(apply(s, patrol('sq:b')), 2); // тик 1,75 — бросок, удар в 1,85
+    expect(hullOf(after, 'E1')).toBe(60);
     expect(hullOf(after, 'E2')).toBeUndefined(); // цел
+    expect((after.strikes ?? [])[0]?.leg).toBe('back');
   });
 
-  it('ЗА ЧАС ПАТРУЛЬ БЬЁТ РОВНО КАК ОДИН УДАР, тик — четверть удара', () => {
+  it('БРОСОК — ПОЛНЫЙ УДАР, ровно как удар приказом, и следующих тиков нет', () => {
     const s = withFleet(world([sq('sq:b', 'bomber', 2)]), 'E1', 'freighter', P);
     const struck = until(
       apply(s, act('shuttle.strike', { planetId: 'A', squadronId: 'sq:b', targetFleetId: 'E1' })),
@@ -431,11 +437,11 @@ describe('SHU-6.2 — тик патруля', () => {
     expect(blow).toBeGreaterThan(0);
 
     const patrolled = apply(s, patrol('sq:b'));
-    expect(100 - hullOf(until(patrolled, 1.75), 'E1')!).toBeCloseTo(blow / 4);
-    expect(100 - hullOf(until(patrolled, 2.5), 'E1')!).toBeCloseTo(blow); // четыре тика
+    expect(100 - hullOf(until(patrolled, 2), 'E1')!).toBeCloseTo(blow);
+    expect(100 - hullOf(until(patrolled, 5), 'E1')!).toBeCloseTo(blow); // домой, а не тики
   });
 
-  it('ЦЕЛЬ ОГРЫЗАЕТСЯ ТОЙ ЖЕ ДОЛЕЙ: тик патруля — четверть ответки на удар', () => {
+  it('ЦЕЛЬ ОГРЫЗАЕТСЯ, КАК НА УДАР: ответка на бросок та же, что на удар приказом', () => {
     const s = withFleet(world([sq('sq:b', 'bomber', 2)]), 'E1', 'cruiser', P);
     // Удар ловит цель около 1,4 ч и в 2 ч ещё летит домой с ответкой на корпусах.
     const struck = (until(
@@ -445,8 +451,9 @@ describe('SHU-6.2 — тик патруля', () => {
     expect(struck?.leg).toBe('back');
     expect(struck?.damage).toBeCloseTo(2 * (1 - 40 / 100)); // 40 × 5%
 
-    const patrolled = patrolOf(until(apply(s, patrol('sq:b')), 1.75));
-    expect(patrolled?.damage).toBeCloseTo(2 * (1 - 10 / 100) / 4);
+    const patrolled = (until(apply(s, patrol('sq:b')), 2).strikes ?? [])[0];
+    expect(patrolled?.leg).toBe('back');
+    expect(patrolled?.damage).toBeCloseTo(struck!.damage!);
   });
 
   it('БЕЗОРУЖНАЯ ПОЛОВИНА НЕ ВЫБИРАЕТ ЦЕЛЬ: охотник за машинами не ныряет под корабль ради нуля урона', () => {
@@ -487,7 +494,7 @@ describe('SHU-6.2 — тик патруля', () => {
     expect(hullOf(until(apply(s, patrol('sq:b')), 2.5), 'MN')).toBeUndefined();
 
     const spotted = withFleet(s, 'SPOT', 'freighter', { x: 150, y: 20 }, 'p1'); // в 20 от мины
-    expect(hullOf(until(apply(spotted, patrol('sq:b')), 1.75), 'MN')).toBe(40);
+    expect(hullOf(until(apply(spotted, patrol('sq:b')), 2), 'MN')).toBe(10); // 50 − 40
   });
 
   it('ВИСЯЩИЙ ПАТРУЛЬ ВИДИТ ОБОРОНА: зональное ПВО корабля бьёт его над точкой', () => {
@@ -510,7 +517,7 @@ describe('SHU-6.2 — тик патруля', () => {
   });
 
   it('СБИТЫЙ ОТВЕТКОЙ ПАТРУЛЬ ИСЧЕЗАЕТ: домой лететь некому, в ангар никто не садится', () => {
-    // Ответка 1000 × 5% × ¼ = 12,5 за тик: два корпуса по 16 гибнут на третьем тике.
+    // Ответка на бросок 1000 × 5% = 50: оба корпуса по 16 гибнут сразу.
     const s = withFleet(world([sq('sq:b', 'bomber', 2)]), 'E1', 'dreadnought', P);
     const { state, events } = run(apply(s, patrol('sq:b')), 10);
     expect(state.strikes ?? []).toHaveLength(0);
@@ -533,17 +540,15 @@ describe('SHU-6.2 — тик патруля', () => {
 });
 
 describe('SHU-6.2 — отзыв патруля', () => {
-  it('ИЗ КРУГА: разворот над точкой, тики больше не бьют, эскадра дома через полтора часа', () => {
-    const s = withFleet(world([sq('sq:b', 'bomber', 2)]), 'E1', 'freighter', { x: 150, y: 30 });
-    let t = until(apply(s, patrol('sq:b')), 2); // тики 1,75 и 2,0 — по 10
-    expect(hullOf(t, 'E1')).toBe(80);
+  it('ИЗ КРУГА: разворот над точкой, на цель в круге он уже не бросается, дома через полтора часа', () => {
+    let t = until(apply(world([sq('sq:b', 'bomber', 2)]), patrol('sq:b')), 2); // круг пуст
     t = apply(t, recall(patrolOf(t)!.id));
     const st = patrolOf(t);
     expect(st?.leg).toBe('back');
     expect(st?.to).toEqual(P);
     expect(st?.arrivesAt).toBe(3.5 * H);
-    const after = until(t, 5);
-    expect(hullOf(after, 'E1')).toBe(80);
+    const after = until(withFleet(t, 'E1', 'freighter', { x: 150, y: 30 }), 5);
+    expect(hullOf(after, 'E1')).toBeUndefined();
     expect(ashore(after)).toBe(2);
   });
 
@@ -590,5 +595,83 @@ describe('SHU-6.2 — отзыв патруля', () => {
     expect(code(flying, recall('strike:nope'))).toBe('E_NO_STRIKE');
     const home = apply(flying, recall(patrolId));
     expect(code(home, recall(patrolId))).toBe('E_RETURNING'); // уже летит домой
+  });
+});
+
+/** Тот же мир, но глаза короткие — 10 у мира и флота: дальше опознаёт только круг патруля
+ *  (ближняя половина, 30), а дальнее его кольцо даёт лишь метку радара. */
+const shortSight = (s: GameState): GameState => ({ ...s, sight: { world: 10, fleet: 10, radarScale: 1 } });
+const engage = (strikeId: string, radar: unknown, playerId = 'p1'): Action =>
+  act('shuttle.engage', { strikeId, radar }, playerId);
+
+describe('SHU-6.18 — правило целей патруля', () => {
+  it('ПО УМОЛЧАНИЮ — ТОЛЬКО ОПОЗНАННЫЕ: метку в дальнем кольце круга патруль не трогает', () => {
+    const s = withFleet(shortSight(world([sq('sq:b', 'bomber', 2)])), 'E1', 'freighter', { x: 150, y: 45 });
+    const { state, events } = run(apply(s, patrol('sq:b')), 8);
+    expect(hullOf(state, 'E1')).toBeUndefined();
+    expect(payloads(events, 'shuttle.hit')).toHaveLength(0);
+    expect(ashore(state)).toBe(2); // отвисел срок и вернулся
+  });
+
+  it('…а в ближней половине круга цель опознана самим патрулём — бросок', () => {
+    const s = withFleet(shortSight(world([sq('sq:b', 'bomber', 2)])), 'E1', 'freighter', { x: 150, y: 20 });
+    expect(hullOf(until(apply(s, patrol('sq:b')), 2.5), 'E1')).toBe(60);
+  });
+
+  it('…и в дальнем кольце, если её опознал свой флот, — бросок', () => {
+    let s = withFleet(shortSight(world([sq('sq:b', 'bomber', 2)])), 'E1', 'freighter', { x: 150, y: 45 });
+    s = withFleet(s, 'OWN', 'freighter', { x: 150, y: 50 }, 'p1'); // в 5 от цели, глаза 10
+    expect(hullOf(until(apply(s, patrol('sq:b')), 2.5), 'E1')).toBe(60);
+  });
+
+  it('«ЛЮБАЯ МЕТКА РАДАРА» — бросок и на неопознанную цель в круге', () => {
+    const s = withFleet(shortSight(world([sq('sq:b', 'bomber', 2)])), 'E1', 'freighter', { x: 150, y: 45 });
+    const flying = apply(s, act('shuttle.patrol', { planetId: 'A', squadronId: 'sq:b', at: P, radar: true }));
+    expect(patrolOf(flying)?.patrol).toEqual({ hours: 3, radius: 60, radar: true });
+    expect(hullOf(until(flying, 2.5), 'E1')).toBe(60);
+  });
+
+  it('ВЫЛЕТ В ДАЛЬНЕМ КОЛЬЦЕ: по метке — залп сразу, по опознанной — когда он подойдёт ближе', () => {
+    // Налёт идёт вниз по x = 150: в тик 2,0 он в 50 от точки (дальнее кольцо), в 2,25 — в 25.
+    const scene = (radar: boolean): GameState => {
+      let s = apply(
+        withRaid(shortSight(world([sq('sq:h', 'hunter', 2)]))),
+        act('shuttle.patrol', { planetId: 'A', squadronId: 'sq:h', at: P, ...(radar ? { radar } : {}) }),
+      );
+      s = apply(until(s, 0.9), raid());
+      return until(s, 2.1);
+    };
+    const raiders = (s: GameState) => (s.strikes ?? []).filter((st) => st.owner === 'p2').length;
+    expect(raiders(scene(true))).toBe(0);
+    expect(raiders(scene(false))).toBe(1);
+  });
+
+  it('ПЕРЕКЛЮЧИТЬ В ВОЗДУХЕ: `shuttle.engage` у патруля — и в пути, и в круге', () => {
+    const s = withFleet(shortSight(world([sq('sq:b', 'bomber', 2)])), 'E1', 'freighter', { x: 150, y: 45 });
+    const flying = apply(s, patrol('sq:b'));
+    const id = patrolOf(flying)!.id;
+    const on = apply(flying, engage(id, true));
+    expect(patrolOf(on)?.patrol?.radar).toBe(true);
+    expect(patrolOf(apply(on, engage(id, false)))?.patrol?.radar).toBeUndefined();
+    // В круге — то же самое, и правило работает со следующего тика.
+    const circling = until(flying, 1.6);
+    expect(hullOf(until(apply(circling, engage(id, true)), 2.5), 'E1')).toBe(60);
+  });
+
+  it('ENGAGE: только свой патруль и только флагом', () => {
+    let s = withFleet(world([sq('sq:i', 'interceptor', 2), sq('sq:b', 'bomber', 2)]), 'E1', 'freighter', {
+      x: 100,
+      y: 0,
+    });
+    s = apply(s, patrol('sq:i'));
+    s = apply(s, act('shuttle.strike', { planetId: 'A', squadronId: 'sq:b', targetFleetId: 'E1' }));
+    const patrolId = patrolOf(s)!.id;
+    const strikeId = (s.strikes ?? []).find((st) => st.target.kind === 'fleet')!.id;
+    expect(code(s, engage(strikeId, true))).toBe('E_NOT_PATROLLING'); // удару цель выбрал игрок
+    expect(code(s, engage(patrolId, true, 'p2'))).toBe('E_NO_STRIKE');
+    expect(code(s, engage(patrolId, 'yes'))).toBe('E_BAD_PAYLOAD');
+    expect(code(s, act('shuttle.patrol', { planetId: 'A', squadronId: 'sq:b', at: P, radar: 1 }))).toBe(
+      'E_BAD_PAYLOAD',
+    );
   });
 });

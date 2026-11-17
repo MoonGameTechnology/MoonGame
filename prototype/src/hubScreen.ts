@@ -49,6 +49,7 @@ import { initShop } from './shopScreen';
 import { fillWelcome, showStage, suggestCallsign } from './signInPages';
 import { refreshHubDoor, restoreSolo, saveSolo, soloSaveActive } from './soloCheckpoint';
 import { readLocal, writeLocal } from './localStore';
+import { initNativeAdPreview } from './nativeAdPreview';
 
 declare const __SECTOR_ZERO_ONLY__: boolean;
 
@@ -481,6 +482,19 @@ function createHubNews() {
   });
 }
 
+function initHubGameDoors(): void {
+  if (!__SECTOR_ZERO_ONLY__) initNativeAdPreview();
+  $('hub-play').addEventListener('click', () => hubTab('games'));
+  $('hub-solo').addEventListener('click', () => {
+    leaveMatch();
+    showHub(false);
+    openSetup('hub');
+  });
+  $('hub-solo-continue').addEventListener('click', restoreSolo);
+  $('hub-sector-zero').addEventListener('click', () => openSectorZero());
+  $('hub-proving-ground').addEventListener('click', () => startProvingGround());
+}
+
 export function initHubScreen(host: HubScreenHost): void {
   game = host;
   hubEl = $('hub');
@@ -708,16 +722,7 @@ export function initHubScreen(host: HubScreenHost): void {
       },
     });
   // hub interactions
-  $('hub-play').addEventListener('click', () => hubTab('games'));
-  // Single-player entry from the hub home — offline skirmish vs bots (both builds).
-  $('hub-solo').addEventListener('click', () => {
-    leaveMatch();
-    showHub(false);
-    openSetup('hub');
-  });
-  $('hub-solo-continue').addEventListener('click', restoreSolo);
-  $('hub-sector-zero').addEventListener('click', () => openSectorZero());
-  $('hub-proving-ground').addEventListener('click', () => startProvingGround());
+  initHubGameDoors();
   $('hub-msg').addEventListener('click', () => {
     hubNote.textContent = t('hub.messages.soon');
   });

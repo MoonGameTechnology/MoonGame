@@ -3,7 +3,6 @@ import type { ModuleSetupApi } from '../../kernel/module';
 import {
   type BaseView,
   CHASE_STEP_MINUTES,
-  PATROL_TICK_SHARE,
   fleetBase,
   flightOf,
   hourMs,
@@ -11,6 +10,7 @@ import {
   noteBase,
   planetBase,
   refuelUntil,
+  rejoinOf,
   scheduleChase,
   schedulePatrolTick,
   withHangar,
@@ -19,7 +19,7 @@ import type { HandlerContext } from '../../kernel/module';
 import { MS_PER_HOUR } from '../../util/time';
 import {
   type MissileFlew,
-  distanceToSegment,
+  patrolMissilePass,
   patrolStrike,
   resolveOutLeg,
   resumeHold,
@@ -31,9 +31,7 @@ import { chaseRadius, chaseStep } from '../../state/chase';
 import { distance } from '../../state/route';
 import {
   divert,
-  hitMissile,
   landingSpot,
-  strikeAirPower,
   strikeSpeed,
   trimCargoToSurvivors,
   turnHome,
@@ -99,18 +97,25 @@ export function registerFlightEvents(api: ModuleSetupApi): void {
     // по одному на уцелевший борт, как и при высадке.
     trimCargoToSurvivors(strike);
     const cargo = (strike.cargo ?? []).filter((st) => st.count > 0);
-    // Удерживаемый патруль (SHU-6.6) садится с удержанием. Его точка у МИРА — `to`
-    // обратной ноги: удержание живёт только у патруля, повернувшего домой по концу
-    // времени (отзыв его снимает, а потерявший базу перестаёт быть патрулём), и
-    // повернул он ровно из своей точки.
-    const held = strike.target.kind === 'point' && strike.patrol?.hold === true;
+    // Удерживаемый патруль (SHU-6.6) садится с удержанием и правилом целей (SHU-6.18).
+    // Точка у МИРА — та, из которой он повернул домой, или та, которую он покинул ради
+    // броска на флот (`rejoinOf`); отзыв удержание снимает, а потерявший базу перестаёт
+    // быть патрулём. У КОРАБЛЯ точки нет: патруль встанет над ним самим.
+    const rejoin = rejoinOf(strike);
     const home: Squadron = {
       id: taken ? nextSquadronId(h, strike.owner) : strike.squadronId,
       units: strike.units.map((st) => ({ ...st })),
       ...(cargo.length > 0 ? { cargo: cargo.map((st) => ({ ...st })) } : {}),
       // Недобитый урон вылета остаётся на машинах (SHU-5.3), а не забывается на посадке.
       ...(strike.damage && strike.damage > 0 ? { damage: strike.damage } : {}),
-      ...(held ? { hold: base.ref.kind === 'planet' ? { at: { ...strike.to } } : {} } : {}),
+      ...(rejoin
+        ? {
+            hold: {
+              ...(base.ref.kind === 'planet' ? { at: { ...rejoin.at } } : {}),
+              ...(rejoin.radar ? { radar: true as const } : {}),
+            },
+          }
+        : {}),
       // Севшая эскадра заправляется (решение владельца 2026-11-17): до `readyAt` не взлетит.
       ...refuelUntil(h, strike.units),
     };
@@ -121,7 +126,7 @@ export function registerFlightEvents(api: ModuleSetupApi): void {
       owner: strike.owner,
       strikeId,
     });
-    if (held) h.schedule(h.ctx.now, 'shuttle.patrol.resume', { owner: strike.owner, squadronId: home.id });
+    if (rejoin) h.schedule(h.ctx.now, 'shuttle.patrol.resume', { owner: strike.owner, squadronId: home.id });
   });
 
   /**
@@ -218,9 +223,10 @@ export function registerFlightEvents(api: ModuleSetupApi): void {
   });
 
   /**
-   * ТИК ПАТРУЛЯ (SHU-6.2): удар по одной цели в круге (`patrolStrike`), затем — либо
-   * следующий тик, либо домой, если время патруля вышло. Конец патруля — тоже тик: в
-   * последнюю минуту круг держится так же, как в первую.
+   * ТИК ПАТРУЛЯ (SHU-6.2): осмотр круга (`patrolStrike`). Нашлась цель — патруль ушёл на
+   * неё броском или залпом и кончился (SHU-6.18); нет — следующий тик, либо домой, если
+   * время патруля вышло. Конец патруля — тоже тик: в последнюю минуту круг держится так
+   * же, как в первую.
    */
   api.on('shuttle.patrol.tick', (event, h: HandlerContext) => {
     const strike = flightOf(h, event.payload);
@@ -228,12 +234,7 @@ export function registerFlightEvents(api: ModuleSetupApi): void {
     // (dead letter).
     if (!strike || strike.leg !== 'patrol') return;
     noteBase(h, strike); // корабль-база жив — запомнить, где он (SHU-6.4)
-    patrolStrike(h, strike);
-    // Ответка цели могла сбить патруль целиком — домой лететь некому.
-    if (strike.units.length === 0) {
-      h.state.strikes = (h.state.strikes ?? []).filter((st) => st.id !== strike.id);
-      return;
-    }
+    if (patrolStrike(h, strike)) return;
     if (h.ctx.now >= strike.arrivesAt) return turnHome(h, strike);
     schedulePatrolTick(h, strike);
   });
@@ -241,9 +242,9 @@ export function registerFlightEvents(api: ModuleSetupApi): void {
   /**
    * ВЫСТРЕЛ ПРИ ВЛЁТЕ (SM-3.7d, решение владельца 2026-10-14). Ракета пролетает круг
    * патруля за минуты, а тик патруля — раз в 15 минут: без этого выстрела она проскакивала
-   * бы между тиками. Висящий патруль бьёт её долей тика, когда пройденный ею отрезок входит
-   * в его круг, — по отрезку, а не по точке, поэтому круг не перепрыгнуть и за один шаг.
-   * Ракета, пущенная уже внутри круга, не «влетает»: её бьёт обычный тик.
+   * бы между тиками. Висящий патруль бьёт её, когда пройденный ею отрезок входит в его круг,
+   * — по отрезку, а не по точке, поэтому круг не перепрыгнуть и за один шаг. С SHU-6.18 —
+   * полным залпом и домой, как по любой цели (`patrolMissilePass`).
    *
    * Возможность, а не событие: `rocketMines` зовёт её синхронно на каждом шаге полёта и
    * ПЕРЕД попаданием, с последним отрезком до цели. Событие разбиралось бы после того, как
@@ -252,16 +253,11 @@ export function registerFlightEvents(api: ModuleSetupApi): void {
    */
   api.provideCapability<MissileFlew>('missile.flew', (h, missileId, from, to) => {
     for (const strike of h.state.strikes ?? []) {
-      const missile = Object.prototype.hasOwnProperty.call(h.state.fleets, missileId)
-        ? h.state.fleets[missileId]
-        : undefined;
+      const missile = Object.hasOwn(h.state.fleets, missileId) ? h.state.fleets[missileId] : undefined;
       if (!missile) return;
       if (strike.leg !== 'patrol' || strike.units.length === 0) continue;
       if (strike.owner === missile.owner || !isHostile(h, strike.owner, missile.owner)) continue;
-      const radius = strike.patrol?.radius ?? 0;
-      if (radius <= 0 || distance(from, strike.to) <= radius) continue;
-      if (distanceToSegment(from, to, strike.to) > radius) continue;
-      hitMissile(h, strike, missile, strikeAirPower(strike, h.ctx.data) * PATROL_TICK_SHARE);
+      patrolMissilePass(h, strike, missile, from, to);
     }
   });
 }

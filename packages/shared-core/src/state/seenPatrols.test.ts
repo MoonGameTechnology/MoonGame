@@ -22,7 +22,7 @@ import {
   type Player,
   type ShuttleStrike,
 } from './gameState';
-import { patrolsSeenBy, sensorCoverage, sightCircles, visibleState } from './visibility';
+import { patrolsSeenBy, radarSources, sensorCoverage, sightCircles, visibleState } from './visibility';
 import type { Action } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 
@@ -200,20 +200,27 @@ describe('SHU-6.10 — кого из чужих патрулей видит зр
   });
 });
 
-describe('SHU-6.12 — патруль союзника — глаза и в спроецированном мире', () => {
-  // Союзник p3 висит над Q2, вдали от миров p1; узел N50 — в его круге и больше ничьём.
+describe('SHU-6.12 — патруль союзника — радар и в спроецированном мире', () => {
+  // Союзник p3 висит над Q2, вдали от миров p1; узел N50 — в дальнем кольце его круга и
+  // больше ничьём, узел N20 — в ближней половине (SHU-6.18: круг — радар).
   const allied = world([patrolOf(Q2, { owner: 'p3' })], {
     diplomacy: { [pairKey('p1', 'p3')]: 'alliance' },
   });
+  allied.planets.N20 = planet('N20', null, 400, -20);
 
-  it('клиент сети опознаёт глазами союзного патруля то же, что и сервер', () => {
+  it('клиент сети видит радаром союзного патруля то же, что и сервер', () => {
     const view = visibleState(allied, 'p1', data);
     expect(view.strikes).toBeUndefined(); // сам вылет союзника снят, пришла только строка
-    expect(sensorCoverage(allied, 'p1', data).identify.has('N50')).toBe(true);
-    expect(sensorCoverage(view, 'p1', data).identify.has('N50')).toBe(true);
+    for (const s of [allied, view]) {
+      const cover = sensorCoverage(s, 'p1', data);
+      expect(cover.identify.has('N20')).toBe(true);
+      expect(cover.identify.has('N50')).toBe(false);
+      expect(cover.radar.has('N50')).toBe(true);
+      expect(radarSources(s, 'p1', data)).toContainEqual({ x: Q2.x, y: Q2.y, range: 60, level: 3 });
+    }
     // Граница обзора на карте получает тот же круг: точка и радиус патруля.
     const eye = sightCircles(view, 'p1', data).find((c) => c.source.kind === 'patrol');
-    expect(eye).toMatchObject({ owner: 'p3', x: Q2.x, y: Q2.y, identify: 60, signature: 60 });
+    expect(eye).toMatchObject({ owner: 'p3', x: Q2.x, y: Q2.y, identify: 30, signature: 60 });
   });
 
   it('видимый ВРАЖЕСКИЙ патруль глазами зрителя не становится', () => {

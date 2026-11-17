@@ -1117,6 +1117,9 @@ export function aloftPanelHtml(st: ShuttleStrike): string {
     card.canSplit && wingOrder('split', 'aloftsplit', id),
     // «Держать» — переключатель: горит, пока патруль держится; нажатие снимает.
     card.hold !== null && wingOrder('keep', 'wingkeep', id, card.hold),
+    // Правило целей (SHU-6.18): горит — бросается и на метку радара, погашен — только на
+    // опознанную цель (дефолт владельца).
+    card.radar !== null && wingOrder('radar', 'wingradar', id, card.radar),
     card.canRecall && wingOrder('recall', 'wingrecall', id),
   ];
   return h + wingOrdersHtml(orders, id);

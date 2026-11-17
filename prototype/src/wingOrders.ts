@@ -21,7 +21,7 @@ export interface WingOrder {
   icon: HoloIcon;
   glyph: string;
   label: string;
-  /** Переключатель включён (патруль держится) — плитка горит, как «Бомбардировка» флота. */
+  /** Переключатель включён (патруль держится, бьёт по радару) — плитка горит, как «Бомбардировка» флота. */
   on?: boolean;
 }
 
@@ -36,6 +36,8 @@ const LOOK = {
   split: ['arrows-split', '⊟', 'cmd.wing.split'],
   merge: ['arrows-merge', '⛬', 'cmd.merge'],
   keep: ['push-pin', '⟳', 'cmd.wing.keep'],
+  // Правило целей патруля (SHU-6.18): горит — бросается на любую метку радара.
+  radar: ['broadcast', '◉', 'cmd.wing.radar'],
   recall: ['arrow-u-up-left', '↩', 'cmd.wing.recall'],
   // Ракетная эскадра (missiles-roadmap): одна ракета или залп всей эскадрой.
   launch: ['paper-plane-tilt', '➚', 'side.missile.launch'],

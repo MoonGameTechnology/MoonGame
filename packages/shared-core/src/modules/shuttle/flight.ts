@@ -478,6 +478,7 @@ export function divert(
   // был он, кончился: поле `patrol` есть только у вылета с целью-точкой.
   strike.target = { kind: 'base' };
   delete strike.patrol;
+  delete strike.rejoin;
   flyTo(h, strike, dest, from);
 }
 
@@ -550,8 +551,8 @@ export function flightTime(
 
 /** То же время полёта без броска: `null` — эскадре нечем лететь. Нужно удержанию патруля
  *  (SHU-6.6), которое поднимает эскадру из события и обязано снять удержание, а не
- *  уронить событие. */
-function flightMs(
+ *  уронить событие, и броску патруля на цель (SHU-6.18) — тоже из события. */
+export function flightMs(
   h: HandlerContext,
   squad: Flyer,
   from: { x: number; y: number },
@@ -677,14 +678,14 @@ export function clearMine(
 }
 
 /**
- * УДАР ВЫЛЕТА ПО ФЛОТУ — урон, гибель цели и её ответка. Один на удар по прибытии и на
- * тик патруля (SHU-6.2): `share` — доля обычного удара (у удара 1, у тика ¼), и ответка
- * берётся той же долей. Две копии этих строк разъехались бы на первой правке урона.
+ * УДАР ВЫЛЕТА ПО ФЛОТУ — урон, гибель цели и её ответка. Один на удар приказом и на бросок
+ * патруля (SHU-6.18): оба долетают до цели и бьют полным ударом. Две копии этих строк
+ * разъехались бы на первой правке урона.
  */
-export function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet, share: number): void {
-  const power = strikePower(strike, h.ctx.data, 'fleet') * share;
+export function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet): void {
+  const power = strikePower(strike, h.ctx.data, 'fleet');
   // Ракета — воздушная цель (SM-3.7d): её бьёт `shuttleDamage`, ответки нет.
-  if (isMissileFleet(target, h.ctx.data)) return hitMissile(h, strike, target, strikeAirPower(strike, h.ctx.data) * share);
+  if (isMissileFleet(target, h.ctx.data)) return hitMissile(h, strike, target, strikeAirPower(strike, h.ctx.data));
   // Мину узнаём ДО удара: у добитого отряда не остаётся юнитов, по которым её узнать.
   const mine = isMineFleet(target, h.ctx.data);
   if (power > 0) {
@@ -721,7 +722,7 @@ export function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fl
     if (mine) clearMine(h, strike.owner, target.id, 'shuttle.mineCleared');
     else removeIfWiped(h, target.id);
   }
-  repelStrike(h, strike, returnFireAgainstFleet(target, h.ctx.data) * share, {
+  repelStrike(h, strike, returnFireAgainstFleet(target, h.ctx.data), {
     kind: 'fleet',
     id: target.id,
     owner: target.owner,
@@ -781,14 +782,15 @@ export function patrolCheck(
   return { plan, from, to, flight };
 }
 
-/** Поднять патруль — один взлёт на приказ и на удержание (SHU-6.6). */
+/** Поднять патруль — один взлёт на приказ и на удержание (SHU-6.6). `radar` — правило
+ *  целей (SHU-6.18): бросаться и на метку радара, а не только на опознанную цель. */
 export function takeOffPatrol(
   h: HandlerContext,
   owner: string,
   base: BaseView,
   ready: Ready,
   route: PatrolRoute,
-  hold: boolean,
+  rule: { hold: boolean; radar: boolean },
 ): void {
   const strike = launchFlight(h, owner, base, ready, {
     target: { kind: 'point' },
@@ -797,7 +799,11 @@ export function takeOffPatrol(
     // Путь к неподвижной точке идёт от места взлёта: с идущего носителя начало
     // отрезка иначе ехало бы вместе с ним (`ShuttleStrike.at`).
     at: { ...route.from },
-    patrol: hold ? { ...route.plan, hold: true } : route.plan,
+    patrol: {
+      ...route.plan,
+      ...(rule.hold ? { hold: true as const } : {}),
+      ...(rule.radar ? { radar: true as const } : {}),
+    },
   });
   scheduleFlight(h, strike, strike.arrivesAt, 'shuttle.arrived');
 }

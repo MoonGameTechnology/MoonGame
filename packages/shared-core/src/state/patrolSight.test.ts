@@ -1,15 +1,17 @@
 /**
- * ОБЗОР В КРУГЕ ПАТРУЛЯ (SHU-6.7) — приёмка кирпича.
+ * ОБЗОР В КРУГЕ ПАТРУЛЯ (SHU-6.7; радар — SHU-6.18) — приёмка.
  *
  * Резолюция владельца 2026-10-04 (`shuttles-roadmap.md` §0.7, по образцу Conflict of
- * Nations): висящий патруль — глаза эскадры над её точкой. Он открывает владельцу миры
- * в своём круге и опознаёт чужой флот под собой по ПОЗИЦИИ: патруль висит над дорогой
- * вдали от миров, и правило «опознан узел — виден флот» не видело бы ровно того, по кому
- * он бьёт. Это глаза, а не радар: опознание и засечка совпадают.
+ * Nations): висящий патруль видит карту над своей точкой и опознаёт чужой флот под собой по
+ * ПОЗИЦИИ: патруль висит над дорогой вдали от миров, и правило «опознан узел — виден флот»
+ * не видело бы ровно того, на кого он бросается. С SHU-6.18 (резолюция владельца
+ * 2026-11-17: «в радиусе патруля авиация использует радар») круг — радар, как любой другой:
+ * засечка на весь круг, опознание — на ближнюю половину.
  *
- * Карта: свой мир A(0,0); точка патруля P(300,0) с кругом 60; чужой мир G(300,40) в
- * круге; линия E(300,150)–F(300,−150) идёт через саму точку. Чужой флот «road» стоит на
- * линии ровно под патрулём (ближайший узел — E, вне круга), флот «far» — у E, вне круга.
+ * Карта: свой мир A(0,0); точка патруля P(300,0) с кругом 60 (опознание 30); чужой мир
+ * K(300,−20) в ближней половине, чужой мир G(300,40) в дальнем кольце; линия
+ * E(300,150)–F(300,−150) идёт через саму точку. Чужой флот «road» стоит на линии ровно под
+ * патрулём (ближайший узел — E, вне круга), флот «far» — у E, вне круга.
  */
 import { describe, expect, it } from 'vitest';
 import { createKernel } from '../kernel/kernel';
@@ -30,6 +32,8 @@ import {
   identifiedNodes,
   isVisibleTo,
   radarSignatures,
+  radarSources,
+  sensorCoverage,
   sightCircles,
   visibleState,
 } from './visibility';
@@ -126,6 +130,7 @@ function world(strikes: ShuttleStrike[] = []): GameState {
     planets: {
       A: home,
       G: g,
+      K: planet('K', 'p2', 300, -20),
       E: planet('E', null, 300, 150, ['F']),
       F: planet('F', null, 300, -150, ['E']),
     },
@@ -142,12 +147,13 @@ function world(strikes: ShuttleStrike[] = []): GameState {
 describe('SHU-6.7 — круг висящего патруля', () => {
   it('КРУГ ЕСТЬ ТОЛЬКО У ВИСЯЩЕГО: летящая к точке и домой эскадра карту не открывает', () => {
     const circle = sightCircles(world([patrolOf()]), 'p1', data).find((c) => c.source.kind === 'patrol');
+    // Радар (SHU-6.18): засечка на весь круг, опознание — на половину, как у радара мира.
     expect(circle).toEqual({
       owner: 'p1',
       source: { kind: 'patrol', id: 'strike:1' },
       x: 300,
       y: 0,
-      identify: 60,
+      identify: 30,
       signature: 60,
     });
     for (const leg of ['out', 'back'] as const) {
@@ -158,17 +164,27 @@ describe('SHU-6.7 — круг висящего патруля', () => {
     expect(sightCircles(world([patrolOf()]), 'p2', data).some((c) => c.source.kind === 'patrol')).toBe(false);
   });
 
-  it('ОТКРЫВАЕТ МИРЫ В СВОЁМ КРУГЕ, а дальние — нет', () => {
-    expect(identifiedNodes(world(), 'p1', data).has('G')).toBe(false);
-    const seen = identifiedNodes(world([patrolOf()]), 'p1', data);
-    expect(seen.has('G')).toBe(true);
-    expect(seen.has('E')).toBe(false);
-    expect(seen.has('F')).toBe(false);
-    // Опознанный мир отдаёт хозяина и гарнизон, неопознанный — пустоту.
-    expect(visibleState(world([patrolOf()]), 'p1', data).planets.G?.garrison).toEqual([
-      { unit: 'cruiser', count: 3 },
-    ]);
-    expect(visibleState(world(), 'p1', data).planets.G?.owner).toBeNull();
+  it('ОПОЗНАЁТ МИРЫ В БЛИЖНЕЙ ПОЛОВИНЕ КРУГА, в дальнем кольце — только засечка', () => {
+    expect(identifiedNodes(world(), 'p1', data).has('K')).toBe(false);
+    const cover = sensorCoverage(world([patrolOf()]), 'p1', data);
+    expect(cover.identify.has('K')).toBe(true);
+    expect(cover.identify.has('G')).toBe(false);
+    expect(cover.radar.has('G')).toBe(true);
+    expect(cover.radar.has('E')).toBe(false);
+    expect(cover.radar.has('F')).toBe(false);
+    // Опознанный мир отдаёт хозяина, неопознанный — пустоту.
+    expect(visibleState(world([patrolOf()]), 'p1', data).planets.K?.owner).toBe('p2');
+    expect(visibleState(world([patrolOf()]), 'p1', data).planets.G?.garrison).toEqual([]);
+    expect(visibleState(world(), 'p1', data).planets.K?.owner).toBeNull();
+  });
+
+  it('РАДАР ПАТРУЛЯ — ВЫСШЕГО УРОВНЯ, без множителей игрока; флот в дальнем кольце — метка', () => {
+    const s = world([patrolOf()]);
+    expect(radarSources(s, 'p1', data)).toEqual([{ x: 300, y: 0, range: 60, level: 3 }]);
+    expect(radarSources(world([patrolOf('out')]), 'p1', data)).toEqual([]);
+    s.fleets.ring = cruiser('ring', { location: 'G' });
+    expect(isVisibleTo(s, 'p1', { fleetId: 'ring' }, data)).toBe(false);
+    expect(radarSignatures(s, 'p1', data)).toEqual([{ location: 'G', size: 'S' }]);
   });
 
   it('ЧУЖОЙ ФЛОТ В КРУГЕ ОПОЗНАН — даже на линии вдали от миров; вне круга — нет', () => {
@@ -206,8 +222,9 @@ describe('SHU-6.7 — круг висящего патруля', () => {
       players: { ...base.players, p3: player('p3') },
       diplomacy: { ...base.diplomacy, [pairKey('p1', 'p3')]: 'alliance' },
     };
-    expect(identifiedNodes(s, 'p3', data).has('G')).toBe(true);
+    expect(identifiedNodes(s, 'p3', data).has('K')).toBe(true);
     expect(visibleState(s, 'p3', data).fleets.road).toBeDefined();
+    expect(radarSources(s, 'p3', data)).toEqual([{ x: 300, y: 0, range: 60, level: 3 }]);
   });
 });
 
@@ -239,20 +256,20 @@ describe('SHU-6.7 — приёмка через ядро', () => {
 
     const flying = run(r.state, 2);
     expect(flying.strikes?.[0]?.leg).toBe('out');
-    expect(identifiedNodes(flying, 'p1', data).has('G')).toBe(false);
+    expect(identifiedNodes(flying, 'p1', data).has('K')).toBe(false);
     expect(visibleState(flying, 'p1', data).fleets.road).toBeUndefined();
 
     const hanging = run(flying, 4);
     expect(hanging.strikes?.[0]?.leg).toBe('patrol');
-    expect(identifiedNodes(hanging, 'p1', data).has('G')).toBe(true);
+    expect(identifiedNodes(hanging, 'p1', data).has('K')).toBe(true);
     expect(visibleState(hanging, 'p1', data).fleets.road).toBeDefined();
     expect(visibleState(hanging, 'p1', data).fleets.far).toBeUndefined();
-    expect(hanging.fog?.p1?.G?.owner).toBe('p2'); // память тумана записала мир под патрулём
+    expect(hanging.fog?.p1?.K?.owner).toBe('p2'); // память тумана записала мир под патрулём
 
     const home = run(hanging, 8);
     expect(home.strikes?.[0]?.leg).toBe('back');
-    expect(identifiedNodes(home, 'p1', data).has('G')).toBe(false);
+    expect(identifiedNodes(home, 'p1', data).has('K')).toBe(false);
     expect(visibleState(home, 'p1', data).fleets.road).toBeUndefined();
-    expect(visibleState(home, 'p1', data).remembered).toContain('G');
+    expect(visibleState(home, 'p1', data).remembered).toContain('K');
   });
 });
