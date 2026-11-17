@@ -733,7 +733,6 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   geo = measureMapLayer(), density = game.dpr()): TerrainField[] {
   const s = game.world();
   const DPR = game.dpr();
-  const galaxyOutline = game.outline();
   const { at, lod } = geo;
   // Every map point goes through the bake's own projection, so a strip painted into the
   // bake later lands exactly where the first paint put its neighbours.
@@ -892,25 +891,12 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   if (holographicMapOn()) g.restore();
   g.strokeStyle = 'rgba(90,151,165,0.2)';
   g.lineWidth = 0.7;
-  // На картах Фронтира территория обрезается выпуклым контуром галактики
-  // (`provinceClip`), а рамка рисовалась прежним прямоугольником — между ними
-  // оставалась широкая пустая полоса, и рамка переставала обозначать край доски.
-  // Рисуем то же, чем обрезаем; прочие карты сохраняют прямоугольник.
-  // Край доски — линия КАРТЫ, а не провинций (владелец 2026-09-24): `classifyBorders`
-  // больше не обводит грани края. Прямоугольник на голограмме — это рамка стекла,
-  // контур галактики там рисует только эта линия, поэтому он идёт в обоих режимах.
-  if (galaxyOutline.length) {
-    g.beginPath();
-    galaxyOutline.forEach((pt, i) => {
-      const v = inBake(pt);
-      if (i === 0) g.moveTo(v.x, v.y);
-      else g.lineTo(v.x, v.y);
-    });
-    g.closePath();
-    g.stroke();
-  } else if (!holographicMapOn()) {
-    g.strokeRect(geo.frame.x, geo.frame.y, geo.frame.width, geo.frame.height);
-  }
+  // Край доски — прямоугольная рамка (владелец 2026-11-17: «рамка квадратная»). На карте,
+  // что кончается по своему контуру (`state.mapEdge`, Фронтир), провинции обрезаны контуром,
+  // а рамка — его описанный прямоугольник (`glassFrame`): крайние касаются её, но не
+  // тянутся к ней. Грани края провинции не обводят (владелец 2026-09-24): край — линия
+  // карты. На голограмме рамка — кайма стекла, без неё — эта линия.
+  if (!holographicMapOn()) g.strokeRect(geo.frame.x, geo.frame.y, geo.frame.width, geo.frame.height);
   // The overview's node rings belong to the map, not to the moment: every province the same
   // neutral ring (`drawSchematicNode`), fading as the node art comes in. Baked on top of the
   // roads they end, since a frame stroking 1675 of them spent half its raster on them. A slow
