@@ -30,8 +30,8 @@
  * 6. **«Патруль» есть только у эскадры, которая умеет висеть** (SHU-6.3): часы и круг
  *    патруля по слабому звену (`squadronPatrol`) и пустой трюм — те же условия, по
  *    которым ядро отобьёт `E_CANNOT_PATROL` и `E_HAS_CARGO`. Десантный челнок кнопки не
- *    получает вовсе. Готовность БАЗЫ у патруля та же, что у удара (`canStrike`): топливо
- *    и перезарядка общие на все вылеты места.
+ *    получает вовсе. Готовность у патруля та же, что у удара (`canStrike`): база не в
+ *    бою, эскадра заправлена.
  * 7. **«Перебазировать» есть, только когда есть КУДА** (SHU-6.5): своя база в дальности
  *    перелёта, где эскадра поместится целиком. Список баз считает
  *    `decisions/relocateTargets.ts` — по состоянию и живым позициям, которых у карточки
@@ -40,12 +40,17 @@
  * 8. **Удержание патруля видно на карточке дома** (SHU-6.6): эскадра с `hold` вернулась
  *    из удерживаемого патруля и встанет снова сама, как только база будет готова.
  *    Карточка помечает её и даёт снять удержание — снять стоячий приказ можно в любую
- *    минуту, в том числе пока база перезаряжается, поэтому эта кнопка не ждёт
+ *    минуту, в том числе пока эскадра заправляется, поэтому эта кнопка не ждёт
  *    `canStrike`. Остальные приказы ядро такой эскадре не запрещает: удар, перелёт,
  *    погрузка и делёж снимают удержание сами.
  */
 import type { GameData, Squadron, UnitStack } from '../../packages/shared-core/src/index';
-import { hasMissiles, squadronPatrol, stacksSize } from '../../packages/shared-core/src/index';
+import {
+  hasMissiles,
+  squadronPatrol,
+  squadronRefueling,
+  stacksSize,
+} from '../../packages/shared-core/src/index';
 import { squadronHullPercent } from '../../decisions/squadronHull';
 import { fleetCallsign } from './fleetName';
 import type { HangarView } from './hangarPanel';
@@ -89,14 +94,17 @@ export interface SquadronCard {
   missiles: boolean;
   /** Держит патруль: встанет снова сама, снять можно всегда (правило 8). */
   hold: boolean;
+  /** До какого момента мира эскадра заправляется; `null` — заправлена (или `now` не дан). */
+  refuelAt: number | null;
 }
 
 const size = (sq: Squadron): number => sq.units.reduce((n, st) => n + Math.max(0, st.count), 0);
 
 /**
  * Карточки ангара: по одной на ЖИВОЕ звено (правило 2 — пустых в списке не бывает).
- * `blocked` у места общий (топливо и перезарядка принадлежат БАЗЕ, SHU-1.2), поэтому
- * «можно ли лететь» одинаково для всех звеньев — и приходит сюда из `HangarView`.
+ * «Можно ли лететь» складывается из `blocked` места (пусто, носитель в бою — одно на все
+ * звенья) и заправки самой эскадры (`readyAt` против `now`, решение владельца 2026-11-17).
+ * Без `now` заправка не видна: так зовут вызывающие, которым важен только состав.
  */
 export function squadronCards(
   view: HangarView,
@@ -105,6 +113,8 @@ export function squadronCards(
     data: GameData;
     /** Есть ли куда перебазировать это звено (правило 7). Без вопроса — некуда. */
     relocate?: (sq: Squadron) => boolean;
+    /** Время мира: эскадра с `readyAt` позже него ещё заправляется. */
+    now?: number;
   },
 ): SquadronCard[] {
   const live = view.squadrons.filter((sq) => size(sq) > 0);
@@ -112,8 +122,9 @@ export function squadronCards(
     const cargo = (sq.cargo ?? []).filter((st) => st.count > 0);
     const plan = squadronPatrol(sq, opts.data);
     const missiles = hasMissiles(sq, opts.data);
-    // Сводить можно только эскадры одного рода: ракеты с челноками ядро не сводит.
-    const kin = live.filter((q) => hasMissiles(q, opts.data) === missiles);
+    const fueling = opts.now !== undefined && squadronRefueling(sq, opts.now);
+    // Ракетам мешает только бой базы, челнокам — ещё и своя заправка.
+    const free = missiles ? view.blocked !== 'busy' : view.blocked === null && !fueling;
     return {
       id: sq.id,
       name: squadronCallsignOf(sq.id),
@@ -122,16 +133,16 @@ export function squadronCards(
       places: stacksSize(sq.units, opts.data),
       hull: squadronHullPercent(sq, opts.data),
       cargo,
-      canStrike: opts.mine && !missiles && view.blocked === null,
+      canStrike: opts.mine && !missiles && free,
       canPatrol: opts.mine && !missiles && plan.hours > 0 && plan.radius > 0 && cargo.length === 0,
       canRelocate: opts.mine && !missiles && (opts.relocate?.(sq) ?? false),
       canSplit: opts.mine && splitOne(sq) !== null,
-      // Сводятся только готовые: пока база заправляется или перезаряжается, плитки нет
-      // (решение владельца 2026-11-17). Ракетам топливо порта не нужно — им мешает только бой.
-      canMerge:
-        opts.mine && kin.length > 1 && (missiles ? view.blocked !== 'busy' : view.blocked === null),
+      // Сводятся только готовые: пока эта эскадра или все её пары заправляются, плитки нет
+      // (решение владельца 2026-11-17) — ядро отбило бы `E_REFUELING`.
+      canMerge: opts.mine && free && mergeTargets(view, sq.id, opts.data, opts.now).length > 0,
       missiles,
       hold: opts.mine && sq.hold !== undefined,
+      refuelAt: fueling ? sq.readyAt! : null,
     };
   });
 }
@@ -146,12 +157,24 @@ export function splitOne(sq: Squadron): { unit: string; count: number } | null {
   return first ? { unit: first.unit, count: 1 } : null;
 }
 
-/** Куда можно слить это звено — все остальные ЖИВЫЕ звенья той же базы. Само себя в
+/** Куда можно слить это звено — остальные ЖИВЫЕ звенья той же базы того же рода (ракеты
+ *  с челноками ядро не сводит) и, при данном `now`, уже заправленные. Само себя в
  *  приёмниках нет: ядро отбивает такую заявку как опечатку (`E_BAD_PAYLOAD`). */
-export function mergeTargets(view: HangarView, fromId: string, data: GameData): string[] {
+export function mergeTargets(
+  view: HangarView,
+  fromId: string,
+  data: GameData,
+  now?: number,
+): string[] {
   const from = view.squadrons.find((sq) => sq.id === fromId);
   const kind = from ? hasMissiles(from, data) : false;
   return view.squadrons
-    .filter((sq) => size(sq) > 0 && sq.id !== fromId && hasMissiles(sq, data) === kind)
+    .filter(
+      (sq) =>
+        size(sq) > 0 &&
+        sq.id !== fromId &&
+        hasMissiles(sq, data) === kind &&
+        !(now !== undefined && squadronRefueling(sq, now)),
+    )
     .map((sq) => sq.id);
 }

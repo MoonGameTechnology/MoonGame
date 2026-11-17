@@ -178,35 +178,21 @@ export function hangarSectionHtml(view: HangarView, owner: string, mine: boolean
     // трюме читалось бы как «два места свободны», а погрузку на них ядро отобьёт.
     (view.aloft > 0
       ? `<div class="row dim">${esc(t('side.wing.aloft', { n: view.aloft }))}</div>`
-      : '') +
-    (view.sortie
-      ? `<div class="row dim">${
-          view.sortie.rearming > 0
-            ? t('side.wing.rearming', { h: view.sortie.rearming })
-            : t('side.wing.fuel', { n: view.sortie.fuel, max: view.sortie.maxFuel })
-        }</div>`
       : '');
-  // Причина «нельзя лететь» называется СВОИМ словом (правило 3 в `hangarPanel.ts`):
-  // пустой ангар, перезарядка и сухой бак — разные ожидания у игрока. Причина у МЕСТА
-  // одна на все звенья: топливо принадлежит базе (SHU-1.2), поэтому строка стоит над
-  // карточками, а не в каждой.
-  const rearming =
-    view.kind === 'hold' ? t('side.wing.blocked.rearming.hold') : t('side.wing.blocked.rearming');
+  // Причина «нельзя лететь» называется СВОИМ словом (правило 3 в `hangarPanel.ts`): пустой
+  // ангар и бой носителя — разные ожидания у игрока. Причина у МЕСТА одна на все звенья,
+  // поэтому строка стоит над карточками, а не в каждой; заправка — у самой эскадры.
   const why =
     view.blocked === 'empty'
       ? t('side.wing.blocked.empty')
       : view.blocked === 'busy'
         ? t('side.wing.blocked.busy')
-        : view.blocked === 'rearming'
-          ? rearming
-          : view.blocked === 'no-fuel'
-            ? t('side.wing.blocked.no-fuel')
-            : '';
+        : '';
   // ПАТРУЛИ ЭТОЙ БАЗЫ (SHU-6.3): улетевшего звена в ангаре нет, и без этих строк игрок
   // не нашёл бы, где его вернуть. Стоят и над пустым ангаром — в небе может висеть весь
   // состав.
   const patrols = mine ? patrolRowsHtml(owner) : '';
-  const cards = squadronCards(view, { mine, data });
+  const cards = squadronCards(view, { mine, data, now: game.world().time });
   if (cards.length === 0) {
     return head + patrols + `<div class="row dim">${esc(t('side.wing.empty'))}</div>`;
   }
@@ -243,6 +229,12 @@ function patrolRowsHtml(owner: string): string {
  * только в её карточке (UIX-10.14, концепт «Управление эскадрой»): своё имя здесь —
  * кнопка, которая выделяет эскадру, как значок ангара на карте.
  */
+/** «заправка 25м» разметкой: срок — живой отсчёт до `readyAt` (решение владельца
+ *  2026-11-17). Знак-место `\u0001` — его нет ни в одной локали. */
+export function refuelNoteHtml(readyAt: number): string {
+  return esc(t('side.squad.refuel', { left: '\u0001' })).replace('\u0001', liveTimerHtml(readyAt));
+}
+
 function squadronCardHtml(card: SquadronCard, mine: boolean): string {
   const title = `${t(SQUADRON_KIND_KEY)} «${card.name}»`;
   const cargo = card.cargo.reduce((n, st) => n + st.count, 0);
@@ -256,7 +248,9 @@ function squadronCardHtml(card: SquadronCard, mine: boolean): string {
   ];
   // У кнопки-имени точка-разделитель не нужна: кнопка и так отделена, а перенос строки
   // оставлял бы точку висеть у её края.
-  const sub = ` <span class="dim">${mine ? '' : '· '}${esc(notes.join(' · '))}</span>`;
+  // Заправка — живым отсчётом после остальных пометок (решение владельца 2026-11-17).
+  const fuel = mine && card.refuelAt !== null ? ` · ${refuelNoteHtml(card.refuelAt)}` : '';
+  const sub = ` <span class="dim">${mine ? '' : '· '}${esc(notes.join(' · '))}${fuel}</span>`;
   const name = mine ? btn('sqpick', card.id, `◇ ${title}`, true) : `<b>${esc(title)}</b>`;
   return `<div class="row">${name}${sub}</div>` + unitRows(card.stacks);
 }

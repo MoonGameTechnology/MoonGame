@@ -3,34 +3,31 @@ import { badgeAt, badgeTap, hangarBadge, parkedState } from './hangarBadge';
 
 describe('hangarBadge', () => {
   it('no squadrons → no badge', () => {
-    expect(hangarBadge({ squadronIds: [], blocked: 'empty' })).toBeNull();
+    expect(hangarBadge({ squadronIds: [], blocked: 'empty', refueling: 0 })).toBeNull();
   });
 
-  it('one badge per base, counted, ready when the base can launch', () => {
-    expect(hangarBadge({ squadronIds: ['a', 'b'], blocked: null })).toEqual({
+  it('one badge per base, counted, ready when some squadron can launch', () => {
+    expect(hangarBadge({ squadronIds: ['a', 'b'], blocked: null, refueling: 1 })).toEqual({
       count: 2,
       ready: true,
       squadronIds: ['a', 'b'],
     });
-    expect(hangarBadge({ squadronIds: ['a'], blocked: 'rearming' })?.ready).toBe(false);
-    expect(hangarBadge({ squadronIds: ['a'], blocked: 'no-fuel' })?.ready).toBe(false);
+    expect(hangarBadge({ squadronIds: ['a', 'b'], blocked: null, refueling: 2 })?.ready).toBe(
+      false,
+    );
+    expect(hangarBadge({ squadronIds: ['a'], blocked: 'busy', refueling: 0 })?.ready).toBe(false);
   });
 });
 
 describe('parkedState', () => {
-  it('names the reason in its own word', () => {
-    const sortie = { fuel: 2, maxFuel: 3, rearming: 0 };
-    expect(parkedState(null, sortie)).toEqual({ kind: 'ready', fuel: 2, maxFuel: 3 });
-    expect(parkedState('rearming', { ...sortie, rearming: 4 })).toEqual({
-      kind: 'rearming',
-      hours: 4,
-    });
-    expect(parkedState('no-fuel', sortie)).toEqual({ kind: 'no-fuel' });
-    expect(parkedState('busy', sortie)).toEqual({ kind: 'busy' });
+  it('names the reason in its own word, refuel with its deadline', () => {
+    expect(parkedState(null, undefined, 100)).toEqual({ kind: 'ready' });
+    expect(parkedState(null, 100, 100)).toEqual({ kind: 'ready' }); // срок вышел ровно сейчас
+    expect(parkedState(null, 160, 100)).toEqual({ kind: 'refueling', readyAt: 160 });
   });
 
-  it('a base without a fuel counter is simply ready', () => {
-    expect(parkedState(null, undefined)).toEqual({ kind: 'ready', fuel: null, maxFuel: null });
+  it('a carrier in battle outranks the refuel: it still blocks after the tank is full', () => {
+    expect(parkedState('busy', 160, 100)).toEqual({ kind: 'busy' });
   });
 });
 

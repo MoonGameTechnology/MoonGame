@@ -245,6 +245,7 @@ describe('visibleState — order chains are the owner’s secret (future intent)
       id,
       units: [{ unit: 'cruiser', count: 1 }],
       hold,
+      readyAt: 5_000, // срок заправки — след недавнего вылета, тоже только свой
     });
     // B — опознанный узел (прыжок от A), и он же рядом с A: каждая сторона опознаёт базы
     // другой.
@@ -258,7 +259,10 @@ describe('visibleState — order chains are the owner’s secret (future intent)
         ...Object.values(view.planets).filter((pl) => pl.owner !== me).flatMap((pl) => pl.hangar ?? []),
         ...Object.values(view.fleets).filter((f) => f.owner !== me).flatMap((f) => f.hangar ?? []),
       ];
-      return { ids: all.map((q) => q.id), held: all.filter((q) => q.hold !== undefined).map((q) => q.id) };
+      return {
+        ids: all.map((q) => q.id),
+        held: all.filter((q) => q.hold !== undefined || q.readyAt !== undefined).map((q) => q.id),
+      };
     };
     for (const [me, other] of [['p1', 'sq:p2:2'], ['p2', 'sq:p1:2']] as const) {
       const view = visibleState(state, me, data);
@@ -271,6 +275,7 @@ describe('visibleState — order chains are the owner’s secret (future intent)
     const mine = visibleState(state, 'p1', data);
     expect(mine.planets.A?.hangar?.[0]?.hold).toEqual({ at: { x: 40, y: 0 } });
     expect(mine.fleets['mine-1']?.hangar?.[0]?.hold).toEqual({});
+    expect(mine.planets.A?.hangar?.[0]?.readyAt).toBe(5_000);
     // Проекция не трогает сам мир: туман режет копию.
     expect(state.planets.B?.hangar?.[0]?.hold).toEqual({ at: { x: 120, y: 5 } });
   });

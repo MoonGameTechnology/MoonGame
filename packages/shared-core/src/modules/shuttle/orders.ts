@@ -243,7 +243,8 @@ export function registerSquadronOrders(api: ModuleSetupApi): void {
    * 3. **Место в трюме корабля держится с взлёта** (`strikesReserved` считает вылет,
    *    чья база — этот корабль): два перелёта на одно место иначе оба взлетели бы, а сел
    *    бы один.
-   * 4. **Тратится один вылет базы, с которой ушли**, как у удара и патруля.
+   * 4. **Перелёт — тот же взлёт:** заправляющаяся эскадра не перелетает, а севшая на новой
+   *    базе заправляется, как после удара.
    * 5. **Боец летит с бортом.** Десантный челнок перебирается вместе со своим бойцом:
    *    это не высадка, на землю он не сходит.
    * 6. **Новая база не приняла — назад, а нет и дома — на ближайшую** (`divert`): тем же
@@ -296,8 +297,10 @@ export function registerSquadronOrders(api: ModuleSetupApi): void {
     const squad = requireSquadron(h, base, p.squadronId);
     const parts = divideSquadron(h, squad, p.units);
     const freshId = nextSquadronId(h, action.playerId);
-    const named: Squadron = { id: squad.id, ...parts.named };
-    const other: Squadron = { id: freshId, ...parts.other };
+    // Заправка — у машин, а не у имени: обе части заправляются до того же срока.
+    const fuel = squad.readyAt !== undefined ? { readyAt: squad.readyAt } : {};
+    const named: Squadron = { id: squad.id, ...parts.named, ...fuel };
+    const other: Squadron = { id: freshId, ...parts.other, ...fuel };
     base.setHangar(base.hangar.flatMap((q) => (q.id === squad.id ? [named, other] : [q])));
     h.emit('squadron.split', {
       baseId: base.ref.id,

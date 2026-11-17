@@ -113,16 +113,23 @@ describe('SHU-4.3 — слияние двумя тапами', () => {
     expect(squadronCards(v, { mine: true, data })[0]?.canMerge).toBe(false);
   });
 
-  it('СВОДЯТСЯ ТОЛЬКО ГОТОВЫЕ: база заправляется или перезаряжается — плитки «Слить» нет', () => {
-    const pair = [sq('a', [['interceptor', 1]]), sq('b', [['bomber', 1]])];
-    const can = (blocked: HangarView['blocked']) =>
-      squadronCards(view(pair, { blocked }), { mine: true, data })[0]?.canMerge;
-    expect([can(null), can('rearming'), can('no-fuel'), can('busy')]).toEqual([true, false, false, false]);
-    // Ракетам топливо порта не нужно: им мешает только бой у базы.
+  it('СВОДЯТСЯ ТОЛЬКО ГОТОВЫЕ: заправляется эта эскадра или её пара — плитки «Слить» нет', () => {
+    const a = sq('a', [['interceptor', 1]]);
+    const b = sq('b', [['bomber', 1]]);
+    const fueling = (q: Squadron): Squadron => ({ ...q, readyAt: 100 });
+    const can = (pair: Squadron[], blocked: HangarView['blocked'] = null) =>
+      squadronCards(view(pair, { blocked }), { mine: true, data, now: 50 })[0]?.canMerge;
+    expect(can([a, b])).toBe(true);
+    expect(can([fueling(a), b])).toBe(false); // сама ещё заправляется
+    expect(can([a, fueling(b)])).toBe(false); // сливать не с кем: пара заправляется
+    expect(can([a, b], 'busy')).toBe(false);
+    expect(mergeTargets(view([a, fueling(b)]), 'a', data, 50)).toEqual([]);
+    expect(mergeTargets(view([a, fueling(b)]), 'a', data, 100)).toEqual(['b']); // срок вышел
+    // Ракеты не заправляются: им мешает только бой у базы.
     const rockets = [sq('m', [['cruise_missile', 1]]), sq('n', [['cruise_missile', 1]])];
     const canRockets = (blocked: HangarView['blocked']) =>
       squadronCards(view(rockets, { blocked }), { mine: true, data })[0]?.canMerge;
-    expect([canRockets('rearming'), canRockets('busy')]).toEqual([true, false]);
+    expect([canRockets(null), canRockets('busy')]).toEqual([true, false]);
   });
 });
 
@@ -192,13 +199,23 @@ describe('SHU-6.3 — кнопка «Патруль»', () => {
     expect(card?.canPatrol).toBe(false);
   });
 
-  it('ГОТОВНОСТЬ БАЗЫ У ПАТРУЛЯ ТА ЖЕ, ЧТО У УДАРА: перезарядка гасит обе кнопки разом', () => {
-    const [card] = squadronCards(view([sq('a', [['interceptor', 2]])], { blocked: 'rearming' }), {
+  it('ГОТОВНОСТЬ У ПАТРУЛЯ ТА ЖЕ, ЧТО У УДАРА: заправка гасит обе кнопки разом', () => {
+    const [card] = squadronCards(view([{ ...sq('a', [['interceptor', 2]]), readyAt: 100 }]), {
       mine: true,
       data,
+      now: 50,
     });
     expect(card?.canPatrol).toBe(true); // умеет
-    expect(card?.canStrike).toBe(false); // но база не готова — кнопка серая
+    expect(card?.canStrike).toBe(false); // но заправляется — плитки нет
+    expect(card?.refuelAt).toBe(100);
+  });
+
+  it('ЗАПРАВКА КОНЧИЛАСЬ — ГОТОВА; без времени мира заправку не видно', () => {
+    const fueled = { ...sq('a', [['interceptor', 2]]), readyAt: 100 };
+    const [done] = squadronCards(view([fueled]), { mine: true, data, now: 100 });
+    expect([done?.canStrike, done?.refuelAt]).toEqual([true, null]);
+    const [blind] = squadronCards(view([fueled]), { mine: true, data });
+    expect(blind?.refuelAt).toBeNull();
   });
 });
 
@@ -241,11 +258,12 @@ describe('SHU-6.5 — кнопка «Перебазировать»', () => {
     expect(card?.canPatrol).toBe(false);
   });
 
-  it('ГОТОВНОСТЬ БАЗЫ ТА ЖЕ, ЧТО У УДАРА: на перезарядке кнопка есть, но серая', () => {
-    const [card] = squadronCards(view([sq('a', [['interceptor', 2]])], { blocked: 'rearming' }), {
+  it('ГОТОВНОСТЬ ТА ЖЕ, ЧТО У УДАРА: на заправке перелёт умеет, но плитки нет', () => {
+    const [card] = squadronCards(view([{ ...sq('a', [['interceptor', 2]]), readyAt: 100 }]), {
       mine: true,
       data,
       relocate: () => true,
+      now: 50,
     });
     expect(card?.canRelocate).toBe(true);
     expect(card?.canStrike).toBe(false);
@@ -253,11 +271,15 @@ describe('SHU-6.5 — кнопка «Перебазировать»', () => {
 });
 
 describe('SHU-6.6 — «Держать патруль» на карточке дома', () => {
-  it('ЭСКАДРА С УДЕРЖАНИЕМ ПОМЕЧЕНА, и снять его можно на перезарядке базы', () => {
-    const held: Squadron = { ...sq('a', [['interceptor', 2]]), hold: { at: { x: 1, y: 2 } } };
-    const [card] = squadronCards(view([held], { blocked: 'rearming' }), { mine: true, data });
+  it('ЭСКАДРА С УДЕРЖАНИЕМ ПОМЕЧЕНА, и снять его можно на заправке', () => {
+    const held: Squadron = {
+      ...sq('a', [['interceptor', 2]]),
+      hold: { at: { x: 1, y: 2 } },
+      readyAt: 100,
+    };
+    const [card] = squadronCards(view([held]), { mine: true, data, now: 50 });
     expect(card?.hold).toBe(true);
-    expect(card?.canStrike).toBe(false); // база ждёт — а снять удержание можно уже сейчас
+    expect(card?.canStrike).toBe(false); // заправляется — а снять удержание можно уже сейчас
   });
 
   it('БЕЗ УДЕРЖАНИЯ И У ЧУЖОЙ ЭСКАДРЫ ОТМЕТКИ НЕТ', () => {

@@ -727,8 +727,7 @@ function fleetHangarHtml(f: Fleet, compact: boolean): string {
   const ME = game.me();
   const hold = f.owner === ME ? fleetHangar(f, data, s) : null;
   if (!hasHangar(hold)) return '';
-  const idle =
-    hold.aloft === 0 && !hold.sortie && squadronCards(hold, { mine: true, data }).length === 0;
+  const idle = hold.aloft === 0 && squadronCards(hold, { mine: true, data }).length === 0;
   // Перегрузка порт ⇄ трюм — в карточке самой эскадры (UIX-10.14): имя в секции её выделяет.
   return compact && idle
     ? `<div class="row dim fc-hangar">${esc(t('side.wing.empty'))}</div>`

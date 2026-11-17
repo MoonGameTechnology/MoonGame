@@ -10,6 +10,7 @@ import {
   nextSquadronId,
   noteBase,
   planetBase,
+  refuelUntil,
   scheduleChase,
   schedulePatrolTick,
   withHangar,
@@ -110,6 +111,8 @@ export function registerFlightEvents(api: ModuleSetupApi): void {
       // Недобитый урон вылета остаётся на машинах (SHU-5.3), а не забывается на посадке.
       ...(strike.damage && strike.damage > 0 ? { damage: strike.damage } : {}),
       ...(held ? { hold: base.ref.kind === 'planet' ? { at: { ...strike.to } } : {} } : {}),
+      // Севшая эскадра заправляется (решение владельца 2026-11-17): до `readyAt` не взлетит.
+      ...refuelUntil(h, strike.units),
     };
     base.setHangar(trimHangar([...base.hangar, home], spot.bay, h.ctx.data));
     h.emit('shuttle.landed', {
@@ -381,7 +384,7 @@ export function registerBaseUpkeep(api: ModuleSetupApi): void {
     if (!site) return;
     const lost = hangarUsed(site);
     delete site.hangar;
-    delete site.sortie;
-    if (lost > 0) h.emit('shuttle.lost', { baseId: site.id, baseKind: 'planet', owner: p.owner, count: lost });
+    if (lost > 0)
+      h.emit('shuttle.lost', { baseId: site.id, baseKind: 'planet', owner: p.owner, count: lost });
   });
 }

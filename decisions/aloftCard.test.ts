@@ -28,13 +28,16 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 10,
       strikeRange: 300,
-      fuel: 3,
       patrolHours: 4,
       patrolRadius: 90,
     }),
     // Десантный челнок: патрулировать не умеет.
-    lander: shuttle({ attack: 0, defense: 2, speed: 100, hp: 24, strikeRange: 300, fuel: 2 }),
-    infantry: { faction: 'x', traits: ['ground'], stats: { attack: 1, defense: 1, speed: 0, hp: 5 } },
+    lander: shuttle({ attack: 0, defense: 2, speed: 100, hp: 24, strikeRange: 300 }),
+    infantry: {
+      faction: 'x',
+      traits: ['ground'],
+      stats: { attack: 1, defense: 1, speed: 0, hp: 5 },
+    },
   },
   factions: {},
   buildings: {

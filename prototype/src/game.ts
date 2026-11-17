@@ -112,16 +112,10 @@ export {
 export { fleetOpsModule, autoRallyModule } from '../../packages/shared-core/src/index';
 export {
   shuttleTake,
-  sortieSpec,
-  freshSortie,
-  canSortie,
-  spendSortie,
-  tickRearm,
   fleetHasShuttle,
   shuttleStrikeRange,
   withinRange,
   shuttleReaches,
-  type SortieState,
 } from '../../packages/shared-core/src/index';
 // Предикаты «действующего крыла» — сторона КЛИЕНТА, а не правило мира, поэтому они
 // не в ядре, а в общем пакете решений, откуда их видит и `packages/client` (CONV-5).

@@ -63,22 +63,14 @@ describe('SHU-3.1 — ангар МИРА виден игроку', () => {
     expect(v.free).toBe(v.bay);
   });
 
-  it('ТРИ ПРИЧИНЫ «НЕЛЬЗЯ ЛЕТЕТЬ» НАЗЫВАЮТСЯ РАЗНЫМИ СЛОВАМИ', () => {
+  it('ПРИЧИНЫ «НЕЛЬЗЯ ЛЕТЕТЬ» У МЕСТА — только пусто; запаса вылетов у базы нет', () => {
     const full = { hangar: [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 1 }] }] };
     expect(planetHangar(port(full), data)!.blocked).toBeNull();
-    expect(planetHangar(port({ ...full, sortie: { fuel: 2, rearming: 3 } }), data)!.blocked).toBe(
-      'rearming',
-    );
-    expect(planetHangar(port({ ...full, sortie: { fuel: 0, rearming: 0 } }), data)!.blocked).toBe(
-      'no-fuel',
-    );
+    // Старый счётчик из сейва ничего не запирает (решение владельца 2026-11-17).
+    expect(
+      planetHangar(port({ ...full, sortie: { fuel: 0, rearming: 3 } }), data)!.blocked,
+    ).toBeNull();
     expect(planetHangar(port(), data)!.blocked).toBe('empty');
-  });
-
-  it('топливо — счётчик МЕСТА, и у пустого порта его не показывают', () => {
-    expect(planetHangar(port(), data)!.sortie).toBeUndefined();
-    const v = planetHangar(port({ hangar: [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 1 }] }] }), data)!;
-    expect(v.sortie?.maxFuel).toBe(data.units.interceptor!.stats.fuel);
   });
 });
 
@@ -238,16 +230,14 @@ describe('трюм носителя читается как порт и знае
   const squad = [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 2 }] }];
   const moving = { from: 'A', to: 'B', departedAt: 0, arrivesAt: 1 };
 
-  it('ПОЛНЫЙ ТРЮМ НЕ СУХОЙ: топливо берётся у машины в ангаре, а не у корпуса', () => {
+  it('ПОЛНЫЙ ТРЮМ ГОТОВ К ВЫЛЕТУ', () => {
     const v = fleetHangar(carrier({ hangar: squad }), data)!;
     expect(v.blocked).toBeNull();
-    expect(v.sortie?.maxFuel).toBeGreaterThan(0);
   });
 
   it('И СОВПАДАЕТ С ПОРТОМ ПРИ ТОМ ЖЕ АНГАРЕ — одно правило, одно чтение', () => {
     const hold = fleetHangar(carrier({ hangar: squad }), data)!;
     const port = planetHangar({ ...portOf(), hangar: squad }, data)!;
-    expect(hold.sortie).toEqual(port.sortie);
     expect(hold.blocked).toBe(port.blocked);
   });
 

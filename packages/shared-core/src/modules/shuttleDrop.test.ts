@@ -53,8 +53,6 @@ const data: GameData = parseGameData({
         speed: 100,
         hp: 10,
         strikeRange: 180,
-        fuel: 4,
-        rearmRounds: 2,
       },
     },
     // Вооружённый челнок — сторож на то, что запрет бить корабли идёт от ОРУЖИЯ.
@@ -62,7 +60,7 @@ const data: GameData = parseGameData({
       faction: 'x',
       domain: 'space',
       traits: ['shuttle'],
-      stats: { attack: 20, defense: 4, speed: 100, hp: 16, strikeRange: 180, fuel: 4, rearmRounds: 2 },
+      stats: { attack: 20, defense: 4, speed: 100, hp: 16, strikeRange: 180 },
     },
     militia: {
       faction: 'x',

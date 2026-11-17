@@ -49,11 +49,10 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 10,
       strikeRange: 180,
-      fuel: 3,
-      rearmRounds: 2,
       shuttleDamage: 22,
       patrolHours: 4,
       patrolRadius: 60,
+      refuelMinutes: 30,
     }),
     bomber: shuttle({
       attack: 20,
@@ -61,8 +60,6 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 16,
       strikeRange: 180,
-      fuel: 2,
-      rearmRounds: 3,
       siegeDamage: 8,
     }),
     // Десантный челнок: короткая рука (120) — перелёт 240.
@@ -72,8 +69,6 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 24,
       strikeRange: 120,
-      fuel: 2,
-      rearmRounds: 2,
     }),
   },
   factions: {},
@@ -217,7 +212,6 @@ describe('SHU-6.4 — приказ перелёта', () => {
     expect(st?.origin).toEqual({ kind: 'planet', id: 'A' });
     expect(st?.leg).toBe('back');
     expect(st?.arrivesAt).toBe(3 * H); // 300 единиц на 100 в час
-    expect(s.planets.A?.sortie?.fuel).toBe(2); // из трёх — один, как у удара
 
     const { state, events } = run(s, 3);
     expect(state.strikes ?? []).toHaveLength(0);
@@ -318,11 +312,20 @@ describe('SHU-6.4 — приказ перелёта', () => {
     s = until(s, 2);
     expect(s.strikes ?? []).toHaveLength(0);
     expect(s.fleets.CV?.hangar?.map((q) => q.id)).toEqual(['sq:i']);
+    // Заправку после посадки проверяет свой тест ниже; здесь важна живая позиция корабля
+    // в эту самую минуту, поэтому эскадра взлетает сразу.
+    const cv = s.fleets.CV!;
+    s = {
+      ...s,
+      fleets: {
+        ...s.fleets,
+        CV: { ...cv, hangar: (cv.hangar ?? []).map(({ readyAt: _r, ...q }) => q) },
+      },
+    };
 
     // С идущего корабля — на порт B(300,0): √(100² + 100²) ≈ 141 единица.
     s = apply(s, relocate('sq:i', { toPlanetId: 'B' }, { fleetId: 'CV' }));
     expect(s.fleets.CV?.hangar ?? []).toHaveLength(0);
-    expect(s.fleets.CV?.sortie?.fuel).toBe(2); // тратит вылет корабля, а не порта
     expect((flight(s)!.arrivesAt - flight(s)!.departedAt) / H).toBeCloseTo(Math.SQRT2, 3);
     s = until(s, 3.5);
     expect(s.planets.B?.hangar?.map((q) => q.id)).toEqual(['sq:i']);
@@ -505,23 +508,15 @@ describe('SHU-6.4 — база пропала, пока эскадра в воз
   });
 });
 
-describe('SHU-6.4 — опустевшая база не сохнет навсегда', () => {
-  it('ПЕРЕЗАРЯДКА НА ПУСТОЙ БАЗЕ СНИМАЕТ СЧЁТЧИК: вернувшаяся эскадра снова взлетает', () => {
+describe('заправка после перелёта (решение владельца 2026-11-17)', () => {
+  it('СЕВШАЯ НА НОВОЙ БАЗЕ ЭСКАДРА ЗАПРАВЛЯЕТСЯ, а затем снова взлетает', () => {
     let s = world([sq('sq:i', 'interceptor', 2)]);
-    s = {
-      ...s,
-      planets: { ...s.planets, A: { ...s.planets.A!, sortie: { fuel: 1, rearming: 0 } } },
-    };
-    s = apply(s, relocate('sq:i', { toPlanetId: 'B' }));
-    expect(s.planets.A?.sortie).toEqual({ fuel: 0, rearming: 2 });
-    s = until(s, 3);
-    // Перезарядка кончилась, когда заправлять было нечего: счётчик снят, а не «полон нулём».
-    expect(s.planets.A?.sortie).toBeUndefined();
-    s = until(apply(s, relocate('sq:i', { toPlanetId: 'A' }, { planetId: 'B' })), 6);
-    expect(docked(s.planets.A)).toBe(2);
-    expect(
-      code(s, act('shuttle.patrol', { planetId: 'A', squadronId: 'sq:i', at: { x: 100, y: 0 } })),
-    ).toBeNull();
+    s = until(apply(s, relocate('sq:i', { toPlanetId: 'B' })), 3);
+    const landed = s.planets.B?.hangar?.find((q) => q.id === 'sq:i');
+    expect(landed?.readyAt).toBeGreaterThan(s.time);
+    const back = act('shuttle.relocate', { planetId: 'B', squadronId: 'sq:i', toPlanetId: 'A' });
+    expect(code(s, back)).toBe('E_REFUELING');
+    expect(code(until(s, 4), back)).toBeNull();
   });
 });
 

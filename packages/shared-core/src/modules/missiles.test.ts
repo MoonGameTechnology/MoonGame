@@ -47,8 +47,6 @@ const data: GameData = parseGameData({
         speed: 50,
         hp: 10,
         strikeRange: 250,
-        fuel: 3,
-        rearmRounds: 2,
       },
       cost: { metal: 10 },
       buildTimeHours: 0,

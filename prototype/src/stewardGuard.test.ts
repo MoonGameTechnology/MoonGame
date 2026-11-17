@@ -409,7 +409,10 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
     const cases: Array<[string, Partial<Planet>]> = [
       ['нет порта', { buildings: [] }],
       ['порт подбит', { buildings: [{ type: 'spaceport', level: 1, hp: 10 }] }],
-      ['перезарядка', { sortie: { fuel: 0, rearming: 2 } }],
+      [
+        'эскадра заправляется',
+        { hangar: [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 2 }], readyAt: 1e15 }] },
+      ],
       [
         'десантный челнок не висит',
         { hangar: [{ id: 'sq:p1:1', units: [{ unit: 'landing_shuttle', count: 1 }] }] },

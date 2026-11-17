@@ -23,6 +23,7 @@ import {
   portDisabled,
   squadronPatrol,
   squadronReach,
+  squadronRefueling,
   STEWARD_LOSS_LIMIT,
   type GameState,
   type Action,
@@ -465,8 +466,8 @@ export function stewardGuardOrders(
   }
   // Патрульная вахта (ST-3.3, только «Активная оборона»; с SHU-6.6 — патруль вместо
   // дежурного вылета): над каждым СВОИМ миром, который ещё не держит патруль, Хранитель
-  // поднимает удерживаемый патруль первой эскадрой, которая умеет висеть. Дальше её
-  // поднимает снова само ядро после каждой перезарядки. Приказ уходит, только когда ядро
+  // поднимает удерживаемый патруль первой заправленной эскадрой, которая умеет висеть.
+  // Дальше её поднимает снова само ядро после каждой заправки. Приказ уходит, только когда ядро
   // его примет: иначе журнал утром соврал бы «патруль поставлен», а отказ повторялся бы
   // каждый тик. Корабли-базы Хранитель не трогает: они идут с флотом, а вахта — у миров.
   if (posture === 'active_defend') {
@@ -475,9 +476,11 @@ export function stewardGuardOrders(
       const base = { kind: 'planet', id: planet.id } as const;
       if (holdsPatrol(state.strikes, planet.hangar, base, ai)) continue; // уже держит
       const port = planetHangar(planet, data);
-      // Топливо, перезарядка и целый порт — та же готовность базы, что у приказа.
+      // Целый порт и заправленная эскадра — та же готовность, что у приказа.
       if (!port || port.blocked !== null || portDisabled(planet, data)) continue;
-      const squad = port.squadrons.find(canHoldPatrol);
+      const squad = port.squadrons.find(
+        (sq) => canHoldPatrol(sq) && !squadronRefueling(sq, state.time),
+      );
       if (!squad) continue;
       out.push(patrolShuttle(ai, { planetId: planet.id }, squad.id, planet.position, true));
       report.push({ at: state.time, kind: 'watch', node: planet.id });

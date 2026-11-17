@@ -42,7 +42,6 @@ const data: GameData = parseGameData({
       speed: 100,
       hp: 10,
       strikeRange: 180,
-      fuel: 3,
       patrolHours: 4,
       patrolRadius: 90,
     }),
@@ -53,11 +52,10 @@ const data: GameData = parseGameData({
       speed: 80,
       hp: 30,
       strikeRange: 180,
-      fuel: 2,
       cargoSize: 2,
     }),
     // Короткая рука: радиус 120 — перелёт 240.
-    lander: shuttle({ attack: 0, defense: 2, speed: 100, hp: 24, strikeRange: 120, fuel: 2 }),
+    lander: shuttle({ attack: 0, defense: 2, speed: 100, hp: 24, strikeRange: 120 }),
   },
   factions: {},
   buildings: {

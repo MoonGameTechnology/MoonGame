@@ -1,28 +1,20 @@
-/** Челноки: зональное ПВО, перехват и перезарядка вылетов. Разрезан из `../shuttle.ts` (SLIM). */
+/** Челноки: зональное ПВО и перехват. Разрезан из `../shuttle.ts` (SLIM). */
 import type { ModuleSetupApi } from '../../kernel/module';
 import {
   type BaseView,
   absorbIntoStrike,
-  baseSortieSpec,
   fleetBase,
   hourMs,
   interceptReach,
   nearestHostileStrike,
   planetBase,
+  refuelUntil,
   withHangar,
 } from './kit';
 import type { Fleet } from '../../state/gameState';
 import type { HandlerContext } from '../../kernel/module';
 import { PD_COOLDOWN_MINUTES, fleetPDRange, fleetPointDefense } from '../../util/pointDefense';
-import {
-  type SortieState,
-  canSortie,
-  freshSortie,
-  hangarMachines,
-  hullShare,
-  spendSortie,
-  tickRearm,
-} from '../../state/shuttle';
+import { hangarMachines, hullShare, squadronRefueling } from '../../state/shuttle';
 import { applyDamageToSide, hookedDamage, isHostile } from '../../util/combat';
 import { cappedUnitStat } from '../../util/stacks';
 import { clearMine } from './flight';
@@ -167,7 +159,9 @@ export function registerAirDefense(api: ModuleSetupApi): void {
    * Три вещи, которые здесь легко потерять при правке:
    *
    * Interceptors use their remaining hull and the air-wing size threshold.
-   * The base spends one sortie and targets the nearest hostile flight in range.
+   * Only squadrons that are not refuelling take part; after the pass each of them
+   * refuels like a landed sortie (owner's decision 2026-11-17, replaced the base's
+   * shared sortie pool). Targets the nearest hostile flight in range.
    */
   api.on('time.advanced', (_event, h: HandlerContext) => {
     const strikes = h.state.strikes ?? [];
@@ -184,8 +178,17 @@ export function registerAirDefense(api: ModuleSetupApi): void {
     ];
     for (const base of bases) {
       if (base.owner === null || base.position === null) continue;
-      const machines = hangarMachines({ hangar: base.hangar });
-      const healthyMachines = base.hangar.flatMap(squad => {
+      // Охотники — эскадры, что не заправляются; машины без `shuttleDamage` в них не идут.
+      const hunters = base.hangar.filter(
+        (squad) =>
+          !squadronRefueling(squad, h.ctx.now) &&
+          squad.units.some(
+            (st) => st.count > 0 && (data.units[st.unit]?.stats.shuttleDamage ?? 0) > 0,
+          ),
+      );
+      if (hunters.length === 0) continue;
+      const machines = hangarMachines({ hangar: hunters });
+      const healthyMachines = hunters.flatMap((squad) => {
         const health = hullShare(squad.units, squad.damage, data);
         return squad.units.map(stack => ({ ...stack,
           hp: (stack.hp ?? stack.count * (effectiveStats(data.units[stack.unit]!, stack, data).hp ?? 1)) * health,
@@ -193,9 +196,6 @@ export function registerAirDefense(api: ModuleSetupApi): void {
       });
       const power = cappedUnitStat(healthyMachines, data, 'shuttleDamage');
       if (power <= 0) continue; // в ангаре нет охотников
-      const spec = baseSortieSpec(base, h.state, data);
-      const sortie = base.sortie ?? freshSortie(spec.maxFuel);
-      if (!canSortie(sortie)) continue; // дежурить нечем — топливо или перезарядка
       const reach = interceptReach(machines, data);
       if (reach <= 0) continue;
 
@@ -218,7 +218,12 @@ export function registerAirDefense(api: ModuleSetupApi): void {
       });
       // Тот же перевод урона в сбитые машины, что у зонального ПВО (`absorbIntoStrike`).
       const downed = absorbIntoStrike(target, dealt, data, h, base.owner);
-      base.setSortie(spendSortie(sortie, spec.rearmRounds));
+      const flew = new Set(hunters.map((squad) => squad.id));
+      base.setHangar(
+        base.hangar.map((squad) =>
+          flew.has(squad.id) ? { ...squad, ...refuelUntil(h, squad.units) } : squad,
+        ),
+      );
       h.emit('shuttle.intercepted', {
         baseId: base.ref.id,
         baseKind: base.ref.kind,
@@ -230,53 +235,5 @@ export function registerAirDefense(api: ModuleSetupApi): void {
       });
     }
     h.state.strikes = strikes.filter((st) => st.units.length > 0);
-  });
-}
-
-/** Перезарядка вылетов. */
-export function registerRearm(api: ModuleSetupApi): void {
-  /** Перезарядка идёт ДОМА: час мира — раунд перезарядки (SHU-1.2). «Дом» — любая
-   *  база: и космопорт, и носитель (SHU-2.1), поэтому счётчик тикает у обоих одним
-   *  правилом, а не двумя копиями, которые разъедутся.
-   *
-   *  Часы считаются от НАКОПЛЕННОГО времени, а не от отрезка (AUD-27): остаток сверх
-   *  целых часов переходит в следующий отрезок (`SortieState.carry`). Иначе итог зависел
-   *  бы от нарезки времени — от частоты событий и вызовов `advanceTo`.
-   *
-   *  Перезарядка кончилась, а заправлять НЕЧЕГО — счётчик снимается (SHU-6.4). База
-   *  опустела насовсем: эскадра перелетела, сгрузилась на корабль, погибла. «Полный»
-   *  бак нулевого размера остался бы на базе навсегда, и следующая эскадра, севшая сюда,
-   *  не взлетела бы никогда; без счётчика она начнёт со свежего запаса своих машин. */
-  api.on('time.advanced', (event, h: HandlerContext) => {
-    const { from, to } = event.payload as { from: number; to: number };
-    const span = to - from;
-    if (!(span > 0)) return;
-    const hour = hourMs(h);
-    // Вид базы — только там, где идёт перезарядка: остальные пропускались и раньше.
-    const rearming = (holder: { sortie?: { rearming: number } }): boolean =>
-      !!holder.sortie && !(holder.sortie.rearming <= 0);
-    const bases: BaseView[] = [
-      ...recordValues(h.state.planets)
-        .filter(rearming)
-        .map((planet) => planetBase(planet, h.ctx.data)),
-      ...recordValues(h.state.fleets)
-        .filter(rearming)
-        .map((fleet) => fleetBase(fleet, h.state, h.ctx.data, h.ctx.now)),
-    ];
-    for (const base of bases) {
-      const sortie = base.sortie;
-      if (!sortie || sortie.rearming <= 0) continue;
-      const spec = baseSortieSpec(base, h.state, h.ctx.data);
-      const total = (sortie.carry ?? 0) + span;
-      const hours = Math.floor(total / hour);
-      let next: SortieState = { fuel: sortie.fuel, rearming: sortie.rearming };
-      for (let i = 0; i < hours && next.rearming > 0; i++) next = tickRearm(next, spec.maxFuel);
-      if (next.rearming <= 0 && next.fuel <= 0) {
-        base.setSortie(undefined);
-        continue;
-      }
-      const carry = total - hours * hour;
-      base.setSortie(next.rearming > 0 && carry > 0 ? { ...next, carry } : next);
-    }
   });
 }
