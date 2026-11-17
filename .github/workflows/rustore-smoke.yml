@@ -4,6 +4,11 @@ on:
     paths:
       - 'mobile/**'
       - 'scripts/rustoreRelease.test.ts'
+      - 'prototype/build.mjs'
+      - 'prototype/rustoreprofiletest.mjs'
+      - 'prototype/src/rustore*.ts'
+      - 'prototype/src/main.ts'
+      - 'prototype/src/hubScreen.ts'
       - '.github/workflows/rustore*.yml'
       - 'pnpm-lock.yaml'
   merge_group:
@@ -35,6 +40,10 @@ jobs:
       - name: Build and verify with disposable synthetic identity
         working-directory: mobile
         run: node rustore-smoke.mjs
+      - name: Network-only RuStore browser smoke
+        run: |
+          pnpm run smoke:browser:install
+          node prototype/rustoreprofiletest.mjs
       - name: Upload verification only (no APK or keys)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

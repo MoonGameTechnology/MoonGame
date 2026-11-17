@@ -5,15 +5,15 @@
 //   node sync-www.mjs           # dev client (dist/void-dominion.html) — default
 //   node sync-www.mjs player    # player client (dist/void-dominion-player.html)
 import { execSync } from 'node:child_process';
-import { mkdirSync, copyFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, copyFileSync, readdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const profile = process.argv[2] ?? 'dev';
-if (profile !== 'dev' && profile !== 'player') {
-  console.error(`sync-www: unknown profile "${profile}" — use "dev" (default) or "player"`);
+if (profile !== 'dev' && profile !== 'player' && profile !== 'rustore') {
+  console.error(`sync-www: unknown profile "${profile}" — use "dev" (default) "player" or "rustore"`);
   process.exit(1);
 }
-const htmlName = profile === 'player' ? 'void-dominion-player.html' : 'void-dominion.html';
+const htmlName = profile === 'rustore' ? 'void-dominion-rustore.html' : profile === 'player' ? 'void-dominion-player.html' : 'void-dominion.html';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const src = fileURLToPath(new URL(`../prototype/dist/${htmlName}`, import.meta.url));
@@ -21,6 +21,7 @@ const wwwDir = fileURLToPath(new URL('./www/', import.meta.url));
 const dest = fileURLToPath(new URL('./www/index.html', import.meta.url));
 
 execSync('node prototype/build.mjs', { cwd: root, stdio: 'inherit' });
+if (profile === 'rustore') rmSync(wwwDir, { recursive: true, force: true });
 mkdirSync(wwwDir, { recursive: true });
 copyFileSync(src, dest);
 // The solo sim worker the page starts from a file next to it (prototype/build.mjs).
