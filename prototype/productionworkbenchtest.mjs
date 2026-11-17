@@ -168,9 +168,9 @@ try {
     assert.ok(await page.locator('#constructor [data-cnhull="frigate"].on').count());
     // Slot tiles install/remove fittings, including the cross inside a selected tile.
     await page.locator('#constructor [data-cnmod]').first().click();
-    await page.locator('#constructor .cn-bay.filled').first().click();
+    await page.locator('#constructor :is(.cn-tile,.cn-bay).filled').first().click();
     await page.locator('#constructor [data-cnrm]').click();
-    assert.equal(await page.locator('#constructor .cn-bay.filled').count(), 0);
+    assert.equal(await page.locator('#constructor :is(.cn-tile,.cn-bay).filled').count(), 0);
     await page.locator('#constructor [data-pw-fit-close]').click();
     // A destroyed facility becomes a visible requirement with a working anchor.
     await page.evaluate(() => window.__productionFixture(false));
@@ -235,7 +235,9 @@ try {
     await page.locator('#constructor [data-ctab="infantry"]').click();
     await page.locator('#constructor [data-cnagain]').click();
     assert.ok(await page.locator('#constructor.pw-fitting-open').count());
-    assert.equal(await page.locator('#constructor .cn-bay.filled [data-cnrm]').getAttribute('data-cnrm'), repeatedModule);
+    // The remove cross sits on the open tile only: open the filled one to read what it holds.
+    await page.locator('#constructor :is(.cn-tile,.cn-bay).filled').first().click();
+    assert.equal(await page.locator('#constructor :is(.cn-slots,.cn-bay.filled) [data-cnrm]').getAttribute('data-cnrm'), repeatedModule);
     assert.ok(await page.locator('#constructor [data-cnbuild]').isVisible());
     await page.locator('#constructor [data-cnbuild]').click();
     assert.equal(await page.locator('#constructor.pw-fitting-open').count(), 0);
