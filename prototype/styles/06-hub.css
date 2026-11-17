@@ -167,6 +167,9 @@
   font-size:26px;font-weight:300;color:var(--sf-accent);}
 #hub .hub-mode:hover{border-color:var(--sf-edge-hi);}
 #hub .hub-mode:active{transform:translateY(1px);}
+#hub #hub-ad-preview .hub-mode{border-color:var(--sf-accent);}
+#hub #hub-ad-preview .hub-mode:disabled{opacity:.6;cursor:wait;}
+#hub #hub-ad-preview p{margin:6px 4px 0;font-size:14px;line-height:1.4;color:var(--sf-text);}
 #hub .hub-discord{text-decoration:none;}
 #hub .hub-discord svg.ht-ic{width:22px;height:22px;}
 #hub .hub-discord:focus-visible{outline:2px solid var(--sf-accent);outline-offset:3px;}
