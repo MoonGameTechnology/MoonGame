@@ -368,16 +368,25 @@ describe('REFM-235 — мир на карте', () => {
     expect(frame.named('drawImage').find((k) => k.args.length === 9)?.args.slice(5)).toEqual([c.x - 13, c.y - 13, 26, 26]);
   });
 
-  it('голографическая карта: в зоне вспышек вместо точки — звезда-каркас', async () => {
-    const { worlds, env, frame, next, node, at, asSector } = await boot();
+  it('звезда — своя провинция: каркас её класса; зона вспышек снова точка', async () => {
+    const { worlds, env, frame, next, node, at, asSector, patchPlanet } = await boot();
     env.holographic = true;
-    asSector(next.id, 'solar_flare');
+    asSector(next.id, 'star');
+    patchPlanet(next.id, { kind: 'star', terrain: 'red_giant', owner: null });
     worlds.drawWorlds(0, LOD());
     const c = at(node(next.id));
+    // The wire sphere of a red giant (1.5 × the base radius of 20) and its corona round the node.
+    const near = (r: number) =>
+      frame.named('lineTo').filter((k) => Math.hypot((k.args[0] as number) - c.x, (k.args[1] as number) - c.y) < r);
+    expect(near(20 * 2.2).length).toBeGreaterThan(40);
     expect(arcAt(frame.calls, c, 2.4)).toBeUndefined();
-    // The wire sphere: its outline ring and dozens of mesh segments round the node.
-    const mesh = frame.named('lineTo').filter((k) => Math.hypot((k.args[0] as number) - c.x, (k.args[1] as number) - c.y) < 13 * 2.6);
-    expect(mesh.length).toBeGreaterThan(40);
+    // A flare zone is terrain again: its survey point, no star.
+    frame.calls.length = 0;
+    asSector(next.id, 'solar_flare');
+    patchPlanet(next.id, { kind: 'solar_flare', terrain: 'solar_flare_zone' });
+    worlds.drawWorlds(0, LOD());
+    expect(arcAt(frame.calls, c, 2.4)).toBeDefined();
+    expect(near(20 * 2.2).length).toBeLessThan(40);
   });
 });
 

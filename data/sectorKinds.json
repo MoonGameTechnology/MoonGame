@@ -239,6 +239,20 @@
     },
     "traversable": false
   },
+  "star": {
+    "name": "Star",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": false,
+    "orbit": false,
+    "allowedBuildings": [],
+    "appearance": {
+      "color": "#ffd36a",
+      "label": "star",
+      "shape": "marker"
+    },
+    "traversable": false
+  },
   "station_site": {
     "name": "Space Fortress",
     "scoreValue": 0,

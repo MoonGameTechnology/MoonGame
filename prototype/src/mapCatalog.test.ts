@@ -177,9 +177,12 @@ describe('published match maps', () => {
     expect(map.map!.paths).toBeUndefined(); // All lanes come from the real mosaic.
     expect(map.nodes.every((n) => n.sector !== 'empty')).toBe(true);
     const openingLengths: number[] = [];
+    // A star is a closed province (no lanes): every OTHER province is reachable.
+    const passable = map.nodes.filter((n) => n.links.length > 0).length;
+    expect(nodes.size - passable).toBe(1);
     for (const start of map.starts) {
       const d = distances(start);
-      expect(d.size).toBe(nodes.size);
+      expect(d.size).toBe(passable);
       const worlds = nodes.get(start)!.links.filter((n) => nodes.get(n)!.sector === 'planet');
       expect(worlds).toHaveLength(2);
       for (const world of worlds) {
@@ -203,8 +206,9 @@ describe('published match maps', () => {
     }
     // No single province is the only connection between two parts of either map.
     for (const blocked of nodes.keys()) {
-      const start = map.nodes.find((n) => n.id !== blocked)!.id;
-      expect(distances(start, blocked).size).toBe(nodes.size - 1);
+      if (nodes.get(blocked)!.links.length === 0) continue;
+      const start = map.nodes.find((n) => n.id !== blocked && n.links.length > 0)!.id;
+      expect(distances(start, blocked).size).toBe(passable - 1);
     }
     if (id === 'ffa-4')
       expect(networkSeats('ffa', id).every((s) => s.team === undefined)).toBe(true);

@@ -147,8 +147,10 @@
         "x": -80,
         "y": 210
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "star",
+      "terrain": "yellow_dwarf",
+      "buildings": [],
+      "garrison": []
     },
     "wreck": {
       "position": {

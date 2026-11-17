@@ -38,6 +38,8 @@
 import { writeFileSync, readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import { CELL_AREA, MIN_GAP, dist, freeCells, pos, rngFrom } from './ffa-provinces.mjs';
+import { layStars } from './star-systems.mjs';
+import { mosaicNeighbours } from './lay-stars.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
@@ -52,6 +54,9 @@ const MAPS = {
     hives: 2,
     neutrals: 4,
     rimRifts: 2,
+    // A star in each flare zone of the storms that does not border a capital, in id order
+    // (owner 2026-11-17).
+    stars: ['binary_star'],
     hub: 'dark_heart',
     names: [
       'kaira',
@@ -93,6 +98,7 @@ const MAPS = {
     hives: 4,
     neutrals: 8,
     rimRifts: 4,
+    stars: ['yellow_dwarf', 'red_giant', 'blue_giant', 'white_dwarf'],
     // A square board, filled to its corners (owner 2026-11-09): the round galaxy left the
     // rectangle the mosaic is clipped by empty in its corners, and the rim provinces ran out
     // into them as long wedges.
@@ -198,6 +204,7 @@ async function loadCore() {
   return mod.exports;
 }
 const core = await loadCore();
+const neighbours = await mosaicNeighbours();
 const data = core.shippedGameData();
 const factions = JSON.parse(readFileSync(ROOT + 'data/factions.json', 'utf8'));
 
@@ -843,6 +850,18 @@ function finish(seats, cfg, g) {
     pricing: JSON.parse(readFileSync(ROOT + 'data/maps/duel-1.json', 'utf8')).pricing,
   };
 
+  // ── star systems: a star in each flare zone, its ring after its class (`star-systems.mjs`).
+  // Laid last, over the finished map: areas, names and inhabitants stay as dealt. A flare
+  // zone beside a capital keeps its flares (`layStars` says why).
+  const nearNow = neighbours(content);
+  const capital = (id) => homeIds.includes(id);
+  const flares = Object.keys(sectors)
+    .filter((id) => sectors[id].kind === 'solar_flare' && !nearNow.get(id).some(capital))
+    .sort();
+  if (flares.length !== cfg.stars.length)
+    throw new Error(`${cfg.id}: ${flares.length} flare zones for ${cfg.stars.length} stars`);
+  layStars(content, flares.map((id, i) => [id, cfg.stars[i]]), neighbours);
+
   // ── contracts (prototype/src/ffaMap.test.ts holds the same on the committed file) ──
   const map = core.parseMatchMap(content);
   const issues = core.validateMatchMap(map, data);
@@ -879,8 +898,11 @@ function finish(seats, cfg, g) {
       (k !== 'accretion_disk' || cfg.disk),
   );
   if (kinds.length) fail.push(`kinds ${kinds}`);
-  if (missing('terrain', data.sectors).length)
-    fail.push(`terrains ${missing('terrain', data.sectors)}`);
+  // Star classes are one family: a map shows some of them, never all six.
+  const isStar = (t) => data.sectors[t].family === 'star';
+  const terrains = missing('terrain', data.sectors).filter((t) => !isStar(t));
+  if (terrains.length) fail.push(`terrains ${terrains}`);
+  if (!all.some((s) => s.kind === 'star')) fail.push('no star');
   if (missing('planetType', data.planetTypes).length)
     fail.push(`worlds ${missing('planetType', data.planetTypes)}`);
   for (const k of ['graveyard', 'debris_field'])

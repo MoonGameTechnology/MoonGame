@@ -603,8 +603,8 @@
         "x": 1449,
         "y": 506
       },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
     },
     "C13R5": {
       "position": {
@@ -644,8 +644,11 @@
         "x": 1317,
         "y": 811
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "star",
+      "terrain": "blue_giant",
+      "size": 1.4,
+      "buildings": [],
+      "garrison": []
     },
     "C13R4": {
       "position": {
@@ -722,8 +725,8 @@
         "x": 1044,
         "y": 834
       },
-      "kind": "dead_world",
-      "terrain": "empty_space"
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
     },
     "C11R7": {
       "position": {

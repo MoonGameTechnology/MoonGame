@@ -64,9 +64,10 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
   });
 
   it('keeps every route reachable, with alternative crossings away from occupied bases', () => {
-    // The black hole and the two rifts are deliberately impassable; everything else is reachable.
+    // The black hole, the two rifts and the pair of stars (owner 2026-11-17) are deliberately
+    // impassable; everything else is reachable.
     const barriers = preset.nodes.filter((n) => data.sectorKinds[n.sector]?.traversable === false);
-    expect(barriers.map((n) => n.sector).sort()).toEqual(['black_hole', 'rift', 'rift']);
+    expect(barriers.map((n) => n.sector).sort()).toEqual(['black_hole', 'rift', 'rift', 'star', 'star']);
     for (const n of barriers) expect(n.links).toEqual([]);
     expect(distances('home_1').size).toBe(preset.nodes.length - barriers.length);
     expect(nodes.get('remnant')!.links).toEqual([]);
@@ -122,7 +123,12 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
       .filter((k) => k !== 'accretion_disk')
       .sort();
     expect(has((s) => s.kind)).toEqual(kinds);
-    expect(has((s) => s.terrain)).toEqual(Object.keys(data.sectors).sort());
+    // Star classes are one family (`data/sectors.json`): a map shows some, never all six.
+    const star = (t: string) => data.sectors[t]!.family === 'star';
+    expect(has((s) => s.terrain).filter((t) => !star(t))).toEqual(
+      Object.keys(data.sectors).filter((t) => !star(t)).sort(),
+    );
+    expect(has((s) => s.terrain).filter(star).length).toBeGreaterThan(0);
     expect(has((s) => s.planetType)).toEqual(Object.keys(data.planetTypes).sort());
     // One graveyard and one debris field beside it, nothing more (owner, 2026-10-14).
     expect(sectors.filter((s) => s.kind === 'graveyard')).toHaveLength(1);

@@ -789,6 +789,18 @@ export const PATROL_DIVE_SOLO_MIGRATION = {
   toDataHash: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Data 0.1.88: a new province kind, the star, and its six classes (owner 2026-11-17: a
+ *  star stands in its own province with a ring its class makes). A saved world keeps its map
+ *  and provinces: stars only appear in new matches. */
+export const STAR_PROVINCE_SOLO_MIGRATION = {
+  fromRules: PATROL_DIVE_SOLO_MIGRATION.toRules,
+  fromData: PATROL_DIVE_SOLO_MIGRATION.toData,
+  fromDataHash: PATROL_DIVE_SOLO_MIGRATION.toDataHash,
+  toRules: '092a2fe87e2178',
+  toData: '0.1.88',
+  toDataHash: '1dc3f007dd5f9e',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -857,6 +869,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SQUADRON_REFUEL_SOLO_MIGRATION,
   ORBITAL_TIME_ORDER_SOLO_MIGRATION,
   PATROL_DIVE_SOLO_MIGRATION,
+  STAR_PROVINCE_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

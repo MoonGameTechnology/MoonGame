@@ -2306,8 +2306,8 @@
         "x": -313,
         "y": -2884
       },
-      "kind": "dead_world",
-      "terrain": "empty_space"
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     },
     "lights_129": {
       "position": {
@@ -2781,16 +2781,16 @@
         "x": -931,
         "y": -2846
       },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
     },
     "lights_179": {
       "position": {
         "x": -1074,
         "y": -3234
       },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     },
     "lights_180": {
       "position": {
@@ -2814,8 +2814,11 @@
         "x": -593,
         "y": -3282
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "star",
+      "terrain": "binary_star",
+      "size": 1.3,
+      "buildings": [],
+      "garrison": []
     },
     "lights_183": {
       "position": {
