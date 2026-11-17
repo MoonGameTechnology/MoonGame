@@ -83,9 +83,13 @@ it('verifies a player bundle larger than the default child-process output buffer
     const path = join(bin, name);
     writeFileSync(path, '#!/usr/bin/env node\n' + source, { mode: 0o700 }); return path;
   };
-  const aapt = script('aapt', `const kind=process.argv[3]; console.log(kind==='badging' ? "package: name='org.moongame.rustore' versionCode='2' versionName='1.0'" : kind==='permissions' ? "uses-permission: name='android.permission.INTERNET'" : ['debuggable','allowBackup','usesCleartextTraffic'].map(n=>'android:'+n+'=(type 0x12)0x0').join('\\n'));`);
+  const manifest = ['debuggable', 'allowBackup', 'usesCleartextTraffic']
+    .map(n => 'android:' + n + '=(type 0x12)0x0').join('\n') +
+    '\nE: application\n  E: meta-data\n    A: android:name="com.my.target.autoInitMode"\n    A: android:value=(type 0x10)0x0\n';
+  const bridge = readFileSync('mobile/native/vk-rewarded-bridge.js', 'utf8');
+  const aapt = script('aapt', `const kind=process.argv[3]; console.log(kind==='badging' ? "package: name='org.moongame.rustore' versionCode='2' versionName='1.0'" : kind==='permissions' ? "uses-permission: name='android.permission.INTERNET'" : ${JSON.stringify(manifest)});`);
   const signer = script('apksigner', `console.log('Number of signers: 1'); console.log('Signer #1 certificate SHA-256 digest: ${cert}');`);
-  script('unzip', `process.stdout.write(process.argv[4].endsWith('index.html') ? 'x'.repeat(20*1024*1024)+'"channel":"rustore","privacyUrl":"privacy.html"' : process.argv[4].endsWith('capacitor.config.json') ? JSON.stringify({appId:'org.moongame.rustore',webDir:'www',server:{androidScheme:process.env.RUSTORE_FIXTURE_INSECURE?'http':'https',cleartext:!!process.env.RUSTORE_FIXTURE_INSECURE}}) : ${JSON.stringify(policyHtml)});`);
+  script('unzip', `process.stdout.write(process.argv[4].endsWith('index.html') ? 'x'.repeat(20*1024*1024)+'"channel":"rustore","privacyUrl":"privacy.html"<script src="vk-rewarded-bridge.js"></script>' : process.argv[4].endsWith('vk-rewarded-bridge.js') ? ${JSON.stringify(bridge)} : process.argv[4].endsWith('capacitor.config.json') ? JSON.stringify({appId:'org.moongame.rustore',webDir:'www',server:{androidScheme:process.env.RUSTORE_FIXTURE_INSECURE?'http':'https',cleartext:!!process.env.RUSTORE_FIXTURE_INSECURE}}) : ${JSON.stringify(policyHtml)});`);
   const apk = join(dir, 'candidate.apk'); const configFile = join(dir, 'config.json');
   writeFileSync(apk, 'synthetic APK fixture'); writeFileSync(configFile, JSON.stringify(config));
   try {

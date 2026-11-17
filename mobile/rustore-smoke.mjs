@@ -66,6 +66,7 @@ try {
   await run('npm', ['run', 'assets']);
   await run('node', ['patch-android.mjs']);
   await run('node', ['patch-rustore.mjs']);
+  await run('node', ['patch-vk-rewarded.mjs']);
   await run('./gradlew', ['assembleRelease', '--no-daemon', '--max-workers=2', '-Dorg.gradle.jvmargs=-Xmx1536m'], 'android');
   const aligned = join(dir, 'aligned.apk'), apk = join(dir, 'synthetic.apk');
   await run(join(buildTools, 'zipalign'), ['-P', '16', '-f', '4', 'android/app/build/outputs/apk/release/app-release-unsigned.apk', aligned]);
