@@ -72,6 +72,7 @@ export const ACTION_TYPES = new Set([
   'seat.confirm',
   'seat.kick',
   'seat.release',
+  'shuttle.engage',
   'shuttle.hold',
   'shuttle.load',
   'shuttle.merge',

@@ -70,6 +70,7 @@ const CLIENT_ACTION_TYPES = [
   'fleet.merge',
   'fleet.split',
   'fleet.engage',
+  'shuttle.engage',
   'shuttle.hold',
   'shuttle.load',
   'shuttle.merge',
@@ -196,6 +197,7 @@ describe('SV-1.2 · action payload schemas', () => {
       ['shuttle.hold', { strikeId: 'strike:p1:0:1', on: true }],
       ['shuttle.hold', { planetId: 'p1', squadronId: 'sq:p1:1', on: false }],
       ['shuttle.hold', { fleetId: 'f1', squadronId: 'sq:p1:1', on: false }],
+      ['shuttle.engage', { strikeId: 'strike:p1:0:1', radar: true }],
       // SHU-6.4: перелёт — с мира на корабль и с корабля на мир.
       ['shuttle.relocate', { planetId: 'p1', squadronId: 'sq:p1:1', toFleetId: 'f1' }],
       ['shuttle.relocate', { fleetId: 'f1', squadronId: 'sq:p1:1', toPlanetId: 'p2' }],
@@ -287,6 +289,8 @@ describe('SV-1.2 · action payload schemas', () => {
       ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: 0, y: 0 }, hold: 1 }],
       ['shuttle.hold', { strikeId: 'strike:p1:0:1' }], // missing on
       ['shuttle.hold', { strikeId: 'strike:p1:0:1', on: 'yes' }], // `on` не булев
+      ['shuttle.engage', { strikeId: 'strike:p1:0:1' }], // без правила
+      ['shuttle.engage', { strikeId: 'strike:p1:0:1', radar: 'any' }], // правило не булево
       ['shuttle.relocate', { planetId: 'p1', toPlanetId: 'p2' }], // SHU-6.4: missing squadronId
       ['shuttle.relocate', { planetId: 'p1', squadronId: 'sq:p1:1', toPlanetId: 7 }], // not an id
       // SHU-6.13: без id вылета эскадры в воздухе нет; точка — целиком и конечная.

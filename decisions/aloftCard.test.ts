@@ -14,7 +14,7 @@ import {
   type Planet,
   type ShuttleStrike,
 } from '../packages/shared-core/src/index';
-import { aloftCard } from './aloftCard';
+import { aloftCard, patrolToggles } from './aloftCard';
 
 const shuttle = (stats: Record<string, number>) => ({ faction: 'x', traits: ['shuttle'], stats });
 
@@ -102,6 +102,30 @@ describe('SHU-6.14 — карточка эскадры в воздухе', () =>
 
   it('УДАР ДЕРЖАТЬ НЕЧЕГО: у удара удержания нет — `null`, а не «выключено»', () => {
     expect(card(strike())!.hold).toBeNull();
+    expect(card(strike())!.radar).toBeNull();
+  });
+
+  it('ПРАВИЛО ЦЕЛЕЙ (SHU-6.18): у патруля — выключено по умолчанию, у возвращающегося — нет', () => {
+    const point = { target: { kind: 'point' as const }, patrol: { hours: 4, radius: 90 } };
+    expect(card(strike(point))!.radar).toBe(false);
+    expect(card(strike({ ...point, patrol: { ...point.patrol, radar: true } }))!.radar).toBe(true);
+    expect(card(strike({ ...point, leg: 'back' }))!.radar).toBeNull();
+  });
+
+  it('БРОСИВШИЙСЯ С УДЕРЖАНИЕМ: «Держать» горит, правило — того патруля, куда он вернётся', () => {
+    const dive = strike({ target: { kind: 'fleet', id: 'F9' }, rejoin: { at: { x: 1, y: 2 }, radar: true } });
+    expect(card(dive)).toMatchObject({ order: { kind: 'fleet', id: 'F9' }, hold: true, radar: true });
+    expect(card({ ...dive, leg: 'back' })).toMatchObject({ hold: null, radar: null });
+  });
+
+  it('ПЕРЕКЛЮЧАТЕЛИ ПАТРУЛЯ ЧИТАЮТСЯ ИЗ ВЫЛЕТА: висящий, бросившийся, удар и пропавший', () => {
+    const point = { target: { kind: 'point' as const }, patrol: { hours: 4, radius: 90 } };
+    expect(patrolToggles(strike(point))).toEqual({ hold: false, radar: false });
+    expect(patrolToggles(strike({ ...point, leg: 'back', patrol: { ...point.patrol, hold: true } }))).toEqual({ hold: true, radar: false });
+    const dive = strike({ target: { kind: 'fleet', id: 'F9' }, rejoin: { at: { x: 1, y: 2 }, radar: true } });
+    expect(patrolToggles(dive)).toEqual({ hold: true, radar: true });
+    expect(patrolToggles(strike())).toEqual({ hold: false, radar: false });
+    expect(patrolToggles(null)).toEqual({ hold: false, radar: false });
   });
 
   it('ВОЗВРАЩАЕТСЯ — УДАР ПОЗАДИ: ни «Удара», ни «Патруля», ни «Домой»; перелёт и делёж есть (правило 3)', () => {
@@ -188,6 +212,7 @@ describe('SHU-6.14 — сторож: кнопка есть ⇔ ядро прим
       if (c.hold !== null) {
         expect(order(s, 'shuttle.hold', { strikeId: st.id, on: !c.hold })).toBe(true);
       }
+      expect(order(s, 'shuttle.engage', { strikeId: st.id, radar: true })).toBe(c.radar !== null);
     });
   }
 });

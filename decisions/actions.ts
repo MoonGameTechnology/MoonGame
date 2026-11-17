@@ -132,6 +132,10 @@ export const redirectSquadron = (
  *  патруль не повернул домой, снять — всегда. */
 export const holdPatrol = (playerId: string, strikeId: string, on: boolean) =>
   act(playerId, 'shuttle.hold', { strikeId, on });
+/** Правило целей патруля в воздухе (SHU-6.18) — по id вылета: `radar` — бросаться на любую
+ *  метку радара в круге, иначе только на опознанную цель. */
+export const engagePatrol = (playerId: string, strikeId: string, radar: boolean) =>
+  act(playerId, 'shuttle.engage', { strikeId, radar });
 /** Снять «Держать патруль» с эскадры, которая ждёт дома перезарядки (SHU-6.6). Включить
  *  дома нечего: точку берут у патруля, для этого есть `patrolShuttle` с `hold`. */
 export const releaseHold = (

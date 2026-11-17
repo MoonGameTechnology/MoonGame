@@ -20,8 +20,13 @@
  * SHU-6.10 — чужой висящий патруль: тот, что висит в моём обзоре, попадает в зрение
  * кадра (и рисуется кругом цвета хозяина), дальний — нет.
  *
+ * SHU-6.18 — бросок и правило целей: переключатель «Бить по радару» в карточке патруля
+ * ставит и снимает правило; удерживаемый патруль над чужим флотом на тике бросается на
+ * него, карточка броска держит «Держать» включённым, а севшая эскадра помнит точку.
+ *
  *   node prototype/patroltest.mjs      # или pnpm run smoke:patrol
  *   PATROL_SHOTS=каталог node prototype/patroltest.mjs   # плюс снимки висящего патруля
+ *   PATROL_LOCALE=ru-RU …                                 # язык браузера для снимков
  */
 import assert from 'node:assert/strict';
 import {
@@ -38,6 +43,7 @@ import { hpOfLevel as __hpOfLevel } from './game';
 // Метки патрулей — у решения: с REFM-223 \`main.ts\` их не импортирует.
 import { patrolMarks as __patrolMarks } from '../../decisions/patrolMarks';
 import { pickSquadron as __pickSquadron, pickStrike as __pickStrike } from './interaction';
+import { patrolShuttle as __patrolShuttle } from '../../decisions/actions';
 let __base = null;
 window.__patrolTest = {
   prepared: () => inMatch() && __mapWasEntered && !mapPreparation.active,
@@ -103,6 +109,7 @@ window.__patrolTest = {
         to: st.to,
         base: st.base,
         hold: st.patrol?.hold === true,
+        radar: st.patrol?.radar === true,
       })),
   // Мир доходит до точки: патруль повисает, у круга появляется отсчёт.
   arrive: () => {
@@ -180,8 +187,60 @@ window.__patrolTest = {
     return { rival, near };
   },
   seenPatrols: () => (vision ? vision.seenPatrols : null),
+  // SHU-6.18: чужой фрегат на дороге от базы, в 80 от неё, и удерживаемый патруль ровно над
+  // ним. Ближняя половина круга опознаёт фрегат, и первый тик бросает эскадру на него.
+  dive: () => {
+    const home = s.planets[__base.planet];
+    const rival = Object.keys(s.players).find((id) => id !== ME);
+    const nb = s.planets[(home.links ?? [])[0]];
+    if (!nb) return { error: 'no lane' };
+    const len = Math.hypot(nb.position.x - home.position.x, nb.position.y - home.position.y);
+    const t = 80 / len;
+    const spot = {
+      position: {
+        x: home.position.x + (nb.position.x - home.position.x) * t,
+        y: home.position.y + (nb.position.y - home.position.y) * t,
+      },
+    };
+    s = structuredClone(s);
+    s.fleets['smoke:foe'] = {
+      id: 'smoke:foe',
+      owner: rival,
+      location: null,
+      edge: { from: home.id, to: nb.id, t },
+      movement: null,
+      units: [{ unit: 'frigate', count: 1 }],
+      traits: [],
+      battleId: null,
+    };
+    const sq = home.hangar[0].id;
+    if (!playerOrder(__patrolShuttle(ME, { planetId: home.id }, sq, spot.position, true))) return null;
+    const st = s.strikes.find((x) => x.target.kind === 'point');
+    apply(advance(s, st.arrivesAt));
+    const tick = s.scheduled.find((e) => e.type === 'shuttle.patrol.tick' && e.payload.strikeId === st.id);
+    if (!tick) return { error: 'no tick', leg: st.leg, sched: s.scheduled.map((e) => e.type) };
+    apply(advance(s, tick.at));
+    const now = s.strikes.find((x) => x.id === st.id);
+    return { id: st.id, sq, at: spot.position, target: now?.target ?? null, rejoin: now?.rejoin ?? null };
+  },
+  // Мир доходит до посадки вылета: бросок, удар, обратная нога.
+  land: (id) => {
+    const trace = [];
+    for (let i = 0; i < 30 && s.strikes?.some((x) => x.id === id); i++) {
+      const st = s.strikes.find((x) => x.id === id);
+      trace.push(st.leg + ':' + st.target.kind + ':' + Math.round((st.arrivesAt - s.time) / 60_000));
+      apply(advance(s, Math.max(s.time + 60_000, st.arrivesAt)));
+    }
+    invalidatePanel();
+    renderPanel();
+    return (s.strikes ?? []).some((x) => x.id === id) ? trace.join(' ') : true;
+  },
 };`;
 
+// Снимки — для человека: двойная плотность и, если задан, язык браузера.
+const shotLook = process.env.PATROL_SHOTS
+  ? { deviceScaleFactor: 2, ...(process.env.PATROL_LOCALE ? { locale: process.env.PATROL_LOCALE } : {}) }
+  : {};
 const site = await serve(await instrumentedGame(hooks));
 const browser = await launchBrowser();
 try {
@@ -191,7 +250,7 @@ try {
   ]) {
     for (const kind of ['port', 'hold']) {
       const phone = viewport.width < 600;
-      const context = await browser.newContext({ viewport, isMobile: phone, hasTouch: phone });
+      const context = await browser.newContext({ viewport, isMobile: phone, hasTouch: phone, ...shotLook });
       const page = await context.newPage();
       page.setDefaultTimeout(15000);
       const press = (locator) => (phone ? locator.tap() : locator.click());
@@ -273,6 +332,24 @@ try {
         await press(keep);
         assert.equal(await held(), true, 'и поставлено снова');
 
+        // «Бить по радару» (SHU-6.18) — переключатель правила целей рядом: по умолчанию
+        // погашен (только опознанные), нажатие включает и снимает.
+        const radarTile = await open(page.locator(`[data-act="wingradar"][data-arg="${flight.id}"]`));
+        const radar = async () =>
+          (await page.evaluate(() => window.__patrolTest.patrols()))[0]?.radar;
+        assert.equal(await radar(), false, 'по умолчанию — только опознанные');
+        assert.equal(await radarTile.getAttribute('aria-pressed'), 'false');
+        await press(radarTile);
+        assert.equal(await radar(), true, 'бьёт по любой метке радара');
+        await frame();
+        const lit = await open(page.locator(`[data-act="wingradar"][data-arg="${flight.id}"]`));
+        assert.equal(await lit.getAttribute('aria-pressed'), 'true', 'плитка горит');
+        if (process.env.PATROL_SHOTS) {
+          await page.screenshot({ path: `${process.env.PATROL_SHOTS}/patrol-radar-${kind}-${viewport.width}.png` });
+        }
+        await press(lit);
+        assert.equal(await radar(), false, 'и снова только опознанные');
+
         // Висение кончилось — домой; сел, заправился — и встал снова сам, игрок ничего не
         // нажимал. До конца заправки в небе пусто.
         await page.evaluate((id) => window.__patrolTest.leg(id), flight.id);
@@ -317,7 +394,7 @@ try {
 
     // SHU-6.10: чужой висящий патруль — в обзоре виден кругом и составом, дальний — нет.
     const phone = viewport.width < 600;
-    const context = await browser.newContext({ viewport, isMobile: phone, hasTouch: phone });
+    const context = await browser.newContext({ viewport, isMobile: phone, hasTouch: phone, ...shotLook });
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
     await withDiagnostics(page, `patrol-foreign-${viewport.width}`, async () => {
@@ -341,9 +418,43 @@ try {
     });
     console.log(`Foreign patrol ${viewport.width}px passed.`);
     await context.close();
+
+    // SHU-6.18: удерживаемый патруль бросается на чужой флот в круге и после посадки помнит точку.
+    const diveContext = await browser.newContext({ viewport, isMobile: phone, hasTouch: phone, ...shotLook });
+    const divePage = await diveContext.newPage();
+    divePage.setDefaultTimeout(15000);
+    await withDiagnostics(divePage, `patrol-dive-${viewport.width}`, async () => {
+      await divePage.goto(site.url + '/');
+      await enterSkirmish(divePage, { tap: phone });
+      await divePage.waitForFunction(() => window.__patrolTest.prepared());
+      await divePage.evaluate(() => window.__patrolTest.prepare('port'));
+      const dive = await divePage.evaluate(() => window.__patrolTest.dive());
+      assert.ok(dive && !dive.error, `патруль поднят: ${JSON.stringify(dive)}`);
+      assert.deepEqual(dive.target, { kind: 'fleet', id: 'smoke:foe' }, 'на тике — бросок на фрегат');
+      assert.deepEqual(dive.rejoin, { at: dive.at }, 'бросок помнит точку патруля');
+      await divePage.evaluate((id) => window.__patrolTest.pickStrike(id), dive.id);
+      await divePage.evaluate(
+        () => new Promise((r) => window.requestAnimationFrame(() => window.requestAnimationFrame(r))),
+      );
+      const keep = divePage.locator(`[data-act="wingkeep"][data-arg="${dive.id}"]`);
+      if (phone && !(await keep.isVisible())) await divePage.locator('#mobile-sheet .mobile-info').tap();
+      await keep.waitFor({ state: 'visible' });
+      assert.equal(await keep.getAttribute('aria-pressed'), 'true', '«Держать» у броска горит');
+      if (process.env.PATROL_SHOTS) {
+        await divePage.screenshot({ path: `${process.env.PATROL_SHOTS}/patrol-dive-${viewport.width}.png` });
+      }
+      assert.equal(await divePage.evaluate((id) => window.__patrolTest.land(id), dive.id), true, 'сел');
+      assert.deepEqual(
+        await divePage.evaluate((q) => window.__patrolTest.homeHold(q), dive.sq),
+        { at: dive.at },
+        'севшая эскадра встанет в ту же точку',
+      );
+    });
+    console.log(`Patrol dive ${viewport.width}px passed.`);
+    await diveContext.close();
   }
   console.log(
-    'Patrol UI smoke passed: port and hold, button, map point, countdown, hold patrol, recall, foreign patrol in sight — desktop and phone.',
+    'Patrol UI smoke passed: port and hold, button, map point, countdown, hold patrol, radar rule, recall, foreign patrol in sight, dive with hold — desktop and phone.',
   );
 } finally {
   await browser.close();

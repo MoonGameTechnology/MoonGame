@@ -805,7 +805,7 @@ export const es: Record<string, string> = {
   'hint.wing-aim': '✓ elige el objetivo del ataque en el mapa',
   'hint.wing-cancelled': 'ataque cancelado',
   'hint.wing-empty': '✗ nada que lanzar — el hangar está vacío',
-  'hint.wing-patrol-aim': '○ elige un punto de patrulla dentro del anillo: vuela {h}h, ataca a objetivos en {r} cada 15 min',
+  'hint.wing-patrol-aim': '○ elige un punto de patrulla dentro del anillo: vuela {h}h, se lanza sobre un objetivo en {r}',
   'hint.wing-relocate-aim': '⇄ elige una base resaltada: alcance de vuelo {r}',
   'hint.wing-relocate-cancelled': 'reubicación cancelada',
   'hint.wing-keep': '⮳ patrulla activa: tras aterrizar y rearmarse despegará sola otra vez',

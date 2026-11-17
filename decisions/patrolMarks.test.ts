@@ -101,6 +101,13 @@ describe('SHU-6.6 — «Держать патруль» глазами игро�
     expect(holdsPatrol([back], [], { kind: 'planet', id: 'A' }, 'p1')).toBe(true);
   });
 
+  it('БАЗА ДЕРЖИТ ПАТРУЛЬ, ПОКА УДЕРЖИВАЕМЫЙ ПАТРУЛЬ БРОСИЛСЯ НА ФЛОТ (SHU-6.18)', () => {
+    const dive = patrol({ target: { kind: 'fleet', id: 'F1' }, leg: 'out', rejoin: { at: { x: 80, y: 30 } } });
+    delete dive.patrol;
+    expect(patrolMarks([dive], { me: 'p1', now: 2000 })).toEqual([]);
+    expect(holdsPatrol([dive], [], { kind: 'planet', id: 'A' }, 'p1')).toBe(true);
+  });
+
   it('БАЗА ДЕРЖИТ ПАТРУЛЬ, ПОКА ЭСКАДРА С УДЕРЖАНИЕМ ЖДЁТ ДОМА ПЕРЕЗАРЯДКИ', () => {
     const home = [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 2 }], hold: {} }];
     expect(holdsPatrol([], home, { kind: 'fleet', id: 'CV' }, 'p1')).toBe(true);

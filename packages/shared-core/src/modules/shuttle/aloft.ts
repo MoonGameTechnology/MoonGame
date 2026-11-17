@@ -2,7 +2,6 @@
 import {
   type BaseView,
   type Flyer,
-  PATROL_TICK_SHARE,
   absorbIntoStrike,
   divideSquadron,
   fleetBase,
@@ -11,6 +10,7 @@ import {
   nextStrikeId,
   ownStrike,
   planetBase,
+  rejoinOf,
   reorder,
   requireSquadron,
   scheduleLeg,
@@ -18,6 +18,7 @@ import {
 import type {
   Fleet,
   Planet,
+  PlanetId,
   ShuttleStrike,
   Squadron,
   StrikeBase,
@@ -29,6 +30,7 @@ import { addUnits, cappedUnitStat } from '../../util/stacks';
 import {
   baseBlock,
   baseFromPayload,
+  flightMs,
   flightTime,
   flyTo,
   hitMissile,
@@ -60,12 +62,15 @@ import {
   squadronReach,
   stacksSize,
   squadronRefueling,
+  withinRange,
 } from '../../state/shuttle';
+import { cloakedReach, fleetCloak } from '../../state/cloak';
+import type { SightCircle } from '../../state/sensorView';
 import { hookedDamage, isHostile, mitigationFactor, ownFleet } from '../../util/combat';
 import { isForkSite } from '../../state/forkSite';
 import { isMineFleet, mineFleetVisible } from '../../state/minefields';
-import { isMissileFleet } from '../../state/ordnance';
-import { isVisibleTo } from '../../state/visibility';
+import { inRadius, isMissileFleet } from '../../state/ordnance';
+import { identifiedNodes, isVisibleTo, sightCircles } from '../../state/visibility';
 import { planetPointDefense } from '../../util/pointDefense';
 import { wearStructures } from '../../util/structureDamage';
 
@@ -118,7 +123,8 @@ export function resumeHold(h: HandlerContext, owner: string, squadronId: string)
   if (typeof ready === 'string') return notNow(ready);
   const route = patrolCheck(h, base.position, squad, ref.kind === 'planet' ? (hold.at ?? null) : base.position);
   if (typeof route === 'string') return notNow(route);
-  takeOffPatrol(h, owner, base, ready, route, true); // удержание уходит с эскадрой на вылет
+  // Удержание и правило целей уходят с эскадрой на вылет.
+  takeOffPatrol(h, owner, base, ready, route, { hold: true, radar: hold.radar === true });
 }
 
 /** База, в ангаре которой стоит эскадра игрока, — или `null`. Id эскадр не повторяются
@@ -149,13 +155,15 @@ function holdWait(h: HandlerContext, squad: Squadron, why: string): number | nul
 }
 
 /**
- * ТИК ПАТРУЛЯ (SHU-6.2, резолюция владельца 2026-10-04) — по кому и чем бьёт висящая
- * эскадра. Решения, которые легко потерять при правке:
+ * ТИК ПАТРУЛЯ (SHU-6.2; бросок — SHU-6.18, резолюция владельца 2026-11-17: «если в зону
+ * патруля влетает цель, патруль устремляется в атаку, атакует и идёт на перезарядку в
+ * ангар») — на кого бросается висящая эскадра. Решения, которые легко потерять при правке:
  *
- * 1. **Одна цель за тик — БЛИЖАЙШАЯ к точке**, при равной дистанции меньший id; граница
- *    круга включительна (`patrolTarget`). Правило выбора то же, что у перехвата
- *    (`nearestHostileStrike`): второй прицел у одного оружия объяснить игроку нечем.
- * 2. **Цели — враждебные флоты и враждебные вылеты.** Флот бьётся и стоящий, и идущий
+ * 1. **Одна цель — БЛИЖАЙШАЯ к точке из тех, что разрешает правило целей**, при равной
+ *    дистанции меньший id; граница круга включительна (`patrolTarget`). Правило выбора то
+ *    же, что у перехвата (`nearestHostileStrike`): второй прицел у одного оружия объяснить
+ *    игроку нечем.
+ * 2. **Цели — враждебные флоты и враждебные вылеты.** Флот берётся и стоящий, и идущий
  *    мимо (позиция живая, `fleetPositionAt`), вылет — и летящий, и висящий в своём
  *    патруле. Миры патруль не бомбит (развилка 2а владельца). Враждебность — `isHostile`:
  *    союзник и партнёр по миру — не цели. Невидимая мина — не цель, как и для удара.
@@ -163,17 +171,30 @@ function holdWait(h: HandlerContext, squad: Squadron, why: string): number | nul
  *    и ракетам — `shuttleDamage` (ракета — воздушная цель, SM-3.7d); безоружная половина не
  *    выбирает цель, иначе чистый охотник за машинами нырял бы под пушки флота ради нуля
  *    урона.
- * 4. **По флоту — тот же удар, что по прибытии, долей тика**, с ответкой той же долей
- *    (`strikeFleet`). **По вылету — тот же канал, что перехват** (фаза `intercept`,
- *    событие `shuttle.intercepted` с `patrolId`): чужой вылет не отвечает, как не
- *    отвечает он перехвату (SHU-1.3); два патруля бьют друг друга каждый в свой тик.
+ * 4. **Правило целей** (`patrol.radar`, дефолт владельца — без поля). Без поля — только
+ *    ОПОЗНАННАЯ цель: флот и ракета — по тому же правилу, что удар приказом
+ *    (`isVisibleTo`), вылет — глазами блока зрения в его точке, как его видит игрок
+ *    (`sortiesInSight`). Свой круг патруля опознаёт ближнюю половину, как любой радар
+ *    (`patrolRadarCircle`). С полем — любая метка радара патруля: всё враждебное в круге,
+ *    кроме флота под маскировочным полем дальше, чем радар его берёт (`cloakedReach`).
+ * 5. **По флоту — БРОСОК.** Эскадра уходит из круга погоней от точки патруля (`flyOut`) и
+ *    бьёт флот по прибытии полным ударом с ответкой, как удар приказом (`resolveOutLeg`),
+ *    а оттуда летит домой на заправку. Удерживаемый патруль запоминает точку и правило
+ *    (`rejoin`) и после заправки встанет туда снова.
+ * 6. **По вылету и ракете — сразу полным залпом и домой.** Догонять воздушную цель модели
+ *    нечем, а бой и так в круге: залп — тем же каналом, что перехват (фаза `intercept`,
+ *    событие `shuttle.intercepted` с `patrolId`); чужой вылет не отвечает, как не отвечает
+ *    он перехвату (SHU-1.3). Домой — тем же разворотом, что по концу патруля, поэтому
+ *    удержание и правило целей садятся с эскадрой сами (`rejoinOf`).
+ *
+ * Возвращает `true`, если патруль кончился броском или залпом: следующего тика не будет.
  */
-export function patrolStrike(h: HandlerContext, strike: ShuttleStrike): void {
+export function patrolStrike(h: HandlerContext, strike: ShuttleStrike): boolean {
   const radius = strike.patrol?.radius ?? 0;
   const data = h.ctx.data;
   const now = h.ctx.now;
-  const vsFleet = strikePower(strike, data, 'fleet') * PATROL_TICK_SHARE;
-  const vsAir = strikeAirPower(strike, data) * PATROL_TICK_SHARE;
+  const vsFleet = strikePower(strike, data, 'fleet');
+  const vsAir = strikeAirPower(strike, data);
   const contacts: PatrolContact[] = [];
   if (vsFleet > 0) {
     for (const f of Object.values(h.state.fleets)) {
@@ -198,17 +219,64 @@ export function patrolStrike(h: HandlerContext, strike: ShuttleStrike): void {
       if (pos) contacts.push({ id: f.id, pos });
     }
   }
-  const pick = patrolTarget(strike.to, radius, contacts);
-  if (pick === null) return;
+  const pick = patrolTarget(strike.to, radius, contacts, patrolRule(h, strike));
+  if (pick === null) return false;
   // id флота и id вылета не пересекаются: вылет всегда `strike:…` (см. `launchFlight`).
-  const fleet = Object.prototype.hasOwnProperty.call(h.state.fleets, pick)
-    ? h.state.fleets[pick]
-    : undefined;
-  if (fleet && isMissileFleet(fleet, data)) return hitMissile(h, strike, fleet, vsAir);
-  if (fleet) return strikeFleet(h, strike, fleet, PATROL_TICK_SHARE);
-  const target = (h.state.strikes ?? []).find((st) => st.id === pick);
+  const fleet = Object.hasOwn(h.state.fleets, pick) ? h.state.fleets[pick] : undefined;
+  if (fleet && !isMissileFleet(fleet, data)) return diveOn(h, strike, fleet); // правило 5
+  if (fleet) hitMissile(h, strike, fleet, vsAir);
+  else interceptFromPatrol(h, strike, pick, vsAir);
+  turnHome(h, strike); // правило 6
+  return true;
+}
+
+/** Проходит ли контакт правило целей патруля (правило 4 `patrolStrike`). Туман читается
+ *  на миг тика: время состояния обработчик события ещё не сдвинул. */
+function patrolRule(h: HandlerContext, strike: ShuttleStrike): (c: PatrolContact) => boolean {
+  const data = h.ctx.data;
+  const fleetOf = (id: string) => (Object.hasOwn(h.state.fleets, id) ? h.state.fleets[id] : undefined);
+  if (strike.patrol?.radar === true) {
+    const radius = strike.patrol.radius;
+    return ({ id, pos }) => {
+      const fleet = fleetOf(id);
+      const cloak = fleet ? fleetCloak(h.state, fleet, data) : 0;
+      return cloak === 0 || withinRange(strike.to, pos, cloakedReach(radius, cloak));
+    };
+  }
+  const state = h.state.time === h.ctx.now ? h.state : { ...h.state, time: h.ctx.now };
+  let nodes: Set<PlanetId> | undefined;
+  let eyes: readonly SightCircle[] | undefined;
+  return ({ id, pos }) => {
+    const fleet = fleetOf(id);
+    if (fleet && !isMissileFleet(fleet, data)) {
+      return isVisibleTo(state, strike.owner, { fleetId: id }, data, (nodes ??= identifiedNodes(state, strike.owner, data)));
+    }
+    // Вылет и ракета — глазами в точке контакта (`sortiesInSight`, `missileVisible`): узла у
+    // них нет, и опознанный мир их не выдаёт.
+    return (eyes ??= sightCircles(state, strike.owner, data)).some((c) => inRadius(pos, c, c.identify));
+  };
+}
+
+/** Бросок патруля на флот (правило 5 `patrolStrike`): погоня от точки патруля. Эскадре
+ *  нечем лететь — патруль остаётся в круге (`false`), а не роняет тик в dead letter. */
+function diveOn(h: HandlerContext, strike: ShuttleStrike, fleet: Fleet): boolean {
+  const from = { ...strike.to };
+  const to = fleetPositionAt(h.state, fleet, h.ctx.now);
+  const flight = to ? flightMs(h, strike, from, to) : null;
+  if (!to || flight === null) return false;
+  const back = rejoinOf(strike);
+  if (back) strike.rejoin = back;
+  strike.target = { kind: 'fleet', id: fleet.id };
+  delete strike.patrol;
+  flyOut(h, strike, from, to, flight);
+  return true;
+}
+
+/** Залп патруля по чужому вылету `targetId` (правило 6 `patrolStrike`). */
+function interceptFromPatrol(h: HandlerContext, strike: ShuttleStrike, targetId: string, power: number): void {
+  const target = (h.state.strikes ?? []).find((st) => st.id === targetId);
   if (!target) return;
-  const dealt = hookedDamage(h, vsAir, {
+  const dealt = hookedDamage(h, power, {
     phase: 'intercept',
     // Бой идёт в открытом небе у точки патруля, а не над базой: узла нет, как у удара по
     // флоту в перелёте. Узел базы отдал бы патрулю «домашний» бонус сектора вдали от дома.
@@ -217,7 +285,7 @@ export function patrolStrike(h: HandlerContext, strike: ShuttleStrike): void {
     defender: target.owner,
     ...strikeAttackerFleet(strike),
   });
-  const downed = absorbIntoStrike(target, dealt, data, h, strike.owner);
+  const downed = absorbIntoStrike(target, dealt, h.ctx.data, h, strike.owner);
   h.emit('shuttle.intercepted', {
     baseId: strike.base.id,
     baseKind: strike.base.kind,
@@ -243,17 +311,44 @@ export type MissileFlew = (
   to: { x: number; y: number },
 ) => void;
 
-/** Расстояние от точки до отрезка [a, b] — пересёк ли путь ракеты круг патруля. */
-export function distanceToSegment(
+/** Ближайшая к точке `p` точка отрезка [a, b]. */
+function nearestOnSegment(
   a: { x: number; y: number },
   b: { x: number; y: number },
   p: { x: number; y: number },
-): number {
+): { x: number; y: number } {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const len2 = dx * dx + dy * dy;
   const t = len2 > 0 ? Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
-  return distance(p, { x: a.x + dx * t, y: a.y + dy * t });
+  return { x: a.x + dx * t, y: a.y + dy * t };
+}
+
+/**
+ * Ракета прошла отрезок [from, to] мимо висящего патруля `strike` (SM-3.7d): на этом отрезке
+ * она СТАЛА его целью — залп полным ударом и домой, как по контакту в тике (правило 6
+ * `patrolStrike`). Стала — значит, в начале отрезка целью не была: вне круга или, под
+ * правилом «только опознанные», в дальнем его кольце. Ракета, которая уже была целью в
+ * начале отрезка (пущена в круге), не «влетает»: её находит обычный тик. Правило
+ * целей спрашивается в ближней к точке патруля точке отрезка: там ближняя половина круга
+ * её опознаёт.
+ */
+export function patrolMissilePass(
+  h: HandlerContext,
+  strike: ShuttleStrike,
+  missile: Fleet,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): void {
+  const radius = strike.patrol?.radius ?? 0;
+  if (radius <= 0) return;
+  const near = nearestOnSegment(from, to, strike.to);
+  if (distance(near, strike.to) > radius) return;
+  const rule = patrolRule(h, strike);
+  if (distance(from, strike.to) <= radius && rule({ id: missile.id, pos: from })) return;
+  if (!rule({ id: missile.id, pos: near })) return;
+  hitMissile(h, strike, missile, strikeAirPower(strike, h.ctx.data));
+  turnHome(h, strike);
 }
 
 /** Цель удара, проверенная по всем правилам приказа: флот или мир, и груз, который
@@ -348,7 +443,7 @@ export function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
       if (strike.target.kind === 'fleet') {
         const target = h.state.fleets[strike.target.id];
         // Цель ушла с точки удара — челноки бьют пустоту и возвращаются ни с чем.
-        if (target && target.owner !== strike.owner) strikeFleet(h, strike, target, 1);
+        if (target && target.owner !== strike.owner) strikeFleet(h, strike, target);
       } else {
         const target = h.state.planets[strike.target.id];
         if (target && target.owner !== strike.owner) {
@@ -520,12 +615,17 @@ export function redirectAloft(h: HandlerContext, playerId: string, p: Record<str
       : strike.leg === 'patrol'
         ? Math.max(0, strike.arrivesAt - h.ctx.now) / hourMs(h)
         : was.hours;
+    // Удержание и правило целей переезжают в новую точку — и у патруля, бросившегося на
+    // флот (`rejoin`, SHU-6.18): игрок перенёс патруль, а не отменил свои настройки.
+    const back = rejoinOf(strike);
     reorder(strike);
     strike.target = { kind: 'point' };
+    delete strike.rejoin;
     strike.patrol = {
       hours,
       radius: was?.radius ?? route.plan.radius,
-      ...(was?.hold ? { hold: true as const } : {}),
+      ...(back ? { hold: true as const } : {}),
+      ...(was?.radar || back?.radar ? { radar: true as const } : {}),
     };
     return flyOut(h, strike, here, route.to, flight);
   }
@@ -541,6 +641,7 @@ export function redirectAloft(h: HandlerContext, playerId: string, p: Record<str
   strike.target = aim.target;
   // Патруль, ушедший на удар, перестал быть патрулём — и удержание уходит с ним.
   delete strike.patrol;
+  delete strike.rejoin;
   flyOut(h, strike, here, to, flight);
 }
 
@@ -571,6 +672,7 @@ export function relocateAloft(h: HandlerContext, playerId: string, p: Record<str
   strike.origin = strike.origin ?? { ...strike.base };
   strike.target = { kind: 'base' };
   delete strike.patrol;
+  delete strike.rejoin;
   flyTo(h, strike, dest, here);
 }
 

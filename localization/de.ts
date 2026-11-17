@@ -804,7 +804,7 @@ export const de: Record<string, string> = {
   'hint.wing-aim': '✳ Angriffsziel auf der Karte wählen',
   'hint.wing-cancelled': 'Angriff abgebrochen',
   'hint.wing-empty': '✖ nichts zum Starten — der Hangar ist leer',
-  'hint.wing-patrol-aim': '◎ Patrouillenpunkt im Kreis wählen: kreist {h}Std, greift Ziele im Radius {r} alle 15 Min an',
+  'hint.wing-patrol-aim': '◎ Patrouillenpunkt im Kreis wählen: kreist {h}Std, stürzt sich auf ein Ziel im Radius {r}',
   'hint.wing-relocate-aim': '⇄ hervorgehobene Basis wählen: Verlegungsreichweite {r}',
   'hint.wing-relocate-cancelled': 'Verlegung abgebrochen',
   'hint.wing-keep': '⟳ Patrouille aktiv: nach Landung und Wiederbewaffnung startet sie selbstständig erneut',

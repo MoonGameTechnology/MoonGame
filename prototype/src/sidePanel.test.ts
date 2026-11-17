@@ -1151,6 +1151,24 @@ describe('REFM-225 — нажатия по листу', () => {
     env.refuse = true;
     tap('wingkeep', 'S3');
     expect(env.notes).toHaveLength(1);
+    // Правило целей (SHU-6.18): новое состояние — из самого вылета, подсказка — какое стало.
+    env.refuse = false;
+    env.sent.length = 0;
+    env.notes.length = 0;
+    env.world = {
+      ...env.world,
+      strikes: [strike('R1', { patrol: { radar: true } } as never), strike('R2', { rejoin: { at: { x: 0, y: 0 } } } as never)],
+    };
+    tap('wingradar', 'R1');
+    tap('wingradar', 'R2');
+    expect([orders(), env.notes]).toEqual([
+      [bare(decide.engagePatrol('p1', 'R1', false)), bare(decide.engagePatrol('p1', 'R2', true))],
+      [t('hint.wing-radar-off'), t('hint.wing-radar-on')],
+    ]);
+    // Бросившийся с удержанием патруль: «Держать» снимает его `rejoin`.
+    env.sent.length = 0;
+    tap('wingkeep', 'R2');
+    expect(orders()).toEqual([bare(decide.holdPatrol('p1', 'R2', false))]);
   });
 
   it('перегрузка: первая эскадра порта — на носитель, трюма — в порт; брать нечего — приказа нет', async () => {

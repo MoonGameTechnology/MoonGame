@@ -805,7 +805,7 @@ export const pl: Record<string, string> = {
   'hint.wing-aim': '✳ wybierz cel uderzenia na mapie',
   'hint.wing-cancelled': 'uderzenie anulowane',
   'hint.wing-empty': '✖ brak maszyn do startu — hangar jest pusty',
-  'hint.wing-patrol-aim': '◎ wybierz punkt patrolu w okręgu: trwa {h} godz., co 15 min atakuje cel w zasięgu {r}',
+  'hint.wing-patrol-aim': '◎ wybierz punkt patrolu w okręgu: trwa {h} godz., rzuca się na cel w zasięgu {r}',
   'hint.wing-relocate-aim': '⇄ wybierz podświetloną bazę: zasięg przelotu {r}',
   'hint.wing-relocate-cancelled': 'przelot anulowany',
   'hint.wing-keep': '⟳ patrol trwa: po powrocie i przezbrojeniu wystartuje samoczynnie',

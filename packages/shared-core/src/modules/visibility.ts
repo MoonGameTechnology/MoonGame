@@ -120,7 +120,9 @@ export const visibilityModule: GameModule = {
   // (`sight.byKind`, решение владельца 2026-09-25). 2.2.0 — висящий патруль шаттлов
   // видит свой круг (SHU-6.7): память пишет и миры под ним. 2.3.0 — корабль, пересёкший
   // границу провинции, узнаёт её тип (`surveyed`, решение владельца 2026-10-23).
-  version: '2.5.0',
+  // 2.6.0 — круг висящего патруля — радар (SHU-6.18): опознаёт ближнюю долю, и миры под
+  // дальним кольцом память больше не пишет.
+  version: '2.6.0',
   setup(api) {
     // Continuous time advances refresh memory; captures and arrivals refresh it
     // immediately so a just-scouted world is remembered at once.
