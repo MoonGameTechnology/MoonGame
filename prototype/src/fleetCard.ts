@@ -1080,7 +1080,8 @@ export function aloftPanelHtml(st: ShuttleStrike): string {
     ...(cargo > 0 ? [esc(t('side.wing.cargo', { n: cargo }))] : []),
     ...(card.hull !== null ? [esc(t('side.wing.hull', { p: card.hull }))] : []),
   ];
-  const sub = { compact: pcUi(), subLive: notes.join(' · ') };
+  // Точки с пробелами и на ПК — как у эскадры на стоянке (`squadronCardView.ts`).
+  const sub = { subLive: notes.join(' · ') };
   let h = kitCardHeader(ownerColor(ME), strikeTitle(st), '', sub) + unitRows(card.stacks);
   // Повернувшая домой бить снова не может (правило 3): без строки игрок искал бы кнопку.
   if (card.returning) h += `<div class="row dim">${esc(t('side.aloft.returning'))}</div>`;

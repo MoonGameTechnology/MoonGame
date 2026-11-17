@@ -126,7 +126,10 @@ export function squadronCards(
       canPatrol: opts.mine && !missiles && plan.hours > 0 && plan.radius > 0 && cargo.length === 0,
       canRelocate: opts.mine && !missiles && (opts.relocate?.(sq) ?? false),
       canSplit: opts.mine && splitOne(sq) !== null,
-      canMerge: opts.mine && kin.length > 1,
+      // Сводятся только готовые: пока база заправляется или перезаряжается, плитки нет
+      // (решение владельца 2026-11-17). Ракетам топливо порта не нужно — им мешает только бой.
+      canMerge:
+        opts.mine && kin.length > 1 && (missiles ? view.blocked !== 'busy' : view.blocked === null),
       missiles,
       hold: opts.mine && sq.hold !== undefined,
     };

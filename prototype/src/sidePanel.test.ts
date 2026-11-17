@@ -225,6 +225,9 @@ interface Env {
   onOrder: () => void;
   sent: Action[];
   notes: string[];
+  /** Подсказки прицела: живут, пока он взведён, и в журнал не идут. */
+  hints: string[];
+  hintDrops: number;
   toasts: string[];
   cam: unknown[][];
   forgot: number;
@@ -308,6 +311,8 @@ async function boot({ tip = true } = {}) {
     onOrder: () => {},
     sent: [],
     notes: [],
+    hints: [],
+    hintDrops: 0,
     toasts: [],
     cam: [],
     forgot: 0,
@@ -367,6 +372,8 @@ async function boot({ tip = true } = {}) {
   vi.doMock('./eventFeed', () => ({
     note: (text: string) => env.notes.push(text),
     toast: (text: string) => env.toasts.push(text),
+    aimHint: (text: string) => env.hints.push(text),
+    dropAimHint: () => env.hintDrops++,
   }));
   vi.doMock('./cmdActions', () => ({
     mobileOrderKind: () => env.mobileOrder,
@@ -1085,16 +1092,20 @@ describe('REFM-225 — нажатия по листу', () => {
     expect(inter.strikeAim).toEqual({ from: base, squadronId: 'sq:1', relocate: true });
     const plan = core.squadronPatrol(sq, game.data);
     const r = Math.round(core.squadronFerryRange(sq, game.data));
-    expect(env.notes).toEqual([
-      t('hint.wing-aim'),
-      t('hint.wing-patrol-aim', { h: plan.hours, r: plan.radius }),
-      t('hint.wing-patrol-aim', { h: plan.hours, r: plan.radius }),
-      t('hint.wing-relocate-aim', { r }),
+    // Подсказка — не событие матча: в «События» она не пишется.
+    expect([env.hints, env.notes]).toEqual([
+      [
+        t('hint.wing-aim'),
+        t('hint.wing-patrol-aim', { h: plan.hours, r: plan.radius }),
+        t('hint.wing-patrol-aim', { h: plan.hours, r: plan.radius }),
+        t('hint.wing-relocate-aim', { r }),
+      ],
+      [],
     ]);
-    env.notes.length = 0;
+    env.hints.length = 0;
     for (const act of ['wingstrike', 'wingpatrol', 'wingrelocate', 'wingrelease', 'wingsplit'])
       tap(act, 'sq:gone');
-    expect([inter.strikeAim, env.notes, env.sent]).toEqual([null, [], []]);
+    expect([inter.strikeAim, env.hints, env.sent]).toEqual([null, [], []]);
   });
 
   it('звенья: удержание, делёж, слияние; «держать патруль» читает сам патруль', async () => {
@@ -1196,7 +1207,7 @@ describe('REFM-225 — нажатия по листу', () => {
     expect([inter.strikeAim, env.forgot]).toEqual([{ ...aim, patrol: true }, 1]);
     tap('aloftrelocate');
     expect(inter.strikeAim).toEqual({ ...aim, relocate: true });
-    expect(env.notes).toEqual([
+    expect(env.hints).toEqual([
       t('hint.wing-aim'),
       t('hint.aloft-patrol-aim'),
       t('hint.wing-relocate-aim', { r: Math.round(core.squadronFerryRange(st, game.data)) }),
@@ -1204,9 +1215,9 @@ describe('REFM-225 — нажатия по листу', () => {
     tap('aloftsplit');
     const sq = { id: 'sq:S1', units: st.units } as Squadron;
     expect(orders()).toEqual([bare(decide.splitAloft('p1', 'S1', [splitOne(sq)!]))]);
-    env.notes.length = 0;
+    env.hints.length = 0;
     for (const act of ['aloftstrike', 'aloftpatrol', 'aloftrelocate', 'aloftsplit']) tap(act, 'S9');
-    expect([inter.strikeAim, env.notes, env.sent.length]).toEqual([null, [], 1]);
+    expect([inter.strikeAim, env.hints, env.sent.length]).toEqual([null, [], 1]);
   });
 
   it('opens a fortress loadout before spending resources and selects the separate site only after confirmation', async () => {

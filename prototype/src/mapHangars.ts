@@ -57,6 +57,14 @@ export function hangarBadgeRect(
   return { left: h.x - halfW, top: h.y - halfH, width: halfW * 2, height: halfH * 2 };
 }
 
+/** Середина правого края значка, за которым стоит эскадра `id`, — якорь её окна на ПК: окно
+ *  встаёт правее значка и не накрывает ни мир, ни сам значок. `null` — значок в этом кадре
+ *  не нарисован (далёкий зум). */
+export function hangarBadgeEdge(id: string): { x: number; y: number } | null {
+  const h = hits.find((hit) => hit.squadronIds.includes(id));
+  return h ? { x: h.x + h.halfW, y: h.y } : null;
+}
+
 const READY = '#5fe0d0';
 const WAIT = '#8a9aa0';
 const DOT = '#f2c94c';

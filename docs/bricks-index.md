@@ -851,6 +851,7 @@
 | UIX-10.14 | ✅ | proto | `docs/backlog-archive.md` | Приказы эскадре — только в её карточке. |
 | UIX-10.15 | ✅ | proto | `docs/backlog-archive.md` | Список «◇ Авиация». |
 | UIX-10.16 | ✅ | proto | `docs/backlog-archive.md` | Приказы эскадры — плитками, как у флота. |
+| UIX-10.17 | ✅ | proto | `docs/backlog-archive.md` | Доводка управления эскадрой по тесту со стороны игрока. |
 | CORP-1 | ✅ | srv | `docs/backlog-archive.md` | Лента новостей на сервере: события корпораций и объявления. |
 | CORP-2 | ✅ | proto | `docs/backlog-archive.md` | Лента на «Домой» вместо «Сводки». |
 | CORP-3 | ✅ | proto | `docs/backlog-archive.md` | Вкладка «Корпорация» в хабе вместо «Альянсов». |

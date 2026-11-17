@@ -57,7 +57,7 @@ import { invalidateCmdBar, renderCmdBar } from './cmdBar';
 import { dossierLevel, nextHover, showsBody } from './dossierHover';
 import type { Dossier } from './dossiers';
 import { openSeatCard } from './diploWindow';
-import { note, toast } from './eventFeed';
+import { aimHint, dropAimHint, note, toast } from './eventFeed';
 import {
   aloftPanelHtml,
   fleetPanelHtml,
@@ -394,6 +394,9 @@ export function renderPanel(): void {
   // каждый кадр, поэтому класс физически не может разъехаться с состоянием — а
   // взводится и гасится прицел из полутора десятков мест.
   document.body.classList.toggle('aim-mode', mapWorkspace);
+  // Подсказка прицела эскадры живёт ровно пока он взведён: приказ отдан или прицел снят —
+  // её нет (раньше она висела ещё пять секунд и оседала в «Событиях»).
+  if (!strikeAim) dropAimHint();
   // Phone: the bottom sheet covers ~50vh — when it OPENS, pan the camera so the
   // selected object is not the one thing the panel talks about yet hides.
   // Момент открытия и величина подъёма — `sheetLift.ts` (REFM-83).
@@ -748,7 +751,7 @@ function onSideClick(ev: MouseEvent): void {
     const base = squadronBase(arg);
     if (base) {
       arm('strikeAim', { from: base, squadronId: arg }); // слияние звеньев гаснет само
-      note(t('hint.wing-aim'));
+      aimHint(t('hint.wing-aim'));
     }
   } else if (act === 'wingpatrol') {
     // SHU-6.3 — тот же прицел, но тап выбирает ТОЧКУ патруля, а не цель: под пальцем
@@ -762,7 +765,7 @@ function onSideClick(ev: MouseEvent): void {
       // У пальца нет наведения: прежняя точка касания нарисовала бы круг там, где игрок
       // уже не целится. Круг появится с первым касанием карты.
       if (MOBILE) forgetAimPointer();
-      note(t('hint.wing-patrol-aim', { h: plan.hours, r: plan.radius }));
+      aimHint(t('hint.wing-patrol-aim', { h: plan.hours, r: plan.radius }));
     }
   } else if (act === 'wingrelocate') {
     // SHU-6.5 — тот же прицел, но тап выбирает СВОЮ БАЗУ, куда эскадра перелетит: вокруг
@@ -770,7 +773,7 @@ function onSideClick(ev: MouseEvent): void {
     const found = squadronAt(arg);
     if (found) {
       arm('strikeAim', { from: found.base, squadronId: arg, relocate: true });
-      note(t('hint.wing-relocate-aim', { r: Math.round(squadronFerryRange(found.sq, data)) }));
+      aimHint(t('hint.wing-relocate-aim', { r: Math.round(squadronFerryRange(found.sq, data)) }));
     }
   } else if (act === 'aloftstrike' || act === 'aloftpatrol' || act === 'aloftrelocate') {
     // SHU-6.14 — тот же прицел, что у карточки в ангаре, но для вылета `arg`: тап по карте
@@ -782,13 +785,13 @@ function onSideClick(ev: MouseEvent): void {
       if (act === 'aloftpatrol') {
         arm('strikeAim', { ...aim, patrol: true });
         if (MOBILE) forgetAimPointer(); // круг появится с первым касанием, как у ангара
-        note(t('hint.aloft-patrol-aim'));
+        aimHint(t('hint.aloft-patrol-aim'));
       } else if (act === 'aloftrelocate') {
         arm('strikeAim', { ...aim, relocate: true });
-        note(t('hint.wing-relocate-aim', { r: Math.round(squadronFerryRange(st, data)) }));
+        aimHint(t('hint.wing-relocate-aim', { r: Math.round(squadronFerryRange(st, data)) }));
       } else {
         arm('strikeAim', aim);
-        note(t('hint.wing-aim'));
+        aimHint(t('hint.wing-aim'));
       }
     }
   } else if (act === 'aloftsplit') {

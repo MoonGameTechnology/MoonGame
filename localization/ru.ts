@@ -1132,7 +1132,7 @@ export const ru: Record<string, string> = {
   'side.squad.port': 'В порту {name}',
   'side.squad.hold': 'На борту «{name}»',
   'side.squad.ready': 'готова',
-  'side.squad.ready.fuel': 'готова · вылетов {n}/{max}',
+  'side.squad.ready.fuel': 'вылетов {n}/{max}',
   'side.squad.no-fuel': 'без вылетов',
   'side.squad.busy': 'носитель в бою',
   'side.squad.siblings': 'Ещё здесь',

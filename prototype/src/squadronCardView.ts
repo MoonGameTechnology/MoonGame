@@ -11,14 +11,13 @@
  * Строка «Ещё здесь» — остальные эскадры той же базы: тап по имени выделяет её, а пока
  * взведено слияние, имя становится «сюда».
  */
-import type { Action, GameState, Planet } from '../../packages/shared-core/src/index';
+import type { Action, GameState, Planet, Squadron } from '../../packages/shared-core/src/index';
 import { hasMissiles, MISSILE_SALVO } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { parkedState } from '../../decisions/hangarBadge';
 import { fleetCallsign } from './fleetName';
 import { esc } from './format';
 import { data, loadShuttle, unloadShuttle } from './game';
-import { pcUi } from './graphicsPrefs';
 import {
   dockedCarrier,
   fleetHangar,
@@ -29,7 +28,7 @@ import {
 import { squadMerge } from './interaction';
 import { squadronRelocateSpots } from './mapAim';
 import { ownerColor } from './mapPalette';
-import { actionButton as btn, cardHeader } from './panelKit';
+import { cardHeader } from './panelKit';
 import { worldName } from './planetName';
 import { wingOrder, wingOrdersHtml, type WingOrder } from './wingOrders';
 import { unitRows } from './worldCard';
@@ -66,27 +65,35 @@ function spotOf(s: GameState, me: string, id: string): Spot | null {
   return null;
 }
 
-/** Строка под именем: где стоит и можно ли лететь (`hangarBadge.ts`, правило 5). */
+/** Можно ли лететь: «вылетов 3/3», «перезарядка: 2 ч»… (`hangarBadge.ts`, правило 5). */
+function stateText(view: HangarView, missiles: boolean): string {
+  const st = parkedState(view.blocked, view.sortie);
+  // Ракетам топливо порта не нужно: им важно одно — не в бою ли база.
+  if (missiles) return t(st.kind === 'busy' ? 'side.squad.busy' : 'side.missile.ready');
+  return st.kind === 'busy'
+    ? t('side.squad.busy')
+    : st.kind === 'rearming'
+      ? t('side.wing.rearming', { h: st.hours })
+      : st.kind === 'no-fuel'
+        ? t('side.squad.no-fuel')
+        : st.fuel !== null && st.maxFuel !== null
+          ? t('side.squad.ready.fuel', { n: st.fuel, max: st.maxFuel })
+          : t('side.squad.ready');
+}
+
+/** Строка под именем: где стоит и можно ли лететь. */
 function statusLine(spot: Spot, deps: SquadronCardDeps, missiles: boolean): string {
   const where =
     spot.kind === 'port'
       ? t('side.squad.port', { name: worldName(deps.world, spot.planet.id) })
       : t('side.squad.hold', { name: fleetCallsign(spot.fleetId) });
-  const st = parkedState(spot.view.blocked, spot.view.sortie);
-  // Ракетам топливо порта не нужно: им важно одно — не в бою ли база.
-  if (missiles)
-    return `${where} · ${t(st.kind === 'busy' ? 'side.squad.busy' : 'side.missile.ready')}`;
-  const state =
-    st.kind === 'busy'
-      ? t('side.squad.busy')
-      : st.kind === 'rearming'
-        ? t('side.wing.rearming', { h: st.hours })
-        : st.kind === 'no-fuel'
-          ? t('side.squad.no-fuel')
-          : st.fuel !== null && st.maxFuel !== null
-            ? t('side.squad.ready.fuel', { n: st.fuel, max: st.maxFuel })
-            : t('side.squad.ready');
-  return `${where} · ${state}`;
+  return `${where} · ${stateText(spot.view, missiles)}`;
+}
+
+function squadronOf(spot: Spot, deps: SquadronCardDeps, id: string): Squadron | undefined {
+  const hangar =
+    spot.kind === 'port' ? spot.planet.hangar : deps.world.fleets[spot.fleetId]?.hangar;
+  return hangar?.find((q) => q.id === id);
 }
 
 /** Строка состояния своей эскадры на стоянке — та же, что под именем в её карточке;
@@ -94,10 +101,21 @@ function statusLine(spot: Spot, deps: SquadronCardDeps, missiles: boolean): stri
 export function parkedStatusText(id: string, deps: SquadronCardDeps): string | null {
   const spot = spotOf(deps.world, deps.me, id);
   if (!spot) return null;
-  const hangar =
-    spot.kind === 'port' ? spot.planet.hangar : deps.world.fleets[spot.fleetId]?.hangar;
-  const sq = hangar?.find((q) => q.id === id);
+  const sq = squadronOf(spot, deps, id);
   return statusLine(spot, deps, !!sq && hasMissiles(sq, data));
+}
+
+/** Строка эскадры в списке «Выберите объект»: сколько бортов и можно ли лететь. Где она
+ *  стоит, список не повторяет: его открыл тап по этому самому месту. */
+export function parkedPickText(id: string, deps: SquadronCardDeps): string | null {
+  const spot = spotOf(deps.world, deps.me, id);
+  const sq = spot && squadronOf(spot, deps, id);
+  if (!spot || !sq) return null;
+  return `${boardsText(sq)} · ${stateText(spot.view, hasMissiles(sq, data))}`;
+}
+
+function boardsText(sq: Squadron): string {
+  return t('avia.ships', { n: sq.units.reduce((n, st) => n + st.count, 0) });
 }
 
 /** Перегрузка ЭТОЙ эскадры между портом и стоящим у мира своим носителем. Ядро возит
@@ -138,7 +156,9 @@ export function parkedSquadronHtml(id: string, deps: SquadronCardDeps): string |
   ];
   const title = `${t(SQUADRON_KIND_KEY)} «${card.name}»`;
   let h =
-    cardHeader(ownerColor(deps.me), title, '', { compact: pcUi(), subLive: notes.join(' · ') }) +
+    // Точки строки состояния — с пробелами и на ПК: «В порту Бета · вылетов 3/3» читается
+    // словами, а сжатое «Бета·вылетов» слипалось (тест владельца 2026-11-15).
+    cardHeader(ownerColor(deps.me), title, '', { subLive: notes.join(' · ') }) +
     unitRows(card.stacks);
   // Плитка есть, только если приказ пройдёт сейчас: готовность базы у удара, патруля и
   // перелёта общая (`canStrike`), и серая плитка здесь обещала бы то, чего нет.
@@ -165,21 +185,28 @@ export function parkedSquadronHtml(id: string, deps: SquadronCardDeps): string |
   return h;
 }
 
-/** «Ещё здесь»: остальные эскадры базы. Пока взведено слияние — куда слить. */
+/** «Ещё здесь»: остальные эскадры базы отдельным блоком плиток — не в ряду приказов, где
+ *  имя соседки читалось как ещё один приказ. Плитка — тот же «◇», что на значке ангара, имя
+ *  и число бортов; тап выделяет соседку. Пока взведено слияние — плитки тех, куда слить. */
 function siblingsHtml(view: HangarView, id: string, merging: boolean): string {
   const others = view.squadrons.filter((sq) => sq.id !== id && sq.units.some((st) => st.count > 0));
   if (others.length === 0) return '';
   const into = merging ? new Set(mergeTargets(view, id, data)) : new Set<string>();
-  const chips = others
+  const tiles = others
     .map((sq) => {
-      const name = squadronCallsignOf(sq.id);
-      return into.has(sq.id)
-        ? btn('wingmergeto', sq.id, `⛬ ${name}`, true)
-        : btn('sqpick', sq.id, `◇ ${name}`, true);
+      const [act, mark] = into.has(sq.id) ? ['wingmergeto', '⛬'] : ['sqpick', '◇'];
+      return (
+        `<button type="button" class="btn-second wing-sib${act === 'wingmergeto' ? ' into' : ''}" data-act="${act}" data-arg="${esc(sq.id)}">` +
+        `<span class="ws-name">${mark} ${esc(squadronCallsignOf(sq.id))}</span>` +
+        `<span class="ws-sub">${esc(boardsText(sq))}</span></button>`
+      );
     })
     .join('');
   const label = merging ? t('side.wing.merge.pick') : t('side.squad.siblings');
-  return `<div class="row dim">${esc(label)}</div><div class="row aloft-acts">${chips}</div>`;
+  return (
+    `<div class="row aloft-acts wing-sibs">` +
+    `<div class="fc-title wing-sibs-title"><b>${esc(label)}</b></div>${tiles}</div>`
+  );
 }
 
 /** Приказ перегрузить эскадру `id`: из порта на свой носитель у причала (`up`) или из трюма

@@ -22,11 +22,29 @@ export function toast(msg: string, at?: string): void {
   host.appendChild(el);
   // Считаются и вытесняются только тосты: предупреждение о сохранении стоит над ними.
   // Значок перебежчика (`defectorDialog.ts`) стоит в стопке, но не тост: его не вытесняют.
-  const plain = '.toast:not(.defector-pending)';
+  const plain = '.toast:not(.defector-pending):not(.aim-hint)';
   for (let extra = toastOverflow(host.querySelectorAll(plain).length); extra > 0; extra--)
     host.querySelector(plain)?.remove();
   window.setTimeout(() => {
     el.classList.add('out');
     window.setTimeout(() => el.remove(), TOAST_FADE_MS);
   }, TOAST_LIFE_MS);
+}
+
+/** Подсказка взведённого прицела («выберите точку патруля…»). Она нужна, пока игрок
+ *  целится, и ни секундой дольше, поэтому живёт не по часам, а до `dropAimHint`; в журнал
+ *  событий не пишется: это не событие матча. Новая подсказка сменяет прежнюю. */
+export function aimHint(msg: string): void {
+  dropAimHint();
+  const host = document.getElementById('toasts');
+  if (!host) return;
+  const el = document.createElement('div');
+  el.className = 'toast aim-hint';
+  el.textContent = msg;
+  host.appendChild(el);
+}
+
+/** Прицел исполнен или снят — подсказка уходит сразу. */
+export function dropAimHint(): void {
+  document.querySelector('#toasts .toast.aim-hint')?.remove();
 }
