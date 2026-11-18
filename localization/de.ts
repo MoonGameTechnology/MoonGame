@@ -4066,6 +4066,7 @@ export const de: Record<string, string> = {
   'training.end.reward': 'Starterpaket: +{n} Daten · +{m} ⌖',
   'training.end.reward-taken': 'Starterpaket bereits erhalten',
   'training.end.again': 'Training wiederholen',
+  'training.guide.orders': 'Schließen Sie die Details mit ✕: Befehle stehen in der Kachelreihe.',
   'training.guide.resume': '↩ Training fortsetzen',
   'training.stage.prep': 'Vorbereitung',
   'training.stage.economy': 'Basis und Wirtschaft',

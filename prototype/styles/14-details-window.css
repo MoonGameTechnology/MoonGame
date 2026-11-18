@@ -1,0 +1,34 @@
+/* Окно сведений на телефоне (заказ владельца 2026-11-18): «i» в шапке листа открывает окно
+   почти во весь экран — от полосы ресурсов до нижней навигации, — а не растит лист снизу.
+   Так у всего, что открывает лист: флота, мира, эскадры. В окне только сведения: ряд
+   приказов прячется (приказы — в свёрнутом листе), значок «i» тоже — окно закрывает ✕
+   (`mobileHud.ts`). Черновик приказа и выбор из списка окна не открывают: им нужен ряд.
+   Слой листа прежний: окна, которые открываются из сведений (бой, верфь), встают поверх. */
+body.mobile-ui #mobile-sheet.expanded:not(.order-mode):not(.choosing) {
+  top: calc(var(--tbh) + 4px + env(safe-area-inset-top));
+  max-height: none;
+  animation: mobile-details-window-in 0.16s ease-out;
+}
+body.mobile-ui #mobile-sheet.expanded:not(.order-mode):not(.choosing) #cmdbar,
+body.mobile-ui #mobile-sheet.expanded:not(.order-mode):not(.choosing) .mobile-info {
+  display: none;
+}
+/* Сведения занимают всё окно и листаются целиком, а не своим окошком в полэкрана. */
+body.mobile-ui #mobile-sheet.expanded:not(.order-mode):not(.choosing) #side {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+body.mobile-ui #mobile-sheet.expanded:not(.order-mode):not(.choosing) #side .pscroll {
+  max-height: none;
+}
+@keyframes mobile-details-window-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.mobile-ui #mobile-sheet.expanded {
+    animation: none;
+  }
+}

@@ -4079,6 +4079,7 @@ export const es: Record<string, string> = {
   'training.end.reward': 'Paquete de inicio: +{n} datos · +{m} ⌖',
   'training.end.reward-taken': 'Paquete de inicio recibido anteriormente',
   'training.end.again': 'Repetir entrenamiento',
+  'training.guide.orders': 'Cierra los detalles con ✕: las órdenes están en la fila de mosaicos.',
   'training.guide.resume': '↩ Reanudar entrenamiento',
   'training.stage.prep': 'Preparación',
   'training.stage.economy': 'Base y economía',

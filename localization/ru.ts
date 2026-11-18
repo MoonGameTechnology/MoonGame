@@ -4809,6 +4809,7 @@ export const ru: Record<string, string> = {
   'training.end.reward': 'Стартовый пакет: +{n} данных · +{m} ⌖',
   'training.end.reward-taken': 'Стартовый пакет получен ранее',
   'training.end.again': 'Повторить обучение',
+  'training.guide.orders': 'Закройте сведения ✕: приказы стоят в ряду плиток.',
   'training.guide.resume': '↩ Вернуть обучение',
   'training.stage.prep': 'Подготовка',
   'training.stage.economy': 'База и экономика',

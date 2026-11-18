@@ -4802,6 +4802,7 @@ export const en: Record<string, string> = {
   'training.end.reward': 'Starter pack: +{n} data · +{m} ⌖',
   'training.end.reward-taken': 'Starter pack already received',
   'training.end.again': 'Replay training',
+  'training.guide.orders': 'Close Details with ✕: orders are on the tile row.',
   'training.guide.resume': '↩ Resume training',
   'training.stage.prep': 'Preparation',
   'training.stage.economy': 'Base and economy',

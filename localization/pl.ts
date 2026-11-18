@@ -4087,6 +4087,7 @@ export const pl: Record<string, string> = {
   'training.end.reward': 'Pakiet startowy: +{n} danych · +{m} ⌖',
   'training.end.reward-taken': 'Pakiet startowy odebrany wcześniej',
   'training.end.again': 'Powtórz szkolenie',
+  'training.guide.orders': 'Zamknij szczegóły przyciskiem ✕: rozkazy są w rzędzie kafelków.',
   'training.guide.resume': '↩ Wznów szkolenie',
   'training.stage.prep': 'Przygotowanie',
   'training.stage.economy': 'Baza i gospodarka',

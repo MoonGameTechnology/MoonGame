@@ -136,6 +136,25 @@ describe('пошаговый полигон Sector Zero', () => {
       expect(steps(mobile).some((s) => s.target?.includes('dockrepair'))).toBe(false);
     }
   });
+  it('на телефоне плитка приказа ждёт закрытого окна сведений: оно прячет ряд приказов', () => {
+    // Окно сведений (заказ владельца 2026-11-18) прячет ряд приказов. Шаг с плиткой «Курс»,
+    // «Ещё» или «Бомбардировка» идёт за шагом «закройте окно», и между ними окно никто не
+    // открывает; при свёрнутом листе такой шаг проходит сам.
+    const all = steps(true);
+    const tile = /^\[data-cmd="(move|more|bombard)"/;
+    const tiles = all.flatMap((s, i) => (s.target && tile.test(s.target) ? [i] : []));
+    expect(tiles.length).toBeGreaterThan(5);
+    for (const i of tiles) {
+      const before = all.slice(0, i).reverse();
+      const guard = before.findIndex((s) => s.id.endsWith('-orders'));
+      const opened = before.findIndex((s) => s.target === '#mobile-sheet [data-mobile="details"]');
+      expect(guard, all[i]!.id).toBeGreaterThanOrEqual(0);
+      expect(opened < 0 || opened > guard, all[i]!.id).toBe(true);
+    }
+    const guard = all.find((s) => s.id.endsWith('-orders'))!;
+    expect(guard.advance.on === 'state' && guard.advance.when()).toBe(true);
+    expect(steps().some((s) => s.id.endsWith('-orders'))).toBe(false);
+  });
   it('неверный приказ не завершает разделение флота', () => {
     const split = steps().find((s) => s.id === 'fleet.split')!;
     const t = new SpotlightTour([split], { locate: () => null, render: () => {} });

@@ -138,6 +138,52 @@ function productionSteps(ui: TrainingTourUi) {
   return { yard, close, building };
 }
 
+/**
+ * Шаги листа телефона: «Сведения» раскрывают окно сведений, а шаг с плиткой приказа сперва
+ * просит его закрыть (окно прячет ряд приказов, `14-details-window.css`). На ПК листа нет —
+ * шагов тоже. Вынесено из `buildTrainingTour` (SLIM-6: функция из бюджета режется, когда её
+ * трогает фича).
+ */
+function sheetSteps(ui: TrainingTourUi) {
+  const state = (when: () => boolean): StepAdvance => ({ on: 'state', when });
+  const visible = (selector: string) => state(() => ui.visible(selector));
+  const details = (stage: TrainingStage, id: string) =>
+    ui.mobile
+      ? [
+          step(
+            stage,
+            id,
+            '#mobile-sheet [data-mobile="details"]',
+            state(() => ui.intent('details')),
+            { copy: 'training.guide.details' },
+          ),
+        ]
+      : [];
+  // При свёрнутом листе шаг проходит сам: условие уже выполнено.
+  const orders = (stage: TrainingStage, id: string) =>
+    ui.mobile
+      ? [
+          step(
+            stage,
+            `${id}-orders`,
+            '#mobile-sheet .mobile-close',
+            state(() => !ui.intent('details')),
+            { copy: 'training.guide.orders' },
+          ),
+        ]
+      : [];
+  const commands = (stage: TrainingStage, id: string, command: string) =>
+    ui.mobile
+      ? [
+          ...orders(stage, id),
+          step(stage, id, '[data-cmd="more"]', visible(`[data-cmd="${command}"]`), {
+            copy: 'training.guide.commands',
+          }),
+        ]
+      : [];
+  return { details, orders, commands };
+}
+
 export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
   const { me, data, baseline: b, ui } = d;
   const state = (when: () => boolean): StepAdvance => ({ on: 'state', when });
@@ -173,26 +219,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
         copy: `training.guide.fleet-role.${role}`,
       },
     );
-  const details = (stage: TrainingStage, id: string) =>
-    ui.mobile
-      ? [
-          step(
-            stage,
-            id,
-            '#mobile-sheet [data-mobile="details"]',
-            state(() => ui.intent('details')),
-            { copy: 'training.guide.details' },
-          ),
-        ]
-      : [];
-  const commands = (stage: TrainingStage, id: string, command: string) =>
-    ui.mobile
-      ? [
-          step(stage, id, '[data-cmd="more"]', visible(`[data-cmd="${command}"]`), {
-            copy: 'training.guide.commands',
-          }),
-        ]
-      : [];
+  const { details, orders, commands } = sheetSteps(ui);
   const at = (role: TrainingFleetRole, planet: string) =>
     !!f(role) && f(role)!.location === planet && !f(role)!.movement && !f(role)!.battleId;
   // Доля корпуса героя на входе в шаг «Ремонт»: проверку зовут только у текущего шага,
@@ -213,6 +240,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     arrived: () => boolean,
   ) => [
     fleet(stage, `${id}-fleet`, role),
+    ...orders(stage, id),
     step(
       stage,
       `${id}-move`,
@@ -248,7 +276,6 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
   ];
   const troops = (stage: TrainingStage, id: string, n: number) => [
     fleet(stage, `${id}-fleet`, 'hero'),
-    ...details(stage, `${id}-details`),
     ...commands(stage, `${id}-commands`, 'troops'),
     step(
       stage,
@@ -309,7 +336,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
         : [];
     return [
       ...route(stage, `${id}-orbit`, 'hero', planet, () => at('hero', planet)),
-      ...details(stage, `${id}-details`),
+      ...orders(stage, id),
       ...bombard,
       step(
         stage,
@@ -415,7 +442,6 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     ),
     ...route('missions', 'beacon', 'support', 'station', () => has('station')),
     fleet('fleet', 'select', 'support'),
-    ...details('fleet', 'details'),
     ...commands('fleet', 'split-commands', 'split'),
     step('fleet', 'split-open', '[data-cmd="split"]', visible('#splitdlg')),
     step(
@@ -457,7 +483,6 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       'open_reach',
       () => (d.introduced?.('p2_patrol') ?? true) && fleetGone(d.world(), 'p2_patrol'),
     ),
-    ...details('battle', 'details'),
     ...commands('battle', 'hero-commands', 'cast'),
     step('battle', 'hero-open', '[data-cmd="cast"]', visible('[data-cmd="castdo"]')),
     step('battle', 'hero', '[data-cmd="castdo"]:not(:disabled)', action('hero.ability')),
@@ -487,7 +512,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     // Шаг подсвечивает полосу корпуса и ждёт, пока она подрастёт, — часы идут.
     step('retreat', 'repair', '[data-stat="hull"]', state(mending), { holdClock: false }),
     fleet('carrier', 'select', 'carrier'),
-    ...carrierStrikeSteps(d, details),
+    ...carrierStrikeSteps(d, details, orders),
     ...troops('assault', 'load', 2),
     ...assault('assault', 'outpost', 'outpost'),
     world('fortify', 'outpost', 'outpost'),
@@ -557,12 +582,14 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
 function carrierStrikeSteps(
   d: TrainingTourDeps,
   details: (stage: TrainingStage, id: string) => SpotlightStep[],
+  orders: (stage: TrainingStage, id: string) => SpotlightStep[],
 ): SpotlightStep[] {
   const { me, ui } = d;
   const state = (when: () => boolean): StepAdvance => ({ on: 'state', when });
   const action = (type: string): StepAdvance => ({ on: 'action', type });
   const f = (role: TrainingFleetRole) => trainingFleet(d.world(), me, role);
   return [
+  ...orders('carrier', 'move'),
   step(
     'carrier',
     'move',
