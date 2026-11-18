@@ -92,7 +92,7 @@ Void Dominion (`@void/*`); название продукта — Averion или 
   (черновик), `ctx`, `rng`, `emit`, `schedule(at, type, payload)`, `hook`, `capability`, `reject`.
 - **Время.** `schedule` ставит событие в очередь по `(at, seq)`; `advanceTo` исполняет её, а
   между событиями шлёт `time.advanced {from, to}` — накопление по формуле, без тиков. Хук
-  `time.stop` режет отрезок шагом `time.stopped` (ракетная мина). Упавшее событие уходит в
+  `time.stop` режет отрезок шагом `time.stopped` (долг казны, мина). Упавшее событие уходит в
   `failures` (dead-letter), мир идёт дальше. Сверх `MAX_ADVANCE_STEPS` — `partial: true`;
   общий цикл догона `runUntil` пока зовёт только реплей, у `MatchRoom` свой. Шаг, завершивший
   матч, последний: часы и очередь дальше не исполняются.

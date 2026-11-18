@@ -133,7 +133,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 5 | `control` | `control.ts` | — | `capital.designated`, `planet.captured` | `economy.production`, `construction.requirement` | — | `control.changed` |
 | 6 | `integration` | `integration.ts` | — | `planet.captured`, `integration.complete`, `planet.destroyed` | `economy.production`, `construction.requirement` | — | sched: `integration.complete` |
 | 7 | `hunger` | `hunger.ts` | — | — | `combat.damage` | — | — |
-| 8 | `economy` | `economy.ts` | — | `time.advanced` | — | — | — |
+| 8 | `economy` | `economy.ts` | — | `time.advanced` | `time.stop` | — | — |
 | 9 | `movement` | `movement.ts` | `fleet.move`, `fleet.stop` | `fleet.split`, `fleet.arrival`, `diplomacy.changed`, `fleet.paceChanged` | — | `fleet.course`, `fleet.reconcileVisibility` | `fleet.halted`, `fleet.leg`, `fleet.parked`, `fleet.departed`, `fleet.fork`, `fleet.arrived`, `fleet.transit`, `fleet.stranded` · sched: `fleet.arrival` |
 | 10 | `hero` | `hero.ts` + `hero/` | `hero.ability`, `hero.spawn`, `hero.skill.unlock`, `hero.equip`, `hero.unequip`, `hero.install`, `hero.uninstall`, `hero.flagship`, `hero.mobilization.cancel` | `fleet.arrived`, `fleet.departed`, `fleet.bombard`, `battle.started`, `planet.captured`, `hero.siege.due`, `hero.path.expire`, `unit.died`, `fleet.destroyed`, `fleet.transit`, `fleet.fork`, `hero.respawn`, `hero.mobilization.complete`, `hero.mobilization.pump` | `fleet.speed`, `combat.damage`, `salvage.share` | `hero.casualty` | `hero.spawned`, `hero.recruited`, `hero.died`, `hero.siege.broken`, `hero.path.created`, `hero.path.expired`, `planet.destroyed`, `hero.siege.started`, `hero.siege.done`, `hero.ability.used`, `hero.respawned`, `hero.skill.unlocked`, `hero.equipped`, `hero.unequipped`, `hero.installed`, `hero.uninstalled`, `hero.mobilization.started`, `hero.mobilization.cancelled`, `hero.flagship.changed`, `construction.queue.pump` · sched: `hero.mobilization.complete`, `hero.mobilization.pump`, `hero.respawn`, `hero.path.expire`, `hero.siege.due` |
 | 11 | `heroEffects` | `heroEffects.ts` | — | — | `combat.damage.parallel`, `combat.damage` | `hero.effect.recall`, `hero.effect.aura`, `hero.effect.reveal`, `hero.effect.jump`, `hero.effect.decoy` | `hero.recalled`, `hero.jumped`, `hero.decoyed`, `hero.aura`, `hero.revealed` |
@@ -214,7 +214,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `fort.garrisonCap` | `faction` | `modules/construction/kit.ts` |
 | `research.slots` | `scientist` | `modules/technology.ts` |
 | `salvage.share` | `hero` → `loadoutEffects` | `modules/salvage.ts` |
-| `time.stop` | `visibility` → `rocketMines` | `kernel/kernel.ts` (режет отрезок `advanceTo` шагом `time.stopped`) |
+| `time.stop` | `economy` → `visibility` → `rocketMines` | `kernel/kernel.ts` (режет отрезок `advanceTo` шагом `time.stopped`) |
 | `victory.score` | — (шов, никто не регистрирует) | `modules/victory.ts` |
 
 Хуки без регистраций — **швы для будущих модулей**: их зовут, но никто не регистрирует, и
