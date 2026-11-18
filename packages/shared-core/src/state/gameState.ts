@@ -785,12 +785,8 @@ export interface Fleet {
   /** World-time (ms) this fleet last took damage. Gates shield regen: shields stay
    *  down for a delay after the last hit (shields-roadmap SH-1.1). Absent = never hit. */
   lastDamagedAt?: number;
-  /** ЗАРЯД (резолюция владельца 2026-11-17): урон залпа, которому не хватило живой цели —
-   *  все враги погибли раньше, чем он кончился (`util/overflow.ts`). `damage` — урон ДО хука
-   *  `combat.damage`: при разрядке бонусы стрелка и защиту цели считают заново. Держится до
-   *  `until` (пять игровых минут) и уходит в первых врагов, с которыми флот сойдётся в бою
-   *  (`dischargeOvercharges`); не успел — пропадает. Чужому игроку не виден
-   *  (`visibility.ts`): это намерение, как маршрут. Absent = заряда нет. */
+  /** ЗАРЯД (MSB-10): урон залпа без живой цели, ДО хука, до `until` (5 игровых минут);
+   *  разряжается в первом бою (`util/battleExchanges.ts`). Чужим не виден. Absent = нет. */
   overcharge?: { damage: number; until: number };
   /** World-time (ms) until which this fleet's travel speed is boosted after a
    *  `fleet.retreat` — the disengaging fleet flees faster while `now < it`. Absent =

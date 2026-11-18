@@ -789,6 +789,19 @@ export const PATROL_DIVE_SOLO_MIGRATION = {
   toDataHash: ORBITAL_TIME_ORDER_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: combat 4.1.0 — what a volley leaves unspent on a fallen side goes to the
+ *  shooter's living enemies, and a fleet keeps what found no target as a charge for five game
+ *  minutes (`Fleet.overcharge`, MSB-10). The catalogue is unchanged; a saved world has no
+ *  charge and reads as is. */
+export const VOLLEY_OVERFLOW_SOLO_MIGRATION = {
+  fromRules: PATROL_DIVE_SOLO_MIGRATION.toRules,
+  fromData: PATROL_DIVE_SOLO_MIGRATION.toData,
+  fromDataHash: PATROL_DIVE_SOLO_MIGRATION.toDataHash,
+  toRules: '1ecc200424a01a',
+  toData: PATROL_DIVE_SOLO_MIGRATION.toData,
+  toDataHash: PATROL_DIVE_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -857,6 +870,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SQUADRON_REFUEL_SOLO_MIGRATION,
   ORBITAL_TIME_ORDER_SOLO_MIGRATION,
   PATROL_DIVE_SOLO_MIGRATION,
+  VOLLEY_OVERFLOW_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

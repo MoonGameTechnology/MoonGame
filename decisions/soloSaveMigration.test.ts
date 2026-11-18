@@ -67,6 +67,7 @@ import {
   SQUADRON_REFUEL_SOLO_MIGRATION as squadronRefuel,
   ORBITAL_TIME_ORDER_SOLO_MIGRATION as orbitalTimeOrder,
   PATROL_DIVE_SOLO_MIGRATION as patrolDive,
+  VOLLEY_OVERFLOW_SOLO_MIGRATION as volleyOverflow,
   SOLO_MIGRATIONS,
   parseCompatibleSoloSave,
 } from './soloSaveMigration';
@@ -241,7 +242,7 @@ describe('the audited release chain (0.1.66 → 0.1.67 → 0.1.68)', () => {
   const shipped = { data: corpFormats.toData, dataHash: corpFormats.toDataHash, manifest: '1' };
 
   it('starts every pair where the one before it ends', () => {
-    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement, controlTech, viceroy, technologyPrices, fleetMergeOrders, fortressPrice, longRangeOptics, productionWorkbench, buildProductionTimes, paceRelief, fleetClocks, missiles, annihilatePeace, pausedSlots, pausedUpkeep, accretionDisk, spyTravel, spyLevels, spySalary, spyFog, forcedMarchPace, broodHold, scheduleOrder, rallyAnyWorld, spyDefector, captiveCarrier, squadronRefuel, orbitalTimeOrder, patrolDive]);
+    expect(SOLO_MIGRATIONS).toEqual([migration, corpFormats, career, reconHalt, spyPrices, spyDelay, reconLayers, spyDisrupt, spyExposed, spyCrew, spyTurn, landingCancel, slowAviation, researchQueue, hospitalWounds, productionLanes, woundedTransport, standUp, bombardVolley, halfModules, fortressModel, loadFirst, heroMobilization, echelons, moduleProgression, armySelection, capitalVictory, spyDevelopment, interceptTurret, cloakField, starLadder, combatContinuity, spyNoWar, controlLimit, controlRecheck, integration, rampSettlement, controlTech, viceroy, technologyPrices, fleetMergeOrders, fortressPrice, longRangeOptics, productionWorkbench, buildProductionTimes, paceRelief, fleetClocks, missiles, annihilatePeace, pausedSlots, pausedUpkeep, accretionDisk, spyTravel, spyLevels, spySalary, spyFog, forcedMarchPace, broodHold, scheduleOrder, rallyAnyWorld, spyDefector, captiveCarrier, squadronRefuel, orbitalTimeOrder, patrolDive, volleyOverflow]);
     SOLO_MIGRATIONS.slice(1).forEach((pair, i) => {
       const before = SOLO_MIGRATIONS[i]!;
       expect([pair.fromRules, pair.fromData, pair.fromDataHash]).toEqual([
