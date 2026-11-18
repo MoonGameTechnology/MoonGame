@@ -85,6 +85,7 @@ jobs:
               adb('shell','uiautomator','dump','/sdcard/probe.xml')
               return ET.fromstring(adb('exec-out','cat','/sdcard/probe.xml'))
           app='com.voiddominion.adprobe'
+          adb('wait-for-device',timeout=150)
           deadline=time.monotonic()+180
           while time.monotonic()<deadline:
               if adb('shell','getprop','sys.boot_completed')=='1':break
