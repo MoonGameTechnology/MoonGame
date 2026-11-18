@@ -137,7 +137,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | 9 | `movement` | `movement.ts` | `fleet.move`, `fleet.stop` | `fleet.split`, `fleet.arrival`, `diplomacy.changed`, `fleet.paceChanged` | — | `fleet.course`, `fleet.reconcileVisibility` | `fleet.halted`, `fleet.leg`, `fleet.parked`, `fleet.departed`, `fleet.fork`, `fleet.arrived`, `fleet.transit`, `fleet.stranded` · sched: `fleet.arrival` |
 | 10 | `hero` | `hero.ts` + `hero/` | `hero.ability`, `hero.spawn`, `hero.skill.unlock`, `hero.equip`, `hero.unequip`, `hero.install`, `hero.uninstall`, `hero.flagship`, `hero.mobilization.cancel` | `fleet.arrived`, `fleet.departed`, `fleet.bombard`, `battle.started`, `planet.captured`, `hero.siege.due`, `hero.path.expire`, `unit.died`, `fleet.destroyed`, `fleet.transit`, `fleet.fork`, `hero.respawn`, `hero.mobilization.complete`, `hero.mobilization.pump` | `fleet.speed`, `combat.damage`, `salvage.share` | `hero.casualty` | `hero.spawned`, `hero.recruited`, `hero.died`, `hero.siege.broken`, `hero.path.created`, `hero.path.expired`, `planet.destroyed`, `hero.siege.started`, `hero.siege.done`, `hero.ability.used`, `hero.respawned`, `hero.skill.unlocked`, `hero.equipped`, `hero.unequipped`, `hero.installed`, `hero.uninstalled`, `hero.mobilization.started`, `hero.mobilization.cancelled`, `hero.flagship.changed`, `construction.queue.pump` · sched: `hero.mobilization.complete`, `hero.mobilization.pump`, `hero.respawn`, `hero.path.expire`, `hero.siege.due` |
 | 11 | `heroEffects` | `heroEffects.ts` | — | — | `combat.damage.parallel`, `combat.damage` | `hero.effect.recall`, `hero.effect.aura`, `hero.effect.reveal`, `hero.effect.jump`, `hero.effect.decoy` | `hero.recalled`, `hero.jumped`, `hero.decoyed`, `hero.aura`, `hero.revealed` |
-| 12 | `orbital` | `orbital.ts` | `fleet.orbit`, `fleet.bombard` | `fleet.arrived`, `time.advanced` | — | — | `aa.fired`, `planet.bombarded`, `fleet.orbit`, `fleet.bombard` |
+| 12 | `orbital` | `orbital.ts` | `fleet.orbit`, `fleet.bombard` | `fleet.arrived`, `time.advanced`, `time.stopped` | `time.stop` | — | `aa.fired`, `planet.bombarded`, `fleet.orbit`, `fleet.bombard` |
 | 13 | `combat` | `combat.ts` | `fleet.assault`, `fleet.retreat`, `battle.retreat`, `battle.attack` | `fleet.arrived`, `fleet.transit`, `diplomacy.changed`, `fleet.intercept`, `fleet.meet`, `player.eliminated`, `assault.landed`, `fleet.departed`, `beachhead.landed`, `combat.clocks.restore`, `combat.tick`, `fleet.launched`, `fleet.split`, `fleet.joined`, `hero.spawned`, `hero.respawned`, `pve.wave.spawned` | `fleet.speed` | `battle.pullIn`, `battle.standUp` | `battle.started`, `battle.joined`, `assault.landing`, `assault.interrupted`, `assault.cancelled`, `assault.ashore`, `beachhead.landed`, `planet.captured`, `fleet.destroyed`, `battle.resolved`, `fleet.retreated`, `combat.round` · sched: `combat.tick`, `combat.clocks.restore`, `assault.landed` |
 | 14 | `veteran` | `veteran.ts` | — | — | `combat.damage`, `combat.mitigation` | — | — |
 | 15 | `intercept` | `intercept.ts` | — | `fleet.leg`, `fleet.parked`, `battle.started` | — | — | sched: `fleet.intercept`, `fleet.meet` |
@@ -214,7 +214,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `fort.garrisonCap` | `faction` | `modules/construction/kit.ts` |
 | `research.slots` | `scientist` | `modules/technology.ts` |
 | `salvage.share` | `hero` → `loadoutEffects` | `modules/salvage.ts` |
-| `time.stop` | `economy` → `visibility` → `rocketMines` | `kernel/kernel.ts` (режет отрезок `advanceTo` шагом `time.stopped`) |
+| `time.stop` | `economy` → `orbital` → `visibility` → `rocketMines` | `kernel/kernel.ts` (режет отрезок `advanceTo` шагом `time.stopped`) |
 | `victory.score` | — (шов, никто не регистрирует) | `modules/victory.ts` |
 
 Хуки без регистраций — **швы для будущих модулей**: их зовут, но никто не регистрирует, и
@@ -464,7 +464,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `technology.research.started` | `technology` | — |
 | `technology.researched` | `technology` | — |
 | `time.advanced` | kernel (`advanceTo`) | `economy`, `orbital`, `salvage`, `construction`, `technology`, `steward`, `pve`, `fleetBrood`, `missionFacts`, `victory`, `espionage`, `bot-diplomacy`, `standing-orders`, `shuttle`, `forced-march`, `effects`, `visibility`, `minefield`, `rocketMines`, `extraction`, `operation`, `captive`, `station` |
-| `time.stopped` | kernel (`advanceTo`, по хуку `time.stop`) | `rocketMines` |
+| `time.stopped` | kernel (`advanceTo`, по хуку `time.stop`) | `orbital`, `rocketMines` |
 | `trader.bought` | `trader` | — |
 | `trader.sold` | `trader` | — |
 | `trader.swapped` | `trader` | — |

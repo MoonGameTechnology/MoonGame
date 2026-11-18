@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
+import type { GameModule } from '../kernel/module';
 import { combatModule } from './combat';
 import { orbitalModule } from './orbital';
 import { interceptModule } from './intercept';
@@ -43,6 +44,9 @@ const dataLiteral = {
       stats: { attack: 4, defense: 8, speed: 4, hp: 120, siegeDamage: 30 },
       line: 'rear',
     },
+    // Ремонтный тендер: свой ремонтный отсек чинит половину корпуса в игровой час где угодно
+    // вне боя — 20 корпуса в час, 5 за четверть часа.
+    tender: { faction: 'x', domain: 'space', stats: { attack: 1, defense: 4, speed: 4, hp: 40, hullRepair: 0.5 } },
   },
   factions: {},
   buildings: {
@@ -358,6 +362,51 @@ describe('orbital — bombardment effects (GDD §7.4)', () => {
         expect(other.state).toEqual(fine.state);
         expect(volleys(other.events)).toEqual(volleys(fine.events));
       }
+    });
+
+    it('залпы флака и ремонт корпуса идут вперемешку при любой нарезке', () => {
+      // Ближний флак одного расчёта: 14 / 4 = 3,5 каждые четверть часа. Тендер за ту же
+      // четверть чинит 5, так что под мелкой нарезкой он держится на полном корпусе. Один
+      // отрезок в 4 часа не вправе сперва положить все 16 залпов (56 при корпусе 40), а потом
+      // начислить ремонт: флот погиб бы, хотя по времени всё время успевал чиниться.
+      const world = () =>
+        stateWith({
+          planets: [planet('P', 'p2', { garrison: [['aa', 1]] })],
+          fleets: [fleet('F', 'p1', 'P', [['tender', 1]], { orbit: 'near' })],
+        });
+      const long = advanceIn(world(), 4 * HOUR, [4 * HOUR]);
+      const fine = advanceIn(world(), 4 * HOUR, [MINUTE]);
+      expect(fine.state.fleets.F?.units).toEqual([{ unit: 'tender', count: 1, hp: 36.5 }]);
+      expect(long.state.fleets.F?.units).toEqual(fine.state.fleets.F?.units);
+      expect(volleys(long.events)).toEqual(volleys(fine.events));
+    });
+
+    it('чужая остановка мира между отметками сетки не даёт флаку второго залпа', () => {
+      // Другой модуль останавливает мир в 0:07 и 1:22 — не на отметках флака. Залп 0:00…1:15
+      // уже лёг на своём шаге; на чужой остановке флак молчит, обстрел — по своим часам.
+      const offGrid: GameModule = {
+        id: 'test-off-grid-stops',
+        version: '1.0.0',
+        setup(api) {
+          api.hook<number>('time.stop', (stop, args) => {
+            const { from, to } = args as { from: number; to: number };
+            for (const t of [7 * MINUTE, 82 * MINUTE]) if (t > from && t <= Math.min(stop, to)) return t;
+            return stop;
+          });
+        },
+      };
+      const world = () =>
+        stateWith({
+          planets: [planet('P', 'p2', { garrison: [['aa', 1]] })],
+          fleets: [fleet('F', 'p1', 'P', [['tender', 1]], { orbit: 'near' })],
+        });
+      const run = (modules: GameModule[]) =>
+        okAdvance(createKernel(modules).advanceTo(world(), at(2 * HOUR)));
+      const plain = run([...combatFamily, constructionModule]);
+      const cut = run([...combatFamily, constructionModule, offGrid]);
+      expect(volleys(cut.events)).toEqual(volleys(plain.events));
+      expect(volleys(plain.events)).toHaveLength(8);
+      expect(cut.state.fleets.F?.units).toEqual(plain.state.fleets.F?.units);
     });
   });
 

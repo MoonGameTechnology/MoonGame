@@ -270,11 +270,17 @@ function armBombard(h: HandlerContext, fleet: Fleet): void {
   fleet.bombardNextAt = h.ctx.now + hourIntervalMs(h.ctx);
 }
 
-/** Every bombardment volley due in the span `(from, to]`, in (instant, fleet id) order.
- *  The clock is absolute (`fleet.bombardNextAt`), so one long span and many short ones
- *  see the same volleys at the same instants. A fleet that stopped bombarding drops its
- *  clock; one left bombarding without a clock (an old save) starts it at the span start. */
-function dueBombardVolleys(h: HandlerContext, from: number, to: number): Array<{ at: number; fleet: Fleet }> {
+/** Every bombardment volley due by `to` — before it, or also on it when `closed` — in
+ *  (instant, fleet id) order. The clock is absolute (`fleet.bombardNextAt`), so one long
+ *  span and many short ones see the same volleys at the same instants. A fleet that stopped
+ *  bombarding drops its clock; one left bombarding without a clock (an old save) starts it
+ *  at the span start. */
+function dueBombardVolleys(
+  h: HandlerContext,
+  from: number,
+  to: number,
+  closed: boolean,
+): Array<{ at: number; fleet: Fleet }> {
   const hourMs = hourIntervalMs(h.ctx);
   const due: Array<{ at: number; fleet: Fleet }> = [];
   for (const f of recordValues(h.state.fleets)) {
@@ -283,25 +289,31 @@ function dueBombardVolleys(h: HandlerContext, from: number, to: number): Array<{
       continue;
     }
     if (f.bombardNextAt === undefined) f.bombardNextAt = from + hourMs;
-    for (let at = f.bombardNextAt; at <= to; at += hourMs) due.push({ at, fleet: f });
+    for (let at = f.bombardNextAt; closed ? at <= to : at < to; at += hourMs) due.push({ at, fleet: f });
   }
   return due.sort((a, b) => a.at - b.at || (a.fleet.id < b.fleet.id ? -1 : a.fleet.id > b.fleet.id ? 1 : 0));
 }
 
-/** The orbital layer over one continuous span `(from, to]`: the worlds' flak on the
+/** The orbital layer over one continuous span `(from, to)`: the worlds' flak on the
  *  quarter-hour grid and every fleet's bombardment volley on its own clock, IN THE ORDER
  *  OF TIME (FORT-5.17). The span's length is not ours — an unwatched match sleeps to its
  *  next event, a watched one ticks every second — so the two fires must interleave as they
  *  would tick by tick: a shelled emplacement stops firing, a fleet downed by flak lands
  *  the volleys it fired before, with the strength it had then. At one instant the flak
- *  lands first, as it does in a span that ends on that instant. */
+ *  lands first.
+ *
+ *  A volley ON the span's end `to` is not this span's: it lands on the `time.stopped` step
+ *  at `to` ({@link runOrbitalInstant}), after every module has accrued the span — so the
+ *  hull a dock or a repair bay mended before the volley is there when it hits. The hook
+ *  `time.stop` ends a span on every next volley ({@link nextVolleyAt}), so a span never
+ *  holds one inside; this loop is the guard if a span arrives uncut. */
 function runOrbitalSpan(h: HandlerContext, from: number, to: number): void {
   const hourMs = hourIntervalMs(h.ctx); // one game-hour of world time
   const quarterMs = hourMs / 4;
   let q = Math.floor(from / quarterMs) + 1;
-  const lastQ = Math.floor(to / quarterMs);
+  const lastQ = Math.ceil(to / quarterMs) - 1;
   let batteries = q <= lastQ ? flakBatteries(h) : [];
-  const volleys = dueBombardVolleys(h, from, to);
+  const volleys = dueBombardVolleys(h, from, to, false);
   let next = 0;
   for (;;) {
     const flakAt = batteries.length > 0 && q <= lastQ ? q * quarterMs : Infinity;
@@ -319,6 +331,40 @@ function runOrbitalSpan(h: HandlerContext, from: number, to: number): void {
     fireBombardVolley(h, fleet);
     fleet.bombardNextAt = at + hourMs;
   }
+}
+
+/** The volleys due ON `at`: the `time.stopped` step there. Flak only when `at` is a mark of
+ *  its grid — another module may stop the world between marks, and the mark before it has
+ *  had its own step. Bombardment by each fleet's clock (an overdue tick lands now too). */
+function runOrbitalInstant(h: HandlerContext, at: number): void {
+  const hourMs = hourIntervalMs(h.ctx);
+  const quarterMs = hourMs / 4;
+  const q = Math.round(at / quarterMs);
+  // Flak lands first at one instant, as inside a span.
+  if (q * quarterMs === at) for (const battery of flakBatteries(h)) fireFlak(h, battery, q, at);
+  for (const { at: due, fleet } of dueBombardVolleys(h, at, at, true)) {
+    if (h.state.fleets[fleet.id] !== fleet || !fleet.bombarding) continue;
+    fireBombardVolley(h, fleet);
+    fleet.bombardNextAt = due + hourMs;
+  }
+}
+
+/** The next instant after `from` on which a volley is due: the next quarter-hour mark
+ *  while some world's flak has a target, or a bombarding fleet's next clock tick. Reads
+ *  the world at the span's start only — the `time.stop` contract. */
+function nextVolleyAt(h: HandlerContext, from: number, limit: number): number {
+  const hourMs = hourIntervalMs(h.ctx);
+  const quarterMs = hourMs / 4;
+  let next = Infinity;
+  for (const f of recordValues(h.state.fleets)) {
+    if (!f.bombarding) continue;
+    let at = f.bombardNextAt ?? from + hourMs;
+    while (at <= from) at += hourMs;
+    if (at < next) next = at;
+  }
+  const flakAt = (Math.floor(from / quarterMs) + 1) * quarterMs;
+  if (flakAt < next && flakAt <= limit && flakBatteries(h).length > 0) next = flakAt;
+  return next;
 }
 
 /** One bombardment volley: an hour's worth of the fleet's shelling, landed at once
@@ -380,7 +426,10 @@ export const orbitalModule: GameModule = {
   //        (`fleet.bombardNextAt`), а не непрерывно.
   // 1.8.0: флак мира и обстрел ложатся в порядке времени, а не «весь флак отрезка, потом
   //        весь обстрел»; залп флака метит `lastDamagedAt` своим мгновением (FORT-5.17).
-  version: '1.8.0',
+  // 1.9.0: каждый залп — свой шаг мира: хук `time.stop` режет отрезок на следующем залпе, а
+  //        залп на конце отрезка ложится на `time.stopped`, когда ремонт и щиты всех модулей
+  //        за отрезок уже начислены. Залпы и ремонт идут вперемешку при любой нарезке.
+  version: '1.9.0',
   setup(api) {
     // A single orbit (GDD §7.4): arriving = stationed in orbit, not bombarding
     // until ordered. Registered BEFORE the melee module in the manifest, so this
@@ -463,6 +512,17 @@ export const orbitalModule: GameModule = {
         return;
       }
       runOrbitalSpan(h, from, to);
+    });
+    // Every volley gets a step of its own: the world stops on it, after the span before
+    // it has been accrued by every module (PE-2.2: one span = many short ones).
+    api.hook<number>('time.stop', (stop, args, h) => {
+      const { from, to } = args as { from: number; to: number };
+      const limit = Math.min(stop, to);
+      const at = nextVolleyAt(h, from, limit);
+      return at <= limit ? at : stop;
+    });
+    api.on('time.stopped', (event, h) => {
+      runOrbitalInstant(h, (event.payload as { at: number }).at);
     });
   },
 };

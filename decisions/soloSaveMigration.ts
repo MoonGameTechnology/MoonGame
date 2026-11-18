@@ -862,6 +862,18 @@ export const BOT_FAVOUR_LINE_SOLO_MIGRATION = {
   toDataHash: FOG_INSTANT_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: orbital 1.9.0 — every flak and bombardment volley is a world step of
+ *  its own (`time.stop` → `time.stopped`), landing after the span before it has been
+ *  accrued, repairs included. The catalogue and the saved shape are unchanged. */
+export const VOLLEY_STEP_SOLO_MIGRATION = {
+  fromRules: BOT_FAVOUR_LINE_SOLO_MIGRATION.toRules,
+  fromData: BOT_FAVOUR_LINE_SOLO_MIGRATION.toData,
+  fromDataHash: BOT_FAVOUR_LINE_SOLO_MIGRATION.toDataHash,
+  toRules: '0884e1e2622619',
+  toData: BOT_FAVOUR_LINE_SOLO_MIGRATION.toData,
+  toDataHash: BOT_FAVOUR_LINE_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -936,6 +948,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   ARREARS_INSTANT_SOLO_MIGRATION,
   FOG_INSTANT_SOLO_MIGRATION,
   BOT_FAVOUR_LINE_SOLO_MIGRATION,
+  VOLLEY_STEP_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
