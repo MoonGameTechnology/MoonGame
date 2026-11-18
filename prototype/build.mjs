@@ -263,7 +263,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <!-- steward («Хранитель») window — content rendered by renderSteward() in main.ts -->
 <div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="stewardbody"></div></div></div>
 <!-- окно боя: открывается тапом по значку боя на карте (battleScreen.ts) -->
-<div id="battlewin"><div class="twbox"><div class="lw-head"><div id="battlewinhead" class="bw-hd"><b data-i18n="battle.win.head"></b></div><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="battlewinbody"></div></div></div>
+<div id="battlewin"><div class="twbox"><div class="lw-head"><div id="battlewinhead" class="bw-hd"><b data-i18n="battle.win.head"></b></div><button class="tw-close btn-x" data-i18n-aria="card.close">✕</button></div><div id="battlewinbody"></div><div id="battlewinsheet" hidden></div></div></div>
 <!-- heroes: the roster/штаб now lives INSIDE the «Производство» screen (Герои pane) -->
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.close"></button></div><div id="scipickbody"></div></div></div>

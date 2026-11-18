@@ -366,7 +366,6 @@ export const de: Record<string, string> = {
   'battle.win.tone.ok': 'intakt',
   'battle.win.attack': 'Angreifen',
   'battle.win.attack-all': 'Mit allen angreifen',
-  'battle.win.attacking': 'Greift an',
   'battle.win.retreat-all': 'Mit allen Kräften zurückziehen',
   'battle.win.allies': 'Eigene und Verbündete',
   'battle.win.opponents': 'Gegner',

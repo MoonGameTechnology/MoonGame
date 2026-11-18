@@ -104,105 +104,82 @@
 #battlewin .bw-hd b{overflow-wrap:anywhere;}
 #battlewin .bw-phase{font-size:var(--fs-caption);color:var(--dim);}
 #battlewin .bw-phase.ground{color:#ffb44d;}
-#battlewinbody .bw-ended{margin-bottom:10px;padding:10px 12px;border:1px solid #ffd27a88;border-radius:8px;background:rgba(255,210,122,.08);}
-#battlewinbody .bw-ended b{display:block;color:#ffd27a;font-size:14px;}
-#battlewinbody .bw-ended p{margin:4px 0 0;font-size:var(--fs-body);color:var(--txt,#e8f6fa);}
-#battlewinbody .bw-sub{margin:0 0 6px;font-size:var(--fs-caption);color:var(--dim);}
-#battlewinbody .bw-balance{margin-bottom:10px;}
-#battlewinbody .bw-bal{display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;background:rgba(255,255,255,.05);}
-#battlewinbody .bw-bal i{display:block;min-width:3px;transition:flex .6s ease;}
+#battlewin .bw-ended{margin-bottom:10px;padding:10px 12px;border:1px solid #ffd27a88;border-radius:8px;background:rgba(255,210,122,.08);}
+#battlewin .bw-ended b{display:block;color:#ffd27a;font-size:14px;}
+#battlewin .bw-ended p{margin:4px 0 0;font-size:var(--fs-body);color:var(--txt,#e8f6fa);}
 /* UIX-12.1: своя доля отличается штриховкой, а не только цветом */
-#battlewinbody .bw-bal i.mine{background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.38) 0 3px,transparent 3px 7px) !important;}
-#battlewinbody .bw-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:var(--fs-body);color:var(--dim);}
-#battlewinbody .bw-legend span{display:inline-flex;align-items:center;gap:5px;}
-#battlewinbody .bw-legend span.mine{color:var(--cyan);font-weight:700;}
-#battlewinbody .bw-legend i{width:9px;height:9px;border-radius:50%;}
-#battlewinbody .bw-side{padding:10px 12px 10px 14px;border:1px solid var(--line);border-left:4px solid var(--own,#8aa0ad);border-radius:10px;
+#battlewin .bw-side{padding:10px 12px 10px 14px;border:1px solid var(--line);border-left:4px solid var(--own,#8aa0ad);border-radius:10px;
   margin-bottom:8px;background:rgba(255,255,255,.02);}
 /* Своя сторона подсвечена рамкой: в свалке на пять сторон «где я» — первый вопрос. */
-#battlewinbody .bw-side.mine{border-color:var(--cyan-dim);border-left-color:var(--own,var(--cyan));background:rgba(53,214,230,.08);}
-#battlewinbody .bw-who{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 7px;font-size:14px;}
-#battlewinbody .bw-you{font-style:normal;font-size:var(--fs-caption);font-weight:700;padding:1px 6px;border-radius:8px;background:var(--cyan);color:#05161c;}
-#battlewinbody .bw-role{font-size:var(--fs-caption);padding:2px 7px;border-radius:8px;border:1px solid var(--line-hi);}
-#battlewinbody .attacker .bw-role{color:#ff7a6b;border-color:rgba(255,122,107,.5);}
-#battlewinbody .defender .bw-role{color:#7fc8ff;border-color:rgba(127,200,255,.5);}
-#battlewinbody .bw-kind{font-size:var(--fs-caption);color:var(--dim);margin-left:auto;}
+#battlewin .bw-side.mine{border-color:var(--cyan-dim);border-left-color:var(--own,var(--cyan));background:rgba(53,214,230,.08);}
+#battlewin .bw-who{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 7px;font-size:14px;}
+#battlewin .bw-you{font-style:normal;font-size:var(--fs-caption);font-weight:700;padding:1px 6px;border-radius:8px;background:var(--cyan);color:#05161c;}
+#battlewin .bw-role{font-size:var(--fs-caption);padding:2px 7px;border-radius:8px;border:1px solid var(--line-hi);}
+#battlewin .attacker .bw-role{color:#ff7a6b;border-color:rgba(255,122,107,.5);}
+#battlewin .defender .bw-role{color:#7fc8ff;border-color:rgba(127,200,255,.5);}
 /* PERK-3.3: надбавка за пережитые бои. Янтарь — цвет семьи ветерана (ср. .umedal.g3),
    чтобы значок в окне боя читался как продолжение вымпела в строке состава. */
-#battlewinbody .bw-vet{font-size:var(--fs-caption);font-variant-numeric:tabular-nums;padding:2px 6px;border-radius:8px;color:var(--amb);border:1px solid rgba(255,190,90,.45);}
-#battlewinbody .bw-meter{position:relative;height:18px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;margin-bottom:4px;}
-#battlewinbody .bw-meter i{position:absolute;inset:0 auto 0 0;border-radius:5px;transition:width .6s ease;}
-#battlewinbody .bw-meter span{position:relative;display:block;padding:0 7px;font-size:var(--fs-caption);line-height:18px;color:#f2fbff;text-shadow:0 1px 2px #000;}
-#battlewinbody .bw-meter.tone-ok i{background:linear-gradient(90deg,#1f9d6a,#3ddc97);}
-#battlewinbody .bw-meter.tone-hurt i{background:linear-gradient(90deg,#b7791f,#ffc14d);}
-#battlewinbody .bw-meter.tone-low i{background:linear-gradient(90deg,#a3261d,#ff5a4d);}
-#battlewinbody .bw-meter.shield i{background:linear-gradient(90deg,#1c6aa6,#5fb8ff);}
-#battlewinbody .bw-units{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
-#battlewinbody .bw-unit{font-size:var(--fs-caption);padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--dim);}
-#battlewinbody .bw-unit b{color:var(--txt,#e8f6fa);}
-#battlewinbody .bw-orders{margin-top:12px;}
-#battlewinbody .bw-ret{display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:6px;border:1px solid var(--cyan-dim);border-radius:9px;background:rgba(53,214,230,.06);}
-#battlewinbody .bw-ret div{flex:1;min-width:0;}
-#battlewinbody .bw-ret div b{display:block;font-size:var(--fs-body);}
-#battlewinbody .bw-ret div span{font-size:var(--fs-caption);color:var(--dim);}
-#battlewinbody .bw-ret button{flex:0 0 auto;min-height:36px;}
+#battlewin .bw-vet{font-size:var(--fs-caption);font-variant-numeric:tabular-nums;padding:2px 6px;border-radius:8px;color:var(--amb);border:1px solid rgba(255,190,90,.45);}
+#battlewin .bw-meter{position:relative;height:18px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;margin-bottom:4px;}
+#battlewin .bw-meter i{position:absolute;inset:0 auto 0 0;border-radius:5px;transition:width .6s ease;}
+#battlewin .bw-meter span{position:relative;display:block;padding:0 7px;font-size:var(--fs-caption);line-height:18px;color:#f2fbff;text-shadow:0 1px 2px #000;}
+#battlewin .bw-meter.tone-ok i{background:linear-gradient(90deg,#1f9d6a,#3ddc97);}
+#battlewin .bw-meter.tone-hurt i{background:linear-gradient(90deg,#b7791f,#ffc14d);}
+#battlewin .bw-meter.tone-low i{background:linear-gradient(90deg,#a3261d,#ff5a4d);}
+#battlewin .bw-meter.shield i{background:linear-gradient(90deg,#1c6aa6,#5fb8ff);}
+#battlewin .bw-units{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+#battlewin .bw-unit{font-size:var(--fs-caption);padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--dim);}
+#battlewin .bw-unit b{color:var(--txt,#e8f6fa);}
 /* UIX-6.2: прогноз над колонками — слово итога и строка «срок · потери»; цвет тот же, что у
    прогноза в прицеле «Атаки», и лишь дублирует слово. */
-#battlewinbody .bw-forecast{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;margin:0 0 10px;padding:8px 12px;border:1px solid var(--line);border-left:4px solid var(--line-hi);border-radius:7px;font-size:var(--fs-body);color:var(--dim);}
-#battlewinbody .bw-forecast b{font-size:14px;color:var(--txt,#e8f6fa);}
-#battlewinbody .bw-forecast.positive{border-left-color:#7df0d0;}
-#battlewinbody .bw-forecast.positive b{color:#7df0d0;}
-#battlewinbody .bw-forecast.negative{border-left-color:#ff5a4d;}
-#battlewinbody .bw-forecast.negative b{color:#ff5a4d;}
-#battlewinbody .bw-forecast.neutral{border-left-color:#ffb43a;}
-#battlewinbody .bw-forecast.neutral b{color:#ffb43a;}
+#battlewin .bw-forecast{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;margin:0 0 10px;padding:8px 12px;border:1px solid var(--line);border-left:4px solid var(--line-hi);border-radius:7px;font-size:var(--fs-body);color:var(--dim);}
+#battlewin .bw-forecast b{font-size:14px;color:var(--txt,#e8f6fa);}
+#battlewin .bw-forecast.positive{border-left-color:#7df0d0;}
+#battlewin .bw-forecast.positive b{color:#7df0d0;}
+#battlewin .bw-forecast.negative{border-left-color:#ff5a4d;}
+#battlewin .bw-forecast.negative b{color:#ff5a4d;}
+#battlewin .bw-forecast.neutral{border-left-color:#ffb43a;}
+#battlewin .bw-forecast.neutral b{color:#ffb43a;}
 /* UIX-6.2: правила отхода и раундов под «?» — на виду одна строка, она же кнопка. */
-#battlewinbody .bw-rules-toggle{display:flex;align-items:center;gap:10px;width:100%;min-height:36px;margin-top:8px;padding:6px 0;border:0;border-top:1px solid var(--line);background:transparent;color:var(--dim);font:inherit;font-size:var(--fs-body);line-height:1.4;text-align:left;cursor:pointer;}
-#battlewinbody .bw-rules-toggle span{flex:1;min-width:0;}
-#battlewinbody .bw-rules-toggle i{flex:0 0 auto;width:22px;height:22px;border:1px solid var(--line-hi);border-radius:50%;font-style:normal;font-weight:700;line-height:20px;text-align:center;color:var(--cyan);}
-#battlewinbody .bw-rules-toggle[aria-expanded="true"] i{background:var(--cyan);border-color:var(--cyan);color:#05161c;}
-#battlewinbody .bw-rules p{font-size:var(--fs-body);color:var(--dim);line-height:1.45;margin:4px 0 0;}
-#battlewinbody .bw-empty{font-size:var(--fs-body);color:var(--dim);}
+#battlewin .bw-rules-toggle{display:flex;align-items:center;gap:10px;width:100%;min-height:36px;margin-top:8px;padding:6px 0;border:0;border-top:1px solid var(--line);background:transparent;color:var(--dim);font:inherit;font-size:var(--fs-body);line-height:1.4;text-align:left;cursor:pointer;}
+#battlewin .bw-rules-toggle span{flex:1;min-width:0;}
+#battlewin .bw-rules-toggle i{flex:0 0 auto;width:22px;height:22px;border:1px solid var(--line-hi);border-radius:50%;font-style:normal;font-weight:700;line-height:20px;text-align:center;color:var(--cyan);}
+#battlewin .bw-rules-toggle[aria-expanded="true"] i{background:var(--cyan);border-color:var(--cyan);color:#05161c;}
+#battlewin .bw-rules p{font-size:var(--fs-body);color:var(--dim);line-height:1.45;margin:4px 0 0;}
+#battlewin .bw-empty{font-size:var(--fs-body);color:var(--dim);}
 /* Horizontal command window: ownership is independent from combat stance. */
 #battlewin .twbox{width:min(1220px,96vw);max-height:92dvh;}
 #battlewinbody{padding:12px 16px;}
-#battlewinbody .bw-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;}
-#battlewinbody .bw-column{min-width:0;}
-#battlewinbody .bw-column h3{display:flex;justify-content:space-between;margin:0 0 8px;padding-bottom:7px;border-bottom:1px solid var(--line-hi);font-size:var(--fs-body);}
-#battlewinbody .bw-column h3 span{color:var(--dim);}
-#battlewinbody .bw-side{margin-bottom:10px;padding:10px 12px;border-left-color:var(--own);border-radius:7px;background:#0c1a24;}
-#battlewinbody .bw-side.mine{border-color:var(--line-hi);border-left-color:var(--own);background:color-mix(in srgb,var(--own) 10%,#0c1a24);}
-#battlewinbody .bw-who{gap:8px;align-items:center;}
-#battlewinbody .bw-who>div{flex:1;min-width:0;}
-#battlewinbody .bw-who b{display:block;color:var(--own);overflow-wrap:anywhere;font-size:14px;}
-#battlewinbody .bw-who small{display:block;font-size:var(--fs-caption);color:var(--dim);margin-top:3px;}
-#battlewinbody .bw-you{background:transparent;border:1px solid var(--own);color:var(--own);white-space:nowrap;}
-#battlewinbody .bw-damage{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;}
-#battlewinbody .bw-damage>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;background:#07121c;border:1px solid var(--line);border-radius:4px;}
-#battlewinbody .bw-damage span{font-size:var(--fs-caption);color:var(--dim);}
-#battlewinbody .bw-damage b{font:700 17px var(--sf-font);font-variant-numeric:tabular-nums;color:var(--txt,#e8f6fa);white-space:nowrap;}
-#battlewinbody .bw-clock{display:flex;justify-content:space-between;align-items:center;padding:7px 0;color:#ffc36b;font-size:var(--fs-caption);}
-#battlewinbody .bw-clock b{font:700 17px var(--sf-font);font-variant-numeric:tabular-nums;}
-#battlewinbody .bw-response{margin:8px 0;color:#7fc8ff;font-size:var(--fs-caption);}
-#battlewinbody .bw-expand,#battlewinbody .bw-effect-toggle,#battlewinbody .bw-more{display:block;width:100%;text-align:left;min-height:36px;padding:7px 0;background:transparent;border:0;color:var(--txt,#e8f6fa);font:inherit;font-size:var(--fs-caption);cursor:pointer;}
-#battlewinbody .bw-effect-toggle{color:#a3d9bd;border-bottom:1px solid var(--line);}
-#battlewinbody .bw-no-effects,#battlewinbody .bw-auto{font-size:var(--fs-caption);color:var(--dim);margin:5px 0;}
-#battlewinbody .bw-tiles{gap:6px;margin-top:4px;align-items:stretch;}
-#battlewinbody .bw-tiles .ptile{flex:0 0 auto;min-width:56px;box-sizing:border-box;color:var(--own);}
-#battlewinbody .bw-tiles .ptile.with-art{flex-basis:104px;}
-#battlewinbody .bw-tiles .ptile:focus-visible{outline:2px solid var(--own);outline-offset:2px;}
-#battlewinbody .bw-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;}
-#battlewinbody .bw-actions button,#battlewinbody .bw-orders button{min-height:38px;padding:8px 15px;font-size:var(--fs-body);border-radius:4px;}
-#battlewinbody .bw-orders{position:sticky;bottom:-12px;display:flex;justify-content:center;gap:12px;padding:10px;background:#09141ff5;border-top:1px solid var(--line-hi);z-index:1;}
-#battlewinbody .bw-effects{padding:8px;background:#07121c;border:1px solid var(--line);border-radius:4px;}
-#battlewinbody .bw-effects ul{list-style:none;padding:0;margin:0;display:grid;gap:7px;}
-#battlewinbody .bw-effects li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:var(--fs-caption);}
-#battlewinbody .bw-effects .buff b{color:#67dca0;}
-#battlewinbody .bw-effects .debuff b{color:#ff887b;}
-#battlewinbody .bw-effects small{grid-column:1/-1;color:var(--dim);}
-#battlewinbody .bw-effects p{font-size:var(--fs-caption);line-height:1.4;color:var(--dim);margin-bottom:0;}
-#battlewinbody button:focus-visible{outline:2px solid #e8f6fa;outline-offset:2px;}
-@media(max-width:700px){#battlewinbody{padding:10px;}#battlewinbody .bw-columns{grid-template-columns:1fr;gap:12px;}#battlewin .twbox{max-height:94dvh;}#battlewinbody .bw-orders{bottom:-10px;}#battlewinbody .bw-damage b{font-size:15px;}#battlewinbody .bw-rules-toggle{min-height:44px;}}
+#battlewin .bw-side{margin-bottom:10px;padding:10px 12px;border-left-color:var(--own);border-radius:7px;background:#0c1a24;}
+#battlewin .bw-side.mine{border-color:var(--line-hi);border-left-color:var(--own);background:color-mix(in srgb,var(--own) 10%,#0c1a24);}
+#battlewin .bw-who{gap:8px;align-items:center;}
+#battlewin .bw-who>div{flex:1;min-width:0;}
+#battlewin .bw-who b{display:block;color:var(--own);overflow-wrap:anywhere;font-size:14px;}
+#battlewin .bw-who small{display:block;font-size:var(--fs-caption);color:var(--dim);margin-top:3px;}
+#battlewin .bw-you{background:transparent;border:1px solid var(--own);color:var(--own);white-space:nowrap;}
+#battlewin .bw-damage{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;}
+#battlewin .bw-damage>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;background:#07121c;border:1px solid var(--line);border-radius:4px;}
+#battlewin .bw-damage span{font-size:var(--fs-caption);color:var(--dim);}
+#battlewin .bw-damage b{font:700 17px var(--sf-font);font-variant-numeric:tabular-nums;color:var(--txt,#e8f6fa);white-space:nowrap;}
+#battlewin .bw-clock{display:flex;justify-content:space-between;align-items:center;padding:7px 0;color:#ffc36b;font-size:var(--fs-caption);}
+#battlewin .bw-clock b{font:700 17px var(--sf-font);font-variant-numeric:tabular-nums;}
+#battlewin .bw-response{margin:8px 0;color:#7fc8ff;font-size:var(--fs-caption);}
+#battlewin .bw-expand,#battlewin .bw-effect-toggle,#battlewin .bw-more{display:block;width:100%;text-align:left;min-height:36px;padding:7px 0;background:transparent;border:0;color:var(--txt,#e8f6fa);font:inherit;font-size:var(--fs-caption);cursor:pointer;}
+#battlewin .bw-effect-toggle{color:#a3d9bd;border-bottom:1px solid var(--line);}
+#battlewin .bw-no-effects,#battlewin .bw-auto{font-size:var(--fs-caption);color:var(--dim);margin:5px 0;}
+#battlewin .bw-tiles{gap:6px;margin-top:4px;align-items:stretch;}
+#battlewin .bw-tiles .ptile{flex:0 0 auto;min-width:56px;box-sizing:border-box;color:var(--own);}
+#battlewin .bw-tiles .ptile.with-art{flex-basis:104px;}
+#battlewin .bw-tiles .ptile:focus-visible{outline:2px solid var(--own);outline-offset:2px;}
+#battlewin .bw-effects{padding:8px;background:#07121c;border:1px solid var(--line);border-radius:4px;}
+#battlewin .bw-effects ul{list-style:none;padding:0;margin:0;display:grid;gap:7px;}
+#battlewin .bw-effects li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:var(--fs-caption);}
+#battlewin .bw-effects .buff b{color:#67dca0;}
+#battlewin .bw-effects .debuff b{color:#ff887b;}
+#battlewin .bw-effects small{grid-column:1/-1;color:var(--dim);}
+#battlewin .bw-effects p{font-size:var(--fs-caption);line-height:1.4;color:var(--dim);margin-bottom:0;}
+#battlewin button:focus-visible{outline:2px solid #e8f6fa;outline-offset:2px;}
+@media(max-width:700px){#battlewin .twbox{max-height:94dvh;}#battlewin .bw-damage b{font-size:15px;}#battlewin .bw-rules-toggle{min-height:44px;}}
 #stewardbody .st-status{padding:11px 13px;border:1px solid var(--cyan-dim);border-radius:9px;background:rgba(53,214,230,.08);font-size:var(--fs-body);color:var(--cyan);line-height:1.55;}
 #stewardbody .st-status.locked{border-color:var(--line);background:rgba(255,255,255,.03);color:var(--dim);}
 #stewardbody .st-status.on{border-color:#7df0d0;background:rgba(125,240,208,.10);color:#9ff0da;}

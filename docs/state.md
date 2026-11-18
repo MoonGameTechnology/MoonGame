@@ -402,8 +402,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - `main.ts` — хозяин мира и проводки; интерфейс разнесён по модулям `init*(host)` с чистыми
   `*Html`. Владельцы: экран подключения — `connectScreen.ts`, настройки — `settingsView.ts` /
   `settingsOverlay.ts`, выбор — `sidePanel.ts`, жизненный цикл матча — `matchLifecycle.ts`,
-  бой — `battleScreen.ts` + `battleView.ts` (прогноз — `decisions/battleForecast.ts`),
-  окна экспедиции — `expeditionWindows.ts`, «Технологии» (дерево плиток) — `techTree.ts`.
+  бой — `battleScreen.ts` + `battleView.ts`, ряды и стрелки — `battleRows.ts` (MSB-12),
+  прогноз — `decisions/battleForecast.ts`, окна экспедиции — `expeditionWindows.ts`, «Технологии» (дерево плиток) — `techTree.ts`.
 - От 720 px — консоль ПК и планшета (`holographicUi.ts`, окна — `floatingWindows.ts`, масштаб —
   `decisions/pcScale.ts`); уже — телефон (`mobileHud.ts`, панель — `decisions/phoneNav.ts`, приказ —
   черновик цели `mobileOrders.ts`, приказы — плитки-иконки, по удержанию памятка `cmdMemo.ts`).

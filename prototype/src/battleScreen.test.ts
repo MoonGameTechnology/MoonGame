@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
   battleEndedHtml,
   battleHeadHtml,
+  battleSheetHtml,
   battleWindowHtml,
   sideRowHtml,
   battleRetreats,
@@ -18,6 +19,7 @@ import { displayUnit, esc, fmtHrs } from './format';
 import { engageForecastCard } from '../../decisions/engageForecast';
 import type { ForecastSide } from '../../decisions/battleForecast';
 import type { BattleModel } from '../../packages/client/src/matchHud';
+import { combatantKey } from '../../packages/shared-core/src/state/battle';
 
 const side = (
   owner: string,
@@ -58,9 +60,8 @@ describe('окно боя', () => {
     const html = battleWindowHtml(
       battle([side('p1', 'attacker', true), side('p2', 'defender'), side('p3', 'attacker')]),
     );
-    // Считаем по `bw-who` — по одной на строку стороны. `bw-side` совпал бы и с
-    // контейнером `bw-sides`, и тест зеленел бы на четырёх «сторонах» вместо трёх.
-    expect(html.match(/class="bw-who"/g) ?? []).toHaveLength(3);
+    // Считаем плитки сторон: по одной на сторону, без плитки «+N».
+    expect(html.match(/data-battle-side=/g) ?? []).toHaveLength(3);
     for (const who of ['P1', 'P2', 'P3']) expect(html).toContain(who);
   });
 
@@ -155,27 +156,25 @@ describe('окно боя', () => {
     b.hull = { current: 100, max: 300 };
     const color = (o: string | null): string => (o === 'p1' ? '#00ffff' : '#ff0000');
     const html = battleWindowHtml(battle([a, b]), [], { color });
-    expect(html).toContain('bw-bal');
+    expect(html).toContain('bw-tug');
     expect(html).toContain('flex:0.7500;background:#00ffff');
-    expect(html).toContain('P2 25%');
+    expect(html).toContain('<b>75%</b>');
+    expect(html).toContain('<b>25%</b>');
     expect(
       battleWindowHtml(battle([side('p1', 'attacker'), side('p2', 'defender')])),
-    ).not.toContain('bw-bal');
+    ).not.toContain('bw-tug');
   });
 
-  it('свою долю полосы отличает не только цвет: штриховка и «Вы» в подписи (UIX-12.1)', () => {
+  it('свою долю полосы отличает не только цвет: штриховка и «Мы» в подписи (UIX-12.1)', () => {
     const a = side('p1', 'attacker', true);
     const b = side('p2', 'defender');
     a.hull = { current: 100, max: 100 };
     b.hull = { current: 100, max: 100 };
     const html = battleWindowHtml(battle([a, b]), [], { color: () => '#888888' });
-    const bar = html.slice(html.indexOf('bw-bal'), html.indexOf('bw-legend'));
-    expect(bar.match(/<i class="mine"/g)).toHaveLength(1);
-    const legend = html.slice(html.indexOf('bw-legend'));
-    const own = legend.slice(legend.indexOf('<span class="mine">'));
-    expect(own.slice(0, own.indexOf('</span>'))).toContain(t('battle.win.you'));
-    // У чужой стороны метки нет: «Вы» встречается в подписи ровно раз.
-    expect(legend.slice(0, legend.indexOf('</div>')).split(t('battle.win.you')).length - 1).toBe(1);
+    const line = html.slice(html.indexOf('bw-tugline'), html.indexOf('bw-forecast') >>> 0);
+    expect(line.match(/<i class="mine"/g)).toHaveLength(1);
+    expect(line).toContain(`${t('battle.win.us')} <b>50%</b>`);
+    expect(line).toContain(`<b>50%</b> ${t('battle.win.them')}`);
   });
 
   it('владелец назван словами хоста, а не именем из состояния (UIX-5.3)', () => {
@@ -186,10 +185,12 @@ describe('окно боя', () => {
     a.hull = { current: 300, max: 300 };
     b.hull = { current: 100, max: 300 };
     const ownerName = (o: string | null): string => (o === 'p2' ? 'Багровая гегемония' : 'Вы');
-    const html = battleWindowHtml(battle([a, b]), [], { ownerName });
-    expect(html).toContain(`Багровая гегемония · ${t('side.battle.side.fleet')}`);
-    expect(html).toContain('Багровая гегемония 25%');
+    const m = battle([a, b]);
+    const html = battleWindowHtml(m, [], { ownerName });
+    expect(html).toContain('aria-label="p2-1 · Багровая гегемония"');
     expect(html).not.toContain('P2');
+    const sheet = battleSheetHtml(m, { ownerName }, { sheet: combatantKey(b.ref!) });
+    expect(sheet).toContain(`Багровая гегемония · ${t('side.battle.side.fleet')}`);
   });
 
   it('свой флот в бою назван позывным и показывает авто-отход', () => {
@@ -243,7 +244,7 @@ describe('окно боя', () => {
     expect(html).toContain('bw-ended');
     expect(html).toContain(t('battle.win.ended'));
     expect(html).toContain('отбились');
-    expect(html.match(/class="bw-who"/g) ?? []).toHaveLength(2); // стороны на месте
+    expect(html.match(/data-battle-side=/g) ?? []).toHaveLength(2); // стороны на месте
     expect(html).not.toContain('pn-timer'); // раундов больше не будет
     expect(html).not.toContain('data-battle-retreat'); // отходить не из чего
     expect(html).not.toContain('bw-empty');
@@ -273,8 +274,8 @@ describe('прогноз и правила в окне боя (UIX-6.2)', () => 
     expect(html).toContain('bw-forecast positive');
     expect(html).toContain(t('engage.forecast.win'));
     expect(html).toContain(esc(t('engage.forecast.line', { h: fmtHrs(3), own: 20, foe: 100 })));
-    // Прогноз стоит над колонками сторон, а не теряется под ними.
-    expect(html.indexOf('bw-forecast')).toBeLessThan(html.indexOf('bw-columns'));
+    // Прогноз стоит над схемой сторон, а не теряется под ней.
+    expect(html.indexOf('bw-forecast')).toBeLessThan(html.indexOf('bw-scheme'));
   });
 
   it('в прогноз идёт текущий состав стороны — стеки с остатком корпуса', () => {
@@ -428,12 +429,15 @@ it('uses the configured own color, fixed blue allies, and never gives allies com
   expect(html).toContain('--own:#c67dff');
   expect(html).toContain('--own:#4a8cff');
   expect(html.match(/data-battle-attack=/g)).toHaveLength(1);
-  expect(html.match(/class="pn-timer"/g)).toHaveLength(2); // only the two attackers
-  expect(html.indexOf('P3')).toBeLessThan(html.indexOf(t('battle.win.opponents')));
+  // Two attackers: a timer on each tile and each chip of the volley queue; the defender none.
+  expect(html.match(/class="pn-timer"/g)).toHaveLength(4);
+  // The ally stands in our row (below the gap), the enemy in the top row.
+  expect(html.indexOf('P3')).toBeGreaterThan(html.indexOf('bw-gap'));
+  expect(html.indexOf('aria-label="p2-1')).toBeLessThan(html.indexOf('bw-gap'));
   expect(sideRowHtml(mine)).toContain('--own:#3ad17a');
 });
 
-it('folding many distinct stacks preserves damage, effects and orders', () => {
+it('folding many distinct stacks preserves damage and effects; orders live below the scheme', () => {
   const mine = { ...side('p1', 'defender', true), key: 'own' };
   mine.units = Array.from({ length: 23 }, () => ({ unit: 'cruiser', count: 1 }));
   mine.readout = {
@@ -461,7 +465,7 @@ it('folding many distinct stacks preserves damage, effects and orders', () => {
   expect(folded).toContain('432');
   expect(folded).toContain('123');
   expect(folded).toContain('data-battle-effects');
-  expect(folded).toContain('data-battle-attack');
+  expect(folded).not.toContain('data-battle-attack');
   expect(folded).not.toContain('real-tiles');
   expect(requested).toBe(-1);
   const expanded = sideRowHtml(mine, view, {

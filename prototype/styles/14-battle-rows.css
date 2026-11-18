@@ -1,0 +1,124 @@
+/* === Окно боя рядами (заказ владельца 2026-11-17, макет v5) =====================
+   Табло, фильтры стрелок, плитки сторон в два ряда со стрелками залпов, плитки приказов
+   внизу и лист стороны: на телефоне выезжает снизу поверх схемы, на широком экране встаёт
+   панелью справа. Разметка — prototype/src/battleRows.ts, battleScreen.ts. */
+#battlewin .twbox{position:relative;width:min(600px,96vw);max-height:92dvh;}
+#battlewinbody{padding:0;}
+#battlewinbody .bw-ended{margin:10px 12px 0;}
+#battlewinbody .bw-empty{padding:12px;}
+
+/* ── табло ── */
+#battlewinbody .bw-board{display:grid;gap:6px;padding:10px 12px 8px;border-bottom:1px solid var(--line);}
+#battlewinbody .bw-tugline{display:flex;align-items:center;gap:8px;font-size:var(--fs-caption);color:var(--dim);white-space:nowrap;}
+#battlewinbody .bw-tugline b{font-size:var(--fs-body);color:var(--txt,#e8f6fa);font-variant-numeric:tabular-nums;}
+#battlewinbody .bw-tug{flex:1 1 auto;min-width:60px;display:flex;height:10px;gap:2px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.05);}
+#battlewinbody .bw-tug i{display:block;min-width:3px;transition:flex .6s ease;}
+#battlewinbody .bw-tug i.mine{background-image:repeating-linear-gradient(120deg,rgba(0,0,0,.38) 0 2px,transparent 2px 6px) !important;}
+#battlewinbody .bw-tug .mid{flex:0 0 2px;background:var(--txt,#e8f6fa);}
+#battlewinbody .bw-board .bw-forecast{margin:0;padding:6px 10px;}
+#battlewinbody .bw-queue{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -12px;padding:0 12px;}
+#battlewinbody .bw-queue::-webkit-scrollbar{display:none;}
+#battlewinbody .bw-q{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;
+  font-size:var(--fs-caption);color:var(--dim);white-space:nowrap;}
+#battlewinbody .bw-q i{width:8px;height:8px;border-radius:50%;}
+#battlewinbody .bw-q b{color:var(--txt,#e8f6fa);font-variant-numeric:tabular-nums;}
+#battlewinbody .bw-q.next{border-color:var(--line-hi);}
+#battlewinbody .bw-alert{margin:0;padding:7px 10px;border:1px solid rgba(255,90,77,.5);border-radius:7px;background:rgba(255,90,77,.08);
+  font-size:var(--fs-caption);color:#ffd9d4;}
+#battlewinbody .bw-alert b{font-variant-numeric:tabular-nums;}
+#battlewinbody .bw-note{margin:0;font-size:var(--fs-caption);color:var(--dim);line-height:1.4;}
+#battlewinbody .bw-note.warn{color:var(--amber);}
+
+/* ── фильтры стрелок ── */
+#battlewinbody .bw-filters{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;padding:8px 12px 0;}
+#battlewinbody .bw-seg{display:inline-flex;border:1px solid var(--line-hi);border-radius:8px;overflow:hidden;}
+#battlewinbody .bw-seg-b,#battlewinbody .bw-tog{appearance:none;min-height:32px;padding:6px 10px;border:0;background:transparent;color:var(--dim);
+  font-family:inherit;font-size:var(--fs-caption);font-weight:600;cursor:pointer;}
+#battlewinbody .bw-seg-b+.bw-seg-b{border-left:1px solid var(--line-hi);}
+#battlewinbody .bw-tog{border:1px solid var(--line-hi);border-radius:8px;}
+#battlewinbody .bw-seg-b.on,#battlewinbody .bw-tog.on{background:rgba(53,214,230,.14);color:var(--txt,#e8f6fa);}
+#battlewinbody .bw-flt-note{font-size:var(--fs-caption);color:var(--dim);}
+
+/* ── схема: два ряда плиток, стрелки под ними ── */
+#battlewinbody .bw-scheme{position:relative;display:flex;flex-direction:column;gap:6px;padding:8px 12px 10px;}
+#battlewinbody .bw-arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+#battlewinbody .bw-arrows text{font:700 11px var(--sf-font,sans-serif);fill:#f2fbff;}
+#battlewinbody .bw-row-h{margin:0;font-size:var(--fs-caption);font-weight:600;color:var(--dim);}
+#battlewinbody .bw-lane{position:relative;z-index:1;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;}
+#battlewinbody .bw-gap{height:52px;}
+#battlewinbody .bw-scheme.quiet .bw-gap{height:14px;}
+#battlewinbody .bw-ft{appearance:none;position:relative;flex:0 0 calc((100% - 24px) / 4);min-width:0;min-height:44px;display:grid;gap:4px;
+  padding:5px;border:1px solid var(--line);border-radius:9px;background:#0a1922;color:var(--txt,#e8f6fa);font:inherit;text-align:left;cursor:pointer;}
+#battlewinbody .bw-ft.me{border-color:color-mix(in srgb,var(--own) 55%,transparent);background:color-mix(in srgb,var(--own) 10%,#0a1922);}
+#battlewinbody .bw-ft.pick{border-color:var(--own);box-shadow:0 0 0 2px color-mix(in srgb,var(--own) 35%,transparent);}
+#battlewinbody .bw-ft.sel{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset;}
+#battlewinbody .bw-ft.dead{opacity:.45;}
+#battlewinbody .bw-ft:focus-visible,#battlewinbody .bw-seg-b:focus-visible,#battlewinbody .bw-tog:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+#battlewinbody .bw-ft-you{position:absolute;top:-7px;left:6px;padding:0 5px;border-radius:6px;background:var(--own);color:#05161c;
+  font-style:normal;font-size:10px;font-weight:700;line-height:14px;}
+#battlewinbody .bw-ft-top{display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0;}
+#battlewinbody .bw-ft-ic{flex:0 0 26px;width:26px;height:26px;display:grid;place-items:center;overflow:hidden;border-radius:6px;background:#06161c;color:var(--own);}
+#battlewinbody .bw-ft-ic .hero-portrait,#battlewinbody .bw-ft-ic .ship-art{width:100%;height:100%;}
+#battlewinbody .bw-ft-ic .ship-art img{width:100%;height:100%;object-fit:cover;}
+#battlewinbody .bw-ft-ic svg{width:22px;height:22px;}
+#battlewinbody .bw-ft-t{font-size:var(--fs-caption);font-weight:700;color:#ffc9a6;white-space:nowrap;font-variant-numeric:tabular-nums;}
+#battlewinbody .bw-ft-t.def{color:#a9d7ff;font-weight:400;}
+#battlewinbody .bw-ft-name{font-size:var(--fs-caption);font-weight:600;line-height:1.2;color:var(--own);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#battlewinbody .bw-ft-name::first-letter{text-transform:uppercase;}
+#battlewinbody .bw-ft-bar{display:flex;align-items:center;gap:4px;}
+#battlewinbody .bw-ft-hp{flex:1 1 auto;height:4px;border-radius:2px;overflow:hidden;background:rgba(255,255,255,.08);}
+#battlewinbody .bw-ft-hp i{display:block;height:100%;background:#3ddc97;}
+#battlewinbody .bw-ft-hp.tone-hurt i{background:#ffc14d;}
+#battlewinbody .bw-ft-hp.tone-low i{background:#ff5a4d;}
+#battlewinbody .bw-ft-sh{flex:0 0 auto;width:5px;height:5px;border-radius:50%;background:#5fb8ff;}
+#battlewinbody .bw-ft-n{font-size:var(--fs-caption);line-height:1;color:var(--txt,#e8f6fa);font-variant-numeric:tabular-nums;}
+#battlewinbody .bw-ft-charge{position:absolute;top:-7px;right:-5px;width:18px;height:18px;display:grid;place-items:center;border-radius:50%;
+  background:#2a2205;border:1px solid var(--amber);font-size:11px;line-height:1;}
+#battlewinbody .bw-ft.grp{place-content:center;justify-items:center;text-align:center;border-style:dashed;}
+#battlewinbody .bw-ft.grp b{font-size:var(--fs-heading);line-height:1;}
+#battlewinbody .bw-ft.grp span{font-size:var(--fs-caption);}
+#battlewinbody .bw-ft.grp small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-caption);color:var(--dim);}
+
+/* ── правила и приказы ── */
+#battlewinbody .bw-rules-toggle{margin:0;padding:6px 12px;}
+#battlewinbody .bw-rules{padding:0 12px 8px;}
+#battlewinbody .bw-orders{position:sticky;bottom:0;z-index:2;display:grid;gap:6px;padding:8px 12px 10px;
+  border-top:1px solid var(--line-hi);background:#09141ff5;}
+#battlewinbody .bw-ots{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:8px;}
+#battlewinbody .bw-ot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:48px;padding:5px 4px;
+  font-size:var(--fs-caption);line-height:1.25;}
+#battlewinbody .bw-ot i{font-style:normal;font-size:18px;line-height:1;}
+#battlewinbody .bw-status{margin:0;font-size:var(--fs-caption);color:var(--dim);line-height:1.4;}
+#battlewinbody .bw-status b{display:inline-block;color:var(--txt,#e8f6fa);}
+#battlewinbody .bw-status b::first-letter{text-transform:uppercase;}
+
+/* ── лист стороны ── */
+#battlewinsheet[hidden]{display:none;}
+#battlewin .bw-sheet-dim{position:absolute;inset:0;z-index:5;background:rgba(1,6,9,.55);}
+#battlewin .bw-sheet{position:absolute;left:0;right:0;bottom:0;z-index:6;max-height:80%;overflow:auto;padding:0 12px 12px;
+  background:var(--glass);border-top:1px solid var(--cyan);border-radius:12px 12px 0 0;box-shadow:0 -12px 30px rgba(0,0,0,.45);}
+#battlewin .bw-sheet-h{position:sticky;top:0;z-index:1;display:flex;justify-content:flex-end;padding:8px 0 4px;background:var(--glass);}
+#battlewin .bw-grab{position:absolute;top:6px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:var(--line-hi);}
+#battlewin .bw-sheet-x{width:36px;min-height:36px;}
+#battlewin .bw-sheet .bw-side{margin:0;}
+#battlewin .bw-aim{margin:8px 0 0;font-size:var(--fs-caption);color:var(--dim);}
+@media (prefers-reduced-motion:no-preference){
+  #battlewin .bw-sheet{animation:bw-sheet-up .18s ease-out;}
+  @keyframes bw-sheet-up{from{transform:translateY(16px);opacity:.6;}}
+}
+/* Широкий экран: лист — панелью справа, схема не перекрывается. */
+@media (min-width:760px){
+  #battlewin.has-sheet .twbox{width:min(980px,96vw);display:grid;grid-template-columns:minmax(0,1fr) 360px;grid-template-rows:auto minmax(0,1fr);}
+  #battlewin.has-sheet .twbox>.lw-head{grid-column:1 / -1;}
+  #battlewin.has-sheet #battlewinsheet{position:relative;min-height:0;border-left:1px solid var(--cyan);}
+  #battlewin .bw-sheet-dim{display:none;}
+  #battlewin .bw-sheet{position:absolute;inset:0;max-height:none;border-top:0;border-radius:0;box-shadow:none;animation:none;}
+  #battlewin .bw-grab{display:none;}
+  #battlewinbody .bw-ft{flex-basis:132px;}
+  #battlewinbody .bw-ots{grid-template-columns:repeat(auto-fit,minmax(96px,128px));}
+}
+/* ПК под зумом (08-pc.css): vw внутри зумленного слоя тоже растут, поэтому делятся на зум. */
+@media (min-width:900px) and (hover:hover) and (pointer:fine){
+  #battlewin .twbox{width:min(600px,calc(96vw / var(--pcz,1.5)));max-height:calc(var(--vph) * .92);}
+  #battlewin.has-sheet .twbox{width:min(980px,calc(96vw / var(--pcz,1.5)));}
+}
