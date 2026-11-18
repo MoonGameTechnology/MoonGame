@@ -97,28 +97,10 @@ function productionQuantity(stage: Stage, unit: string, wanted: number, enough: 
   });
 }
 
-export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
-  const { me, home, ui } = d;
-  const w = d.world;
-  // Fixed at the start of the lesson: the guild's two lots and the main hero.
-  const bid = guideLot(w(), 'buy')?.id ?? '';
-  const ask = guideLot(w(), 'sell')?.id ?? '';
-  const hero = guideHero(w(), me)?.id ?? '';
-  // Militia already in the home garrison do not count as trained in the lesson.
-  const militia = guideTroopsHome(w(), home);
-
+/** Шаги листа телефона: «Сведения» открывают окно сведений, а шаг с плиткой приказа сперва
+ *  просит его закрыть. Вынесено из `buildOperationSteps` (SLIM-1: функция до 300 строк). */
+function sheetSteps(ui: OperationUi) {
   const phone = (s: SpotlightStep): SpotlightStep[] => (ui.mobile ? [s] : []);
-  // A window that is not on the player's phone bar lives under «More».
-  const more = (stage: Stage, item: string) =>
-    phone(
-      step(
-        stage,
-        `${item}-more`,
-        '[data-phone-tab="more"]',
-        () => ui.visible(`[data-phone-tab="${item}"], [data-phone-more="${item}"]`),
-        { copy: 'onb.guide.more' },
-      ),
-    );
   const details = (stage: Stage, id: string) =>
     phone(
       step(stage, id, '#mobile-sheet [data-mobile="details"]', () => ui.intent('details'), {
@@ -141,6 +123,32 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       }),
     ),
   ];
+  return { details, orders, commands };
+}
+
+export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
+  const { me, home, ui } = d;
+  const w = d.world;
+  // Fixed at the start of the lesson: the guild's two lots and the main hero.
+  const bid = guideLot(w(), 'buy')?.id ?? '';
+  const ask = guideLot(w(), 'sell')?.id ?? '';
+  const hero = guideHero(w(), me)?.id ?? '';
+  // Militia already in the home garrison do not count as trained in the lesson.
+  const militia = guideTroopsHome(w(), home);
+
+  const phone = (s: SpotlightStep): SpotlightStep[] => (ui.mobile ? [s] : []);
+  // A window that is not on the player's phone bar lives under «More».
+  const more = (stage: Stage, item: string) =>
+    phone(
+      step(
+        stage,
+        `${item}-more`,
+        '[data-phone-tab="more"]',
+        () => ui.visible(`[data-phone-tab="${item}"], [data-phone-more="${item}"]`),
+        { copy: 'onb.guide.more' },
+      ),
+    );
+  const { details, orders, commands } = sheetSteps(ui);
   const homeWorld = (stage: Stage) => [
     step(stage, 'home', null, () => ui.selectedWorld() === home, {
       anchor: () => ui.anchor(home),

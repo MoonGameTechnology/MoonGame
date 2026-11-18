@@ -73,8 +73,7 @@ export function initMobileHud(host: MobileHudHost) {
   // «Сведения» — значок «i» в шапке рядом с ✕ (UIX-10.5, заказ владельца 2026-11-06: «Сведения
   // так же через восклицательный знак можно поместить на отметку»): тот же рисунок, что у
   // «Описания» карточки партии. Нижний ряд под ним кнопки больше не держит, и свёрнутый лист
-  // флота стал на этот ряд ниже. Раскрытый лист — окно сведений почти во весь экран (заказ
-  // владельца 2026-11-18, `14-details-window.css`): значок в нём прячется, закрывает ✕.
+  // флота стал на этот ряд ниже. Раскрытый лист — окно сведений: «i» в нём прячется, ✕ его закрывает.
   const info = document.createElement('button');
   info.type = 'button';
   info.className = 'mobile-info btn-second';
@@ -202,11 +201,7 @@ export function initMobileHud(host: MobileHudHost) {
     if (action === 'details') {
       if (!swiped) expand(!expanded);
       swiped = false;
-    } else if (action === 'close') {
-      // В окне сведений ✕ закрывает окно, а не карточку: выбор и ряд приказов остаются.
-      if (expanded) expand(false);
-      else host.dismiss();
-    }
+    } else if (action === 'close') { if (expanded) expand(false); else host.dismiss(); }
     else if (action === 'ping') host.ping();
     else if (action === 'lift') liftedSource(host.side, button.dataset.lift!)?.click();
     else if (action === 'badge') {
