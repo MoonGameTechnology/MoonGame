@@ -125,12 +125,22 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
         copy: 'onb.guide.sheet',
       }),
     );
-  const commands = (stage: Stage, id: string, command: string) =>
+  // Окно сведений на телефоне прячет ряд приказов (`14-details-window.css`): шаг с плиткой
+  // сперва просит закрыть окно, а при свёрнутом листе проходит сам.
+  const orders = (stage: Stage, id: string) =>
     phone(
+      step(stage, `${id}-orders`, '#mobile-sheet .mobile-close', () => !ui.intent('details'), {
+        copy: 'onb.guide.orders',
+      }),
+    );
+  const commands = (stage: Stage, id: string, command: string) => [
+    ...orders(stage, id),
+    ...phone(
       step(stage, id, '[data-cmd="more"]', () => ui.visible(`[data-cmd="${command}"]`), {
         copy: 'onb.guide.commands',
       }),
-    );
+    ),
+  ];
   const homeWorld = (stage: Stage) => [
     step(stage, 'home', null, () => ui.selectedWorld() === home, {
       anchor: () => ui.anchor(home),
@@ -200,7 +210,6 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
         copy: 'onb.guide.hero-ship',
       },
     ),
-    ...details(stage, 'hero-details'),
   ];
   const deployed = (preparing = false) => !!guideHeroFleet(w(), me) || (preparing && !!guideHero(w(), me)?.mobilization);
   const refitted = () => guideHeroModules(w(), me).includes(GUIDE_HERO_MODULE);
@@ -215,6 +224,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     guideUnitsOrdered(w(), home, me, GUIDE_WING) > 0;
   const owned = () => w().planets[GUIDE_ASSAULT]?.owner === me;
   const course = (stage: Stage) => [
+    ...orders(stage, 'move'),
     step(
       stage,
       'move',
@@ -391,8 +401,8 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     step('assault', 'rally', `[data-cmd="castdo"][data-ab="${GUIDE_ABILITY}"]`, () =>
       guideAbilityCast(w(), me, d.data),
     ),
-    // The phone keeps the landing button in the open sheet; the cast collapsed it.
-    ...details('assault', 'land-details'),
+    // Высадка — плитка свёрнутого листа: окно сведений, если открыто, закрывается.
+    ...orders('assault', 'land'),
     step('assault', 'land', '[data-cmd="attack"]', () => guideAssaultStarted(w(), me)),
     step('assault', 'capture', null, owned, { reveal: () => ui.show(GUIDE_ASSAULT) }),
   ];

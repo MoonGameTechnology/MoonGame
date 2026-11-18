@@ -3753,6 +3753,7 @@ export const es: Record<string, string> = {
   'onb.recap.rest': 'Durante tu ausencia',
   'onb.recap.title': 'Resumen de regreso',
   'onb.tour.done': '✔ Tutorial completado · +{n} XP. ¡Ahora juega una partida real!',
+  'onb.guide.orders': 'Cierra los detalles con ✕: las órdenes están en la fila de mosaicos.',
   'onb.guide.welcome': 'Aprendemos sin rivales: economía, flota, mercado, héroe, tropas, aviación y asalto.',
   'onb.guide.nav': 'Prueba los gestos del mapa. Luego pulsa «Siguiente».',
   'onb.guide.home': 'Toca tu mundo natal iluminado. «Mostrar» centrará la cámara en él.',

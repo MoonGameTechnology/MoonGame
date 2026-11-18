@@ -3740,6 +3740,7 @@ export const de: Record<string, string> = {
   'onb.recap.rest': 'Während Ihrer Abwesenheit',
   'onb.recap.title': 'Rückkehr-Übersicht',
   'onb.tour.done': '✔ Tutorial abgeschlossen · +{n} EP. Spielen Sie jetzt ein echtes Match!',
+  'onb.guide.orders': 'Schließen Sie die Details mit ✕: Befehle stehen in der Kachelreihe.',
   'onb.guide.welcome': 'Lernen ohne Gegner: Wirtschaft, Flotte, Markt, Held, Truppen, Luftfahrt und Sturm.',
   'onb.guide.nav': 'Probieren Sie die Kartengesten aus. Drücken Sie danach „Weiter“.',
   'onb.guide.home': 'Wählen Sie Ihre hervorgehobene Heimatwelt. „Anzeigen“ richtet die Kamera auf sie aus.',

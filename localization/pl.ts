@@ -3761,6 +3761,7 @@ export const pl: Record<string, string> = {
   'onb.recap.rest': 'Podczas twojej nieobecności',
   'onb.recap.title': 'Raport powrotu',
   'onb.tour.done': '✔ Szkolenie ukończone · +{n} PD. Zagraj w prawdziwym meczu!',
+  'onb.guide.orders': 'Zamknij szczegóły przyciskiem ✕: rozkazy są w rzędzie kafelków.',
   'onb.guide.welcome': 'Uczymy się bez przeciwników: gospodarka, flota, rynek, bohater, wojska, lotnictwo i szturm.',
   'onb.guide.nav': 'Wypróbuj gesty mapy. Następnie naciśnij „Dalej”.',
   'onb.guide.home': 'Dotknij podświetlonego świata macierzystego. „Pokaż” wycentruje na nim kamerę.',

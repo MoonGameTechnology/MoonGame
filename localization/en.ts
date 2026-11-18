@@ -4448,6 +4448,7 @@ export const en: Record<string, string> = {
   'onb.recap.rest': 'While you were away',
   'onb.recap.title': 'Return digest',
   'onb.tour.done': '✔ Tutorial complete · +{n} XP. Now play a real match!',
+  'onb.guide.orders': 'Close Details with ✕: orders are on the tile row.',
   'onb.guide.welcome': 'Learn without opponents: economy, fleet, market, hero, troops, aviation, assault.',
   'onb.guide.nav': "Try the map gestures, then press Next.",
   'onb.guide.home': "Select your highlighted homeworld. Show brings the camera back to it.",
