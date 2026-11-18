@@ -32,7 +32,7 @@ final class ProbeTelemetry {
         install = saved;
     }
 
-    void emit(String requestId, String phase, String code, Integer sdkCode, long elapsed, Receipt receipt) {
+    void emit(String requestId, String phase, String code, Integer sdkCode, VkNetworkFailure network, long elapsed, Receipt receipt) {
         try {
             JSONObject props = new JSONObject().put("source", "vk_rewarded_minimal").put("diagnostic", true)
                 .put("phase", phase).put("requestId", requestId).put("slotId", BuildConfig.SLOT_ID)
@@ -42,6 +42,10 @@ final class ProbeTelemetry {
                 .put("consent", false).put("trackingEnvironment", false).put("trackingLocation", false);
             if (code != null) props.put("code", code).put("name", code).put("kind", "native_ad").put("where", "native-minimal");
             if (sdkCode != null) props.put("sdkCode", sdkCode);
+            if (network != null) {
+                props.put("networkFailure", network.kind);
+                if (network.httpStatus != null) props.put("httpStatus", network.httpStatus);
+            }
             String event = code != null ? "client_error" : "earned".equals(phase) ? "rewarded_ad_completed" : "rewarded_ad_offered";
             JSONObject row = new JSONObject().put("id", UUID.randomUUID().toString()).put("e", event)
                 .put("t", System.currentTimeMillis()).put("p", props);

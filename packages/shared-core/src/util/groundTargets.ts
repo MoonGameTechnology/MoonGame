@@ -52,6 +52,8 @@ export function targetedVolley(
   targets: readonly UnitStack[],
   data: GameData,
   role: FireRole,
+  /** N линии державы в бою (MSB-11); не передан — по самим стрелкам. */
+  lineCount?: number,
 ): TargetedVolley {
   const shares = classShares(targets, data);
   const present = TARGET_CLASSES.filter((cls) => shares[cls] > 0);
@@ -59,8 +61,13 @@ export function targetedVolley(
   // что до правила, а класть его всё равно некуда.
   if (present.length === 0) present.push('other');
   const weight = (cls: TargetClass): number => (shares[cls] > 0 ? shares[cls] : 1);
-  const rows = cappedUnitBreakdown(shooters, data, (stats) =>
-    present.reduce((sum, cls) => sum + weight(cls) * statVs(stats, role, cls), 0),
+  const rows = cappedUnitBreakdown(
+    shooters,
+    data,
+    (stats) => present.reduce((sum, cls) => sum + weight(cls) * statVs(stats, role, cls), 0),
+    undefined,
+    undefined,
+    lineCount,
   );
   const pools = emptyPools();
   let total = 0;

@@ -113,7 +113,9 @@ describe('combat lifecycle preserves personal clocks', () => {
     state.fleets.c!.units[0]!.hp = 1;
     const result = advance(state, HOUR);
     expect(result.events.filter(e => e.type === 'combat.round')).toHaveLength(1);
-    expect(result.state.fleets.b!.units[0]!.hp).toBe(994);
+    // Залп a (12) — по 6 в b и c; c держит 1 HP, его остаток 5 уходит в b (резолюция
+    // 2026-11-17, `util/overflow.ts`): 1000 − 6 − 5.
+    expect(result.state.fleets.b!.units[0]!.hp).toBe(989);
     expect(survivor(result.state, 'a')?.nextAttackAt).toBe(2 * HOUR);
     expect(survivor(result.state, 'a')?.attackCount).toBe(0);
   });
@@ -183,6 +185,7 @@ describe('combat lifecycle preserves personal clocks', () => {
       payload: { battleId: 'battle:1' } });
     state.scheduleSeq = 2;
     const result = advance(state, HOUR);
+    // Заслуга — за то, что легло: 1 в c, 6 и остаток 5 в b — ровно залп, без двойного счёта.
     expect(result.state.fleets.a!.units[0]!.damageDealt).toBe(12);
     expect(survivor(result.state, 'a')?.nextAttackAt).toBe(2 * HOUR);
     expect(survivor(result.state, 'a')?.attackCount).toBe(0);
@@ -217,7 +220,8 @@ describe('combat lifecycle preserves personal clocks', () => {
     expect(result.state.fleets.a!.units[0]!.hp).toBeUndefined();
     const next = advance(result.state, 1.75 * HOUR);
     expect(next.events.filter(e => e.type === 'combat.round')).toHaveLength(1);
-    expect(next.state.fleets.a!.units[0]!.hp).toBeCloseTo(1000 - 12 * .994);
+    // b уже потерял 11 (6 своих и 5 остатка от c) — бьёт с силой 989/1000.
+    expect(next.state.fleets.a!.units[0]!.hp).toBeCloseTo(1000 - 12 * .989);
   });
 
   it('default roles are reassigned by the existing relink rule without an explicit order', () => {
@@ -273,7 +277,9 @@ describe('combat lifecycle preserves personal clocks', () => {
     expect(result.events.filter(e => e.type === 'combat.round')).toHaveLength(1);
     expect(survivor(result.state, 'a')?.nextAttackAt).toBe(1.5 * HOUR);
     expect(survivor(result.state, 'a')?.attackCount).toBe(0);
-    expect(result.state.planets.P!.beachheads![0]!.units[0]!.hp).toBeUndefined();
+    // Залп берега a раньше срока не случился, но ответ гарнизона, убивший берег c (1 HP),
+    // отдал остаток живому врагу — берегу a (резолюция 2026-11-17, `util/overflow.ts`).
+    expect(result.state.planets.P!.beachheads![0]!.units[0]!.hp).toBeCloseTo(1000 - 7, 3);
   });
 
   it('a peaceful source’s empty tick cannot end the forecast of the remaining enemies', () => {

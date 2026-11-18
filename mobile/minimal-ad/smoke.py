@@ -3,7 +3,7 @@ import re
 import subprocess
 import sys
 import time
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
 
 
 def adb(*args):

@@ -1447,6 +1447,9 @@ function project(
     delete fleet.resume;
     // Намерение слиться (`mergeInto`, MRG-1) — тот же план: выдало бы, к кому флот идёт.
     delete fleet.mergeInto;
+    // Заряд (остаток прошлого залпа, резолюция 2026-11-17) — тоже план: выдал бы, сколько
+    // урона флот принесёт в следующий бой.
+    delete fleet.overcharge;
     if (fleet.movement) {
       delete fleet.movement.path;
       delete fleet.movement.destination;

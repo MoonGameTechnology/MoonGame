@@ -65,7 +65,7 @@ public final class AdProbeActivity extends Activity {
         shown = false;
         button.setEnabled(false);
         status.setText(R.string.loading);
-        observe("requested", null, null, false);
+        observe("requested", null, null, null, false);
         handler.postDelayed(timeout, 30_000);
         try {
             // Match the game's explicit-tap, non-personalized SDK configuration.
@@ -80,20 +80,28 @@ public final class AdProbeActivity extends Activity {
                         if (shown) return;
                         if (!visible()) { finish("unavailable", "E_AD_BACKGROUND", null); return; }
                         shown = true;
-                        observe("loaded", null, null, false);
+                        observe("loaded", null, null, null, false);
                         handler.removeCallbacks(timeout);
                         handler.postDelayed(timeout, 300_000);
                         try { ad.show(); } catch (RuntimeException e) { finish("unavailable", "E_AD_SHOW", null); }
                     });
                 }
                 @Override public void onNoAd(IAdLoadingError error, RewardedAd ad) {
-                    onMain(ad, () -> finish("unavailable", "E_AD_SDK", error == null ? null : error.getCode()));
+                    onMain(ad, () -> {
+                        Integer code = error == null ? null : error.getCode();
+                        VkNetworkFailure network = null;
+                        if (code != null && code == IAdLoadingError.LoadErrorType.UNDEFINED_NETWORK_ERROR) {
+                            try { network = VkNetworkFailure.fromMessage(error.getMessage()); }
+                            catch (RuntimeException ignored) { /* Preserve the original SDK code. */ }
+                        }
+                        finish("unavailable", "E_AD_SDK", code, network);
+                    });
                 }
                 @Override public void onFailedToShow(RewardedAd ad) {
                     onMain(ad, () -> finish("unavailable", "E_AD_SHOW", null));
                 }
                 @Override public void onDisplay(RewardedAd ad) {
-                    onMain(ad, () -> observe("displayed", null, null, false));
+                    onMain(ad, () -> observe("displayed", null, null, null, false));
                 }
                 @Override public void onReward(Reward reward, RewardedAd ad) {
                     onMain(ad, () -> { if (shown) earned = true; });
@@ -113,10 +121,10 @@ public final class AdProbeActivity extends Activity {
         handler.post(() -> { if (request != null && active == ad) callback.run(); });
     }
 
-    private void observe(String phase, String code, Integer sdkCode, boolean receipt) {
+    private void observe(String phase, String code, Integer sdkCode, VkNetworkFailure network, boolean receipt) {
         final String id = request;
         long elapsed = Math.max(0, Math.min(330_000, SystemClock.elapsedRealtime() - started));
-        telemetry.emit(id, phase, code, sdkCode, elapsed, receipt ? ok -> handler.post(() -> {
+        telemetry.emit(id, phase, code, sdkCode, network, elapsed, receipt ? ok -> handler.post(() -> {
             // A previous request's receipt cannot overwrite the next request's UI.
             if (!isDestroyed() && request == null && id.equals(button.getTag())) {
                 status.append("\n" + getString(ok ? R.string.log_sent : R.string.log_failed));
@@ -125,13 +133,17 @@ public final class AdProbeActivity extends Activity {
     }
 
     private void finish(String phase, String error, Integer sdkCode) {
+        finish(phase, error, sdkCode, null);
+    }
+
+    private void finish(String phase, String error, Integer sdkCode, VkNetworkFailure network) {
         if (request == null) return;
         Integer safeSdk = sdkCode != null && sdkCode >= 0 && sdkCode <= 99999 ? sdkCode : null;
         String code = error == null ? null : "E_AD_SDK".equals(error) && safeSdk != null ? "VK-" + safeSdk : error;
         int text = "earned".equals(phase) ? R.string.earned : "cancelled".equals(phase) ? R.string.cancelled : errorText(code);
         status.setText(getString(text).replace("{code}", code == null ? "E_AD_SDK" : code));
         button.setTag(request);
-        observe(phase, code, safeSdk, true);
+        observe(phase, code, safeSdk, network, true);
         request = null;
         RewardedAd ad = active;
         active = null;

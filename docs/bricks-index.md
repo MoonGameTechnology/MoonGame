@@ -1162,6 +1162,8 @@
 | MSB-7 | ✅ | core | `docs/multiside-combat-roadmap.md` | Зенитки и обстрел при N сторонах |
 | MSB-8 | ✅ | core | `docs/multiside-combat-roadmap.md` | Штурм не стоит, подмога не ждёт |
 | MSB-9 | ✅ | core proto | `docs/multiside-combat-roadmap.md` | Штурм не запирает флот: высадка по таймеру, потом плацдарм |
+| MSB-10 | ✅ | core | `docs/multiside-combat-roadmap.md` | Остаток залпа уходит в живые цели |
+| MSB-11 | ✅ | core | `docs/multiside-combat-roadmap.md` | Одна линия на державу |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md` | Гайдовый первый матч (соло без соперников) |

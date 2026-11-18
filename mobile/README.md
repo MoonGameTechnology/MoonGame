@@ -95,6 +95,8 @@ provider's app/slot configuration, so it is not an identical game-package test.
 The probe has no game assets, Capacitor runtime, account access or reward grants.
 Its bounded `vk_rewarded_minimal` observations go only to the existing HTTPS
 telemetry receiver; the status also reports whether the terminal log was accepted.
+For SDK code 1000 the probe also sends a fixed `networkFailure` category and,
+when available, the HTTP status. The source SDK error text stays on the device.
 It is a manual diagnostic only and must never enter the signed normal update lane.
 The emulator smoke blocks the probe UID's IPv4/IPv6 traffic before tapping: it
 checks launch, a bounded offline error and retry, without generating live ad views.

@@ -87,7 +87,7 @@ dependencies {
   for (const locale of ['en', 'ru', 'de', 'pl', 'es']) {
     files[`app/src/main/res/values${locale === 'en' ? '' : '-' + locale}/strings.xml`] = await resources(locale);
   }
-  for (const name of ['AdProbeActivity.java', 'ProbeTelemetry.java'])
+  for (const name of ['AdProbeActivity.java', 'ProbeTelemetry.java', 'VkNetworkFailure.java'])
     files[`app/src/main/java/com/voiddominion/adprobe/${name}`] = readFileSync(join(here, name), 'utf8');
   for (const [path, content] of Object.entries(files)) {
     mkdirSync(dirname(join(target, path)), { recursive: true });

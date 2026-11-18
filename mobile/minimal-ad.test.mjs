@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { prepareProbe } from './minimal-ad/prepare.mjs';
 
 const dirs = [];
@@ -19,6 +21,34 @@ function fixture() {
 }
 
 describe('native-only ad probe', () => {
+  it('reports only fixed network evidence from ambiguous SDK code 1000 messages', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vk-network-failure-'));
+    dirs.push(dir);
+    const source = fileURLToPath(new URL('./minimal-ad/VkNetworkFailure.java', import.meta.url));
+    const checks = join(dir, 'NetworkCheck.java');
+    writeFileSync(checks, `package com.voiddominion.adprobe;
+      import java.util.Objects;
+      final class NetworkCheck {
+        private static void check(String message, String kind, Integer status) {
+          VkNetworkFailure actual = VkNetworkFailure.fromMessage(message);
+          if (!kind.equals(actual.kind) || !Objects.equals(status, actual.httpStatus))
+            throw new AssertionError(actual.kind + " " + actual.httpStatus);
+        }
+        public static void main(String[] args) {
+          check("204 – null", "http", 204);
+          check("429 – Ad request error - response code429", "http", 429);
+          check("-1 – Unable to resolve host data.invalid", "dns", null);
+          check("-1 – Trust anchor for certification path not found", "tls", null);
+          check("-1 – Cleartext HTTP traffic not permitted", "cleartext_blocked", null);
+          check("-1 – failed to connect to data.invalid", "connect", null);
+          check("-1 – Read timed out", "timeout", null);
+          check("arbitrary text https://data.invalid/?token=private&status=429", "unknown", null);
+          check(null, "unknown", null);
+        }
+      }`);
+    execFileSync('java', ['-m', 'jdk.compiler/com.sun.tools.javac.Main', '-d', dir, source, checks], { timeout: 5000 });
+    execFileSync('java', ['-cp', dir, 'com.voiddominion.adprobe.NetworkCheck'], { timeout: 5000 });
+  });
   it('builds a separate app identity with the same SDK and no game or Capacitor runtime', async () => {
     const f = fixture();
     await prepareProbe(f.target, 5977, 'a'.repeat(40), f.wrapper);

@@ -291,6 +291,18 @@ describe('visibleState — order chains are the owner’s secret (future intent)
     expect('forcedMarch' in visibleState(state, 'p1', data)).toBe(false);
   });
 
+  it('заряд чужого флота — намерение: не виден; свой — виден (резолюция 2026-11-17)', () => {
+    const state = scenario();
+    const charge = { damage: 9, until: state.time + 1000 };
+    state.fleets['enemy-near'] = { ...state.fleets['enemy-near']!, overcharge: { ...charge } };
+    state.fleets['mine-1'] = { ...state.fleets['mine-1']!, overcharge: { ...charge } };
+    const view = visibleState(state, 'p1', data);
+    // Проверка не пустая: сам флот виден, вырезан только заряд.
+    expect(view.fleets['enemy-near']).toBeDefined();
+    expect(view.fleets['enemy-near']?.overcharge).toBeUndefined();
+    expect(view.fleets['mine-1']?.overcharge).toEqual(charge);
+  });
+
   it('маршрут чужого флота — намерение: виден текущий участок, но не цель, прыжки и `resume`', () => {
     const state = scenario();
     const route = {
