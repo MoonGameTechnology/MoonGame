@@ -96,6 +96,9 @@ The probe has no game assets, Capacitor runtime, account access or reward grants
 Its bounded `vk_rewarded_minimal` observations go only to the existing HTTPS
 telemetry receiver; the status also reports whether the terminal log was accepted.
 It is a manual diagnostic only and must never enter the signed normal update lane.
+The probe has no updater or download control: distribute a separate full-game
+recovery link alongside it. Install that recovery only after testing the probe;
+its greater versionCode prevents installing the older probe again as an update.
 
 Install a new site-aware APK once; subsequent checks read only our HTTPS site:
 `/downloads/android/{alpha|player}/latest.json`. It is a signed envelope
