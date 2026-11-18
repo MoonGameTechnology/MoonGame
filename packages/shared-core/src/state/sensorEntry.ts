@@ -30,3 +30,45 @@ export function sensorEntry(
   }
   return null;
 }
+
+/** First arc-length fraction at which the road LEAVES a sensor circle it has been in —
+ *  inside from the start, or entered on the way — or null when the road never is inside,
+ *  or still is at its end. A road that only grazes the rim (one touching point) is never
+ *  inside: there is no span of time to be seen in. */
+export function sensorExit(
+  road: readonly RoadPoint[],
+  center: RoadPoint,
+  radius: number,
+): number | null {
+  const total = polylineLength(road);
+  if (!(total > 0)) return null;
+  let covered = 0;
+  const start = road[0]!;
+  const sx = start.x - center.x,
+    sy = start.y - center.y;
+  let inside = sx * sx + sy * sy <= radius * radius;
+  for (let i = 1; i < road.length; i++) {
+    const a = road[i - 1]!,
+      b = road[i]!;
+    const dx = b.x - a.x,
+      dy = b.y - a.y;
+    const x = a.x - center.x,
+      y = a.y - center.y;
+    const length2 = dx * dx + dy * dy;
+    if (length2 === 0) continue;
+    const length = Math.sqrt(length2);
+    const dot = x * dx + y * dy;
+    const discriminant = dot * dot - length2 * (x * x + y * y - radius * radius);
+    if (discriminant > 0) {
+      const root = Math.sqrt(discriminant);
+      const enter = (-dot - root) / length2;
+      const leave = (-dot + root) / length2;
+      if (inside || (enter >= 0 && enter <= 1)) {
+        if (leave >= 0 && leave <= 1) return (covered + leave * length) / total;
+        if (leave > 1) inside = true;
+      }
+    }
+    covered += length;
+  }
+  return null;
+}

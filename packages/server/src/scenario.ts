@@ -100,7 +100,10 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '111'; // PE-2.2: порядок тот же; `economy` 1.6.0 —
+export const MODULE_MANIFEST_VERSION = '112'; // Туман: порядок тот же; `visibility` 2.7.0 —
+// память о флоте снимается в миг потери из виду, обследование провинции метится мигом
+// пересечения границы, а не концом отрезка. Партия на 111 помнила бы флот иначе.
+// export const MODULE_MANIFEST_VERSION = '111'; // PE-2.2: порядок тот же; `economy` 1.6.0 —
 // блэкаут включается в миг, когда казна иссякла, а не в конце отрезка: один отрезок даёт то же,
 // что много коротких. Партия на 110 жила бы в долгах дольше, и реплей разошёлся бы.
 // export const MODULE_MANIFEST_VERSION = '110'; // MSB-11: порядок тот же; `combat` 4.2.0 — одна

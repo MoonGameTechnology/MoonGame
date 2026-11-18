@@ -1,13 +1,22 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { FogMemory, GameState, PlanetId, PlanetSnapshot, PlayerId } from '../state/gameState';
-import { sensorEntry } from '../state/sensorEntry';
-import { laneRoad, subPolyline } from '../state/roads';
+import type {
+  Fleet,
+  FogMemory,
+  GameState,
+  Planet,
+  PlanetId,
+  PlanetSnapshot,
+  PlayerId,
+} from '../state/gameState';
+import { sensorEntry, sensorExit } from '../state/sensorEntry';
+import { crossingT, laneRoad, subPolyline } from '../state/roads';
 import { sightCircles } from '../state/visibility';
-import { legT } from '../state/fleetPosition';
+import { fleetPositionAt, legT } from '../state/fleetPosition';
 import { fleetNodeAt } from '../state/fleetPosition';
 import { isMineFleet, isMissileFleet } from '../state/minefields';
 import { observedSwarm, swarmFleetIds } from '../state/swarmIntel';
 import { sensorCoverageOf } from '../state/visibility';
+import { coverageInCircles, type SightCircle } from '../state/sensorView';
 import { peek, peekValues } from '../util/draft';
 
 /**
@@ -40,8 +49,9 @@ function snapshot(state: GameState, planetId: PlanetId, now: number): PlanetSnap
 
 /** Refresh every active player's memory with what they currently identify. Sensors are
  *  read for all of them in one pass (`sensorCoverageOf`): nothing below changes what any
- *  player identifies, so the sets match a per-player `identifiedNodes` exactly. */
-function refreshMemory(h: HandlerContext): void {
+ *  player identifies, so the sets match a per-player `identifiedNodes` exactly. `since` is
+ *  the start of the span being closed (`now` for a step at an instant). */
+function refreshMemory(h: HandlerContext, since: number = h.ctx.now): void {
   const state = h.state;
   const fog = (state.fog ??= {});
   const active = Object.keys(state.players).filter((id) => state.players[id]?.status === 'active');
@@ -61,10 +71,54 @@ function refreshMemory(h: HandlerContext): void {
       if (state.planets[nodeId]) memory[nodeId] = snapshot(state, nodeId, h.ctx.now);
     }
   }
-  survey(h, active);
+  survey(h, active, since);
   // Optional movement capability: reconcile only after real sensor discovery.
   // Keep this internal; an extra broadcast on a hidden capture would leak activity.
   h.capability<(ctx: HandlerContext) => void>('fleet.reconcileVisibility')?.(h);
+}
+
+/** The last whole millisecond, at or before `at`, at which the fleet's circle still
+ *  identifies `planet` — judged by the coverage rule itself at the fleet's own position
+ *  then, so a rim the geometry puts a float's width outside is stepped back from rather
+ *  than stopped on (the memory refreshed there would not see the world). */
+function lastSeen(
+  h: HandlerContext,
+  fleet: Fleet,
+  eye: SightCircle,
+  planet: Planet,
+  at: number,
+): number {
+  for (let t = at; t > at - 3; t--) {
+    const pos = fleetPositionAt(h.state, fleet, t);
+    if (
+      pos &&
+      coverageInCircles([planet], [{ ...eye, x: pos.x, y: pos.y }]).identify.has(planet.id)
+    )
+      return t;
+  }
+  return at - 3;
+}
+
+/** Whether a world stays in sight of the owner's bloc through a FIXED circle — a world's
+ *  own sensors, a mine's eye or a fleet at rest — so one moving fleet losing it changes
+ *  nothing. Moving, shared and time-boxed circles are not counted: at worst the world is
+ *  stopped once more than it needed. */
+function stillSeen(
+  h: HandlerContext,
+  circles: ReturnType<typeof sightCircles>,
+  fleetId: string,
+  at: { x: number; y: number },
+): boolean {
+  return circles.some((c) => {
+    if (c.source.id === fleetId || !(c.identify > 0)) return false;
+    const fixed =
+      c.source.kind === 'world' ||
+      c.source.kind === 'mine' ||
+      (c.source.kind === 'fleet' && !h.state.fleets[c.source.id]?.movement);
+    const dx = c.x - at.x,
+      dy = c.y - at.y;
+    return fixed && dx * dx + dy * dy < c.identify * c.identify;
+  });
 }
 
 /** Record the type of the province each ship of an active player is in, so a province
@@ -73,7 +127,7 @@ function refreshMemory(h: HandlerContext): void {
  *  splits the lane. A mine stays where it was laid and a missile observes nothing, so
  *  neither surveys. A record is rewritten only when the type differs: the projection
  *  ships it, and a time stamp refreshed every step would resend it with every step. */
-function survey(h: HandlerContext, active: readonly PlayerId[]): void {
+function survey(h: HandlerContext, active: readonly PlayerId[], since: number): void {
   const state = h.state;
   const players = new Set(active);
   for (const fleet of peekValues(state.fleets)) {
@@ -96,9 +150,31 @@ function survey(h: HandlerContext, active: readonly PlayerId[]): void {
       ...(planet.kind !== undefined ? { kind: planet.kind } : {}),
       ...(planet.terrain !== undefined ? { terrain: planet.terrain } : {}),
       ...(planet.planetType !== undefined ? { planetType: planet.planetType } : {}),
-      at: h.ctx.now,
+      at: crossedAt(state, fleet, planet.id, since, h.ctx.now),
     };
   }
+}
+
+/** When `fleet` was first in province `nodeId` within the span `(since, now]`: on a lane
+ *  into it, the instant its leg passed the border (`crossingT`); otherwise the span's
+ *  start — a fleet at rest, or still short of the border, was there all span long (rest
+ *  and departure change only at a span's edges). Either way the same however the world's
+ *  time is cut. */
+function crossedAt(
+  state: GameState,
+  fleet: Fleet,
+  nodeId: PlanetId,
+  since: number,
+  now: number,
+): number {
+  const mv = fleet.movement;
+  if (!mv || nodeId !== mv.to) return since;
+  const startT = mv.startT ?? 0;
+  const endT = mv.endT ?? 1;
+  if (endT === startT) return since;
+  const share = (crossingT(state, mv.from, mv.to) - startT) / (endT - startT);
+  const at = mv.departedAt + Math.min(1, Math.max(0, share)) * (mv.arrivesAt - mv.departedAt);
+  return Math.min(now, at);
 }
 
 /** Радиусы зрения режима — один раз, на первом шаге часов, как `pve` заводит свою волну:
@@ -121,8 +197,9 @@ export const visibilityModule: GameModule = {
   // видит свой круг (SHU-6.7): память пишет и миры под ним. 2.3.0 — корабль, пересёкший
   // границу провинции, узнаёт её тип (`surveyed`, решение владельца 2026-10-23).
   // 2.6.0 — круг висящего патруля — радар (SHU-6.18): опознаёт ближнюю долю, и миры под
-  // дальним кольцом память больше не пишет.
-  version: '2.6.0',
+  // дальним кольцом память больше не пишет. 2.7.0 — память тумана снимается в миг потери из
+  // виду, а `surveyed.at` — миг пересечения границы, а не конец отрезка: нарезка не меняет итог.
+  version: '2.7.0',
   setup(api) {
     // Continuous time advances refresh memory; captures and arrivals refresh it
     // immediately so a just-scouted world is remembered at once.
@@ -155,6 +232,36 @@ export const visibilityModule: GameModule = {
           const at = Math.max(from + 1, Math.ceil(from + entry * (until - from)));
           if (at <= until) stop = Math.min(stop, at);
         }
+        // PE-2.2: and where a world passes OUT of this fleet's sight, so memory keeps it as
+        // it stood the last instant it was seen — a long jump and live ticks remember the
+        // same moment, and nothing that happened to it after sight was lost. The stop is the
+        // last whole millisecond up to the exit — the rim itself still identifies, as at a
+        // span's end. A world that stays in a fixed circle of the same bloc does not leave
+        // sight at all.
+        // Only a world near this stretch of road can leave its circle: a box round the
+        // stretch, widened by the radius, rejects the rest of the map cheaply.
+        const r = eye.identify;
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+        for (const p of segment) {
+          minX = Math.min(minX, p.x - r);
+          minY = Math.min(minY, p.y - r);
+          maxX = Math.max(maxX, p.x + r);
+          maxY = Math.max(maxY, p.y + r);
+        }
+        for (const planet of peekValues(h.state.planets)) {
+          if (planet.owner === fleet.owner) continue;
+          const { x, y } = planet.position;
+          if (x < minX || x > maxX || y < minY || y > maxY) continue;
+          const exit = sensorExit(segment, planet.position, eye.identify);
+          if (exit === null) continue;
+          const at = lastSeen(h, fleet, eye, planet, Math.floor(from + exit * (until - from)));
+          if (at <= from || at >= until || at >= stop) continue;
+          if (stillSeen(h, circles, fleet.id, planet.position)) continue;
+          stop = at;
+        }
       }
       return stop;
     });
@@ -162,9 +269,9 @@ export const visibilityModule: GameModule = {
       pinSight(h);
       refreshMemory(h);
     });
-    api.on('time.advanced', (_event, h) => {
+    api.on('time.advanced', (event, h) => {
       pinSight(h);
-      refreshMemory(h);
+      refreshMemory(h, (event.payload as { from: number }).from);
     });
     api.on('planet.captured', (_event, h) => refreshMemory(h));
     api.on('fleet.arrived', (_event, h) => refreshMemory(h));

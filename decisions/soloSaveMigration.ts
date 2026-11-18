@@ -838,6 +838,18 @@ export const ARREARS_INSTANT_SOLO_MIGRATION = {
   toDataHash: LINE_PER_POWER_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: visibility 2.7.0 — fog memory of a fleet is taken at the instant it leaves
+ *  sight and a province survey is stamped at the instant the border is crossed, not at the end
+ *  of the advanced span. The catalogue and the saved shape are unchanged. */
+export const FOG_INSTANT_SOLO_MIGRATION = {
+  fromRules: ARREARS_INSTANT_SOLO_MIGRATION.toRules,
+  fromData: ARREARS_INSTANT_SOLO_MIGRATION.toData,
+  fromDataHash: ARREARS_INSTANT_SOLO_MIGRATION.toDataHash,
+  toRules: '1bc313c4745206',
+  toData: ARREARS_INSTANT_SOLO_MIGRATION.toData,
+  toDataHash: ARREARS_INSTANT_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -910,6 +922,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   VOLLEY_OVERFLOW_SOLO_MIGRATION,
   LINE_PER_POWER_SOLO_MIGRATION,
   ARREARS_INSTANT_SOLO_MIGRATION,
+  FOG_INSTANT_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
