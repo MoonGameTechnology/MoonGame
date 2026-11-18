@@ -77,7 +77,15 @@ class FakeEl {
     child.parentNode = this;
     return child;
   }
-  addEventListener(): void {}
+  /** Слушатели по типу события: тест зовёт их сам (`fire`). */
+  readonly listeners: Record<string, ((ev: unknown) => void)[]> = {};
+  addEventListener(type: string, fn: (ev: unknown) => void): void {
+    (this.listeners[type] ??= []).push(fn);
+  }
+  /** Лист ищет кнопку нажатия так: `closest('[data-mobile]')`. */
+  closest(selector: string): FakeEl | null {
+    return selector === '[data-mobile]' && this.dataset.mobile ? this : null;
+  }
   querySelector(selector: string): FakeEl | null {
     return this.found[selector] ?? null;
   }
@@ -120,10 +128,11 @@ function boot() {
     return mark;
   });
   const noop = (): void => {};
+  let dismissed = 0;
   const hud = initMobileHud({
     side: side as unknown as HTMLElement,
     commands: commands as unknown as HTMLElement,
-    dismiss: noop,
+    dismiss: () => dismissed++,
     choose: noop,
     ping: noop,
     summary: noop,
@@ -133,7 +142,14 @@ function boot() {
   });
   hud.sync(true);
   const sheet = body.children.find((el) => el.id === 'mobile-sheet')!;
-  return { hud, sheet, side, made, writes: () => made.reduce((n, el) => n + el.writes, 0) };
+  return {
+    hud,
+    sheet,
+    side,
+    made,
+    dismissed: () => dismissed,
+    writes: () => made.reduce((n, el) => n + el.writes, 0),
+  };
 }
 
 it('кадр без перемен ничего не переписывает в листе', () => {
@@ -256,4 +272,22 @@ it('«Построить» и ник хозяина мира — в нижнем
   // У флота кнопок мира нет, даже если панель ещё держит прежнюю разметку.
   hud.update('fleet:f1', false, false, []);
   expect(part(sheet, 'mobile-quick').hidden).toBe(true);
+});
+
+it('✕ в окне сведений закрывает окно, а не карточку', () => {
+  const { hud, sheet, dismissed } = boot();
+  const head = part(sheet, 'mobile-sheet-head');
+  const [info, close] = [head.children[3]!, head.children[4]!];
+  const tap = (button: FakeEl) =>
+    sheet.listeners.click!.forEach((fn) => fn({ target: button }));
+  hud.update('fleet:f1', false, false, []);
+  tap(info);
+  expect(hud.expanded()).toBe(true);
+  expect(sheet.classList.contains('expanded')).toBe(true);
+  tap(close);
+  expect(hud.expanded()).toBe(false);
+  expect(dismissed()).toBe(0);
+  // Свёрнутый лист ✕ закрывает целиком, как раньше.
+  tap(close);
+  expect(dismissed()).toBe(1);
 });

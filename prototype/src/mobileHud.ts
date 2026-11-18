@@ -73,7 +73,7 @@ export function initMobileHud(host: MobileHudHost) {
   // «Сведения» — значок «i» в шапке рядом с ✕ (UIX-10.5, заказ владельца 2026-11-06: «Сведения
   // так же через восклицательный знак можно поместить на отметку»): тот же рисунок, что у
   // «Описания» карточки партии. Нижний ряд под ним кнопки больше не держит, и свёрнутый лист
-  // флота стал на этот ряд ниже. Раскрытый лист значок подсвечивает: второй тап сворачивает.
+  // флота стал на этот ряд ниже. Раскрытый лист — окно сведений: «i» в нём прячется, ✕ его закрывает.
   const info = document.createElement('button');
   info.type = 'button';
   info.className = 'mobile-info btn-second';
@@ -201,7 +201,7 @@ export function initMobileHud(host: MobileHudHost) {
     if (action === 'details') {
       if (!swiped) expand(!expanded);
       swiped = false;
-    } else if (action === 'close') host.dismiss();
+    } else if (action === 'close') { if (expanded) expand(false); else host.dismiss(); }
     else if (action === 'ping') host.ping();
     else if (action === 'lift') liftedSource(host.side, button.dataset.lift!)?.click();
     else if (action === 'badge') {
@@ -329,7 +329,7 @@ export function initMobileHud(host: MobileHudHost) {
         if (mark) setAttr(badge, 'aria-label', mark.label);
       });
       setAttr(grab, 'aria-label', `${title} — ${t('hud.mobile.details')}`);
-      setAttr(close, 'aria-label', t('card.close'));
+      setAttr(close, 'aria-label', expanded ? t('hud.mobile.collapse') : t('card.close'));
       const infoLabel = expanded ? t('hud.mobile.collapse') : t('hud.mobile.details');
       setAttr(info, 'aria-label', infoLabel);
       setAttr(info, 'title', infoLabel);

@@ -148,13 +148,14 @@ describe('guided first match', () => {
       'ground.details',
       'aviation.details',
       'aviation.wing-details',
-      'landing.hero-details',
+      'landing.troops-commands-orders',
       'landing.troops-commands',
+      'landing.move-orders',
       'landing.send',
       'assault.wing-details',
-      'assault.hero-details',
+      'assault.cast-commands-orders',
       'assault.cast-commands',
-      'assault.land-details',
+      'assault.land-orders',
     ]);
   });
 
