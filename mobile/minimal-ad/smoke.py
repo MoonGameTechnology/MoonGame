@@ -74,6 +74,14 @@ while time.monotonic() < deadline:
 else:
     raise RuntimeError('E_PROBE_BUTTON_RESULT')
 
+logs = adb('logcat', '-d', '-s', 'VkAdProbe:I')
+assert 'Test device configured' in logs, 'E_PROBE_TEST_DEVICE'
+prefs = ET.fromstring(adb('exec-out', 'run-as', 'com.voiddominion.adprobe',
+                          'cat', 'shared_prefs/mytarget_prefs.xml'))
+instance = prefs.find("string[@name='instanceId']")
+assert instance is not None and re.fullmatch(r'[a-f0-9-]{36}', instance.text or ''), 'E_PROBE_TEST_INSTALL'
+print('SDK configured for the local test installation before loading the ad.')
+
 adb('uninstall', 'com.voiddominion.adprobe')
 assert package_uid('com.voiddominion.player') == game_uid, 'E_PROBE_REMOVED_GAME'
 adb('shell', 'run-as', 'com.voiddominion.player', 'test', '-f', 'files/ad-probe-coexistence')

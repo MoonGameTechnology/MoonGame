@@ -118,6 +118,12 @@ export function initCmdBar(host: CmdBarHost): void {
   cmdbar = document.getElementById('cmdbar')!;
 }
 
+/** Подпись и описание приказа для памятки плитки на телефоне (`cmdMemo.ts`): плитка там
+ *  без подписи, и удержание показывает их окном поверх листа. */
+function memoData(label: string, desc?: string): string {
+  return ` data-label="${esc(label)}"${desc ? ` data-hint="${esc(desc)}"` : ''}`;
+}
+
 /** Total count across a stack of units (ships, garrison or landing troops). */
 const sumUnits = (stacks: ReadonlyArray<{ count: number }>): number =>
   stacks.reduce((a, s) => a + s.count, 0);
@@ -143,10 +149,10 @@ function cmdBtn(
   const look = `${cmd === 'move' ? 'btn-main' : 'btn-second'}${cls ? ` ${cls}` : ''}`;
   if (disabled && why) {
     const reason = t(why);
-    return `<button data-cmd="${cmd}" class="${look}" title="${esc(`${label} — ${reason}`)}" aria-label="${esc(`${label} — ${reason}`)}" aria-disabled="true" data-why="${esc(why)}"><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
+    return `<button data-cmd="${cmd}" class="${look}" title="${esc(`${label} — ${reason}`)}" aria-label="${esc(`${label} — ${reason}`)}" aria-disabled="true" data-why="${esc(why)}"${memoData(label, desc)}><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
   }
   const tip = desc ? `${label} — ${desc}` : label;
-  return `<button data-cmd="${cmd}" class="${look}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
+  return `<button data-cmd="${cmd}" class="${look}" title="${esc(tip)}" aria-label="${esc(tip)}"${memoData(label, desc)} ${disabled ? 'disabled' : ''}><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
 }
 
 /** CHAIN-UX: полоска режима «Приказ» — живёт в ноде #cmdbar (все четыре

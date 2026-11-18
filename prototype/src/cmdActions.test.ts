@@ -747,7 +747,17 @@ describe('REFM-227 — стык с main.ts', () => {
 
   it('делегат ряда вешает сам модуль', async () => {
     const { page } = await boot();
-    expect(page.listeners.map(([type]) => type)).toEqual(['click']);
+    // Делегат приказов, затем удержание плитки на телефоне (`cmdMemo.ts`): его клик в
+    // фазе перехвата гасит приказ после показанной памятки.
+    expect(page.listeners.map(([type]) => type)).toEqual([
+      'click',
+      'pointerdown',
+      'pointermove',
+      'pointerup',
+      'pointercancel',
+      'click',
+      'contextmenu',
+    ]);
     expect(MAIN).not.toMatch(/addEventListener\('click', onCommandClick\)/);
   });
 

@@ -90,7 +90,10 @@ The manual native ad probe (`minimal-ad/`, workflow `android-ad-probe.yml`) pack
 one Android button plus status as a separate `com.voiddominion.adprobe` application.
 It installs alongside `com.voiddominion.player`, with its own private data and
 launcher entry. The debug certificate, slot and SDK privacy settings match the
-player lane. VK sees the probe's separate package; fill can depend on the
+player lane. The probe alone registers its local SDK installation UUID with
+`withTestDevices` before SDK initialization. It reuses the UUID on upgrades;
+on fresh installs it seeds the same preference used by the pinned SDK 5.52.5.
+The telemetry sent to the game server excludes this value. VK sees the probe's separate package; fill can depend on the
 provider's app/slot configuration, so it is not an identical game-package test.
 The probe has no game assets, Capacitor runtime, account access or reward grants.
 Its bounded `vk_rewarded_minimal` observations go only to the existing HTTPS

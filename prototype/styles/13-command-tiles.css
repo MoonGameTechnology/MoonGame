@@ -1,0 +1,72 @@
+/* Плитки приказов на телефоне и памятка по удержанию (заказ владельца 2026-11-17):
+   `prototype/src/cmdMemo.ts`, место окна — `decisions/cmdMemo.ts`. Свой лист, а не
+   хвост `mobile-console.css`: тот уже у предела размера (SLIM-1). Селекторы здесь
+   специфичнее правил листа, поэтому место в каскаде им не важно. */
+/* Плитки приказов (заказ владельца 2026-11-17): одна иконка без подписи — плитки
+   одинаковые, и ряд стоит ровно. Колонки — прежняя сетка листа (`auto-fit` от 64 px, на
+   телефоне до пяти в ряд): плиток мало — они шире, и «Ещё» остаётся с края, а не уходит в
+   середину под всплывающие уведомления. Что за приказ, говорит памятка по удержанию
+   (`cmdMemo.ts`), а экранному диктору — `aria-label` кнопки. Только вне черновика приказа:
+   там у кнопок свои подписи. `:has` — чтобы плитка без своей иконки осталась как была, а
+   браузер без `:has` показал прежний вид целиком, а не две иконки сразу. */
+body.mobile-ui #mobile-sheet:not(.order-mode) #cmdbar > button:has(.holo-icon) {
+  min-height: 52px;
+  padding: 0;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+body.mobile-ui #mobile-sheet:not(.order-mode) #cmdbar > button:has(.holo-icon) .cl,
+body.mobile-ui #mobile-sheet:not(.order-mode) #cmdbar > button:has(.holo-icon) .simple-icon {
+  display: none;
+}
+body.mobile-ui #mobile-sheet:not(.order-mode) #cmdbar > button:has(.holo-icon) .holo-icon {
+  display: inline-flex;
+}
+body.mobile-ui #mobile-sheet:not(.order-mode) #cmdbar > button:has(.holo-icon) .holo-icon svg {
+  width: 26px;
+  height: 26px;
+  fill: currentColor;
+}
+/* Памятка плитки: окно поверх листа над рядом, стрелка — на удержанную плитку. */
+.cmd-memo {
+  position: fixed;
+  z-index: 61;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--cyan);
+  border-radius: 14px;
+  background: #0c2c31;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(53, 214, 230, 0.15);
+  color: var(--ink);
+  font: var(--fs-body) / 1.35 var(--sf-font);
+  pointer-events: none;
+}
+.cmd-memo[hidden] {
+  display: none;
+}
+.cmd-memo > b {
+  color: var(--sf-hi);
+  font-size: 15px;
+  font-weight: 600;
+}
+.cmd-memo > .cmd-memo-why {
+  color: var(--amber);
+}
+.cmd-memo::after {
+  content: '';
+  position: absolute;
+  bottom: -7px;
+  left: calc(var(--arrow-x, 50%) - 6px);
+  width: 12px;
+  height: 12px;
+  background: #0c2c31;
+  border-right: 1px solid var(--cyan);
+  border-bottom: 1px solid var(--cyan);
+  transform: rotate(45deg);
+}

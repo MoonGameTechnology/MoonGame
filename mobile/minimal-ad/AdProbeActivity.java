@@ -1,6 +1,7 @@
 package com.voiddominion.adprobe;
 
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -57,6 +58,18 @@ public final class AdProbeActivity extends Activity {
     @Override protected void onResume() { super.onResume(); resumed = true; }
     @Override protected void onPause() { resumed = false; super.onPause(); }
 
+    // SDK 5.52.5 stores its random per-install UUID here. Seed it before SDK
+    // initialization on a fresh probe, and reuse the SDK's UUID on upgrades.
+    private String testInstanceId() {
+        SharedPreferences prefs = getSharedPreferences("mytarget_prefs", MODE_PRIVATE);
+        String id = prefs.getString("instanceId", null);
+        if (id == null || id.isEmpty()) {
+            id = UUID.randomUUID().toString();
+            prefs.edit().putString("instanceId", id).apply();
+        }
+        return id;
+    }
+
     private void load() {
         if (request != null || !visible()) return;
         request = "preview_" + UUID.randomUUID();
@@ -70,9 +83,17 @@ public final class AdProbeActivity extends Activity {
         try {
             // Match the game's explicit-tap, non-personalized SDK configuration.
             MyTargetPrivacy.setUserConsent(false);
+            String instanceId = testInstanceId();
             MyTargetManager.setSdkConfig(new MyTargetConfig.Builder()
+                .withTestDevices(instanceId)
                 .withTrackingEnvironment(false).withTrackingLocation(false).build());
             MyTargetManager.initSdk(this);
+            String[] devices = MyTargetManager.getSdkConfig().testDevices;
+            if (devices == null || devices.length != 1 || !instanceId.equals(devices[0])) {
+                finish("unavailable", "E_AD_TEST_CONFIG", null);
+                return;
+            }
+            android.util.Log.i("VkAdProbe", "Test device configured");
             active = new RewardedAd(BuildConfig.SLOT_ID, this);
             active.setListener(new RewardedAd.RewardedAdListener() {
                 @Override public void onLoad(RewardedAd ad) {

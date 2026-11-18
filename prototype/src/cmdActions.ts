@@ -93,6 +93,7 @@ import {
 } from './mobileOrders';
 import { playerOrder } from './orderPipeline';
 import { maxPlan, planOrders, stepPlan, troopsModel } from './troopsMenu';
+import { initCmdMemo } from './cmdMemo';
 
 /** Что нажатиям и черновику нужно от игры. */
 export interface CmdActionsHost {
@@ -127,7 +128,9 @@ let game: CmdActionsHost;
 /** Подключить модуль к игре и повесить делегат на ряд команд. */
 export function initCmdActions(host: CmdActionsHost): void {
   game = host;
-  document.getElementById('cmdbar')!.addEventListener('click', onCommandClick);
+  const bar = document.getElementById('cmdbar')!;
+  bar.addEventListener('click', onCommandClick);
+  initCmdMemo(bar); // удержание плитки на телефоне — памятка вместо приказа
 }
 
 const sumUnits = (stacks: { count: number }[]): number => stacks.reduce((a, s) => a + s.count, 0);
