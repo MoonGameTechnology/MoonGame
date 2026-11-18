@@ -15,6 +15,13 @@ def screen():
     return ET.fromstring(adb('exec-out', 'cat', '/sdcard/ad-probe-ui.xml'))
 
 
+def package_uid(package):
+    value = adb('shell', 'cmd', 'package', 'list', 'packages', '-U', package)
+    match = re.search(r'\buid:(\d+)', value)
+    assert match and 10000 <= int(match[1]) < 100000, 'E_PROBE_UID'
+    return match[1]
+
+
 deadline = time.monotonic() + 180
 while time.monotonic() < deadline:
     try:
@@ -29,16 +36,23 @@ else:
 adb('shell', 'svc', 'wifi', 'disable')
 adb('shell', 'svc', 'data', 'disable')
 adb('shell', 'input', 'keyevent', '82')
+assert len(sys.argv) == 3, 'E_PROBE_GAME_FIXTURE'
+# Keep the real game installed and seed a private marker without launching it.
+adb('install', '-r', sys.argv[2])
+game_uid = package_uid('com.voiddominion.player')
+adb('shell', 'run-as', 'com.voiddominion.player', 'mkdir', '-p', 'files')
+adb('shell', 'run-as', 'com.voiddominion.player', 'touch', 'files/ad-probe-coexistence')
 adb('install', '-r', sys.argv[1])
+probe_uid = package_uid('com.voiddominion.adprobe')
+assert probe_uid != game_uid, 'E_PROBE_SHARED_UID'
+assert package_uid('com.voiddominion.player') == game_uid, 'E_PROBE_REPLACED_GAME'
 # AOSP emulator only: block this application's IPv4/IPv6 traffic even if a
 # virtual Ethernet interface survives the Wi-Fi/mobile-data switches.
 adb('root')
 adb('wait-for-device')
-uid_match = re.search(r'\buid:(\d+)', adb('shell', 'cmd', 'package', 'list', 'packages', '-U', 'com.voiddominion.player'))
-assert uid_match and 10000 <= int(uid_match[1]) < 100000, 'E_PROBE_UID'
 for firewall in ['iptables', 'ip6tables']:
-    adb('shell', firewall, '-I', 'OUTPUT', '-m', 'owner', '--uid-owner', uid_match[1], '-j', 'REJECT')
-adb('shell', 'am', 'start', '-W', '-n', 'com.voiddominion.player/.AdProbeActivity')
+    adb('shell', firewall, '-I', 'OUTPUT', '-m', 'owner', '--uid-owner', probe_uid, '-j', 'REJECT')
+adb('shell', 'am', 'start', '-W', '-n', 'com.voiddominion.adprobe/.AdProbeActivity')
 ui = screen()
 buttons = [n for n in ui.iter('node') if n.get('class') == 'android.widget.Button']
 assert len(buttons) == 1 and buttons[0].get('enabled') == 'true', 'E_PROBE_ONE_BUTTON'
@@ -54,8 +68,13 @@ while time.monotonic() < deadline:
     buttons = [n for n in ui.iter('node') if n.get('class') == 'android.widget.Button']
     text = ' '.join(n.get('text', '') for n in ui.iter('node'))
     if re.search(r'VK-\d{1,5}|E_AD_[A-Z_]+', text) and len(buttons) == 1 and buttons[0].get('enabled') == 'true':
-        print('Installed native APK: one button, no game WebView, explicit tap returns a bounded offline error, retry enabled.')
+        print('Installed standalone APK: one button, no game WebView, explicit tap returns a bounded offline error, retry enabled.')
         break
     time.sleep(3)
 else:
     raise RuntimeError('E_PROBE_BUTTON_RESULT')
+
+adb('uninstall', 'com.voiddominion.adprobe')
+assert package_uid('com.voiddominion.player') == game_uid, 'E_PROBE_REMOVED_GAME'
+adb('shell', 'run-as', 'com.voiddominion.player', 'test', '-f', 'files/ad-probe-coexistence')
+print('Both real APKs coexisted with different UIDs; removing the probe preserved the game and its private data marker.')

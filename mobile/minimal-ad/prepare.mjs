@@ -27,7 +27,7 @@ async function resources(locale) {
   }).join('\n') + '\n</resources>\n';
 }
 
-/** Fresh directory only; the SDK, identifier, signing key and privacy match the player APK. */
+/** Fresh directory only; the SDK, signing key and privacy match the game; the package is separate. */
 export async function prepareProbe(target, versionCode, sha, wrapperDirectory) {
   if (!Number.isInteger(versionCode) || versionCode < 1 || versionCode > 2100000000 || !/^[a-f0-9]{40}$/.test(sha))
     throw Error('E_PROBE_VERSION');
@@ -42,10 +42,10 @@ export async function prepareProbe(target, versionCode, sha, wrapperDirectory) {
     'gradle.properties': 'android.useAndroidX=true\norg.gradle.jvmargs=-Xmx2048m\n',
     'app/build.gradle': `apply plugin: 'com.android.application'
 android {
-    namespace 'com.voiddominion.player'
+    namespace 'com.voiddominion.adprobe'
     compileSdk 36
     defaultConfig {
-        applicationId 'com.voiddominion.player'
+        applicationId 'com.voiddominion.adprobe'
         minSdk 24
         targetSdk 36
         versionCode ${versionCode}
@@ -88,7 +88,7 @@ dependencies {
     files[`app/src/main/res/values${locale === 'en' ? '' : '-' + locale}/strings.xml`] = await resources(locale);
   }
   for (const name of ['AdProbeActivity.java', 'ProbeTelemetry.java'])
-    files[`app/src/main/java/com/voiddominion/player/${name}`] = readFileSync(join(here, name), 'utf8');
+    files[`app/src/main/java/com/voiddominion/adprobe/${name}`] = readFileSync(join(here, name), 'utf8');
   for (const [path, content] of Object.entries(files)) {
     mkdirSync(dirname(join(target, path)), { recursive: true });
     writeFileSync(join(target, path), content);

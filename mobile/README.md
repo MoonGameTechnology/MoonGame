@@ -87,20 +87,20 @@ needs a real (secret) keystore — a later step.
 ## In-app auto-update
 
 The manual native ad probe (`minimal-ad/`, workflow `android-ad-probe.yml`) packages
-one Android button plus status, with the same `com.voiddominion.player`, debug
-certificate, slot and SDK privacy settings as the player lane. It temporarily
-replaces the installed player APK; it neither opens nor deletes the game's saved
-data. Prepare a verified full player APK with a greater versionCode before handing
-the probe to the owner, so returning to the game requires no uninstall/downgrade.
+one Android button plus status as a separate `com.voiddominion.adprobe` application.
+It installs alongside `com.voiddominion.player`, with its own private data and
+launcher entry. The debug certificate, slot and SDK privacy settings match the
+player lane. VK sees the probe's separate package; fill can depend on the
+provider's app/slot configuration, so it is not an identical game-package test.
 The probe has no game assets, Capacitor runtime, account access or reward grants.
 Its bounded `vk_rewarded_minimal` observations go only to the existing HTTPS
 telemetry receiver; the status also reports whether the terminal log was accepted.
 It is a manual diagnostic only and must never enter the signed normal update lane.
-The probe has no updater or download control: distribute a separate full-game
-recovery link alongside it. Install that recovery only after testing the probe;
-its greater versionCode prevents installing the older probe again as an update.
 The emulator smoke blocks the probe UID's IPv4/IPv6 traffic before tapping: it
 checks launch, a bounded offline error and retry, without generating live ad views.
+It also installs the real player APK alongside the probe, seeds a private game
+marker, and checks the game and marker survive removing the probe. The game's
+fixture download is pinned by SHA-256 and the game is not launched.
 Actual ad playback still requires the owner's on-device check.
 
 Install a new site-aware APK once; subsequent checks read only our HTTPS site:

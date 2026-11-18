@@ -80,6 +80,8 @@ jobs:
           sudo chmod a+rw /dev/kvm
       - name: Test the installed one-button app offline
         run: |
+          curl --fail --proto '=https' --max-time 90 --output "$RUNNER_TEMP/game.apk" 'https://77-221-140-87.sslip.io/downloads/android/diagnostics/vk-game-5980-a03d03df.apk'
+          printf '%s  %s\n' '54433d52f371558c5931c17bdc4b52696d443a39aa0c2b0c9d6a37360acff73e' "$RUNNER_TEMP/game.apk" | sha256sum -c -
           "$ANDROID_HOME/emulator/emulator" -avd vk-ad-probe -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 2048 -cores 2 > "$RUNNER_TEMP/emulator.log" 2>&1 &
           trap 'tail -n 60 "$RUNNER_TEMP/emulator.log"' ERR
-          python3 mobile/minimal-ad/smoke.py "$RUNNER_TEMP/ad-probe/app/build/outputs/apk/debug/app-debug.apk"
+          python3 mobile/minimal-ad/smoke.py "$RUNNER_TEMP/ad-probe/app/build/outputs/apk/debug/app-debug.apk" "$RUNNER_TEMP/game.apk"

@@ -1,4 +1,4 @@
-package com.voiddominion.player;
+package com.voiddominion.adprobe;
 
 import android.app.Activity;
 import android.os.Bundle;

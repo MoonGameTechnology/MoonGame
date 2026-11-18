@@ -7,10 +7,10 @@ import { verifyApk } from '../apk-verify.mjs';
 const [apk, rawVersion, sha] = process.argv.slice(2);
 const versionCode = Number(rawVersion);
 if (!apk || !Number.isSafeInteger(versionCode) || !/^[a-f0-9]{40}$/.test(sha)) throw Error('E_PROBE_VERIFY_CONFIG');
-const manifest = { appId: 'com.voiddominion.player', versionCode, versionName: `ad-probe-${sha.slice(0, 8)}`, signerSha256: distribution.signerSha256 };
+const manifest = { appId: 'com.voiddominion.adprobe', versionCode, versionName: `ad-probe-${sha.slice(0, 8)}`, signerSha256: distribution.signerSha256 };
 await verifyApk(apk, manifest);
 const badging = execFileSync(process.env.AAPT || 'aapt', ['dump', 'badging', apk], { encoding: 'utf8' });
-if (!badging.includes("launchable-activity: name='com.voiddominion.player.AdProbeActivity'") ||
+if (!badging.includes("launchable-activity: name='com.voiddominion.adprobe.AdProbeActivity'") ||
     !badging.includes("sdkVersion:'24'") || /uses-permission: name='(?:com\.google\.android\.gms\.permission\.AD_ID|com\.android\.vending\.BILLING|com\.google\.android\.finsky\.permission\.BIND_GET_INSTALL_REFERRER_SERVICE)'/.test(badging))
   throw Error('E_PROBE_MANIFEST');
 const xml = execFileSync(process.env.AAPT || 'aapt', ['dump', 'xmltree', apk, 'AndroidManifest.xml'], { encoding: 'utf8' });

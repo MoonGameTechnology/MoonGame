@@ -19,11 +19,14 @@ function fixture() {
 }
 
 describe('native-only ad probe', () => {
-  it('builds the same player identity and SDK with no game or Capacitor runtime', async () => {
+  it('builds a separate app identity with the same SDK and no game or Capacitor runtime', async () => {
     const f = fixture();
     await prepareProbe(f.target, 5977, 'a'.repeat(40), f.wrapper);
     const gradle = f.read('app/build.gradle');
-    expect(gradle).toContain("applicationId 'com.voiddominion.player'");
+    expect(gradle).toContain("applicationId 'com.voiddominion.adprobe'");
+    expect(gradle).not.toContain("applicationId 'com.voiddominion.player'");
+    expect(f.read('app/src/main/java/com/voiddominion/adprobe/AdProbeActivity.java')).toContain('package com.voiddominion.adprobe;');
+    expect(f.read('app/src/main/java/com/voiddominion/adprobe/ProbeTelemetry.java')).toContain('package com.voiddominion.adprobe;');
     expect(gradle).toContain('versionCode 5977');
     expect(gradle).toContain("versionName 'ad-probe-aaaaaaaa'");
     expect(gradle).toContain('mytarget-sdk:5.52.5');

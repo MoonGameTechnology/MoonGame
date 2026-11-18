@@ -1,4 +1,4 @@
-package com.voiddominion.player;
+package com.voiddominion.adprobe;
 
 import android.content.Context;
 import android.content.SharedPreferences;
