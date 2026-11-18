@@ -93,7 +93,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/mcp": "0.0.84",
+    "@playwright/mcp": "0.0.85",
     "@types/node": "^26.6.6",
     "@types/ws": "8.18.2",
     "@vitest/coverage-v8": "^4.1.12",
@@ -104,7 +104,7 @@
     "prettier": "^3.9.10",
     "qrcode": "1.5.4",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
+    "typescript-eslint": "^8.72.2",
     "vitest": "^4.1.12",
     "ws": "8.22.1"
   },
