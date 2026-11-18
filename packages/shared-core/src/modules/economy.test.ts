@@ -278,6 +278,83 @@ describe('economy module — building upkeep + arrears brownout (building econom
     expect(r.state.players.p1?.resources.energy).toBeCloseTo(96, 5);
     expect(r.state.players.p1?.arrears).toBeUndefined();
   });
+
+  // PE-2.2: the brownout starts when the treasury runs dry, not when the span ends. The
+  // span's length is not ours — an unwatched match catches a whole night up in one span,
+  // a watched one ticks every second — and a player who ran out of energy at 10:00 must
+  // not earn full output until whenever the world happened to be advanced next.
+  describe('a bill that runs dry inside a span (PE-2.2)', () => {
+    // 10 energy against 24 a day: dry at exactly 10:00; credits 8/h, then 4/h browned out.
+    const world = () =>
+      stateWith({ players: [player('p1', { energy: 10 })], planets: [planet('a', 'p1', ['refinery'])] });
+
+    it('one span browns out from the dry instant: 10 h at 8/h, then 14 h at 4/h', () => {
+      const r = okAdvance(createKernel([economyModule]).advanceTo(world(), ctx3(DAY)));
+      expect(r.state.players.p1?.resources.credits).toBeCloseTo(10 * 8 + 14 * 4, 4);
+      expect(r.state.players.p1?.resources.energy).toBe(0);
+      expect(r.state.players.p1?.arrears).toEqual(['energy']);
+      // The world is stopped once, on the dry instant, and nowhere else.
+      const stops = r.events.filter((e) => e.type === 'time.stopped');
+      expect(stops).toHaveLength(1);
+      expect(Math.abs((stops[0]!.payload as { at: number }).at - 10 * HOUR)).toBeLessThanOrEqual(1);
+    });
+
+    it('one span, hourly steps and minute steps settle the same treasury', () => {
+      const kernel = createKernel([economyModule]);
+      const once = okAdvance(kernel.advanceTo(world(), ctx3(DAY))).state;
+      for (const step of [HOUR, 60_000, 7 * 60_000 + 13]) {
+        let s = world();
+        for (let t = step; t < DAY; t += step) s = okAdvance(kernel.advanceTo(s, ctx3(t))).state;
+        s = okAdvance(kernel.advanceTo(s, ctx3(DAY))).state;
+        // Within one step's brownout share: a step that ends ON the dry instant may settle
+        // the last cent of the bill as paid and only brown out on the next one.
+        expect(Math.abs((s.players.p1?.resources.credits ?? 0) - (once.players.p1?.resources.credits ?? 0)))
+          .toBeLessThanOrEqual((4 * step) / HOUR + 1e-6);
+        expect(s.players.p1?.arrears).toEqual(once.players.p1?.arrears);
+      }
+    });
+
+    it('a brownout whose bill is covered again lifts at once, not at the end of the span', () => {
+      // In arrears on energy with nothing in store, but the reactor now out-produces the
+      // refinery's bill (5/h against 1/h): the first instant pays it, the brownout lifts,
+      // and the refinery runs the rest of the day at full rate.
+      const st = stateWith({
+        players: [player('p1', { energy: 0, credits: 1000 })],
+        planets: [planet('a', 'p1', ['reactor', 'refinery'])],
+      });
+      st.players.p1!.arrears = ['energy'];
+      const kernel = createKernel([economyModule]);
+      const once = okAdvance(kernel.advanceTo(st, ctx3(DAY))).state;
+      expect(once.players.p1?.arrears).toBeUndefined();
+      // credits: 1000 − 24 (reactor's bill) + 8/h × 24 h at full rate.
+      expect(once.players.p1?.resources.credits).toBeCloseTo(1000 - 24 + 8 * 24, 3);
+      let s = st;
+      for (let t = 60_000; t <= DAY; t += 60_000) s = okAdvance(kernel.advanceTo(s, ctx3(t))).state;
+      expect(Math.abs((s.players.p1?.resources.credits ?? 0) - (once.players.p1?.resources.credits ?? 0)))
+        .toBeLessThanOrEqual(4 / 60 + 1e-6);
+    });
+
+    it('income that only just matches the bill does not stop the world every millisecond', () => {
+      // The reactor makes exactly what five refineries burn (120 energy a day): a float's
+      // last digit decides whether each instant is short, so no stop is promised for it.
+      const st = stateWith({
+        players: [player('p1', { energy: 0, credits: 1000 })],
+        planets: [planet('a', 'p1', ['reactor', 'refinery', 'refinery', 'refinery', 'refinery', 'refinery'])],
+      });
+      st.players.p1!.arrears = ['energy'];
+      const r = okAdvance(createKernel([economyModule]).advanceTo(st, ctx3(DAY)));
+      expect(r.partial).toBeFalsy();
+      expect(r.state.time).toBe(DAY);
+      expect(r.events.filter((e) => e.type === 'time.stopped').length).toBeLessThanOrEqual(1);
+    });
+
+    it('a treasury that lasts the whole span is never stopped', () => {
+      const st = stateWith({ players: [player('p1', { energy: 100 })], planets: [planet('a', 'p1', ['refinery'])] });
+      const r = okAdvance(createKernel([economyModule]).advanceTo(st, ctx3(DAY)));
+      expect(r.events.map((e) => e.type)).not.toContain('time.stopped');
+      expect(r.state.players.p1?.resources.credits).toBeCloseTo(192, 5);
+    });
+  });
 });
 
 // BF-13: a Postgres JSONB round-trip (hibernation) re-orders object keys, so an

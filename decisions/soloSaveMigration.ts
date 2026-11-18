@@ -826,6 +826,18 @@ export const LINE_PER_POWER_SOLO_MIGRATION = {
   toDataHash: VOLLEY_OVERFLOW_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: economy 1.6.0 — a power falls into arrears at the instant its treasury
+ *  runs dry, not at the end of the advanced span, so one long span equals many short ones
+ *  (PE-2.2). The catalogue and the saved shape are unchanged. */
+export const ARREARS_INSTANT_SOLO_MIGRATION = {
+  fromRules: LINE_PER_POWER_SOLO_MIGRATION.toRules,
+  fromData: LINE_PER_POWER_SOLO_MIGRATION.toData,
+  fromDataHash: LINE_PER_POWER_SOLO_MIGRATION.toDataHash,
+  toRules: '126c8ad2a73c74',
+  toData: LINE_PER_POWER_SOLO_MIGRATION.toData,
+  toDataHash: LINE_PER_POWER_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -897,6 +909,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   STAR_PROVINCE_SOLO_MIGRATION,
   VOLLEY_OVERFLOW_SOLO_MIGRATION,
   LINE_PER_POWER_SOLO_MIGRATION,
+  ARREARS_INSTANT_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

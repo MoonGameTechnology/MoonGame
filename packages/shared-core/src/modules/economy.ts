@@ -342,6 +342,136 @@ function billOf(h: HandlerContext, playerId: string, base: ResourceBag): Resourc
   return raw;
 }
 
+/** Construction completions by planet — one pass over the queue, not one per planet.
+ *  `rampsOn` takes each list in the queue's own order. */
+function buildsByPlanet(scheduled: GameState['scheduled']): Map<unknown, GameState['scheduled']> {
+  const builds = new Map<unknown, GameState['scheduled']>();
+  for (const event of scheduled) {
+    if (event.type !== 'construction.complete') continue;
+    const planetId = (event.payload as ConstructionPayload).planetId;
+    const list = builds.get(planetId);
+    if (list) list.push(event);
+    else builds.set(planetId, [event]);
+  }
+  return builds;
+}
+
+/** An owner's multiplier on unit upkeep (the `economy.unitUpkeep` hook), asked once per
+ *  owner. A broken multiplier bills the base rate rather than paying the owner (negative)
+ *  or poisoning the treasury (non-finite). */
+function unitShares(h: HandlerContext): (owner: string) => number {
+  const shares = new Map<string, number>();
+  return (owner) => {
+    let share = shares.get(owner);
+    if (share === undefined) {
+      const raw = h.hook<number>('economy.unitUpkeep', 1, { playerId: owner });
+      share = Number.isFinite(raw) && raw >= 0 ? raw : 1;
+      shares.set(owner, share);
+    }
+    return share;
+  };
+}
+
+/** Each listed owner's hourly output at the instant `at`: what the settlement credits
+ *  there — the same buildings, brownout and `economy.production` hooks, a construction
+ *  ramp at its share of that instant. A world under bombardment or in battle yields
+ *  nothing, as in the settlement. */
+function incomeAt(
+  h: HandlerContext,
+  planetIds: readonly string[],
+  at: number,
+  owners: ReadonlyMap<string, unknown>,
+): Map<string, Record<string, number>> {
+  const data = h.ctx.data;
+  const bombarded = bombardedPlanets(h.state, data);
+  const fighting = battleLocations(h.state);
+  const builds = buildsByPlanet(h.state.scheduled);
+  const out = new Map<string, Record<string, number>>();
+  for (const planetId of planetIds) {
+    const planet = h.state.planets[planetId]!;
+    if (planet.owner === null || !owners.has(planet.owner)) continue;
+    const player = h.state.players[planet.owner];
+    if (!player || bombarded.has(planetId) || fighting.has(planetId)) continue;
+    const bag: Record<string, number> = mergeBags(
+      baseProduction(planet, data, player.arrears, feedsOnBiomass(h.state, planet.owner, data)),
+      pausedProduction(planet, data),
+    );
+    for (const r of rampsOn(builds.get(planetId) ?? [], h.state, planet, data, h.ctx)) {
+      if (r.from > at || r.to <= at) continue;
+      const progress = buildProgress(at, r.to, r.durationMs);
+      for (const res of Object.keys(r.full)) bag[res] = (bag[res] ?? 0) + (r.full[res] ?? 0) * progress;
+    }
+    const rate = h.hook<ResourceBag>('economy.production', bag, { planetId, from: at, to: at });
+    let total = out.get(planet.owner);
+    if (!total) out.set(planet.owner, (total = {}));
+    for (const res of Object.keys(rate)) total[res] = (total[res] ?? 0) + (rate[res] ?? 0);
+  }
+  return out;
+}
+
+/** PE-2.2: the first instant inside `(from, to)` at which a player's treasury runs dry of a
+ *  resource it is billed in — as the whole millisecond just past it, so the settlement
+ *  there finds the bill short — or at which a brownout can lift, or `Infinity`. The economy settles a span with the
+ *  arrears of the LAST settlement, so a span that ran on past the dry instant paid full
+ *  output for hours the player had nothing to run on; the length of a span is not ours
+ *  (an unwatched match catches a night up in one, a watched one ticks every second).
+ *  Stopping the world there lets the brownout start where the treasury ran out.
+ *
+ *  Only a bill the treasury could not cover on its own over the span can run dry inside
+ *  it, so only those owners' income is worked out. The rate is the one at `from`: output
+ *  only grows inside a span (a construction ramp, a world settling in), so a dry instant
+ *  never comes later than the estimate — at worst the world stops early and the next span
+ *  looks again. Brownout only lowers output, so a bill short at brownout stays short and
+ *  nothing flips back and forth.
+ *
+ *  The other way round: a resource in arrears with nothing in store whose income now
+ *  covers its bill (a new reactor) is paid by the very next instant, so the world stops a
+ *  millisecond on — the settlement there lifts the brownout instead of the whole span
+ *  running browned out. */
+function dryInstant(h: HandlerContext, from: number, to: number): number {
+  const data = h.ctx.data;
+  const scale = timeScaleOf(h.ctx);
+  const spanDays = ((to - from) / MS_PER_DAY) * scale;
+  const planetIds = Object.keys(h.state.planets).sort();
+  const upkeepPerOwner = upkeepByOwner(h.state, data, planetIds, unitShares(h));
+  // Per owner: [resource, bill per day, browned out with nothing in store].
+  const atRisk = new Map<string, Array<[string, number, boolean]>>();
+  for (const playerId of Object.keys(h.state.players).sort()) {
+    const player = h.state.players[playerId]!;
+    const bill = billOf(h, playerId, upkeepPerOwner.get(playerId) ?? {});
+    const risky: Array<[string, number, boolean]> = [];
+    for (const res of Object.keys(bill).sort()) {
+      const perDay = bill[res] ?? 0;
+      const have = player.resources[res] ?? 0;
+      if (perDay <= 0 || have >= perDay * spanDays) continue; // lasts the span with no income
+      risky.push([res, perDay, have <= 0 && player.arrears?.includes(res) === true]);
+    }
+    if (risky.length > 0) atRisk.set(playerId, risky);
+  }
+  if (atRisk.size === 0) return Infinity;
+  const income = incomeAt(h, planetIds, from, atRisk);
+  let dry = Infinity;
+  for (const [playerId, risky] of atRisk) {
+    const have = h.state.players[playerId]!.resources;
+    const rate = income.get(playerId) ?? {};
+    for (const [res, perDay, brownedOut] of risky) {
+      const netPerMs = ((rate[res] ?? 0) / MS_PER_HOUR - perDay / MS_PER_DAY) * scale;
+      if (brownedOut) {
+        // Covered again — by a clear margin: income that only just matches the bill could
+        // settle a millisecond short by a float's last digit and stop the world every
+        // millisecond after; such a bill lifts at the span's end, as before.
+        const billPerMs = (perDay / MS_PER_DAY) * scale;
+        if (netPerMs > billPerMs * 1e-9) dry = Math.min(dry, from + 1);
+        continue;
+      }
+      if (!(netPerMs < 0)) continue;
+      const at = from + (have[res] ?? 0) / -netPerMs;
+      dry = Math.min(dry, Math.max(from + 1, Math.floor(at) + 1));
+    }
+  }
+  return dry < to ? dry : Infinity;
+}
+
 /**
  * Economy — a base module (docs/modulesystem.md). On every `time.advanced` span
  * it settles the player economy by formula over elapsed real time
@@ -367,8 +497,15 @@ export const economyModule: GameModule = {
   // 1.4.0: хук `economy.unitUpkeep` — множитель содержания войск владельца (BAL-19).
   // 1.4.2: приостановленная стройка платит содержание за ту долю, которую производит.
   // 1.5.0: хук `economy.upkeep` — счёт игрока целиком (зарплата шпионов).
-  version: '1.5.0',
+  // 1.6.0: мир останавливается в миг, когда казна игрока иссякла по счёту, и блэкаут идёт
+  // с этого мига, а не с конца отрезка (PE-2.2).
+  version: '1.6.0',
   setup(api) {
+    // PE-2.2: stop the world where a treasury runs dry ({@link dryInstant}).
+    api.hook<number>('time.stop', (stop, args, h) => {
+      const { from, to } = args as { from: number; to: number };
+      return Math.min(stop, dryInstant(h, from, Math.min(stop, to)));
+    });
     api.on('time.advanced', (event, h) => {
       const { from, to } = event.payload as { from: number; to: number };
       const span = to - from;
@@ -384,16 +521,7 @@ export const economyModule: GameModule = {
       // набора считаются ОДНИМ проходом каждый — иначе на каждый узел пришлось бы
       // перебирать все бои и все флоты.
       const fighting = battleLocations(h.state);
-      // Стройки по мирам — один проход по очереди событий, а не проход на каждый мир.
-      // `rampsOn` берёт свой список в прежнем порядке очереди.
-      const builds = new Map<unknown, GameState['scheduled']>();
-      for (const event of h.state.scheduled) {
-        if (event.type !== 'construction.complete') continue;
-        const planetId = (event.payload as ConstructionPayload).planetId;
-        const list = builds.get(planetId);
-        if (list) list.push(event);
-        else builds.set(planetId, [event]);
-      }
+      const builds = buildsByPlanet(h.state.scheduled);
 
       // Sorted (BF-13): several planets credit the same treasury cell — float
       // addition order must not depend on JSONB key order after hibernation.
@@ -410,9 +538,11 @@ export const economyModule: GameModule = {
         if (bombarded.has(planetId) || fighting.has(planetId)) {
           continue; // узел не работает: обстрел (GDD §7.4) либо бой прямо здесь
         }
-        // Arrears from the LAST settlement dim this span's output (state-carried, so the
-        // formula stays continuous and deterministic across any span split), and a PAUSED
-        // construction keeps its frozen share (only further construction halts).
+        // Arrears from the LAST settlement dim this span's output, and a PAUSED construction
+        // keeps its frozen share (only further construction halts). A span never runs past
+        // the instant a bill runs dry or can be paid again: the world is stopped there
+        // ({@link dryInstant}, PE-2.2), so the brownout follows the treasury however the
+        // span is cut.
         const steady = mergeBags(
           baseProduction(planet, data, player.arrears, feedsOnBiomass(h.state, planet.owner, data)),
           pausedProduction(planet, data),
@@ -437,19 +567,7 @@ export const economyModule: GameModule = {
         }
       }
 
-      // Asked once per owner and span. A broken multiplier bills the base rate rather than
-      // paying the owner (negative) or poisoning the treasury (non-finite).
-      const shares = new Map<string, number>();
-      const unitShare = (owner: string): number => {
-        let share = shares.get(owner);
-        if (share === undefined) {
-          const raw = h.hook<number>('economy.unitUpkeep', 1, { playerId: owner });
-          share = Number.isFinite(raw) && raw >= 0 ? raw : 1;
-          shares.set(owner, share);
-        }
-        return share;
-      };
-      const upkeepPerOwner = upkeepByOwner(h.state, data, planetIds, unitShare);
+      const upkeepPerOwner = upkeepByOwner(h.state, data, planetIds, unitShares(h));
       for (const playerId of Object.keys(h.state.players).sort()) {
         const player = h.state.players[playerId];
         if (!player) {
