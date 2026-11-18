@@ -472,6 +472,6 @@ export function ordersHtml(
     );
   return (
     `<div class="bw-orders"><div class="bw-ots">${tiles.join('')}</div>` +
-    `<p class="bw-status"><b>${esc(sideName(sel, view))}</b> · ${esc(notes.join(' · '))}</p></div>`
+    `<p class="bw-status"><b>${esc(sideTileName(sel, view))}</b> · ${esc(notes.join(' · '))}</p></div>`
   );
 }

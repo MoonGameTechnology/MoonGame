@@ -42,7 +42,7 @@
 /* ── схема: два ряда плиток, стрелки под ними ── */
 #battlewinbody .bw-scheme{position:relative;display:flex;flex-direction:column;gap:6px;padding:8px 12px 10px;}
 #battlewinbody .bw-arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
-#battlewinbody .bw-arrows text{font:700 11px var(--sf-font,sans-serif);fill:#f2fbff;}
+#battlewinbody .bw-arrows text{font:700 12px var(--sf-font,sans-serif);fill:#f2fbff;}
 #battlewinbody .bw-row-h{margin:0;font-size:var(--fs-caption);font-weight:600;color:var(--dim);}
 #battlewinbody .bw-lane{position:relative;z-index:1;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;}
 #battlewinbody .bw-gap{height:52px;}
@@ -54,8 +54,8 @@
 #battlewinbody .bw-ft.sel{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset;}
 #battlewinbody .bw-ft.dead{opacity:.45;}
 #battlewinbody .bw-ft:focus-visible,#battlewinbody .bw-seg-b:focus-visible,#battlewinbody .bw-tog:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
-#battlewinbody .bw-ft-you{position:absolute;top:-7px;left:6px;padding:0 5px;border-radius:6px;background:var(--own);color:#05161c;
-  font-style:normal;font-size:10px;font-weight:700;line-height:14px;}
+#battlewinbody .bw-ft-you{position:absolute;top:-8px;left:6px;padding:0 5px;border-radius:6px;background:var(--own);color:#05161c;
+  font-style:normal;font-size:12px;font-weight:700;line-height:15px;}
 #battlewinbody .bw-ft-top{display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0;}
 #battlewinbody .bw-ft-ic{flex:0 0 26px;width:26px;height:26px;display:grid;place-items:center;overflow:hidden;border-radius:6px;background:#06161c;color:var(--own);}
 #battlewinbody .bw-ft-ic .hero-portrait,#battlewinbody .bw-ft-ic .ship-art{width:100%;height:100%;}
@@ -64,7 +64,6 @@
 #battlewinbody .bw-ft-t{font-size:var(--fs-caption);font-weight:700;color:#ffc9a6;white-space:nowrap;font-variant-numeric:tabular-nums;}
 #battlewinbody .bw-ft-t.def{color:#a9d7ff;font-weight:400;}
 #battlewinbody .bw-ft-name{font-size:var(--fs-caption);font-weight:600;line-height:1.2;color:var(--own);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-#battlewinbody .bw-ft-name::first-letter{text-transform:uppercase;}
 #battlewinbody .bw-ft-bar{display:flex;align-items:center;gap:4px;}
 #battlewinbody .bw-ft-hp{flex:1 1 auto;height:4px;border-radius:2px;overflow:hidden;background:rgba(255,255,255,.08);}
 #battlewinbody .bw-ft-hp i{display:block;height:100%;background:#3ddc97;}
@@ -73,7 +72,7 @@
 #battlewinbody .bw-ft-sh{flex:0 0 auto;width:5px;height:5px;border-radius:50%;background:#5fb8ff;}
 #battlewinbody .bw-ft-n{font-size:var(--fs-caption);line-height:1;color:var(--txt,#e8f6fa);font-variant-numeric:tabular-nums;}
 #battlewinbody .bw-ft-charge{position:absolute;top:-7px;right:-5px;width:18px;height:18px;display:grid;place-items:center;border-radius:50%;
-  background:#2a2205;border:1px solid var(--amber);font-size:11px;line-height:1;}
+  background:#2a2205;border:1px solid var(--amber);font-size:12px;line-height:1;}
 #battlewinbody .bw-ft.grp{place-content:center;justify-items:center;text-align:center;border-style:dashed;}
 #battlewinbody .bw-ft.grp b{font-size:var(--fs-heading);line-height:1;}
 #battlewinbody .bw-ft.grp span{font-size:var(--fs-caption);}
@@ -89,8 +88,7 @@
   font-size:var(--fs-caption);line-height:1.25;}
 #battlewinbody .bw-ot i{font-style:normal;font-size:18px;line-height:1;}
 #battlewinbody .bw-status{margin:0;font-size:var(--fs-caption);color:var(--dim);line-height:1.4;}
-#battlewinbody .bw-status b{display:inline-block;color:var(--txt,#e8f6fa);}
-#battlewinbody .bw-status b::first-letter{text-transform:uppercase;}
+#battlewinbody .bw-status b{color:var(--txt,#e8f6fa);}
 
 /* ── лист стороны ── */
 #battlewinsheet[hidden]{display:none;}

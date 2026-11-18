@@ -88,7 +88,12 @@ export function sideName(side: Side, view: BattleView): string {
 /** Подпись плитки: у флота — позывной; у гарнизона и плацдарма чужой державы — её имя,
  *  иначе два плацдарма разных держав подписаны одним словом. */
 export function sideTileName(side: Side, view: BattleView): string {
-  return sideFleetId(side) || side.mine ? sideName(side, view) : ownerLabel(side, view);
+  if (sideFleetId(side)) return sideName(side, view);
+  if (!side.mine) return ownerLabel(side, view);
+  // Вид стороны в локали — со строчной («плацдарм»: так он стоит внутри фразы листа), а на
+  // плитке это имя.
+  const kind = sideKindLabel(side);
+  return kind.charAt(0).toLocaleUpperCase() + kind.slice(1);
 }
 
 /** Живые юниты стороны — по стекам, если они есть. */

@@ -5123,7 +5123,6 @@ export const ru: Record<string, string> = {
   'side.arch.scout': 'скауты',
   'side.arch.swarm': 'рой',
   'side.arch.transport': 'транспорты',
-  'side.battle.retreat': '⤺ Отступить',
   'side.battle.side.fleet': 'флот',
   'side.battle.side.garrison': 'гарнизон',
   'side.battle.side.landing': 'десант',

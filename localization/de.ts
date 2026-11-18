@@ -4338,7 +4338,6 @@ export const de: Record<string, string> = {
   'side.arch.scout': 'Aufklärer',
   'side.arch.swarm': 'Schwarm',
   'side.arch.transport': 'Transporter',
-  'side.battle.retreat': '⤺ Rückzug',
   'side.battle.side.fleet': 'Flotte',
   'side.battle.side.garrison': 'Garnison',
   'side.battle.side.landing': 'Landungstruppen',

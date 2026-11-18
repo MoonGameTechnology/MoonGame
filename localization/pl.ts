@@ -4359,7 +4359,6 @@ export const pl: Record<string, string> = {
   'side.arch.scout': 'Zwiadowca',
   'side.arch.swarm': 'Rój',
   'side.arch.transport': 'Transportowiec',
-  'side.battle.retreat': '⤺ Odwrót',
   'side.battle.side.fleet': 'Flota',
   'side.battle.side.garrison': 'Garnizon',
   'side.battle.side.landing': 'Desant',
