@@ -5,7 +5,7 @@ name: Check immutable native ad probe 5979
 on:
   push:
     branches: [fix/vk-ad-diagnostics-20261117]
-    paths: ['.github/workflows/android-ad-probe-check.yml']
+    paths: ['.github/workflows/android-ad-probe-check.yml', 'mobile/minimal-ad/smoke.py']
   workflow_dispatch:
 
 permissions:

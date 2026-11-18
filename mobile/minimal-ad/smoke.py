@@ -34,7 +34,7 @@ adb('install', '-r', sys.argv[1])
 # virtual Ethernet interface survives the Wi-Fi/mobile-data switches.
 adb('root')
 adb('wait-for-device')
-uid_match = re.search(r'userId=(\d+)', adb('shell', 'dumpsys', 'package', 'com.voiddominion.player'))
+uid_match = re.search(r'\buid:(\d+)', adb('shell', 'cmd', 'package', 'list', 'packages', '-U', 'com.voiddominion.player'))
 assert uid_match and 10000 <= int(uid_match[1]) < 100000, 'E_PROBE_UID'
 for firewall in ['iptables', 'ip6tables']:
     adb('shell', firewall, '-I', 'OUTPUT', '-m', 'owner', '--uid-owner', uid_match[1], '-j', 'REJECT')

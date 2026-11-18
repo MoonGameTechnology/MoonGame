@@ -23,6 +23,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      ANDROID_USER_HOME: ${{ github.workspace }}/.probe-android-user
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.probe-android-user/avd
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,7 +72,10 @@ jobs:
           SDK_BIN="$ANDROID_HOME/cmdline-tools/latest/bin"
           test -x "$SDK_BIN/sdkmanager"
           "$SDK_BIN/sdkmanager" 'emulator' 'platform-tools' 'system-images;android-35;default;x86_64'
-          echo no | "$SDK_BIN/avdmanager" create avd --name vk-ad-probe --package 'system-images;android-35;default;x86_64' --force
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | "$SDK_BIN/avdmanager" create avd --name vk-ad-probe --package 'system-images;android-35;default;x86_64' --path "$ANDROID_AVD_HOME/vk-ad-probe.avd" --force
+          test -f "$ANDROID_AVD_HOME/vk-ad-probe.avd/config.ini"
+          printf 'avd.ini.encoding=UTF-8\npath=%s\ntarget=android-35\n' "$ANDROID_AVD_HOME/vk-ad-probe.avd" > "$ANDROID_AVD_HOME/vk-ad-probe.ini"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           sudo chmod a+rw /dev/kvm
       - name: Test the installed one-button app offline
