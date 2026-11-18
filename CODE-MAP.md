@@ -489,7 +489,7 @@ Recovery-письма обоих хостов форматирует `scripts/re
 | `state/matchState.ts` · `state/capitalVictory.ts` | `MatchState`, `capitalVictoryStatus` | результат, закреплённый вес зданий и публичные цели столиц |
 | `state/buildFromMap.ts` | `buildStateFromMap(map, data, opts)` | посев матча из карты |
 | `state/diplomacy.ts` | `getStance`, `setStance`, `pairKey`, `DEFAULT_STANCE` | дипломатия |
-| `state/botFavour.ts` | `botFavour`, `botEmbargoes`, `FAVOUR_*` | шкала расположения ботов (счётчик `approval` сеет прототип) |
+| `state/botFavour.ts` | `botFavour`, `botEmbargoes`, `favourBelow`, `FAVOUR_*` | шкала расположения ботов (счётчик `approval` сеет прототип) |
 | `data/schemas.ts` · `data/victorySchema.ts` | `GameDataSchema`, `parseGameData`, `ModeVictorySchema`, `ScoringRulesSchema` | zod-схемы контента и правил победы |
 | `data/mapSchema.ts` | `MatchMapSchema`, `MatchMap`, `avaShape`, `MapSlot` | zod-схемы карт |
 | `action/types.ts` | `Action`, `Context`, `MatchConfig`, `VictoryConfig`, `timeScaleOf` | типы действий |
