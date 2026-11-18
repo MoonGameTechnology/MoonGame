@@ -1266,16 +1266,22 @@
         "x": -396,
         "y": 688
       },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
+      "kind": "star",
+      "terrain": "blue_giant",
+      "size": 1.4,
+      "buildings": [],
+      "garrison": []
     },
     "crown_105": {
       "position": {
         "x": 402,
         "y": -689
       },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
+      "kind": "star",
+      "terrain": "blue_giant",
+      "size": 1.4,
+      "buildings": [],
+      "garrison": []
     },
     "crown_106": {
       "position": {

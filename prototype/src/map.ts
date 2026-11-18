@@ -57,6 +57,8 @@ const SECTOR_TYPE_UI: Record<string, SectorTypeUi> = {
   rift: { name: 'Spatial Rift', core: 'empty_space', color: '#7a4a8f' },
   // The plasma ring round the Abyss black hole (ffa-50): impassable like a rift, hot in colour.
   accretion_disk: { name: 'Accretion Disk', core: 'empty_space', color: '#ff9a4a' },
+  // A star: its own province, impassable; its class is the province's terrain (owner 2026-11-17).
+  star: { name: 'Star', core: 'empty_space', color: '#ffd36a' },
   empty: { name: 'Empty Space', core: 'empty_space', color: '#46606e' },
   // new terrains — each maps to a core `data.sectors` entry for its speed/HP bonus
   ion_storm: { name: 'Ion Storm', core: 'ion_storm', color: '#6fe3ff' },
