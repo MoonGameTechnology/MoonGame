@@ -250,8 +250,10 @@
         "x": 70,
         "y": -410
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "star",
+      "terrain": "yellow_dwarf",
+      "buildings": [],
+      "garrison": []
     },
     "drift": {
       "position": {

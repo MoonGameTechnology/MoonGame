@@ -2980,8 +2980,10 @@
         "x": -6062,
         "y": -824
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "star",
+      "terrain": "yellow_dwarf",
+      "buildings": [],
+      "garrison": []
     },
     "suns_018": {
       "position": {
@@ -3022,8 +3024,8 @@
         "x": -5725,
         "y": -693
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     },
     "suns_020": {
       "position": {
@@ -3186,8 +3188,11 @@
         "x": 6939,
         "y": 185
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "star",
+      "terrain": "red_giant",
+      "size": 1.6,
+      "buildings": [],
+      "garrison": []
     },
     "suns_040": {
       "position": {
@@ -4075,7 +4080,7 @@
       },
       "kind": "planet",
       "terrain": "empty_space",
-      "planetType": "terran"
+      "planetType": "barren"
     },
     "suns_138": {
       "position": {
@@ -4416,8 +4421,8 @@
         "x": 3457,
         "y": 18
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
     },
     "suns_176": {
       "position": {
@@ -4434,7 +4439,7 @@
       },
       "kind": "planet",
       "terrain": "empty_space",
-      "planetType": "volcanic"
+      "planetType": "irradiated"
     },
     "suns_178": {
       "position": {
@@ -7070,8 +7075,8 @@
         "x": 3343,
         "y": -883
       },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
     },
     "suns_466": {
       "position": {
@@ -7087,8 +7092,11 @@
         "x": 3482,
         "y": -552
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "star",
+      "terrain": "blue_giant",
+      "size": 1.4,
+      "buildings": [],
+      "garrison": []
     },
     "suns_468": {
       "position": {
@@ -7105,7 +7113,7 @@
       },
       "kind": "planet",
       "terrain": "empty_space",
-      "planetType": "terran"
+      "planetType": "irradiated"
     },
     "suns_470": {
       "position": {
@@ -7292,16 +7300,16 @@
         "x": -1736,
         "y": -3052
       },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
+      "kind": "nebula",
+      "terrain": "nebula"
     },
     "suns_493": {
       "position": {
         "x": -1099,
         "y": -3374
       },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
+      "kind": "dead_world",
+      "terrain": "depleted_system"
     },
     "suns_494": {
       "position": {
@@ -7317,8 +7325,10 @@
         "x": -1852,
         "y": -3516
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "star",
+      "terrain": "white_dwarf",
+      "buildings": [],
+      "garrison": []
     },
     "suns_496": {
       "position": {
@@ -7350,8 +7360,8 @@
         "x": -1486,
         "y": -3860
       },
-      "kind": "asteroid",
-      "terrain": "empty_space"
+      "kind": "dead_world",
+      "terrain": "depleted_system"
     },
     "suns_500": {
       "position": {

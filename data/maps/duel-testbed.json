@@ -442,8 +442,10 @@
         "x": 1620,
         "y": 420
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "star",
+      "terrain": "pulsar",
+      "buildings": [],
+      "garrison": []
     },
     "storm_3": {
       "position": {
@@ -477,7 +479,7 @@
       },
       "kind": "planet",
       "terrain": "empty_space",
-      "planetType": "volcanic"
+      "planetType": "irradiated"
     },
     "spent": {
       "position": {

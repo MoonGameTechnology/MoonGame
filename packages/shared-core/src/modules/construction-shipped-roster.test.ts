@@ -123,6 +123,8 @@ const EXPECTED: Record<string, string[] | null> = {
   rift: [],
   // The accretion disk round the Abyss black hole: impassable plasma, the same hole as a rift.
   accretion_disk: [],
+  // A star in its own province: impassable and uncapturable, nothing is raised in a corona.
+  star: [],
   pirate_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
   neutral_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
   // owner decision 8: a fortress does not exclude mining — the rig can be rebuilt here

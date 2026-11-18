@@ -1,10 +1,10 @@
 /**
- * Which star burns at the heart of a solar-flare zone. A flare zone exists because a star is
- * there, so the map draws one at its node; which kind is picked from the node's map position,
- * so every client, every visit and every replay of the same map shows the same star without
- * the map data having to carry it.
+ * Which star a star province holds (owner 2026-11-17: «каждая такая моделька должна иметь
+ * свою провинцию»). A star is a province of kind `star`; its class is the province's
+ * terrain — one of the `star` family in `data/sectors.json` — so the class reaches every
+ * client with the province itself, under the same fog, and the drawing never guesses.
  */
-export type StarClass = 'yellow_dwarf' | 'red_giant' | 'blue_giant' | 'white_dwarf' | 'pulsar' | 'binary';
+export type StarClass = 'yellow_dwarf' | 'red_giant' | 'blue_giant' | 'white_dwarf' | 'pulsar' | 'binary_star';
 
 export const STAR_CLASSES: readonly StarClass[] = [
   'yellow_dwarf',
@@ -12,14 +12,13 @@ export const STAR_CLASSES: readonly StarClass[] = [
   'blue_giant',
   'white_dwarf',
   'pulsar',
-  'binary',
+  'binary_star',
 ];
 
-/** The star of the node at map position (`x`, `y`): a fixed integer hash of the rounded
- *  coordinates, so neighbouring zones rarely repeat and a sub-unit drift changes nothing. */
-export function starClassAt(x: number, y: number): StarClass {
-  let h = (Math.round(x) * 73856093) ^ (Math.round(y) * 19349663);
-  h = Math.imul(h ^ (h >>> 13), 0x5bd1e995);
-  h ^= h >>> 15;
-  return STAR_CLASSES[(h >>> 0) % STAR_CLASSES.length]!;
+const KNOWN = new Set<string>(STAR_CLASSES);
+
+/** The class of a star province from its terrain; a terrain no star class names (an old or
+ *  edited map) draws the plainest star, a yellow dwarf, rather than nothing. */
+export function starClassOf(terrain: string | undefined): StarClass {
+  return terrain !== undefined && KNOWN.has(terrain) ? (terrain as StarClass) : 'yellow_dwarf';
 }

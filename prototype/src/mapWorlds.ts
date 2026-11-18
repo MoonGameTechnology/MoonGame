@@ -46,7 +46,7 @@ import { VOID_COLOR } from './sideColors';
 import { sweepPaint, sweepShows } from './sweepFx';
 import { drawBlackHole } from './blackHoleArt';
 import { drawStar } from './starArt';
-import { starClassAt } from '../../decisions/starClass';
+import { starClassOf } from '../../decisions/starClass';
 
 /** Что мирам карты нужно от игры. */
 export interface MapWorldsHost {
@@ -264,25 +264,35 @@ export function prepareWorldArt(): void {
  * значках (жалоба владельца на APK: на минимальном зуме искусство узла, бейджи и эффекты
  * ложились друг на друга).
  */
-/** A terrain province's selectable survey point. In a flare zone it is the star that throws
- *  the flares (`starArt.ts`), its class fixed by the node's place (`decisions/starClass.ts`). */
-function drawSurveyPoint(
-  cx: CanvasRenderingContext2D,
-  c: { x: number; y: number },
-  n: { x: number; y: number },
-  sector: string,
-  col: string,
-  R: number,
-  clockMs: number,
-): void {
-  if (sector === 'solar_flare') {
-    drawStar(cx, c.x, c.y, R, starClassAt(n.x, n.y), clockMs && clockMs + phaseAt(n.x, n.y) * 400);
-    return;
-  }
+/** A terrain province's selectable survey point. */
+function drawSurveyPoint(cx: CanvasRenderingContext2D, c: { x: number; y: number }, col: string): void {
   cx.fillStyle = rgba(col, 0.7);
   cx.beginPath();
   cx.arc(c.x, c.y, 2.4, 0, TAU);
   cx.fill();
+}
+
+/** A black hole or a star: drawn through the fog, never a world. `true` when it drew. */
+function drawCelestial(
+  cx: CanvasRenderingContext2D,
+  n: MapNode,
+  p: { size?: number; terrain?: string },
+  c: { x: number; y: number },
+  ns: number,
+  hologramTime: number,
+): boolean {
+  if (n.sector === 'black_hole') {
+    cx.save();
+    // the Abyss of ffa-50 is a size-2 hole, drawn twice as big
+    drawBlackHole(cx, c.x, c.y, 20 * ns * (p.size ?? 1), hologramTime);
+    cx.restore();
+    return true;
+  }
+  if (n.sector !== 'star') return false;
+  // A star outshines a world (the hole's radius); its class is the province's terrain, and
+  // the class sets its size.
+  drawStar(cx, c.x, c.y, 20 * ns, starClassOf(p.terrain), hologramTime && hologramTime + phaseAt(n.x, n.y) * 400);
+  return true;
 }
 
 export function drawWorlds(now: number, lod: MapLod): void {
@@ -382,13 +392,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     // Variant B: fog hides capturable systems (void cells stay as pure geometry).
     // Какой вид у узла — `fogView.ts` (REFM-62): пустой всегда виден, неопознанный
     // показывается ПАМЯТЬЮ, никогда не виденный — знаком вопроса только вблизи.
-    if (n.sector === 'black_hole') {
-      cx.save();
-      const hs = ns * (p.size ?? 1); // the Abyss of ffa-50 is a size-2 hole, drawn twice as big
-      drawBlackHole(cx, c.x, c.y, 20 * hs, hologramTime);
-      cx.restore();
-      continue;
-    }
+    if (drawCelestial(cx, n, p, c, ns, hologramTime)) continue;
     const kn = known(n.id);
     const mem = memory.get(n.id);
     const view = nodeView({ sector: n.sector, identified: kn, remembered: !!mem });
@@ -596,7 +600,7 @@ export function drawWorlds(now: number, lod: MapLod): void {
     if (holographicMapOn() && hasTerrainMaterial(sector) &&
       sector !== 'dead_world' && sector !== 'planet' && sector !== 'void_station') {
       // Terrain is the province's material; retain a precise selectable survey point.
-      drawSurveyPoint(cx, c, n, sector, col, R, stale ? 0 : hologramTime);
+      drawSurveyPoint(cx, c, col);
     } else if (sector === 'planet') {
       // A transparent rotating wire volume, with no opaque core obscuring its mesh.
       // The visual clock is independent of game speed and freezes on pause/reduced motion.

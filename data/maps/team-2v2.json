@@ -1028,16 +1028,20 @@
         "x": -378,
         "y": -802
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "star",
+      "terrain": "yellow_dwarf",
+      "buildings": [],
+      "garrison": []
     },
     "reach_83": {
       "position": {
         "x": 438,
         "y": 805
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "star",
+      "terrain": "yellow_dwarf",
+      "buildings": [],
+      "garrison": []
     },
     "reach_84": {
       "position": {

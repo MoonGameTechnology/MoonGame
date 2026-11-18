@@ -1,5 +1,5 @@
 /**
- * The star at the heart of a solar-flare zone, drawn in the map's own hand: the same
+ * A star province's star (`decisions/starClass.ts`), drawn in the map's own hand: the same
  * transparent rotating wire sphere as a planet, in the star's colour, plus what each class of
  * star does — a corona of rays, a stellar wind of rings, a pulsar's beams, a binary's orbit.
  * Lines only, no fills, so it reads as kin of the planets. `clockMs` is the map's visual
@@ -18,7 +18,7 @@ const COLOR: Readonly<Record<StarClass | 'companion', string>> = {
   blue_giant: '143,192,255',
   white_dwarf: '230,240,255',
   pulsar: '143,240,255',
-  binary: '255,211,106',
+  binary_star: '255,211,106',
   companion: '143,192,255',
 };
 
@@ -151,7 +151,7 @@ export function drawStar(cx: CanvasRenderingContext2D, x: number, y: number, r: 
       wire(cx, x, y, r * 0.36, rgb, t * 3);
       break;
     }
-    case 'binary': {
+    case 'binary_star': {
       const o = r * 1.5;
       const at = (ang: number, rad: number): [number, number] => {
         const ex = Math.cos(ang) * rad;

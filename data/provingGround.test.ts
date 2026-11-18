@@ -68,7 +68,13 @@ describe('полигон — полнота каталога', () => {
       (k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station',
     );
     expect(has((id) => map.sectors[id]!.kind)).toEqual(provinceKinds.sort());
-    expect(has((id) => map.sectors[id]!.terrain)).toEqual(Object.keys(data.sectors).sort());
+    // Star classes are one family (`data/sectors.json`): one star shows the kind, its class
+    // is one of six — the big maps carry the rest.
+    const star = (t: string) => data.sectors[t]!.family === 'star';
+    expect(has((id) => map.sectors[id]!.terrain).filter((t) => !star(t)).sort()).toEqual(
+      Object.keys(data.sectors).filter((t) => !star(t)).sort(),
+    );
+    expect(has((id) => map.sectors[id]!.terrain).filter(star)).toHaveLength(1);
     expect(has((id) => map.sectors[id]!.planetType)).toEqual(Object.keys(data.planetTypes).sort());
   });
 });

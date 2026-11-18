@@ -207,7 +207,12 @@ describe.each(FFA_MAPS)(
         .filter((k) => k !== 'accretion_disk' || id === 'ffa-50')
         .sort();
       expect(has((s) => s.kind)).toEqual(kinds);
-      expect(has((s) => s.terrain)).toEqual(Object.keys(data.sectors).sort());
+      // Star classes are one family (`data/sectors.json`): a map shows some, never all six.
+      const star = (t: string) => data.sectors[t]!.family === 'star';
+      expect(has((s) => s.terrain).filter((t) => !star(t))).toEqual(
+        Object.keys(data.sectors).filter((t) => !star(t)).sort(),
+      );
+      expect(has((s) => s.terrain).filter(star).length).toBeGreaterThan(0);
       expect(has((s) => s.planetType)).toEqual(Object.keys(data.planetTypes).sort());
       expect(sectors.filter((s) => s.kind === 'graveyard')).toHaveLength(1);
       expect(sectors.filter((s) => s.kind === 'debris_field')).toHaveLength(1);
