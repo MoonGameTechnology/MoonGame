@@ -172,6 +172,41 @@ describe('fleet scouting (A3) — a traveling fleet commits passed nodes to memo
     const view = visibleState(done.state, 'p1', sdata);
     expect(view.remembered).toContain('B');
   });
+  // PE-2.2: memory is the world as it stood when sight of it was LOST — not as it stood at
+  // whatever instant the span that lost it happened to end. The probe sees B (circle 40)
+  // from hour 6 to hour 14; one long jump and ten-minute steps remember the same moment.
+  it('a world flown past is remembered as of the instant sight of it was lost, however time is cut', () => {
+    const state: GameState = {
+      ...createInitialState({ seed: 'scout', version: { data: '0.1.0', manifest: '1' } }),
+      players: { p1: player('p1'), p2: player('p2') },
+      planets: {
+        A: planet('A', null, ['B'], { position: { x: 0, y: 0 } }),
+        B: planet('B', 'p2', ['A', 'C'], { position: { x: 100, y: 0 }, garrison: [{ unit: 'scout', count: 2 }] }),
+        C: planet('C', null, ['B'], { position: { x: 200, y: 0 } }),
+      },
+      fleets: {
+        probe: { id: 'probe', owner: 'p1', location: 'A', movement: null, units: [{ unit: 'scout', count: 1 }], traits: [] },
+      },
+    };
+    const kernel = createKernel([movementModule, visibilityModule]);
+    const sctx = (now: number): Context => ({ now, data: sdata, config: { timeScale: 1 } });
+    const move = kernel.applyAction(
+      state,
+      { id: 's:p1:1', type: 'fleet.move', playerId: 'p1', payload: { fleetId: 'probe', to: 'C' }, issuedAt: 0 },
+      sctx(0),
+    );
+    if (!move.ok) throw new Error(move.code);
+    const advance = (s: GameState, t: number): GameState => {
+      const r = kernel.advanceTo(s, sctx(t));
+      if (!r.ok) throw new Error(r.code);
+      return r.state;
+    };
+    const long = advance(move.state, 20 * HOUR);
+    let steps = move.state;
+    for (let t = 600_000; t <= 20 * HOUR; t += 600_000) steps = advance(steps, t);
+    expect(Math.abs((long.fog?.p1?.B?.at ?? 0) - 14 * HOUR)).toBeLessThanOrEqual(1);
+    expect(long.fog?.p1?.B).toEqual(steps.fog?.p1?.B);
+  });
 });
 
 describe('обследование: тип провинции раскрывается на границе (владелец 2026-10-23)', () => {
@@ -224,7 +259,9 @@ describe('обследование: тип провинции раскрывае
     expect(before.surveyed?.p1?.B).toBeUndefined(); // ещё по эту сторону границы
 
     const across = at(before, 25); // за границей, но до центра B ещё 150 — круг его не достаёт
-    expect(across.surveyed?.p1?.B).toEqual({ kind: 'graveyard', terrain: 'debris_field', at: 25 * HOUR });
+    // Датировано мигом пересечения границы (час 20), а не концом отрезка, в котором его
+    // заметили: один длинный шаг и частые шаги пишут одно и то же.
+    expect(across.surveyed?.p1?.B).toEqual({ kind: 'graveyard', terrain: 'debris_field', at: 20 * HOUR });
     expect(across.fog?.p1?.B).toBeUndefined(); // это не скан
 
     const view = visibleState(across, 'p1', sdata);
@@ -237,7 +274,25 @@ describe('обследование: тип провинции раскрывае
 
   it('пока тип прежний, запись не переписывается каждым шагом', () => {
     const across = at(at(flying(), 25), 30);
-    expect(across.surveyed?.p1?.B?.at).toBe(25 * HOUR);
+    expect(across.surveyed?.p1?.B?.at).toBe(20 * HOUR);
+  });
+
+  it('флот, стоящий в провинции с начала отрезка, датирует её началом отрезка, а не концом', () => {
+    const resting = (): GameState => {
+      const s = flying();
+      s.fleets.probe = { ...s.fleets.probe!, location: 'B', movement: null };
+      return s;
+    };
+    let steps = resting();
+    for (let h = 1; h <= 4; h++) steps = at(steps, h / 2);
+    expect(at(resting(), 2).surveyed?.p1?.B?.at).toBe(0);
+    expect(steps.surveyed?.p1?.B).toEqual(at(resting(), 2).surveyed?.p1?.B);
+  });
+
+  it('пересечение границы датируется одинаково при любой нарезке времени', () => {
+    let steps = flying();
+    for (let h = 1; h <= 25; h++) steps = at(steps, h);
+    expect(steps.surveyed?.p1?.B).toEqual(at(flying(), 25).surveyed?.p1?.B);
   });
 
   it('чужое обследование зрителю не уходит, а необследованная провинция типа не выдаёт', () => {
