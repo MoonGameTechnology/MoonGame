@@ -100,7 +100,10 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '109'; // MSB-10: порядок тот же; `combat` 4.1.0 —
+export const MODULE_MANIFEST_VERSION = '110'; // MSB-11: порядок тот же; `combat` 4.2.0 — одна
+// линия на державу: N в `min(1, L/N)` — все корабли державы в бою, а не флота (резолюция
+// владельца 2026-11-18). Партия на 109 считала бы линию по флоту, и реплей разошёлся бы.
+// export const MODULE_MANIFEST_VERSION = '109'; // MSB-10: порядок тот же; `combat` 4.1.0 —
 // остаток залпа уходит в живые цели, доля без цели — заряд флота на пять игровых минут
 // (`Fleet.overcharge`, резолюция владельца 2026-11-17). Партия на 108 сожгла бы остаток, и
 // реплей разошёлся бы с её записью.

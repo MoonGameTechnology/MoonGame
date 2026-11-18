@@ -1,4 +1,5 @@
 import { spendVolley } from '../util/overflow';
+import { liveUnitCount } from '../util/stacks';
 import type { UnitStack } from './gameState';
 import type { GameData } from '../data/schemas';
 import { damageByClass, damageUnits, MAX_COMBAT_ROUNDS, stackHull } from '../util/combat';
@@ -195,10 +196,15 @@ export function previewSides(
       i => roles[i] === 'defender', (from, targets, role) => {
         // Тот же залп, что в живом бою (`util/battleExchanges.ts`): снимок долей до первого
         // урона и перенос остатка с погибших на живых врагов стрелка (`util/overflow.ts`).
-        const shots = new Map(targets.map(i => [i, targetedVolley(live[from]!, live[i]!, data, role)]));
+        // Линия державы (MSB-11): N — все живые юниты владельца стрелка в этом звене;
+        // у стороны без хозяина — своя, как в бою (`util/battleLine.ts`).
+        const owner = input[from]!.owner;
+        const line = owner == null ? undefined
+          : link.filter(j => up(j) && input[j]!.owner === owner).reduce((n, j) => n + liveUnitCount(live[j]!, data), 0);
+        const shots = new Map(targets.map(i => [i, targetedVolley(live[from]!, live[i]!, data, role, line)]));
         const shotAt = (i: number) => {
           let shot = shots.get(i);
-          if (!shot) shots.set(i, (shot = targetedVolley(live[from]!, live[i]!, data, role)));
+          if (!shot) shots.set(i, (shot = targetedVolley(live[from]!, live[i]!, data, role, line)));
           return shot;
         };
         spendVolley(targets, () => link.filter(j => up(j) && foes(from, j)), legs => legs.map(({ target: i, budget }) => {
