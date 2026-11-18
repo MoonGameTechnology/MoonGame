@@ -30,6 +30,15 @@ export const FAVOUR_SPY_CAUGHT_HIT = 20; // drop when the bot catches that seat'
 export const FAVOUR_WAR_DECAY_PER_DAY = 5; // sustained war keeps eroding favour
 export const FAVOUR_HEAL_PER_DAY = 6; // peace slowly mends it back toward FAVOUR_BASE
 
+/** Float dust a meter may carry from summing many short spans: 720 five-minute heals land on
+ *  34.99999999999966, not on the line at 35 that one long span hits exactly (PE-2.2). */
+export const FAVOUR_EPS = 1e-9;
+/** Is `favour` under `line`? Every threshold read goes through here, so how time was cut
+ *  into spans never decides an embargo, a war or an accepted offer. */
+export function favourBelow(favour: number, line: number): boolean {
+  return favour < line - FAVOUR_EPS;
+}
+
 /** A bot's favour toward `player` (FAVOUR_BASE if untracked / not a bot). */
 export function botFavour(state: GameState, bot: string, player: string): number {
   return (state as ApprovalState).approval?.[bot]?.[player] ?? FAVOUR_BASE;
@@ -38,7 +47,7 @@ export function botFavour(state: GameState, bot: string, player: string): number
 export function botEmbargoes(state: GameState, bot: string, player: string): boolean {
   return (
     (state as ApprovalState).approval?.[bot] !== undefined &&
-    botFavour(state, bot, player) < FAVOUR_EMBARGO
+    favourBelow(botFavour(state, bot, player), FAVOUR_EMBARGO)
   );
 }
 

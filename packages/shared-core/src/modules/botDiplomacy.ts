@@ -23,7 +23,9 @@ import {
   FAVOUR_HEAL_PER_DAY,
   botFavour,
   botEmbargoes,
+  favourBelow,
 } from '../state/botFavour';
+import type { HandlerContext } from '../kernel/module';
 import type { MarketEmbargoCapability } from './market';
 
 /** Minimal view of the state extension for the approval meter. */
@@ -33,9 +35,24 @@ interface ApprovalState extends GameState {
 
 const DAY = 24 * 3_600_000;
 
+/** A meter under the war line makes the bot commit to war at once (once), then vent so it
+ *  won't thrash war/peace. Called the moment favour drops and at the start of every span,
+ *  before healing: otherwise a long span could heal a sunk meter back over the line that a
+ *  run of short spans would have caught (PE-2.2). */
+function fallOut(h: HandlerContext, meter: Record<string, number>, bot: string, player: string): void {
+  if (!favourBelow(meter[player]!, FAVOUR_WAR) || getStance(h.state, bot, player) === 'war') return;
+  const [me, them] = [h.state.players[bot], h.state.players[player]];
+  // No war from or on the dead, and never on a fixed teammate (the core declaration guard).
+  if (me?.status !== 'active' || them?.status !== 'active') return;
+  if (hasFixedSides(h.ctx.config?.modeId) && me.team !== undefined && me.team === them.team) return;
+  setStance(h.state, bot, player, 'war');
+  meter[player] = FAVOUR_EMBARGO; // vent: hostile now, but above the war line
+  h.emit('diplomacy.changed', { a: bot, b: player, stance: 'war' });
+}
+
 export const botDiplomacyModule: GameModule = {
   id: 'bot-diplomacy',
-  version: '0.2.0',
+  version: '0.3.0',
   setup(api) {
     // CONV-9: рынок ядра спрашивает эмбарго через капабилити, а не лезет в чужое
     // состояние. Владелец правила — этот модуль: счётчик расположения ботов живёт
@@ -60,7 +77,7 @@ export const botDiplomacyModule: GameModule = {
       if (!meter || meter[from] === undefined) return; // `to` isn't a tracked bot vs `from`
       const need =
         stance === 'peace' ? FAVOUR_PEACE_ACCEPT : stance === 'pact' ? FAVOUR_PACT_ACCEPT : null;
-      if (need !== null && botFavour(h.state, to, from) >= need) {
+      if (need !== null && !favourBelow(botFavour(h.state, to, from), need)) {
         clearOffers(h.state, to, from);
         setStance(h.state, to, from, stance);
         h.emit('diplomacy.changed', { a: to, b: from, stance });
@@ -86,6 +103,7 @@ export const botDiplomacyModule: GameModule = {
       const meter = (h.state as ApprovalState).approval?.[owner];
       if (!meter || meter[spy] === undefined) return; // the victim isn't a tracked bot
       meter[spy] = Math.max(0, meter[spy]! - FAVOUR_SPY_CAUGHT_HIT);
+      fallOut(h, meter, owner, spy);
     });
     // An eliminated seat leaves the favour ledger entirely: its own meter dies with
     // it, and no surviving bot keeps tracking (or later declaring on) a corpse —
@@ -118,15 +136,13 @@ export const botDiplomacyModule: GameModule = {
           const side = h.state.players[bot]!.team;
           if (hasFixedSides(h.ctx.config?.modeId) && side !== undefined &&
               side === h.state.players[player]!.team) continue;
+          // The war check comes first: a meter that sank under the line is read at the
+          // span's start, before this span's healing could lift it back.
+          fallOut(h, meter, bot, player);
           const atWar = getStance(h.state, bot, player) === 'war';
           meter[player] = atWar
             ? Math.max(0, meter[player]! - FAVOUR_WAR_DECAY_PER_DAY * days)
             : Math.min(FAVOUR_BASE, meter[player]! + FAVOUR_HEAL_PER_DAY * days);
-          if (meter[player]! < FAVOUR_WAR && !atWar) {
-            setStance(h.state, bot, player, 'war');
-            meter[player] = FAVOUR_EMBARGO; // vent: hostile now, but above the war line
-            h.emit('diplomacy.changed', { a: bot, b: player, stance: 'war' });
-          }
         }
       }
     });

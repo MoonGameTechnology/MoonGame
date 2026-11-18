@@ -154,6 +154,7 @@ export {
   FAVOUR_HEAL_PER_DAY,
   botFavour,
   botEmbargoes,
+  favourBelow,
 } from '../../packages/shared-core/src/index';
 export { approvalView } from './botFavour';
 

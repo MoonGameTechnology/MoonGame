@@ -100,7 +100,10 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '112'; // Туман: порядок тот же; `visibility` 2.7.0 —
+export const MODULE_MANIFEST_VERSION = '113'; // Боты: порядок тот же; `bot-diplomacy` 0.3.0 —
+// порог расположения читается с допуском 1e-9, а война за пойманного шпиона объявляется сразу и
+// в начале отрезка, до лечения. Партия на 112 могла бы зависеть от того, как нарезано время.
+// export const MODULE_MANIFEST_VERSION = '112'; // Туман: порядок тот же; `visibility` 2.7.0 —
 // память о флоте снимается в миг потери из виду, обследование провинции метится мигом
 // пересечения границы, а не концом отрезка. Партия на 111 помнила бы флот иначе.
 // export const MODULE_MANIFEST_VERSION = '111'; // PE-2.2: порядок тот же; `economy` 1.6.0 —

@@ -50,6 +50,7 @@ import {
   FAVOUR_BASE,
   FAVOUR_EMBARGO,
   FAVOUR_WAR,
+  favourBelow,
   hasMapShare,
   hasMapShareOffer,
   HOUR,
@@ -392,7 +393,7 @@ function favourBarHtml(bot: string): string {
   const pct = clamp(f / FAVOUR_BASE, 0, 1) * 100;
   const embPct = (FAVOUR_EMBARGO / FAVOUR_BASE) * 100;
   const warPct = (FAVOUR_WAR / FAVOUR_BASE) * 100;
-  const tier = f < FAVOUR_WAR ? 'war' : f < FAVOUR_EMBARGO ? 'embargo' : 'ok';
+  const tier = favourBelow(f, FAVOUR_WAR) ? 'war' : favourBelow(f, FAVOUR_EMBARGO) ? 'embargo' : 'ok';
   const label =
     tier === 'war'
       ? t('comms.favour.brink')

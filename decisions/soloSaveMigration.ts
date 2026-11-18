@@ -850,6 +850,18 @@ export const FOG_INSTANT_SOLO_MIGRATION = {
   toDataHash: ARREARS_INSTANT_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: bot-diplomacy 0.3.0 — favour thresholds allow 1e-9 of float dust, and a
+ *  bot that a caught spy sinks under the war line declares war at once, checked again at a
+ *  span's start before healing. How time is cut no longer decides it (PE-2.2). */
+export const BOT_FAVOUR_LINE_SOLO_MIGRATION = {
+  fromRules: FOG_INSTANT_SOLO_MIGRATION.toRules,
+  fromData: FOG_INSTANT_SOLO_MIGRATION.toData,
+  fromDataHash: FOG_INSTANT_SOLO_MIGRATION.toDataHash,
+  toRules: '1b05ec284f4729',
+  toData: FOG_INSTANT_SOLO_MIGRATION.toData,
+  toDataHash: FOG_INSTANT_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -923,6 +935,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   LINE_PER_POWER_SOLO_MIGRATION,
   ARREARS_INSTANT_SOLO_MIGRATION,
   FOG_INSTANT_SOLO_MIGRATION,
+  BOT_FAVOUR_LINE_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without
