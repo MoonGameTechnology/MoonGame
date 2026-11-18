@@ -288,8 +288,8 @@ describe('три стиля кнопок (UIX-11.1)', () => {
     expect(html).toMatch(/data-sx="cancel" class="cbtn btn-quiet"/);
   });
 
-  it('окно боя: «Атаковать всеми» — главная, отход и атака стороны — вторичные', () => {
-    const side = (owner: string, role: 'attacker' | 'defender', mine: boolean) => ({
+  it('окно боя: главная одна — «В атаку» флота или «Атака всеми»; отход и сведения вторичные', () => {
+    const side = (owner: string, role: 'attacker' | 'defender', mine: boolean, n = 1) => ({
       owner,
       ownerName: owner,
       ownerFaction: 'x',
@@ -297,27 +297,37 @@ describe('три стиля кнопок (UIX-11.1)', () => {
       units: [{ unit: 'cruiser', count: 3 }],
       mine,
       role,
-      ref: { kind: 'fleet' as const, fleetId: `${owner}-1` },
+      ref: { kind: 'fleet' as const, fleetId: `${owner}-${n}` },
     });
-    const sides = [side('p1', 'defender', true), side('p2', 'attacker', false)];
-    const m = {
-      kind: 'battle',
-      id: 'b1',
-      location: 'L',
-      phase: 'orbital',
-      round: 1,
-      nextRoundAt: 9000,
-      sides,
-      attacker: sides[1],
-      defender: sides[0],
-    } as unknown as BattleModel;
-    const html = battleWindowHtml(m, ['p1-1']);
-    const toggles = /class="bw-(expand|effect-toggle|more|rules-toggle)\b|class="ptile/;
-    expect(unstyled(html).filter((tag) => !toggles.test(tag))).toEqual([]);
-    expect(html).toMatch(/class="b bw-attack btn-main" data-battle-attack-all/);
-    expect(html).toMatch(/class="b btn-second" data-battle-retreat-all/);
-    expect(html).toMatch(/class="b bw-attack btn-second" data-battle-attack=/);
-    expect(html).toMatch(/class="b btn-second" data-battle-retreat=/);
+    const model = (sides: ReturnType<typeof side>[]) =>
+      ({
+        kind: 'battle',
+        id: 'b1',
+        location: 'L',
+        phase: 'orbital',
+        round: 1,
+        nextRoundAt: 9000,
+        sides,
+        attacker: sides[1],
+        defender: sides[0],
+      }) as unknown as BattleModel;
+    // Плитки сторон и фильтры стрелок — переключатели схемы, а не кнопки действия.
+    const toggles =
+      /class="bw-(expand|effect-toggle|more|rules-toggle|ft|tog|seg-b)\b|class="ptile/;
+    const one = battleWindowHtml(model([side('p1', 'defender', true), side('p2', 'attacker', false)]), ['p1-1']);
+    expect(unstyled(one).filter((tag) => !toggles.test(tag))).toEqual([]);
+    expect(one).toMatch(/class="b bw-ot bw-attack btn-main" data-battle-attack=/);
+    expect(one).toMatch(/class="b bw-ot btn-second" data-battle-retreat=/);
+    expect(one).toMatch(/class="b bw-ot btn-second" data-battle-info=/);
+    expect(one.match(/btn-main/g)).toHaveLength(1);
+    const two = battleWindowHtml(
+      model([side('p1', 'defender', true), side('p1', 'attacker', true, 2), side('p2', 'attacker', false)]),
+      ['p1-1', 'p1-2'],
+    );
+    expect(unstyled(two).filter((tag) => !toggles.test(tag))).toEqual([]);
+    expect(two).toMatch(/class="b bw-ot bw-attack btn-main" data-battle-attack-all/);
+    expect(two).toMatch(/class="b bw-ot btn-second" data-battle-retreat-all/);
+    expect(two.match(/btn-main/g)).toHaveLength(1);
   });
 
   it('рынок, штаб героев, корпорация: у каждой кнопки действия — стиль, главная — одна на форму', () => {

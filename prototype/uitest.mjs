@@ -469,7 +469,7 @@ for (const [kind, id] of Object.entries(mod.exports.cards())) {
 }
 const battleScene = mod.exports.battleFixture();
 assert.ok(getEl('battlewin').classList.contains('show'), 'province fallback must not swallow the battle badge');
-assert.equal((getEl('battlewinbody').innerHTML.match(/class="bw-who"/g) ?? []).length, 2);
+assert.equal((getEl('battlewinbody').innerHTML.match(/data-battle-side=/g) ?? []).length, 2);
 assert.ok(getEl('battlewinbody').innerHTML.includes('data-battle-retreat="' + battleScene.own + '"'));
 assert.ok(!getEl('battlewinbody').innerHTML.includes('data-battle-retreat="' + battleScene.foe + '"'));
 // Selection behind the modal is unrelated; retreat still uses its explicit participant.

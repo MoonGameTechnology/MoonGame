@@ -17,8 +17,11 @@ import { inspectBattle } from '../../packages/shared-core/src/state/battleReadou
 import { createBattleModel } from '../../packages/client/src/index';
 import { attackBattle } from '../../decisions/actions';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
+import { devourSieges } from '../../decisions/devourSiege';
+import { heroPortraitHtml } from '../../packages/client/src/heroPortraits';
 import { t } from '../../localization/runtime';
 import { battleRetreats, initBattleWindow } from './battleScreen';
+import type { Side } from './battleSide';
 import { note } from './eventFeed';
 import { unitTileHtml } from './fleetCard';
 import { fleetCallsign } from './fleetName';
@@ -26,9 +29,11 @@ import { esc } from './format';
 import { ctx, data } from './game';
 import { autoRetreatAt } from './groupOrders';
 import { openCodex, openShipCard } from './helpCenter';
+import { unitIconHtml } from './icons';
 import { arm } from './interaction';
 import { ownerColor } from './mapPalette';
 import { playerOrder } from './orderPipeline';
+import { catalogPortraitHtml } from './shipArt';
 import { kernel as soloKernel } from './protoKernel';
 import { invalidatePanel } from './sidePanel';
 import { timeLeft } from './worldQueries';
@@ -55,6 +60,31 @@ let readout: ReturnType<typeof inspectBattle> = {};
 let readoutId = '';
 let readoutAt = -Infinity;
 
+/** Лик плитки стороны: портрет героя, который ведёт флот, иначе самый крупный род войск —
+ *  наземным портрет из каталога, кораблям силуэт. */
+function sideIcon(side: Side, color: string): string {
+  const s = game.world();
+  const fleetId = side.ref?.kind === 'fleet' ? side.ref.fleetId : undefined;
+  const hero = fleetId
+    ? Object.values(s.heroes ?? {}).find((h) => h.fleetId === fleetId && h.alive !== false)
+    : undefined;
+  const face = hero ? heroPortraitHtml(hero.archetype) : '';
+  if (face) return face;
+  let lead: string | undefined;
+  let best = -Infinity;
+  for (const u of side.stacks ?? side.units) {
+    const hp = data.units[u.unit]?.stats.hp ?? 0;
+    if (u.count > 0 && hp > best) {
+      best = hp;
+      lead = u.unit;
+    }
+  }
+  if (!lead) return '';
+  if (data.units[lead]?.domain === 'ground')
+    return catalogPortraitHtml('u', lead, data, 'thumb', side.ownerFaction) || unitIconHtml(lead, data, color);
+  return unitIconHtml(lead, data, color, 22, side.ownerFaction);
+}
+
 export function battleRetreatAim(): string | null {
   return retreatAim;
 }
@@ -79,6 +109,7 @@ export function initBattleView(host: BattleViewHost): void {
     root: () => root,
     body: () => document.getElementById('battlewinbody') as HTMLElement,
     head: () => document.getElementById('battlewinhead') as HTMLElement,
+    sheet: () => document.getElementById('battlewinsheet'),
     state: () => game.world(),
     me: () => game.me(),
     model: (id) => {
@@ -125,6 +156,20 @@ export function initBattleView(host: BattleViewHost): void {
       placeName: (id) => game.placeName(id),
       autoRetreatAt,
       timeLeft,
+      icon: sideIcon,
+      hostile: (a, b) => battleHostility(game.world())(a, b),
+      isGround: (unit) => data.units[unit]?.domain === 'ground',
+      siege: (planetId) => {
+        const mark = devourSieges(game.world(), game.me()).find((m) => m.target === planetId);
+        return mark ? { archetype: mark.archetype, until: mark.until } : null;
+      },
+      landingOrder: (planetId) =>
+        (game.world().planets[planetId]?.beachheads ?? []).map((b) => b.owner),
+      charge: (fleetId) => {
+        const s = game.world();
+        const c = s.fleets[fleetId]?.overcharge;
+        return c && c.until > s.time ? c : null;
+      },
       // UIX-6.2: прогноз по текущему составу сторон — новый раунд сам даёт новый прогноз.
       forecast: (sides) => {
         const s = game.world();

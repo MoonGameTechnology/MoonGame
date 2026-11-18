@@ -611,7 +611,7 @@ try {
     for (let i = 0; i < 200 && (await page.evaluate(() => window.__szTest.battles())); i++)
       await page.evaluate(() => window.__szTest.skip(5));
     await page.locator('#battlewinbody .bw-ended').waitFor({ state: 'visible' });
-    assert.ok(await page.locator('#battlewinbody .bw-who').count() > 0, 'после боя окно держит снимок сторон');
+    assert.ok(await page.locator('#battlewinbody .bw-ft').count() > 0, 'после боя окно держит снимок сторон');
     await page.locator('#battlewin .tw-close').click();
 
     // 2. Обычная схватка на основной странице — те же кнопки на месте.

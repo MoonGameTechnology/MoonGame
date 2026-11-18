@@ -1,48 +1,69 @@
 /**
- * ОКНО БОЯ — кто дерётся за этот узел и какими силами (заказ владельца 2026-09-15).
+ * ОКНО БОЯ — кто дерётся за этот узел и какими силами (заказ владельца 2026-09-15; схема
+ * рядами — заказ 2026-11-17, макет v5).
  *
- * До него расклад боя можно было увидеть ровно одним путём: выделить СВОЙ флот, который
- * в этом бою стоит. То есть про чужую схватку рядом узнать было нечем, а про свою
- * приходилось сперва попасть пальцем по кораблю — и это в игре, где значок боя на карте
- * уже висит и уже показывает отсчёт до следующего раунда.
- *
- * Окно открывается тапом по этому значку (`decisions/battleTap.ts`) и показывает то, чего
- * карточка флота показать не могла: ВСЕ стороны разом, с ролями и силами. Именно это стало
- * возможным после MSB-6 — модель панели (`createBattleModel`) отдаёт `sides` списком, а не
- * парой «атакующий/обороняющийся».
+ * Окно открывается тапом по значку боя на карте (`decisions/battleTap.ts`) и показывает то,
+ * чего карточка флота показать не могла: ВСЕ стороны разом, с ролями и силами.
  *
  * Форма та же, что у остальных REFM-экранов: всё, что только считает и верстает, — чистая
  * экспортируемая функция (проверяется без DOM), а `initBattleWindow(host)` берёт
  * зависимости явно.
  *
- * 1. **Ролю берём У СТОРОНЫ, а не из места в списке.** Атакующих может быть несколько
+ * 1. **Схема рядами, а не колонки карточек.** Сверху — противники, снизу — свои, каждая
+ *    сторона — маленькая плитка; стрелки показывают, куда идут НАШИ залпы (куда целится
+ *    враг — не видно). Кто в каком ряду и что видно — `decisions/battleScheme.ts`,
+ *    разметка — `battleRows.ts`, стрелки — `battleArrows.ts`.
+ * 2. **Всё о стороне — в её листе по нажатию на плитку**: корпус, щит, урон, эффекты,
+ *    состав. На телефоне лист выезжает снизу поверх схемы, на ПК встаёт панелью справа и
+ *    схему не закрывает.
+ * 3. **Приказы — плитками внизу, для выделенного своего флота.** Свой флот один — он выделен
+ *    сразу; своих несколько — внизу «Атака всеми» и «Отступить всеми», пока не выбран один.
+ * 4. **Ролю берём У СТОРОНЫ, а не из места в списке.** Атакующих может быть несколько
  *    (MSB-3/MSB-4), и порядок о роли не говорит ничего.
- * 2. **Своя сторона помечена.** В свалке на пять сторон «где я» — первый вопрос игрока, и
- *    искать себя по имени владельца в списке одинаковых строк было бы мучением.
- * 3. **Прогноз — в своём бою, сколько бы в нём ни было сторон (UIX-6.2, UIX-6.3).** Над
- *    колонками стоит итог словом, срок и потери (`decisions/battleForecast.ts`). Он
- *    считается от текущего состава, поэтому новый раунд сам даёт новый прогноз, а в бою
- *    трёх сторон и больше досчитывает цепочку: после гибели выжившие сцепляются заново.
- *    Для этого окно отдаёт прогнозу владельцев (вражду), союзников своей колонки (их
- *    победа — моя победа), id флотов (кто нападёт в новом звене) и гарнизон (кто держит
- *    мир). В чужом бою прогноза нет: победа и поражение бывают только у своей стороны.
- * 4. **Пустое окно не открывается молча.** Бой мог кончиться, пока палец летел к экрану;
+ * 5. **Прогноз — в своём бою, сколько бы в нём ни было сторон (UIX-6.2, UIX-6.3).** Он
+ *    считается от текущего состава, поэтому новый раунд сам даёт новый прогноз. В чужом
+ *    бою прогноза нет: победа и поражение бывают только у своей стороны.
+ * 6. **Пустое окно не открывается молча.** Бой мог кончиться, пока палец летел к экрану;
  *    честная строка лучше пустой рамки.
- * 5. **Правила — под «?», на виду одна строка (UIX-6.2).** Цена отхода нужна в момент
- *    решения, поэтому видна она; остальное (отход не добивает, десант не отступает, как
- *    ходят залпы) раскрывается нажатием и остаётся открытым между раундами.
+ * 7. **Правила — под «?», на виду одна строка (UIX-6.2).** Цена отхода нужна в момент
+ *    решения, поэтому видна она; остальное раскрывается нажатием.
  */
 import { t } from '../../localization/runtime';
 import { esc, displayUnit, fmtHrs, kfmt, runClockShown } from './format';
 import { runRealSeconds } from '../../decisions/runClock';
-import type { ForecastSide } from '../../decisions/battleForecast';
 import type { EngageForecastCard } from '../../decisions/engageForecast';
-import { hullTone, meterShare, powerShares } from '../../decisions/battleBalance';
+import { hullTone, meterShare } from '../../decisions/battleBalance';
 import { veteranBadge } from '../../decisions/veteranBadge';
-import { combatantKey, landingBattleOf } from '../../packages/shared-core/src/state/battle';
-import { safeHexColor, COLOR } from './sideColors';
+import { visibleVolleys } from '../../decisions/battleScheme';
+import { landingBattleOf } from '../../packages/shared-core/src/state/battle';
 import type { GameState, PlayerId } from '../../packages/shared-core/src/index';
 import type { BattleModel } from '../../packages/client/src/matchHud';
+import {
+  ownerLabel,
+  sideAlive,
+  sideColor,
+  sideFleetId,
+  sideKey,
+  sideKindLabel,
+  sideName,
+  type BattleView,
+  type Side,
+} from './battleSide';
+import {
+  boardHtml,
+  filtersHtml,
+  ordersHtml,
+  schemeArrows,
+  schemeHtml,
+  schemeLayout,
+  shareLabel,
+  shownArrows,
+  type Lane,
+  type SchemeArrow,
+} from './battleRows';
+import { drawSchemeArrows } from './battleArrows';
+
+export type { BattleView } from './battleSide';
 
 /** Что окну нужно от хоста — ровно и только это. */
 export interface BattleWindowHost {
@@ -51,6 +72,8 @@ export interface BattleWindowHost {
   /** Заголовок в шапке окна — туда пишется {@link battleHeadHtml}. Нет узла — шапка
    *  остаётся той, что в разметке. */
   head?: () => HTMLElement | null;
+  /** Место листа стороны (правило 2). Нет узла — лист дописывается в конец тела. */
+  sheet?: () => HTMLElement | null;
   state: () => GameState;
   me: () => PlayerId;
   /** Модель боя (из `@void/client`), либо null — бой исчез или под туманом. */
@@ -62,34 +85,6 @@ export interface BattleWindowHost {
    *  рисуется нейтральным цветом, сырым id и без строки авто-отхода. */
   view?: BattleView;
 }
-
-/** Как хост называет и красит то, что окно показывает. */
-export interface BattleView {
-  /** The same unit tile renderer used by fleet and garrison cards. */
-  tiles?: (side: Side, limit: number, color: string) => string;
-  ownerName?: (owner: string | null) => string;
-  /** Цвет владельца — тот же, что у его флотов и границ на карте. */
-  color?: (owner: string | null) => string;
-  /** Позывной флота вместо сырого id. */
-  fleetName?: (fleetId: string) => string;
-  /** Имя мира, за который бой. */
-  placeName?: (planetId: string) => string;
-  /** Порог авто-отхода флота (доля корпуса) или null — приказа нет. */
-  autoRetreatAt?: (fleetId: string) => number | null;
-  /** Остаток до отметки времени мира — текст отсчёта до следующего раунда. */
-  timeLeft?: (at: number) => string;
-  /** UIX-6.2: прогноз боя по текущему составу сторон (`decisions/battleForecast.ts`). */
-  forecast?: (sides: readonly ForecastSide[]) => EngageForecastCard | null;
-}
-
-type Side = BattleModel['sides'][number];
-
-/** Имя владельца стороны словами игрока: модель несёт `player.name` из состояния — имя дома
- *  из данных, английское («Azure Compact»), — а перевод знает хост (UIX-5.3). */
-const ownerLabel = (side: Side, view: BattleView): string =>
-  view.ownerName?.(side.owner) ?? side.ownerName;
-
-const NEUTRAL = '#8aa0ad';
 
 /** Словом рядом с цветом шкалы: цвет не единственный носитель смысла. */
 const TONE_KEY = {
@@ -122,16 +117,16 @@ export interface BattleWindowOptions {
   retreats?: readonly string[];
   /** Раскрыты ли правила под «?» (UIX-6.2). */
   rules?: boolean;
-}
-
-function sideKey(side: Side): string {
-  return side.key ?? (side.ref ? combatantKey(side.ref) : `${side.kind}:${side.owner}`);
-}
-
-function sideColor(side: Side, view: BattleView): string {
-  if (side.mine) return safeHexColor(view.color?.(side.owner), COLOR.p1!);
-  if (side.relation === 'ally') return COLOR.ally!;
-  return safeHexColor(view.color?.(side.owner), side.relation === 'neutral' ? NEUTRAL : '#ff5a4d');
+  /** Выделенная своя сторона; `null` — «все флоты», нет — по умолчанию (правило 3). */
+  sel?: string | null;
+  /** Сторона, чей лист открыт (правило 2). */
+  sheet?: string | null;
+  /** Чьи стрелки: все наши или только мои. */
+  arrows?: 'all' | 'mine';
+  /** Рисовать ли ответы пунктиром. */
+  replies?: boolean;
+  /** Раскрытые ряды «+N». */
+  openLanes?: ReadonlySet<Lane>;
 }
 
 function sourceName(source: string): string {
@@ -176,7 +171,8 @@ function effectsHtml(side: Side, view: BattleView, open: boolean): string {
   );
 }
 
-/** Hull, shield, damage, effects and commands stay visible when tiles are folded. */
+/** Лист стороны: корпус, щит, урон, эффекты и состав. Приказов в листе нет — они плитками
+ *  внизу окна (правило 3); строка авто-отхода своего флота остаётся здесь. */
 export function sideRowHtml(
   side: Side,
   view: BattleView = {},
@@ -186,17 +182,9 @@ export function sideRowHtml(
   const expanded = options.expanded?.has(key) ?? true;
   const count = (side.stacks ?? side.units).filter((u) => u.count > 0).length;
   const full = options.fullComposition?.has(key) ?? false;
-  const ref = side.ref;
-  const fleetId = ref && (ref.kind === 'fleet' || ref.kind === 'landing') ? ref.fleetId : undefined;
-  const kind =
-    side.kind === 'garrison'
-      ? t('side.battle.side.garrison')
-      : side.kind === 'landing'
-        ? t('side.battle.side.landing')
-        : side.kind === 'beachhead'
-          ? t('battle.win.beachhead')
-          : t('side.battle.side.fleet');
-  const name = fleetId ? (view.fleetName?.(fleetId) ?? fleetId) : kind;
+  const fleetId = sideFleetId(side);
+  const kind = sideKindLabel(side);
+  const name = sideName(side, view);
   const badge = side.mine
     ? t('battle.win.you')
     : side.relation === 'ally'
@@ -220,8 +208,7 @@ export function sideRowHtml(
         .map((u) => `<span class="bw-unit"><b>${u.count}×</b> ${esc(displayUnit(u.unit))}</span>`)
         .join(''))
     : '';
-  const canRetreat = fleetId && options.retreats?.includes(fleetId);
-  const autoAt = fleetId ? view.autoRetreatAt?.(fleetId) : undefined;
+  const autoAt = side.mine && fleetId ? view.autoRetreatAt?.(fleetId) : undefined;
   return (
     `<article class="bw-side${side.mine ? ' mine' : ''} ${side.role}" style="--own:${esc(col)}">` +
     `<div class="bw-who"><div><b>${esc(name)}</b><small>${esc(ownerLabel(side, view))} · ${esc(kind)}</small></div>` +
@@ -239,6 +226,9 @@ export function sideRowHtml(
         ? `<p class="bw-response">⛨ ${esc(t('battle.win.response'))}</p>`
         : `<div class="bw-clock"><span>${esc(t('battle.win.next-attack'))}</span><b class="pn-timer" data-at="${side.nextAttackAt ?? ''}">…</b></div>`
       : '') +
+    (autoAt !== undefined
+      ? `<p class="bw-auto">${esc(autoAt === null ? t('battle.win.auto.off') : t('battle.win.auto.on', { n: Math.round(autoAt * 100) }))}</p>`
+      : '') +
     effectsHtml(side, view, options.effects?.has(key) ?? false) +
     `<button class="bw-expand" data-battle-expand="${esc(key)}" aria-expanded="${expanded}">${expanded ? '▾' : '▸'} ${esc(t('battle.win.composition', { n: count }))}</button>` +
     (expanded
@@ -247,47 +237,11 @@ export function sideRowHtml(
           ? `<button class="bw-more" data-battle-more="${esc(key)}">${esc(full ? t('battle.win.less') : t('battle.win.more', { n: count - 16 }))}</button>`
           : '')
       : '') +
-    (side.mine && !options.ended
-      ? `<div class="bw-actions">` +
-        `<button class="b bw-attack btn-second" data-battle-attack="${esc(key)}"${side.role === 'attacker' ? ' disabled' : ''}>${esc(t(side.role === 'attacker' ? 'battle.win.attacking' : 'battle.win.attack'))}</button>` +
-        `<button class="b btn-second" data-battle-retreat="${esc(fleetId ?? '')}"${canRetreat ? '' : ' disabled'}>${esc(t('side.battle.retreat'))}</button></div>` +
-        (fleetId && autoAt !== undefined
-          ? `<p class="bw-auto">${esc(autoAt === null ? t('battle.win.auto.off') : t('battle.win.auto.on', { n: Math.round(autoAt * 100) }))}</p>`
-          : '')
-      : '') +
     `</article>`
   );
 }
 
-/** Полоса «запас прочности»: доли сторон цветами владельцев. Меньше двух долей — нет.
- *  Свою долю отличает не только цвет (UIX-12.1): она заштрихована, а в подписи стоит
- *  метка «Вы» — при цветослепоте зелёный и красный сливаются. */
-function balanceHtml(sides: readonly Side[], view: BattleView): string {
-  const shares = powerShares(sides);
-  if (shares.length < 2) return '';
-  const col = (s: Side): string => esc(view.color?.(s.owner) ?? NEUTRAL);
-  return (
-    `<div class="bw-balance"><p class="bw-sub">${esc(t('battle.win.balance'))}</p><div class="bw-bal">` +
-    sides
-      .map(
-        (s, i) =>
-          `<i${s.mine ? ' class="mine"' : ''} style="flex:${(shares[i] ?? 0).toFixed(4)};background:${col(s)}"></i>`,
-      )
-      .join('') +
-    `</div><div class="bw-legend">` +
-    sides
-      .map(
-        (s, i) =>
-          `<span${s.mine ? ' class="mine"' : ''}><i style="background:${col(s)}"></i>` +
-          (s.mine ? `<em class="bw-you">${esc(t('battle.win.you'))}</em>` : '') +
-          `${esc(ownerLabel(s, view))} ${Math.round((shares[i] ?? 0) * 100)}%</span>`,
-      )
-      .join('') +
-    `</div></div>`
-  );
-}
-
-/** Прогноз (правило 3): слово итога, срок и потери; цвет лишь дублирует слово. */
+/** Прогноз (правило 5): слово итога, срок и потери; цвет лишь дублирует слово. */
 function forecastHtml(c: EngageForecastCard | null | undefined): string {
   if (!c) return '';
   return (
@@ -296,7 +250,7 @@ function forecastHtml(c: EngageForecastCard | null | undefined): string {
   );
 }
 
-/** Правила под «?» (правило 5): строка на виду и есть кнопка, подробности — по нажатию. */
+/** Правила под «?» (правило 7): строка на виду и есть кнопка, подробности — по нажатию. */
 function rulesHtml(line: string, detail: readonly string[], open: boolean): string {
   return (
     `<button class="bw-rules-toggle" data-battle-rules aria-expanded="${open}"><span>${esc(line)}</span><i aria-hidden="true">?</i></button>` +
@@ -305,9 +259,8 @@ function rulesHtml(line: string, detail: readonly string[], open: boolean): stri
 }
 
 /**
- * Шапка окна: где бой, фаза и сколько сторон (заказ владельца 2026-09-28). Раньше то же
- * самое стояло отдельной карточкой над полосой сил и съедало её высоту, хотя в шапке
- * рядом с «Бой» место и так было. Нет модели — просто «Бой».
+ * Шапка окна: где бой, фаза и сколько сторон (заказ владельца 2026-09-28). Нет модели —
+ * просто «Бой».
  */
 export function battleHeadHtml(m: BattleModel | null, view: BattleView = {}): string {
   if (!m) return `<b>${esc(t('battle.win.head'))}</b>`;
@@ -318,7 +271,28 @@ export function battleHeadHtml(m: BattleModel | null, view: BattleView = {}): st
   );
 }
 
-/** Two visual columns only: diplomacy and attack targets stay per participant. */
+/** Прогноз по текущему составу сторон (правило 5); в кончившемся бою — нет. */
+function windowForecast(m: BattleModel, view: BattleView, options: BattleWindowOptions): string {
+  if (options.ended) return '';
+  return forecastHtml(
+    view.forecast?.(
+      m.sides.map((s) => ({
+        mine: s.mine,
+        ...(s.relation === 'ally' ? { ally: true } : {}),
+        role: s.role,
+        ...(s.attackOrdered ? { attackOrdered: true } : {}),
+        ...(s.nextAttackAt !== undefined ? { nextAttackAt: s.nextAttackAt } : {}),
+        units: s.stacks ?? s.units,
+        owner: s.owner,
+        ...(s.ref?.kind === 'fleet' ? { key: s.ref.fleetId } : {}),
+        ...(s.kind === 'garrison' ? { holds: true } : {}),
+        ...(s.fortress ? { fortress: s.fortress } : {}),
+      })),
+    ),
+  );
+}
+
+/** Тело окна: табло, фильтры стрелок, схема рядами, правила и плитки приказов. */
 export function battleWindowHtml(
   m: BattleModel | null,
   retreats: readonly string[] = [],
@@ -326,52 +300,18 @@ export function battleWindowHtml(
   options: BattleWindowOptions = {},
 ): string {
   if (!m) return `<p class="bw-empty">${esc(t('battle.win.empty'))}</p>`;
+  const opts = { ...options, retreats };
+  const layout = schemeLayout(m, view, opts);
+  const arrows = schemeArrows(m, view, opts, layout);
   const ground = m.phase === 'ground';
-  const friends = m.sides.filter((s) => s.mine || s.relation === 'ally');
-  const others = m.sides.filter((s) => !s.mine && s.relation !== 'ally');
-  const expanded =
-    options.expanded ?? new Set([friends[0], others[0]].filter((s): s is Side => !!s).map(sideKey));
-  const renderColumn = (sides: Side[], title: string): string =>
-    `<section class="bw-column"><h3>${esc(title)} <span>${sides.length}</span></h3>` +
-    sides.map((s) => sideRowHtml(s, view, { ...options, expanded, retreats })).join('') +
-    '</section>';
-  const canAttack = m.sides.some((s) => s.mine && s.role === 'defender');
   const orders = !options.ended && m.sides.some((s) => s.mine);
   const rule = runClockShown()
     ? t('battle.win.rule.run', { n: runRealSeconds(3_600_000) })
     : t('battle.win.rule');
   return (
-    balanceHtml(m.sides, {
-      ...view,
-      color: (owner) =>
-        sideColor(
-          m.sides.find((s) => s.owner === owner)!,
-          view,
-        ),
-    }) +
-    (options.ended
-      ? ''
-      : forecastHtml(
-          view.forecast?.(
-            m.sides.map((s) => ({
-              mine: s.mine,
-              ...(s.relation === 'ally' ? { ally: true } : {}),
-              role: s.role,
-              ...(s.attackOrdered ? { attackOrdered: true } : {}),
-              ...(s.nextAttackAt !== undefined ? { nextAttackAt: s.nextAttackAt } : {}),
-              units: s.stacks ?? s.units,
-              owner: s.owner,
-              ...(s.ref?.kind === 'fleet' ? { key: s.ref.fleetId } : {}),
-              ...(s.kind === 'garrison' ? { holds: true } : {}),
-              ...(s.fortress ? { fortress: s.fortress } : {}),
-            })),
-          ),
-        )) +
-    `<div class="bw-columns">${renderColumn(friends, t('battle.win.allies'))}${renderColumn(others, t('battle.win.opponents'))}</div>` +
-    (orders
-      ? `<div class="bw-orders"><button class="b bw-attack btn-main" data-battle-attack-all${canAttack ? '' : ' disabled'}>${esc(t('battle.win.attack-all'))}</button>` +
-        `<button class="b btn-second" data-battle-retreat-all${retreats.length ? '' : ' disabled'}>${esc(t('battle.win.retreat-all'))}</button></div>`
-      : '') +
+    boardHtml(m, view, opts, layout, windowForecast(m, view, options)) +
+    filtersHtml(arrows, opts) +
+    schemeHtml(view, opts, layout, arrows.length === 0) +
     rulesHtml(
       !orders
         ? t('battle.win.rules')
@@ -380,15 +320,71 @@ export function battleWindowHtml(
           : t('battle.win.retreat-cost'),
       orders && !ground ? [t('battle.win.retreat-rules'), rule] : [rule],
       options.rules ?? false,
-    )
+    ) +
+    ordersHtml(m, view, opts, layout)
   );
 }
 
-/** Current membership, never the unrelated fleet selected behind the window. */
+/** Стрелки, которые окно рисует сейчас: видимые игроку и прошедшие фильтры. */
+export function battleWindowArrows(
+  m: BattleModel | null,
+  view: BattleView = {},
+  options: BattleWindowOptions = {},
+): SchemeArrow[] {
+  if (!m) return [];
+  return shownArrows(schemeArrows(m, view, options, schemeLayout(m, view, options)), options);
+}
+
+/** По кому бьёт сторона — строкой листа: свои — целями с долями, враг — «не видно». */
+function aimLine(m: BattleModel, side: Side, view: BattleView): string {
+  if (side.role !== 'attacker' || !sideAlive(side)) return '';
+  if (!side.mine && side.relation !== 'ally')
+    return `<p class="bw-aim">${esc(t('battle.win.aim-hidden'))}</p>`;
+  const key = sideKey(side);
+  const hostile = view.hostile ?? ((a, b) => a !== b);
+  const seats = m.sides.map((s) => ({
+    key: sideKey(s),
+    owner: s.owner,
+    mine: s.mine,
+    ally: s.relation === 'ally',
+    attacks: s.role === 'attacker',
+    alive: sideAlive(s),
+  }));
+  const names = visibleVolleys(seats, hostile)
+    .filter((v) => !v.reply && v.from === key)
+    .map((v) => {
+      const target = m.sides.find((s) => sideKey(s) === v.to);
+      const name = target ? sideName(target, view) : v.to;
+      return v.of > 1 ? `${name} (${shareLabel(v.of)})` : name;
+    });
+  return names.length
+    ? `<p class="bw-aim">${esc(t('battle.win.hits', { list: names.join(', ') }))}</p>`
+    : '';
+}
+
+/** Лист стороны (правило 2) или пусто, когда лист закрыт или стороны больше нет. */
+export function battleSheetHtml(
+  m: BattleModel | null,
+  view: BattleView = {},
+  options: BattleWindowOptions = {},
+): string {
+  const side = m?.sides.find((s) => sideKey(s) === options.sheet);
+  if (!m || !side) return '';
+  return (
+    `<div class="bw-sheet-dim" data-battle-sheet-close></div>` +
+    `<section class="bw-sheet" aria-label="${esc(sideName(side, view))}">` +
+    `<div class="bw-sheet-h"><span class="bw-grab" aria-hidden="true"></span>` +
+    `<button class="bw-sheet-x btn-x" data-battle-sheet-close aria-label="${esc(t('card.close'))}">✕</button></div>` +
+    sideRowHtml(side, view, options) +
+    (options.ended ? '' : aimLine(m, side, view)) +
+    `</section>`
+  );
+}
+
 /**
  * Бой кончился, пока окно открыто (решение владельца 2026-09-25): итог строкой журнала и
  * последний снимок сторон под ним — до закрытия, а не «об этом бое ничего не известно».
- * Отсчёта раунда и кнопок отхода нет: раундов больше не будет, отходить не из чего.
+ * Отсчёта раунда, стрелок и приказов нет: раундов больше не будет, отходить не из чего.
  */
 export function battleEndedHtml(
   last: BattleModel | null,
@@ -402,6 +398,7 @@ export function battleEndedHtml(
   return banner + battleWindowHtml(still, [], view, { ...options, ended: true });
 }
 
+/** Current membership, never the unrelated fleet selected behind the window. */
 export function battleRetreats(state: GameState, id: string, me: PlayerId): string[] {
   return (state.battles[id]?.sides ?? []).flatMap((side) =>
     state.battles[id]?.phase === 'orbital' &&
@@ -428,43 +425,71 @@ export function initBattleWindow(host: BattleWindowHost): {
   let summary: string | null = null;
   const isOpen = (): boolean => host.root().classList.contains('show');
   let lastHtml = '';
+  let lastSheet = '';
   let lastHead = '';
   let expanded: Set<string> | undefined;
   const fullComposition = new Set<string>();
   const effects = new Set<string>();
+  const openLanes = new Set<Lane>();
   let rules = false;
+  let sel: string | null | undefined;
+  let sheet: string | null = null;
+  let arrowsPick: 'all' | 'mine' = 'all';
+  let replies = true;
+  /** Стрелки последней отрисовки: перерисовываются по месту плиток, когда меняется окно. */
+  let arrows: SchemeArrow[] = [];
+  const options = (): BattleWindowOptions => ({
+    ...(expanded ? { expanded } : {}),
+    fullComposition,
+    effects,
+    rules,
+    ...(sel !== undefined ? { sel } : {}),
+    sheet,
+    arrows: arrowsPick,
+    replies,
+    openLanes,
+  });
+  const sheetHost = (): HTMLElement | null => host.sheet?.() ?? null;
+  const draw = (): void => {
+    const scheme = host.body().querySelector<HTMLElement>('.bw-scheme');
+    if (scheme) drawSchemeArrows(scheme, arrows);
+  };
   const repaint = (): void => {
     if (!isOpen() || shown === null) return;
     const model = host.model(shown);
-    if (model) {
-      lastModel = model;
-      expanded ??= new Set(
-        [
-          model.sides.find((s) => s.mine || s.relation === 'ally'),
-          model.sides.find((s) => !s.mine && s.relation !== 'ally'),
-        ]
-          .filter((s): s is Side => !!s)
-          .map(sideKey),
-      );
-    }
-    const options = { expanded, fullComposition, effects, rules };
-    const html =
-      !model && summary !== null
-        ? battleEndedHtml(lastModel, summary, host.view, options)
-        : battleWindowHtml(
-            model,
-            model ? battleRetreats(host.state(), shown, host.me()) : [],
-            host.view,
-            options,
-          );
-    if (html !== lastHtml) {
+    if (model) lastModel = model;
+    const ended = !model && summary !== null;
+    const opts = options();
+    const html = ended
+      ? battleEndedHtml(lastModel, summary!, host.view, opts)
+      : battleWindowHtml(
+          model,
+          model ? battleRetreats(host.state(), shown, host.me()) : [],
+          host.view,
+          opts,
+        );
+    const snapshot = ended ? lastModel : model;
+    const sheetHtml = battleSheetHtml(snapshot, host.view, { ...opts, ended });
+    const place = sheetHost();
+    const changed = html !== lastHtml || sheetHtml !== lastSheet;
+    if (html !== lastHtml || (!place && sheetHtml !== lastSheet)) {
       const scroll = host.body().scrollTop;
-      host.body().innerHTML = html;
+      host.body().innerHTML = place ? html : html + sheetHtml;
       host.body().scrollTop = scroll;
       lastHtml = html;
     }
+    if (place && sheetHtml !== lastSheet) {
+      place.innerHTML = sheetHtml;
+      place.hidden = !sheetHtml;
+    }
+    lastSheet = sheetHtml;
+    host.root().classList.toggle('has-sheet', !!sheetHtml);
+    if (changed) {
+      arrows = ended ? [] : battleWindowArrows(model, host.view, opts);
+      draw();
+    }
     // Шапка — по тому же снимку, что и тело: кончившийся бой держит в ней своё место.
-    const head = battleHeadHtml(model ?? (summary !== null ? lastModel : null), host.view);
+    const head = battleHeadHtml(snapshot, host.view);
     if (head !== lastHead) {
       const el = host.head?.();
       if (el) el.innerHTML = head;
@@ -475,19 +500,34 @@ export function initBattleWindow(host: BattleWindowHost): {
     // пришлись на разные кадры, терялось бы. Поэтому узел патчится на месте.
     const left = host.view?.timeLeft;
     if (left)
-      for (const el of Array.from(host.body().querySelectorAll<HTMLElement>('.pn-timer')))
-        el.textContent = el.dataset.at ? left(Number(el.dataset.at)) : '—';
+      for (const root of [host.body(), place])
+        for (const el of Array.from(root?.querySelectorAll<HTMLElement>('.pn-timer') ?? []))
+          el.textContent = el.dataset.at ? left(Number(el.dataset.at)) : '—';
   };
+  if (typeof window !== 'undefined')
+    window.addEventListener('resize', () => {
+      if (isOpen()) draw();
+    });
   host.root().addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
+    const model = shown ? host.model(shown) : null;
+    const snapshot = model ?? (summary !== null ? lastModel : null);
+    if (tg.closest('[data-battle-expand]')) {
+      const key = tg.closest<HTMLElement>('[data-battle-expand]')!.dataset.battleExpand!;
+      // До первого нажатия раскрыт состав каждой стороны: набор заводится из всех ключей.
+      expanded ??= new Set(snapshot?.sides.map(sideKey) ?? []);
+      if (expanded.has(key)) expanded.delete(key);
+      else expanded.add(key);
+      repaint();
+      return;
+    }
     for (const [attr, set] of [
-      ['battleExpand', expanded],
       ['battleMore', fullComposition],
       ['battleEffects', effects],
     ] as const) {
       const name = attr.replace(/[A-Z]/g, (x) => `-${x.toLowerCase()}`);
       const key = tg.closest<HTMLElement>(`[data-${name}]`)?.dataset[attr];
-      if (key && set) {
+      if (key) {
         if (set.has(key)) set.delete(key);
         else set.add(key);
         repaint();
@@ -501,8 +541,59 @@ export function initBattleWindow(host: BattleWindowHost): {
       if (rules) host.body().querySelector('.bw-rules')?.scrollIntoView({ block: 'nearest' });
       return;
     }
-    if (shown && host.model(shown)) {
-      const model = host.model(shown)!;
+    if (tg.closest('[data-battle-sheet-close]')) {
+      sheet = null;
+      repaint();
+      return;
+    }
+    const lane = tg.closest<HTMLElement>('[data-battle-lane]')?.dataset.battleLane as
+      | Lane
+      | undefined;
+    if (lane) {
+      if (openLanes.has(lane)) openLanes.delete(lane);
+      else openLanes.add(lane);
+      repaint();
+      return;
+    }
+    const pick = tg.closest<HTMLElement>('[data-battle-arrows]')?.dataset.battleArrows;
+    if (pick === 'all' || pick === 'mine') {
+      arrowsPick = pick;
+      repaint();
+      return;
+    }
+    if (tg.closest('[data-battle-replies]')) {
+      replies = !replies;
+      repaint();
+      return;
+    }
+    const tile = tg.closest<HTMLElement>('[data-battle-side]')?.dataset.battleSide;
+    if (tile && snapshot) {
+      const side = snapshot.sides.find((s) => sideKey(s) === tile);
+      const current = schemeLayout(snapshot, host.view ?? {}, {
+        ...options(),
+        ended: !model,
+      }).sel;
+      // Своя живая сторона: первый тап выделяет её (приказы внизу), второй — открывает лист.
+      if (side?.mine && sideAlive(side) && model && current !== tile) {
+        sel = tile;
+        sheet = null;
+      } else sheet = sheet === tile ? null : tile;
+      repaint();
+      return;
+    }
+    const info = tg.closest<HTMLElement>('[data-battle-info]')?.dataset.battleInfo;
+    if (info) {
+      sheet = info;
+      repaint();
+      return;
+    }
+    if (tg.closest('[data-battle-unselect]')) {
+      sel = null;
+      sheet = null;
+      repaint();
+      return;
+    }
+    if (shown && model) {
       const attack = tg.closest<HTMLElement>('[data-battle-attack]')?.dataset.battleAttack;
       if (
         attack &&
@@ -529,18 +620,22 @@ export function initBattleWindow(host: BattleWindowHost): {
       }
     }
     const fleet = tg.closest<HTMLElement>('[data-battle-retreat]')?.dataset.battleRetreat;
-    if (
-      fleet &&
-      shown &&
-      host.model(shown) &&
-      battleRetreats(host.state(), shown, host.me()).includes(fleet)
-    ) {
+    if (fleet && shown && model && battleRetreats(host.state(), shown, host.me()).includes(fleet)) {
       host.retreat(fleet);
       repaint();
       return;
     }
     if (tg === host.root() || tg.classList.contains('tw-close')) {
       host.root().classList.remove('show');
+      host.root().classList.remove('has-sheet');
+      // Лист живёт в своём узле: без очистки он пережил бы окно и встал поверх нового боя.
+      const place = sheetHost();
+      if (place) {
+        place.innerHTML = '';
+        place.hidden = true;
+      }
+      sheet = null;
+      lastSheet = '';
       shown = null;
     }
   });
@@ -552,10 +647,17 @@ export function initBattleWindow(host: BattleWindowHost): {
         expanded = undefined;
         fullComposition.clear();
         effects.clear();
+        openLanes.clear();
         rules = false;
+        sel = undefined;
+        sheet = null;
+        arrowsPick = 'all';
+        replies = true;
       }
       shown = battleId;
       lastHtml = '';
+      // Не пустая строка: пустой лист тоже обязан лечь в свой узел при новом открытии.
+      lastSheet = '\u0000';
       lastHead = '';
       host.root().classList.add('show');
       repaint();
