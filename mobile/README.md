@@ -99,6 +99,9 @@ It is a manual diagnostic only and must never enter the signed normal update lan
 The probe has no updater or download control: distribute a separate full-game
 recovery link alongside it. Install that recovery only after testing the probe;
 its greater versionCode prevents installing the older probe again as an update.
+The emulator smoke blocks the probe UID's IPv4/IPv6 traffic before tapping: it
+checks launch, a bounded offline error and retry, without generating live ad views.
+Actual ad playback still requires the owner's on-device check.
 
 Install a new site-aware APK once; subsequent checks read only our HTTPS site:
 `/downloads/android/{alpha|player}/latest.json`. It is a signed envelope
