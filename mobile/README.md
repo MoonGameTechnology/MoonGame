@@ -86,6 +86,17 @@ needs a real (secret) keystore — a later step.
 
 ## In-app auto-update
 
+The manual native ad probe (`minimal-ad/`, workflow `android-ad-probe.yml`) packages
+one Android button plus status, with the same `com.voiddominion.player`, debug
+certificate, slot and SDK privacy settings as the player lane. It temporarily
+replaces the installed player APK; it neither opens nor deletes the game's saved
+data. Prepare a verified full player APK with a greater versionCode before handing
+the probe to the owner, so returning to the game requires no uninstall/downgrade.
+The probe has no game assets, Capacitor runtime, account access or reward grants.
+Its bounded `vk_rewarded_minimal` observations go only to the existing HTTPS
+telemetry receiver; the status also reports whether the terminal log was accepted.
+It is a manual diagnostic only and must never enter the signed normal update lane.
+
 Install a new site-aware APK once; subsequent checks read only our HTTPS site:
 `/downloads/android/{alpha|player}/latest.json`. It is a signed envelope
 `{payload, signature}`: `payload` is the manifest (`versionCode`, `versionName`,

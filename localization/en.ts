@@ -3864,6 +3864,9 @@ export const en: Record<string, string> = {
   'news.title': 'News',
   'news.when.yesterday': 'yesterday, {time}',
   // --- hub — Хаб (экран между матчами): шапка, карточки, плитки «Ещё», нижняя навигация.
+  'hub.ad-preview.minimal-title': 'Ad check',
+  'hub.ad-preview.log-sent': 'Log sent',
+  'hub.ad-preview.log-failed': 'Could not send the log',
   'hub.ad-preview.action': 'Check ads',
   'hub.ad-preview.cancelled': 'Viewing cancelled',
   'hub.ad-preview.earned': 'Viewing completed',

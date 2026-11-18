@@ -72,6 +72,8 @@ const srcFiles = (): string[] => [
   // Host-rendered bot DM templates: the server declares keys, the host owns texts.
   'packages/server/src/botSocial.ts',
   'scripts/botChatText.ts',
+  // The native-only Android probe compiles the same locale keys into Android XML.
+  'mobile/minimal-ad/prepare.mjs',
 ];
 
 /** Шипнутый каталог — ВТОРОЙ источник живых ключей, наравне с исходниками (CONV-12c).

@@ -3873,6 +3873,9 @@ export const ru: Record<string, string> = {
   'news.title': 'Новости',
   'news.when.yesterday': 'вчера, {time}',
   // --- hub — Хаб (экран между матчами): шапка, карточки, плитки «Ещё», нижняя навигация.
+  'hub.ad-preview.minimal-title': 'Проверка рекламы VK',
+  'hub.ad-preview.log-sent': 'Журнал отправлен',
+  'hub.ad-preview.log-failed': 'Не удалось отправить журнал',
   'hub.ad-preview.action': 'Проверить рекламу',
   'hub.ad-preview.cancelled': 'Просмотр отменён',
   'hub.ad-preview.earned': 'Просмотр завершён',
