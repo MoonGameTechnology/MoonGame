@@ -66,10 +66,14 @@ jobs:
           if-no-files-found: error
       - name: Install emulator image for the native UI check
         run: |
-          sdkmanager 'system-images;android-35;default;x86_64'
-          echo no | avdmanager create avd --name vk-ad-probe --package 'system-images;android-35;default;x86_64' --force
+          SDK_BIN="$ANDROID_HOME/cmdline-tools/latest/bin"
+          test -x "$SDK_BIN/sdkmanager"
+          "$SDK_BIN/sdkmanager" 'emulator' 'platform-tools' 'system-images;android-35;default;x86_64'
+          echo no | "$SDK_BIN/avdmanager" create avd --name vk-ad-probe --package 'system-images;android-35;default;x86_64' --force
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           sudo chmod a+rw /dev/kvm
       - name: Test the installed one-button app offline
         run: |
-          "$ANDROID_HOME/emulator/emulator" -avd vk-ad-probe -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 2048 -cores 2 > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          "$ANDROID_HOME/emulator/emulator" -avd vk-ad-probe -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 2048 -cores 2 > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          trap 'tail -n 60 "$RUNNER_TEMP/emulator.log"' ERR
           python3 mobile/minimal-ad/smoke.py "$RUNNER_TEMP/ad-probe/app/build/outputs/apk/debug/app-debug.apk"
