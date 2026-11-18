@@ -143,7 +143,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 106: членство — `spy-levels` 1.0.0 сразу за `espionage`: опыт и уровни шпионов.
 // 107: порядок тот же; auto-rally 1.4.0 и movement 1.10.0 — точка сбора на любой мир (RALLY-2).
 // 108: порядок тот же; orbital 1.8.0 — флак и обстрел в порядке времени при любой нарезке (FORT-5.17).
-const PINNED_FOR_VERSION = '108';
+// 109: порядок тот же; combat 4.1.0 — остаток залпа уходит в живые цели, заряд флота (MSB-10).
+const PINNED_FOR_VERSION = '109';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

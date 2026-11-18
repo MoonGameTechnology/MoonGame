@@ -1,4 +1,4 @@
-import { volleyShare } from '../util/volley';
+import { spendVolley } from '../util/overflow';
 import type { UnitStack } from './gameState';
 import type { GameData } from '../data/schemas';
 import { damageByClass, damageUnits, MAX_COMBAT_ROUNDS, stackHull } from '../util/combat';
@@ -193,19 +193,27 @@ export function previewSides(
   const round = (link: readonly number[], roles: readonly Role[], due: readonly number[]): boolean => {
     return combatSequence(link, due, up, foes,
       i => roles[i] === 'defender', (from, targets, role) => {
-        const shots = targets.map(i => {
-          const shot = targetedVolley(live[from]!, live[i]!, data, role);
-          const damage = volleyShare(shot.total, targets.length);
-          return { i, damage, pools: splitDealt(shot.pools, shot.total, damage) };
-        });
-        for (const { i, damage, pools } of shots) {
+        // Тот же залп, что в живом бою (`util/battleExchanges.ts`): снимок долей до первого
+        // урона и перенос остатка с погибших на живых врагов стрелка (`util/overflow.ts`).
+        const shots = new Map(targets.map(i => [i, targetedVolley(live[from]!, live[i]!, data, role)]));
+        const shotAt = (i: number) => {
+          let shot = shots.get(i);
+          if (!shot) shots.set(i, (shot = targetedVolley(live[from]!, live[i]!, data, role)));
+          return shot;
+        };
+        spendVolley(targets, () => link.filter(j => up(j) && foes(from, j)), legs => legs.map(({ target: i, budget }) => {
+          const shot = shotAt(i);
+          const damage = shot.total * budget;
+          if (!(damage > 0)) return 0;
           const structure = structures[i];
           const hullInput = divertFortressDamage(structure, live[i]!, damage, data).hullInput;
-          live[i] = structure?.fortress
-            ? damageUnits(live[i]!, hullInput, data).survivors
-            : damageByClass(live[i]!, pools, data).survivors;
+          const laid = structure?.fortress
+            ? damageUnits(live[i]!, hullInput, data)
+            : damageByClass(live[i]!, splitDealt(shot.pools, shot.total, damage), data);
+          live[i] = laid.survivors;
           if (structure?.fortress) for (const body of live[i]!) refreshFortressBody(structure, body, data);
-        }
+          return budget * Math.min(1, laid.unspent / damage);
+        }));
       });
   };
 

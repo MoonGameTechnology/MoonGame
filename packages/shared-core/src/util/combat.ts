@@ -287,13 +287,17 @@ function isTargetable(stack: UnitStack, data: GameData): boolean {
  * Optional class potency converts an equal volley share to class-specific HP loss.
  * Overkill is redistributed with the same class potency and echelon proportions.
  * Each pass conserves actual damage, including the garrison damage floor.
+ *
+ * `unspent` — урон, которому не нашлось живого юнита: сторона погибла раньше, чем он
+ * кончился (или выжил только род войск, которому этот урон не вредит). Раньше он молча
+ * терялся; теперь бой отдаёт его другим целям (`util/overflow.ts`).
  */
 export function damageUnits(
   units: UnitStack[],
   totalDamage: number,
   data: GameData,
   weights?: ClassPools,
-): { survivors: UnitStack[]; deaths: { unit: string; count: number }[] } {
+): { survivors: UnitStack[]; deaths: { unit: string; count: number }[]; unspent: number } {
   const deaths: { unit: string; count: number }[] = [];
   const potency = units.map(s => weights ? Math.max(0, weights[targetClassOf(data.units[s.unit])]) : 1);
   let remaining = Math.max(0, totalDamage);
@@ -310,7 +314,7 @@ export function damageUnits(
     if (leftover >= remaining) break;
     remaining = leftover;
   }
-  return { survivors: units.filter(s => s.count > 0), deaths };
+  return { survivors: units.filter(s => s.count > 0), deaths, unspent: Math.max(0, remaining) };
 }
 
 /** Recover class potency from the original formation's allocations. */
@@ -318,7 +322,7 @@ export function damageByClass(
   units: UnitStack[],
   pools: ClassPools,
   data: GameData,
-): { survivors: UnitStack[]; deaths: { unit: string; count: number }[] } {
+): { survivors: UnitStack[]; deaths: { unit: string; count: number }[]; unspent: number } {
   const shares = classShares(units, data);
   const power = (cls: keyof ClassPools): number => shares[cls] > 0 ? pools[cls] / shares[cls] : 0;
   return damageUnits(units, poolsTotal(pools), data, {
@@ -398,8 +402,19 @@ export function applyDamage(
   data: GameData,
   source: Record<string, unknown>,
 ): UnitStack[] {
+  return applyDamageCounted(h, units, totalDamage, data, source).survivors;
+}
+
+/** {@link applyDamage}, который ещё и сообщает урон без цели (`unspent` у {@link damageUnits}). */
+function applyDamageCounted(
+  h: HandlerContext,
+  units: UnitStack[],
+  totalDamage: number,
+  data: GameData,
+  source: Record<string, unknown>,
+): { survivors: UnitStack[]; unspent: number } {
   const value = captureCasualtyCost(h.state, units, data);
-  const { survivors, deaths } = damageUnits(units, totalDamage, data);
+  const { survivors, deaths, unspent } = damageUnits(units, totalDamage, data);
   const costs = partitionCasualtyCost(deaths, value());
   for (const [index,d] of deaths.entries()) {
     // A missile (SM-3.7b) does not die as a unit: shot down by shuttles it leaves spent,
@@ -408,7 +423,7 @@ export function applyDamage(
     if (unitHasTrait(data, d.unit, MISSILE_TRAIT)) continue;
     announceCasualty(h, { unit: d.unit, count: d.count, ...source, lossCost: costs[index] ?? {} });
   }
-  return survivors;
+  return { survivors, unspent };
 }
 
 /**
@@ -548,6 +563,8 @@ export function capHooked(d: HookedDamage, max: number): HookedDamage {
   return Math.min(d, Math.max(0, max)) as HookedDamage;
 }
 
+/** Положить уже прошедший хук урон на сторону боя. Возвращает урон, которому на стороне
+ *  не нашлось живой цели (0 — лёг весь): залп отдаёт его другим целям (`util/overflow.ts`). */
 export function applyDamageToSide(
   h: HandlerContext,
   ref: CombatantRef,
@@ -572,10 +589,10 @@ export function applyDamageToSide(
   /** Class potency for orbital/air fire, applied through the same echelons. */
   evenly?: ClassPools,
   damageShares?: Record<string, number>,
-): void {
+): number {
   const units = sideUnits(h.state, ref);
   if (!units) {
-    return;
+    return dmg;
   }
   const site = ref.kind === 'fleet' ? fortressSiteOf(h.state, ref.fleetId) : undefined;
   if (ref.kind === 'fleet') {
@@ -628,10 +645,10 @@ export function applyDamageToSide(
       ? damageByClass(units, byClass, data)
       : null;
   if (!laid) {
-    const survivors = applyDamage(h, units, dmg, data, source);
+    const { survivors, unspent } = applyDamageCounted(h, units, dmg, data, source);
     setSideUnits(h.state, ref, survivors);
     if (site) for (const body of survivors) refreshFortressBody(site, body, data);
-    return;
+    return unspent;
   }
   const costs = partitionCasualtyCost(laid.deaths, value());
   for (const [index,d] of laid.deaths.entries()) {
@@ -643,6 +660,7 @@ export function applyDamageToSide(
     });
   }
   setSideUnits(h.state, ref, laid.survivors);
+  return laid.unspent;
 }
 
 /** Delete a fleet whose LAST ship just died outside a battle (orbital AA or

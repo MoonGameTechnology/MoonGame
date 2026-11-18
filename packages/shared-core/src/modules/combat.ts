@@ -16,7 +16,7 @@ import { peekValues } from '../util/draft';
 import { isCapturable } from '../state/sectorKind';
 import { attacks, attackerOf, defenderOf, landingBattleOf, shipsEngaged } from '../state/battle';
 import type { FleetCourse } from './movement';
-import { battleExchanges } from '../util/battleExchanges';
+import { battleExchanges, dischargeOvercharges } from '../util/battleExchanges';
 import { orderBattleAttack, roundIntervalMs, scheduleTick } from '../util/battleClocks';
 import { queueBattleClockRestore, restoreBattleClocks, retainBattleAfterRetreat, roadBattleSides } from '../util/battleContinuity';
 import {
@@ -1067,8 +1067,18 @@ export const combatModule: GameModule = {
   // 3.10.0: наземные выжившие уходят из боя с ранами; лечит их госпиталь, а не сам бой.
   // 3.11.0: флот, вставший у мира не прилётом (верфь, взлёт, раскол, герой), сходится с врагом.
   // 3.12.0: separate fortress hull/internal-system damage routing.
-  version: '4.0.1',
+  // 4.1.0: остаток залпа уходит в живые цели; доля без цели — заряд флота на пять игровых
+  // минут, разряжается в первом бою (резолюция владельца 2026-11-17, `util/overflow.ts`).
+  version: '4.1.0',
   setup(api) {
+    // Заряд флота разряжается, как только перед ним появился враг: бой начался или флот в
+    // него вступил. Раньше первого залпа — это хвост прошлого выстрела, а не новый.
+    for (const type of ['battle.started', 'battle.joined'] as const) {
+      api.on(type, (event, h) => {
+        const { battleId } = event.payload as { battleId?: unknown };
+        if (typeof battleId === 'string') dischargeOvercharges(h, battleId);
+      });
+    }
     api.provideCapability<BattlePullIn>('battle.pullIn', (at, h) => pullInBystanders(h, at));
     // Встал у мира без прилёта — бой, как у прибывшего (`util/standUp.ts`, баг 2026-11-02).
     api.provideCapability<BattleStandUp>('battle.standUp', (fleetId, at, h) => {
