@@ -1,0 +1,114 @@
+name: VK online paired test
+
+on:
+  push:
+    branches: [test/vk-online-pair-20261118]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vk-online-pair-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ANDROID_USER_HOME: ${{ github.workspace }}/.probe-android-user
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.probe-android-user/avd
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: pnpm
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install locked build tooling
+        run: |
+          pnpm install --frozen-lockfile
+          npm ci --prefix mobile
+      - name: Build native-only probe
+        run: |
+          {
+            echo "VOID_VC=$(git rev-list --count HEAD)"
+            echo "VOID_SHA=$(git rev-parse HEAD)"
+          } >> "$GITHUB_ENV"
+          node mobile/minimal-ad/prepare.mjs "$RUNNER_TEMP/ad-probe" "$(git rev-list --count HEAD)" "$(git rev-parse HEAD)"
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import os
+          p=Path(os.environ['RUNNER_TEMP'])/'ad-probe/app/src/main/java/com/voiddominion/adprobe/AdProbeActivity.java'
+          s=p.read_text()
+          s=s.replace('MyTargetPrivacy.setUserConsent(false);','MyTargetManager.setDebugMode(true);\n            MyTargetPrivacy.setUserConsent(false);')
+          s=s.replace('active = new RewardedAd(BuildConfig.SLOT_ID, this);','int slot = getIntent().getBooleanExtra("demo", false) ? 45101 : BuildConfig.SLOT_ID;\n            active = new RewardedAd(slot, this);')
+          s=s[:s.index('        final String id = request;')]+'''        android.util.Log.i("PairEvidence", phase + " " + (code == null ? "ok" : code));
+              }
+
+          '''+s[s.index('    private void finish('):]
+          s=s.replace('if (shown) earned = true;', 'if (shown) { earned = true; android.util.Log.i("PairEvidence", "reward ok"); }')
+          p.write_text(s)
+          PYCODE
+          cd "$RUNNER_TEMP/ad-probe"
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Install emulator image for the native UI check
+        run: |
+          SDK_BIN="$ANDROID_HOME/cmdline-tools/latest/bin"
+          test -x "$SDK_BIN/sdkmanager"
+          "$SDK_BIN/sdkmanager" 'emulator' 'platform-tools' 'system-images;android-35;default;x86_64'
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | "$SDK_BIN/avdmanager" create avd --name vk-ad-probe --package 'system-images;android-35;default;x86_64' --path "$ANDROID_AVD_HOME/vk-ad-probe.avd" --force
+          test -f "$ANDROID_AVD_HOME/vk-ad-probe.avd/config.ini"
+          printf 'avd.ini.encoding=UTF-8\npath=%s\ntarget=android-35\n' "$ANDROID_AVD_HOME/vk-ad-probe.avd" > "$ANDROID_AVD_HOME/vk-ad-probe.ini"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          sudo chmod a+rw /dev/kvm
+      - name: Compare rewarded callbacks on one online emulator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/probe-smoke"
+          "$RUNNER_TEMP/probe-smoke/bin/pip" install --require-hashes --only-binary=:all: --no-deps -r mobile/minimal-ad/smoke-requirements.txt
+          "$ANDROID_HOME/emulator/emulator" -avd vk-ad-probe -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 2048 -cores 2 > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          cat > "$RUNNER_TEMP/online.py" <<'PYCODE'
+          import json, re, subprocess, time
+          from defusedxml import ElementTree as ET
+          def adb(*args, timeout=25):
+              return subprocess.check_output(['adb', *args], timeout=timeout, text=True, errors='replace').strip()
+          def ui():
+              adb('shell','uiautomator','dump','/sdcard/probe.xml')
+              return ET.fromstring(adb('exec-out','cat','/sdcard/probe.xml'))
+          app='com.voiddominion.adprobe'
+          deadline=time.monotonic()+180
+          while time.monotonic()<deadline:
+              if adb('shell','getprop','sys.boot_completed')=='1':break
+              time.sleep(2)
+          else:raise RuntimeError('boot timed out')
+          adb('shell','input','keyevent','82')
+          adb('install','-r',__import__('sys').argv[1])
+          for slot in [45101,2111707]:
+              adb('shell','am','force-stop',app)
+              adb('logcat','-c')
+              adb('shell','am','start','-W','-n',app+'/.AdProbeActivity','--ez','demo',str(slot==45101).lower())
+              btn,=[n for n in ui().iter('node') if n.get('class')=='android.widget.Button']
+              x,y,z,w=map(int,re.findall(r'\d+',btn.get('bounds','')))
+              adb('shell','input','tap',str((x+z)//2),str((y+w)//2))
+              deadline=time.monotonic()+75
+              while time.monotonic()<deadline:
+                  lines=adb('logcat','-d','-v','raw','PairEvidence:I','*:S').splitlines()
+                  if any(s.startswith(('unavailable ','reward ','cancelled ','earned ')) for s in lines):break
+                  time.sleep(2)
+              pid=subprocess.run(['adb','shell','pidof',app],capture_output=True,text=True,timeout=8).stdout.strip().split()
+              logs=adb('logcat','-d','--pid='+pid[0]) if pid else ''
+              phases=[s for s in lines if re.fullmatch(r'(requested|loaded|displayed|reward|earned|cancelled|unavailable) (ok|VK-\d{1,5}|E_AD_[A-Z_]+)',s)]
+              categories=[s for s in ('UnknownHostException','SSLHandshakeException','SocketTimeoutException','ConnectException','Connection reset','No route to host','CertPathValidatorException','Permission denied') if s.lower() in logs.lower()]
+              print('PAIR_RESULT '+json.dumps(dict(slot=slot,phases=phases,sdk_test_flag='Test mode is enabled on current device' in logs,transport=categories,response_codes=sorted(set(re.findall(r'response: code=([-0-9]{1,3})\b',logs))))),flush=True)
+              assert 'requested ok' in phases
+          PYCODE
+          "$RUNNER_TEMP/probe-smoke/bin/python" "$RUNNER_TEMP/online.py" "$RUNNER_TEMP/ad-probe/app/build/outputs/apk/debug/app-debug.apk"
