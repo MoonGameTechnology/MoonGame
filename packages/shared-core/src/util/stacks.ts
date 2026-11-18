@@ -317,16 +317,24 @@ export interface StackContribution {
   damage: number;
 }
 
-/** All live stacks contribute; no strongest-first selection or HP from shields. */
+/** Живые юниты стеков — N в пределе линии `min(1, L/N)`. */
+export function liveUnitCount(stacks: readonly UnitStack[], data: GameData): number {
+  return stacks.reduce((n, s) => (s.count > 0 && data.units[s.unit] ? n + s.count : n), 0);
+}
+
+/** All live stacks contribute; no strongest-first selection or HP from shields.
+ *  `lineCount` — N линии, когда он шире этих стеков: в бою это все корабли державы
+ *  (MSB-11, `util/battleLine.ts`). Не передан — N считается по самим стекам. */
 export function cappedUnitBreakdown(
   stacks: readonly UnitStack[],
   data: GameData,
   stat: string | ((stats: Record<string, number>) => number),
   eligible?: (def: UnitDef) => boolean,
   cap?: number,
+  lineCount?: number,
 ): StackContribution[] {
   const live = stacks.filter(s => s.count > 0 && data.units[s.unit]);
-  const count = live.reduce((n, s) => n + s.count, 0);
+  const count = Math.max(lineCount ?? 0, live.reduce((n, s) => n + s.count, 0));
   const limit = cap ?? (live.every(s => data.units[s.unit]!.domain === 'ground')
     ? GROUND_COMBAT_UNIT_CAP : COMBAT_UNIT_CAP);
   const efficiency = combatEfficiency(count, limit);

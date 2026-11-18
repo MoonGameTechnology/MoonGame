@@ -801,6 +801,31 @@ export const STAR_PROVINCE_SOLO_MIGRATION = {
   toDataHash: '1dc3f007dd5f9e',
 } as const;
 
+/** Rules-only pair: combat 4.1.0 — what a volley leaves unspent on a fallen side goes to the
+ *  shooter's living enemies, and a fleet keeps what found no target as a charge for five game
+ *  minutes (`Fleet.overcharge`, MSB-10). The catalogue is unchanged; a saved world has no
+ *  charge and reads as is. */
+export const VOLLEY_OVERFLOW_SOLO_MIGRATION = {
+  fromRules: STAR_PROVINCE_SOLO_MIGRATION.toRules,
+  fromData: STAR_PROVINCE_SOLO_MIGRATION.toData,
+  fromDataHash: STAR_PROVINCE_SOLO_MIGRATION.toDataHash,
+  toRules: '1bea1871c0f6b4',
+  toData: STAR_PROVINCE_SOLO_MIGRATION.toData,
+  toDataHash: STAR_PROVINCE_SOLO_MIGRATION.toDataHash,
+} as const;
+
+/** Rules-only pair: combat 4.2.0 — one battle line per power: N in `min(1, L/N)` counts every
+ *  living unit the owner has in the battle, not one fleet's (MSB-11). The catalogue and the
+ *  saved shape are unchanged. */
+export const LINE_PER_POWER_SOLO_MIGRATION = {
+  fromRules: VOLLEY_OVERFLOW_SOLO_MIGRATION.toRules,
+  fromData: VOLLEY_OVERFLOW_SOLO_MIGRATION.toData,
+  fromDataHash: VOLLEY_OVERFLOW_SOLO_MIGRATION.toDataHash,
+  toRules: '0ed98354e9290d',
+  toData: VOLLEY_OVERFLOW_SOLO_MIGRATION.toData,
+  toDataHash: VOLLEY_OVERFLOW_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -870,6 +895,8 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   ORBITAL_TIME_ORDER_SOLO_MIGRATION,
   PATROL_DIVE_SOLO_MIGRATION,
   STAR_PROVINCE_SOLO_MIGRATION,
+  VOLLEY_OVERFLOW_SOLO_MIGRATION,
+  LINE_PER_POWER_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

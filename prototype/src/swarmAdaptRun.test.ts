@@ -287,11 +287,15 @@ describe('MC-01 на pve-1: удары шаттлов доводят Рой до
     expect(run.done).toBeDefined();
     expect(run.done!.pointDefense).toBeGreaterThan(0);
     expect(run.done!.connectedToHive).toBe(false);
-    // The new HP/return-fire model kills the relay before the recipe reaches the
-    // hive. Later waves cannot inherit that isolated hull's point defense.
+    // Изолированный корпус покров не раздаёт: у поздних волн он бывает только у тех, кто сам
+    // в сети Роя (узел `swarmNet`) и получил рецепт по ней. С одной линией на державу (MSB-11)
+    // порт и три авианосца игрока бьют одной линией, ретранслятор доживает, и сеть успевает
+    // передать рецепт; прежде он погибал раньше, и у поздних волн покрова не было вовсе.
     const later = Object.values(run.state.fleets).filter(f =>
       f.owner === 'p3' && f.id.startsWith('pve:wave:') && f.id !== run.done!.fleetId);
     expect(later.length).toBeGreaterThan(0);
-    expect(later.every(f => fleetPointDefense(f, data) === 0)).toBe(true);
+    const holders = run.state.swarmNet?.holders ?? {};
+    for (const f of later.filter(f => fleetPointDefense(f, data) > 0))
+      expect(holders[`fleet:${f.id}`], f.id).toBeDefined();
   });
 });
