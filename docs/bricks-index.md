@@ -1589,6 +1589,17 @@
 | TT-4.1 | 🔶 | data core | `docs/tech-tree-roadmap.md` | Слот учёного + выбор на старте |
 | TT-4.2 | 🔒 | data core | `docs/tech-tree-roadmap.md` | Капстоун: супер-юнит / особое здание (лейт-гейм) |
 | TT-4.3 | ✅ | data core | `docs/tech-tree-roadmap.md` | Учёный «+слот» |
+| TEC-0 | ✅ | docs | `docs/time-economy-roadmap.md` | Модель экономики времени и резолюции владельца |
+| TEC-1 | ⏳ | data core | `docs/time-economy-roadmap.md` | Матрица времени: опоры в данных и пересчёт цен |
+| TEC-2 | 🔒 | docs | `docs/time-economy-roadmap.md` | Сверка нынешних цен основной игры в ЭЧ |
+| TEC-3 | 🔒 | core proto | `docs/time-economy-roadmap.md` | Бюджет ускорения в партии |
+| TEC-4 | 🔒 | core proto | `docs/time-economy-roadmap.md` | Ресурсы за ◆ в партии |
+| TEC-5 | 🔒 | srv data | `docs/time-economy-roadmap.md` | Карточки в инвентаре аккаунта |
+| TEC-6 | 🔒 | core proto | `docs/time-economy-roadmap.md` | Применение карточки в партии |
+| TEC-7 | 🔒 | srv proto | `docs/time-economy-roadmap.md` | Дневные задания дают карточки |
+| TEC-8 | 🔒 | srv proto | `docs/time-economy-roadmap.md` | Реклама за карточку ускорения |
+| TEC-9 | 🔒 | srv | `docs/time-economy-roadmap.md` | Заработанные карточки на аукционе |
+| TEC-11 | 🔒 | srv | `docs/time-economy-roadmap.md` | Телеметрия «часы до цели» |
 | VET-1 | ✅ | core | `docs/unit-medals-roadmap.md` | Вклад стека в залп перестаёт выбрасываться |
 | VET-2 | ✅ | core | `docs/unit-medals-roadmap.md` | Счётчики ветерана на стеке |
 | VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md` | Грейды и пороги |

@@ -715,7 +715,7 @@ Money→market без денежной модели EC-0.2 (faucet/sink обяз
 
 ## Ссылки
 
-Ревью-критика (в этой ветке диалога) · `metagame.md` (мета-слой) · `accounts-roadmap.md` ·
+Ревью-критика (в этой ветке диалога) · [экономика времени — цена игрового часа как стержень цен](time-economy-roadmap.md) · `metagame.md` (мета-слой) · `accounts-roadmap.md` ·
 `persistence-roadmap.md` (F2/PE-1.1 леджер) · `server-roadmap.md` (F5/F6) ·
 `game-integrity-roadmap.md` (RMT/аномалии) · `operations-roadmap.md` (телеметрия/модерация) ·
 `secure-*-roadmap.md` (платежи/фрод/комплаенс) · `data/resources.json` (внутриматчевый `credits` — почему донат-валюта зовётся **Суверены**).
