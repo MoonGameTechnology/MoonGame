@@ -39,6 +39,7 @@ import { readRaw, writeRaw } from './prefs';
 import { PORTRAITS } from './profileArt';
 import { initProfile } from './profileScreen';
 import { initRank } from './rankScreen';
+import { setSpeedupAuth } from './speedupClient';
 import { initMedalRewards } from './medalRewards';
 import { initModuleRewards } from './moduleRewards';
 import { initRegistrationReward } from './registrationReward';
@@ -232,6 +233,9 @@ export async function hubAuthorizedBase(): Promise<{ base: string; token: string
     httpBase,
   );
 }
+
+// Ускорение за ◆ из партии ходит в сеть по тому же правилу, что и вкладки хаба (TEC-3.2).
+setSpeedupAuth(hubAuthorizedBase);
 
 export let friends: ReturnType<typeof initFriends> | null = null;
 

@@ -13,6 +13,7 @@ import { heroFlagshipUnit } from '../../packages/shared-core/src/state/heroFlags
 import { YARD_GROUND_HULLS, YARD_HULLS, YARD_SQUAD_HULLS } from './productionRoster';
 import { PRODUCTION_LANES, type ProductionLane } from '../../decisions/productionSections';
 import { laneCanResume, laneReadyTimes, laneVisibleRows } from '../../decisions/laneQueue';
+import { speedupButton, type SpeedupButton } from './speedupButtons';
 
 /** Имя линии в списке и в шапке каталога. */
 export const LANE_NAME: Record<ProductionLane, string> = {
@@ -43,6 +44,8 @@ interface LaneJob {
   cancel: string;
   /** Подпись отмены: идущий встаёт на паузу с возвратом, ждущий просто убирается. */
   cancelTitle?: string;
+  /** Идущая стройка: «Закончить» или «за ◆» (TEC-3.2). */
+  speed?: SpeedupButton | undefined;
 }
 
 const hoursMs = (h: number | undefined): number | undefined => (h === undefined ? undefined : h * HOUR);
@@ -66,6 +69,7 @@ function laneJobs(state: GameState, world: string, lane: ProductionLane) {
       seq: -1, label: orderLabel(p), unit: p.unit, building: p.building, at: e.at,
       duration: buildDurationHours(p, data, state) * HOUR, cancel: `data-pw-cancel="${esc(String(e.seq))}"`,
       cancelTitle: 'side.conveyor.cancel.title',
+      speed: speedupButton(state, planet.owner ?? '', e.at, 'build', String(e.seq)),
     });
   }
   for (const q of planet.buildQueue ?? []) {
@@ -158,7 +162,11 @@ export function laneStripHtml(state: GameState, world: string, lane: ProductionL
       `<div class="pw-job${j.at === undefined ? ' waiting' : j.duration ? ' run' : ''}"><span class="pw-job-art">${jobArt(j)}</span><b>${esc(j.label)}</b>` +
       timer(ready[i]) +
       (j.cancel ? `<button class="btn-x" ${j.cancel} aria-label="${t(j.cancelTitle ?? 'side.conveyor.cancel.title')}" title="${t(j.cancelTitle ?? 'side.conveyor.cancel.title')}">×</button>` : '<span></span>') +
-      `${j.at !== undefined && j.duration ? `<progress max="100" value="${barPct(j.at, j.duration, state.time)}"></progress>` : ''}</div>`,
+      `${j.at !== undefined && j.duration ? `<progress max="100" value="${barPct(j.at, j.duration, state.time)}"></progress>` : ''}` +
+      (j.speed
+        ? `<button class="pw-speed" data-pw-speed="${esc(j.speed.act)}" data-pw-speedarg="${esc(j.speed.arg)}" title="${esc(j.speed.title)}">${esc(j.speed.label)}</button>`
+        : '') +
+      `</div>`,
   );
   const canResume = laneCanResume(jobs);
   const resumeTitle = t(canResume ? 'side.conveyor.resume.title' : 'err.lane-busy');

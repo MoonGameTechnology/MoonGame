@@ -17,8 +17,15 @@ import { esc } from './format';
 
 /** Что показывать в конвейере — снимок, уже собранный хозяином. */
 export interface ConveyorView {
-  /** Идущая стройка: подпись, момент завершения, длительность и id для отмены. */
-  active: { label: string; at: number; durationMs: number; seq: number } | null;
+  /** Идущая стройка: подпись, момент завершения, длительность и id для отмены. `offer` —
+   *  кнопка ускорения (TEC-3.2), уже подписанная хозяином: «Закончить» или «за ◆». */
+  active: {
+    label: string;
+    at: number;
+    durationMs: number;
+    seq: number;
+    offer?: { act: string; arg: string; label: string; title: string };
+  } | null;
   /** Очередь после активной, в порядке исполнения. */
   /** Ждущие заказы. `id` — номер, которым заказ отменяют: с BLD-1 очередь живёт
    *  в ЯДРЕ, и снятие ждущего идёт тем же `construction.cancel`, что и снятие
@@ -62,6 +69,10 @@ export function conveyorHtml(
       `<em class="conv-time" data-at="${a.at}">—</em>` +
       `<button class="conv-cancel btn-x" data-act="cancelbuild" data-arg="${a.seq}" title="${esc(labels.cancel)}">✕</button>` +
       `</div>`;
+    if (a.offer) {
+      const o = a.offer;
+      html += `<button class="conv-speed btn-second" data-act="${esc(o.act)}" data-arg="${esc(o.arg)}" title="${esc(o.title)}">${esc(o.label)}</button>`;
+    }
     html += bar(` class="conv-fill" data-at="${a.at}" data-dur="${a.durationMs}"`);
   } else if (view.waitingCost !== null) {
     // Очередь НЕ застряла — её голову просто пока не на что оплатить. Говорим это
