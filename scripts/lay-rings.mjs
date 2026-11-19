@@ -24,7 +24,17 @@ export const RINGS = {
       home_sun_2: { k: 8, turn: 0.5, clear: 1.3 },
     },
   },
-  'ffa-4': { plans: { cinder: { k: 8, turn: 0.75, clear: 0.98 } } },
+  // Four star systems (`lay-stars.mjs` BEHIND), each star with the duel's plan; the
+  // provinces beyond each star hold, like the 2 на 2 map's.
+  'ffa-4': {
+    hold: [1, 2, 3, 4].flatMap((s) => [1, 2, 3, 4, 5].map((n) => `home_sun_${s}_rim_${n}`)),
+    plans: {
+      home_sun_1: { k: 8, turn: 0.5, clear: 1.3 },
+      home_sun_2: { k: 8, turn: 0.5, clear: 1.3 },
+      home_sun_3: { k: 8, turn: 0.5, clear: 1.3 },
+      home_sun_4: { k: 8, turn: 0.5, clear: 1.3 },
+    },
+  },
   // Two star systems like the duel: the same plan, turned half round with the map. The
   // provinces beyond each star (`lay-stars.mjs` BEHIND) hold: they were found round the
   // rings as laid.

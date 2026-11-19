@@ -27,7 +27,9 @@ const STARS: Array<[unknown, Record<string, string>]> = [
   [team3, { crown_104: 'blue_giant', crown_105: 'blue_giant' }],
   // Две звёздные системы (владелец 2026-11-19): своя звезда за каждой столицей, классы разные.
   [duel1, { home_sun_1: 'red_giant', home_sun_2: 'blue_giant' }],
-  [ffa4, { cinder: 'yellow_dwarf' }],
+  // Четыре звёздные системы (владелец 2026-11-19, «И ФФА на 4 тоже придумай и сделай»): своя
+  // звезда за каждой столицей, все четыре класса разные.
+  [ffa4, { home_sun_1: 'red_giant', home_sun_2: 'blue_giant', home_sun_3: 'yellow_dwarf', home_sun_4: 'white_dwarf' }],
   [ffa20, { lights_182: 'binary_star' }],
   [ffa50, { suns_017: 'yellow_dwarf', suns_039: 'red_giant', suns_467: 'blue_giant', suns_495: 'white_dwarf' }],
   [testbed, { flare_2: 'pulsar' }],

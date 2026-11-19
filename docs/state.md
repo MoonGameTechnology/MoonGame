@@ -339,7 +339,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   и новая пара в `decisions/soloSaveMigrationPairs.ts`: без неё локальная схватка прежнего каталога
   не откроется (сторож — `soloSaveMigrationWiring.test.ts`). Новый фрагмент:
   `GameDataSchema`, `composeGameDataBundle`, `data/bundle.ts`.
-- **Карты `data/maps`.** Основная игра (`techRules.ruleset: main`): `duel-1` (2/71), `ffa-4` (4/39),
+- **Карты `data/maps`.** Основная игра (`techRules.ruleset: main`): `duel-1` (2/71), `ffa-4` (4/103),
   `team-2v2` (4/113), `team-3v3` (6/147), `ffa-20` (20/337), `ffa-50` (50/834, квадрат, в центре
   «Бездна»; `scripts/generate-ffa.mjs`). Sector Zero — `training-1` и главы `pve-1`…`pve-6`. Битвы
   корпораций — по формату (`data/avaFormats.json`, CORP-8). Служебные — `proving-ground`,
@@ -351,7 +351,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 - **Звёзды и кольца** (владелец 2026-11-17/19) — провинция `star` (класс — `terrain`, 6 классов)
   и чёрная дыра в замкнутом кольце своего вида (`RING_OF`, `decisions/celestialRing.ts`), закрытом
   проходу и авиации, ≈ 3 провинции с телом; соседей раздвигает `celestial-rings.mjs`, контракт —
-  `data/celestialRings.test.ts`. Дуэль и 2 на 2 — две звёздные системы, звезда за каждой стороной.
+  `data/celestialRings.test.ts`. Дуэль, 2 на 2 и FFA на 4: своя звезда за каждой стороной.
 - **Цены и сроки основной игры** (решение владельца 2026-10-18) — поле `pricing` её шести карт,
   посев закрепляет его в `GameState.pricing`; расчёт — `util/pricing.ts` (`matchUnitCost` для
   корпусов, `matchCost` для прочего), одинаково для UI, бота, оплаты и отмены. Новые партии

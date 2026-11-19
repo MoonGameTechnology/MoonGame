@@ -213,16 +213,16 @@
     },
     "shale": {
       "position": {
-        "x": -734,
-        "y": -219
+        "x": -730,
+        "y": -220
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "mist": {
       "position": {
-        "x": -403,
-        "y": -544
+        "x": -390,
+        "y": -540
       },
       "kind": "planet",
       "terrain": "asteroid_field",
@@ -230,52 +230,41 @@
     },
     "watch": {
       "position": {
-        "x": -389,
-        "y": -63
+        "x": -380,
+        "y": -70
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "riftward": {
       "position": {
-        "x": -85,
-        "y": -814
+        "x": -80,
+        "y": -800
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula",
       "planetType": "energy_nexus"
     },
-    "cinder": {
-      "position": {
-        "x": 70,
-        "y": -410
-      },
-      "kind": "star",
-      "terrain": "yellow_dwarf",
-      "buildings": [],
-      "garrison": [],
-      "size": 1.4
-    },
     "drift": {
       "position": {
-        "x": 331,
-        "y": -128
+        "x": 320,
+        "y": -140
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "storm": {
       "position": {
-        "x": 554,
-        "y": 145
+        "x": 550,
+        "y": 140
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "shelf": {
       "position": {
-        "x": 825,
-        "y": -168
+        "x": 820,
+        "y": -170
       },
       "kind": "planet",
       "terrain": "nebula",
@@ -292,8 +281,8 @@
     },
     "cloud": {
       "position": {
-        "x": 101,
-        "y": 152
+        "x": 100,
+        "y": 140
       },
       "kind": "dead_world",
       "terrain": "depleted_system",
@@ -302,9 +291,9 @@
     "outpost": {
       "position": {
         "x": 250,
-        "y": 541
+        "y": 540
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "shoal": {
@@ -326,16 +315,16 @@
     },
     "veil": {
       "position": {
-        "x": -231,
-        "y": 442
+        "x": -230,
+        "y": 440
       },
       "kind": "debris_field",
       "terrain": "derelict_graveyard"
     },
     "belt": {
       "position": {
-        "x": -611,
-        "y": 251
+        "x": -610,
+        "y": 250
       },
       "kind": "planet",
       "terrain": "depleted_system",
@@ -359,8 +348,8 @@
     },
     "ember": {
       "position": {
-        "x": -14,
-        "y": -114
+        "x": -10,
+        "y": -130
       },
       "kind": "planet",
       "terrain": "deep_void",
@@ -368,81 +357,637 @@
     },
     "spur": {
       "position": {
-        "x": 348,
-        "y": -831
+        "x": 340,
+        "y": -820
       },
       "kind": "asteroid",
       "terrain": "dust_lane"
     },
-    "cinder_ring_1": {
+    "hollow": {
       "position": {
-        "x": 211,
-        "y": -316
+        "x": 70,
+        "y": -410
+      },
+      "kind": "empty",
+      "terrain": "deep_void"
+    },
+    "fringe_1": {
+      "position": {
+        "x": -777,
+        "y": -1233
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_2": {
+      "position": {
+        "x": -460,
+        "y": -1256
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_3": {
+      "position": {
+        "x": -143,
+        "y": -1278
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_4": {
+      "position": {
+        "x": 174,
+        "y": -1301
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_5": {
+      "position": {
+        "x": 491,
+        "y": -1323
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_6": {
+      "position": {
+        "x": 1557,
+        "y": -416
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_7": {
+      "position": {
+        "x": 1608,
+        "y": -116
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_8": {
+      "position": {
+        "x": 1659,
+        "y": 185
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_9": {
+      "position": {
+        "x": 805,
+        "y": 1285
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_10": {
+      "position": {
+        "x": 483,
+        "y": 1328
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_11": {
+      "position": {
+        "x": 161,
+        "y": 1371
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_12": {
+      "position": {
+        "x": -161,
+        "y": 1415
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_13": {
+      "position": {
+        "x": -483,
+        "y": 1458
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_14": {
+      "position": {
+        "x": -1528,
+        "y": 540
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_15": {
+      "position": {
+        "x": -1563,
+        "y": 208
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_16": {
+      "position": {
+        "x": -1598,
+        "y": -124
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_1": {
+      "position": {
+        "x": -1317,
+        "y": -845
+      },
+      "kind": "star",
+      "terrain": "red_giant",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_2": {
+      "position": {
+        "x": 1099,
+        "y": -1014
+      },
+      "kind": "star",
+      "terrain": "blue_giant",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_3": {
+      "position": {
+        "x": 1413,
+        "y": 840
+      },
+      "kind": "star",
+      "terrain": "yellow_dwarf",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_4": {
+      "position": {
+        "x": -1104,
+        "y": 1189
+      },
+      "kind": "star",
+      "terrain": "white_dwarf",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_1_rim_1": {
+      "position": {
+        "x": -1597,
+        "y": -512
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_1_rim_2": {
+      "position": {
+        "x": -1730,
+        "y": -781
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_1_rim_3": {
+      "position": {
+        "x": -1658,
+        "y": -1073
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_1_rim_4": {
+      "position": {
+        "x": -1416,
+        "y": -1251
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_1_rim_5": {
+      "position": {
+        "x": -1116,
+        "y": -1231
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_2_rim_1": {
+      "position": {
+        "x": 830,
+        "y": -1356
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "home_sun_2_rim_2": {
+      "position": {
+        "x": 1121,
+        "y": -1431
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_2_rim_3": {
+      "position": {
+        "x": 1393,
+        "y": -1302
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_2_rim_4": {
+      "position": {
+        "x": 1517,
+        "y": -1028
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_2_rim_5": {
+      "position": {
+        "x": 1437,
+        "y": -739
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "home_sun_3_rim_1": {
+      "position": {
+        "x": 1466,
+        "y": 362
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_3_rim_2": {
+      "position": {
+        "x": 1812,
+        "y": 624
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_3_rim_3": {
+      "position": {
+        "x": 1796,
+        "y": 1059
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_3_rim_4": {
+      "position": {
+        "x": 1431,
+        "y": 1295
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_3_rim_5": {
+      "position": {
+        "x": 1028,
+        "y": 1131
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "home_sun_4_rim_1": {
+      "position": {
+        "x": -829,
+        "y": 1527
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "home_sun_4_rim_2": {
+      "position": {
+        "x": -1118,
+        "y": 1607
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_4_rim_3": {
+      "position": {
+        "x": -1392,
+        "y": 1482
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_4_rim_4": {
+      "position": {
+        "x": -1521,
+        "y": 1211
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_4_rim_5": {
+      "position": {
+        "x": -1446,
+        "y": 920
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "home_sun_1_ring_1": {
+      "position": {
+        "x": -1111,
+        "y": -759
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_2": {
+      "position": {
+        "x": -1231,
+        "y": -639
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_3": {
+      "position": {
+        "x": -1403,
+        "y": -639
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_4": {
+      "position": {
+        "x": -1523,
+        "y": -759
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_5": {
+      "position": {
+        "x": -1523,
+        "y": -931
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_6": {
+      "position": {
+        "x": -1403,
+        "y": -1051
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_7": {
+      "position": {
+        "x": -1231,
+        "y": -1051
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_8": {
+      "position": {
+        "x": -1111,
+        "y": -931
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_1": {
+      "position": {
+        "x": 1305,
+        "y": -928
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_2": {
+      "position": {
+        "x": 1185,
+        "y": -808
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_3": {
+      "position": {
+        "x": 1013,
+        "y": -808
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_4": {
+      "position": {
+        "x": 893,
+        "y": -928
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_5": {
+      "position": {
+        "x": 893,
+        "y": -1100
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_6": {
+      "position": {
+        "x": 1013,
+        "y": -1220
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_7": {
+      "position": {
+        "x": 1185,
+        "y": -1220
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_8": {
+      "position": {
+        "x": 1305,
+        "y": -1100
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_3_ring_1": {
+      "position": {
+        "x": 1619,
+        "y": 926
       },
       "kind": "corona",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "cinder_ring_2": {
+    "home_sun_3_ring_2": {
       "position": {
-        "x": 103,
-        "y": -244
+        "x": 1499,
+        "y": 1046
       },
       "kind": "corona",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "cinder_ring_3": {
+    "home_sun_3_ring_3": {
       "position": {
-        "x": -24,
-        "y": -269
+        "x": 1327,
+        "y": 1046
       },
       "kind": "corona",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "cinder_ring_4": {
+    "home_sun_3_ring_4": {
       "position": {
-        "x": -96,
-        "y": -377
+        "x": 1207,
+        "y": 926
       },
       "kind": "corona",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "cinder_ring_5": {
+    "home_sun_3_ring_5": {
       "position": {
-        "x": -71,
-        "y": -504
+        "x": 1207,
+        "y": 754
       },
       "kind": "corona",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "cinder_ring_6": {
+    "home_sun_3_ring_6": {
       "position": {
-        "x": 37,
-        "y": -576
+        "x": 1327,
+        "y": 634
       },
       "kind": "corona",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "cinder_ring_7": {
+    "home_sun_3_ring_7": {
       "position": {
-        "x": 164,
-        "y": -551
+        "x": 1499,
+        "y": 634
       },
       "kind": "corona",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "cinder_ring_8": {
+    "home_sun_3_ring_8": {
       "position": {
-        "x": 236,
-        "y": -443
+        "x": 1619,
+        "y": 754
       },
       "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_1": {
+      "position": {
+        "x": -898,
+        "y": 1275
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_2": {
+      "position": {
+        "x": -1018,
+        "y": 1395
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_3": {
+      "position": {
+        "x": -1190,
+        "y": 1395
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_4": {
+      "position": {
+        "x": -1310,
+        "y": 1275
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_5": {
+      "position": {
+        "x": -1310,
+        "y": 1103
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_6": {
+      "position": {
+        "x": -1190,
+        "y": 983
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_7": {
+      "position": {
+        "x": -1018,
+        "y": 983
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_8": {
+      "position": {
+        "x": -898,
+        "y": 1103
+      },
+      "kind": "planetary_nebula",
       "terrain": "empty_space",
       "size": 0.62
     }
@@ -457,7 +1002,26 @@
         "shale",
         "mist",
         "haze",
-        "watch"
+        "watch",
+        "fringe_1",
+        "fringe_2",
+        "fringe_3",
+        "fringe_4",
+        "fringe_5",
+        "home_sun_1",
+        "home_sun_1_ring_1",
+        "home_sun_1_ring_2",
+        "home_sun_1_ring_3",
+        "home_sun_1_ring_4",
+        "home_sun_1_ring_5",
+        "home_sun_1_ring_6",
+        "home_sun_1_ring_7",
+        "home_sun_1_ring_8",
+        "home_sun_1_rim_1",
+        "home_sun_1_rim_2",
+        "home_sun_1_rim_3",
+        "home_sun_1_rim_4",
+        "home_sun_1_rim_5"
       ]
     },
     {
@@ -469,7 +1033,21 @@
         "riftward",
         "drift",
         "shelf",
-        "spur"
+        "spur",
+        "home_sun_2",
+        "home_sun_2_ring_1",
+        "home_sun_2_ring_2",
+        "home_sun_2_ring_3",
+        "home_sun_2_ring_4",
+        "home_sun_2_ring_5",
+        "home_sun_2_ring_6",
+        "home_sun_2_ring_7",
+        "home_sun_2_ring_8",
+        "home_sun_2_rim_1",
+        "home_sun_2_rim_2",
+        "home_sun_2_rim_3",
+        "home_sun_2_rim_4",
+        "home_sun_2_rim_5"
       ]
     },
     {
@@ -481,7 +1059,29 @@
         "storm",
         "wreck",
         "outpost",
-        "shoal"
+        "shoal",
+        "fringe_6",
+        "fringe_7",
+        "fringe_8",
+        "fringe_9",
+        "fringe_10",
+        "fringe_11",
+        "fringe_12",
+        "fringe_13",
+        "home_sun_3",
+        "home_sun_3_ring_1",
+        "home_sun_3_ring_2",
+        "home_sun_3_ring_3",
+        "home_sun_3_ring_4",
+        "home_sun_3_ring_5",
+        "home_sun_3_ring_6",
+        "home_sun_3_ring_7",
+        "home_sun_3_ring_8",
+        "home_sun_3_rim_1",
+        "home_sun_3_rim_2",
+        "home_sun_3_rim_3",
+        "home_sun_3_rim_4",
+        "home_sun_3_rim_5"
       ]
     },
     {
@@ -492,22 +1092,31 @@
         "world_8",
         "flotsam",
         "reach",
-        "veil"
+        "veil",
+        "fringe_14",
+        "fringe_15",
+        "fringe_16",
+        "home_sun_4",
+        "home_sun_4_ring_1",
+        "home_sun_4_ring_2",
+        "home_sun_4_ring_3",
+        "home_sun_4_ring_4",
+        "home_sun_4_ring_5",
+        "home_sun_4_ring_6",
+        "home_sun_4_ring_7",
+        "home_sun_4_ring_8",
+        "home_sun_4_rim_1",
+        "home_sun_4_rim_2",
+        "home_sun_4_rim_3",
+        "home_sun_4_rim_4",
+        "home_sun_4_rim_5"
       ]
     },
     {
       "id": "depleted_node",
       "sectors": [
         "ember",
-        "cinder",
-        "cinder_ring_1",
-        "cinder_ring_2",
-        "cinder_ring_3",
-        "cinder_ring_4",
-        "cinder_ring_5",
-        "cinder_ring_6",
-        "cinder_ring_7",
-        "cinder_ring_8",
+        "hollow",
         "cloud",
         "belt"
       ]
