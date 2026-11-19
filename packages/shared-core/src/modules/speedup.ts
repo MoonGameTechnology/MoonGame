@@ -17,6 +17,12 @@
  * Ускоряется не больше остатка очереди и не больше бюджета K: хост просит часы, ядро
  * отказывает, если их больше, чем осталось у очереди или в бюджете, — без молчаливой
  * обрезки, иначе цена в действии и списанное разошлись бы.
+ *
+ * - `resources.buy` (TEC-4) — ресурс на `hours` эталонных часов за ◆: столько, сколько
+ *   стоят эти часы по матрице (`resourceForHours`, вниз до целого). Тоже только хоста, из
+ *   того же бюджета K и по той же цене, что ускорение (решение владельца: один бюджет на
+ *   всё, что сокращает путь за ◆): купить час металла и ускорить стройку на час — одна и
+ *   та же трата.
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Action } from '../action/types';
@@ -28,7 +34,7 @@ import {
   type QueueHasten,
   type QueueRef,
 } from '../util/speedup';
-import { hasTimeValue } from '../util/timeValue';
+import { hasTimeValue, resourceForHours } from '../util/timeValue';
 
 /** Разобрать ссылку на очередь из полезной нагрузки; `null` — кривая нагрузка. */
 function readRef(payload: Record<string, unknown>): QueueRef | null {
@@ -72,6 +78,31 @@ function speedup(action: Action, h: HandlerContext): void {
   h.emit('queue.sped', { playerId: action.playerId, ...ref, hours, sovereigns: price });
 }
 
+function buyResources(action: Action, h: HandlerContext): void {
+  const p = (action.payload ?? {}) as Record<string, unknown>;
+  const { resource, hours, price } = p;
+  if (typeof resource !== 'string' || typeof hours !== 'number' || !(hours > 0) || !Number.isFinite(hours) ||
+    typeof price !== 'number' || !Number.isInteger(price) || price < 0) {
+    return h.reject('E_BAD_PAYLOAD');
+  }
+  const player = h.state.players[action.playerId];
+  if (!player) return h.reject('E_FORBIDDEN');
+  const def = h.ctx.data.timeValue;
+  if (!hasTimeValue(def)) return h.reject('E_NOT_AVAILABLE');
+  if (h.state.match.goldActions === false) return h.reject('E_GOLD_OFF');
+  const amount = Math.floor(resourceForHours(resource, hours, def));
+  if (!Object.hasOwn(def.referenceHour, resource) || amount < 1) return h.reject('E_BAD_PAYLOAD');
+  if (hours > speedupLeftHours(h.state, action.playerId, def, h.ctx) + 1e-9) {
+    return h.reject('E_SPEEDUP_BUDGET');
+  }
+  if (speedupPrice(h.state, action.playerId, hours, def, h.ctx) !== price) {
+    return h.reject('E_PRICE_CHANGED');
+  }
+  player.resources[resource] = (player.resources[resource] ?? 0) + amount;
+  recordSpeedup(h.state, action.playerId, hours, h.ctx);
+  h.emit('resources.bought', { playerId: action.playerId, resource, amount, hours, sovereigns: price });
+}
+
 function finish(action: Action, h: HandlerContext): void {
   const ref = readRef((action.payload ?? {}) as Record<string, unknown>);
   if (!ref) return h.reject('E_BAD_PAYLOAD');
@@ -87,9 +118,11 @@ function finish(action: Action, h: HandlerContext): void {
 
 export const speedupModule: GameModule = {
   id: 'speedup',
-  version: '1.0.0',
+  // 1.1.0: `resources.buy` — ресурсы за ◆ из того же бюджета K (TEC-4).
+  version: '1.1.0',
   setup(api) {
     api.onAction('queue.speedup', speedup);
+    api.onAction('resources.buy', buyResources);
     api.onAction('queue.finish', finish);
   },
 };

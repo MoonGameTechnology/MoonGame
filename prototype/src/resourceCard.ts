@@ -15,8 +15,11 @@ import {
 } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { data } from './gameData';
-import { esc, flowPer, flowRate, resLine } from './format';
+import { esc, fmtEta, flowPer, flowRate, resLine } from './format';
 import { controlLimitOf, incomeBreakdown } from './economy';
+import { resourceOffer } from '../../decisions/speedupOffer';
+import { ctx } from './protoKernel';
+import { requestResources, speedupPaid } from './speedupClient';
 
 /** Resources that can be traded on the in-game market (credits are the currency). */
 const TRADEABLE = new Set(['metal', 'food', 'energy', 'microelectronics']);
@@ -41,6 +44,14 @@ export interface ResourceCardHost {
   onOpenTrader?: (resource: string) => void;
 }
 
+/** Покупка ресурса за ◆ в сетевой партии (TEC-4): что даст час и почём. */
+export interface CardPurchase {
+  amount: number;
+  price: number;
+  hours: number;
+  leftHours: number;
+}
+
 /** Что карточка знает о пакете снабжения. */
 export interface CardSupply {
   pack: Record<string, number>;
@@ -58,14 +69,16 @@ export function initResourceCard(host: ResourceCardHost): { open: (resource: str
     const root = host.root();
     if (!root) return;
     current = resource;
+    const state = host.state();
     root.innerHTML = resourceCardHtml(
-      host.state(),
+      state,
       host.me(),
       resource,
       host.icons,
       host.marketShown?.() ?? true,
       host.supply?.() ?? null,
       host.traderGoods?.()?.includes(resource) ?? false,
+      resourceOffer(state, host.me(), resource, ctx(state.time, state), speedupPaid()),
     );
   }
 
@@ -86,6 +99,12 @@ export function initResourceCard(host: ResourceCardHost): { open: (resource: str
     if (supplyBtn) {
       if (!supplyBtn.disabled) host.onBuySupply?.();
       paint(current); // казна и остаток покупок — уже новые
+      return;
+    }
+    const buyBtn = tg.closest<HTMLElement>('[data-rc-buyres]');
+    if (buyBtn) {
+      host.root()?.classList.remove('show');
+      requestResources(current, Number(buyBtn.dataset.rcBuyres));
       return;
     }
     const traderBtn = tg.closest('[data-rc-trader]') as HTMLElement | null;
@@ -115,6 +134,7 @@ export function resourceCardHtml(
   market = true,
   supply: CardSupply | null = null,
   trader = false,
+  purchase: CardPurchase | null = null,
 ): string {
   const player = state.players[me];
   const stock = Math.round(player?.resources?.[resource] ?? 0);
@@ -167,6 +187,7 @@ export function resourceCardHtml(
     <div class="rc-sec">${esc(t('rescard.net'))}</div>
     <div class="rc-flow ${netCls}">${netStr}${esc(flowPer())}</div>
     ${supply ? supplyHtml(supply) : ''}
+    ${purchase ? purchaseHtml(purchase) : ''}
     ${market ? `<button class="rc-market ${canTrade ? '' : 'disabled'}" data-rc-market="${esc(resource)}">
       ${canTrade ? esc(t('rescard.market')) : esc(t('rescard.no-trade'))}
     </button>` : ''}
@@ -188,4 +209,11 @@ function supplyHtml(supply: CardSupply): string {
     <div class="rc-supply">${resLine(supply.pack, { sign: true })}</div>
     <button class="rc-buy" data-rc-supply${out || !supply.affordable ? ' disabled' : ''}>${esc(t('rescard.supply.buy', { price: supply.price }))}</button>
     <div class="rc-note">${esc(hint)}</div>`;
+}
+
+/** Блок «Купить за ◆» (TEC-4): час ресурса из того же бюджета, что ускорение очередей. */
+function purchaseHtml(p: CardPurchase): string {
+  return `<div class="rc-sec">${esc(t('rescard.buy'))}</div>
+    <button class="rc-buy" data-rc-buyres="${p.hours}">${esc(t('rescard.buy.button', { n: p.amount, price: p.price }))}</button>
+    <div class="rc-note">${esc(t('rescard.buy.note', { left: fmtEta(p.leftHours) }))}</div>`;
 }

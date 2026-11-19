@@ -1,6 +1,6 @@
 /**
- * Ускорение очереди за ◆ из сетевой партии (TEC-3.2): запрос `POST /matches/:id/speedup`
- * (TEC-3.1) и его повтор.
+ * Платные приказы сетевой партии (TEC-3.2, TEC-4): ускорение очереди
+ * (`POST /matches/:id/speedup`) и покупка ресурса (`POST /matches/:id/resources`), их повтор.
  *
  * Правило, ради которого модуль существует: **номер запроса живёт до окончательного ответа.**
  * Сервер списывает ◆ под этот номер, а если ответ потерялся (503, обрыв, закрыли вкладку),
@@ -12,7 +12,7 @@
  * «когда вкладка имеет право ходить в сеть» (`decisions/hubAuth.ts`).
  */
 import type { QueueRef } from '../../packages/shared-core/src/index';
-import { speedupAnswerFinal, speedupBody } from '../../decisions/speedupOffer';
+import { speedupAnswerFinal } from '../../decisions/speedupOffer';
 import { refusalText } from '../../decisions/refusalText';
 import { t } from '../../localization/runtime';
 import { serverMatchId } from './netSession';
@@ -23,9 +23,13 @@ import { detach } from './detach';
 
 type AuthorizedBase = () => Promise<{ base: string; token: string } | null>;
 
+/** Платный приказ партии: ускорение очереди или покупка ресурса (TEC-4) — у сервера один
+ *  журнал ◆ и один бюджет на оба, поэтому и здесь одна очередь запроса. */
 interface Pending {
   requestId: string;
-  ref: QueueRef;
+  path: 'speedup' | 'resources';
+  /** Тело запроса без номера. */
+  body: Record<string, unknown>;
   hours: number;
 }
 
@@ -47,7 +51,15 @@ function readPending(matchId: string): Pending | null {
   try {
     const raw = readLocal(key(matchId));
     const p = raw ? (JSON.parse(raw) as Pending) : null;
-    if (p && typeof p.requestId === 'string' && typeof p.hours === 'number' && p.ref) return p;
+    if (
+      p &&
+      typeof p.requestId === 'string' &&
+      typeof p.hours === 'number' &&
+      (p.path === 'speedup' || p.path === 'resources') &&
+      p.body &&
+      typeof p.body === 'object'
+    )
+      return p;
   } catch {
     /* a broken record reads as none; the tab's copy may still hold it */
   }
@@ -75,10 +87,10 @@ async function post(matchId: string, p: Pending): Promise<{ status: number; body
   const auth = await authorized?.();
   if (!auth) return { status: 401, body: { error: 'E_AUTH' } };
   try {
-    const res = await fetch(`${auth.base}/matches/${encodeURIComponent(matchId)}/speedup`, {
+    const res = await fetch(`${auth.base}/matches/${encodeURIComponent(matchId)}/${p.path}`, {
       method: 'POST',
       headers: { authorization: `Bearer ${auth.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify(speedupBody(p.requestId, p.ref, p.hours)),
+      body: JSON.stringify({ requestId: p.requestId, ...p.body }),
     });
     const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     return { status: res.status, body };
@@ -90,7 +102,8 @@ async function post(matchId: string, p: Pending): Promise<{ status: number; body
 function report(p: Pending, answer: { status: number; body: Record<string, unknown> }): void {
   const { body } = answer;
   if (answer.status === 200) {
-    toast(t('speedup.done', { time: fmtEta(p.hours), n: Number(body.sovereigns) }));
+    const n = Number(body.sovereigns);
+    toast(p.path === 'resources' ? t('rescard.buy.done', { n }) : t('speedup.done', { time: fmtEta(p.hours), n }));
     return;
   }
   const code = typeof body.error === 'string' ? body.error : 'E_NETWORK';
@@ -127,22 +140,32 @@ async function send(matchId: string): Promise<void> {
   }
 }
 
-/** Ускорить очередь `ref` на `hours` игровых часов. Пока прежний запрос не разрешён,
- *  новый не начинается: сначала дошлётся прежний. Без сессии новый запрос не заводится. */
-export function requestSpeedup(ref: QueueRef, hours: number): void {
+/** Отправить платный приказ. Пока прежний запрос не разрешён, новый не начинается: сначала
+ *  дошлётся прежний. Без сессии новый запрос не заводится. */
+function request(path: Pending['path'], body: Record<string, unknown>, hours: number): void {
   const matchId = serverMatchId();
   if (!matchId || inFlight) return;
   detach(
-    'speedup',
+    path,
     (async () => {
       if (!readPending(matchId)) {
         if (!(await authorized?.())) {
           toast(t('speedup.sign-in'));
           return;
         }
-        writePending(matchId, { requestId: crypto.randomUUID(), ref, hours });
+        writePending(matchId, { requestId: crypto.randomUUID(), path, body, hours });
       }
       await send(matchId);
     })(),
   );
+}
+
+/** Ускорить очередь `ref` на `hours` игровых часов. */
+export function requestSpeedup(ref: QueueRef, hours: number): void {
+  request('speedup', { ...ref, hours }, hours);
+}
+
+/** Купить ресурс на `hours` эталонных часов (TEC-4). */
+export function requestResources(resource: string, hours: number): void {
+  request('resources', { resource, hours }, hours);
 }

@@ -1596,7 +1596,7 @@
 | TEC-3 | ✅ | core | `docs/time-economy-roadmap.md` | Ускорение очередей: правила ядра |
 | TEC-3.1 | ✅ | srv sec | `docs/time-economy-roadmap.md` | Списание ◆ за ускорение на сервере |
 | TEC-3.2 | ✅ | proto | `docs/time-economy-roadmap.md` | Кнопки ускорения и остаток бюджета |
-| TEC-4 | ⏳ | core proto | `docs/time-economy-roadmap.md` | Ресурсы за ◆ в партии |
+| TEC-4 | ✅ | core srv proto | `docs/time-economy-roadmap.md` | Ресурсы за ◆ в партии |
 | TEC-5 | ⏳ | srv data | `docs/time-economy-roadmap.md` | Карточки в инвентаре аккаунта |
 | TEC-6 | 🔒 | core proto | `docs/time-economy-roadmap.md` | Применение карточки в партии |
 | TEC-7 | 🔒 | srv proto | `docs/time-economy-roadmap.md` | Дневные задания дают карточки |

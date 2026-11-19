@@ -474,6 +474,9 @@ export const CELESTIAL_RINGS_SOLO_MIGRATION = after(SPEEDUP_SOLO_MIGRATION, {
   toRules: '034650f6d786f9', toData: '0.1.92', toDataHash: '05bcf6dbb76099',
 });
 
+/** TEC-4: rules only — `speedup` 1.1.0 sells resources for ◆ (`resources.buy`, host-only). */
+export const RESOURCE_PURCHASE_SOLO_MIGRATION = after(CELESTIAL_RINGS_SOLO_MIGRATION, { toRules: '0f558d0bf17afc' });
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -517,4 +520,5 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   TIME_VALUE_SOLO_MIGRATION,
   SPEEDUP_SOLO_MIGRATION,
   CELESTIAL_RINGS_SOLO_MIGRATION,
+  RESOURCE_PURCHASE_SOLO_MIGRATION,
 ];

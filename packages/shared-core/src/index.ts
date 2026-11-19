@@ -939,5 +939,5 @@ export { attacks, combatantKey } from './state/battle';
 export { inspectBattle, type BattleReadout, type BattleModifier } from './state/battleReadout';
 // The value of time (TEC-1) and paid queue speed-ups (TEC-3): the host prices a speed-up with
 // the same functions the core checks the price with (TEC-3.1).
-export { hasTimeValue } from './util/timeValue';
+export { hasTimeValue, resourceForHours } from './util/timeValue';
 export { finishesFree, speedupLeftHours, speedupPrice, type QueueRef } from './util/speedup';

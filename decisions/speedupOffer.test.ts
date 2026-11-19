@@ -6,7 +6,7 @@ import {
   type GameData,
   type GameState,
 } from '../packages/shared-core/src/index';
-import { speedupAnswerFinal, speedupBody, speedupOffer } from './speedupOffer';
+import { resourceOffer, speedupAnswerFinal, speedupOffer } from './speedupOffer';
 
 /** TEC-3.2: what the player is offered at a running queue. 10 ◆ per hour, +10% per hour,
  *  K = 1.5, the last 5 minutes free. */
@@ -91,17 +91,27 @@ describe('speedupOffer (TEC-3.2)', () => {
   });
 });
 
-describe('speedup request body and answers', () => {
-  it('names the queue the way the route reads it', () => {
-    expect(speedupBody('r1', { kind: 'construction', seq: 4 }, 1)).toEqual({ requestId: 'r1', kind: 'construction', seq: 4, hours: 1 });
-    expect(speedupBody('r1', { kind: 'research', technology: 'optics' }, 0.5)).toEqual({
-      requestId: 'r1',
-      kind: 'research',
-      technology: 'optics',
-      hours: 0.5,
-    });
+describe('resourceOffer (TEC-4)', () => {
+  it('an hour of the resource at the speed-up price', () => {
+    // 10 metal per hour, weight 1 → 1 ЭЧ = 10 metal; the first hour costs 11 ◆.
+    expect(resourceOffer(world(), 'p1', 'metal', ctx(24 * HOUR), true)).toEqual({ hours: 1, amount: 10, price: 11, leftHours: 12 });
   });
 
+  it('the rest of the budget when less than an hour is left', () => {
+    expect(resourceOffer(world(2.5), 'p1', 'metal', ctx(6 * HOUR), true)).toMatchObject({ hours: 0.5, amount: 5 });
+  });
+
+  it('nothing without a wallet, gold, budget or a priced resource', () => {
+    expect(resourceOffer(world(), 'p1', 'metal', ctx(24 * HOUR), false)).toBeNull();
+    expect(resourceOffer(world(3), 'p1', 'metal', ctx(6 * HOUR), true)).toBeNull();
+    expect(resourceOffer(world(), 'p1', 'credits', ctx(24 * HOUR), true)).toBeNull();
+    const noGold = world();
+    noGold.match.goldActions = false;
+    expect(resourceOffer(noGold, 'p1', 'metal', ctx(24 * HOUR), true)).toBeNull();
+  });
+});
+
+describe('speedup answers', () => {
   it('only an unknown answer is retried with the same request id', () => {
     expect(speedupAnswerFinal(503)).toBe(false);
     expect(speedupAnswerFinal(0)).toBe(false);

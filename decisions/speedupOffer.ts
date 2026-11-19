@@ -21,7 +21,7 @@ import {
   speedupPrice,
   type Context,
   type GameState,
-  type QueueRef,
+  resourceForHours,
 } from '../packages/shared-core/src/index';
 
 export type SpeedupOffer =
@@ -60,11 +60,24 @@ export function speedupOffer(
   };
 }
 
-/** Тело запроса ускорения на сервер (`POST /matches/:id/speedup`, TEC-3.1). */
-export function speedupBody(requestId: string, ref: QueueRef, hours: number): Record<string, unknown> {
-  return ref.kind === 'construction'
-    ? { requestId, kind: 'construction', seq: ref.seq, hours }
-    : { requestId, kind: 'research', technology: ref.technology, hours };
+/** Покупка ресурса за ◆ (TEC-4): тот же бюджет K и та же цена часа, что у ускорения. Шаг —
+ *  час, а когда бюджета меньше часа — его остаток (вниз до минуты); ресурс — сколько стоят эти
+ *  часы по матрице, вниз до целого. Нечего купить (нет кошелька, золота, матрицы, ресурса в
+ *  ней или бюджета) — `null`. */
+export function resourceOffer(
+  state: GameState,
+  me: string,
+  resource: string,
+  ctx: Context,
+  paid: boolean,
+): { hours: number; amount: number; price: number; leftHours: number } | null {
+  const def = ctx.data.timeValue;
+  if (!paid || state.match.goldActions === false || !Object.hasOwn(def.referenceHour, resource)) return null;
+  const left = speedupLeftHours(state, me, def, ctx);
+  const hours = floorMinutes(Math.min(1, left), 1);
+  const amount = Math.floor(resourceForHours(resource, hours, def));
+  if (hours < MINUTE || amount < 1) return null;
+  return { hours, amount, price: speedupPrice(state, me, hours, def, ctx), leftHours: floorMinutes(left, 10) };
 }
 
 /** Ответ сервера окончательный (итог записан или ничего не списано) или запрос надо повторить

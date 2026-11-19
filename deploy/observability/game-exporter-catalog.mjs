@@ -67,6 +67,7 @@ export const ACTION_TYPES = new Set([
   'pve.supply',
   'queue.finish',
   'queue.speedup',
+  'resources.buy',
   'rally.point',
   'rocketMine.disarm',
   'rocketMine.mode',

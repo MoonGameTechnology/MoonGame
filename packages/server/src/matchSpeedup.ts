@@ -17,6 +17,9 @@
  * (its write failed, an unexpected throw) nothing is settled and the client gets
  * `E_UNAVAILABLE` (503): repeating the same request resolves it.
  *
+ * The same path sells resources for ◆ (`POST /matches/:id/resources`, TEC-4): the core action
+ * `resources.buy`, the same budget K, price and ledger.
+ *
  * Requests of one account run one at a time in this process. Two speed-ups priced off the
  * same world would leave the second one's price stale, and two copies of one request racing
  * to settle could record a refusal for an order the room applied.
@@ -24,6 +27,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
   hasTimeValue,
+  resourceForHours,
   speedupLeftHours,
   speedupPrice,
   type Action,
@@ -66,6 +70,18 @@ interface SpeedupOrder {
   hours: number;
 }
 
+/** One order paid in ◆ from the budget K: a speed-up or a resource purchase (TEC-4). */
+interface PaidOrder {
+  requestId: string;
+  hours: number;
+  type: 'queue.speedup' | 'resources.buy';
+  /** The order's own fields: the ledger fingerprints them with the seat and the hours, and
+   *  the core action carries them with the hours and the price. */
+  terms: Record<string, unknown>;
+  /** The action id's prefix in the room's receipts. */
+  prefix: string;
+}
+
 interface Answer {
   status: number;
   body: Record<string, unknown>;
@@ -98,12 +114,30 @@ export function readSpeedupOrder(body: unknown): SpeedupOrder | null {
   return null;
 }
 
+/** The body of a resource purchase (TEC-4): `{ requestId, resource, hours }`. */
+export function readResourceOrder(body: unknown): { requestId: string; resource: string; hours: number } | null {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return null;
+  const b = body as Record<string, unknown>;
+  const { requestId, resource, hours } = b;
+  if (Object.keys(b).sort().join(',') !== 'hours,requestId,resource') return null;
+  if (!id(requestId) || !id(resource)) return null;
+  if (typeof hours !== 'number' || !Number.isFinite(hours) || hours <= 0 || hours > MAX_HOURS)
+    return null;
+  return { requestId, resource, hours };
+}
+
 /** The price of a fresh order, or why the room would refuse it before any ◆ move. The
  *  core checks all of this again; checking here keeps doomed orders off the ledger. */
-function quote(state: GameState, seat: string, hours: number, ctx: Context): MatchQuote {
+function quote(state: GameState, seat: string, order: PaidOrder, ctx: Context): MatchQuote {
   const def = ctx.data.timeValue;
+  const hours = order.hours;
   if (state.match.status === 'ended') return { ok: false, code: 'E_MATCH_ENDED' };
   if (!hasTimeValue(def)) return { ok: false, code: 'E_NOT_AVAILABLE' };
+  if (order.type === 'resources.buy') {
+    const resource = String(order.terms.resource);
+    if (!Object.hasOwn(def.referenceHour, resource) || resourceForHours(resource, hours, def) < 1)
+      return { ok: false, code: 'E_BAD_REQUEST' };
+  }
   if (state.match.goldActions === false) return { ok: false, code: 'E_GOLD_OFF' };
   if (hours > speedupLeftHours(state, seat, def, ctx) + 1e-9)
     return { ok: false, code: 'E_SPEEDUP_BUDGET' };
@@ -121,18 +155,18 @@ function answerOf(outcome: MatchReplay): Answer {
   };
 }
 
-async function speedup(
+async function pay(
   deps: MatchSpeedupApiDeps,
   who: Identity,
   matchId: string,
-  order: SpeedupOrder,
+  order: PaidOrder,
 ): Promise<Answer> {
   const seat = await deps.seatOf(matchId, who.login);
   if (!seat) return refuse(403, 'E_FORBIDDEN');
   const request = {
     matchId,
     requestId: order.requestId,
-    order: { seat, ...order.ref, hours: order.hours },
+    order: { seat, ...order.terms, hours: order.hours },
   };
   const settled = await deps.ledger.replay(who.accountId, request);
   if (settled) return answerOf(settled);
@@ -142,14 +176,14 @@ async function speedup(
     const ctx = room.liveContext();
     const spent = await deps.ledger.spend(who.accountId, {
       ...request,
-      quote: () => quote(room.state, seat, order.hours, ctx),
+      quote: () => quote(room.state, seat, order, ctx),
     });
-    if (!spent.ok) return refuse(409, spent.code);
+    if (!spent.ok) return refuse(spent.code === 'E_BAD_REQUEST' ? 400 : 409, spent.code);
     const verdict = await room.submitServerAction(seat, {
-      id: `speedup:${metaEconomyFingerprint([who.accountId, matchId, order.requestId]).slice(0, 32)}`,
-      type: 'queue.speedup',
+      id: `${order.prefix}:${metaEconomyFingerprint([who.accountId, matchId, order.requestId]).slice(0, 32)}`,
+      type: order.type,
       playerId: seat,
-      payload: { ...order.ref, hours: order.hours, price: spent.amount },
+      payload: { ...order.terms, hours: order.hours, price: spent.amount },
       issuedAt: ctx.now,
     });
     const code = verdict.ok ? undefined : (verdict.code ?? 'E_INTERNAL');
@@ -183,20 +217,30 @@ export function registerMatchSpeedupApi(app: FastifyInstance, deps: MatchSpeedup
     tails.set(key, tail);
     return run;
   };
-  app.post('/matches/:id/speedup', { bodyLimit: 1024 }, async (request, reply) => {
-    reply.header('cache-control', 'no-store');
-    if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
-    try {
-      const who = await deps.identify(request);
-      if (!who) return reply.code(401).send({ error: 'E_AUTH' });
-      const matchId = (request.params as { id?: unknown }).id;
-      const order = readSpeedupOrder(request.body);
-      if (!id(matchId) || !order) return reply.code(400).send({ error: 'E_BAD_REQUEST' });
-      const answer = await serial(who.accountId, () => speedup(deps, who, matchId, order));
-      return reply.code(answer.status).send(answer.body);
-    } catch {
-      app.log.error({ code: 'E_UNAVAILABLE', requestId: request.id }, 'match speed-up failed');
-      return reply.code(503).send({ error: 'E_UNAVAILABLE' });
-    }
+  const route = (path: string, read: (body: unknown) => PaidOrder | null): void => {
+    app.post(`/matches/:id/${path}`, { bodyLimit: 1024 }, async (request, reply) => {
+      reply.header('cache-control', 'no-store');
+      if (limited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+      try {
+        const who = await deps.identify(request);
+        if (!who) return reply.code(401).send({ error: 'E_AUTH' });
+        const matchId = (request.params as { id?: unknown }).id;
+        const order = read(request.body);
+        if (!id(matchId) || !order) return reply.code(400).send({ error: 'E_BAD_REQUEST' });
+        const answer = await serial(who.accountId, () => pay(deps, who, matchId, order));
+        return reply.code(answer.status).send(answer.body);
+      } catch {
+        app.log.error({ code: 'E_UNAVAILABLE', requestId: request.id }, `match ${path} failed`);
+        return reply.code(503).send({ error: 'E_UNAVAILABLE' });
+      }
+    });
+  };
+  route('speedup', (body) => {
+    const o = readSpeedupOrder(body);
+    return o && { requestId: o.requestId, hours: o.hours, type: 'queue.speedup', terms: { ...o.ref }, prefix: 'speedup' };
+  });
+  route('resources', (body) => {
+    const o = readResourceOrder(body);
+    return o && { requestId: o.requestId, hours: o.hours, type: 'resources.buy', terms: { resource: o.resource }, prefix: 'resources' };
   });
 }
