@@ -312,7 +312,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 (`state/cloak.ts`, модуль `cloak-field`) сжимает чужие круги опознания на `1 − cloak`;
 срывается боем, обстрелом и вылетом шаттлов (`Fleet.cloakBrokenUntil`), видно шпиону и скану.
 
-## 6. Данные (`data/*.json`, версия `0.1.86`)
+## 6. Данные (`data/*.json`, версия `0.1.90`)
 
 Контент — данные: новая сущность или число — правка JSON, а не кода (скилл `add-game-content`).
 Имя в JSON английское, текст — ключ `data.<слаг>` в обеих локалях (`prototype/src/i18n.test.ts`).
@@ -327,7 +327,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 | `modes` `events` `resources` | режимы, правила событий, ресурсы | 15·6·6 |
 | `scoring` | делитель очков построек `buildingDivisor: 3` для новых партий | — |
 | `sectorZeroShop` `sectorZeroStars` | Sector Zero: предложения магазина, ступени звёзд | 18·6 |
-| `rewards` `medalGrades` `veteran` `promotion` `market` | XP за партию, ветеран, биржа | — |
+| `rewards` `medalGrades` `veteran` `promotion` `market` `timeValue` | XP за партию, ветеран, биржа; матрица времени TEC-1 (`util/timeValue.ts`, правилами пока не читается) | — |
 
 - **Сборка.** Список фрагментов один — `composeGameDataBundle`
   (`packages/shared-core/src/data/loadGameData.ts`), разбор — `parseGameData` (zod); браузерам

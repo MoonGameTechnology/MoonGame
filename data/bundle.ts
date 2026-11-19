@@ -47,6 +47,7 @@ import medalGrades from './medalGrades.json';
 import veteran from './veteran.json';
 import promotion from './promotion.json';
 import market from './market.json';
+import timeValue from './timeValue.json';
 
 /** Копия списка фрагментов для сборщика. Экспортирована, чтобы сторож мог сверить её с
  *  тем, что `composeGameDataBundle` реально запрашивает: разъехавшись, они НЕ роняют
@@ -78,6 +79,7 @@ export const FRAGMENTS: Record<string, unknown> = {
   'veteran.json': veteran,
   'promotion.json': promotion,
   'market.json': market,
+  'timeValue.json': timeValue,
 };
 
 /** Валидированный шипнутый бандл, собранный общим загрузчиком. */

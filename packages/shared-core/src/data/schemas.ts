@@ -1348,6 +1348,41 @@ export const ResearchBoostDefSchema = z.object({
   decay: z.number().gt(0).lt(1).default(0.5),
 });
 
+/**
+ * Матрица времени (TEC-1, `docs/time-economy-roadmap.md`): эталонный игровой час (ЭЧ) —
+ * единица, через которую выражаются цены в ресурсах, Суверенах ◆ и Варрантах ⌖. Пустой
+ * `referenceHour` = матрицы в этих данных нет, правила о цене часа выключены.
+ */
+export const TimeValueDefSchema = z
+  .object({
+    /** Валовая добыча эталонной державы за игровой час, по ресурсу. */
+    referenceHour: ResourceBagSchema.default({}),
+    /** Вес ресурса внутри часа: единица ресурса стоит `weight / referenceHour` ЭЧ. Ключи —
+     *  ровно ресурсы `referenceHour`, сумма — 1, поэтому весь набор часа стоит ровно 1 ЭЧ. */
+    weights: z.record(z.string(), z.number().positive()).default({}),
+    /** Цена одного ЭЧ в ◆ при прямой трате. */
+    sovereignsPerHour: z.number().positive().default(10),
+    /** Сколько ⌖ игрок зарабатывает за ЭЧ игры. */
+    warrantsPerHour: z.number().positive().default(4),
+    /** Потолок ускорения K: платящий идёт не больше чем в K раз быстрее бесплатного. */
+    speedupCap: z.number().min(1).default(1.5),
+  })
+  .strict()
+  .refine(
+    (t) => {
+      const keys = Object.keys(t.referenceHour);
+      const weights = Object.keys(t.weights);
+      if (keys.length === 0) return weights.length === 0;
+      const sum = weights.reduce((a, k) => a + t.weights[k]!, 0);
+      return (
+        weights.length === keys.length &&
+        keys.every((k) => t.weights[k] !== undefined && (t.referenceHour[k] ?? 0) > 0) &&
+        Math.abs(sum - 1) < 1e-9
+      );
+    },
+    { message: 'timeValue: weights must name exactly the referenceHour resources and sum to 1' },
+  );
+
 /** How a match is seated: N against N in two teams, or every player for themselves.
  *  A mode names the format; the lobby turns it into concrete seats (PVE-1.1). A
  *  corporations battle goes up to 10 on 10 (CORP-8). */
@@ -1658,9 +1693,11 @@ export const GameDataSchema = z.object({
   /** Случайный промоушен (PERK-3.2). Ноль в любом поле = механики нет вовсе. */
   promotion: PromotionDefSchema.prefault({}),
   market: MarketDefSchema.prefault({}),
+  timeValue: TimeValueDefSchema.prefault({}),
 });
 
 export type MarketDef = z.infer<typeof MarketDefSchema>;
+export type TimeValueDef = z.infer<typeof TimeValueDefSchema>;
 export type VeteranDef = z.infer<typeof VeteranDefSchema>;
 export type PromotionDef = z.infer<typeof PromotionDefSchema>;
 export type ResourceBag = z.infer<typeof ResourceBagSchema>;
