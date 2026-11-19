@@ -422,6 +422,9 @@ export async function checkMobileStrategy(browser, url) {
     assert(!(await page.locator('#tech').isVisible()));
     // The adapter restores desktop sizing; the same windows are not permanently stretched.
     await page.setViewportSize({ width: 1200, height: 800 });
+    // Вид телефона снимается кадром позже смены размера: до того нижняя панель ещё видна, и
+    // `open` пошёл бы через неё — в панель, которая исчезает под пальцем.
+    await page.waitForFunction(() => !document.body.classList.contains('mobile-ui'));
     await open('market');
     const desktop = await page.locator('#market .mkbox').boundingBox();
     assert(desktop.width < 1000 && desktop.height < 790);

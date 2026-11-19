@@ -16,6 +16,12 @@ body.mobile-ui #mobile-sheet.expanded:not(.order-mode):not(.choosing) #cmdbar,
 body.mobile-ui #mobile-sheet.expanded:not(.order-mode):not(.choosing) .mobile-info {
   display: none;
 }
+/* Всплывающие сообщения не ложатся на окно сведений (заказ владельца 2026-11-19): пока окно
+   открыто, стопка спрятана. Закрыл окно — сообщения снова на месте, а пропущенное ждёт во
+   вкладке «События». */
+body.mobile-ui:has(#mobile-sheet.expanded:not(.order-mode):not(.choosing):not([hidden])) #toasts {
+  display: none;
+}
 /* Сведения занимают всё окно и листаются целиком, а не своим окошком в полэкрана. */
 body.mobile-ui #mobile-sheet.expanded:not(.order-mode):not(.choosing) #side {
   overflow-y: auto;

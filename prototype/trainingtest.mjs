@@ -116,8 +116,16 @@ try {
           (await control.isEnabled()) &&
           step.id !== 'research.grid'
         ) {
-          if (mode === 'phone') await control.tap();
-          else await control.click();
+          // Шаг на часах (ремонт у дока и т. п.) может кончиться сам, пока робот целится: пузырь
+          // следующего шага ложится на старую цель, и нажатие ждало бы её все 30 секунд. Короткая
+          // попытка; не вышло — если шаг уже сменился, цикл просто читает новый, иначе жмём ещё раз
+          // с прежним терпением.
+          const act = (timeout) =>
+            mode === 'phone' ? control.tap({ timeout }) : control.click({ timeout });
+          await act(5000).catch(async () => {
+            const now = await page.evaluate(() => window.__trainingTest.current()?.id);
+            if (now === step.id) await act(undefined);
+          });
           tapped = true;
         } else if (step.anchor && step.clock) {
           const rect = await page.locator('.sl-ring').boundingBox();
