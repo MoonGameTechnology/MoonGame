@@ -336,7 +336,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `corpBuildings` (§8): своя проверка, кривой файл — отказ запуска.
 - **Пин.** Партия хранит `version.data` и отпечаток бандла `version.dataHash`; сверка — §2.
 - **Как менять.** Правка бандла — `version` в `data/manifest.json`, пин в `schemas.test.ts` (гейт)
-  и новая пара в `decisions/soloSaveMigration.ts`: без неё локальная схватка прежнего каталога
+  и новая пара в `decisions/soloSaveMigrationPairs.ts`: без неё локальная схватка прежнего каталога
   не откроется (сторож — `soloSaveMigrationWiring.test.ts`). Новый фрагмент:
   `GameDataSchema`, `composeGameDataBundle`, `data/bundle.ts`.
 - **Карты `data/maps`.** Основная игра (`techRules.ruleset: main`): `duel-1` (2 места, 19

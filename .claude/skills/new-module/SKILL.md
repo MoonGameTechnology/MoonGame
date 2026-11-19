@@ -165,7 +165,7 @@ export const beaconModule: GameModule = {
 
 - подними `MODULE_MANIFEST_VERSION` в `packages/server/src/scenario.ts` (комментарий
   рядом — что поменялось) и перезакрепи список в `moduleManifest.test.ts`;
-- добавь пару соло-сохранений в `decisions/soloSaveMigration.ts`: новый граф модулей
+- добавь пару соло-сохранений в `decisions/soloSaveMigrationPairs.ts`: новый граф модулей
   меняет отпечаток правил, и без пары локальная схватка прошлого выпуска перестанет
   читаться. Сторож — `prototype/src/soloSaveMigrationWiring.test.ts`. То же нужно,
   когда модуль меняет правила без смены состава (поднял `version`).
