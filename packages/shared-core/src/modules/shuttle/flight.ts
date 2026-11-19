@@ -50,6 +50,7 @@ import {
 } from '../../util/combat';
 import { basePosition } from '../../state/strikePosition';
 import { distance } from '../../state/route';
+import { closedSky, crossesClosedSky } from '../../state/closedSky';
 import { fleetPositionAt } from '../../state/fleetPosition';
 import { hasMapShare } from '../../state/diplomacy';
 import { isCapturable } from '../../state/sectorKind';
@@ -382,11 +383,14 @@ function nearestBase(
   }
   let best: StrikeBase | null = null;
   let bestDist = Infinity;
+  const sky = closedSky(h.state, h.ctx.data);
   for (const c of candidates) {
     if (!c.at) continue;
     const d = distance(from, c.at);
     // Строго ближе: при равной дистанции остаётся тот, кто раньше в обходе.
     if (d > reach || d >= bestDist) continue;
+    // Перелёт и без приказа не идёт над звездой и её кольцом (`closedSky.ts`).
+    if (crossesClosedSky(sky, from, c.at)) continue;
     const spot = landingSpot(h, strike.owner, c.ref, strike.id);
     if (!spot || spot.room < need) continue;
     best = c.ref;
@@ -758,13 +762,16 @@ type PatrolRoute = {
  * приказ, на удержание (SHU-6.6) и на новую точку в воздухе (SHU-6.13): своя копия у
  * удержания разъехалась бы с приказом, и эскадра вставала бы сама туда, куда игрок её не
  * пустил бы. `from` — позиция базы: радиус меряется от неё, а не от эскадры. `to` —
- * `null`, если точки в приказе нет.
+ * `null`, если точки в приказе нет. `via` — откуда эскадра полетит на самом деле, если не
+ * с базы (из воздуха, SHU-6.13): над закрытым небом не ложится ни этот путь, ни путь
+ * домой.
  */
 export function patrolCheck(
   h: HandlerContext,
   from: { x: number; y: number } | null,
   squad: Flyer,
   to: { x: number; y: number } | null,
+  via?: { x: number; y: number },
 ): PatrolRoute | string {
   // Время и круг — по слабому звену; ноль хоть у одной машины — патрулировать нечем
   // (десантный челнок этих чисел не имеет).
@@ -777,6 +784,15 @@ export function patrolCheck(
   const range = squadronReach(squad, h.ctx.data);
   if (range <= 0) return 'E_NO_RANGE';
   if (distance(from, to) > range) return 'E_OUT_OF_RANGE';
+  // Над звездой, чёрной дырой и их кольцом патруль не встаёт и не пролетает (`closedSky.ts`):
+  // ни в точке, ни по пути домой, ни по пути туда из воздуха.
+  const sky = closedSky(h.state, h.ctx.data);
+  if (
+    crossesClosedSky(sky, to, to) ||
+    crossesClosedSky(sky, from, to) ||
+    (via !== undefined && crossesClosedSky(sky, via, to))
+  )
+    return 'E_SKY_CLOSED';
   const flight = flightMs(h, squad, from, to);
   if (flight === null) return 'E_NO_SPEED';
   return { plan, from, to, flight };

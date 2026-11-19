@@ -23,6 +23,7 @@ import {
 } from './flight';
 import { basePosition, strikePosition } from '../../state/strikePosition';
 import { distance } from '../../state/route';
+import { closedSky, crossesClosedSky } from '../../state/closedSky';
 import {
   divideSquadron,
   nextSquadronId,
@@ -84,6 +85,8 @@ export function registerLaunchOrders(api: ModuleSetupApi): void {
     const range = squadronReach(squad, h.ctx.data);
     if (range <= 0) return h.reject('E_NO_RANGE');
     if (distance(from, to) > range) return h.reject('E_OUT_OF_RANGE');
+    // Над звездой, чёрной дырой и их кольцом авиация не летает (`closedSky.ts`).
+    if (crossesClosedSky(closedSky(h.state, h.ctx.data), from, to)) return h.reject('E_SKY_CLOSED');
 
     const strike = launchFlight(h, action.playerId, base, ready, {
       target: aim.target,
@@ -297,6 +300,7 @@ export function registerSquadronOrders(api: ModuleSetupApi): void {
     const range = squadronFerryRange(squad, h.ctx.data);
     if (range <= 0) return h.reject('E_NO_RANGE');
     if (distance(from, to) > range) return h.reject('E_OUT_OF_RANGE');
+    if (crossesClosedSky(closedSky(h.state, h.ctx.data), from, to)) return h.reject('E_SKY_CLOSED');
 
     const cargo = (squad.cargo ?? []).filter((st) => st.count > 0);
     const strike = launchFlight(h, action.playerId, base, ready, {

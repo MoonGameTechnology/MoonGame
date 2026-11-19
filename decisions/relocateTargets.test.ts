@@ -62,6 +62,8 @@ const data: GameData = parseGameData({
     spaceport: { name: 'Spaceport', cost: {}, buildTimeHours: 0, hp: 30, shuttleBay: 6 },
   },
   events: {},
+  // Звезда: над ней авиация не летает (правило 8).
+  sectorKinds: { star: { traversable: false, overflight: false } },
 });
 
 const kernel = createKernel([shuttleModule]);
@@ -248,7 +250,17 @@ describe('SHU-6.5 — куда эскадру можно перебазиров�
     expect(targets(s, { kind: 'fleet', id: 'GONE' }, IX)).toEqual([]);
     expect(targets(s, HOME, { id: 'sq:z', units: [] })).toEqual([]);
   });
+
+  it('ЗА ЗВЕЗДОЙ БАЗЫ НЕТ: путь к B(300) лёг бы над звездой S(225), корабль у D(150) — до неё', () => {
+    expect(ids(targets(withStar(world()), HOME, IX))).toEqual(['fleet:F']);
+  });
 });
+
+/** Звезда S(225) между чужим портом E(200) и пустым узлом G(250): все центры на одной
+ *  прямой, поэтому её клетка — полоса x ∈ [212.5, 237.5] поперёк карты. */
+function withStar(s: GameState): GameState {
+  return { ...s, planets: { ...s.planets, S: { ...planet('S', null, 225), kind: 'star' } } };
+}
 
 describe('SHU-6.5 — сторож зеркала: предложено ⇔ ядро примет', () => {
   /** Каждая своя база, кроме дома, — настоящим приказом через кернел. */
@@ -304,6 +316,10 @@ describe('SHU-6.5 — сторож зеркала: предложено ⇔ яд
     const s = world([]);
     s.fleets.F = ship('F', 'D', { hangar: [IX] });
     mirror(s, { kind: 'fleet', id: 'F' }, IX);
+  });
+
+  it('ЗВЕЗДА НА ПУТИ: база за ней не предложена — и ядро её не примет', () => {
+    mirror(withStar(world()), HOME, IX);
   });
 });
 

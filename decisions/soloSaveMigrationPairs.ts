@@ -884,6 +884,19 @@ export const FLEET_LINE_SOLO_MIGRATION = {
   toDataHash: VOLLEY_STEP_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Data 0.1.89 + shuttle 2.3.0, missiles 1.1.0: the closed sky (owner 2026-11-19). A province
+ *  kind with `overflight: false` — the star, the black hole, the accretion disk — closes the
+ *  sky above it: no strike, patrol, ferry or missile flies over it (`E_SKY_CLOSED`). The saved
+ *  shape is unchanged; a flight already in the air flies on, only new orders are checked. */
+export const CLOSED_SKY_SOLO_MIGRATION = {
+  fromRules: FLEET_LINE_SOLO_MIGRATION.toRules,
+  fromData: FLEET_LINE_SOLO_MIGRATION.toData,
+  fromDataHash: FLEET_LINE_SOLO_MIGRATION.toDataHash,
+  toRules: '11ce709e7a74d5',
+  toData: '0.1.89',
+  toDataHash: '0c94b5782dc447',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -960,4 +973,5 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   BOT_FAVOUR_LINE_SOLO_MIGRATION,
   VOLLEY_STEP_SOLO_MIGRATION,
   FLEET_LINE_SOLO_MIGRATION,
+  CLOSED_SKY_SOLO_MIGRATION,
 ];

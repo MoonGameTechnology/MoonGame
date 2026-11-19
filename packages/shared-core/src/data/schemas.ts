@@ -799,6 +799,8 @@ export const SectorKindDefSchema = z.object({
    * прилетевший флот вступает в бой и бьёт по корпусу»).
    */
   bombardable: z.boolean().default(true),
+  /** Летает ли авиация над провинцией (владелец 2026-11-19); `false` — `state/closedSky.ts`. */
+  overflight: z.boolean().default(true),
   /** Province-centric build roster: the building ids raisable on this province type.
    *  Absent/undefined = ANY building (the permissive default, so kind-less / roster-less
    *  worlds keep building as before). Explicit `[]` = no construction here (empty /

@@ -3534,6 +3534,7 @@ export const en: Record<string, string> = {
   'err.nothing-to-repair': 'No damage — repairs are not needed',
   'err.order-limit': 'open-order limit reached',
   'err.out-of-range': 'out of range',
+  'err.sky-closed': 'no flying over a star, a black hole or their ring',
   'err.orbit-contested': 'an enemy fleet still holds the orbit — beat it first',
   'err.outbox-full': 'offline and the order queue is full — wait for the reconnect',
   'err.own-order': 'that is your own order',

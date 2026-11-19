@@ -40,6 +40,7 @@ import { dockHullRate, fleetHangarRepairRate } from '../../util/repair';
 import { fleetPositionAt } from '../../state/fleetPosition';
 import { forkSiteInBattle } from '../../state/forkSite';
 import { hangarUsed, squadronReach, stacksSize, trimHangar } from '../../state/shuttle';
+import { closedSky, crossesClosedSky } from '../../state/closedSky';
 import { indexServiceSites, serviceSitesForFleet } from '../../state/fortress';
 import { isAllied, isHostile } from '../../util/combat';
 import { recordValues } from '../../util/records';
@@ -187,6 +188,9 @@ export function registerFlightEvents(api: ModuleSetupApi): void {
     const radius = chaseRadius(strike.units, data);
     const leash = squadronReach(strike, data);
 
+    // Цель ушла за звезду или чёрную дыру — путь к ней лёг бы над закрытым небом
+    // (`closedSky.ts`), и погоня срывается так же, как на поводке.
+    const sky = closedSky(h.state, data);
     let cursor = strike.departedAt; // прошлый пересчёт (правило 2)
     let caught = false;
     let lost = false;
@@ -199,7 +203,7 @@ export function registerFlightEvents(api: ModuleSetupApi): void {
         lost = true; // правило 4
         break;
       }
-      if (distance(home, aim) > leash) {
+      if (distance(home, aim) > leash || crossesClosedSky(sky, strike.at, aim)) {
         lost = true; // правило 3
         break;
       }
