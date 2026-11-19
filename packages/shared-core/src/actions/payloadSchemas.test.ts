@@ -39,6 +39,7 @@ const CLIENT_ACTION_TYPES = [
   'construction.resume',
   'technology.research',
   'technology.boost',
+  'queue.finish',
   'technology.queue',
   'technology.dequeue',
   'technology.queue.move',

@@ -179,6 +179,8 @@ export interface Player {
    *  `MAX_STEWARD_HOLD_POINTS`). Owner-private — a rival reading your anchors is
    *  targeting intel. Absent = no points. */
   stewardHoldPoints?: PlanetId[];
+  /** Учёт ускорения очередей за время (TEC-3, `util/speedup.ts`); владельцу, чужим не виден. */
+  speedup?: import('../util/speedup').SpeedupState;
   /** Arsenal snapshot (ARS-3): the catalog ids this seat OWNS and may build with —
    *  taken from the account's `ArsenalStore` when the session is assembled (AvA:
    *  at roster lock, GDD §2 «консервация»). While present, `unit.build` requires

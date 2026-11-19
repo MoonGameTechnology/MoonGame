@@ -450,30 +450,29 @@ export const CLOSED_SKY_SOLO_MIGRATION = {
   toDataHash: '0c94b5782dc447',
 } as const;
 
-/** Data 0.1.90: the time matrix (TEC-1, owner 2026-11-19). A new catalogue fragment
- *  `timeValue` — the reference game hour, its price in Sovereigns and Warrants and the speed-up
- *  cap. No rule reads it yet, so a saved world plays on unchanged; only the catalogue pin moves. */
-export const TIME_VALUE_SOLO_MIGRATION = {
-  fromRules: CLOSED_SKY_SOLO_MIGRATION.toRules,
-  fromData: CLOSED_SKY_SOLO_MIGRATION.toData,
-  fromDataHash: CLOSED_SKY_SOLO_MIGRATION.toDataHash,
-  toRules: '0c1bb362ecae00',
-  toData: '0.1.90',
-  toDataHash: '03a2caa630fe0d',
-} as const;
+/** A pair from where `prev` ends; `to` names only the pins that moved (TEC-3). */
+const after = (prev: SoloMigration, to: Partial<SoloMigration> & { toRules: string }): SoloMigration => ({
+  fromRules: prev.toRules, fromData: prev.toData, fromDataHash: prev.toDataHash, toData: prev.toData, toDataHash: prev.toDataHash, ...to });
 
-/** Data 0.1.91: the rings round the bodies (owner 2026-11-18/19). Six ring kinds — corona,
+/** Data 0.1.90: the time matrix (TEC-1, owner 2026-11-19) — the `timeValue` fragment. No
+ *  rule reads it yet, so a saved world plays on unchanged; only the catalogue pin moves. */
+export const TIME_VALUE_SOLO_MIGRATION = after(CLOSED_SKY_SOLO_MIGRATION, {
+  toRules: '0c1bb362ecae00', toData: '0.1.90', toDataHash: '03a2caa630fe0d',
+});
+
+/** Data 0.1.91 + `speedup` 1.0.0 (TEC-3): hurrying a queue. A saved world has no speed-up
+ *  record and reads as one that never hurried; queues and their timings are untouched. */
+export const SPEEDUP_SOLO_MIGRATION = after(TIME_VALUE_SOLO_MIGRATION, {
+  toRules: '014cda3b66c91d', toData: '0.1.91', toDataHash: '18512a1ab58092',
+});
+
+/** Data 0.1.92: the rings round the bodies (owner 2026-11-18/19). Six ring kinds — corona,
  *  dust shell, stellar wind, planetary nebula, pulsar wind, circumbinary disk — join the
  *  catalogue, impassable and closed to aviation like the accretion disk. A save keeps the map
  *  it was dealt; the saved shape is unchanged. */
-export const CELESTIAL_RINGS_SOLO_MIGRATION = {
-  fromRules: TIME_VALUE_SOLO_MIGRATION.toRules,
-  fromData: TIME_VALUE_SOLO_MIGRATION.toData,
-  fromDataHash: TIME_VALUE_SOLO_MIGRATION.toDataHash,
-  toRules: '19ce9fb96c1c06',
-  toData: '0.1.91',
-  toDataHash: '17b22869b3dece',
-} as const;
+export const CELESTIAL_RINGS_SOLO_MIGRATION = after(SPEEDUP_SOLO_MIGRATION, {
+  toRules: '034650f6d786f9', toData: '0.1.92', toDataHash: '05bcf6dbb76099',
+});
 
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
@@ -516,5 +515,6 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   FLEET_LINE_SOLO_MIGRATION,
   CLOSED_SKY_SOLO_MIGRATION,
   TIME_VALUE_SOLO_MIGRATION,
+  SPEEDUP_SOLO_MIGRATION,
   CELESTIAL_RINGS_SOLO_MIGRATION,
 ];

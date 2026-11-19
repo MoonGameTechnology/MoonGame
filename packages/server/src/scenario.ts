@@ -100,7 +100,10 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '116'; // Закрытое небо: порядок тот же; `shuttle` 2.3.0 и
+export const MODULE_MANIFEST_VERSION = '117'; // TEC-3: ЧЛЕНСТВО — `speedup` 1.0.0 в самый конец;
+// `construction` 1.16.0 и `technology` 1.8.0 дают возможности `construction.hasten` и
+// `technology.hasten`. Партия на 116 не знала ускорения за время и бюджета K.
+// export const MODULE_MANIFEST_VERSION = '116'; // Закрытое небо: порядок тот же; `shuttle` 2.3.0 и
 // `missiles` 1.1.0 — удар, патруль, перелёт и ракета не идут над звездой, чёрной дырой и их кольцом
 // (`E_SKY_CLOSED`), погоня за ними срывается. Партия на 115 принимала такие приказы, и реплей разошёлся бы.
 // export const MODULE_MANIFEST_VERSION = '115'; // MSB-13: порядок тот же; `combat` 4.3.0 —

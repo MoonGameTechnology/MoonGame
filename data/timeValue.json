@@ -3,5 +3,7 @@
   "weights": { "metal": 0.65, "credits": 0.15, "microelectronics": 0.1, "food": 0.05, "energy": 0.05 },
   "sovereignsPerHour": 10,
   "warrantsPerHour": 4,
-  "speedupCap": 1.5
+  "speedupCap": 1.5,
+  "escalation": 0.1,
+  "freeFinishMinutes": 5
 }

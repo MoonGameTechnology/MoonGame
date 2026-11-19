@@ -41,6 +41,7 @@ export const WIRE_PAYLOADS: Record<string, unknown> = {
   'construction.resume': { planetId: 'home_p1', id: 0 },
   'technology.research': { technology: 'propulsion_1' },
   'technology.boost': { technology: 'propulsion_1' },
+  'queue.finish': { kind: 'construction', seq: 0 },
   'technology.queue': { technology: 'propulsion_1' },
   'technology.dequeue': { technology: 'propulsion_1' },
   'technology.queue.move': { technology: 'propulsion_1', to: 0 },

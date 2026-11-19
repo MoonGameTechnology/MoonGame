@@ -1141,6 +1141,7 @@ function project(
     delete player.stewardLog;
     delete player.stewardHoldPoints;
     delete player.arsenal; // what an enemy CAN build is strategic intel (ARS-3)
+    delete player.speedup; // how much a rival has paid to hurry is owner-private (TEC-3)
   }
   // Scoreboard: each player's live planet/fleet/unit totals aggregate territory
   // the viewer can't see, so an enemy's `scores` line is fog-sensitive intel

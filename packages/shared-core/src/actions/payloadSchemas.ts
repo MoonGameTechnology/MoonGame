@@ -105,6 +105,12 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'technology.research': z.object({ technology: id }),
   // SES-3: sink the premium resource into one ACTIVE research (diminishing returns)
   'technology.boost': z.object({ technology: id }),
+  // TEC-3: бесплатно закончить последние минуты своей очереди (стройка по номеру или
+  // идущее исследование). Платное `queue.speedup` — только хоста, схемы у него нет.
+  'queue.finish': z.union([
+    z.object({ kind: z.literal('construction'), seq: z.number().int().nonnegative() }),
+    z.object({ kind: z.literal('research'), technology: id }),
+  ]),
   // RQ-1: research queue — append, remove (with dependants), move to index `to`
   'technology.queue': z.object({ technology: id }),
   'technology.dequeue': z.object({ technology: id }),

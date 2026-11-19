@@ -58,6 +58,7 @@ import { operationModule } from './modules/operation';
 import { captiveModule } from './modules/captive';
 import { autoMergeModule } from './modules/autoMerge';
 import { cloakFieldModule } from './modules/cloakField';
+import { speedupModule } from './modules/speedup';
 
 /**
  * ОДИН СПИСОК МОДУЛЕЙ ИГРЫ (SLIM-4) — состав и порядок ядра для ОБОИХ хостов: прототипа
@@ -198,4 +199,7 @@ export const GAME_MODULES: GameModule[] = [
   // стоящий в узле. В САМЫЙ КОНЕЦ: прибытие сначала слышат все (бой, захват, мины, союзник,
   // архив), и только потом флот исчезает в стоявшем.
   autoMergeModule,
+  // Ускорение очередей за время (TEC-3): только свои действия, событий не слушает; очереди
+  // сдвигают их владельцы через возможности `construction.hasten` и `technology.hasten`.
+  speedupModule,
 ];
