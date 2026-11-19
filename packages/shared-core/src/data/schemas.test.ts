@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.90'); // TEC-1: матрица времени — эталонный игровой час и цена часа в ◆ и ⌖ (`timeValue`).
+    expect(data.version).toBe('0.1.91'); // TEC-3: рост цены ускорения в сутках и бесплатные последние минуты (`timeValue`).
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что

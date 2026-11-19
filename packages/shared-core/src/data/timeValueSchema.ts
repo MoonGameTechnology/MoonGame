@@ -18,6 +18,11 @@ export const TimeValueDefSchema = z
     warrantsPerHour: z.number().positive().default(4),
     /** Потолок ускорения K: платящий идёт не больше чем в K раз быстрее бесплатного. */
     speedupCap: z.number().min(1).default(1.5),
+    /** На сколько дорожает каждый следующий ускоренный час в те же игровые сутки партии
+     *  (TEC-3): 0,1 — второй час на 10% дороже первого. 0 — цена ровная. */
+    escalation: z.number().min(0).default(0),
+    /** Сколько последних игровых минут очереди заканчиваются бесплатно (TEC-3). 0 — нет. */
+    freeFinishMinutes: z.number().min(0).default(0),
   })
   .strict()
   .refine(

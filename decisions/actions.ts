@@ -293,6 +293,12 @@ export const dequeueTech = (playerId: string, technology: string) =>
 /** RQ-1: переставить тему очереди на место `to` (с нуля). Выше своего предка — отказ. */
 export const moveQueuedTech = (playerId: string, technology: string, to: number) =>
   act(playerId, 'technology.queue.move', { technology, to });
+/** TEC-3: бесплатно закончить последние минуты своей очереди — заказ стройки по номеру
+ *  или идущее исследование. Остаток длиннее `freeFinishMinutes` — ядро откажет. */
+export const finishQueue = (
+  playerId: string,
+  ref: { kind: 'construction'; seq: number } | { kind: 'research'; technology: string },
+) => act(playerId, 'queue.finish', ref);
 /** «Хранитель»: hand this seat to the AI until game-time `until`, running `posture` —
  *  'defend' («Оборона», the safe default) or 'active_defend' («Активная оборона»,
  *  ST-3.3: + forecast-gated counterstrike and shuttle fire-watch on own soil).

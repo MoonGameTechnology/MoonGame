@@ -171,6 +171,7 @@ const PLAYER_EXPOSURE: Record<keyof Player, 'public' | 'owner-private'> = {
   stewardLog: 'owner-private',
   stewardHoldPoints: 'owner-private', // якоря обороны — наводка
   arsenal: 'owner-private', // что соперник МОЖЕТ построить
+  speedup: 'owner-private', // сколько соперник заплатил за ускорение (TEC-3)
 };
 
 /** Ключи, которых нет в `GameState`, — их ДОБАВЛЯЕТ сама проекция. */
@@ -262,6 +263,7 @@ function maximalState(): GameState {
         stewardLog: [{ at: 50, kind: 'hold', node: 'A' }],
         stewardHoldPoints: ['A'],
         arsenal: { hulls: ['scout'], modules: [] },
+        speedup: { usedHours: 2, day: 1, dayHours: 2 },
       },
       // Соперник: те же поля, засеянные канарейками.
       [RIVAL]: {
@@ -284,6 +286,7 @@ function maximalState(): GameState {
         stewardLog: [{ at: 60, kind: 'evac', node: 'CANARY_node' }],
         stewardHoldPoints: ['CANARY_hold'],
         arsenal: { hulls: ['CANARY_hull'], modules: [] },
+        speedup: { usedHours: 77, day: 7, dayHours: 7 },
       },
     },
     planets: {
