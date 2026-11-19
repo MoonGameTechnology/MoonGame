@@ -874,6 +874,18 @@ export const VOLLEY_STEP_SOLO_MIGRATION = {
   toDataHash: BOT_FAVOUR_LINE_SOLO_MIGRATION.toDataHash,
 } as const;
 
+/** Rules-only pair: combat 4.3.0 — the battle line counts fleets, not ships: N in
+ *  `min(1, L/N)` is one fleet's own units again, and past five fleets of one power each fires
+ *  at 5/M (MSB-13). The catalogue and the saved shape are unchanged. */
+export const FLEET_LINE_SOLO_MIGRATION = {
+  fromRules: VOLLEY_STEP_SOLO_MIGRATION.toRules,
+  fromData: VOLLEY_STEP_SOLO_MIGRATION.toData,
+  fromDataHash: VOLLEY_STEP_SOLO_MIGRATION.toDataHash,
+  toRules: '03ce0ec8268cc3',
+  toData: VOLLEY_STEP_SOLO_MIGRATION.toData,
+  toDataHash: VOLLEY_STEP_SOLO_MIGRATION.toDataHash,
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -949,6 +961,7 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   FOG_INSTANT_SOLO_MIGRATION,
   BOT_FAVOUR_LINE_SOLO_MIGRATION,
   VOLLEY_STEP_SOLO_MIGRATION,
+  FLEET_LINE_SOLO_MIGRATION,
 ];
 
 /** Read current saves strictly, or migrate an audited predecessor without

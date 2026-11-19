@@ -6,7 +6,7 @@ import { combatantKey } from './battle';
 import { getStance } from './diplomacy';
 import { mitigationFromPool, sideAlive, sideUnits } from '../util/combat';
 import { targetedVolley } from '../util/groundTargets';
-import { battleLineCount } from '../util/battleLine';
+import { battleLineShare } from '../util/battleLine';
 
 export interface BattleModifier {
   source: string;
@@ -64,7 +64,7 @@ export function inspectBattle(
         sideUnits(state, b.ref) ?? [],
         ctx.data,
         role,
-        battleLineCount(state, ctx.data, battle, a),
+        battleLineShare(state, battle, a),
       ).total / divisor;
     const args = {
       battleId,

@@ -34,8 +34,6 @@ export interface BattleView {
   icon?: (side: Side, color: string) => string;
   /** Вражда владельцев — та же, что у ядра; без неё враждебны все разные владельцы. */
   hostile?: Hostility;
-  /** Наземный ли род войск — от этого предел линии (10 кораблей или 20 наземных). */
-  isGround?: (unit: string) => boolean;
   /** Осада «Поглощения» над МОИМ миром, где идёт бой (`decisions/devourSiege.ts`). */
   siege?: (planetId: string) => { archetype: string | undefined; until: number } | null;
   /** Владельцы плацдармов мира в порядке высадки — от этого, кому достанется мир. */

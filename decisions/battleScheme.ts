@@ -21,18 +21,14 @@
  *    «сколько максимум участников и как это отрисуется — можно ли так сломать игру»).
  *    Предела числа сторон в ядре нет, а плитка должна оставаться пальцевой. Свои стороны
  *    не сворачиваются никогда: приказ отдаётся тапом по своей плитке.
- * 5. **Перегруз линии — по державе** (MSB-11): N — все живые юниты державы во всех её
- *    сторонах боя, предел L — 10 кораблей или 20 наземных. N > L — каждый бьёт на L/N, и
- *    это окно называет числом, а не тихо съедает урон.
+ * 5. **Перегруз линии флотов — по державе** (MSB-13): у державы пять флотов бьют в полную
+ *    силу, сверх — каждый на 5/M (`util/battleLine.ts`). Окно называет это числом, а не тихо
+ *    съедает урон. Предел кораблей внутри флота — своё правило флота, строки табло у него нет.
  * 6. **Кому достанется мир — когда плацдармов в бою два и больше.** Правило ядра
  *    (`modules/combat.ts`, MSB-4): мир получает владелец САМОГО РАННЕГО ВЫЖИВШЕГО
  *    плацдарма, по порядку высадки. С одним плацдармом вопроса нет — и строки нет.
  */
-import {
-  COMBAT_UNIT_CAP,
-  GROUND_COMBAT_UNIT_CAP,
-  combatEfficiency,
-} from '../packages/shared-core/src/util/stacks';
+import { FLEET_LINE, fleetLineShare } from '../packages/shared-core/src/util/battleLine';
 import type { Hostility } from './battleForecast';
 
 /** Сколько плиток в ряду без сворачивания (правило 4). */
@@ -122,30 +118,20 @@ export function foldLane<T extends { mine: boolean }>(
   return { shown, folded: list.filter((s) => !shown.includes(s)) };
 }
 
-/** Перегруз линии державы (правило 5) или `null`, когда линия не перегружена. */
+/** Перегруз линии флотов державы (правило 5) или `null`, когда линия не перегружена. */
 export interface LineOverload {
-  /** Живых юнитов державы в бою. */
+  /** Живых флотов (сторон) державы в бою. */
   count: number;
-  /** Предел линии. */
+  /** Предел линии флотов. */
   cap: number;
-  /** С какой силой бьёт каждый, в процентах. */
+  /** С какой силой бьёт каждый флот, в процентах. */
   pct: number;
 }
 
-/**
- * `units` — все живые стеки моих сторон боя, `ground` — наземный ли род войск.
- * Предел — как у ядра (`cappedUnitBreakdown`): 20, когда все юниты наземные, иначе 10.
- */
-export function lineOverload(
-  units: readonly { unit: string; count: number }[],
-  ground: (unit: string) => boolean,
-): LineOverload | null {
-  const live = units.filter((u) => u.count > 0);
-  const count = live.reduce((n, u) => n + u.count, 0);
-  const cap =
-    live.length > 0 && live.every((u) => ground(u.unit)) ? GROUND_COMBAT_UNIT_CAP : COMBAT_UNIT_CAP;
-  if (!(count > cap)) return null;
-  return { count, cap, pct: Math.floor(combatEfficiency(count, cap) * 100) };
+/** `fleets` — сколько живых сторон у моей державы в бою; правило то же, что у ядра. */
+export function lineOverload(fleets: number): LineOverload | null {
+  if (!(fleets > FLEET_LINE)) return null;
+  return { count: fleets, cap: FLEET_LINE, pct: Math.floor(fleetLineShare(fleets) * 100) };
 }
 
 /**

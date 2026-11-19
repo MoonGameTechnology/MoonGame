@@ -1165,6 +1165,7 @@
 | MSB-10 | ✅ | core | `docs/multiside-combat-roadmap.md` | Остаток залпа уходит в живые цели |
 | MSB-11 | ✅ | core | `docs/multiside-combat-roadmap.md` | Одна линия на державу |
 | MSB-12 | ✅ | proto | `docs/multiside-combat-roadmap.md` | Окно боя рядами |
+| MSB-13 | ✅ | core proto | `docs/multiside-combat-roadmap.md` | Линия флотов державы |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md` | Гайдовый первый матч (соло без соперников) |
