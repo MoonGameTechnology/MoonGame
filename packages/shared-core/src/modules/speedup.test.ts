@@ -185,3 +185,39 @@ describe('матрицы нет — ускорения нет', () => {
     expect(code(k.applyAction(state, speed(seq, 1, 11), { now: 24 * HOUR, data: bare }))).toBe('E_NOT_AVAILABLE');
   });
 });
+
+describe('ресурсы за ◆ (TEC-4)', () => {
+  // Матрица теста: 10 металла в час, вес 1 → 1 ЭЧ = 10 металла.
+  const buy = (hours: number, price: number, resource = 'metal') =>
+    act('resources.buy', { resource, hours, price });
+
+  it('даёт ресурс на купленные часы и тратит тот же бюджет K по той же цене', () => {
+    const { state } = building(0, 24 * HOUR);
+    const price = speedupPrice(state, 'p1', 2, data.timeValue, ctx(24 * HOUR));
+    expect(price).toBe(22);
+    const after = ok(kernel.applyAction(state, buy(2, price), ctx(24 * HOUR)));
+    expect(after.players.p1!.resources.metal).toBe((state.players.p1!.resources.metal ?? 0) + 20);
+    expect(after.players.p1!.speedup).toEqual({ usedHours: 2, day: 1, dayHours: 2 });
+    // Час ускорения после этого стоит уже как третий час суток.
+    expect(speedupPrice(after, 'p1', 1, data.timeValue, ctx(24 * HOUR))).toBe(13);
+  });
+
+  it('бюджет, цена, золото и матрица — те же отказы, что у ускорения', () => {
+    const { state } = building(0, 6 * HOUR); // бюджет 3 ч
+    expect(code(kernel.applyAction(state, buy(4, speedupPrice(state, 'p1', 4, data.timeValue, ctx(6 * HOUR))), ctx(6 * HOUR)))).toBe('E_SPEEDUP_BUDGET');
+    expect(code(kernel.applyAction(state, buy(1, 99), ctx(6 * HOUR)))).toBe('E_PRICE_CHANGED');
+    const noGold = structuredClone(state);
+    noGold.match.goldActions = false;
+    expect(code(kernel.applyAction(noGold, buy(1, 11), ctx(6 * HOUR)))).toBe('E_GOLD_OFF');
+    const bare = parseGameData({ ...data, timeValue: {} });
+    expect(code(kernel.applyAction(state, buy(1, 11), { now: 6 * HOUR, data: bare }))).toBe('E_NOT_AVAILABLE');
+  });
+
+  it('ресурс вне матрицы и кривая нагрузка — отказ', () => {
+    const { state } = building(0, 24 * HOUR);
+    expect(code(kernel.applyAction(state, buy(1, 11, 'credits'), ctx(24 * HOUR)))).toBe('E_BAD_PAYLOAD');
+    expect(code(kernel.applyAction(state, act('resources.buy', { resource: 'metal', hours: -1, price: 0 }), ctx(24 * HOUR)))).toBe('E_BAD_PAYLOAD');
+    // Меньше единицы ресурса за проданные часы — не продаётся.
+    expect(code(kernel.applyAction(state, buy(0.01, speedupPrice(state, 'p1', 0.01, data.timeValue, ctx(24 * HOUR))), ctx(24 * HOUR)))).toBe('E_BAD_PAYLOAD');
+  });
+});

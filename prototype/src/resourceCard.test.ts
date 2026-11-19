@@ -61,3 +61,19 @@ describe('снабжение — проводка у хоста', () => {
     expect(fn.match(/saveSectorProgress\(/g)).toHaveLength(1);
   });
 });
+
+describe('карточка ресурса — покупка за ◆ в сетевой партии (TEC-4)', () => {
+  const buy = (purchase: Parameters<typeof resourceCardHtml>[7]) =>
+    resourceCardHtml(state, 'p1', 'metal', {}, false, null, false, purchase);
+
+  it('нечего купить — нет и блока', () => {
+    expect(buy(null)).not.toContain('data-rc-buyres');
+  });
+
+  it('кнопка несёт часы, подпись — сколько ресурса и почём, под ней — остаток бюджета', () => {
+    const html = buy({ amount: 33, price: 11, hours: 1, leftHours: 12 });
+    expect(html).toContain('data-rc-buyres="1"');
+    expect(html).toContain('+33 за 11 ◆');
+    expect(html).toContain('можно ещё');
+  });
+});

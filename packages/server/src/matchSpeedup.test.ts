@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Action, GameState } from '@void/shared-core';
 import { MatchSovereignLedger } from './matchSovereigns';
-import { readSpeedupOrder, registerMatchSpeedupApi, type SpeedupRoom } from './matchSpeedup';
+import { readResourceOrder, readSpeedupOrder, registerMatchSpeedupApi, type SpeedupRoom } from './matchSpeedup';
 import { MemoryMetaEconomyStore } from './metaEconomyStore';
 import { MemoryMetaMarket } from './metaMarket';
 import { createDevMatch, loadShippedData } from './scenario';
@@ -79,8 +79,8 @@ async function fixture(
     rooms: { get: (matchId) => (matchId === 'm1' ? wrapped : undefined) },
     ...(options.rateMax !== undefined ? { rateMax: options.rateMax } : {}),
   });
-  const post = (body: Record<string, unknown>, login = 'Pilot', match = 'm1') =>
-    app.inject({ method: 'POST', url: `/matches/${match}/speedup`, headers: { 'x-login': login }, payload: body });
+  const post = (body: Record<string, unknown>, login = 'Pilot', match = 'm1', path = 'speedup') =>
+    app.inject({ method: 'POST', url: `/matches/${match}/${path}`, headers: { 'x-login': login }, payload: body });
   const balance = async () => (await store.read('acc')).sovereigns ?? 0;
   return { room, seq, at, order, post, balance };
 }
@@ -246,6 +246,44 @@ describe('POST /matches/:id/speedup (TEC-3.1)', () => {
     await f.post(speed(f.seq, 1, 'a'));
     await f.post(speed(f.seq, 1, 'b'));
     expect((await f.post(speed(f.seq, 1, 'c'))).statusCode).toBe(429);
+  });
+});
+
+describe('POST /matches/:id/resources (TEC-4)', () => {
+  const buy = (resource: string, hours: number, requestId = 'b1') => ({ requestId, resource, hours });
+
+  it('sells the hours of a resource at the speed-up price, from the same budget', async () => {
+    const f = await fixture();
+    const metal = f.room.state.players.green!.resources.metal ?? 0;
+    const res = await f.post(buy('metal', 1), 'Pilot', 'm1', 'resources');
+    // 1 ЭЧ of metal = 22 / 0.65 = 33.8 → 33; the first hour of the day costs 11 ◆.
+    expect([res.statusCode, res.json()]).toEqual([200, { ok: true, sovereigns: 11 }]);
+    expect(f.room.state.players.green!.resources.metal).toBe(metal + 33);
+    expect(await f.balance()).toBe(489);
+    // The next speed-up hour is the second one of the day.
+    expect((await f.post(speed(f.seq, 1, 's1'))).json()).toEqual({ ok: true, sovereigns: 12 });
+  });
+
+  it('a resource outside the matrix is refused before any ◆ move', async () => {
+    const f = await fixture();
+    const res = await f.post(buy('biomass', 1), 'Pilot', 'm1', 'resources');
+    expect([res.statusCode, res.json()]).toEqual([400, { error: 'E_BAD_REQUEST' }]);
+    expect(await f.balance()).toBe(500);
+  });
+
+  it('one request id cannot pay for a speed-up and a purchase', async () => {
+    const f = await fixture();
+    await f.post(speed(f.seq, 1, 'same'));
+    const res = await f.post(buy('metal', 1, 'same'), 'Pilot', 'm1', 'resources');
+    expect([res.statusCode, res.json()]).toEqual([409, { error: 'E_IDEMPOTENCY_CONFLICT' }]);
+    expect(await f.balance()).toBe(489);
+  });
+
+  it('reads only `{ requestId, resource, hours }`', () => {
+    expect(readResourceOrder(buy('metal', 2))).toEqual({ requestId: 'b1', resource: 'metal', hours: 2 });
+    expect(readResourceOrder({ ...buy('metal', 2), extra: 1 })).toBeNull();
+    expect(readResourceOrder(buy('metal', 0))).toBeNull();
+    expect(readResourceOrder(buy('../x', 1))).toBeNull();
   });
 });
 
