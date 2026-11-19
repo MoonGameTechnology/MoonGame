@@ -1,4 +1,5 @@
 import { ModeVictorySchema, ScoringRulesSchema } from './victorySchema';
+import { TimeValueDefSchema } from './timeValueSchema';
 export { ModeVictorySchema } from './victorySchema';
 import { z } from 'zod';
 
@@ -1658,6 +1659,7 @@ export const GameDataSchema = z.object({
   /** Случайный промоушен (PERK-3.2). Ноль в любом поле = механики нет вовсе. */
   promotion: PromotionDefSchema.prefault({}),
   market: MarketDefSchema.prefault({}),
+  timeValue: TimeValueDefSchema.prefault({}),
 });
 
 export type MarketDef = z.infer<typeof MarketDefSchema>;
