@@ -52,8 +52,8 @@ export function targetedVolley(
   targets: readonly UnitStack[],
   data: GameData,
   role: FireRole,
-  /** N линии державы в бою (MSB-11); не передан — по самим стрелкам. */
-  lineCount?: number,
+  /** Доля линии флотов державы в бою (MSB-13); не передана — 1. */
+  lineShare?: number,
 ): TargetedVolley {
   const shares = classShares(targets, data);
   const present = TARGET_CLASSES.filter((cls) => shares[cls] > 0);
@@ -67,7 +67,7 @@ export function targetedVolley(
     (stats) => present.reduce((sum, cls) => sum + weight(cls) * statVs(stats, role, cls), 0),
     undefined,
     undefined,
-    lineCount,
+    lineShare,
   );
   const pools = emptyPools();
   let total = 0;

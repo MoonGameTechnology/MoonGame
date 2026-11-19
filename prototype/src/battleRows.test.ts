@@ -216,16 +216,20 @@ describe('лист стороны', () => {
 });
 
 describe('строки табло', () => {
-  it('перегруз линии державы назван числами (MSB-11)', () => {
-    const big = mine('attacker', { units: [{ unit: 'frigate', count: 15 }] });
-    const second = mine('defender', { key: '2', units: [{ unit: 'cruiser', count: 10 }] });
-    const html = battleWindowHtml(battle([big, second, side('p2', 'defender')]), [], {
-      hostile,
-    });
-    expect(html).toContain(esc(t('battle.win.overload', { n: 25, cap: 10, pct: 40 })));
-    expect(
-      battleWindowHtml(battle([mine('attacker'), side('p2', 'defender')]), [], { hostile }),
-    ).not.toContain('bw-note warn');
+  it('перегруз линии флотов державы назван числами (MSB-13)', () => {
+    // Шесть своих флотов — сверх пяти; корабли внутри флота строки не дают.
+    const own = Array.from({ length: 6 }, (_, i) =>
+      mine(i ? 'defender' : 'attacker', {
+        key: `${i + 1}`,
+        units: [{ unit: 'frigate', count: 15 }],
+      }),
+    );
+    const html = battleWindowHtml(battle([...own, side('p2', 'defender')]), [], { hostile });
+    expect(html).toContain(esc(t('battle.win.overload', { n: 6, cap: 5, pct: 83 })));
+    const one = mine('attacker', { units: [{ unit: 'frigate', count: 16 }] });
+    expect(battleWindowHtml(battle([one, side('p2', 'defender')]), [], { hostile })).not.toContain(
+      'bw-note warn',
+    );
   });
 
   it('два плацдарма — кому достанется мир: первому высадившемуся', () => {

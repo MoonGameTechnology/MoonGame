@@ -13,7 +13,7 @@
  *    он выделен сразу. Своих несколько и ни один не выделен — внизу общие «Атака всеми» и
  *    «Отступить всеми».
  * 3. **Строки табло — только когда им есть что сказать:** осада своего мира, наследник мира
- *    при двух плацдармах, перегруз своей линии, «вы не участвуете» в чужом бою.
+ *    при двух плацдармах, перегруз своей линии флотов, «вы не участвуете» в чужом бою.
  */
 import { hasKey, t } from '../../localization/runtime';
 import { hullTone, meterShare, powerShares } from '../../decisions/battleBalance';
@@ -375,8 +375,7 @@ function notesHtml(
       html += `<p class="bw-note">${esc(t('battle.win.heir', { name: view.ownerName?.(heir) ?? heir }))}</p>`;
   }
   if (!layout.observer) {
-    const units = m.sides.filter((s) => s.mine && sideAlive(s)).flatMap((s) => sideStacks(s));
-    const over = lineOverload(units, view.isGround ?? (() => false));
+    const over = lineOverload(m.sides.filter((s) => s.mine && sideAlive(s)).length);
     if (over)
       html += `<p class="bw-note warn">${esc(t('battle.win.overload', { n: over.count, cap: over.cap, pct: over.pct }))}</p>`;
   } else html += `<p class="bw-note">${esc(t('battle.win.watch'))}</p>`;

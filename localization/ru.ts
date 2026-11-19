@@ -561,7 +561,7 @@ export const ru: Record<string, string> = {
   'battle.win.info': 'Подробнее',
   'battle.win.more-sides': '{n|сторона|стороны|сторон}',
   'battle.win.one-target': 'Весь залп в одного врага',
-  'battle.win.overload': 'Линия огня перегружена: {n} в бою при пределе {cap}, каждый бьёт на {pct}%',
+  'battle.win.overload': 'Линия флотов перегружена: {n} {n|флот|флота|флотов} в бою при пределе {cap}, каждый бьёт на {pct}%',
   'battle.win.pick-own': 'Приказы одного флота: нажмите на его плитку',
   'battle.win.queue': 'Очередь залпов',
   'battle.win.retreat': 'Отступить',

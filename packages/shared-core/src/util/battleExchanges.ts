@@ -5,7 +5,7 @@ import { attacks } from '../state/battle';
 import { combatSequence } from './combatSequence';
 import { splitDealt, targetedVolley, type FireRole, type TargetedVolley } from './groundTargets';
 import { OVERCHARGE_HOURS, spendVolley } from './overflow';
-import { battleLineCount } from './battleLine';
+import { battleLineShare } from './battleLine';
 import {
   addHooked,
   applyDamageToSide,
@@ -65,8 +65,8 @@ function fireWithOverflow(
   incoming: Map<BattleSide, HookedDamage>,
 ): { left: number; volley: number } {
   const shots = new Map<BattleSide, TargetedVolley>();
-  // Линия державы стрелка (MSB-11) — одна на весь залп, до первого урона.
-  const line = battleLineCount(h.state, h.ctx.data, battle, source);
+  // Линия флотов державы стрелка (MSB-13) — одна на весь залп, до первого урона.
+  const line = battleLineShare(h.state, battle, source);
   const shotAt = (target: BattleSide): TargetedVolley => {
     let shot = shots.get(target);
     if (!shot) {
@@ -191,7 +191,7 @@ export function dischargeOvercharges(h: HandlerContext, battleId: string): void 
       sideUnits(h.state, targets[0]!.ref) ?? [],
       h.ctx.data,
       'attack',
-      battleLineCount(h.state, h.ctx.data, battle, side),
+      battleLineShare(h.state, battle, side),
     ).total;
     if (!(volley > 0)) continue;
     const { left } = fireWithOverflow(

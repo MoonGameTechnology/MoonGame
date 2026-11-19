@@ -158,7 +158,6 @@ export function initBattleView(host: BattleViewHost): void {
       timeLeft,
       icon: sideIcon,
       hostile: (a, b) => battleHostility(game.world())(a, b),
-      isGround: (unit) => data.units[unit]?.domain === 'ground',
       siege: (planetId) => {
         const mark = devourSieges(game.world(), game.me()).find((m) => m.target === planetId);
         return mark ? { archetype: mark.archetype, until: mark.until } : null;
