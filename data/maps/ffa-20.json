@@ -1189,24 +1189,24 @@
     },
     "lights_007": {
       "position": {
-        "x": -5,
-        "y": 1985
+        "x": 51,
+        "y": 1975
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_008": {
       "position": {
-        "x": -287,
-        "y": 2341
+        "x": -101,
+        "y": 2419
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_009": {
       "position": {
-        "x": 1290,
-        "y": 2509
+        "x": 1265,
+        "y": 2533
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -1234,29 +1234,29 @@
         "x": 906,
         "y": 1593
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_013": {
       "position": {
-        "x": 1307,
-        "y": 2003
+        "x": 1141,
+        "y": 2029
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_014": {
       "position": {
-        "x": 330,
-        "y": 3283
+        "x": 334,
+        "y": 3279
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_015": {
       "position": {
-        "x": 1190,
-        "y": 3110
+        "x": 1181,
+        "y": 3098
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -1267,13 +1267,13 @@
         "x": 714,
         "y": 1287
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_017": {
       "position": {
-        "x": 972,
-        "y": 3664
+        "x": 928,
+        "y": 3647
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -1281,15 +1281,15 @@
     },
     "lights_018": {
       "position": {
-        "x": 76,
-        "y": 3803
+        "x": 336,
+        "y": 3714
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_019": {
       "position": {
-        "x": 572,
+        "x": 584,
         "y": 3942
       },
       "kind": "planet",
@@ -1298,16 +1298,16 @@
     },
     "lights_020": {
       "position": {
-        "x": 161,
-        "y": 4162
+        "x": 349,
+        "y": 4243
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_021": {
       "position": {
-        "x": 1099,
-        "y": 4198
+        "x": 1018,
+        "y": 4220
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -1324,8 +1324,8 @@
     },
     "lights_023": {
       "position": {
-        "x": -3251,
-        "y": 65
+        "x": -3262,
+        "y": 41
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
@@ -1340,24 +1340,24 @@
     },
     "lights_025": {
       "position": {
-        "x": -2932,
-        "y": -185
+        "x": -2934,
+        "y": -110
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_026": {
       "position": {
-        "x": -3103,
-        "y": 535
+        "x": -3156,
+        "y": 366
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_027": {
       "position": {
-        "x": -2821,
-        "y": 170
+        "x": -2810,
+        "y": 103
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -1365,10 +1365,10 @@
     },
     "lights_028": {
       "position": {
-        "x": -2199,
-        "y": -118
+        "x": -2196,
+        "y": -115
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_029": {
@@ -1381,8 +1381,8 @@
     },
     "lights_030": {
       "position": {
-        "x": 2540,
-        "y": 1600
+        "x": 2640,
+        "y": 1551
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
@@ -1398,48 +1398,48 @@
     },
     "lights_032": {
       "position": {
-        "x": 3678,
-        "y": 1941
+        "x": 3660,
+        "y": 1955
       },
       "kind": "solar_flare",
       "terrain": "solar_flare_zone"
     },
     "lights_033": {
       "position": {
-        "x": 3655,
-        "y": 2328
+        "x": 3651,
+        "y": 2308
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_034": {
       "position": {
-        "x": 4113,
-        "y": 2459
+        "x": 4128,
+        "y": 2423
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_035": {
       "position": {
-        "x": 3923,
-        "y": 2792
+        "x": 3991,
+        "y": 2577
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_036": {
       "position": {
-        "x": 4508,
-        "y": 1958
+        "x": 4513,
+        "y": 2019
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_037": {
       "position": {
-        "x": 4299,
-        "y": 2786
+        "x": 4384,
+        "y": 2707
       },
       "kind": "asteroid",
       "terrain": "empty_space"
@@ -1455,8 +1455,8 @@
     },
     "lights_039": {
       "position": {
-        "x": 2411,
-        "y": 1120
+        "x": 2417,
+        "y": 1110
       },
       "kind": "asteroid",
       "terrain": "dust_lane"
@@ -1505,8 +1505,8 @@
     },
     "lights_042": {
       "position": {
-        "x": 3122,
-        "y": 624
+        "x": 3124,
+        "y": 635
       },
       "kind": "planet",
       "terrain": "asteroid_field",
@@ -1514,18 +1514,18 @@
     },
     "lights_043": {
       "position": {
-        "x": 3362,
-        "y": 1072
+        "x": 3352,
+        "y": 1070
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "lights_044": {
       "position": {
-        "x": 2136,
-        "y": 1359
+        "x": 2203,
+        "y": 1196
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_045": {
@@ -1558,7 +1558,7 @@
         "x": 1858,
         "y": -1
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_049": {
@@ -1572,8 +1572,8 @@
     },
     "lights_050": {
       "position": {
-        "x": 3702,
-        "y": -1093
+        "x": 3703,
+        "y": -1094
       },
       "kind": "dead_world",
       "terrain": "depleted_system",
@@ -1581,8 +1581,8 @@
     },
     "lights_051": {
       "position": {
-        "x": 3283,
-        "y": -741
+        "x": 3430,
+        "y": -896
       },
       "kind": "asteroid",
       "terrain": "depleted_system"
@@ -1648,16 +1648,16 @@
     },
     "lights_056": {
       "position": {
-        "x": 2903,
-        "y": -597
+        "x": 2880,
+        "y": -906
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_057": {
       "position": {
-        "x": 4166,
-        "y": -1075
+        "x": 4158,
+        "y": -1078
       },
       "kind": "planet",
       "terrain": "deep_void",
@@ -1665,8 +1665,8 @@
     },
     "lights_058": {
       "position": {
-        "x": 3727,
-        "y": -1817
+        "x": 3715,
+        "y": -1727
       },
       "kind": "asteroid",
       "terrain": "deep_void"
@@ -1674,15 +1674,15 @@
     "lights_059": {
       "position": {
         "x": 4415,
-        "y": -1627
+        "y": -1626
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_060": {
       "position": {
-        "x": 4397,
-        "y": -2006
+        "x": 4452,
+        "y": -1949
       },
       "kind": "planet",
       "terrain": "deep_void",
@@ -1690,40 +1690,40 @@
     },
     "lights_061": {
       "position": {
-        "x": 4091,
-        "y": -2298
+        "x": 4245,
+        "y": -2118
       },
       "kind": "asteroid",
       "terrain": "deep_void"
     },
     "lights_062": {
       "position": {
-        "x": 4994,
-        "y": -1300
+        "x": 4958,
+        "y": -1487
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_063": {
       "position": {
-        "x": 5129,
-        "y": -880
+        "x": 5190,
+        "y": -1212
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_064": {
       "position": {
-        "x": 4006,
-        "y": -2747
+        "x": 4205,
+        "y": -2913
       },
       "kind": "asteroid",
       "terrain": "deep_void"
     },
     "lights_065": {
       "position": {
-        "x": -3662,
-        "y": 584
+        "x": -3727,
+        "y": 544
       },
       "kind": "planet",
       "terrain": "depleted_system",
@@ -1731,8 +1731,8 @@
     },
     "lights_066": {
       "position": {
-        "x": -3928,
-        "y": 1070
+        "x": -3962,
+        "y": 1072
       },
       "kind": "dead_world",
       "terrain": "depleted_system",
@@ -1748,10 +1748,10 @@
     },
     "lights_068": {
       "position": {
-        "x": -3647,
-        "y": 1344
+        "x": -3735,
+        "y": 1385
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_069": {
@@ -1765,8 +1765,8 @@
     },
     "lights_070": {
       "position": {
-        "x": -3154,
-        "y": 1210
+        "x": -3304,
+        "y": 1353
       },
       "kind": "asteroid",
       "terrain": "deep_void"
@@ -1774,39 +1774,39 @@
     "lights_071": {
       "position": {
         "x": -4639,
-        "y": 1089
+        "y": 1086
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_072": {
       "position": {
-        "x": -4765,
-        "y": 550
+        "x": -4690,
+        "y": 633
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_073": {
       "position": {
-        "x": -5048,
-        "y": 890
+        "x": -5042,
+        "y": 917
       },
       "kind": "asteroid",
       "terrain": "deep_void"
     },
     "lights_074": {
       "position": {
-        "x": -4802,
-        "y": 1665
+        "x": -4868,
+        "y": 1479
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_075": {
       "position": {
-        "x": -5164,
-        "y": 545
+        "x": -5133,
+        "y": 766
       },
       "kind": "planet",
       "terrain": "deep_void",
@@ -1814,24 +1814,24 @@
     },
     "lights_076": {
       "position": {
-        "x": -5250,
-        "y": 1395
+        "x": -5261,
+        "y": 1381
       },
       "kind": "rift",
       "terrain": "empty_space"
     },
     "lights_077": {
       "position": {
-        "x": -5236,
-        "y": 124
+        "x": -5232,
+        "y": 518
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_078": {
       "position": {
-        "x": -5107,
-        "y": 1879
+        "x": -5266,
+        "y": 1782
       },
       "kind": "planet",
       "terrain": "deep_void",
@@ -1839,16 +1839,16 @@
     },
     "lights_079": {
       "position": {
-        "x": -4880,
-        "y": 2188
+        "x": -5154,
+        "y": 2200
       },
       "kind": "asteroid",
       "terrain": "deep_void"
     },
     "lights_080": {
       "position": {
-        "x": -3879,
-        "y": -560
+        "x": -3892,
+        "y": -554
       },
       "kind": "dead_world",
       "terrain": "dust_lane",
@@ -1856,16 +1856,16 @@
     },
     "lights_081": {
       "position": {
-        "x": -3437,
-        "y": -891
+        "x": -3603,
+        "y": -855
       },
       "kind": "asteroid",
       "terrain": "dust_lane"
     },
     "lights_082": {
       "position": {
-        "x": -3984,
-        "y": -1072
+        "x": -3996,
+        "y": -1073
       },
       "kind": "asteroid",
       "terrain": "dust_lane"
@@ -1922,8 +1922,8 @@
     },
     "lights_085": {
       "position": {
-        "x": -3738,
-        "y": -1342
+        "x": -3790,
+        "y": -1363
       },
       "kind": "planet",
       "terrain": "asteroid_field",
@@ -1931,16 +1931,16 @@
     },
     "lights_086": {
       "position": {
-        "x": -3009,
-        "y": -563
+        "x": -3051,
+        "y": -377
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "lights_087": {
       "position": {
-        "x": -4501,
-        "y": -1126
+        "x": -4491,
+        "y": -1101
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
@@ -1956,10 +1956,10 @@
     },
     "lights_089": {
       "position": {
-        "x": -4959,
-        "y": -918
+        "x": -4958,
+        "y": -920
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_090": {
@@ -1973,32 +1973,32 @@
     },
     "lights_091": {
       "position": {
-        "x": -4951,
-        "y": -1488
+        "x": -5031,
+        "y": -1238
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_092": {
       "position": {
-        "x": -4850,
-        "y": -1874
+        "x": -5111,
+        "y": -1540
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_093": {
       "position": {
-        "x": -5317,
-        "y": -1404
+        "x": -5379,
+        "y": -1341
       },
       "kind": "asteroid_cluster",
       "terrain": "asteroid_cluster"
     },
     "lights_094": {
       "position": {
-        "x": -5465,
-        "y": -459
+        "x": -5554,
+        "y": -651
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2006,15 +2006,15 @@
     },
     "lights_095": {
       "position": {
-        "x": -5585,
-        "y": -13
+        "x": -5904,
+        "y": -52
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_096": {
       "position": {
-        "x": 625,
+        "x": 624,
         "y": -2974
       },
       "kind": "dead_world",
@@ -2057,16 +2057,16 @@
     },
     "lights_098": {
       "position": {
-        "x": 932,
-        "y": -2368
+        "x": 771,
+        "y": -2407
       },
       "kind": "asteroid",
       "terrain": "dust_lane"
     },
     "lights_099": {
       "position": {
-        "x": 418,
-        "y": -3642
+        "x": 454,
+        "y": -3608
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
@@ -2082,24 +2082,24 @@
     },
     "lights_101": {
       "position": {
-        "x": 1380,
-        "y": -3939
+        "x": 1279,
+        "y": -3917
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "lights_102": {
       "position": {
-        "x": 705,
-        "y": -4279
+        "x": 738,
+        "y": -4283
       },
       "kind": "asteroid_cluster",
       "terrain": "asteroid_cluster"
     },
     "lights_103": {
       "position": {
-        "x": 1131,
-        "y": -4458
+        "x": 1127,
+        "y": -4460
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2107,42 +2107,42 @@
     },
     "lights_104": {
       "position": {
-        "x": 1761,
-        "y": -4256
+        "x": 1511,
+        "y": -4364
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_105": {
       "position": {
-        "x": 29,
-        "y": -4517
+        "x": 89,
+        "y": -4593
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_106": {
       "position": {
-        "x": -2962,
-        "y": -1896
+        "x": -2965,
+        "y": -1953
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
     "lights_107": {
       "position": {
-        "x": -3516,
-        "y": -1682
+        "x": -3551,
+        "y": -1721
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_108": {
       "position": {
-        "x": -2765,
-        "y": -2253
+        "x": -2769,
+        "y": -2231
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_109": {
@@ -2150,13 +2150,13 @@
         "x": -3663,
         "y": -2095
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_110": {
       "position": {
-        "x": -3299,
-        "y": -2451
+        "x": -3306,
+        "y": -2443
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2164,8 +2164,8 @@
     },
     "lights_111": {
       "position": {
-        "x": -3168,
-        "y": -1277
+        "x": -3308,
+        "y": -1425
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2173,10 +2173,10 @@
     },
     "lights_112": {
       "position": {
-        "x": -2751,
-        "y": -1232
+        "x": -2631,
+        "y": -1405
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_113": {
@@ -2184,21 +2184,21 @@
         "x": -3786,
         "y": -2560
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_114": {
       "position": {
-        "x": -3030,
-        "y": -2932
+        "x": -3196,
+        "y": -2816
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_115": {
       "position": {
-        "x": -4190,
-        "y": -2381
+        "x": -4138,
+        "y": -2419
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2206,16 +2206,16 @@
     },
     "lights_116": {
       "position": {
-        "x": -4561,
-        "y": -2452
+        "x": -4485,
+        "y": -2612
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_117": {
       "position": {
         "x": 2652,
-        "y": -1413
+        "y": -1414
       },
       "kind": "dead_world",
       "terrain": "dust_lane",
@@ -2223,8 +2223,8 @@
     },
     "lights_118": {
       "position": {
-        "x": 2442,
-        "y": -1098
+        "x": 2416,
+        "y": -1138
       },
       "kind": "asteroid",
       "terrain": "dust_lane"
@@ -2239,8 +2239,8 @@
     },
     "lights_120": {
       "position": {
-        "x": 1906,
-        "y": -1601
+        "x": 1965,
+        "y": -1502
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
@@ -2256,8 +2256,8 @@
     },
     "lights_122": {
       "position": {
-        "x": 2221,
-        "y": -708
+        "x": 2141,
+        "y": -748
       },
       "kind": "asteroid",
       "terrain": "empty_space"
@@ -2273,47 +2273,47 @@
     "lights_124": {
       "position": {
         "x": 1505,
-        "y": -1217
+        "y": -1209
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_125": {
       "position": {
-        "x": 572,
-        "y": -2353
+        "x": 558,
+        "y": -2355
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard"
     },
     "lights_126": {
       "position": {
-        "x": 65,
-        "y": -2200
+        "x": 75,
+        "y": -2202
       },
       "kind": "debris_field",
       "terrain": "derelict_graveyard"
     },
     "lights_127": {
       "position": {
-        "x": -190,
-        "y": -2515
+        "x": -119,
+        "y": -2565
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_128": {
       "position": {
-        "x": -298,
-        "y": -2868
+        "x": -296,
+        "y": -2904
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "empty",
+      "terrain": "empty_space"
     },
     "lights_129": {
       "position": {
-        "x": 34,
-        "y": -1841
+        "x": 37,
+        "y": -1840
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2329,10 +2329,10 @@
     },
     "lights_131": {
       "position": {
-        "x": 704,
-        "y": -1571
+        "x": 703,
+        "y": -1570
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_132": {
@@ -2346,16 +2346,16 @@
     },
     "lights_133": {
       "position": {
-        "x": -184,
-        "y": -1484
+        "x": -183,
+        "y": -1483
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_134": {
       "position": {
-        "x": 3605,
-        "y": 98
+        "x": 3664,
+        "y": 137
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula",
@@ -2363,50 +2363,50 @@
     },
     "lights_135": {
       "position": {
-        "x": 3480,
-        "y": -246
+        "x": 3669,
+        "y": -208
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
     },
     "lights_136": {
       "position": {
-        "x": 3882,
-        "y": -244
+        "x": 3902,
+        "y": -242
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_137": {
       "position": {
-        "x": 3973,
-        "y": 355
+        "x": 3967,
+        "y": 342
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_138": {
       "position": {
-        "x": 3687,
-        "y": 634
+        "x": 3673,
+        "y": 621
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_139": {
       "position": {
-        "x": 3048,
-        "y": -241
+        "x": 3278,
+        "y": -27
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_140": {
       "position": {
-        "x": 4312,
-        "y": 126
+        "x": 4311,
+        "y": 121
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_141": {
@@ -2420,8 +2420,8 @@
     },
     "lights_142": {
       "position": {
-        "x": 4929,
-        "y": 474
+        "x": 4941,
+        "y": 452
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2429,24 +2429,24 @@
     },
     "lights_143": {
       "position": {
-        "x": 5184,
-        "y": -358
+        "x": 5245,
+        "y": -79
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_144": {
       "position": {
-        "x": 4858,
-        "y": 1207
+        "x": 4925,
+        "y": 1187
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_145": {
       "position": {
-        "x": 5351,
-        "y": 88
+        "x": 5366,
+        "y": 137
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2454,8 +2454,8 @@
     },
     "lights_146": {
       "position": {
-        "x": 2031,
-        "y": 2570
+        "x": 2055,
+        "y": 2698
       },
       "kind": "dead_world",
       "terrain": "dust_lane",
@@ -2505,24 +2505,24 @@
     },
     "lights_148": {
       "position": {
-        "x": 2438,
-        "y": 2219
+        "x": 2581,
+        "y": 2303
       },
       "kind": "asteroid",
       "terrain": "dust_lane"
     },
     "lights_149": {
       "position": {
-        "x": 1874,
-        "y": 2936
+        "x": 1875,
+        "y": 2918
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "lights_150": {
       "position": {
-        "x": 1927,
-        "y": 2005
+        "x": 2000,
+        "y": 2389
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
@@ -2538,24 +2538,24 @@
     },
     "lights_152": {
       "position": {
-        "x": 2050,
-        "y": 3332
+        "x": 2080,
+        "y": 3244
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "lights_153": {
       "position": {
-        "x": 1455,
-        "y": 2858
+        "x": 1454,
+        "y": 2855
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "lights_154": {
       "position": {
-        "x": 2796,
-        "y": 3551
+        "x": 2806,
+        "y": 3545
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2563,32 +2563,32 @@
     },
     "lights_155": {
       "position": {
-        "x": 2138,
-        "y": 3829
+        "x": 2259,
+        "y": 3762
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_156": {
       "position": {
-        "x": 3199,
-        "y": 3495
+        "x": 3037,
+        "y": 3557
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_157": {
       "position": {
-        "x": 2585,
-        "y": 3946
+        "x": 2666,
+        "y": 3940
       },
       "kind": "asteroid_cluster",
       "terrain": "asteroid_cluster"
     },
     "lights_158": {
       "position": {
-        "x": 3119,
-        "y": 3940
+        "x": 3099,
+        "y": 3960
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2596,32 +2596,32 @@
     },
     "lights_159": {
       "position": {
-        "x": 3478,
-        "y": 3777
+        "x": 3382,
+        "y": 3941
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_160": {
       "position": {
-        "x": 3914,
-        "y": 3202
+        "x": 4202,
+        "y": 3052
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_161": {
       "position": {
-        "x": 1736,
-        "y": 4340
+        "x": 1701,
+        "y": 4474
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_162": {
       "position": {
-        "x": 2239,
-        "y": -2459
+        "x": 2338,
+        "y": -2493
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula",
@@ -2629,15 +2629,15 @@
     },
     "lights_163": {
       "position": {
-        "x": 2164,
-        "y": -2088
+        "x": 2318,
+        "y": -2055
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
     },
     "lights_164": {
       "position": {
-        "x": 2739,
+        "x": 2737,
         "y": -2373
       },
       "kind": "nebula",
@@ -2645,40 +2645,40 @@
     },
     "lights_165": {
       "position": {
-        "x": 1802,
-        "y": -2145
+        "x": 2110,
+        "y": -2058
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_166": {
       "position": {
-        "x": 2266,
-        "y": -3102
+        "x": 2268,
+        "y": -3092
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_167": {
       "position": {
-        "x": 1743,
-        "y": -3020
+        "x": 1759,
+        "y": -3083
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_168": {
       "position": {
-        "x": 2849,
-        "y": -2913
+        "x": 2835,
+        "y": -2917
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_169": {
       "position": {
-        "x": 1417,
-        "y": -2312
+        "x": 1150,
+        "y": -2515
       },
       "kind": "asteroid",
       "terrain": "empty_space"
@@ -2728,10 +2728,10 @@
     },
     "lights_172": {
       "position": {
-        "x": 2369,
-        "y": -3705
+        "x": 2497,
+        "y": -3505
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_173": {
@@ -2754,16 +2754,16 @@
     },
     "lights_175": {
       "position": {
-        "x": 3532,
-        "y": -3412
+        "x": 3510,
+        "y": -3471
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_176": {
       "position": {
-        "x": 2675,
-        "y": -4048
+        "x": 2870,
+        "y": -4029
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2771,40 +2771,40 @@
     },
     "lights_177": {
       "position": {
-        "x": 2270,
-        "y": -4183
+        "x": 2548,
+        "y": -4325
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_178": {
       "position": {
-        "x": -945,
-        "y": -2830
+        "x": -947,
+        "y": -2987
       },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
     },
     "lights_179": {
       "position": {
-        "x": -1095,
-        "y": -3235
+        "x": -1075,
+        "y": -3232
       },
-      "kind": "solar_flare",
-      "terrain": "solar_flare_zone"
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
     },
     "lights_180": {
       "position": {
-        "x": -1511,
-        "y": -2542
+        "x": -1587,
+        "y": -2587
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "lights_181": {
       "position": {
-        "x": -1420,
-        "y": -3414
+        "x": -1407,
+        "y": -3411
       },
       "kind": "planet",
       "terrain": "solar_flare_zone",
@@ -2812,35 +2812,32 @@
     },
     "lights_182": {
       "position": {
-        "x": -614,
-        "y": -3207
+        "x": -606,
+        "y": -3250
       },
-      "kind": "star",
-      "terrain": "binary_star",
-      "size": 1.4,
-      "buildings": [],
-      "garrison": []
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     },
     "lights_183": {
       "position": {
-        "x": -809,
-        "y": -2254
+        "x": -528,
+        "y": -2563
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_184": {
       "position": {
-        "x": -1172,
-        "y": -3761
+        "x": -1185,
+        "y": -3739
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_185": {
       "position": {
-        "x": -1863,
-        "y": -3489
+        "x": -1773,
+        "y": -3520
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2848,50 +2845,50 @@
     },
     "lights_186": {
       "position": {
-        "x": -1022,
-        "y": -4186
+        "x": -1082,
+        "y": -4181
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_187": {
       "position": {
-        "x": -2103,
-        "y": -3754
+        "x": -2020,
+        "y": -3840
       },
       "kind": "rift",
       "terrain": "empty_space"
     },
     "lights_188": {
       "position": {
-        "x": -2461,
-        "y": -3400
+        "x": -2289,
+        "y": -3605
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_189": {
       "position": {
-        "x": -615,
-        "y": -4297
+        "x": -707,
+        "y": -4324
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_190": {
       "position": {
-        "x": -1628,
-        "y": 1834
+        "x": -1653,
+        "y": 1825
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
     "lights_191": {
       "position": {
-        "x": -2173,
-        "y": 1822
+        "x": -2169,
+        "y": 1827
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_192": {
@@ -2899,7 +2896,7 @@
         "x": -1756,
         "y": 1432
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_193": {
@@ -2913,10 +2910,10 @@
     },
     "lights_194": {
       "position": {
-        "x": -1278,
-        "y": 2023
+        "x": -1514,
+        "y": 1972
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_195": {
@@ -2939,8 +2936,8 @@
     },
     "lights_197": {
       "position": {
-        "x": -2019,
-        "y": 525
+        "x": -2004,
+        "y": 517
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -2948,8 +2945,8 @@
     },
     "lights_198": {
       "position": {
-        "x": -3149,
-        "y": 1845
+        "x": -3165,
+        "y": 1913
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula",
@@ -2957,8 +2954,8 @@
     },
     "lights_199": {
       "position": {
-        "x": -2744,
-        "y": 2167
+        "x": -2745,
+        "y": 2158
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
@@ -2999,24 +2996,24 @@
     },
     "lights_201": {
       "position": {
-        "x": -2857,
-        "y": 1513
+        "x": -2824,
+        "y": 1687
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_202": {
       "position": {
-        "x": -3652,
-        "y": 1706
+        "x": -3672,
+        "y": 1728
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "lights_203": {
       "position": {
-        "x": -2469,
-        "y": 1380
+        "x": -2349,
+        "y": 1470
       },
       "kind": "nebula",
       "terrain": "nebula"
@@ -3032,31 +3029,31 @@
     },
     "lights_205": {
       "position": {
-        "x": -3529,
-        "y": 2856
+        "x": -3561,
+        "y": 2841
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_206": {
       "position": {
-        "x": -3142,
-        "y": 3052
+        "x": -3268,
+        "y": 2994
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_207": {
       "position": {
-        "x": -3489,
+        "x": -3557,
         "y": 3278
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_208": {
       "position": {
-        "x": -3833,
+        "x": -3836,
         "y": 3160
       },
       "kind": "planet",
@@ -3065,16 +3062,16 @@
     },
     "lights_209": {
       "position": {
-        "x": -4499,
-        "y": 2349
+        "x": -4339,
+        "y": 2575
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_210": {
       "position": {
-        "x": -4383,
-        "y": 2696
+        "x": -4306,
+        "y": 2865
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -3082,8 +3079,8 @@
     },
     "lights_211": {
       "position": {
-        "x": -1213,
-        "y": 2756
+        "x": -1258,
+        "y": 2825
       },
       "kind": "dead_world",
       "terrain": "dust_lane",
@@ -3092,7 +3089,7 @@
     "lights_212": {
       "position": {
         "x": -985,
-        "y": 3109
+        "y": 3110
       },
       "kind": "asteroid",
       "terrain": "dust_lane"
@@ -3133,16 +3130,16 @@
     },
     "lights_214": {
       "position": {
-        "x": -765,
-        "y": 2212
+        "x": -622,
+        "y": 2582
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "lights_215": {
       "position": {
-        "x": -534,
-        "y": 2660
+        "x": -456,
+        "y": 2818
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
@@ -3158,31 +3155,31 @@
     },
     "lights_217": {
       "position": {
-        "x": -1639,
-        "y": 3394
+        "x": -1611,
+        "y": 3397
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "lights_218": {
       "position": {
-        "x": -977,
-        "y": 3721
+        "x": -1090,
+        "y": 3681
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_219": {
       "position": {
-        "x": -2112,
-        "y": 3373
+        "x": -1974,
+        "y": 3397
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_220": {
       "position": {
-        "x": -1577,
+        "x": -1576,
         "y": 3882
       },
       "kind": "asteroid_cluster",
@@ -3190,8 +3187,8 @@
     },
     "lights_221": {
       "position": {
-        "x": -2089,
-        "y": 3747
+        "x": -2014,
+        "y": 3810
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -3199,18 +3196,18 @@
     },
     "lights_222": {
       "position": {
-        "x": -407,
-        "y": 3931
+        "x": -815,
+        "y": 3841
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "lights_223": {
       "position": {
-        "x": -2447,
-        "y": 3538
+        "x": -2349,
+        "y": 3666
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_224": {
@@ -3224,16 +3221,16 @@
     },
     "lights_225": {
       "position": {
-        "x": -2271,
-        "y": -1707
+        "x": -2243,
+        "y": -1737
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
     },
     "lights_226": {
       "position": {
-        "x": -1768,
-        "y": -2256
+        "x": -1783,
+        "y": -2257
       },
       "kind": "nebula",
       "terrain": "nebula"
@@ -3248,8 +3245,8 @@
     },
     "lights_228": {
       "position": {
-        "x": -1424,
-        "y": -2037
+        "x": -1594,
+        "y": -1986
       },
       "kind": "nebula",
       "terrain": "nebula"
@@ -3265,10 +3262,10 @@
     },
     "lights_230": {
       "position": {
-        "x": -1199,
-        "y": -1670
+        "x": -1278,
+        "y": -1545
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_231": {
@@ -3283,7 +3280,7 @@
     "lights_232": {
       "position": {
         "x": -996,
-        "y": -1242
+        "y": -1240
       },
       "kind": "asteroid",
       "terrain": "empty_space"
@@ -3299,16 +3296,16 @@
     },
     "lights_234": {
       "position": {
-        "x": -2070,
-        "y": -461
+        "x": -2046,
+        "y": -446
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_235": {
       "position": {
-        "x": -412,
-        "y": 258
+        "x": -408,
+        "y": 255
       },
       "kind": "planet",
       "terrain": "deep_void",
@@ -3316,8 +3313,8 @@
     },
     "lights_236": {
       "position": {
-        "x": -399,
-        "y": -342
+        "x": -395,
+        "y": -338
       },
       "kind": "planet",
       "terrain": "deep_void",
@@ -3325,72 +3322,72 @@
     },
     "lights_237": {
       "position": {
-        "x": 138,
-        "y": -581
+        "x": 136,
+        "y": -576
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
     "lights_238": {
       "position": {
-        "x": -189,
-        "y": 593
+        "x": -188,
+        "y": 588
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_239": {
       "position": {
-        "x": 606,
-        "y": 144
+        "x": 602,
+        "y": 143
       },
       "kind": "rift",
       "terrain": "empty_space"
     },
     "lights_240": {
       "position": {
-        "x": -777,
-        "y": -147
+        "x": -773,
+        "y": -146
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "deep_void"
     },
     "lights_241": {
       "position": {
-        "x": -824,
-        "y": 308
+        "x": -820,
+        "y": 307
       },
       "kind": "asteroid",
       "terrain": "deep_void"
     },
     "lights_242": {
       "position": {
-        "x": -606,
-        "y": 680
+        "x": -604,
+        "y": 678
       },
       "kind": "rift",
       "terrain": "empty_space"
     },
     "lights_243": {
       "position": {
-        "x": 131,
-        "y": 881
+        "x": 130,
+        "y": 878
       },
       "kind": "asteroid",
       "terrain": "deep_void"
     },
     "lights_244": {
       "position": {
-        "x": 454,
-        "y": -820
+        "x": 453,
+        "y": -818
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_245": {
       "position": {
-        "x": 514,
-        "y": 924
+        "x": 513,
+        "y": 923
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -3398,7 +3395,7 @@
     },
     "lights_246": {
       "position": {
-        "x": 999,
+        "x": 997,
         "y": 406
       },
       "kind": "asteroid",
@@ -3406,7 +3403,7 @@
     },
     "lights_247": {
       "position": {
-        "x": -602,
+        "x": -601,
         "y": -1000
       },
       "kind": "planet",
@@ -3418,12 +3415,12 @@
         "x": -917,
         "y": -822
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_249": {
       "position": {
-        "x": 1205,
+        "x": 1204,
         "y": -25
       },
       "kind": "planet",
@@ -3432,7 +3429,7 @@
     },
     "lights_250": {
       "position": {
-        "x": -1066,
+        "x": -1065,
         "y": 683
       },
       "kind": "asteroid",
@@ -3452,7 +3449,7 @@
         "x": 336,
         "y": 1268
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_253": {
@@ -3486,7 +3483,7 @@
         "x": 1112,
         "y": -979
       },
-      "kind": "dead_world",
+      "kind": "empty",
       "terrain": "empty_space"
     },
     "lights_257": {
@@ -3515,10 +3512,230 @@
       "terrain": "empty_space",
       "planetType": "barren"
     },
+    "home_sun_1": {
+      "position": {
+        "x": -4811,
+        "y": -1924
+      },
+      "kind": "star",
+      "terrain": "yellow_dwarf",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_2": {
+      "position": {
+        "x": -2602,
+        "y": -3232
+      },
+      "kind": "star",
+      "terrain": "red_giant",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_3": {
+      "position": {
+        "x": -246,
+        "y": -4166
+      },
+      "kind": "star",
+      "terrain": "blue_giant",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_4": {
+      "position": {
+        "x": 2114,
+        "y": -4103
+      },
+      "kind": "star",
+      "terrain": "white_dwarf",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_5": {
+      "position": {
+        "x": 3831,
+        "y": -2601
+      },
+      "kind": "star",
+      "terrain": "pulsar",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_6": {
+      "position": {
+        "x": 5102,
+        "y": -732
+      },
+      "kind": "star",
+      "terrain": "binary_star",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_7": {
+      "position": {
+        "x": 4458,
+        "y": 1326
+      },
+      "kind": "star",
+      "terrain": "yellow_dwarf",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_8": {
+      "position": {
+        "x": 3770,
+        "y": 3277
+      },
+      "kind": "star",
+      "terrain": "red_giant",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_9": {
+      "position": {
+        "x": 1825,
+        "y": 4002
+      },
+      "kind": "star",
+      "terrain": "blue_giant",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_10": {
+      "position": {
+        "x": -339,
+        "y": 3946
+      },
+      "kind": "star",
+      "terrain": "white_dwarf",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_11": {
+      "position": {
+        "x": -2645,
+        "y": 3279
+      },
+      "kind": "star",
+      "terrain": "pulsar",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_12": {
+      "position": {
+        "x": -4621,
+        "y": 2177
+      },
+      "kind": "star",
+      "terrain": "binary_star",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_13": {
+      "position": {
+        "x": -5237,
+        "y": 30
+      },
+      "kind": "star",
+      "terrain": "red_giant",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_14": {
+      "position": {
+        "x": -2909,
+        "y": -1004
+      },
+      "kind": "star",
+      "terrain": "white_dwarf",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_15": {
+      "position": {
+        "x": -860,
+        "y": -2206
+      },
+      "kind": "star",
+      "terrain": "pulsar",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_16": {
+      "position": {
+        "x": 1538,
+        "y": -2220
+      },
+      "kind": "star",
+      "terrain": "yellow_dwarf",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_17": {
+      "position": {
+        "x": 2921,
+        "y": -359
+      },
+      "kind": "star",
+      "terrain": "red_giant",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_18": {
+      "position": {
+        "x": 1909,
+        "y": 1910
+      },
+      "kind": "star",
+      "terrain": "white_dwarf",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_19": {
+      "position": {
+        "x": -798,
+        "y": 2127
+      },
+      "kind": "star",
+      "terrain": "yellow_dwarf",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
+    "home_sun_20": {
+      "position": {
+        "x": -2951,
+        "y": 1016
+      },
+      "kind": "star",
+      "terrain": "blue_giant",
+      "buildings": [],
+      "garrison": [],
+      "size": 1.4
+    },
     "heart_ring_1": {
       "position": {
-        "x": 199,
-        "y": 85
+        "x": 197,
+        "y": 84
       },
       "kind": "accretion_disk",
       "terrain": "empty_space",
@@ -3526,8 +3743,8 @@
     },
     "heart_ring_2": {
       "position": {
-        "x": 61,
-        "y": 223
+        "x": 60,
+        "y": 221
       },
       "kind": "accretion_disk",
       "terrain": "empty_space",
@@ -3535,8 +3752,8 @@
     },
     "heart_ring_3": {
       "position": {
-        "x": -133,
-        "y": 223
+        "x": -132,
+        "y": 221
       },
       "kind": "accretion_disk",
       "terrain": "empty_space",
@@ -3544,8 +3761,8 @@
     },
     "heart_ring_4": {
       "position": {
-        "x": -271,
-        "y": 85
+        "x": -269,
+        "y": 84
       },
       "kind": "accretion_disk",
       "terrain": "empty_space",
@@ -3553,8 +3770,8 @@
     },
     "heart_ring_5": {
       "position": {
-        "x": -271,
-        "y": -109
+        "x": -269,
+        "y": -108
       },
       "kind": "accretion_disk",
       "terrain": "empty_space",
@@ -3562,8 +3779,8 @@
     },
     "heart_ring_6": {
       "position": {
-        "x": -133,
-        "y": -247
+        "x": -132,
+        "y": -245
       },
       "kind": "accretion_disk",
       "terrain": "empty_space",
@@ -3571,8 +3788,8 @@
     },
     "heart_ring_7": {
       "position": {
-        "x": 61,
-        "y": -247
+        "x": 60,
+        "y": -245
       },
       "kind": "accretion_disk",
       "terrain": "empty_space",
@@ -3580,93 +3797,1852 @@
     },
     "heart_ring_8": {
       "position": {
-        "x": 199,
-        "y": -109
+        "x": 197,
+        "y": -108
       },
       "kind": "accretion_disk",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "lights_182_ring_1": {
+    "home_sun_1_ring_1": {
       "position": {
-        "x": -375,
-        "y": -3120
+        "x": -4563,
+        "y": -1821
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_2": {
+      "position": {
+        "x": -4708,
+        "y": -1676
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_3": {
+      "position": {
+        "x": -4914,
+        "y": -1676
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_4": {
+      "position": {
+        "x": -5059,
+        "y": -1821
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_5": {
+      "position": {
+        "x": -5059,
+        "y": -2027
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_6": {
+      "position": {
+        "x": -4914,
+        "y": -2172
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_7": {
+      "position": {
+        "x": -4708,
+        "y": -2172
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_ring_8": {
+      "position": {
+        "x": -4563,
+        "y": -2027
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_1": {
+      "position": {
+        "x": -2354,
+        "y": -3129
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_2": {
+      "position": {
+        "x": -2499,
+        "y": -2984
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_3": {
+      "position": {
+        "x": -2705,
+        "y": -2984
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_4": {
+      "position": {
+        "x": -2850,
+        "y": -3129
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_5": {
+      "position": {
+        "x": -2850,
+        "y": -3335
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_6": {
+      "position": {
+        "x": -2705,
+        "y": -3480
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_7": {
+      "position": {
+        "x": -2499,
+        "y": -3480
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_2_ring_8": {
+      "position": {
+        "x": -2354,
+        "y": -3335
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_3_ring_1": {
+      "position": {
+        "x": 2,
+        "y": -4063
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_3_ring_2": {
+      "position": {
+        "x": -143,
+        "y": -3918
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_3_ring_3": {
+      "position": {
+        "x": -349,
+        "y": -3918
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_3_ring_4": {
+      "position": {
+        "x": -494,
+        "y": -4063
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_3_ring_5": {
+      "position": {
+        "x": -494,
+        "y": -4269
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_3_ring_6": {
+      "position": {
+        "x": -349,
+        "y": -4414
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_3_ring_7": {
+      "position": {
+        "x": -143,
+        "y": -4414
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_3_ring_8": {
+      "position": {
+        "x": 2,
+        "y": -4269
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_1": {
+      "position": {
+        "x": 2362,
+        "y": -4000
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_2": {
+      "position": {
+        "x": 2217,
+        "y": -3855
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_3": {
+      "position": {
+        "x": 2011,
+        "y": -3855
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_4": {
+      "position": {
+        "x": 1866,
+        "y": -4000
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_5": {
+      "position": {
+        "x": 1866,
+        "y": -4206
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_6": {
+      "position": {
+        "x": 2011,
+        "y": -4351
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_7": {
+      "position": {
+        "x": 2217,
+        "y": -4351
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_4_ring_8": {
+      "position": {
+        "x": 2362,
+        "y": -4206
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_5_ring_1": {
+      "position": {
+        "x": 4079,
+        "y": -2498
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_5_ring_2": {
+      "position": {
+        "x": 3934,
+        "y": -2353
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_5_ring_3": {
+      "position": {
+        "x": 3728,
+        "y": -2353
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_5_ring_4": {
+      "position": {
+        "x": 3583,
+        "y": -2498
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_5_ring_5": {
+      "position": {
+        "x": 3583,
+        "y": -2704
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_5_ring_6": {
+      "position": {
+        "x": 3728,
+        "y": -2849
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_5_ring_7": {
+      "position": {
+        "x": 3934,
+        "y": -2849
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_5_ring_8": {
+      "position": {
+        "x": 4079,
+        "y": -2704
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_6_ring_1": {
+      "position": {
+        "x": 5350,
+        "y": -629
       },
       "kind": "circumbinary_disk",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "lights_182_ring_2": {
+    "home_sun_6_ring_2": {
       "position": {
-        "x": -487,
-        "y": -2987
+        "x": 5205,
+        "y": -484
       },
       "kind": "circumbinary_disk",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "lights_182_ring_3": {
+    "home_sun_6_ring_3": {
       "position": {
-        "x": -658,
-        "y": -2956
+        "x": 4999,
+        "y": -484
       },
       "kind": "circumbinary_disk",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "lights_182_ring_4": {
+    "home_sun_6_ring_4": {
       "position": {
-        "x": -809,
-        "y": -3043
+        "x": 4854,
+        "y": -629
       },
       "kind": "circumbinary_disk",
       "terrain": "empty_space",
       "size": 0.62
     },
-    "lights_182_ring_5": {
+    "home_sun_6_ring_5": {
       "position": {
-        "x": -869,
+        "x": 4854,
+        "y": -835
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_6_ring_6": {
+      "position": {
+        "x": 4999,
+        "y": -980
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_6_ring_7": {
+      "position": {
+        "x": 5205,
+        "y": -980
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_6_ring_8": {
+      "position": {
+        "x": 5350,
+        "y": -835
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_7_ring_1": {
+      "position": {
+        "x": 4706,
+        "y": 1429
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_7_ring_2": {
+      "position": {
+        "x": 4561,
+        "y": 1574
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_7_ring_3": {
+      "position": {
+        "x": 4355,
+        "y": 1574
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_7_ring_4": {
+      "position": {
+        "x": 4210,
+        "y": 1429
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_7_ring_5": {
+      "position": {
+        "x": 4210,
+        "y": 1223
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_7_ring_6": {
+      "position": {
+        "x": 4355,
+        "y": 1078
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_7_ring_7": {
+      "position": {
+        "x": 4561,
+        "y": 1078
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_7_ring_8": {
+      "position": {
+        "x": 4706,
+        "y": 1223
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_8_ring_1": {
+      "position": {
+        "x": 4018,
+        "y": 3380
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_8_ring_2": {
+      "position": {
+        "x": 3873,
+        "y": 3525
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_8_ring_3": {
+      "position": {
+        "x": 3667,
+        "y": 3525
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_8_ring_4": {
+      "position": {
+        "x": 3522,
+        "y": 3380
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_8_ring_5": {
+      "position": {
+        "x": 3522,
+        "y": 3174
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_8_ring_6": {
+      "position": {
+        "x": 3667,
+        "y": 3029
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_8_ring_7": {
+      "position": {
+        "x": 3873,
+        "y": 3029
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_8_ring_8": {
+      "position": {
+        "x": 4018,
+        "y": 3174
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_9_ring_1": {
+      "position": {
+        "x": 2073,
+        "y": 4105
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_9_ring_2": {
+      "position": {
+        "x": 1928,
+        "y": 4250
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_9_ring_3": {
+      "position": {
+        "x": 1722,
+        "y": 4250
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_9_ring_4": {
+      "position": {
+        "x": 1577,
+        "y": 4105
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_9_ring_5": {
+      "position": {
+        "x": 1577,
+        "y": 3899
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_9_ring_6": {
+      "position": {
+        "x": 1722,
+        "y": 3754
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_9_ring_7": {
+      "position": {
+        "x": 1928,
+        "y": 3754
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_9_ring_8": {
+      "position": {
+        "x": 2073,
+        "y": 3899
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_10_ring_1": {
+      "position": {
+        "x": -91,
+        "y": 4049
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_10_ring_2": {
+      "position": {
+        "x": -236,
+        "y": 4194
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_10_ring_3": {
+      "position": {
+        "x": -442,
+        "y": 4194
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_10_ring_4": {
+      "position": {
+        "x": -587,
+        "y": 4049
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_10_ring_5": {
+      "position": {
+        "x": -587,
+        "y": 3843
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_10_ring_6": {
+      "position": {
+        "x": -442,
+        "y": 3698
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_10_ring_7": {
+      "position": {
+        "x": -236,
+        "y": 3698
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_10_ring_8": {
+      "position": {
+        "x": -91,
+        "y": 3843
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_11_ring_1": {
+      "position": {
+        "x": -2397,
+        "y": 3382
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_11_ring_2": {
+      "position": {
+        "x": -2542,
+        "y": 3527
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_11_ring_3": {
+      "position": {
+        "x": -2748,
+        "y": 3527
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_11_ring_4": {
+      "position": {
+        "x": -2893,
+        "y": 3382
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_11_ring_5": {
+      "position": {
+        "x": -2893,
+        "y": 3176
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_11_ring_6": {
+      "position": {
+        "x": -2748,
+        "y": 3031
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_11_ring_7": {
+      "position": {
+        "x": -2542,
+        "y": 3031
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_11_ring_8": {
+      "position": {
+        "x": -2397,
+        "y": 3176
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_12_ring_1": {
+      "position": {
+        "x": -4373,
+        "y": 2280
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_12_ring_2": {
+      "position": {
+        "x": -4518,
+        "y": 2425
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_12_ring_3": {
+      "position": {
+        "x": -4724,
+        "y": 2425
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_12_ring_4": {
+      "position": {
+        "x": -4869,
+        "y": 2280
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_12_ring_5": {
+      "position": {
+        "x": -4869,
+        "y": 2074
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_12_ring_6": {
+      "position": {
+        "x": -4724,
+        "y": 1929
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_12_ring_7": {
+      "position": {
+        "x": -4518,
+        "y": 1929
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_12_ring_8": {
+      "position": {
+        "x": -4373,
+        "y": 2074
+      },
+      "kind": "circumbinary_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_13_ring_1": {
+      "position": {
+        "x": -4989,
+        "y": 133
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_13_ring_2": {
+      "position": {
+        "x": -5134,
+        "y": 278
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_13_ring_3": {
+      "position": {
+        "x": -5340,
+        "y": 278
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_13_ring_4": {
+      "position": {
+        "x": -5485,
+        "y": 133
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_13_ring_5": {
+      "position": {
+        "x": -5485,
+        "y": -73
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_13_ring_6": {
+      "position": {
+        "x": -5340,
+        "y": -218
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_13_ring_7": {
+      "position": {
+        "x": -5134,
+        "y": -218
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_13_ring_8": {
+      "position": {
+        "x": -4989,
+        "y": -73
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_14_ring_1": {
+      "position": {
+        "x": -2661,
+        "y": -901
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_14_ring_2": {
+      "position": {
+        "x": -2806,
+        "y": -756
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_14_ring_3": {
+      "position": {
+        "x": -3012,
+        "y": -756
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_14_ring_4": {
+      "position": {
+        "x": -3157,
+        "y": -901
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_14_ring_5": {
+      "position": {
+        "x": -3157,
+        "y": -1107
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_14_ring_6": {
+      "position": {
+        "x": -3012,
+        "y": -1252
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_14_ring_7": {
+      "position": {
+        "x": -2806,
+        "y": -1252
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_14_ring_8": {
+      "position": {
+        "x": -2661,
+        "y": -1107
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_15_ring_1": {
+      "position": {
+        "x": -612,
+        "y": -2103
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_15_ring_2": {
+      "position": {
+        "x": -757,
+        "y": -1958
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_15_ring_3": {
+      "position": {
+        "x": -963,
+        "y": -1958
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_15_ring_4": {
+      "position": {
+        "x": -1108,
+        "y": -2103
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_15_ring_5": {
+      "position": {
+        "x": -1108,
+        "y": -2309
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_15_ring_6": {
+      "position": {
+        "x": -963,
+        "y": -2454
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_15_ring_7": {
+      "position": {
+        "x": -757,
+        "y": -2454
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_15_ring_8": {
+      "position": {
+        "x": -612,
+        "y": -2309
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_16_ring_1": {
+      "position": {
+        "x": 1786,
+        "y": -2117
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_16_ring_2": {
+      "position": {
+        "x": 1641,
+        "y": -1972
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_16_ring_3": {
+      "position": {
+        "x": 1435,
+        "y": -1972
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_16_ring_4": {
+      "position": {
+        "x": 1290,
+        "y": -2117
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_16_ring_5": {
+      "position": {
+        "x": 1290,
+        "y": -2323
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_16_ring_6": {
+      "position": {
+        "x": 1435,
+        "y": -2468
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_16_ring_7": {
+      "position": {
+        "x": 1641,
+        "y": -2468
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_16_ring_8": {
+      "position": {
+        "x": 1786,
+        "y": -2323
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_17_ring_1": {
+      "position": {
+        "x": 3169,
+        "y": -256
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_17_ring_2": {
+      "position": {
+        "x": 3024,
+        "y": -111
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_17_ring_3": {
+      "position": {
+        "x": 2818,
+        "y": -111
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_17_ring_4": {
+      "position": {
+        "x": 2673,
+        "y": -256
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_17_ring_5": {
+      "position": {
+        "x": 2673,
+        "y": -462
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_17_ring_6": {
+      "position": {
+        "x": 2818,
+        "y": -607
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_17_ring_7": {
+      "position": {
+        "x": 3024,
+        "y": -607
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_17_ring_8": {
+      "position": {
+        "x": 3169,
+        "y": -462
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_18_ring_1": {
+      "position": {
+        "x": 2157,
+        "y": 2013
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_18_ring_2": {
+      "position": {
+        "x": 2012,
+        "y": 2158
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_18_ring_3": {
+      "position": {
+        "x": 1806,
+        "y": 2158
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_18_ring_4": {
+      "position": {
+        "x": 1661,
+        "y": 2013
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_18_ring_5": {
+      "position": {
+        "x": 1661,
+        "y": 1807
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_18_ring_6": {
+      "position": {
+        "x": 1806,
+        "y": 1662
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_18_ring_7": {
+      "position": {
+        "x": 2012,
+        "y": 1662
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_18_ring_8": {
+      "position": {
+        "x": 2157,
+        "y": 1807
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_19_ring_1": {
+      "position": {
+        "x": -550,
+        "y": 2230
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_19_ring_2": {
+      "position": {
+        "x": -695,
+        "y": 2375
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_19_ring_3": {
+      "position": {
+        "x": -901,
+        "y": 2375
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_19_ring_4": {
+      "position": {
+        "x": -1046,
+        "y": 2230
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_19_ring_5": {
+      "position": {
+        "x": -1046,
+        "y": 2024
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_19_ring_6": {
+      "position": {
+        "x": -901,
+        "y": 1879
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_19_ring_7": {
+      "position": {
+        "x": -695,
+        "y": 1879
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_19_ring_8": {
+      "position": {
+        "x": -550,
+        "y": 2024
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_20_ring_1": {
+      "position": {
+        "x": -2703,
+        "y": 1119
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_20_ring_2": {
+      "position": {
+        "x": -2848,
+        "y": 1264
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_20_ring_3": {
+      "position": {
+        "x": -3054,
+        "y": 1264
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_20_ring_4": {
+      "position": {
+        "x": -3199,
+        "y": 1119
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_20_ring_5": {
+      "position": {
+        "x": -3199,
+        "y": 913
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_20_ring_6": {
+      "position": {
+        "x": -3054,
+        "y": 768
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_20_ring_7": {
+      "position": {
+        "x": -2848,
+        "y": 768
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_20_ring_8": {
+      "position": {
+        "x": -2703,
+        "y": 913
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "home_sun_1_rim_1": {
+      "position": {
+        "x": -5416,
+        "y": -1968
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_1_rim_2": {
+      "position": {
+        "x": -5275,
+        "y": -2316
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_1_rim_3": {
+      "position": {
+        "x": -4956,
+        "y": -2514
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "home_sun_2_rim_1": {
+      "position": {
+        "x": -3209,
         "y": -3207
       },
-      "kind": "circumbinary_disk",
-      "terrain": "empty_space",
-      "size": 0.62
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     },
-    "lights_182_ring_6": {
+    "home_sun_2_rim_2": {
       "position": {
-        "x": -809,
-        "y": -3371
+        "x": -3107,
+        "y": -3569
       },
-      "kind": "circumbinary_disk",
-      "terrain": "empty_space",
-      "size": 0.62
+      "kind": "empty",
+      "terrain": "empty_space"
     },
-    "lights_182_ring_7": {
+    "home_sun_2_rim_3": {
       "position": {
-        "x": -658,
-        "y": -3458
+        "x": -2813,
+        "y": -3801
       },
-      "kind": "circumbinary_disk",
-      "terrain": "empty_space",
-      "size": 0.62
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     },
-    "lights_182_ring_8": {
+    "home_sun_3_rim_1": {
       "position": {
-        "x": -487,
-        "y": -3427
+        "x": -464,
+        "y": -4733
       },
-      "kind": "circumbinary_disk",
-      "terrain": "empty_space",
-      "size": 0.62
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
     },
-    "lights_182_ring_9": {
+    "home_sun_3_rim_2": {
       "position": {
-        "x": -375,
-        "y": -3294
+        "x": 360,
+        "y": -4198
       },
-      "kind": "circumbinary_disk",
-      "terrain": "empty_space",
-      "size": 0.62
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "home_sun_4_rim_1": {
+      "position": {
+        "x": 1842,
+        "y": -4646
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "home_sun_4_rim_2": {
+      "position": {
+        "x": 2213,
+        "y": -4702
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "home_sun_5_rim_1": {
+      "position": {
+        "x": 4402,
+        "y": -2396
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "home_sun_6_rim_1": {
+      "position": {
+        "x": 5646,
+        "y": -1002
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_6_rim_2": {
+      "position": {
+        "x": 5701,
+        "y": -631
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_6_rim_3": {
+      "position": {
+        "x": 5527,
+        "y": -298
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "home_sun_7_rim_1": {
+      "position": {
+        "x": 4627,
+        "y": 743
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_7_rim_2": {
+      "position": {
+        "x": 4960,
+        "y": 1667
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "home_sun_8_rim_1": {
+      "position": {
+        "x": 4331,
+        "y": 3510
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_8_rim_2": {
+      "position": {
+        "x": 4087,
+        "y": 3795
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_8_rim_3": {
+      "position": {
+        "x": 3722,
+        "y": 3882
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_9_rim_1": {
+      "position": {
+        "x": 2239,
+        "y": 4446
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "home_sun_10_rim_1": {
+      "position": {
+        "x": -198,
+        "y": 4536
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "home_sun_10_rim_2": {
+      "position": {
+        "x": -572,
+        "y": 4507
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "home_sun_10_rim_3": {
+      "position": {
+        "x": -857,
+        "y": 4263
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "home_sun_11_rim_1": {
+      "position": {
+        "x": -2861,
+        "y": 3846
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "home_sun_11_rim_2": {
+      "position": {
+        "x": -3153,
+        "y": 3611
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "home_sun_12_rim_1": {
+      "position": {
+        "x": -4736,
+        "y": 2773
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_12_rim_2": {
+      "position": {
+        "x": -5065,
+        "y": 2592
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "home_sun_13_rim_1": {
+      "position": {
+        "x": -5594,
+        "y": 521
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_15_rim_1": {
+      "position": {
+        "x": -1238,
+        "y": -2681
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "home_sun_16_rim_1": {
+      "position": {
+        "x": 1339,
+        "y": -2793
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_16_rim_2": {
+      "position": {
+        "x": 2022,
+        "y": -2587
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "home_sun_18_rim_1": {
+      "position": {
+        "x": 2332,
+        "y": 1475
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "home_sun_19_rim_1": {
+      "position": {
+        "x": -1382,
+        "y": 2292
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "home_sun_20_rim_1": {
+      "position": {
+        "x": -3558,
+        "y": 1023
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "home_sun_20_rim_2": {
+      "position": {
+        "x": -3446,
+        "y": 665
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "fringe_01": {
+      "position": {
+        "x": -5733,
+        "y": -416
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_02": {
+      "position": {
+        "x": -3999,
+        "y": -3001
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_03": {
+      "position": {
+        "x": -3692,
+        "y": -3184
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_04": {
+      "position": {
+        "x": -2449,
+        "y": -3864
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_05": {
+      "position": {
+        "x": -1778,
+        "y": -4130
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_06": {
+      "position": {
+        "x": -1443,
+        "y": -4263
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_07": {
+      "position": {
+        "x": 682,
+        "y": -4644
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_08": {
+      "position": {
+        "x": 4865,
+        "y": -1912
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_09": {
+      "position": {
+        "x": 5258,
+        "y": 495
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_10": {
+      "position": {
+        "x": 5135,
+        "y": 878
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_11": {
+      "position": {
+        "x": 4637,
+        "y": 2380
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_12": {
+      "position": {
+        "x": 2583,
+        "y": 4244
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_13": {
+      "position": {
+        "x": 1319,
+        "y": 4411
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_14": {
+      "position": {
+        "x": -1314,
+        "y": 4214
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "fringe_15": {
+      "position": {
+        "x": -5472,
+        "y": 1058
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
     }
   },
   "regions": [
@@ -3696,7 +5672,8 @@
         "lights_018",
         "lights_019",
         "lights_020",
-        "lights_021"
+        "lights_021",
+        "fringe_13"
       ]
     },
     {
@@ -3725,7 +5702,8 @@
         "lights_034",
         "lights_035",
         "lights_036",
-        "lights_037"
+        "lights_037",
+        "fringe_11"
       ]
     },
     {
@@ -3766,7 +5744,8 @@
         "lights_061",
         "lights_062",
         "lights_063",
-        "lights_064"
+        "lights_064",
+        "fringe_08"
       ]
     },
     {
@@ -3789,7 +5768,18 @@
         "lights_076",
         "lights_077",
         "lights_078",
-        "lights_079"
+        "lights_079",
+        "home_sun_13",
+        "home_sun_13_ring_1",
+        "home_sun_13_ring_2",
+        "home_sun_13_ring_3",
+        "home_sun_13_ring_4",
+        "home_sun_13_ring_5",
+        "home_sun_13_ring_6",
+        "home_sun_13_ring_7",
+        "home_sun_13_ring_8",
+        "home_sun_13_rim_1",
+        "fringe_15"
       ]
     },
     {
@@ -3812,7 +5802,8 @@
         "lights_092",
         "lights_093",
         "lights_094",
-        "lights_095"
+        "lights_095",
+        "fringe_01"
       ]
     },
     {
@@ -3828,7 +5819,8 @@
         "lights_102",
         "lights_103",
         "lights_104",
-        "lights_105"
+        "lights_105",
+        "fringe_07"
       ]
     },
     {
@@ -3846,7 +5838,20 @@
         "lights_113",
         "lights_114",
         "lights_115",
-        "lights_116"
+        "lights_116",
+        "home_sun_1",
+        "home_sun_1_ring_1",
+        "home_sun_1_ring_2",
+        "home_sun_1_ring_3",
+        "home_sun_1_ring_4",
+        "home_sun_1_ring_5",
+        "home_sun_1_ring_6",
+        "home_sun_1_ring_7",
+        "home_sun_1_ring_8",
+        "home_sun_1_rim_1",
+        "home_sun_1_rim_2",
+        "home_sun_1_rim_3",
+        "fringe_02"
       ]
     },
     {
@@ -3901,7 +5906,41 @@
         "lights_142",
         "lights_143",
         "lights_144",
-        "lights_145"
+        "lights_145",
+        "home_sun_6",
+        "home_sun_6_ring_1",
+        "home_sun_6_ring_2",
+        "home_sun_6_ring_3",
+        "home_sun_6_ring_4",
+        "home_sun_6_ring_5",
+        "home_sun_6_ring_6",
+        "home_sun_6_ring_7",
+        "home_sun_6_ring_8",
+        "home_sun_7",
+        "home_sun_7_ring_1",
+        "home_sun_7_ring_2",
+        "home_sun_7_ring_3",
+        "home_sun_7_ring_4",
+        "home_sun_7_ring_5",
+        "home_sun_7_ring_6",
+        "home_sun_7_ring_7",
+        "home_sun_7_ring_8",
+        "home_sun_17",
+        "home_sun_17_ring_1",
+        "home_sun_17_ring_2",
+        "home_sun_17_ring_3",
+        "home_sun_17_ring_4",
+        "home_sun_17_ring_5",
+        "home_sun_17_ring_6",
+        "home_sun_17_ring_7",
+        "home_sun_17_ring_8",
+        "home_sun_6_rim_1",
+        "home_sun_6_rim_2",
+        "home_sun_6_rim_3",
+        "home_sun_7_rim_1",
+        "home_sun_7_rim_2",
+        "fringe_09",
+        "fringe_10"
       ]
     },
     {
@@ -3928,7 +5967,40 @@
         "lights_158",
         "lights_159",
         "lights_160",
-        "lights_161"
+        "lights_161",
+        "home_sun_8",
+        "home_sun_8_ring_1",
+        "home_sun_8_ring_2",
+        "home_sun_8_ring_3",
+        "home_sun_8_ring_4",
+        "home_sun_8_ring_5",
+        "home_sun_8_ring_6",
+        "home_sun_8_ring_7",
+        "home_sun_8_ring_8",
+        "home_sun_9",
+        "home_sun_9_ring_1",
+        "home_sun_9_ring_2",
+        "home_sun_9_ring_3",
+        "home_sun_9_ring_4",
+        "home_sun_9_ring_5",
+        "home_sun_9_ring_6",
+        "home_sun_9_ring_7",
+        "home_sun_9_ring_8",
+        "home_sun_18",
+        "home_sun_18_ring_1",
+        "home_sun_18_ring_2",
+        "home_sun_18_ring_3",
+        "home_sun_18_ring_4",
+        "home_sun_18_ring_5",
+        "home_sun_18_ring_6",
+        "home_sun_18_ring_7",
+        "home_sun_18_ring_8",
+        "home_sun_8_rim_1",
+        "home_sun_8_rim_2",
+        "home_sun_8_rim_3",
+        "home_sun_9_rim_1",
+        "home_sun_18_rim_1",
+        "fringe_12"
       ]
     },
     {
@@ -3954,7 +6026,39 @@
         "lights_174",
         "lights_175",
         "lights_176",
-        "lights_177"
+        "lights_177",
+        "home_sun_4",
+        "home_sun_4_ring_1",
+        "home_sun_4_ring_2",
+        "home_sun_4_ring_3",
+        "home_sun_4_ring_4",
+        "home_sun_4_ring_5",
+        "home_sun_4_ring_6",
+        "home_sun_4_ring_7",
+        "home_sun_4_ring_8",
+        "home_sun_5",
+        "home_sun_5_ring_1",
+        "home_sun_5_ring_2",
+        "home_sun_5_ring_3",
+        "home_sun_5_ring_4",
+        "home_sun_5_ring_5",
+        "home_sun_5_ring_6",
+        "home_sun_5_ring_7",
+        "home_sun_5_ring_8",
+        "home_sun_16",
+        "home_sun_16_ring_1",
+        "home_sun_16_ring_2",
+        "home_sun_16_ring_3",
+        "home_sun_16_ring_4",
+        "home_sun_16_ring_5",
+        "home_sun_16_ring_6",
+        "home_sun_16_ring_7",
+        "home_sun_16_ring_8",
+        "home_sun_4_rim_1",
+        "home_sun_4_rim_2",
+        "home_sun_5_rim_1",
+        "home_sun_16_rim_1",
+        "home_sun_16_rim_2"
       ]
     },
     {
@@ -3968,22 +6072,27 @@
         "lights_180",
         "lights_181",
         "lights_182",
-        "lights_182_ring_1",
-        "lights_182_ring_2",
-        "lights_182_ring_3",
-        "lights_182_ring_4",
-        "lights_182_ring_5",
-        "lights_182_ring_6",
-        "lights_182_ring_7",
-        "lights_182_ring_8",
-        "lights_182_ring_9",
         "lights_183",
         "lights_184",
         "lights_185",
         "lights_186",
         "lights_187",
         "lights_188",
-        "lights_189"
+        "lights_189",
+        "home_sun_3",
+        "home_sun_3_ring_1",
+        "home_sun_3_ring_2",
+        "home_sun_3_ring_3",
+        "home_sun_3_ring_4",
+        "home_sun_3_ring_5",
+        "home_sun_3_ring_6",
+        "home_sun_3_ring_7",
+        "home_sun_3_ring_8",
+        "home_sun_3_rim_1",
+        "home_sun_3_rim_2",
+        "fringe_04",
+        "fringe_05",
+        "fringe_06"
       ]
     },
     {
@@ -4020,7 +6129,29 @@
         "lights_207",
         "lights_208",
         "lights_209",
-        "lights_210"
+        "lights_210",
+        "home_sun_12",
+        "home_sun_12_ring_1",
+        "home_sun_12_ring_2",
+        "home_sun_12_ring_3",
+        "home_sun_12_ring_4",
+        "home_sun_12_ring_5",
+        "home_sun_12_ring_6",
+        "home_sun_12_ring_7",
+        "home_sun_12_ring_8",
+        "home_sun_20",
+        "home_sun_20_ring_1",
+        "home_sun_20_ring_2",
+        "home_sun_20_ring_3",
+        "home_sun_20_ring_4",
+        "home_sun_20_ring_5",
+        "home_sun_20_ring_6",
+        "home_sun_20_ring_7",
+        "home_sun_20_ring_8",
+        "home_sun_12_rim_1",
+        "home_sun_12_rim_2",
+        "home_sun_20_rim_1",
+        "home_sun_20_rim_2"
       ]
     },
     {
@@ -4043,7 +6174,41 @@
         "lights_220",
         "lights_221",
         "lights_222",
-        "lights_223"
+        "lights_223",
+        "home_sun_10",
+        "home_sun_10_ring_1",
+        "home_sun_10_ring_2",
+        "home_sun_10_ring_3",
+        "home_sun_10_ring_4",
+        "home_sun_10_ring_5",
+        "home_sun_10_ring_6",
+        "home_sun_10_ring_7",
+        "home_sun_10_ring_8",
+        "home_sun_11",
+        "home_sun_11_ring_1",
+        "home_sun_11_ring_2",
+        "home_sun_11_ring_3",
+        "home_sun_11_ring_4",
+        "home_sun_11_ring_5",
+        "home_sun_11_ring_6",
+        "home_sun_11_ring_7",
+        "home_sun_11_ring_8",
+        "home_sun_19",
+        "home_sun_19_ring_1",
+        "home_sun_19_ring_2",
+        "home_sun_19_ring_3",
+        "home_sun_19_ring_4",
+        "home_sun_19_ring_5",
+        "home_sun_19_ring_6",
+        "home_sun_19_ring_7",
+        "home_sun_19_ring_8",
+        "home_sun_10_rim_1",
+        "home_sun_10_rim_2",
+        "home_sun_10_rim_3",
+        "home_sun_11_rim_1",
+        "home_sun_11_rim_2",
+        "home_sun_19_rim_1",
+        "fringe_14"
       ]
     },
     {
@@ -4065,7 +6230,39 @@
         "lights_231",
         "lights_232",
         "lights_233",
-        "lights_234"
+        "lights_234",
+        "home_sun_2",
+        "home_sun_2_ring_1",
+        "home_sun_2_ring_2",
+        "home_sun_2_ring_3",
+        "home_sun_2_ring_4",
+        "home_sun_2_ring_5",
+        "home_sun_2_ring_6",
+        "home_sun_2_ring_7",
+        "home_sun_2_ring_8",
+        "home_sun_14",
+        "home_sun_14_ring_1",
+        "home_sun_14_ring_2",
+        "home_sun_14_ring_3",
+        "home_sun_14_ring_4",
+        "home_sun_14_ring_5",
+        "home_sun_14_ring_6",
+        "home_sun_14_ring_7",
+        "home_sun_14_ring_8",
+        "home_sun_15",
+        "home_sun_15_ring_1",
+        "home_sun_15_ring_2",
+        "home_sun_15_ring_3",
+        "home_sun_15_ring_4",
+        "home_sun_15_ring_5",
+        "home_sun_15_ring_6",
+        "home_sun_15_ring_7",
+        "home_sun_15_ring_8",
+        "home_sun_2_rim_1",
+        "home_sun_2_rim_2",
+        "home_sun_2_rim_3",
+        "home_sun_15_rim_1",
+        "fringe_03"
       ]
     },
     {

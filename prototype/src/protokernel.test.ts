@@ -29,8 +29,8 @@ describe('victory score limit', () => {
 
   it('duel and four-player FFA: the points of the whole map and an 80% capture (BAL-16)', () => {
     for (const [mapId, scoreLimit] of [
-      ['duel-1', 560],
-      ['ffa-4', 790],
+      ['duel-1', 910],
+      ['ffa-4', 840],
     ] as const) {
       expect(ctx(0, { mapId }).config?.victory).toMatchObject({
         scoreLimit,

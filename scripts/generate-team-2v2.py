@@ -3,21 +3,29 @@
 
 Coordinates are authored once; the game derives lanes from the power diagram and
 terrain budgets. No mirrored quadrants, hand-written lanes or runtime generation.
-Regenerate from the repository root, then run teamMap.test.ts against the real core.
+Regenerate from the repository root, then lay the star systems and their rings
+(`node scripts/lay-stars.mjs`, `node scripts/lay-rings.mjs`) and run teamMap.test.ts
+against the real core.
+
+TWO STAR SYSTEMS (owner 2026-11-19, «По типу карты 1 на 1»): like the duel, the map is a
+battle between two systems. No body stands between the teams: where the old black hole was,
+open deep space; `lay-stars.mjs` sets a star behind each team with the provinces beyond it,
+and `lay-rings.mjs` its ring. Plain open space is `empty` (Empty Space, nobody's to take),
+not a dead world: of the dead worlds only those with something on them stay.
 
 AREAS (`docs/map-terrain-regions-concept.md` §5.3–5.5). Every sampled province falls
 into a named area, and inside the area core → shell → edge follows the distance to the
 area's anchor, so terrain forms coherent bodies instead of one terrain per rectangle.
 All six area templates are used, and every province kind, terrain and world
-type of the catalogue appears — except `empty`, which the owner keeps off combat
-maps (2026-09-22), and the fork fortress, which only a player builds. Areas that give a side something to own come in
+type of the catalogue appears — except the black hole (see above) and the fork fortress,
+which only a player builds. Areas that give a side something to own come in
 PAIRS turned 180° about the centre (team A's home districts map onto team B's under
 that turn); areas that hold a single prize sit on the x = 0 axis, the same distance
 from both teams. The province grid itself stays an irregular sample, so the four
 start districts still differ in shape.
 
 Wrecks are a rare find (owner, 2026-10-14): the wreck area holds ONE graveyard and ONE
-debris field beside it; the rest of the area is plain open space with dead worlds.
+debris field beside it; the rest of the area is plain open space.
 """
 import collections
 import json
@@ -79,11 +87,11 @@ for sid, x, y, npc, name in [
     fleets[pid + '-fleet'] = dict(owner=pid, location=sid, units=units,
         landing=[dict(unit='swarm_lander', count=3)] if npc == 'swarm' else [])
 
-# The old remnant lies off-centre; the traffic can pass on either side.
-add('remnant', 70, 130, 'black_hole', 'deep_void')
+# No body in the centre (owner 2026-11-19): the old black hole's place is open deep space.
+add('open_centre', 70, 130, 'empty', 'deep_void')
 add('relic', -210, -270, 'planet', 'deep_void', planetType='relic_world', garrison=[dict(unit='militia', count=2)])
 # Not a station: a fortress is only ever built by a player (docs/fortress-roadmap.md §0.6).
-add('crossing', 160, -540, 'dead_world', 'deep_void')
+add('crossing', 160, -540, 'empty', 'deep_void')
 FIXED = list(sectors)
 
 # A fixed Poisson sample supplies varied cell sizes and degrees. Each accepted point
@@ -148,8 +156,8 @@ for name, ps in members.items():
 
 # Ladder per template: (cells, kind, terrain) from the core outwards; None = the rest.
 MASSIF = [(1, 'dead_world', 'dust_lane'), (2, 'asteroid', 'dust_lane'), (None, 'asteroid', 'asteroid_field')]
-NEBULA = [(2, 'dense_nebula', 'dense_nebula'), (3, 'nebula', 'nebula'), (None, 'dead_world', 'empty_space')]
-EXPANSE = [(3, 'dead_world', 'deep_void'), (None, 'dead_world', 'empty_space')]
+NEBULA = [(2, 'dense_nebula', 'dense_nebula'), (3, 'nebula', 'nebula'), (None, 'empty', 'empty_space')]
+EXPANSE = [(3, 'empty', 'deep_void'), (None, 'empty', 'empty_space')]
 LADDER = {
     'western_expanse': EXPANSE, 'eastern_expanse': EXPANSE,
     'ash_massif': MASSIF, 'iron_massif': MASSIF,
@@ -158,11 +166,11 @@ LADDER = {
     # area is plain open space rather than more debris (owner, 2026-10-14).
     'expedition_graveyard': [(1, 'graveyard', 'derelict_graveyard'),
                              (1, 'debris_field', 'derelict_graveyard'),
-                             (None, 'dead_world', 'empty_space')],
+                             (None, 'empty', 'empty_space')],
     'depleted_node': [(2, 'dead_world', 'depleted_system'), (1, 'asteroid', 'depleted_system'),
-                      (None, 'dead_world', 'deep_void')],
+                      (None, 'empty', 'deep_void')],
     'storm_front': [(4, 'ion_storm', 'ion_storm'), (3, 'solar_flare', 'solar_flare_zone'),
-                    (None, 'dead_world', 'empty_space')],
+                    (None, 'empty', 'empty_space')],
 }
 
 ROLE, AREA, REGION_SECTORS = {}, {}, collections.OrderedDict((name, []) for name in REGIONS)
@@ -220,7 +228,7 @@ for area in ('drift_nebula', 'veil_nebula'):
     sectors[nexus]['planetType'] = 'energy_nexus'
     PLACED.add(nexus)
 pair('drift_nebula', 'veil_nebula', -900, 850, 'edge', kind='planet', planetType='volcanic')
-# Storm front: an irradiated world under the flares on each side of the black hole.
+# Storm front: an irradiated world under the flares on each side of the centre.
 pair('storm_front', 'storm_front', -600, 450, kind='planet', terrain='solar_flare_zone',
      planetType='irradiated')
 # Open expanses: a fortress world guarding the flank and a rift
@@ -236,11 +244,11 @@ sectors[spent[0]].update(kind='planet', planetType='barren')
 sectors[spent[1]].update(planetType='dead_world')
 PLACED.update(spent)
 
-content = dict(id='team-2v2', seed='broken-reach-20261014', edge='hull', sectors=sectors,
+content = dict(id='team-2v2', mode='capital_2v2', seed='broken-reach-20261014', edge='hull', sectors=sectors,
     regions=[dict(id=name, sectors=ids) for name, ids in REGION_SECTORS.items()],
     players=players, slots=slots, fleets=fleets,
-    pricing=json.loads((ROOT / 'data/maps/duel-1.json').read_text())['pricing'],
-    techRules=dict(ruleset='main', starting=['scout_design'], dayGates=True, exclude=[]))
+    techRules=dict(ruleset='main', starting=['scout_design'], dayGates=True, exclude=[]),
+    pricing=json.loads((ROOT / 'data/maps/duel-1.json').read_text())['pricing'])
 (ROOT / 'data/maps/team-2v2.json').write_text(json.dumps(content, ensure_ascii=False, indent=2) + '\n')
 print('provinces:', len(sectors), {name: len(ids) for name, ids in REGION_SECTORS.items()})
 if '--roles' in __import__('sys').argv:

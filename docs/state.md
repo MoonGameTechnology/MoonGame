@@ -339,8 +339,8 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   и новая пара в `decisions/soloSaveMigrationPairs.ts`: без неё локальная схватка прежнего каталога
   не откроется (сторож — `soloSaveMigrationWiring.test.ts`). Новый фрагмент:
   `GameDataSchema`, `composeGameDataBundle`, `data/bundle.ts`.
-- **Карты `data/maps`.** Основная игра (`techRules.ruleset: main`): `duel-1` (2/71), `ffa-4` (4/39),
-  `team-2v2` (4/110), `team-3v3` (6/147), `ffa-20` (20/337), `ffa-50` (50/834, квадрат, в центре
+- **Карты `data/maps`.** Основная игра (`techRules.ruleset: main`): `duel-1` (2/71), `ffa-4` (4/103),
+  `team-2v2` (4/113), `team-3v3` (6/147), `ffa-20` (20/558), `ffa-50` (50/834, квадрат, в центре
   «Бездна»; `scripts/generate-ffa.mjs`). Sector Zero — `training-1` и главы `pve-1`…`pve-6`. Битвы
   корпораций — по формату (`data/avaFormats.json`, CORP-8). Служебные — `proving-ground`,
   `duel-testbed`, `skirmish-1`; `data/frontier-50|100.json` — для старых партий.
@@ -348,10 +348,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   `edge: "hull"` — контур в 0.6 шага от крайних центров, без поля — рамка 5%; контур везде, кроме
   глав I, II, V, VI и `ava-2v2-1`/`ava-duel-1` (владелец 2026-11-17). Рамка доски всегда
   прямоугольная: крайние провинции касаются её, но не тянутся к ней (`glassFrame`).
-- **Звёзды и кольца** (владелец 2026-11-17/19) — непроходимая провинция `star` (класс — `terrain`,
-  6 классов семьи `star`) и чёрная дыра стоят в замкнутом кольце своего вида (`RING_OF`,
-  `decisions/celestialRing.ts`), закрытом проходу и авиации, ≈ 3 провинции с телом; соседи
-  раздвинуты (`scripts/celestial-rings.mjs`), контракт — `data/celestialRings.test.ts`.
+- **Звёзды и кольца** (владелец 2026-11-17/19) — провинция `star` (класс — `terrain`, 6 классов)
+  и чёрная дыра в замкнутом кольце своего вида (`RING_OF`, `decisions/celestialRing.ts`), закрытом
+  проходу и авиации, ≈ 3 провинции с телом; соседей раздвигает `celestial-rings.mjs`, контракт —
+  `data/celestialRings.test.ts`. Дуэль, 2 на 2, FFA на 4 и на 20: своя звезда за каждой стороной.
 - **Цены и сроки основной игры** (решение владельца 2026-10-18) — поле `pricing` её шести карт,
   посев закрепляет его в `GameState.pricing`; расчёт — `util/pricing.ts` (`matchUnitCost` для
   корпусов, `matchCost` для прочего), одинаково для UI, бота, оплаты и отмены. Новые партии

@@ -187,9 +187,9 @@ describe('published match maps', () => {
     };
     expect(new Set(map.starts.map((start) => profile(start, 2))).size).toBe(map.starts.length);
     expect(map.map!.paths).toBeUndefined(); // All lanes come from the real mosaic.
-    // The duel keeps open space between its systems (owner 2026-11-19: «мало пустого
-    // космического пространства»); FFA for 4 stays without it.
-    if (id === 'ffa-4') expect(map.nodes.every((n) => n.sector !== 'empty')).toBe(true);
+    // Both keep open space between their star systems (owner 2026-11-19: «мало пустого
+    // космического пространства», then «И ФФА на 4 тоже придумай и сделай»).
+    expect(map.nodes.some((n) => n.sector === 'empty')).toBe(true);
     const openingLengths: number[] = [];
     // Stars and their rings are closed provinces (no lanes): every OTHER province is reachable.
     const passable = map.nodes.filter((n) => n.links.length > 0).length;

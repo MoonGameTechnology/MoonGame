@@ -39,7 +39,7 @@ export const STAR_SIZE = {
 };
 
 /** Kind → the terrain that kind of province stands on in a star's ring. */
-const TERRAIN_OF = {
+export const TERRAIN_OF = {
   solar_flare: 'solar_flare_zone',
   asteroid: 'asteroid_field',
   dead_world: 'depleted_system',
@@ -63,7 +63,7 @@ export const STAR_RING = {
 /** Plain kinds a star may re-kind. Graveyards and debris fields are one of a kind on the
  *  big maps, and a dense cluster is an area's prize: none of them moves. */
 const PLAIN = new Set(['asteroid', 'nebula', 'dead_world', 'ion_storm', 'dense_nebula', 'solar_flare']);
-const STORY = ['recruitHero', 'rendezvous', 'vault', 'captive', 'transit'];
+export const STORY = ['recruitHero', 'rendezvous', 'vault', 'captive', 'transit'];
 
 const isSeat = (map, sector) =>
   sector.owner !== null && sector.owner !== undefined && (map.slots?.[sector.owner] || map.players?.[sector.owner]);
@@ -206,34 +206,62 @@ function angle(c, s) {
 }
 
 /**
- * Sets a new star behind each capital of a duel (owner 2026-11-19: «Добавь сзади столиц по
- * звездам», «Пусть разные типы звёзд будут с разных сторон»): on the line through the two
- * capitals, `steps` map steps past each one, away from the enemy. The second stands exactly
- * where the first does with the map turned half round the capitals' midpoint, so both starts
- * keep the same space round them; only the class differs. `pairs` is
- * `[[capitalId, starId, class], [capitalId, starId, class]]`; each star joins its capital's
- * area. Its ring (`celestial-rings.mjs`) is laid after, and may step it a little further out.
+ * Sets a new star behind each side of a map (owner 2026-11-19: «Добавь сзади столиц по
+ * звездам», «Пусть разные типы звёзд будут с разных сторон»; then the 2 на 2 and the FFA maps
+ * the same way). A side is one capital or a team's capitals; its star stands `steps` map steps
+ * past the side's middle, on the line from the middle of all the sides, away from the rest. On
+ * a map of two sides each star stands where the other does with the map turned half round, so
+ * both sides keep the same space round them; only the class differs. `placements` is
+ * `[[capitalId | capitalIds, starId, class, nudge?], …]`; `nudge` (`[dx, dy]`) moves a star a
+ * little off that place, as the generators nudge a province's twin, where the sides' start
+ * districts would otherwise come out copies of each other. Each star joins the area of its
+ * side's first capital. Its ring (`celestial-rings.mjs`) is laid after, and may step it a
+ * little further out. Returns the middle of the sides (what the far sides of the systems turn
+ * round).
  */
-export function setStarsBehind(map, pairs, step, steps) {
-  const [[c1, id1, cls1], [c2, id2, cls2]] = pairs;
-  const h1 = map.sectors[c1].position;
-  const h2 = map.sectors[c2].position;
-  const mid = { x: (h1.x + h2.x) / 2, y: (h1.y + h2.y) / 2 };
-  const len = Math.hypot(h1.x - h2.x, h1.y - h2.y);
-  const p1 = {
-    x: Math.round(h1.x + ((h1.x - h2.x) / len) * steps * step),
-    y: Math.round(h1.y + ((h1.y - h2.y) / len) * steps * step),
-  };
-  const p2 = { x: Math.round(2 * mid.x - p1.x), y: Math.round(2 * mid.y - p1.y) };
-  for (const [capital, id, cls, position] of [
-    [c1, id1, cls1, p1],
-    [c2, id2, cls2, p2],
-  ]) {
+export function setStarsBehind(map, placements, step, steps) {
+  const mean = (ps) => ({
+    x: ps.reduce((t, p) => t + p.x, 0) / ps.length,
+    y: ps.reduce((t, p) => t + p.y, 0) / ps.length,
+  });
+  const sides = placements.map(([capitals]) => mean([capitals].flat().map((id) => map.sectors[id].position)));
+  const mid = mean(sides);
+  placements.forEach(([capitals, id, cls, [dx, dy] = [0, 0]], i) => {
     if (map.sectors[id]) throw new Error(`${map.id}: ${id} already stands`);
     if (!STAR_RING[cls]) throw new Error(`${map.id}: unknown star class ${cls}`);
+    const side = sides[i];
+    const len = Math.hypot(side.x - mid.x, side.y - mid.y);
+    const position = {
+      x: Math.round(side.x + ((side.x - mid.x) / len) * steps * step) + dx,
+      y: Math.round(side.y + ((side.y - mid.y) / len) * steps * step) + dy,
+    };
     map.sectors[id] = { position, kind: 'star', terrain: cls, buildings: [], garrison: [] };
-    const region = (map.regions ?? []).find((r) => r.sectors.includes(capital));
+    const region = (map.regions ?? []).find((r) => r.sectors.includes([capitals].flat()[0]));
     if (region) region.sectors.push(id);
+  });
+  return mid;
+}
+
+/**
+ * Sets the provinces on the far side of each star (owner 2026-11-19: provinces round each
+ * star, as on the duel): the ring then stands among provinces, not at the edge of the map, and
+ * a road runs behind the star. `rim` is `{ starId: [[x, y, kind, terrain], …] }`, the ids
+ * `${starId}_rim_${n}`; `turn` (`{ starId: otherStarId }`) gives a star the far side of another
+ * turned half round `mid`, so the two sides of a mirror map keep the same space. Each province
+ * joins its star's area.
+ */
+export function setRimBehind(map, rim, mid, turn = {}) {
+  const sides = Object.entries(rim);
+  for (const [star, from] of Object.entries(turn))
+    sides.push([star, rim[from].map(([x, y, ...k]) => [Math.round(2 * mid.x - x), Math.round(2 * mid.y - y), ...k])]);
+  for (const [star, places] of sides) {
+    const region = (map.regions ?? []).find((r) => r.sectors.includes(star));
+    places.forEach(([x, y, kind, terrain], i) => {
+      const id = `${star}_rim_${i + 1}`;
+      if (map.sectors[id]) throw new Error(`${map.id}: ${id} already stands`);
+      map.sectors[id] = { position: { x, y }, kind, terrain };
+      if (region) region.sectors.push(id);
+    });
   }
   return map;
 }

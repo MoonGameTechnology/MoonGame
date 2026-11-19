@@ -11,15 +11,18 @@ import { DEFAULT_SCORE_LIMIT } from '../modules/victory';
 
 /** Score threshold per map (BAL-16, owner's resolution 2026-10-15): the points of the
  *  whole built-up map. Half the map taken without a fight brings 55–59% of it, won
- *  battles bring the rest (measured 2026-10-14: 120 bot matches of 30 days). */
+ *  battles bring the rest (measured 2026-10-14: 120 bot matches of 30 days). The maps
+ *  rebuilt as star systems (2026-11-19) scaled their thresholds with the points of the
+ *  built-up map: duel 500 → 810, FFA for 4 1010 → 1070, 2 на 2 1834 → 1744, FFA for 20
+ *  8182 → 7912. A running network match keeps the threshold persisted in its ruleset. */
 export const MAP_SCORE_LIMITS = {
-  'duel-1': 560,
-  'ffa-4': 790,
-  'team-2v2': 2200,
+  'duel-1': 910,
+  'ffa-4': 840,
+  'team-2v2': 2090,
   'team-3v3': 3300,
-  // The large FFAs keep the frontier's share of the map's points (~0.47 of the base): one
+  // The large FFAs keep the frontier's share of the map's points (~0.46 of the base): one
   // seat of twenty or fifty need not hold half the map to win on points.
-  'ffa-20': 3800,
+  'ffa-20': 3670,
   'ffa-50': 9400,
   nexus: 1100,
   'frontier-50': 7500,
