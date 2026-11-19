@@ -1594,15 +1594,15 @@
 | TEC-1 | ✅ | data core | `docs/time-economy-roadmap.md` | Матрица времени: опоры в данных |
 | TEC-2 | ⏳ | docs | `docs/time-economy-roadmap.md` | Сверка нынешних цен основной игры в ЭЧ |
 | TEC-3 | ✅ | core | `docs/time-economy-roadmap.md` | Ускорение очередей: правила ядра |
-| TEC-3.1 | ⏳ | srv sec | `docs/time-economy-roadmap.md` | Списание ◆ за ускорение на сервере |
-| TEC-3.2 | 🔒 | proto | `docs/time-economy-roadmap.md` | Кнопки ускорения и остаток бюджета |
-| TEC-4 | 🔒 | core proto | `docs/time-economy-roadmap.md` | Ресурсы за ◆ в партии |
+| TEC-3.1 | ✅ | srv sec | `docs/time-economy-roadmap.md` | Списание ◆ за ускорение на сервере |
+| TEC-3.2 | ⏳ | proto | `docs/time-economy-roadmap.md` | Кнопки ускорения и остаток бюджета |
+| TEC-4 | ⏳ | core proto | `docs/time-economy-roadmap.md` | Ресурсы за ◆ в партии |
 | TEC-5 | ⏳ | srv data | `docs/time-economy-roadmap.md` | Карточки в инвентаре аккаунта |
 | TEC-6 | 🔒 | core proto | `docs/time-economy-roadmap.md` | Применение карточки в партии |
 | TEC-7 | 🔒 | srv proto | `docs/time-economy-roadmap.md` | Дневные задания дают карточки |
 | TEC-8 | 🔒 | srv proto | `docs/time-economy-roadmap.md` | Реклама за карточку ускорения |
 | TEC-9 | 🔒 | srv | `docs/time-economy-roadmap.md` | Заработанные карточки на аукционе |
-| TEC-11 | 🔒 | srv | `docs/time-economy-roadmap.md` | Телеметрия «часы до цели» |
+| TEC-11 | ⏳ | srv | `docs/time-economy-roadmap.md` | Телеметрия «часы до цели» |
 | VET-1 | ✅ | core | `docs/unit-medals-roadmap.md` | Вклад стека в залп перестаёт выбрасываться |
 | VET-2 | ✅ | core | `docs/unit-medals-roadmap.md` | Счётчики ветерана на стеке |
 | VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md` | Грейды и пороги |

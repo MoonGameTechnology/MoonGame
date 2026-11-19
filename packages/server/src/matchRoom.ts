@@ -648,6 +648,12 @@ export class MatchRoom {
     return this.kernel.canApplyAll(state, actions, this.context(now));
   }
 
+  /** TEC-3.1: the reducer's context at the live world clock — a host prices an order paid
+   *  in ◆ with the same data, scale and clock the reducer will check that price against. */
+  liveContext(): Context {
+    return this.context(this.clock());
+  }
+
   get sequence(): number {
     return this.seq;
   }
