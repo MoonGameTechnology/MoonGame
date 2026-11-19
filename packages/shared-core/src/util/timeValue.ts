@@ -18,7 +18,8 @@
  *
  * Только сложение, умножение и деление: результат одинаков на любом движке.
  */
-import type { ResourceBag, TimeValueDef } from '../data/schemas';
+import type { ResourceBag } from '../data/schemas';
+import type { TimeValueDef } from '../data/timeValueSchema';
 
 /** Цена единицы ресурса в ЭЧ (правило 1); ресурс вне матрицы — 0. */
 export function unitHours(resource: string, def: TimeValueDef): number {

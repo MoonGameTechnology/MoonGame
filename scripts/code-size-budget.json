@@ -6,7 +6,7 @@
     "prototype/netserver.ts": 2097,
     "packages/shared-core/src/state/gameState.ts": 1826,
     "packages/shared-core/src/modules/combat.ts": 1574,
-    "packages/shared-core/src/data/schemas.ts": 1727,
+    "packages/shared-core/src/data/schemas.ts": 1729,
     "prototype/src/mapLayer.ts": 1615,
     "decisions/sectorZeroProgress.ts": 1524,
     "packages/shared-core/src/state/visibility.ts": 1516,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadGameData } from '../data/loadGameData';
-import { TimeValueDefSchema } from '../data/schemas';
+import { TimeValueDefSchema } from '../data/timeValueSchema';
 import {
   bundleHours,
   gameHoursOfReal,
