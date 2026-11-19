@@ -52,6 +52,7 @@ import {
 import { basePosition, homePosition, strikePosition } from '../../state/strikePosition';
 import { deepClone } from '../../util/clone';
 import { distance } from '../../state/route';
+import { closedSky, crossesClosedSky } from '../../state/closedSky';
 import { fireOnGarrison } from '../../util/groundFire';
 import { fleetPositionAt } from '../../state/fleetPosition';
 import {
@@ -605,7 +606,7 @@ export function redirectAloft(h: HandlerContext, playerId: string, p: Record<str
       typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)
         ? { x, y }
         : null;
-    const route = patrolCheck(h, home, strike, to);
+    const route = patrolCheck(h, home, strike, to, here);
     if (typeof route === 'string') return h.reject(route);
     const flight = flightTime(h, strike, here, route.to);
     // Правило 3: срок над кругом не начинается заново, круг — снятый на вылете.
@@ -636,6 +637,9 @@ export function redirectAloft(h: HandlerContext, playerId: string, p: Record<str
   const range = squadronReach(strike, h.ctx.data);
   if (range <= 0) return h.reject('E_NO_RANGE');
   if (distance(home, to) > range) return h.reject('E_OUT_OF_RANGE');
+  // Туда — из точки, где эскадра сейчас, обратно — к базе: оба пути не над светилом.
+  const sky = closedSky(h.state, h.ctx.data);
+  if (crossesClosedSky(sky, here, to) || crossesClosedSky(sky, to, home)) return h.reject('E_SKY_CLOSED');
   const flight = flightTime(h, strike, here, to);
   reorder(strike);
   strike.target = aim.target;
@@ -667,6 +671,7 @@ export function relocateAloft(h: HandlerContext, playerId: string, p: Record<str
   const range = squadronFerryRange(strike, h.ctx.data);
   if (range <= 0) return h.reject('E_NO_RANGE');
   if (distance(here, to) > range) return h.reject('E_OUT_OF_RANGE');
+  if (crossesClosedSky(closedSky(h.state, h.ctx.data), here, to)) return h.reject('E_SKY_CLOSED');
   reorder(strike);
   // Откуда ушла: перелёт помнит прежний дом, остальные — свою базу.
   strike.origin = strike.origin ?? { ...strike.base };

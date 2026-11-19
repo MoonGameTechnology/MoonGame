@@ -1,9 +1,12 @@
 import {
+  closedSky,
+  crossesClosedSky,
   fleetHoldFree,
   fleetShuttleBay,
   shuttleBayAt,
   squadronFerryRange,
   stacksSize,
+  type ClosedSky,
   type GameData,
   type GameState,
   type Squadron,
@@ -44,6 +47,8 @@ import {
  *    эскадра летит от неё, и не предлагается, когда она уже возвращается туда сама
  *    (`E_BAD_PAYLOAD`). Место в трюме своего корабля эскадра держит с взлёта, поэтому
  *    своё же место ей не помеха.
+ * 8. **Не над звездой, чёрной дырой и их кольцом** (решение владельца 2026-11-19): путь
+ *    перелёта над закрытым небом ядро отбивает (`E_SKY_CLOSED`, `closedSky`).
  */
 
 /** Точка на карте (мировые координаты). */
@@ -73,12 +78,15 @@ export function relocateTargets(
     data: GameData;
     pos: (base: StrikeBase) => XY | null;
     aloft?: { at: XY; returning: boolean };
+    /** Закрытое небо карты, если вызывающий его уже собрал (правило 8). */
+    sky?: ClosedSky;
   },
 ): RelocateTarget[] {
   const { me, from, squadron, data, pos, aloft } = opts;
   const range = squadronFerryRange(squadron, data);
   const origin = aloft ? aloft.at : pos(from);
   if (!(range > 0) || !origin) return [];
+  const sky = opts.sky ?? closedSky(state, data);
   const need = stacksSize(squadron.units, data);
   // Своё место в трюме корабля вылета эскадра держит сама (правило 7).
   const own = (id: string): number => (aloft && from.kind === 'fleet' && from.id === id ? need : 0);
@@ -99,7 +107,7 @@ export function relocateTargets(
     const at = pos(base);
     if (!at) continue;
     const distance = Math.hypot(at.x - origin.x, at.y - origin.y);
-    if (distance <= range) out.push({ base, at, distance }); // правило 4
+    if (distance <= range && !crossesClosedSky(sky, origin, at)) out.push({ base, at, distance }); // правила 4 и 8
   }
   // Сортировка устойчива: внутри одной дистанции миры уже стоят раньше кораблей, а те и
   // другие — по id (правило 6).

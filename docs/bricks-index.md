@@ -1567,6 +1567,7 @@
 | SHU-6.16 | ✅ | core proto | `docs/shuttles-roadmap.md` | Чужой вылет в полёте: глазами и радаром |
 | SHU-6.17 | ✅ | core data proto | `docs/shuttles-roadmap.md` | Заправка у эскадры вместо запаса вылетов базы |
 | SHU-6.18 | ✅ | core proto | `docs/shuttles-roadmap.md` | Патруль бросается на цель, круг патруля — радар |
+| SHU-6.19 | ✅ | core data proto | `docs/shuttles-roadmap.md` | Закрытое небо над звездой и чёрной дырой |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |
 | ST-3.2 | ✅ | srv proto | `docs/steward-roadmap.md` | Драйвер: эвакуация под угрозой (поза defend) |
 | ST-3.3 | ✅ | core srv proto | `docs/steward-roadmap.md` | Поза «Активная оборона» — контрудар при приемлемых потерях |

@@ -20,6 +20,7 @@ const DEFAULT_KIND: SectorKindDef = {
   buildable: true,
   stationable: true,
   bombardable: true,
+  overflight: true,
   orbit: true,
   allowedBuildings: undefined,
   appearance: DEFAULT_APPEARANCE,

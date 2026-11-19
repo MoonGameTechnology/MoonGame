@@ -100,7 +100,10 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '114'; // Орбита: порядок тот же; `orbital` 1.9.0 —
+export const MODULE_MANIFEST_VERSION = '115'; // Закрытое небо: порядок тот же; `shuttle` 2.3.0 и
+// `missiles` 1.1.0 — удар, патруль, перелёт и ракета не идут над звездой, чёрной дырой и их кольцом
+// (`E_SKY_CLOSED`), погоня за ними срывается. Партия на 114 принимала такие приказы, и реплей разошёлся бы.
+// export const MODULE_MANIFEST_VERSION = '114'; // Орбита: порядок тот же; `orbital` 1.9.0 —
 // каждый залп флака и обстрела — свой шаг мира (`time.stop` → `time.stopped`), после ремонта
 // за отрезок. Партия на 113 сперва клала залпы всего отрезка, потом чинила, и реплей разошёлся бы.
 // export const MODULE_MANIFEST_VERSION = '113'; // Боты: порядок тот же; `bot-diplomacy` 0.3.0 —

@@ -17,6 +17,7 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Fleet, Planet, RoadPoint, Squadron } from '../state/gameState';
 import { fleetPositionAt } from '../state/fleetPosition';
 import { distance } from '../state/route';
+import { closedSky, crossesClosedSky } from '../state/closedSky';
 import { getStance } from '../state/diplomacy';
 import { isVisibleTo } from '../state/visibility';
 import { isOrdnanceFleet, MISSILE_SALVO } from '../state/ordnance';
@@ -121,7 +122,8 @@ function takeMissiles(base: LaunchBase, squad: Squadron, count: number): Array<{
 
 export const missilesModule: GameModule = {
   id: 'missiles',
-  version: '1.0.0',
+  // 1.1.0: пуск над закрытым небом (звезда, чёрная дыра, их кольцо) отбит `E_SKY_CLOSED`.
+  version: '1.1.0',
   setup(api) {
     api.onAction('missile.launch', (action, h) => {
       const p = (action.payload ?? {}) as Record<string, unknown>;
@@ -143,6 +145,9 @@ export const missilesModule: GameModule = {
       const range = squadronReach(squad, h.ctx.data);
       if (range <= 0) return h.reject('E_NO_RANGE');
       if (distance(base.position, target.at) > range) return h.reject('E_OUT_OF_RANGE');
+      // Ракета, как и вылет, не идёт над звездой и её кольцом (`state/closedSky.ts`).
+      if (crossesClosedSky(closedSky(h.state, h.ctx.data), base.position, target.at))
+        return h.reject('E_SKY_CLOSED');
 
       for (const { unit } of takeMissiles(base, squad, count)) {
         const def = h.ctx.data.units[unit];

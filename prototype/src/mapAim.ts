@@ -14,9 +14,11 @@
  * циклом. Рисовалки зовёт кадр `renderMap()`; список целей «Атаки» и базы перелёта нужны и
  * нажатию, `main.ts` отдаёт их `mapInput.ts`.
  */
-import type { Fleet, GameState, ShuttleStrike, Squadron, StrikeBase } from '../../packages/shared-core/src/index';
+import type { ClosedSky, Fleet, GameState, ShuttleStrike, Squadron, StrikeBase } from '../../packages/shared-core/src/index';
 import {
   abilityRange,
+  closedSky,
+  crossesClosedSky,
   estimateTravelHours,
   knownClosed,
   legEndT,
@@ -221,12 +223,25 @@ export function drawCastAim(): void {
   cx.restore();
 }
 
+/** Закрытое небо карты (`closedSky.ts`): над звездой, чёрной дырой и их кольцом авиация не
+ *  летает. Мозаика за матч не меняется, а мир — новый объект на каждом тике, поэтому ответ
+ *  помнится на карту и число провинций, а не на кадр: сборка обходит все пары провинций. */
+let skyMemo: { key: string; sky: ClosedSky } | null = null;
+export function mapSky(s: GameState): ClosedSky {
+  const key = s.mapId === undefined ? '' : `${s.mapId}|${Object.keys(s.planets).length}`;
+  if (key && skyMemo?.key === key) return skyMemo.sky;
+  const sky = closedSky(s, data);
+  if (key) skyMemo = { key, sky };
+  return sky;
+}
+
 /**
  * ПРИЦЕЛ ПАТРУЛЯ (SHU-6.3): под указателем — круг, в котором эскадра будет бить, если
  * поставить точку здесь. Круг дальности вокруг базы рисует `drawCombatRanges` — тот же,
- * что у удара: дальность у обоих приказов одна (`squadronReach`). Точка за дальностью
- * красит круг отказом — подсказка, а не запрет, вердикт за ядром (`E_OUT_OF_RANGE`), как
- * у каста (`drawCastAim`).
+ * что у удара: дальность у обоих приказов одна (`squadronReach`). Точка за дальностью или
+ * над закрытым небом (звезда, чёрная дыра, их кольцо) красит круг отказом — подсказка, а
+ * не запрет, вердикт за ядром (`E_OUT_OF_RANGE`, `E_SKY_CLOSED`), как у каста
+ * (`drawCastAim`).
  */
 export function drawPatrolAim(): void {
   if (!strikeAim?.patrol || !aimPointer) return;
@@ -239,7 +254,15 @@ export function drawPatrolAim(): void {
   );
   if (!home) return;
   const at = unworld(aimPointer);
-  const far = Math.hypot(at.x - home.x, at.y - home.y) > squadronReach(found.sq, data);
+  const sky = mapSky(game.world());
+  // Из воздуха эскадра летит к новой точке оттуда, где она сейчас (SHU-6.13), а домой —
+  // всегда к базе: закрытым небом не должен лечь ни один из путей.
+  const via = found.aloft ? strikeWorldPos(found.aloft.id) : null;
+  const far =
+    Math.hypot(at.x - home.x, at.y - home.y) > squadronReach(found.sq, data) ||
+    crossesClosedSky(sky, at, at) ||
+    crossesClosedSky(sky, home, at) ||
+    (via !== null && crossesClosedSky(sky, via, at));
   // Перенесённый патруль держит круг, снятый на вылете (SHU-6.13) — его и рисуем.
   const rPx = worldDist(found.aloft?.patrol?.radius ?? squadronPatrol(found.sq, data).radius);
   drawPatrolCircle(aimPointer, rPx, 'aim', far ? CAST_FAR : R_WING);
@@ -287,6 +310,7 @@ export function squadronRelocateSpots(
     squadron: sq,
     data,
     pos: strikeBasePos,
+    sky: mapSky(s),
     ...(aloft && at ? { aloft: { at, returning: aloft.leg === 'back' } } : {}),
   });
 }
