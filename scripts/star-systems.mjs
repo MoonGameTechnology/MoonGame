@@ -39,7 +39,7 @@ export const STAR_SIZE = {
 };
 
 /** Kind → the terrain that kind of province stands on in a star's ring. */
-const TERRAIN_OF = {
+export const TERRAIN_OF = {
   solar_flare: 'solar_flare_zone',
   asteroid: 'asteroid_field',
   dead_world: 'depleted_system',
@@ -63,7 +63,7 @@ export const STAR_RING = {
 /** Plain kinds a star may re-kind. Graveyards and debris fields are one of a kind on the
  *  big maps, and a dense cluster is an area's prize: none of them moves. */
 const PLAIN = new Set(['asteroid', 'nebula', 'dead_world', 'ion_storm', 'dense_nebula', 'solar_flare']);
-const STORY = ['recruitHero', 'rendezvous', 'vault', 'captive', 'transit'];
+export const STORY = ['recruitHero', 'rendezvous', 'vault', 'captive', 'transit'];
 
 const isSeat = (map, sector) =>
   sector.owner !== null && sector.owner !== undefined && (map.slots?.[sector.owner] || map.players?.[sector.owner]);

@@ -30,14 +30,43 @@ const STARS: Array<[unknown, Record<string, string>]> = [
   // Четыре звёздные системы (владелец 2026-11-19, «И ФФА на 4 тоже придумай и сделай»): своя
   // звезда за каждой столицей, все четыре класса разные.
   [ffa4, { home_sun_1: 'red_giant', home_sun_2: 'blue_giant', home_sun_3: 'yellow_dwarf', home_sun_4: 'white_dwarf' }],
-  [ffa20, { lights_182: 'binary_star' }],
+  // «Двадцать огней» — двадцать звёздных систем (владелец 2026-11-19, «И на 20»): звезда за
+  // каждой столицей, соседние места — разных классов (`scripts/ffa-systems.mjs`).
+  [
+    ffa20,
+    Object.fromEntries(
+      [
+        'yellow_dwarf',
+        'red_giant',
+        'blue_giant',
+        'white_dwarf',
+        'pulsar',
+        'binary_star',
+        'yellow_dwarf',
+        'red_giant',
+        'blue_giant',
+        'white_dwarf',
+        'pulsar',
+        'binary_star',
+        'red_giant',
+        'white_dwarf',
+        'pulsar',
+        'yellow_dwarf',
+        'red_giant',
+        'white_dwarf',
+        'yellow_dwarf',
+        'blue_giant',
+      ].map((cls, i) => [`home_sun_${i + 1}`, cls]),
+    ),
+  ],
   [ffa50, { suns_017: 'yellow_dwarf', suns_039: 'red_giant', suns_467: 'blue_giant', suns_495: 'white_dwarf' }],
   [testbed, { flare_2: 'pulsar' }],
   [proving, { C12R8: 'blue_giant' }],
 ];
 
-/** Maps whose stars re-made their first ring (the competitive mirror maps lay the star alone). */
-const RINGED = new Set(['ffa-20', 'ffa-50', 'duel-testbed', 'proving-ground']);
+/** Maps whose stars re-made their first ring (the competitive mirror maps and the star systems
+ *  behind the capitals lay the star alone). */
+const RINGED = new Set(['ffa-50', 'duel-testbed', 'proving-ground']);
 
 /** A class's ring: the kinds its plain neighbours take and the world its planets become. */
 const RING: Record<string, { kinds: string[]; world: string | null }> = {

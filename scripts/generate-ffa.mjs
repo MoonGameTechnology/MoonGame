@@ -14,10 +14,11 @@
  * - areas follow the templates of `docs/map-terrain-regions-concept.md` §5.3–5.5 (core →
  *   shell → edge from the area's anchor), they are labels only (`regions`, M2.15);
  * - the whole catalogue of kinds, terrains and world types is on the map, except `empty`
- *   (kept off combat maps) and both fortresses, `void_station` and `fork_station`: only a
- *   player builds them (`docs/fortress-roadmap.md` §0.6); a map that seeds one gets a
- *   fortress without its core and guns; a ring kind only round its body, the accretion disk
- *   round a black hole and a star's own round a star (`celestial-rings.mjs`);
+ *   (open space only round star systems, `ffa-systems.mjs`) and both fortresses,
+ *   `void_station` and `fork_station`: only a player builds them (`docs/fortress-roadmap.md`
+ *   §0.6); a map that seeds one gets a fortress without its core and guns; a ring kind only
+ *   round its body, the accretion disk round a black hole and a star's own round a star
+ *   (`celestial-rings.mjs`);
  * - wrecks are a rare find: one graveyard and one debris field per map (owner,
  *   2026-10-14);
  * - geometry is an irregular sample, never mirrored quadrants; the owner trades a little
@@ -41,6 +42,7 @@ import { CELL_AREA, MIN_GAP, dist, freeCells, pos, rngFrom } from './ffa-provinc
 import { layStars, markRingWorlds } from './star-systems.mjs';
 import { mosaicNeighbours } from './lay-stars.mjs';
 import { RING_KIND, layRings, ringKindOf } from './celestial-rings.mjs';
+import { SYSTEMS, layOutskirts, laySystems } from './ffa-systems.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
@@ -55,14 +57,10 @@ const MAPS = {
     hives: 2,
     neutrals: 4,
     rimRifts: 2,
-    // A star in each flare zone of the storms that does not border a capital, in id order
-    // (owner 2026-11-17).
-    stars: ['binary_star'],
+    // No star in the flare zones: a star stands behind each capital (`ffa-systems.mjs`).
+    stars: [],
     // Rings round the bodies (owner 2026-11-19, `celestial-rings.mjs`), plans found by search.
-    rings: {
-      heart: { k: 8, turn: 0.5, clear: 1.22 },
-      lights_182: { k: 9, turn: 0.5, clear: 1.22 },
-    },
+    rings: { heart: { k: 8, turn: 0.5, clear: 1.22 } },
     hub: 'dark_heart',
     names: [
       'kaira',
@@ -867,29 +865,37 @@ function finish(seats, cfg, g) {
     pricing: JSON.parse(readFileSync(ROOT + 'data/maps/duel-1.json', 'utf8')).pricing,
   };
 
-  // ── star systems: a star in each flare zone, its ring after its class (`star-systems.mjs`).
-  // Laid last, over the finished map: areas, names and inhabitants stay as dealt. A flare
-  // zone beside a capital keeps its flares (`layStars` says why).
+  // ── star systems: a star in each flare zone, its ring after its class (`star-systems.mjs`),
+  // or one behind each capital (`ffa-systems.mjs`). Laid last, over the finished map: areas,
+  // names and inhabitants stay as dealt. A flare zone beside a capital keeps its flares
+  // (`layStars` says why).
+  const sys = SYSTEMS[cfg.id];
   const nearNow = neighbours(content);
   const capital = (id) => homeIds.includes(id);
-  const flares = Object.keys(sectors)
-    .filter((id) => sectors[id].kind === 'solar_flare' && !nearNow.get(id).some(capital))
-    .sort();
+  const flares = sys
+    ? []
+    : Object.keys(sectors)
+        .filter((id) => sectors[id].kind === 'solar_flare' && !nearNow.get(id).some(capital))
+        .sort();
   if (flares.length !== cfg.stars.length)
     throw new Error(`${cfg.id}: ${flares.length} flare zones for ${cfg.stars.length} stars`);
   layStars(content, flares.map((id, i) => [id, cfg.stars[i]]), neighbours);
+  const systems = sys && laySystems(content, sys, { capitals: homeIds, keep: PRIZE });
+  for (const id of systems?.stars ?? []) AREA[id] = AREA[id.replace('home_sun_', 'home_')];
 
   // ── rings round the bodies (`celestial-rings.mjs`, owner 2026-11-19): laid last, they push
   // the provinces round each body outward. The Abyss keeps the disk it was dealt (`disk`) and
   // rides along, disk and all, when a star's ring reaches it.
   const disk = Object.keys(sectors).filter((id) => sectors[id].kind === 'accretion_disk');
-  const laid = layRings(content, cfg.rings, neighbours, {
+  const laid = layRings(content, { ...cfg.rings, ...systems?.plans }, neighbours, {
     rigid: cfg.disk ? [{ body: 'heart', ids: ['heart', ...disk] }] : [],
   });
   for (const [body, { ring }] of Object.entries(laid)) for (const id of ring) AREA[id] = AREA[body];
   for (const [id, at] of Object.entries(cfg.afterRings ?? {})) sectors[id].position = { ...at };
   // The push brought new worlds beside each star's ring: they take its class's world too.
   markRingWorlds(content, flares, neighbours(content));
+  for (const [id, host] of sys ? layOutskirts(content, sys, systems, neighbours) : [])
+    AREA[id] = AREA[host];
 
   // ── contracts (prototype/src/ffaMap.test.ts holds the same on the committed file) ──
   const map = core.parseMatchMap(content);

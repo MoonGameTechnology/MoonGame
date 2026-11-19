@@ -27,16 +27,18 @@ import { en } from '../../localization/en';
 
 /** The big free-for-all maps (`scripts/generate-ffa.mjs`): same contracts, their own scale.
  *  `provinces` counts places: the ring round each body (owner 2026-11-10, 2026-11-18/19) is
- *  a wall of provinces on top. */
+ *  a wall of provinces on top. `openSpace` — a map of star systems (`scripts/ffa-systems.mjs`,
+ *  owner 2026-11-19: «И на 20»), whose plain dead worlds and outskirts are open space. */
 const FFA_MAPS = [
   {
     title: 'Twenty Lights — 20-player FFA',
     id: 'ffa-20',
-    provinces: 320,
+    provinces: 390,
     seats: 20,
     pirates: 3,
     hives: 2,
     neutrals: 4,
+    openSpace: true,
   },
   {
     title: 'Fifty Suns — 50-player FFA',
@@ -46,12 +48,13 @@ const FFA_MAPS = [
     pirates: 6,
     hives: 4,
     neutrals: 8,
+    openSpace: false,
   },
 ] as const;
 
 describe.each(FFA_MAPS)(
   '$title',
-  ({ id, provinces, seats: capacity, pirates, hives, neutrals }) => {
+  ({ id, provinces, seats: capacity, pirates, hives, neutrals, openSpace }) => {
     const preset = mapPreset(id);
     const seats = networkSeats('ffa', id as MapId);
     const nodes = new Map(preset.nodes.map((n) => [n.id, n]));
@@ -204,8 +207,9 @@ describe.each(FFA_MAPS)(
         [...new Set(sectors.map(pick).filter((v): v is string => v !== undefined))].sort();
       const kinds = Object.keys(data.sectorKinds)
         // Fortresses (`void_station`, `fork_station`) are only raised by a player, see
-        // data/seededFortress.test.ts; `empty` stays off combat maps.
-        .filter((k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station' && k !== 'empty')
+        // data/seededFortress.test.ts; `empty` stays off combat maps but a map of star systems.
+        .filter((k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station')
+        .filter((k) => k !== 'empty' || openSpace)
         // A ring is its body's kind: the map shows the rings of the bodies on it.
         .filter((k) => !isCelestialRing(k) || sectors.some((s) => ringKindOf(s) === k))
         .sort();
