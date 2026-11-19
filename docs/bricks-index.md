@@ -1592,7 +1592,7 @@
 | TT-4.3 | ✅ | data core | `docs/tech-tree-roadmap.md` | Учёный «+слот» |
 | TEC-0 | ✅ | docs | `docs/time-economy-roadmap.md` | Модель экономики времени и резолюции владельца |
 | TEC-1 | ✅ | data core | `docs/time-economy-roadmap.md` | Матрица времени: опоры в данных |
-| TEC-2 | ⏳ | docs | `docs/time-economy-roadmap.md` | Сверка нынешних цен основной игры в ЭЧ |
+| TEC-2 | ✅ | docs | `docs/time-economy-roadmap.md` | Сверка нынешних цен основной игры в ЭЧ |
 | TEC-3 | ✅ | core | `docs/time-economy-roadmap.md` | Ускорение очередей: правила ядра |
 | TEC-3.1 | ✅ | srv sec | `docs/time-economy-roadmap.md` | Списание ◆ за ускорение на сервере |
 | TEC-3.2 | ✅ | proto | `docs/time-economy-roadmap.md` | Кнопки ускорения и остаток бюджета |
