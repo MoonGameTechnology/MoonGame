@@ -31,6 +31,7 @@ import {
 } from './techTreeModel';
 import { techPhoneStripHtml, techSideHtml, type TechSheet } from './techTreeSide';
 import { data } from './gameData';
+import { speedupAct, speedupButton, type SpeedupButton } from './speedupButtons';
 
 export {
   DAMAGE_SCOPE_LABEL,
@@ -138,6 +139,12 @@ function linkChip(m: TechModel, id: string, from: string, mark: string, cls: str
 
 /** Окошко узла: значок, имя, ветка, состояние, эффект, цена и срок, «Нужно», «Ведёт к»,
  *  описание и кнопки. Перерисовывается из состояния — живой ререндер его не закрывает. */
+/** Кнопка ускорения идущей темы (TEC-3.2); предлагать нечего — пусто. */
+const speedHtml = (b: SpeedupButton | undefined): string =>
+  b
+    ? `<button class="tt-mq btn-second" data-speedact="${esc(b.act)}" data-speedarg="${esc(b.arg)}" title="${esc(b.title)}">${esc(b.label)}</button>`
+    : '';
+
 function nodeModalHtml(m: TechModel, id: string): string {
   const td = m.techs[id]!;
   const st = m.nodeState(id);
@@ -181,7 +188,8 @@ function nodeModalHtml(m: TechModel, id: string): string {
         ? `<button class="tt-mbtn btn-main" data-go="${esc(id)}">🔬 ${t('tech.action.research')} · ${fmtDur(m.hours(id))}</button>`
         : `<button class="tt-mbtn wait btn-main" disabled>${affordable ? t('tech.action.slots-full') : t('tech.action.no-resources')}</button>`
       : st === 'res' && run
-        ? `<button class="tt-mbtn wait btn-main" disabled>⏳ ${t('tech.action.running-clock', { n: liveTimerHtml(run.completesAt, 'clock') })}</button>`
+        ? `<button class="tt-mbtn wait btn-main" disabled>⏳ ${t('tech.action.running-clock', { n: liveTimerHtml(run.completesAt, 'clock') })}</button>` +
+          speedHtml(speedupButton(m.state, m.me, run.completesAt, 'tech', id))
         : st === 'done'
           ? `<button class="tt-mbtn wait btn-main" disabled>✓ ${t('tech.action.done')}</button>`
           : '';
@@ -422,6 +430,12 @@ export function initTechTree(host: TechHost): {
     }
     // «Исследовать» есть и в окошке узла (.tt-mbtn), и в строке очереди (.tt-qgo) —
     // спрашиваем по САМОМУ приказу (data-go), а не по классу кнопки.
+    const speed = tg.closest<HTMLElement>('[data-speedact]');
+    if (speed && speedupAct(speed.dataset.speedact!, speed.dataset.speedarg ?? '', host.me())) {
+      modalId = null;
+      repaint();
+      return;
+    }
     const go = (tg.closest('[data-go]') as HTMLElement | null)?.dataset.go;
     // Приказ из окошка узла закрывает его: игрок сразу видит кольцо на плитке.
     if ((go || (tg.closest('[data-q]') as HTMLElement | null)) && tg.closest('.tt-modal'))

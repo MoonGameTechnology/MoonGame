@@ -137,6 +137,7 @@ import { isSectorZeroRun } from './sectorRun';
 import { opensNow } from './sheetLift';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { splitOne } from './squadronPanel';
+import { speedupAct } from './speedupButtons';
 import { cursorTipPos } from './tipPlacement';
 import { arrivalHours } from './travelEta';
 import { toggleWingMore } from './wingOrders';
@@ -740,6 +741,7 @@ function onSideClick(ev: MouseEvent): void {
   } else if (act === 'cancelbuild') {
     // The active order only — refunds the unbuilt share and pauses it (resumable).
     playerOrder(cancelConstruction(ME, selPlanet!, Number(arg)));
+  } else if (speedupAct(act ?? '', arg ?? '', ME)) { /* TEC-3.2: ускорить или закончить стройку — speedupButtons.ts */
   } else if (act === 'resumebuild') {
     playerOrder(resumeConstruction(ME, selPlanet!, Number(arg)));
   } else if (act === 'dequeue') {

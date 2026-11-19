@@ -545,7 +545,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 | Лента новостей: корпорации, битвы, медали игроков, объявления администратора | `corpNews.ts`, `newsApi.ts`, `newsScreen.ts` | вкл. (`GET /news`, кнопка в шапке хаба) |
 | Арсенал: стартовый набор, дроп, гейт `E_NOT_OWNED` | `mainGameArsenal.ts`, `arsenal.ts` | вкл. |
 | Мета-экономика: материалы, крафт, выплаты, сезон, Суверены, витрина за ◆, перки премиума, награды за медали | `metaEconomy*.ts`, `medalRewards.ts` | вкл. |
-| Ускорение очередей за ◆ в сетевой партии: списание под квитанцию, возврат при отказе ядра (TEC-3.1) | `matchSpeedup.ts`, `matchSovereigns.ts` | вкл. (`POST /matches/:id/speedup`; кнопок пока нет — TEC-3.2) |
+| Ускорение очередей за ◆ в сетевой партии: списание под квитанцию, возврат при отказе ядра (TEC-3.1); кнопки у заказа и темы (TEC-3.2) | `matchSpeedup.ts`, `matchSovereigns.ts`; клиент `speedupClient.ts` | вкл. (`POST /matches/:id/speedup`) |
 | Аукцион `MetaMarket`: комиссия 8%, торги, заказы на покупку | `metaMarket.ts`, `metaAuction.ts`, `metaOrders.ts` | вкл., от 700 XP (5-й уровень) |
 | Сессионная AvA в форматах от 2 на 2 до 10 на 10, медали, аренда корп-арсенала | `avaService.ts`, `avaFormats.ts`, `medalService.ts` и др. | вкл. |
 | Магазин Commerce: 4 товара и 6 пакетов Суверенов, провайдеров нет | `commerceMain.ts`, свой процесс и БД | недоступны |

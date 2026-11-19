@@ -31,6 +31,14 @@ describe('конвейер — идущая стройка', () => {
     expect(html).toContain('conv-fill');
   });
 
+  it('кнопка ускорения (TEC-3.2) — только когда хозяин её подписал', () => {
+    expect(conveyorHtml('C1R1', 'buildings', view({ active }), labels)).not.toContain('conv-speed');
+    const offer = { act: 'speedbuild', arg: '7:1', label: '⏩ 1 ч · 11 ◆', title: 'ускорить' };
+    const html = conveyorHtml('C1R1', 'buildings', view({ active: { ...active, offer } }), labels);
+    expect(html).toContain('data-act="speedbuild" data-arg="7:1"');
+    expect(html).toContain('⏩ 1 ч · 11 ◆');
+  });
+
   it('ЖИВЫЕ ЧИСЛА не входят в разметку — только якоря для покадрового патча', () => {
     const html = conveyorHtml('C1R1', 'buildings', view({ active }), labels);
     expect(html).toContain('data-at="5000000"');

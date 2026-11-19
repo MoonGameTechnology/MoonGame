@@ -51,6 +51,7 @@ import type { UnitCatalogTab } from './buildScreen';
 import { bombardVolleyAt } from './bombardClock';
 import { builtTileHtml } from './catalogTile';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
+import { speedupButton } from './speedupButtons';
 import { controlLimitOf } from './economy';
 import { buildingName, cost, displayUnit, esc, resLine } from './format';
 import { data } from './gameData';
@@ -310,6 +311,7 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
             at: active.at,
             durationMs: buildDurationHours(active.payload) * HOUR,
             seq: active.seq,
+            offer: speedupButton(s, game.me(), active.at, 'build', String(active.seq)),
           }
         : null,
       queued: queued.map((q) => ({ label: esc(constructionLabel(q)), id: q.id })),

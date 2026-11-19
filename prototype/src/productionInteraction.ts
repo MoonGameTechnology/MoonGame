@@ -10,6 +10,7 @@ import type { YardHost, YardTab } from './shipyard';
 import type { BuildCategory } from './buildScreen';
 import { data } from './gameData';
 import { toggleLaneStrip } from './productionQueueView';
+import { speedupAct } from './speedupButtons';
 
 interface Navigation {
   planet: string;
@@ -22,6 +23,8 @@ export function productionClick(tg: HTMLElement, host: YardHost, nav: Navigation
   const income = tg.closest<HTMLElement>('[data-pw-income]')?.dataset.pwIncome;
   if (income) { host.openInfo?.(`income:${income}`, income); return true; }
   if (tg.closest('[data-pw-strip-more]')) { toggleLaneStrip(); nav.repaint(); return true; }
+  const speed = tg.closest<HTMLElement>('[data-pw-speed]');
+  if (speed && speedupAct(speed.dataset.pwSpeed ?? '', speed.dataset.pwSpeedarg ?? '', host.me())) { nav.repaint(); return true; }
   const cancel = tg.closest<HTMLElement>('[data-pw-cancel]')?.dataset.pwCancel;
   const resume = tg.closest<HTMLElement>('[data-pw-resume]')?.dataset.pwResume;
   const cancelHero = tg.closest<HTMLElement>('[data-pw-hero-cancel]')?.dataset.pwHeroCancel;
