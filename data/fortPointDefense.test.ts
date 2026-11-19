@@ -94,7 +94,24 @@ describe('где ставится космическая крепость — р
     // Своим незахватываемое тут становится, поэтому закрыта она флагом, а не владением.
     // `accretion_disk` (плазменное кольцо вокруг чёрной дыры «Бездны») — та же дыра, что разлом.
     // `star` (звезда как своя провинция, 2026-11-17) — туда не летают, как в чёрную дыру.
-    expect(uncapturable.sort()).toEqual(['accretion_disk', 'black_hole', 'debris_field', 'empty', 'fork_station', 'rift', 'star', 'station_site']);
+    // Кольцо звезды (корона, пылевая оболочка, звёздный и пульсарный ветер, планетарная
+    // туманность, околодвойной диск; владелец 2026-11-18/19) — та же стена, что диск.
+    expect(uncapturable.sort()).toEqual([
+      'accretion_disk',
+      'black_hole',
+      'circumbinary_disk',
+      'corona',
+      'debris_field',
+      'dust_shell',
+      'empty',
+      'fork_station',
+      'planetary_nebula',
+      'pulsar_wind',
+      'rift',
+      'star',
+      'station_site',
+      'stellar_wind',
+    ]);
     expect(isStationable(data, { kind: 'fork_station' })).toBe(false);
   });
 

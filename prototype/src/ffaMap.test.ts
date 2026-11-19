@@ -21,10 +21,13 @@ import { aiOrders } from './ai';
 import { advance, order } from './protoKernel';
 import { HOUR } from './time';
 import { regionKey } from '../../decisions/regionName';
+import { isCelestialRing, ringKindOf } from '../../decisions/celestialRing';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 
-/** The big free-for-all maps (`scripts/generate-ffa.mjs`): same contracts, their own scale. */
+/** The big free-for-all maps (`scripts/generate-ffa.mjs`): same contracts, their own scale.
+ *  `provinces` counts places: the ring round each body (owner 2026-11-10, 2026-11-18/19) is
+ *  a wall of provinces on top. */
 const FFA_MAPS = [
   {
     title: 'Twenty Lights — 20-player FFA',
@@ -38,7 +41,7 @@ const FFA_MAPS = [
   {
     title: 'Fifty Suns — 50-player FFA',
     id: 'ffa-50',
-    provinces: 800,
+    provinces: 790,
     seats: 50,
     pirates: 6,
     hives: 4,
@@ -74,7 +77,7 @@ describe.each(FFA_MAPS)(
     it('is offered for new matches and loads through the core with every inhabitant', () => {
       expect(MAP_IDS).toContain(id);
       expect(validateMatchMap(preset.map!, data)).toEqual([]);
-      expect(preset.nodes).toHaveLength(provinces);
+      expect(preset.nodes.filter((n) => !isCelestialRing(n.sector))).toHaveLength(provinces);
       expect(preset.map!.paths).toBeUndefined(); // lanes come from the real mosaic
       expect(seats).toHaveLength(capacity);
       expect(new Set(seats.map((s) => s.start)).size).toBe(capacity);
@@ -101,7 +104,7 @@ describe.each(FFA_MAPS)(
           expect(networkStartsOf(state, 'ffa')[p.id]).toBeNull();
         }
       }
-      expect(mapNodesFromState(JSON.parse(JSON.stringify(state)))).toHaveLength(provinces);
+      expect(mapNodesFromState(JSON.parse(JSON.stringify(state)))).toHaveLength(preset.nodes.length);
       expect(scoreLimitFor(state)).toBeGreaterThan(scoreLimitFor({ mapId: 'ffa-4' }));
     });
 
@@ -118,7 +121,7 @@ describe.each(FFA_MAPS)(
       expect(barriers.filter((n) => n.sector === 'black_hole')).toHaveLength(1);
       expect(barriers.some((n) => n.sector === 'rift')).toBe(true);
       for (const n of barriers) expect(n.links).toEqual([]);
-      expect(distances(preset.starts[0]!).size).toBe(provinces - barriers.length);
+      expect(distances(preset.starts[0]!).size).toBe(preset.nodes.length - barriers.length);
       const inhabited = new Set(
         Object.keys(preset.map!.sectors).filter((s) =>
           preset.map!.sectors[s]!.owner?.startsWith('npc-'),
@@ -203,8 +206,8 @@ describe.each(FFA_MAPS)(
         // Fortresses (`void_station`, `fork_station`) are only raised by a player, see
         // data/seededFortress.test.ts; `empty` stays off combat maps.
         .filter((k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station' && k !== 'empty')
-        // The accretion disk rings only the Abyss of `ffa-50` (owner 2026-11-10).
-        .filter((k) => k !== 'accretion_disk' || id === 'ffa-50')
+        // A ring is its body's kind: the map shows the rings of the bodies on it.
+        .filter((k) => !isCelestialRing(k) || sectors.some((s) => ringKindOf(s) === k))
         .sort();
       expect(has((s) => s.kind)).toEqual(kinds);
       // Star classes are one family (`data/sectors.json`): a map shows some, never all six.

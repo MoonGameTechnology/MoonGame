@@ -6,8 +6,8 @@
   "sectors": {
     "C8R5": {
       "position": {
-        "x": 55,
-        "y": 0
+        "x": 49,
+        "y": 10
       },
       "kind": "dead_world",
       "terrain": "deep_void"
@@ -112,16 +112,16 @@
     },
     "C7R6": {
       "position": {
-        "x": -102,
-        "y": 303
+        "x": -105,
+        "y": 308
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
     "C7R4": {
       "position": {
-        "x": -103,
-        "y": -215
+        "x": -114,
+        "y": -213
       },
       "kind": "empty",
       "terrain": "deep_void"
@@ -129,7 +129,7 @@
     "C8R6": {
       "position": {
         "x": 205,
-        "y": 208
+        "y": 217
       },
       "kind": "dead_world",
       "terrain": "deep_void"
@@ -140,27 +140,28 @@
         "y": -258
       },
       "kind": "black_hole",
-      "terrain": "deep_void"
+      "terrain": "deep_void",
+      "size": 1.4
     },
     "C9R5": {
       "position": {
-        "x": 347,
-        "y": -18
+        "x": 353,
+        "y": -8
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
     "C6R6": {
       "position": {
-        "x": -423,
-        "y": 313
+        "x": -424,
+        "y": 314
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
     "C6R4": {
       "position": {
-        "x": -425,
+        "x": -430,
         "y": -207
       },
       "kind": "rift",
@@ -168,7 +169,7 @@
     },
     "C6R5": {
       "position": {
-        "x": -574,
+        "x": -575,
         "y": 53
       },
       "kind": "dead_world",
@@ -176,16 +177,16 @@
     },
     "C7R3": {
       "position": {
-        "x": -254,
-        "y": -474
+        "x": -262,
+        "y": -478
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "C9R6": {
       "position": {
-        "x": 497,
-        "y": 243
+        "x": 500,
+        "y": 249
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -202,24 +203,24 @@
     },
     "C9R4": {
       "position": {
-        "x": 498,
-        "y": -280
+        "x": 509,
+        "y": -281
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "C10R5": {
       "position": {
-        "x": 626,
-        "y": 30
+        "x": 633,
+        "y": 35
       },
       "kind": "accretion_disk",
       "terrain": "empty_space"
     },
     "C7R2": {
       "position": {
-        "x": -104,
-        "y": -732
+        "x": -108,
+        "y": -738
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -428,7 +429,7 @@
     },
     "C6R3": {
       "position": {
-        "x": -576,
+        "x": -577,
         "y": -468
       },
       "kind": "dead_world",
@@ -436,8 +437,8 @@
     },
     "C6R2": {
       "position": {
-        "x": -427,
-        "y": -727
+        "x": -429,
+        "y": -728
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -453,7 +454,7 @@
     "C7R1": {
       "position": {
         "x": -255,
-        "y": -992
+        "y": -993
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -469,8 +470,8 @@
     },
     "C10R2": {
       "position": {
-        "x": 778,
-        "y": -753
+        "x": 780,
+        "y": -755
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard"
@@ -478,7 +479,7 @@
     "C10R1": {
       "position": {
         "x": 629,
-        "y": -1014
+        "y": -1015
       },
       "kind": "debris_field",
       "terrain": "derelict_graveyard"
@@ -493,8 +494,8 @@
     },
     "C11R3": {
       "position": {
-        "x": 899,
-        "y": -465
+        "x": 902,
+        "y": -466
       },
       "kind": "debris_field",
       "terrain": "derelict_graveyard"
@@ -509,16 +510,16 @@
     },
     "C9R2": {
       "position": {
-        "x": 499,
-        "y": -802
+        "x": 502,
+        "y": -807
       },
       "kind": "debris_field",
       "terrain": "empty_space"
     },
     "C10R3": {
       "position": {
-        "x": 628,
-        "y": -493
+        "x": 636,
+        "y": -497
       },
       "kind": "debris_field",
       "terrain": "empty_space"
@@ -535,14 +536,14 @@
     "C9R1": {
       "position": {
         "x": 349,
-        "y": -1063
+        "y": -1064
       },
       "kind": "empty",
       "terrain": "empty_space"
     },
     "C10R4": {
       "position": {
-        "x": 777,
+        "x": 784,
         "y": -231
       },
       "kind": "debris_field",
@@ -577,7 +578,7 @@
     "C8R2": {
       "position": {
         "x": 205,
-        "y": -774
+        "y": -782
       },
       "kind": "debris_field",
       "terrain": "empty_space"
@@ -585,7 +586,7 @@
     "C8R1": {
       "position": {
         "x": 55,
-        "y": -1032
+        "y": -1034
       },
       "kind": "debris_field",
       "terrain": "empty_space"
@@ -600,16 +601,16 @@
     },
     "C13R7": {
       "position": {
-        "x": 1449,
-        "y": 506
+        "x": 1464,
+        "y": 472
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
     },
     "C13R5": {
       "position": {
-        "x": 1450,
-        "y": -11
+        "x": 1451,
+        "y": -14
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
@@ -617,7 +618,7 @@
     "C12R6": {
       "position": {
         "x": 1318,
-        "y": 295
+        "y": 268
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
@@ -633,8 +634,8 @@
     },
     "C12R5": {
       "position": {
-        "x": 1169,
-        "y": 36
+        "x": 1168,
+        "y": 30
       },
       "kind": "solar_flare",
       "terrain": "solar_flare_zone"
@@ -660,7 +661,7 @@
     },
     "C11R4": {
       "position": {
-        "x": 1048,
+        "x": 1049,
         "y": -205
       },
       "kind": "dead_world",
@@ -668,8 +669,8 @@
     },
     "C12R7": {
       "position": {
-        "x": 1168,
-        "y": 554
+        "x": 1149,
+        "y": 521
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -706,40 +707,40 @@
     },
     "C11R6": {
       "position": {
-        "x": 1046,
-        "y": 315
+        "x": 1035,
+        "y": 294
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "C11R5": {
       "position": {
-        "x": 897,
-        "y": 55
+        "x": 898,
+        "y": 54
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "C11R8": {
       "position": {
-        "x": 1044,
-        "y": 834
+        "x": 1006,
+        "y": 837
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "C11R7": {
       "position": {
-        "x": 895,
-        "y": 575
+        "x": 869,
+        "y": 560
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "C10R6": {
       "position": {
-        "x": 775,
-        "y": 292
+        "x": 770,
+        "y": 287
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -812,8 +813,8 @@
     },
     "C8R7": {
       "position": {
-        "x": 55,
-        "y": 469
+        "x": 54,
+        "y": 472
       },
       "kind": "dead_world",
       "terrain": "deep_void"
@@ -877,14 +878,14 @@
     "C9R7": {
       "position": {
         "x": 346,
-        "y": 505
+        "y": 507
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
     "C9R8": {
       "position": {
-        "x": 496,
+        "x": 492,
         "y": 766
       },
       "kind": "dead_world",
@@ -892,27 +893,207 @@
     },
     "C10R9": {
       "position": {
-        "x": 622,
-        "y": 1075
+        "x": 614,
+        "y": 1078
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
     "C10R7": {
       "position": {
-        "x": 624,
-        "y": 553
+        "x": 615,
+        "y": 550
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
     "C10R8": {
       "position": {
-        "x": 773,
+        "x": 748,
         "y": 813
       },
       "kind": "dead_world",
       "terrain": "deep_void"
+    },
+    "C12R8_ring_1": {
+      "position": {
+        "x": 1470,
+        "y": 889
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C12R8_ring_2": {
+      "position": {
+        "x": 1395,
+        "y": 964
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C12R8_ring_3": {
+      "position": {
+        "x": 1290,
+        "y": 981
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C12R8_ring_4": {
+      "position": {
+        "x": 1196,
+        "y": 932
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C12R8_ring_5": {
+      "position": {
+        "x": 1147,
+        "y": 838
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C12R8_ring_6": {
+      "position": {
+        "x": 1164,
+        "y": 733
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C12R8_ring_7": {
+      "position": {
+        "x": 1239,
+        "y": 658
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C12R8_ring_8": {
+      "position": {
+        "x": 1344,
+        "y": 641
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C12R8_ring_9": {
+      "position": {
+        "x": 1438,
+        "y": 690
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C12R8_ring_10": {
+      "position": {
+        "x": 1487,
+        "y": 784
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C8R4_ring_1": {
+      "position": {
+        "x": 363,
+        "y": -233
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C8R4_ring_2": {
+      "position": {
+        "x": 318,
+        "y": -145
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C8R4_ring_3": {
+      "position": {
+        "x": 230,
+        "y": -100
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C8R4_ring_4": {
+      "position": {
+        "x": 132,
+        "y": -116
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C8R4_ring_5": {
+      "position": {
+        "x": 63,
+        "y": -185
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C8R4_ring_6": {
+      "position": {
+        "x": 47,
+        "y": -283
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C8R4_ring_7": {
+      "position": {
+        "x": 92,
+        "y": -371
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C8R4_ring_8": {
+      "position": {
+        "x": 180,
+        "y": -416
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C8R4_ring_9": {
+      "position": {
+        "x": 278,
+        "y": -400
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "C8R4_ring_10": {
+      "position": {
+        "x": 347,
+        "y": -331
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
     }
   },
   "regions": [
@@ -925,6 +1106,16 @@
         "C7R4",
         "C8R6",
         "C8R4",
+        "C8R4_ring_1",
+        "C8R4_ring_2",
+        "C8R4_ring_3",
+        "C8R4_ring_4",
+        "C8R4_ring_5",
+        "C8R4_ring_6",
+        "C8R4_ring_7",
+        "C8R4_ring_8",
+        "C8R4_ring_9",
+        "C8R4_ring_10",
         "C9R5",
         "C6R6",
         "C6R4",
@@ -1003,6 +1194,16 @@
         "C13R6",
         "C12R5",
         "C12R8",
+        "C12R8_ring_1",
+        "C12R8_ring_2",
+        "C12R8_ring_3",
+        "C12R8_ring_4",
+        "C12R8_ring_5",
+        "C12R8_ring_6",
+        "C12R8_ring_7",
+        "C12R8_ring_8",
+        "C12R8_ring_9",
+        "C12R8_ring_10",
         "C13R4",
         "C11R4",
         "C12R7",

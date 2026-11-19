@@ -213,16 +213,16 @@
     },
     "shale": {
       "position": {
-        "x": -730,
-        "y": -220
+        "x": -734,
+        "y": -219
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "mist": {
       "position": {
-        "x": -390,
-        "y": -540
+        "x": -403,
+        "y": -544
       },
       "kind": "planet",
       "terrain": "asteroid_field",
@@ -230,16 +230,16 @@
     },
     "watch": {
       "position": {
-        "x": -380,
-        "y": -70
+        "x": -389,
+        "y": -63
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "riftward": {
       "position": {
-        "x": -80,
-        "y": -800
+        "x": -85,
+        "y": -814
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula",
@@ -253,28 +253,29 @@
       "kind": "star",
       "terrain": "yellow_dwarf",
       "buildings": [],
-      "garrison": []
+      "garrison": [],
+      "size": 1.4
     },
     "drift": {
       "position": {
-        "x": 320,
-        "y": -140
+        "x": 331,
+        "y": -128
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "storm": {
       "position": {
-        "x": 550,
-        "y": 140
+        "x": 554,
+        "y": 145
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "shelf": {
       "position": {
-        "x": 820,
-        "y": -170
+        "x": 825,
+        "y": -168
       },
       "kind": "planet",
       "terrain": "nebula",
@@ -291,8 +292,8 @@
     },
     "cloud": {
       "position": {
-        "x": 100,
-        "y": 140
+        "x": 101,
+        "y": 152
       },
       "kind": "dead_world",
       "terrain": "depleted_system",
@@ -301,7 +302,7 @@
     "outpost": {
       "position": {
         "x": 250,
-        "y": 540
+        "y": 541
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -325,16 +326,16 @@
     },
     "veil": {
       "position": {
-        "x": -230,
-        "y": 440
+        "x": -231,
+        "y": 442
       },
       "kind": "debris_field",
       "terrain": "derelict_graveyard"
     },
     "belt": {
       "position": {
-        "x": -610,
-        "y": 250
+        "x": -611,
+        "y": 251
       },
       "kind": "planet",
       "terrain": "depleted_system",
@@ -358,8 +359,8 @@
     },
     "ember": {
       "position": {
-        "x": -10,
-        "y": -130
+        "x": -14,
+        "y": -114
       },
       "kind": "planet",
       "terrain": "deep_void",
@@ -367,11 +368,83 @@
     },
     "spur": {
       "position": {
-        "x": 340,
-        "y": -820
+        "x": 348,
+        "y": -831
       },
       "kind": "asteroid",
       "terrain": "dust_lane"
+    },
+    "cinder_ring_1": {
+      "position": {
+        "x": 211,
+        "y": -316
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "cinder_ring_2": {
+      "position": {
+        "x": 103,
+        "y": -244
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "cinder_ring_3": {
+      "position": {
+        "x": -24,
+        "y": -269
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "cinder_ring_4": {
+      "position": {
+        "x": -96,
+        "y": -377
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "cinder_ring_5": {
+      "position": {
+        "x": -71,
+        "y": -504
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "cinder_ring_6": {
+      "position": {
+        "x": 37,
+        "y": -576
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "cinder_ring_7": {
+      "position": {
+        "x": 164,
+        "y": -551
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "cinder_ring_8": {
+      "position": {
+        "x": 236,
+        "y": -443
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
     }
   },
   "regions": [
@@ -427,6 +500,14 @@
       "sectors": [
         "ember",
         "cinder",
+        "cinder_ring_1",
+        "cinder_ring_2",
+        "cinder_ring_3",
+        "cinder_ring_4",
+        "cinder_ring_5",
+        "cinder_ring_6",
+        "cinder_ring_7",
+        "cinder_ring_8",
         "cloud",
         "belt"
       ]

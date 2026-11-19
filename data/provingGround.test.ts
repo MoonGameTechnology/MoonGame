@@ -22,6 +22,7 @@ import {
   type MatchMap,
 } from '../packages/shared-core/src/index';
 import { regionKey } from '../decisions/regionName';
+import { isCelestialRing, ringKindOf } from '../decisions/celestialRing';
 import { ru } from '../localization/ru';
 import { en } from '../localization/en';
 import { shippedGameData } from './bundle';
@@ -54,8 +55,10 @@ describe('полигон — полнота каталога', () => {
   it('проходит валидатор на шипнутом каталоге; соседство — из мозаики; 70–90 провинций', () => {
     expect(validateMatchMap(map, data)).toEqual([]);
     expect(map.paths).toBeUndefined();
-    expect(ids.length).toBeGreaterThanOrEqual(70);
-    expect(ids.length).toBeLessThanOrEqual(90);
+    // Кольца вокруг тел (владелец 2026-11-18/19) — стена из провинций, а не места на карте.
+    const places = ids.filter((id) => !isCelestialRing(map.sectors[id]!.kind));
+    expect(places.length).toBeGreaterThanOrEqual(70);
+    expect(places.length).toBeLessThanOrEqual(90);
   });
 
   it('на нём ВСЕ виды провинций, все среды и все типы миров каталога', () => {
@@ -64,8 +67,12 @@ describe('полигон — полнота каталога', () => {
     // Обе крепости карта не кладёт — их строит игрок. Площадка на развилке (`fork_station`,
     // FORT-6.1) появляется, когда крепость ставят на развилку дороги; `void_station` — когда
     // её поднимают на своей провинции (`data/seededFortress.test.ts`).
+    // Кольцо — вид своего тела: здесь стоят кольца тех тел, что есть на карте, а кольца
+    // остальных классов звёзд несут большие карты, как и сами классы.
+    const rings = new Set(ids.map((id) => ringKindOf(map.sectors[id]!)));
     const provinceKinds = Object.keys(data.sectorKinds).filter(
-      (k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station',
+      (k) =>
+        k !== 'station_site' && k !== 'fork_station' && k !== 'void_station' && (!isCelestialRing(k) || rings.has(k)),
     );
     expect(has((id) => map.sectors[id]!.kind)).toEqual(provinceKinds.sort());
     // Star classes are one family (`data/sectors.json`): one star shows the kind, its class

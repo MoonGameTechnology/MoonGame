@@ -2944,8 +2944,8 @@
     },
     "suns_013": {
       "position": {
-        "x": -6745,
-        "y": 30
+        "x": -6748,
+        "y": 34
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
@@ -2960,8 +2960,8 @@
     },
     "suns_015": {
       "position": {
-        "x": -6875,
-        "y": -371
+        "x": -6904,
+        "y": -352
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
@@ -2977,13 +2977,14 @@
     },
     "suns_017": {
       "position": {
-        "x": -6062,
-        "y": -824
+        "x": -6059,
+        "y": -917
       },
       "kind": "star",
       "terrain": "yellow_dwarf",
       "buildings": [],
-      "garrison": []
+      "garrison": [],
+      "size": 1.4
     },
     "suns_018": {
       "position": {
@@ -3021,16 +3022,16 @@
     },
     "suns_019": {
       "position": {
-        "x": -5725,
-        "y": -693
+        "x": -5593,
+        "y": -604
       },
       "kind": "solar_flare",
       "terrain": "solar_flare_zone"
     },
     "suns_020": {
       "position": {
-        "x": -6877,
-        "y": -781
+        "x": -6947,
+        "y": -769
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -3038,16 +3039,16 @@
     },
     "suns_021": {
       "position": {
-        "x": -5433,
-        "y": -233
+        "x": -5402,
+        "y": -199
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "suns_022": {
       "position": {
-        "x": -6294,
-        "y": -1111
+        "x": -6420,
+        "y": -1215
       },
       "kind": "asteroid",
       "terrain": "empty_space"
@@ -3063,8 +3064,8 @@
     },
     "suns_024": {
       "position": {
-        "x": -6508,
-        "y": -1414
+        "x": -6582,
+        "y": -1496
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -3079,8 +3080,8 @@
     },
     "suns_026": {
       "position": {
-        "x": -6889,
-        "y": -1638
+        "x": -6899,
+        "y": -1646
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -3160,16 +3161,16 @@
     },
     "suns_036": {
       "position": {
-        "x": 6583,
-        "y": -198
+        "x": 6535,
+        "y": -252
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "suns_037": {
       "position": {
-        "x": 6347,
-        "y": -566
+        "x": 6331,
+        "y": -587
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
@@ -3186,18 +3187,18 @@
     "suns_039": {
       "position": {
         "x": 6939,
-        "y": 185
+        "y": 207
       },
       "kind": "star",
       "terrain": "red_giant",
-      "size": 1.6,
+      "size": 1.4,
       "buildings": [],
       "garrison": []
     },
     "suns_040": {
       "position": {
-        "x": 6631,
-        "y": 449
+        "x": 6570,
+        "y": 497
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -3238,8 +3239,8 @@
     },
     "suns_042": {
       "position": {
-        "x": 6285,
-        "y": 707
+        "x": 6250,
+        "y": 734
       },
       "kind": "asteroid",
       "terrain": "empty_space"
@@ -3321,8 +3322,8 @@
     },
     "suns_052": {
       "position": {
-        "x": 6612,
-        "y": 1129
+        "x": 6603,
+        "y": 1153
       },
       "kind": "dead_world",
       "terrain": "deep_void"
@@ -3487,24 +3488,24 @@
     },
     "suns_072": {
       "position": {
-        "x": -5265,
-        "y": -1297
+        "x": -5213,
+        "y": -1322
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
     },
     "suns_073": {
       "position": {
-        "x": -5133,
-        "y": -822
+        "x": -5087,
+        "y": -817
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "suns_074": {
       "position": {
-        "x": -5060,
-        "y": -1588
+        "x": -5058,
+        "y": -1589
       },
       "kind": "nebula",
       "terrain": "nebula"
@@ -3527,8 +3528,8 @@
     },
     "suns_077": {
       "position": {
-        "x": -5467,
-        "y": -1614
+        "x": -5435,
+        "y": -1652
       },
       "kind": "nebula",
       "terrain": "nebula"
@@ -3543,8 +3544,8 @@
     },
     "suns_079": {
       "position": {
-        "x": -5757,
-        "y": -1130
+        "x": -5625,
+        "y": -1223
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -3794,8 +3795,8 @@
     },
     "suns_106": {
       "position": {
-        "x": 4227,
-        "y": -1491
+        "x": 4229,
+        "y": -1494
       },
       "kind": "dead_world",
       "terrain": "deep_void"
@@ -3818,8 +3819,8 @@
     },
     "suns_109": {
       "position": {
-        "x": 4442,
-        "y": -1047
+        "x": 4453,
+        "y": -1053
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -4386,8 +4387,8 @@
     },
     "suns_171": {
       "position": {
-        "x": 3016,
-        "y": 248
+        "x": 3001,
+        "y": 273
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
@@ -4402,8 +4403,8 @@
     },
     "suns_173": {
       "position": {
-        "x": 3603,
-        "y": 376
+        "x": 3607,
+        "y": 403
       },
       "kind": "nebula",
       "terrain": "nebula"
@@ -4418,8 +4419,8 @@
     },
     "suns_175": {
       "position": {
-        "x": 3457,
-        "y": 18
+        "x": 3454,
+        "y": 87
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
@@ -4434,8 +4435,8 @@
     },
     "suns_177": {
       "position": {
-        "x": 3049,
-        "y": -111
+        "x": 3004,
+        "y": -65
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -4451,8 +4452,8 @@
     },
     "suns_179": {
       "position": {
-        "x": 2568,
-        "y": -113
+        "x": 2551,
+        "y": -105
       },
       "kind": "asteroid",
       "terrain": "empty_space"
@@ -6399,8 +6400,8 @@
     },
     "suns_393": {
       "position": {
-        "x": 4177,
-        "y": 377
+        "x": 4180,
+        "y": 382
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -6667,8 +6668,8 @@
     },
     "suns_422": {
       "position": {
-        "x": 4644,
-        "y": -423
+        "x": 4649,
+        "y": -422
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -7064,24 +7065,24 @@
     },
     "suns_464": {
       "position": {
-        "x": 2802,
-        "y": -1010
+        "x": 2767,
+        "y": -1033
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "suns_465": {
       "position": {
-        "x": 3343,
-        "y": -883
+        "x": 3312,
+        "y": -956
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
     },
     "suns_466": {
       "position": {
-        "x": 2986,
-        "y": -1421
+        "x": 2976,
+        "y": -1439
       },
       "kind": "planet",
       "terrain": "solar_flare_zone",
@@ -7100,16 +7101,16 @@
     },
     "suns_468": {
       "position": {
-        "x": 2398,
-        "y": -603
+        "x": 2386,
+        "y": -604
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "suns_469": {
       "position": {
-        "x": 3724,
-        "y": -1249
+        "x": 3741,
+        "y": -1298
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -7328,7 +7329,8 @@
       "kind": "star",
       "terrain": "white_dwarf",
       "buildings": [],
-      "garrison": []
+      "garrison": [],
+      "size": 1.4
     },
     "suns_496": {
       "position": {
@@ -7345,7 +7347,7 @@
       },
       "kind": "planet",
       "terrain": "empty_space",
-      "planetType": "terran"
+      "planetType": "barren"
     },
     "suns_498": {
       "position": {
@@ -7539,7 +7541,7 @@
     },
     "suns_521": {
       "position": {
-        "x": 6765,
+        "x": 6830,
         "y": -3415
       },
       "kind": "asteroid",
@@ -8644,6 +8646,312 @@
       "kind": "planet",
       "terrain": "empty_space",
       "planetType": "terran"
+    },
+    "suns_017_ring_1": {
+      "position": {
+        "x": -5836,
+        "y": -788
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_017_ring_2": {
+      "position": {
+        "x": -5971,
+        "y": -675
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_017_ring_3": {
+      "position": {
+        "x": -6147,
+        "y": -675
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_017_ring_4": {
+      "position": {
+        "x": -6282,
+        "y": -788
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_017_ring_5": {
+      "position": {
+        "x": -6313,
+        "y": -962
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_017_ring_6": {
+      "position": {
+        "x": -6225,
+        "y": -1114
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_017_ring_7": {
+      "position": {
+        "x": -6059,
+        "y": -1175
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_017_ring_8": {
+      "position": {
+        "x": -5893,
+        "y": -1114
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_017_ring_9": {
+      "position": {
+        "x": -5805,
+        "y": -962
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_039_ring_1": {
+      "position": {
+        "x": 7192,
+        "y": 257
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_039_ring_2": {
+      "position": {
+        "x": 7082,
+        "y": 421
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_039_ring_3": {
+      "position": {
+        "x": 6889,
+        "y": 460
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_039_ring_4": {
+      "position": {
+        "x": 6725,
+        "y": 350
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_039_ring_5": {
+      "position": {
+        "x": 6686,
+        "y": 157
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_039_ring_6": {
+      "position": {
+        "x": 6796,
+        "y": -7
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_039_ring_7": {
+      "position": {
+        "x": 6989,
+        "y": -46
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_039_ring_8": {
+      "position": {
+        "x": 7153,
+        "y": 64
+      },
+      "kind": "dust_shell",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_467_ring_1": {
+      "position": {
+        "x": 3723,
+        "y": -552
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_467_ring_2": {
+      "position": {
+        "x": 3652,
+        "y": -382
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_467_ring_3": {
+      "position": {
+        "x": 3482,
+        "y": -311
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_467_ring_4": {
+      "position": {
+        "x": 3312,
+        "y": -382
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_467_ring_5": {
+      "position": {
+        "x": 3241,
+        "y": -552
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_467_ring_6": {
+      "position": {
+        "x": 3312,
+        "y": -722
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_467_ring_7": {
+      "position": {
+        "x": 3482,
+        "y": -793
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_467_ring_8": {
+      "position": {
+        "x": 3652,
+        "y": -722
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_495_ring_1": {
+      "position": {
+        "x": -1642,
+        "y": -3439
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_495_ring_2": {
+      "position": {
+        "x": -1740,
+        "y": -3322
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_495_ring_3": {
+      "position": {
+        "x": -1891,
+        "y": -3295
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_495_ring_4": {
+      "position": {
+        "x": -2024,
+        "y": -3372
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_495_ring_5": {
+      "position": {
+        "x": -2076,
+        "y": -3516
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_495_ring_6": {
+      "position": {
+        "x": -2024,
+        "y": -3660
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_495_ring_7": {
+      "position": {
+        "x": -1891,
+        "y": -3737
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_495_ring_8": {
+      "position": {
+        "x": -1740,
+        "y": -3710
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "suns_495_ring_9": {
+      "position": {
+        "x": -1642,
+        "y": -3593
+      },
+      "kind": "planetary_nebula",
+      "terrain": "empty_space",
+      "size": 0.62
     }
   },
   "regions": [
@@ -8678,6 +8986,15 @@
         "suns_015",
         "suns_016",
         "suns_017",
+        "suns_017_ring_1",
+        "suns_017_ring_2",
+        "suns_017_ring_3",
+        "suns_017_ring_4",
+        "suns_017_ring_5",
+        "suns_017_ring_6",
+        "suns_017_ring_7",
+        "suns_017_ring_8",
+        "suns_017_ring_9",
         "suns_018",
         "suns_019",
         "suns_020",
@@ -8716,6 +9033,14 @@
         "suns_037",
         "suns_038",
         "suns_039",
+        "suns_039_ring_1",
+        "suns_039_ring_2",
+        "suns_039_ring_3",
+        "suns_039_ring_4",
+        "suns_039_ring_5",
+        "suns_039_ring_6",
+        "suns_039_ring_7",
+        "suns_039_ring_8",
         "suns_040",
         "suns_041",
         "suns_042",
@@ -9383,6 +9708,14 @@
         "suns_465",
         "suns_466",
         "suns_467",
+        "suns_467_ring_1",
+        "suns_467_ring_2",
+        "suns_467_ring_3",
+        "suns_467_ring_4",
+        "suns_467_ring_5",
+        "suns_467_ring_6",
+        "suns_467_ring_7",
+        "suns_467_ring_8",
         "suns_468",
         "suns_469"
       ]
@@ -9434,6 +9767,15 @@
         "suns_493",
         "suns_494",
         "suns_495",
+        "suns_495_ring_1",
+        "suns_495_ring_2",
+        "suns_495_ring_3",
+        "suns_495_ring_4",
+        "suns_495_ring_5",
+        "suns_495_ring_6",
+        "suns_495_ring_7",
+        "suns_495_ring_8",
+        "suns_495_ring_9",
         "suns_496",
         "suns_497",
         "suns_498",

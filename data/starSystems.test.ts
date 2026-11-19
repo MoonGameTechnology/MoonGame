@@ -24,7 +24,8 @@ const data = shippedGameData();
 const STARS: Array<[unknown, Record<string, string>]> = [
   [team2, { reach_82: 'yellow_dwarf', reach_83: 'yellow_dwarf' }],
   [team3, { crown_104: 'blue_giant', crown_105: 'blue_giant' }],
-  [duel1, { crossing: 'yellow_dwarf' }],
+  // Две звёздные системы (владелец 2026-11-19): своя звезда за каждой столицей, классы разные.
+  [duel1, { home_sun_1: 'red_giant', home_sun_2: 'blue_giant' }],
   [ffa4, { cinder: 'yellow_dwarf' }],
   [ffa20, { lights_182: 'binary_star' }],
   [ffa50, { suns_017: 'yellow_dwarf', suns_039: 'red_giant', suns_467: 'blue_giant', suns_495: 'white_dwarf' }],
@@ -97,13 +98,12 @@ describe('звёздные системы — звезда в своей про�
     },
   );
 
-  it('гиганты занимают больше места, чем карлики', () => {
-    for (const [map, stars] of maps)
-      for (const [id, cls] of Object.entries(stars)) {
-        const size = map.sectors[id]!.size ?? 1;
-        if (cls.endsWith('_giant') || cls === 'binary_star') expect([id, size > 1]).toEqual([id, true]);
-        else expect([id, size]).toEqual([id, 1]);
-      }
+  it('звезда любого класса стоит одним весом: место вокруг неё занимает кольцо', () => {
+    // Тело с кольцом — около трёх провинций у каждой звезды (владелец 2026-11-19, макет колец),
+    // поэтому класс больше не меняет вес самой звезды (`data/celestialRings.test.ts`).
+    const sizes = maps.flatMap(([map, stars]) => Object.keys(stars).map((id) => map.sectors[id]!.size ?? 1));
+    expect(new Set(sizes).size).toBe(1);
+    expect(sizes[0]).toBeGreaterThan(1);
   });
 
   it.each(maps.filter(([map]) => RINGED.has(map.id)).map(([map, stars]) => [map.id, map, stars] as const))(
@@ -117,7 +117,11 @@ describe('звёздные системы — звезда в своей про�
         Object.values(map.sectors).filter((s) => s[field] === value).length;
       for (const [id, cls] of Object.entries(stars)) {
         const { kinds, world } = RING[cls]!;
-        for (const n of near.get(id)!) {
+        // The star stands inside its own ring (owner 2026-11-18/19): its first ring of places
+        // is what borders that ring from outside.
+        const ring = new Set(near.get(id)!);
+        const first = new Set([...ring].flatMap((r) => near.get(r)!).filter((n) => n !== id && !ring.has(n)));
+        for (const n of first) {
           const s = map.sectors[n]!;
           // A seat's side, a prize or a story keeps its province; so does the map's last of a
           // kind or a world (the maps show the whole catalogue).

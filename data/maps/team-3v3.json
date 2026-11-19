@@ -623,15 +623,16 @@
     },
     "remnant": {
       "position": {
-        "x": 60,
-        "y": 40
+        "x": 74,
+        "y": 73
       },
       "kind": "black_hole",
-      "terrain": "deep_void"
+      "terrain": "deep_void",
+      "size": 1.4
     },
     "relic": {
       "position": {
-        "x": -20,
+        "x": -208,
         "y": -520
       },
       "kind": "planet",
@@ -646,8 +647,8 @@
     },
     "crossing": {
       "position": {
-        "x": 30,
-        "y": 600
+        "x": 212,
+        "y": 654
       },
       "kind": "dead_world",
       "terrain": "deep_void"
@@ -703,7 +704,7 @@
     },
     "crown_036": {
       "position": {
-        "x": -1522,
+        "x": -1523,
         "y": 353
       },
       "kind": "dead_world",
@@ -785,8 +786,8 @@
     },
     "crown_046": {
       "position": {
-        "x": 1514,
-        "y": -400
+        "x": 1517,
+        "y": -399
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -908,7 +909,7 @@
     },
     "crown_061": {
       "position": {
-        "x": -1000,
+        "x": -1003,
         "y": -900
       },
       "kind": "asteroid",
@@ -1006,8 +1007,8 @@
     },
     "crown_073": {
       "position": {
-        "x": 941,
-        "y": 899
+        "x": 951,
+        "y": 905
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
@@ -1071,8 +1072,8 @@
     },
     "crown_081": {
       "position": {
-        "x": -1452,
-        "y": 1149
+        "x": -1455,
+        "y": 1150
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -1122,8 +1123,8 @@
     },
     "crown_087": {
       "position": {
-        "x": 1251,
-        "y": -1569
+        "x": 1253,
+        "y": -1570
       },
       "kind": "nebula",
       "terrain": "nebula"
@@ -1146,8 +1147,8 @@
     },
     "crown_090": {
       "position": {
-        "x": 1488,
-        "y": -1200
+        "x": 1489,
+        "y": -1201
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -1180,15 +1181,15 @@
     "crown_094": {
       "position": {
         "x": 224,
-        "y": -2022
+        "y": -2024
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard"
     },
     "crown_095": {
       "position": {
-        "x": -103,
-        "y": -1653
+        "x": -121,
+        "y": -1699
       },
       "kind": "debris_field",
       "terrain": "derelict_graveyard"
@@ -1229,8 +1230,8 @@
     },
     "crown_100": {
       "position": {
-        "x": 117,
-        "y": 1712
+        "x": 128,
+        "y": 1739
       },
       "kind": "dead_world",
       "terrain": "depleted_system",
@@ -1263,8 +1264,8 @@
     },
     "crown_104": {
       "position": {
-        "x": -396,
-        "y": 688
+        "x": -312,
+        "y": 788
       },
       "kind": "star",
       "terrain": "blue_giant",
@@ -1274,8 +1275,8 @@
     },
     "crown_105": {
       "position": {
-        "x": 402,
-        "y": -689
+        "x": 287,
+        "y": -783
       },
       "kind": "star",
       "terrain": "blue_giant",
@@ -1285,16 +1286,16 @@
     },
     "crown_106": {
       "position": {
-        "x": -365,
-        "y": 192
+        "x": -533,
+        "y": 84
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "crown_107": {
       "position": {
-        "x": 356,
-        "y": -161
+        "x": 514,
+        "y": -65
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
@@ -1319,80 +1320,80 @@
     },
     "crown_110": {
       "position": {
-        "x": -571,
-        "y": 1042
+        "x": -680,
+        "y": 1161
       },
       "kind": "solar_flare",
       "terrain": "solar_flare_zone"
     },
     "crown_111": {
       "position": {
-        "x": -35,
-        "y": -1003
+        "x": -162,
+        "y": -1125
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "crown_112": {
       "position": {
-        "x": 589,
-        "y": -1073
+        "x": 700,
+        "y": -1196
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "crown_113": {
       "position": {
-        "x": 78,
-        "y": 1044
+        "x": 195,
+        "y": 1171
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "crown_114": {
       "position": {
-        "x": -496,
-        "y": -561
+        "x": -635,
+        "y": -573
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "crown_115": {
       "position": {
-        "x": 481,
-        "y": 621
+        "x": 635,
+        "y": 665
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "crown_116": {
       "position": {
-        "x": -752,
-        "y": -258
+        "x": -828,
+        "y": -288
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "crown_117": {
       "position": {
-        "x": 783,
-        "y": 314
+        "x": 877,
+        "y": 348
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "crown_118": {
       "position": {
-        "x": 1197,
-        "y": -630
+        "x": 1265,
+        "y": -623
       },
       "kind": "asteroid",
       "terrain": "empty_space"
     },
     "crown_119": {
       "position": {
-        "x": -1221,
-        "y": 660
+        "x": -1276,
+        "y": 657
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -1407,11 +1408,245 @@
     },
     "crown_121": {
       "position": {
-        "x": 1246,
-        "y": 376
+        "x": 1252,
+        "y": 378
       },
       "kind": "dead_world",
       "terrain": "empty_space"
+    },
+    "crown_104_ring_1": {
+      "position": {
+        "x": -41,
+        "y": 788
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_104_ring_2": {
+      "position": {
+        "x": -93,
+        "y": 947
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_104_ring_3": {
+      "position": {
+        "x": -228,
+        "y": 1046
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_104_ring_4": {
+      "position": {
+        "x": -396,
+        "y": 1046
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_104_ring_5": {
+      "position": {
+        "x": -531,
+        "y": 947
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_104_ring_6": {
+      "position": {
+        "x": -583,
+        "y": 788
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_104_ring_7": {
+      "position": {
+        "x": -531,
+        "y": 629
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_104_ring_8": {
+      "position": {
+        "x": -396,
+        "y": 530
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_104_ring_9": {
+      "position": {
+        "x": -228,
+        "y": 530
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_104_ring_10": {
+      "position": {
+        "x": -93,
+        "y": 629
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_105_ring_1": {
+      "position": {
+        "x": 570,
+        "y": -727
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_105_ring_2": {
+      "position": {
+        "x": 447,
+        "y": -543
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_105_ring_3": {
+      "position": {
+        "x": 231,
+        "y": -500
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_105_ring_4": {
+      "position": {
+        "x": 47,
+        "y": -623
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_105_ring_5": {
+      "position": {
+        "x": 4,
+        "y": -839
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_105_ring_6": {
+      "position": {
+        "x": 127,
+        "y": -1023
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_105_ring_7": {
+      "position": {
+        "x": 343,
+        "y": -1066
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "crown_105_ring_8": {
+      "position": {
+        "x": 527,
+        "y": -943
+      },
+      "kind": "stellar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_1": {
+      "position": {
+        "x": 285,
+        "y": 214
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_2": {
+      "position": {
+        "x": 123,
+        "y": 321
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_3": {
+      "position": {
+        "x": -67,
+        "y": 284
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_4": {
+      "position": {
+        "x": -174,
+        "y": 122
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_5": {
+      "position": {
+        "x": -137,
+        "y": -68
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_6": {
+      "position": {
+        "x": 25,
+        "y": -175
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_7": {
+      "position": {
+        "x": 215,
+        "y": -138
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_8": {
+      "position": {
+        "x": 322,
+        "y": 24
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
     }
   },
   "regions": [
@@ -1559,10 +1794,36 @@
         "neutral_west",
         "neutral_east",
         "remnant",
+        "remnant_ring_1",
+        "remnant_ring_2",
+        "remnant_ring_3",
+        "remnant_ring_4",
+        "remnant_ring_5",
+        "remnant_ring_6",
+        "remnant_ring_7",
+        "remnant_ring_8",
         "relic",
         "crossing",
         "crown_104",
+        "crown_104_ring_1",
+        "crown_104_ring_2",
+        "crown_104_ring_3",
+        "crown_104_ring_4",
+        "crown_104_ring_5",
+        "crown_104_ring_6",
+        "crown_104_ring_7",
+        "crown_104_ring_8",
+        "crown_104_ring_9",
+        "crown_104_ring_10",
         "crown_105",
+        "crown_105_ring_1",
+        "crown_105_ring_2",
+        "crown_105_ring_3",
+        "crown_105_ring_4",
+        "crown_105_ring_5",
+        "crown_105_ring_6",
+        "crown_105_ring_7",
+        "crown_105_ring_8",
         "crown_106",
         "crown_107",
         "crown_108",

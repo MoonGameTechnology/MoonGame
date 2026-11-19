@@ -2,6 +2,8 @@
  * map, never a GameState: ownership, fleets and the camera cannot move the environment.
  * A fixed spatial lattice gives neighbouring provinces one drawing, even without a road.
  * Polygon influence is local; roads only calm decoration and never generate new routes. */
+import { isCelestialRing } from './celestialRing';
+
 export type TerrainPoint = readonly [number, number];
 export type TerrainFamily = 'asteroid' | 'nebula' | 'dust' | 'debris' | 'wreck' | 'storm' | 'orbit';
 export interface TerrainEnvironmentCell {
@@ -147,7 +149,7 @@ function prepareCells(cells: readonly TerrainEnvironmentCell[]): PreparedCell[] 
       // Small provinces retain an interior: their transitions cannot have the width of
       // a neighbouring giant. Special bodies keep their own existing node renderer.
       const influence = Math.min(MAX_INFLUENCE, Math.max(12, Math.min(box.width, box.height) * 0.16));
-      const profile = c.kind === 'black_hole' || c.kind === 'rift' || c.kind === 'accretion_disk' ? undefined
+      const profile = c.kind === 'black_hole' || c.kind === 'rift' || isCelestialRing(c.kind) ? undefined
         : PROFILES[c.terrain ?? ''] ?? PROFILES[c.kind ?? ''];
       return { id: c.id, poly, box, influence, profile };
     }).sort((a, b) => a.id.localeCompare(b.id));

@@ -125,6 +125,14 @@ const EXPECTED: Record<string, string[] | null> = {
   accretion_disk: [],
   // A star in its own province: impassable and uncapturable, nothing is raised in a corona.
   star: [],
+  // The ring a star's class makes round it (owner 2026-11-18/19): impassable, closed to
+  // aviation and uncapturable, the same wall as the accretion disk round a black hole.
+  corona: [],
+  dust_shell: [],
+  stellar_wind: [],
+  planetary_nebula: [],
+  pulsar_wind: [],
+  circumbinary_disk: [],
   pirate_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
   neutral_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
   // owner decision 8: a fortress does not exclude mining — the rig can be rebuilt here

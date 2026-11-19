@@ -8,6 +8,7 @@ import { aiOrders } from './ai';
 import { advance, order, setMatchMode } from './protoKernel';
 import { HOUR } from './time';
 import { regionKey } from '../../decisions/regionName';
+import { isCelestialRing, ringKindOf } from '../../decisions/celestialRing';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 
@@ -36,7 +37,8 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
   afterEach(() => setMatchMode(undefined));
   it('loads the authored mosaic and all inhabitants through the core', () => {
     expect(validateMatchMap(preset.map!, data)).toEqual([]);
-    expect(preset.nodes).toHaveLength(provinces);
+    // The ring round each body (owner 2026-11-18/19) is a wall of provinces, not a place.
+    expect(preset.nodes.filter((n) => !isCelestialRing(n.sector))).toHaveLength(provinces);
     expect(preset.map!.paths).toBeUndefined();
     const raw = buildStateFromMap(preset.map!, data, {
       slots: Object.fromEntries(seats.map((seat, i) => [`slot_${i + 1}`, { playerId: seat.id }])),
@@ -60,14 +62,16 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
         expect(networkStartsOf(s, '5v5')[p.id]).toBeNull();
       }
     }
-    expect(mapNodesFromState(JSON.parse(JSON.stringify(s)))).toHaveLength(provinces);
+    expect(mapNodesFromState(JSON.parse(JSON.stringify(s)))).toHaveLength(preset.nodes.length);
   });
 
   it('keeps every route reachable, with alternative crossings away from occupied bases', () => {
     // The black hole, the two rifts and the pair of stars (owner 2026-11-17) are deliberately
-    // impassable; everything else is reachable.
+    // impassable, and so is the ring round each body (owner 2026-11-18/19); everything else
+    // is reachable.
     const barriers = preset.nodes.filter((n) => data.sectorKinds[n.sector]?.traversable === false);
-    expect(barriers.map((n) => n.sector).sort()).toEqual(['black_hole', 'rift', 'rift', 'star', 'star']);
+    expect(barriers.filter((n) => !isCelestialRing(n.sector)).map((n) => n.sector).sort())
+      .toEqual(['black_hole', 'rift', 'rift', 'star', 'star']);
     for (const n of barriers) expect(n.links).toEqual([]);
     expect(distances('home_1').size).toBe(preset.nodes.length - barriers.length);
     expect(nodes.get('remnant')!.links).toEqual([]);
@@ -119,8 +123,9 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
     // `empty` stays off combat maps by the owner's ruling (see mapSchema.test.ts).
     const kinds = Object.keys(data.sectorKinds)
       .filter((k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station' && k !== 'empty')
-      // The accretion disk rings only the Abyss black hole of `ffa-50` (owner 2026-11-10).
-      .filter((k) => k !== 'accretion_disk')
+      // A ring is its body's kind: the map shows the rings of the bodies on it, and the big
+      // maps carry the other classes with their rings.
+      .filter((k) => !isCelestialRing(k) || sectors.some((s) => ringKindOf(s) === k))
       .sort();
     expect(has((s) => s.kind)).toEqual(kinds);
     // Star classes are one family (`data/sectors.json`): a map shows some, never all six.

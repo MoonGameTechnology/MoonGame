@@ -16,8 +16,8 @@
  * - the whole catalogue of kinds, terrains and world types is on the map, except `empty`
  *   (kept off combat maps) and both fortresses, `void_station` and `fork_station`: only a
  *   player builds them (`docs/fortress-roadmap.md` §0.6); a map that seeds one gets a
- *   fortress without its core and guns; `accretion_disk` only round a black hole that has
- *   one (`disk`, the Abyss of `ffa-50`);
+ *   fortress without its core and guns; a ring kind only round its body, the accretion disk
+ *   round a black hole and a star's own round a star (`celestial-rings.mjs`);
  * - wrecks are a rare find: one graveyard and one debris field per map (owner,
  *   2026-10-14);
  * - geometry is an irregular sample, never mirrored quadrants; the owner trades a little
@@ -38,8 +38,9 @@
 import { writeFileSync, readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import { CELL_AREA, MIN_GAP, dist, freeCells, pos, rngFrom } from './ffa-provinces.mjs';
-import { layStars } from './star-systems.mjs';
+import { layStars, markRingWorlds } from './star-systems.mjs';
 import { mosaicNeighbours } from './lay-stars.mjs';
+import { RING_KIND, layRings, ringKindOf } from './celestial-rings.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
@@ -57,6 +58,11 @@ const MAPS = {
     // A star in each flare zone of the storms that does not border a capital, in id order
     // (owner 2026-11-17).
     stars: ['binary_star'],
+    // Rings round the bodies (owner 2026-11-19, `celestial-rings.mjs`), plans found by search.
+    rings: {
+      heart: { k: 8, turn: 0.5, clear: 1.22 },
+      lights_182: { k: 9, turn: 0.5, clear: 1.22 },
+    },
     hub: 'dark_heart',
     names: [
       'kaira',
@@ -99,6 +105,17 @@ const MAPS = {
     neutrals: 8,
     rimRifts: 4,
     stars: ['yellow_dwarf', 'red_giant', 'blue_giant', 'white_dwarf'],
+    // The Abyss has its disk already (`disk`); the stars get theirs (`celestial-rings.mjs`).
+    rings: {
+      suns_017: { k: 9, turn: 0.75, clear: 1.22 },
+      suns_039: { k: 8, turn: 0.25, clear: 1.22 },
+      suns_467: { k: 8, turn: 0, clear: 1.14 },
+      suns_495: { k: 9, turn: 0.5, clear: 1.06 },
+    },
+    // The ring of the rim star suns_039 stands out past the old outline, and the outline's new
+    // edge stretched the rim province below it to ×2.64 of a place (`provinceMap.test.ts`
+    // caps it at 2.6): it steps out to meet the edge, its lanes unchanged.
+    afterRings: { suns_521: { x: 6830, y: -3415 } },
     // A square board, filled to its corners (owner 2026-11-09): the round galaxy left the
     // rectangle the mosaic is clipped by empty in its corners, and the rim provinces ran out
     // into them as long wedges.
@@ -862,40 +879,63 @@ function finish(seats, cfg, g) {
     throw new Error(`${cfg.id}: ${flares.length} flare zones for ${cfg.stars.length} stars`);
   layStars(content, flares.map((id, i) => [id, cfg.stars[i]]), neighbours);
 
+  // ── rings round the bodies (`celestial-rings.mjs`, owner 2026-11-19): laid last, they push
+  // the provinces round each body outward. The Abyss keeps the disk it was dealt (`disk`) and
+  // rides along, disk and all, when a star's ring reaches it.
+  const disk = Object.keys(sectors).filter((id) => sectors[id].kind === 'accretion_disk');
+  const laid = layRings(content, cfg.rings, neighbours, {
+    rigid: cfg.disk ? [{ body: 'heart', ids: ['heart', ...disk] }] : [],
+  });
+  for (const [body, { ring }] of Object.entries(laid)) for (const id of ring) AREA[id] = AREA[body];
+  for (const [id, at] of Object.entries(cfg.afterRings ?? {})) sectors[id].position = { ...at };
+  // The push brought new worlds beside each star's ring: they take its class's world too.
+  markRingWorlds(content, flares, neighbours(content));
+
   // ── contracts (prototype/src/ffaMap.test.ts holds the same on the committed file) ──
   const map = core.parseMatchMap(content);
   const issues = core.validateMatchMap(map, data);
   if (issues.length) throw new Error(`${cfg.id}: ${issues.slice(0, 8)}`);
+  // The rings moved provinces and lanes: the contracts are held on the lanes of the map as
+  // it is written, not as it was dealt.
+  const edgesNow = core.matchMapEdges(map, data);
+  const adjNow = new Map(Object.keys(sectors).map((s) => [s, []]));
+  for (const [a, b] of edgesNow.paths) {
+    adjNow.get(a).push(b);
+    adjNow.get(b).push(a);
+  }
   const fail = [];
   const pair = [];
   homeIds.forEach((h, i) => {
-    const d = hops(adj, [h]);
+    const d = hops(adjNow, [h]);
     for (const o of homeIds) if (o !== h) pair.push(d.get(o));
-    const worlds = adj
+    const worlds = adjNow
       .get(h)
       .filter((s) => sectors[s].kind === 'planet')
       .sort();
     if (worlds.join() !== `opening_${i + 1}_1,opening_${i + 1}_2`)
       fail.push(`${h} worlds ${worlds}`);
     for (const p of placed) if (d.get(p) < 3) fail.push(`${h} -> ${p} ${d.get(p)}`);
-    const bypass = hops(adj, [h], new Set(placed));
+    const bypass = hops(adjNow, [h], new Set(placed));
     for (const o of homeIds) if (!bypass.has(o)) fail.push(`${h} bypass ${o}`);
   });
   for (const v of Object.keys(sectors)) {
-    if (homeIds.includes(v) || !adj.get(v).length) continue;
-    const d = hops(adj, [homeIds[0] === v ? homeIds[1] : homeIds[0]], new Set([v]));
+    if (homeIds.includes(v) || !adjNow.get(v).length) continue;
+    const d = hops(adjNow, [homeIds[0] === v ? homeIds[1] : homeIds[0]], new Set([v]));
     if (homeIds.some((h) => !d.has(h))) fail.push(`cut ${v}`);
   }
   const all = Object.values(sectors);
   const missing = (field, catalogue) =>
     Object.keys(catalogue).filter((k) => !all.some((s) => s[field] === k));
+  // A ring kind stands only round its body: the map shows the rings of the bodies it has.
+  const ringKinds = new Set(Object.values(RING_KIND));
+  const ringsHere = new Set(all.map(ringKindOf).filter(Boolean));
   const kinds = missing('kind', data.sectorKinds).filter(
     (k) =>
       k !== 'empty' &&
       k !== 'station_site' &&
       k !== 'fork_station' &&
       k !== 'void_station' &&
-      (k !== 'accretion_disk' || cfg.disk),
+      (!ringKinds.has(k) || ringsHere.has(k)),
   );
   if (kinds.length) fail.push(`kinds ${kinds}`);
   // Star classes are one family: a map shows some of them, never all six.
@@ -919,13 +959,13 @@ function finish(seats, cfg, g) {
       .join(' ');
   const hist = pair.reduce((m, h) => ((m[h] = (m[h] ?? 0) + 1), m), {});
   console.log(
-    `${cfg.id}: ${all.length} provinces, ${g.edges.paths.length} lanes, ${g.edges.sealed.length} sealed, ` +
+    `${cfg.id}: ${all.length} provinces, ${edgesNow.paths.length} lanes, ${edgesNow.sealed.length} sealed, ` +
       `${regions.length} areas, ${placed.length} inhabitants, seats ≥${minPair} hops apart`,
   );
   console.log(
     '  nearest-seat hops:',
     homeIds
-      .map((h) => Math.min(...homeIds.filter((o) => o !== h).map((o) => hops(adj, [h]).get(o))))
+      .map((h) => Math.min(...homeIds.filter((o) => o !== h).map((o) => hops(adjNow, [h]).get(o))))
       .join(' '),
   );
   console.log(

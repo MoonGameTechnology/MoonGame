@@ -98,6 +98,7 @@ async function boot() {
   vi.doMock('./mapLayer', () => ({
     mapView: VIEW,
     holographicFrame: FRAME,
+    provinceGeometry: null,
     livingBorders: () => live.env.borders,
     provincePolygon: (id: string) => live.env.polys[id],
     get terrainFields() {

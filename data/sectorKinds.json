@@ -256,6 +256,96 @@
     "traversable": false,
     "overflight": false
   },
+  "corona": {
+    "name": "Corona",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": false,
+    "orbit": false,
+    "allowedBuildings": [],
+    "appearance": {
+      "color": "#ffd36a",
+      "label": "corona",
+      "shape": "marker"
+    },
+    "traversable": false,
+    "overflight": false
+  },
+  "dust_shell": {
+    "name": "Dust Shell",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": false,
+    "orbit": false,
+    "allowedBuildings": [],
+    "appearance": {
+      "color": "#ff6f4f",
+      "label": "dust shell",
+      "shape": "marker"
+    },
+    "traversable": false,
+    "overflight": false
+  },
+  "stellar_wind": {
+    "name": "Stellar Wind",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": false,
+    "orbit": false,
+    "allowedBuildings": [],
+    "appearance": {
+      "color": "#8fc0ff",
+      "label": "stellar wind",
+      "shape": "marker"
+    },
+    "traversable": false,
+    "overflight": false
+  },
+  "planetary_nebula": {
+    "name": "Planetary Nebula",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": false,
+    "orbit": false,
+    "allowedBuildings": [],
+    "appearance": {
+      "color": "#7ff0d0",
+      "label": "planetary nebula",
+      "shape": "marker"
+    },
+    "traversable": false,
+    "overflight": false
+  },
+  "pulsar_wind": {
+    "name": "Pulsar Wind",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": false,
+    "orbit": false,
+    "allowedBuildings": [],
+    "appearance": {
+      "color": "#8ff0ff",
+      "label": "pulsar wind",
+      "shape": "marker"
+    },
+    "traversable": false,
+    "overflight": false
+  },
+  "circumbinary_disk": {
+    "name": "Circumbinary Disk",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": false,
+    "orbit": false,
+    "allowedBuildings": [],
+    "appearance": {
+      "color": "#ffe7a8",
+      "label": "circumbinary disk",
+      "shape": "marker"
+    },
+    "traversable": false,
+    "overflight": false
+  },
   "station_site": {
     "name": "Space Fortress",
     "scoreValue": 0,

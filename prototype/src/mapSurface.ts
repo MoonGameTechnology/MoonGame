@@ -19,7 +19,8 @@ import { glowOn, motionOn } from './graphicsPrefs';
 import { clipGlassSurface, drawGlassRim, drawGlassWave, drawTerrainField } from './holographicSurface';
 import { selPlanet } from './interaction';
 import { drawCaptureFlashes } from './mapEffects';
-import { holographicFrame, livingBorders, mapView, provincePolygon, terrainFields } from './mapLayer';
+import { holographicFrame, livingBorders, mapView, provinceGeometry, provincePolygon, terrainFields } from './mapLayer';
+import { drawRingSpills } from './ringSpill';
 import { LOCK } from './mapPalette';
 
 /** Что поверхности карты нужно от игры. */
@@ -95,6 +96,8 @@ export function drawMapSurface(now: number, lod: MapLod): void {
           b.x + b.width < sight.x || b.y + b.height < sight.y) continue;
         drawTerrainField(cx, field, hologramTime, true);
       }
+      // A ring's light spills past its border onto the provinces round it (`ringSpill.ts`).
+      drawRingSpills(cx, terrainFields, provinceGeometry, sight, mapView.k, hologramTime);
       cx.restore();
     }
     if (!game.still()) drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn(), seen);

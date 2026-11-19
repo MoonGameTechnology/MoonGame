@@ -165,7 +165,75 @@ export function layStars(map, placements, neighbours, { ring: withRing = true } 
   return map;
 }
 
+/**
+ * Once a star stands inside its impassable ring (`celestial-rings.mjs`), its first ring of
+ * places is what borders that ring from outside, and the push brought new provinces there. A
+ * neutral world among them takes the class's world, as the star's own neighbours did in
+ * `layStars`: a seat's side, an inhabitant, a prize or a story keeps its province, and the
+ * map's last world of a type keeps its type. Plain kinds stay as they are: a kind sets a
+ * province's lane budget, and the ring was laid on the lanes as they stood.
+ */
+export function markRingWorlds(map, stars, near) {
+  const types = new Map();
+  for (const s of Object.values(map.sectors))
+    if (s.planetType !== undefined) types.set(s.planetType, (types.get(s.planetType) ?? 0) + 1);
+  const seatSide = new Set();
+  for (const [id, s] of Object.entries(map.sectors))
+    if (isSeat(map, s)) for (const n of [id, ...(near.get(id) ?? [])]) seatSide.add(n);
+  for (const id of [...stars].sort()) {
+    const { world } = STAR_RING[map.sectors[id].terrain];
+    if (!world) continue;
+    const ring = new Set(near.get(id) ?? []);
+    const first = [...new Set([...ring].flatMap((r) => near.get(r) ?? []))].filter((n) => n !== id && !ring.has(n));
+    for (const n of first.sort()) {
+      const s = map.sectors[n];
+      if (s.kind !== 'planet' || s.planetType === world || seatSide.has(n) || (s.owner ?? null)) continue;
+      if (STORY.some((k) => s[k] !== undefined) || (s.buildings ?? []).length || (s.garrison ?? []).length) continue;
+      if (s.planetType !== undefined) {
+        if ((types.get(s.planetType) ?? 0) <= 1) continue;
+        types.set(s.planetType, types.get(s.planetType) - 1);
+      }
+      s.planetType = world;
+      types.set(world, (types.get(world) ?? 0) + 1);
+    }
+  }
+  return map;
+}
+
 function angle(c, s) {
   const a = Math.atan2(s.position.y - c.position.y, s.position.x - c.position.x);
   return a < 0 ? a + 2 * Math.PI : a;
+}
+
+/**
+ * Sets a new star behind each capital of a duel (owner 2026-11-19: «Добавь сзади столиц по
+ * звездам», «Пусть разные типы звёзд будут с разных сторон»): on the line through the two
+ * capitals, `steps` map steps past each one, away from the enemy. The second stands exactly
+ * where the first does with the map turned half round the capitals' midpoint, so both starts
+ * keep the same space round them; only the class differs. `pairs` is
+ * `[[capitalId, starId, class], [capitalId, starId, class]]`; each star joins its capital's
+ * area. Its ring (`celestial-rings.mjs`) is laid after, and may step it a little further out.
+ */
+export function setStarsBehind(map, pairs, step, steps) {
+  const [[c1, id1, cls1], [c2, id2, cls2]] = pairs;
+  const h1 = map.sectors[c1].position;
+  const h2 = map.sectors[c2].position;
+  const mid = { x: (h1.x + h2.x) / 2, y: (h1.y + h2.y) / 2 };
+  const len = Math.hypot(h1.x - h2.x, h1.y - h2.y);
+  const p1 = {
+    x: Math.round(h1.x + ((h1.x - h2.x) / len) * steps * step),
+    y: Math.round(h1.y + ((h1.y - h2.y) / len) * steps * step),
+  };
+  const p2 = { x: Math.round(2 * mid.x - p1.x), y: Math.round(2 * mid.y - p1.y) };
+  for (const [capital, id, cls, position] of [
+    [c1, id1, cls1, p1],
+    [c2, id2, cls2, p2],
+  ]) {
+    if (map.sectors[id]) throw new Error(`${map.id}: ${id} already stands`);
+    if (!STAR_RING[cls]) throw new Error(`${map.id}: unknown star class ${cls}`);
+    map.sectors[id] = { position, kind: 'star', terrain: cls, buildings: [], garrison: [] };
+    const region = (map.regions ?? []).find((r) => r.sectors.includes(capital));
+    if (region) region.sectors.push(id);
+  }
+  return map;
 }

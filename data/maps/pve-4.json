@@ -116,8 +116,8 @@
     },
     "north_drift": {
       "position": {
-        "x": -320,
-        "y": -590
+        "x": -338,
+        "y": -598
       },
       "kind": "asteroid_cluster",
       "terrain": "asteroid_cluster"
@@ -160,8 +160,8 @@
     },
     "inner_w": {
       "position": {
-        "x": -395,
-        "y": -45
+        "x": -400,
+        "y": -41
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
@@ -234,56 +234,56 @@
     },
     "inner_e": {
       "position": {
-        "x": 665,
-        "y": -60
+        "x": 668,
+        "y": -58
       },
       "kind": "dead_world",
       "terrain": "depleted_system"
     },
     "ember": {
       "position": {
-        "x": -20,
-        "y": -215
+        "x": -42,
+        "y": -185
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
     },
     "shade": {
       "position": {
-        "x": 240,
-        "y": -190
+        "x": 260,
+        "y": -159
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "bridge_w": {
       "position": {
-        "x": -370,
-        "y": 110
+        "x": -371,
+        "y": 111
       },
       "kind": "planet",
       "terrain": "empty_space"
     },
     "rift_sw": {
       "position": {
-        "x": -125,
-        "y": 70
+        "x": -132,
+        "y": 83
       },
       "kind": "rift",
       "terrain": "empty_space"
     },
     "bridge_c": {
       "position": {
-        "x": 135,
-        "y": 140
+        "x": 136,
+        "y": 153
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard"
     },
     "rift_se": {
       "position": {
-        "x": 385,
-        "y": 95
+        "x": 390,
+        "y": 104
       },
       "kind": "rift",
       "terrain": "empty_space"
@@ -306,8 +306,8 @@
     },
     "gloom": {
       "position": {
-        "x": -140,
-        "y": 200
+        "x": -142,
+        "y": 204
       },
       "kind": "nebula",
       "terrain": "nebula"
@@ -315,15 +315,15 @@
     "outer_mid": {
       "position": {
         "x": 130,
-        "y": 285
+        "y": 287
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
     "outer_e": {
       "position": {
-        "x": 375,
-        "y": 240
+        "x": 376,
+        "y": 241
       },
       "kind": "dead_world",
       "terrain": "depleted_system"
@@ -481,28 +481,29 @@
         "y": -395
       },
       "kind": "black_hole",
-      "terrain": "empty_space"
+      "terrain": "empty_space",
+      "size": 1.4
     },
     "rift_w": {
       "position": {
-        "x": -150,
-        "y": -400
+        "x": -186,
+        "y": -401
       },
       "kind": "rift",
       "terrain": "empty_space"
     },
     "rift_e": {
       "position": {
-        "x": 370,
-        "y": -420
+        "x": 406,
+        "y": -423
       },
       "kind": "rift",
       "terrain": "empty_space"
     },
     "rift_n": {
       "position": {
-        "x": 130,
-        "y": -635
+        "x": 133,
+        "y": -672
       },
       "kind": "rift",
       "terrain": "empty_space"
@@ -524,8 +525,8 @@
     },
     "far_eye": {
       "position": {
-        "x": 690,
-        "y": -615
+        "x": 695,
+        "y": -617
       },
       "kind": "void_station",
       "terrain": "empty_space"
@@ -608,6 +609,78 @@
           "count": 6
         }
       ]
+    },
+    "black_hole_ring_1": {
+      "position": {
+        "x": 242,
+        "y": -340
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "black_hole_ring_2": {
+      "position": {
+        "x": 165,
+        "y": -263
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "black_hole_ring_3": {
+      "position": {
+        "x": 55,
+        "y": -263
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "black_hole_ring_4": {
+      "position": {
+        "x": -22,
+        "y": -340
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "black_hole_ring_5": {
+      "position": {
+        "x": -22,
+        "y": -450
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "black_hole_ring_6": {
+      "position": {
+        "x": 55,
+        "y": -527
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "black_hole_ring_7": {
+      "position": {
+        "x": 165,
+        "y": -527
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "black_hole_ring_8": {
+      "position": {
+        "x": 242,
+        "y": -450
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
     }
   },
   "objectives": [

@@ -1,5 +1,6 @@
 /** Schematic light projected over visible province geometry; no simulation inputs. */
 import type { ProvincePolygon } from "../../packages/client/src/provinceSelection";
+import { drawStarRing, RING_ART_COLORS } from "./ringTerrainArt";
 
 export interface TerrainArtField {
   id: string;
@@ -31,6 +32,7 @@ const COLORS: Readonly<Record<string, string>> = {
   black_hole: "#a98bff",
   dust_lane: "#baa7cc",
   depleted_system: "#7f99ab",
+  ...RING_ART_COLORS,
 };
 const ANIMATED = new Set([
   "nebula",
@@ -40,6 +42,7 @@ const ANIMATED = new Set([
   "rift",
   "accretion_disk",
   "black_hole",
+  ...Object.keys(RING_ART_COLORS),
 ]);
 
 /** Smooth interior coverage, including concave boundaries. Outside is transparent. */
@@ -293,6 +296,8 @@ function geometry(field: TerrainArtField): Geometry {
     blackHole({ marker, box: b, poly, path, line, random });
   } else if (field.kind === "accretion_disk") {
     accretionDisk({ marker, box: b, poly, path, line, random });
+  } else if (drawStarRing(field.kind, { marker, box: b, poly, path, line, random })) {
+    // A star's ring, drawn round its star (`ringTerrainArt.ts`).
   } else if (field.kind === "dust_lane") {
     // Fine sediment follows one oblique ribbon, with a dense middle and soft edges.
     for (let band = -4; band <= 4; band++) {
