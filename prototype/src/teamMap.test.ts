@@ -12,13 +12,17 @@ import { isCelestialRing, ringKindOf } from '../../decisions/celestialRing';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 
-/** The authored team maps: same contracts, their own size and spacing. */
+/** The authored team maps: same contracts, their own size and spacing. The 2v2 is two star
+ *  systems like the duel (owner 2026-11-19, «По типу карты 1 на 1»): no black hole between the
+ *  teams (`hole`), and open space where plain dead worlds stood (`openSpace`). */
 const TEAM_MAPS = [
-  { title: 'Broken Reach — main-game 2v2', id: 'team-2v2', mode: 'capital_2v2', provinces: 85, side: 2, allyHops: 4, enemyHops: 8 },
-  { title: 'Shattered Crown — main-game 3v3', id: 'team-3v3', mode: 'team_3v3', provinces: 121, side: 3, allyHops: 4, enemyHops: 8 },
+  { title: 'Broken Reach — main-game 2v2', id: 'team-2v2', mode: 'capital_2v2', provinces: 97, side: 2, allyHops: 4, enemyHops: 8,
+    barriers: ['rift', 'rift', 'star', 'star'], hole: null, openSpace: true },
+  { title: 'Shattered Crown — main-game 3v3', id: 'team-3v3', mode: 'team_3v3', provinces: 121, side: 3, allyHops: 4, enemyHops: 8,
+    barriers: ['black_hole', 'rift', 'rift', 'star', 'star'], hole: 'remnant', openSpace: false },
 ] as const;
 
-describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemyHops }) => {
+describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemyHops, barriers: walls, hole, openSpace }) => {
   const preset = mapPreset(id);
   const seats = networkSeats('ffa', id as MapId);
   const fresh = () => newGame({ mapId: id, seats });
@@ -66,15 +70,14 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
   });
 
   it('keeps every route reachable, with alternative crossings away from occupied bases', () => {
-    // The black hole, the two rifts and the pair of stars (owner 2026-11-17) are deliberately
-    // impassable, and so is the ring round each body (owner 2026-11-18/19); everything else
-    // is reachable.
+    // The black hole (3v3), the two rifts and the pair of stars (owner 2026-11-17) are
+    // deliberately impassable, and so is the ring round each body (owner 2026-11-18/19);
+    // everything else is reachable.
     const barriers = preset.nodes.filter((n) => data.sectorKinds[n.sector]?.traversable === false);
-    expect(barriers.filter((n) => !isCelestialRing(n.sector)).map((n) => n.sector).sort())
-      .toEqual(['black_hole', 'rift', 'rift', 'star', 'star']);
+    expect(barriers.filter((n) => !isCelestialRing(n.sector)).map((n) => n.sector).sort()).toEqual(walls);
     for (const n of barriers) expect(n.links).toEqual([]);
     expect(distances('home_1').size).toBe(preset.nodes.length - barriers.length);
-    expect(nodes.get('remnant')!.links).toEqual([]);
+    if (hole) expect(nodes.get(hole)!.links).toEqual([]);
     const inhabited = Object.keys(preset.map!.sectors).filter((id) => preset.map!.sectors[id]!.owner?.startsWith('npc-'));
     for (const start of preset.starts) {
       const d = distances(start);
@@ -120,9 +123,11 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
       [...new Set(sectors.map(pick).filter((v): v is string => v !== undefined))].sort();
     // Fortresses are never authored: a player raises `void_station` on a held province and
     // `fork_station` on a road fork (see data/seededFortress.test.ts).
-    // `empty` stays off combat maps by the owner's ruling (see mapSchema.test.ts).
+    // `empty` stays off combat maps by the owner's ruling (see mapSchema.test.ts), but for the
+    // open space of the 2v2's star systems; a map without a black hole between its sides has none.
     const kinds = Object.keys(data.sectorKinds)
-      .filter((k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station' && k !== 'empty')
+      .filter((k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station')
+      .filter((k) => (k !== 'empty' || openSpace) && (k !== 'black_hole' || hole))
       // A ring is its body's kind: the map shows the rings of the bodies on it, and the big
       // maps carry the other classes with their rings.
       .filter((k) => !isCelestialRing(k) || sectors.some((s) => ringKindOf(s) === k))

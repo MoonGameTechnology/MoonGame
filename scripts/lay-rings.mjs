@@ -25,14 +25,14 @@ export const RINGS = {
     },
   },
   'ffa-4': { plans: { cinder: { k: 8, turn: 0.75, clear: 0.98 } } },
-  // The relic world and the flare zone west of it hold: pushed apart, they cut the western
-  // team's way to the relic, and the prizes would no longer lie at like distances.
+  // Two star systems like the duel: the same plan, turned half round with the map. The
+  // provinces beyond each star (`lay-stars.mjs` BEHIND) hold: they were found round the
+  // rings as laid.
   'team-2v2': {
-    hold: ['relic', 'reach_84'],
+    hold: [1, 2, 3, 4, 5].flatMap((n) => [`home_sun_a_rim_${n}`, `home_sun_b_rim_${n}`]),
     plans: {
-      reach_82: { k: 8, turn: 0.75, clear: 1.22 },
-      reach_83: { k: 8, turn: 0.75, clear: 1.06 },
-      remnant: { k: 9, turn: 0.25, clear: 1.06 },
+      home_sun_a: { k: 8, turn: 0.5, clear: 1.3 },
+      home_sun_b: { k: 8, turn: 0.5, clear: 1.3 },
     },
   },
   'team-3v3': {

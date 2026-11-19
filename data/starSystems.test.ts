@@ -22,7 +22,8 @@ const data = shippedGameData();
 
 /** Where each map's stars stand, and of which class. */
 const STARS: Array<[unknown, Record<string, string>]> = [
-  [team2, { reach_82: 'yellow_dwarf', reach_83: 'yellow_dwarf' }],
+  // Две звёздные системы (владелец 2026-11-19), как на дуэли: своя звезда за каждой командой.
+  [team2, { home_sun_a: 'red_giant', home_sun_b: 'blue_giant' }],
   [team3, { crown_104: 'blue_giant', crown_105: 'blue_giant' }],
   // Две звёздные системы (владелец 2026-11-19): своя звезда за каждой столицей, классы разные.
   [duel1, { home_sun_1: 'red_giant', home_sun_2: 'blue_giant' }],

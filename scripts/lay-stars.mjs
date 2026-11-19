@@ -5,27 +5,22 @@
  * not know about stars, and `data/starSystems.test.ts` fails on a map whose star went missing.
  *
  * Where: a star takes a flare zone's place — flares exist because a star is there. Only
- * where it keeps the map fair: on the 2 на 2 map both sides get one, mirror to mirror; the
- * 3 на 3 map has a single flare zone, on one side, so its pair stands in the storms of the
- * middle. The duel is a battle between two star systems (owner 2026-11-19): no star between
- * the capitals, a new one behind each (`BEHIND`), a different class on each side, and the
- * provinces round each system are authored in the map itself. The competitive maps take no
- * ring (`RING`):
- * their provinces are not mirror-exact, so a ring would re-kind a province on one side only.
- * The test maps show other classes with their rings.
+ * where it keeps the map fair: the 3 на 3 map has a single flare zone, on one side, so its
+ * pair stands in the storms of the middle. The duel and the 2 на 2 map are a battle between
+ * two star systems (owner 2026-11-19): no body between the sides, a new star behind each side
+ * (`BEHIND`), a different class on each, and provinces round each system — authored in the
+ * duel itself, laid here on the far side of each 2 на 2 star (`rim`). The competitive maps
+ * take no ring (`RING`): their provinces are not mirror-exact, so a ring would re-kind a
+ * province on one side only. The test maps show other classes with their rings.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { build } from 'esbuild';
-import { layStars, setStarsBehind } from './star-systems.mjs';
+import { layStars, setRimBehind, setStarsBehind } from './star-systems.mjs';
 import { spacingOf } from './celestial-rings.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
 export const STARS = {
-  'team-2v2': [
-    ['reach_82', 'yellow_dwarf'],
-    ['reach_83', 'yellow_dwarf'],
-  ],
   // The 3 на 3 map's one flare zone lies on one side; its stars are blue giants in the
   // ion storms of the middle, mirror to mirror.
   'team-3v3': [
@@ -40,13 +35,40 @@ export const STARS = {
 /** Maps whose stars bring their ring of neighbours (the rest lay the star alone). */
 const RING = new Set(['duel-testbed', 'proving-ground']);
 
-/** New stars behind the duel's capitals, a different class on each side (owner 2026-11-19),
- *  set `BEHIND_STEPS` map steps past each capital (`setStarsBehind`). */
+/** New stars behind each side, a different class on each (owner 2026-11-19), set
+ *  `BEHIND_STEPS` map steps past the side (`setStarsBehind`); `rim` — the provinces on the far
+ *  side of a star, `turn` — a star whose far side is another's turned half round
+ *  (`setRimBehind`). */
 export const BEHIND = {
-  'duel-1': [
-    ['home_1', 'home_sun_1', 'red_giant'],
-    ['home_2', 'home_sun_2', 'blue_giant'],
-  ],
+  'duel-1': {
+    stars: [
+      ['home_1', 'home_sun_1', 'red_giant'],
+      ['home_2', 'home_sun_2', 'blue_giant'],
+    ],
+  },
+  // 2 на 2 like the duel (owner 2026-11-19, schematic v1 approved): a star behind each team's
+  // pair of capitals. Five provinces behind team A's star, turned half round for team B, put
+  // the ring among provinces with a road behind the star; found by search, none of the lanes
+  // round the capitals moves. Turned exactly, the two corner districts (home_1, home_4) would
+  // come out copies two lanes deep; team B's star stands 72 units off, the smallest nudge that
+  // keeps every contract of `teamMap.test.ts` (its corner world loses the road to the open
+  // space north of it).
+  'team-2v2': {
+    stars: [
+      [['home_1', 'home_2'], 'home_sun_a', 'red_giant'],
+      [['home_3', 'home_4'], 'home_sun_b', 'blue_giant', [-60, 40]],
+    ],
+    rim: {
+      home_sun_a: [
+        [-3091, -665, 'nebula', 'nebula'],
+        [-3251, -365, 'asteroid', 'asteroid_field'],
+        [-3131, 554, 'solar_flare', 'solar_flare_zone'],
+        [-2771, -945, 'asteroid', 'asteroid_field'],
+        [-3006, -30, 'empty', 'empty_space'],
+      ],
+    },
+    turn: { home_sun_b: 'home_sun_a' },
+  },
 };
 const BEHIND_STEPS = 1.2;
 
@@ -88,7 +110,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const placements = STARS[id] ?? [];
     const file = `${ROOT}data/maps/${id}.json`;
     const map = JSON.parse(readFileSync(file, 'utf8'));
-    const behind = BEHIND[id] ?? [];
+    const { stars: behind = [], rim, turn } = BEHIND[id] ?? {};
     const laid = (sid, cls) => map.sectors[sid]?.kind === 'star' && map.sectors[sid].terrain === cls;
     if (placements.every(([sid, cls]) => laid(sid, cls)) && behind.every(([, sid, cls]) => laid(sid, cls))) {
       console.log(`${id}: stars already laid`);
@@ -97,7 +119,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     // Measured before any star stands, so a star set behind a capital keeps the map's step.
     const step = spacingOf(map);
     layStars(map, placements, neighbours, { ring: RING.has(id) });
-    if (behind.length) setStarsBehind(map, behind, step, BEHIND_STEPS);
+    if (behind.length) {
+      const mid = setStarsBehind(map, behind, step, BEHIND_STEPS);
+      if (rim) setRimBehind(map, rim, mid, turn);
+    }
     writeFileSync(file, JSON.stringify(map, null, 2) + '\n');
     console.log(`${id}: ${[...placements, ...behind.map(([, s, c]) => [s, c])].map(([s, c]) => `${s} ${c}`).join(', ')}`);
   }
