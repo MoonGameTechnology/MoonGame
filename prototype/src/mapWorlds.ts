@@ -18,6 +18,7 @@ import { drawSchematicNode, type MapLod } from '../../packages/client/src/mapLod
 import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { t, tData } from '../../localization/runtime';
 import { isEmplacementFleet } from '../../decisions/emplacement';
+import { isCelestialRing } from '../../decisions/celestialRing';
 import { layoutRegionLabels, regionLabelAlpha, regionLabels } from '../../decisions/regionName';
 import { STALE_ALPHA, worldLook } from '../../decisions/worldLook';
 import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from './buildChips';
@@ -630,10 +631,10 @@ export function drawWorlds(now: number, lod: MapLod): void {
         cx.stroke();
       }
       cx.restore();
-    } else if (sector === 'accretion_disk') {
-      // Classic mode: a hot, flattened swirl — plasma falling into the black hole.
+    } else if (isCelestialRing(sector)) {
+      // Classic mode: a flattened swirl in the ring's light — the disk's plasma, a star's ring.
       cx.save();
-      cx.strokeStyle = '#ffb26b';
+      cx.strokeStyle = sector === 'accretion_disk' ? '#ffb26b' : (sectorTypeOf(n.id)?.color ?? col);
       cx.lineWidth = 1.2;
       for (const k of [0.45, 0.75, 1]) {
         cx.globalAlpha = lit * dim * (1.1 - k * 0.6);

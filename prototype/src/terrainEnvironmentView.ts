@@ -6,6 +6,7 @@ import {
   type TerrainEnvironmentTile,
   type TerrainPoint,
 } from '../../decisions/terrainEnvironment';
+import { isCelestialRing, ringBodyOf } from '../../decisions/celestialRing';
 import type { TerrainField } from './holographicSurface';
 
 interface EnvironmentKnowledge { kind?: string; terrain?: string }
@@ -148,29 +149,35 @@ interface CentredNode {
   readonly sector: string;
 }
 
-const holes = new WeakMap<readonly CentredNode[], CentredNode | null>();
+const centres = new WeakMap<readonly CentredNode[], Map<CentredNode, CentredNode>>();
 
 /**
- * The point a province's terrain art is drawn round: its own node, except for the accretion
- * disk, whose plasma streaks circle the black hole, so the ring of disk provinces reads as
- * one continuous disk. Without a black hole on the map the disk falls back to its own node.
+ * The point a province's terrain art is drawn round: its own node, except for a body's ring
+ * (the accretion disk, a star's ring), whose strokes circle the nearest body of its kind, so
+ * the ring of provinces reads as one piece. Without such a body on the map the ring falls
+ * back to its own node.
  */
 export function terrainArtCentre<N extends CentredNode>(
   nodes: readonly N[],
   node: N,
   kind: string | undefined,
 ): CentredNode {
-  if (kind !== 'accretion_disk') return node;
-  let hole = holes.get(nodes);
-  if (hole === undefined) {
-    hole = nodes.find((n) => n.sector === 'black_hole') ?? null;
-    holes.set(nodes, hole);
+  if (!isCelestialRing(kind)) return node;
+  let memo = centres.get(nodes);
+  if (memo === undefined) {
+    memo = new Map();
+    centres.set(nodes, memo);
   }
-  return hole ?? node;
+  let centre = memo.get(node);
+  if (centre === undefined) {
+    centre = ringBodyOf(nodes, node, kind) ?? node;
+    memo.set(node, centre);
+  }
+  return centre;
 }
 
 /** Kinds drawn by their own art over the province, not by the shared environment field:
- *  the rift, the accretion disk and the black hole (`holographicTerrainArt.ts`). */
-const OWN_ART = new Set(['rift', 'accretion_disk', 'black_hole']);
+ *  the rift, the black hole and every body's ring (`holographicTerrainArt.ts`). */
+const OWN_ART = new Set(['rift', 'black_hole']);
 export const hasOwnTerrainArt = (kind: string | undefined): kind is string =>
-  kind !== undefined && OWN_ART.has(kind);
+  kind !== undefined && (OWN_ART.has(kind) || isCelestialRing(kind));

@@ -19,6 +19,7 @@ import {
   type MatchMap,
 } from '../packages/shared-core/src/index';
 import { provinceKey } from '../decisions/provinceName';
+import { isCelestialRing, ringKindOf } from '../decisions/celestialRing';
 import { ru } from '../localization/ru';
 import { en } from '../localization/en';
 import { shippedGameData } from './bundle';
@@ -38,8 +39,11 @@ describe('тестовая дуэльная карта — полнота', () =
   it('проходит валидатор на шипнутом каталоге, соседство выводится из мозаики', () => {
     expect(validateMatchMap(map, data)).toEqual([]);
     expect(map.paths).toBeUndefined();
-    expect(ids.length).toBeGreaterThanOrEqual(55);
-    expect(ids.length).toBeLessThanOrEqual(60);
+    // Кольца вокруг тел (владелец 2026-11-18/19) — стена из провинций, а не места на карте:
+    // в 55–60 провинций заказа они не входят.
+    const places = ids.filter((id) => !isCelestialRing(map.sectors[id]!.kind));
+    expect(places.length).toBeGreaterThanOrEqual(55);
+    expect(places.length).toBeLessThanOrEqual(60);
   });
 
   // Карта существует ради полноты: новая запись в каталоге без места здесь — это контент,
@@ -50,8 +54,12 @@ describe('тестовая дуэльная карта — полнота', () =
     // Обе крепости карта не кладёт — их строит игрок. Площадка на развилке (`fork_station`,
     // FORT-6.1) появляется, когда крепость ставят на развилку дороги; `void_station` — когда
     // её поднимают на своей провинции (`data/seededFortress.test.ts`).
+    // Кольцо — вид своего тела: здесь стоят кольца тех тел, что есть на карте, а кольца
+    // остальных классов звёзд несут большие карты, как и сами классы.
+    const rings = new Set(ids.map((id) => ringKindOf(map.sectors[id]!)));
     const provinceKinds = Object.keys(data.sectorKinds).filter(
-      (k) => k !== 'station_site' && k !== 'fork_station' && k !== 'void_station',
+      (k) =>
+        k !== 'station_site' && k !== 'fork_station' && k !== 'void_station' && (!isCelestialRing(k) || rings.has(k)),
     );
     expect([...has((id) => map.sectors[id]!.kind)].sort()).toEqual(provinceKinds.sort());
     // Star classes are one family (`data/sectors.json`): one star shows the kind, its class

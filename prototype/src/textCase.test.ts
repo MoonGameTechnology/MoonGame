@@ -91,7 +91,7 @@ const ACRONYMS: Record<'ru' | 'en', ReadonlySet<string>> = {
   ru: new Set('ИИ ПКО ПВО ЛС ОП КД ЛКМ ПКМ ПК НПЗ ОЗ ПРО БЧ АТК ЗАЩ СКР МБ'.split(' ')),
   en: new Set([
     ...'AI HP XP CD HQ DM AA PD PVE PVP FFA DEV FPS PC APK VPN MB'.split(' '),
-    ...'ATK DEF SPD II III IV VI VOID DOMINION SECTOR ZERO'.split(' '),
+    ...'ATK DEF SPD II III IV VI VII VIII VOID DOMINION SECTOR ZERO'.split(' '),
   ]),
 };
 const CAPS_WORD: Record<'ru' | 'en', RegExp> = {

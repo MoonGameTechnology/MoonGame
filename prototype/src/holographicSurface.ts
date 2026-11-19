@@ -3,6 +3,7 @@ import { rgba } from '../../packages/client/src/holoDraw';
 import { holographicTheme as theme } from '../../packages/client/src/theme';
 import type { ProvincePolygon } from '../../packages/client/src/provinceSelection';
 import type { TerrainEnvironmentTile } from '../../decisions/terrainEnvironment';
+import { isCelestialRing } from '../../decisions/celestialRing';
 import { drawTerrainEnvironmentTile, type TerrainEnvironmentProjection } from '../../packages/client/src/terrainEnvironmentDraw';
 import type { HoloRect } from './holographicLayout';
 
@@ -70,14 +71,14 @@ const TERRAIN_KINDS = new Set([
   'debris_field',
   'asteroid_cluster',
   'rift',
-  'accretion_disk',
   'black_hole',
   'dust_lane',
   'depleted_system',
 ]);
 
-/** Only these decorative terrain families replace their old standalone glyph. */
-export const hasTerrainMaterial = (kind: string): boolean => TERRAIN_KINDS.has(kind);
+/** Only these decorative terrain families replace their old standalone glyph — and every
+ *  body's ring, drawn round its body. */
+export const hasTerrainMaterial = (kind: string): boolean => TERRAIN_KINDS.has(kind) || isCelestialRing(kind);
 
 /** Unknown terrain remains under the same fog as its former floating type badge. */
 export function makeTerrainField(

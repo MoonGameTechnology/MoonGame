@@ -514,11 +514,12 @@
     },
     "remnant": {
       "position": {
-        "x": 70,
-        "y": 130
+        "x": 66,
+        "y": 122
       },
       "kind": "black_hole",
-      "terrain": "deep_void"
+      "terrain": "deep_void",
+      "size": 1.4
     },
     "relic": {
       "position": {
@@ -537,8 +538,8 @@
     },
     "crossing": {
       "position": {
-        "x": 160,
-        "y": -540
+        "x": 168,
+        "y": -594
       },
       "kind": "dead_world",
       "terrain": "deep_void"
@@ -635,8 +636,8 @@
     },
     "reach_35": {
       "position": {
-        "x": 1257,
-        "y": 325
+        "x": 1267,
+        "y": 323
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -701,7 +702,7 @@
     },
     "reach_43": {
       "position": {
-        "x": 1520,
+        "x": 1521,
         "y": 1495
       },
       "kind": "dead_world",
@@ -710,8 +711,8 @@
     },
     "reach_44": {
       "position": {
-        "x": 1054,
-        "y": 1503
+        "x": 1058,
+        "y": 1508
       },
       "kind": "asteroid",
       "terrain": "dust_lane"
@@ -734,8 +735,8 @@
     },
     "reach_47": {
       "position": {
-        "x": 1045,
-        "y": 965
+        "x": 1057,
+        "y": 969
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
@@ -800,8 +801,8 @@
     },
     "reach_55": {
       "position": {
-        "x": -955,
-        "y": 792
+        "x": -959,
+        "y": 794
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -817,8 +818,8 @@
     },
     "reach_57": {
       "position": {
-        "x": -543,
-        "y": 953
+        "x": -558,
+        "y": 969
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -883,8 +884,8 @@
     },
     "reach_65": {
       "position": {
-        "x": 581,
-        "y": -896
+        "x": 585,
+        "y": -904
       },
       "kind": "dead_world",
       "terrain": "empty_space"
@@ -949,8 +950,8 @@
     },
     "reach_73": {
       "position": {
-        "x": 363,
-        "y": 1473
+        "x": 362,
+        "y": 1483
       },
       "kind": "dead_world",
       "terrain": "depleted_system",
@@ -967,7 +968,7 @@
     "reach_75": {
       "position": {
         "x": 511,
-        "y": 1802
+        "y": 1807
       },
       "kind": "dead_world",
       "terrain": "deep_void"
@@ -991,16 +992,16 @@
     },
     "reach_78": {
       "position": {
-        "x": 316,
-        "y": -132
+        "x": 363,
+        "y": -188
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "reach_79": {
       "position": {
-        "x": -341,
-        "y": 132
+        "x": -413,
+        "y": 130
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
@@ -1025,23 +1026,25 @@
     },
     "reach_82": {
       "position": {
-        "x": -378,
-        "y": -802
+        "x": -398,
+        "y": -740
       },
       "kind": "star",
       "terrain": "yellow_dwarf",
       "buildings": [],
-      "garrison": []
+      "garrison": [],
+      "size": 1.4
     },
     "reach_83": {
       "position": {
-        "x": 438,
-        "y": 805
+        "x": 481,
+        "y": 833
       },
       "kind": "star",
       "terrain": "yellow_dwarf",
       "buildings": [],
-      "garrison": []
+      "garrison": [],
+      "size": 1.4
     },
     "reach_84": {
       "position": {
@@ -1053,11 +1056,236 @@
     },
     "reach_85": {
       "position": {
-        "x": 734,
-        "y": 481
+        "x": 782,
+        "y": 493
       },
       "kind": "dead_world",
       "terrain": "empty_space"
+    },
+    "reach_82_ring_1": {
+      "position": {
+        "x": -172,
+        "y": -589
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_82_ring_2": {
+      "position": {
+        "x": -345,
+        "y": -473
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_82_ring_3": {
+      "position": {
+        "x": -549,
+        "y": -514
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_82_ring_4": {
+      "position": {
+        "x": -665,
+        "y": -687
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_82_ring_5": {
+      "position": {
+        "x": -624,
+        "y": -891
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_82_ring_6": {
+      "position": {
+        "x": -451,
+        "y": -1007
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_82_ring_7": {
+      "position": {
+        "x": -247,
+        "y": -966
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_82_ring_8": {
+      "position": {
+        "x": -131,
+        "y": -793
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_83_ring_1": {
+      "position": {
+        "x": 677,
+        "y": 964
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_83_ring_2": {
+      "position": {
+        "x": 527,
+        "y": 1065
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_83_ring_3": {
+      "position": {
+        "x": 350,
+        "y": 1029
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_83_ring_4": {
+      "position": {
+        "x": 249,
+        "y": 879
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_83_ring_5": {
+      "position": {
+        "x": 285,
+        "y": 702
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_83_ring_6": {
+      "position": {
+        "x": 435,
+        "y": 601
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_83_ring_7": {
+      "position": {
+        "x": 612,
+        "y": 637
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "reach_83_ring_8": {
+      "position": {
+        "x": 713,
+        "y": 787
+      },
+      "kind": "corona",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_1": {
+      "position": {
+        "x": 299,
+        "y": 163
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_2": {
+      "position": {
+        "x": 218,
+        "y": 303
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_3": {
+      "position": {
+        "x": 66,
+        "y": 358
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_4": {
+      "position": {
+        "x": -86,
+        "y": 303
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_5": {
+      "position": {
+        "x": -167,
+        "y": 163
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_6": {
+      "position": {
+        "x": -139,
+        "y": 4
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_7": {
+      "position": {
+        "x": -15,
+        "y": -100
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_8": {
+      "position": {
+        "x": 147,
+        "y": -100
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "remnant_ring_9": {
+      "position": {
+        "x": 271,
+        "y": 4
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
     }
   },
   "regions": [
@@ -1179,6 +1407,15 @@
         "neutral_west",
         "neutral_east",
         "remnant",
+        "remnant_ring_1",
+        "remnant_ring_2",
+        "remnant_ring_3",
+        "remnant_ring_4",
+        "remnant_ring_5",
+        "remnant_ring_6",
+        "remnant_ring_7",
+        "remnant_ring_8",
+        "remnant_ring_9",
         "relic",
         "crossing",
         "reach_78",
@@ -1186,7 +1423,23 @@
         "reach_80",
         "reach_81",
         "reach_82",
+        "reach_82_ring_1",
+        "reach_82_ring_2",
+        "reach_82_ring_3",
+        "reach_82_ring_4",
+        "reach_82_ring_5",
+        "reach_82_ring_6",
+        "reach_82_ring_7",
+        "reach_82_ring_8",
         "reach_83",
+        "reach_83_ring_1",
+        "reach_83_ring_2",
+        "reach_83_ring_3",
+        "reach_83_ring_4",
+        "reach_83_ring_5",
+        "reach_83_ring_6",
+        "reach_83_ring_7",
+        "reach_83_ring_8",
         "reach_84",
         "reach_85"
       ]

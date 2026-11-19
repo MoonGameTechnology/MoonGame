@@ -897,6 +897,19 @@ export const CLOSED_SKY_SOLO_MIGRATION = {
   toDataHash: '0c94b5782dc447',
 } as const;
 
+/** Data 0.1.90: the rings round the bodies (owner 2026-11-18/19). Six ring kinds — corona,
+ *  dust shell, stellar wind, planetary nebula, pulsar wind, circumbinary disk — join the
+ *  catalogue, impassable and closed to aviation like the accretion disk. A save keeps the map
+ *  it was dealt; the saved shape is unchanged. */
+export const CELESTIAL_RINGS_SOLO_MIGRATION = {
+  fromRules: CLOSED_SKY_SOLO_MIGRATION.toRules,
+  fromData: CLOSED_SKY_SOLO_MIGRATION.toData,
+  fromDataHash: CLOSED_SKY_SOLO_MIGRATION.toDataHash,
+  toRules: '1c628eae03f150',
+  toData: '0.1.90',
+  toDataHash: '01c9aef1df327e',
+} as const;
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -974,4 +987,5 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   VOLLEY_STEP_SOLO_MIGRATION,
   FLEET_LINE_SOLO_MIGRATION,
   CLOSED_SKY_SOLO_MIGRATION,
+  CELESTIAL_RINGS_SOLO_MIGRATION,
 ];

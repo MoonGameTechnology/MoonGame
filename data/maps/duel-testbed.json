@@ -115,7 +115,7 @@
     },
     "trojan_l4": {
       "position": {
-        "x": -810,
+        "x": -812,
         "y": -161
       },
       "kind": "asteroid_cluster",
@@ -131,16 +131,16 @@
     },
     "wreck_1": {
       "position": {
-        "x": -700,
-        "y": -620
+        "x": -702,
+        "y": -621
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard"
     },
     "wreck_2": {
       "position": {
-        "x": -400,
-        "y": -840
+        "x": -408,
+        "y": -851
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard"
@@ -155,8 +155,8 @@
     },
     "debris_2": {
       "position": {
-        "x": -300,
-        "y": -560
+        "x": -370,
+        "y": -629
       },
       "kind": "debris_field",
       "terrain": "empty_space"
@@ -180,16 +180,17 @@
     },
     "singularity": {
       "position": {
-        "x": 150,
-        "y": -150
+        "x": 78,
+        "y": -187
       },
       "kind": "black_hole",
-      "terrain": "deep_void"
+      "terrain": "deep_void",
+      "size": 1.4
     },
     "relic": {
       "position": {
-        "x": -130,
-        "y": -170
+        "x": -299,
+        "y": -156
       },
       "kind": "planet",
       "terrain": "deep_void",
@@ -240,8 +241,8 @@
     },
     "survey_2": {
       "position": {
-        "x": -110,
-        "y": 110
+        "x": -191,
+        "y": 239
       },
       "kind": "empty",
       "terrain": "deep_void"
@@ -257,24 +258,24 @@
     },
     "scar_nw": {
       "position": {
-        "x": -150,
-        "y": -440
+        "x": -253,
+        "y": -555
       },
       "kind": "accretion_disk",
       "terrain": "empty_space"
     },
     "scar_s": {
       "position": {
-        "x": -220,
-        "y": 520
+        "x": -229,
+        "y": 541
       },
       "kind": "rift",
       "terrain": "empty_space"
     },
     "scar_e": {
       "position": {
-        "x": 650,
-        "y": 90
+        "x": 706,
+        "y": 117
       },
       "kind": "rift",
       "terrain": "empty_space"
@@ -298,8 +299,8 @@
     },
     "veil_w": {
       "position": {
-        "x": 620,
-        "y": -700
+        "x": 641,
+        "y": -720
       },
       "kind": "nebula",
       "terrain": "nebula"
@@ -415,8 +416,8 @@
     },
     "storm_1": {
       "position": {
-        "x": 880,
-        "y": 150
+        "x": 875,
+        "y": 148
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
@@ -439,26 +440,27 @@
     },
     "flare_2": {
       "position": {
-        "x": 1620,
-        "y": 420
+        "x": 1675,
+        "y": 498
       },
       "kind": "star",
       "terrain": "pulsar",
       "buildings": [],
-      "garrison": []
+      "garrison": [],
+      "size": 1.4
     },
     "storm_3": {
       "position": {
-        "x": 1000,
-        "y": 440
+        "x": 960,
+        "y": 437
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "hot_world": {
       "position": {
-        "x": 1270,
-        "y": 620
+        "x": 1190,
+        "y": 644
       },
       "kind": "planet",
       "terrain": "solar_flare_zone",
@@ -474,8 +476,8 @@
     },
     "blaze": {
       "position": {
-        "x": 1560,
-        "y": 760
+        "x": 1523,
+        "y": 844
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -536,16 +538,16 @@
     },
     "reach_w": {
       "position": {
-        "x": -560,
-        "y": 110
+        "x": -597,
+        "y": 127
       },
       "kind": "dead_world",
       "terrain": "empty_space"
     },
     "reach_nw": {
       "position": {
-        "x": -440,
-        "y": -300
+        "x": -537,
+        "y": -321
       },
       "kind": "planet",
       "terrain": "deep_void",
@@ -561,8 +563,8 @@
     },
     "reach_n": {
       "position": {
-        "x": 100,
-        "y": -700
+        "x": 104,
+        "y": -805
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -583,6 +585,150 @@
       },
       "kind": "dead_world",
       "terrain": "empty_space"
+    },
+    "singularity_ring_1": {
+      "position": {
+        "x": 270,
+        "y": -107
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "singularity_ring_2": {
+      "position": {
+        "x": 158,
+        "y": 5
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "singularity_ring_3": {
+      "position": {
+        "x": -2,
+        "y": 5
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "singularity_ring_4": {
+      "position": {
+        "x": -114,
+        "y": -107
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "singularity_ring_5": {
+      "position": {
+        "x": -114,
+        "y": -267
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "singularity_ring_6": {
+      "position": {
+        "x": -2,
+        "y": -379
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "singularity_ring_7": {
+      "position": {
+        "x": 158,
+        "y": -379
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "singularity_ring_8": {
+      "position": {
+        "x": 270,
+        "y": -267
+      },
+      "kind": "accretion_disk",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "flare_2_ring_1": {
+      "position": {
+        "x": 1848,
+        "y": 613
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "flare_2_ring_2": {
+      "position": {
+        "x": 1716,
+        "y": 702
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "flare_2_ring_3": {
+      "position": {
+        "x": 1560,
+        "y": 671
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "flare_2_ring_4": {
+      "position": {
+        "x": 1471,
+        "y": 539
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "flare_2_ring_5": {
+      "position": {
+        "x": 1502,
+        "y": 383
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "flare_2_ring_6": {
+      "position": {
+        "x": 1634,
+        "y": 294
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "flare_2_ring_7": {
+      "position": {
+        "x": 1790,
+        "y": 325
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
+    },
+    "flare_2_ring_8": {
+      "position": {
+        "x": 1879,
+        "y": 457
+      },
+      "kind": "pulsar_wind",
+      "terrain": "empty_space",
+      "size": 0.62
     }
   },
   "players": {

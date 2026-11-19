@@ -312,7 +312,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 (`state/cloak.ts`, модуль `cloak-field`) сжимает чужие круги опознания на `1 − cloak`;
 срывается боем, обстрелом и вылетом шаттлов (`Fleet.cloakBrokenUntil`), видно шпиону и скану.
 
-## 6. Данные (`data/*.json`, версия `0.1.86`)
+## 6. Данные (`data/*.json`, версия `0.1.90`)
 
 Контент — данные: новая сущность или число — правка JSON, а не кода (скилл `add-game-content`).
 Имя в JSON английское, текст — ключ `data.<слаг>` в обеих локалях (`prototype/src/i18n.test.ts`).
@@ -323,7 +323,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 | `technologies` | технологии основной игры | 56 |
 | `buildings` `modules` `factions` `scientists` | постройки, модули, фракции, учёные | 34·27·7·8 |
 | `heroes` и ещё 4 `hero*` | архетипы, способности, пассивки, узлы дерева, грейды | 6·12·13·19·4 |
-| `sectorKinds` `sectors` `planetTypes` | виды узлов, местность, типы планет | 19·11·12 |
+| `sectorKinds` `sectors` `planetTypes` | виды узлов, местность, типы планет | 26·17·12 |
 | `modes` `events` `resources` | режимы, правила событий, ресурсы | 15·6·6 |
 | `scoring` | делитель очков построек `buildingDivisor: 3` для новых партий | — |
 | `sectorZeroShop` `sectorZeroStars` | Sector Zero: предложения магазина, ступени звёзд | 18·6 |
@@ -339,19 +339,19 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   и новая пара в `decisions/soloSaveMigrationPairs.ts`: без неё локальная схватка прежнего каталога
   не откроется (сторож — `soloSaveMigrationWiring.test.ts`). Новый фрагмент:
   `GameDataSchema`, `composeGameDataBundle`, `data/bundle.ts`.
-- **Карты `data/maps`.** Основная игра (`techRules.ruleset: main`): `duel-1` (2 места, 19
-  провинций), `ffa-4` (4/31), `team-2v2` (4/85), `team-3v3` (6/121), `ffa-20` (20/320), `ffa-50`
-  (50/800, квадрат до углов, `shape: 'square'` в `scripts/generate-ffa.mjs`; в центре чёрная дыра
-  «Бездны» `size: 2` за кольцом из 10 непроходимых `accretion_disk`, владелец 2026-11-10). Sector
-  Zero — `training-1` и главы `pve-1`…`pve-6`. Битвы корпораций берут карту по формату
-  (`data/avaFormats.json`, CORP-8). Служебные — `proving-ground` (скрытый «Полигон»),
+- **Карты `data/maps`.** Основная игра (`techRules.ruleset: main`): `duel-1` (2/71), `ffa-4` (4/39),
+  `team-2v2` (4/110), `team-3v3` (6/147), `ffa-20` (20/337), `ffa-50` (50/834, квадрат, в центре
+  «Бездна»; `scripts/generate-ffa.mjs`). Sector Zero — `training-1` и главы `pve-1`…`pve-6`. Битвы
+  корпораций — по формату (`data/avaFormats.json`, CORP-8). Служебные — `proving-ground`,
   `duel-testbed`, `skirmish-1`; `data/frontier-50|100.json` — для старых партий.
 - **Край карты** — `mosaicClip` ядра (проходы и оба рендера), закреплён в `GameState.mapEdge`.
   `edge: "hull"` — контур в 0.6 шага от крайних центров, без поля — рамка 5%; контур везде, кроме
   глав I, II, V, VI и `ava-2v2-1`/`ava-duel-1` (владелец 2026-11-17). Рамка доски всегда
   прямоугольная: крайние провинции касаются её, но не тянутся к ней (`glassFrame`).
-- **Звёзды** (владелец 2026-11-17) — непроходимая незахватываемая провинция `star` в зоне вспышек
-  не у столицы, класс — её `terrain` (6 классов семьи `star`); соседи по классу — `star-systems.mjs`.
+- **Звёзды и кольца** (владелец 2026-11-17/19) — непроходимая провинция `star` (класс — `terrain`,
+  6 классов семьи `star`) и чёрная дыра стоят в замкнутом кольце своего вида (`RING_OF`,
+  `decisions/celestialRing.ts`), закрытом проходу и авиации, ≈ 3 провинции с телом; соседи
+  раздвинуты (`scripts/celestial-rings.mjs`), контракт — `data/celestialRings.test.ts`.
 - **Цены и сроки основной игры** (решение владельца 2026-10-18) — поле `pricing` её шести карт,
   посев закрепляет его в `GameState.pricing`; расчёт — `util/pricing.ts` (`matchUnitCost` для
   корпусов, `matchCost` для прочего), одинаково для UI, бота, оплаты и отмены. Новые партии

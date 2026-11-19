@@ -155,7 +155,7 @@ describe('closedSky — какие провинции закрывают неб�
     expect(closedSky(mapOf(odd), data).closed).toEqual([]);
   });
 
-  it('в шипнутом каталоге небо закрыто ровно у звезды, чёрной дыры и аккреционного диска', () => {
+  it('в шипнутом каталоге небо закрыто ровно у звезды, чёрной дыры и колец вокруг них', () => {
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
     const shipped = loadGameData((name) =>
       JSON.parse(readFileSync(path.join(root, 'data', name), 'utf8')),
@@ -164,7 +164,17 @@ describe('closedSky — какие провинции закрывают неб�
       .filter(([, def]) => def.overflight === false)
       .map(([id]) => id)
       .sort();
-    expect(closed).toEqual(['accretion_disk', 'black_hole', 'star']);
+    expect(closed).toEqual([
+      'accretion_disk',
+      'black_hole',
+      'circumbinary_disk',
+      'corona',
+      'dust_shell',
+      'planetary_nebula',
+      'pulsar_wind',
+      'star',
+      'stellar_wind',
+    ]);
     // Закрытое небо — у непроходимых провинций: над тем, куда флот войти может, авиация летает.
     for (const id of closed) expect(shipped.sectorKinds[id]!.traversable).toBe(false);
   });

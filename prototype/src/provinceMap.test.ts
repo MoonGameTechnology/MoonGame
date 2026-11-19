@@ -13,6 +13,7 @@ import {
   SEED_WEIGHT,
 } from '../../packages/shared-core/src/index';
 import { computePowerCells } from '../../packages/client/src/territory';
+import { isCelestialRing } from '../../decisions/celestialRing';
 
 import {
   CLIP_PAD_MIN,
@@ -241,7 +242,10 @@ describe('край карты — по контуру провинций, без
         }, 0),
       ) / 2;
     const areas = cells.map((c) => area(c.poly));
-    const median = [...areas].sort((a, b) => a - b)[areas.length >> 1]!;
+    // An ordinary province: a body's ring is a strip of small closed cells, not a place.
+    const { sectors } = read(id);
+    const places = areas.filter((_, k) => !isCelestialRing(sectors[seeds[cells[k]!.idx]!.id]?.kind));
+    const median = [...places].sort((a, b) => a - b)[places.length >> 1]!;
     return cells.map((c, k) => ({
       id: seeds[c.idx]!.id,
       share: areas[k]! / median,

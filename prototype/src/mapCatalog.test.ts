@@ -7,6 +7,18 @@ import { regionKey } from '../../decisions/regionName';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 
+/** Province kinds no lane enters (`data/sectorKinds.json`): stars, holes and their rings. */
+const CLOSED = new Set(
+  Object.entries(
+    JSON.parse(readFileSync(new URL('../../data/sectorKinds.json', import.meta.url), 'utf8')) as Record<
+      string,
+      { traversable?: boolean }
+    >,
+  )
+    .filter(([, k]) => k.traversable === false)
+    .map(([kind]) => kind),
+);
+
 describe('Frontier 50', () => {
   it('keeps 50 starts two provinces apart, three provinces inside the rim, and bases buffered', () => {
     const map = mapPreset('frontier-50');
@@ -175,11 +187,13 @@ describe('published match maps', () => {
     };
     expect(new Set(map.starts.map((start) => profile(start, 2))).size).toBe(map.starts.length);
     expect(map.map!.paths).toBeUndefined(); // All lanes come from the real mosaic.
-    expect(map.nodes.every((n) => n.sector !== 'empty')).toBe(true);
+    // The duel keeps open space between its systems (owner 2026-11-19: «мало пустого
+    // космического пространства»); FFA for 4 stays without it.
+    if (id === 'ffa-4') expect(map.nodes.every((n) => n.sector !== 'empty')).toBe(true);
     const openingLengths: number[] = [];
-    // A star is a closed province (no lanes): every OTHER province is reachable.
+    // Stars and their rings are closed provinces (no lanes): every OTHER province is reachable.
     const passable = map.nodes.filter((n) => n.links.length > 0).length;
-    expect(nodes.size - passable).toBe(1);
+    expect(nodes.size - passable).toBe(map.nodes.filter((n) => CLOSED.has(n.sector)).length);
     for (const start of map.starts) {
       const d = distances(start);
       expect(d.size).toBe(passable);
