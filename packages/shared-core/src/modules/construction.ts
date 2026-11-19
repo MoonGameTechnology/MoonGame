@@ -4,6 +4,7 @@ import { clearInfected } from './construction/kit';
 import { registerConstructionMaintenance } from './construction/maintenance';
 import { registerBuildingOrders, registerUnitOrders } from './construction/orders';
 import { registerCompletion, registerWarDamage } from './construction/events';
+import { registerHasten } from './construction/hasten';
 
 export type { BuildingHit, BuildingDamage, DelayedOrder, ConstructionDelay } from './construction/kit';
 
@@ -40,8 +41,10 @@ export const constructionModule: GameModule = {
   // 1.13.0: the requirement hook names the order's world; queued units re-ask it (BAL-19).
   // 1.14.0: a running unit build is parked when its world leaves control; resume re-asks (BAL-19).
   // 1.15.2: приостановленная постройка держит своё место в крепости (ponytail-аудит).
-  version: '1.15.2',
+  // 1.16.0: возможность `construction.hasten` — ускорение идущего заказа (TEC-3).
+  version: '1.16.0',
   setup(api) {
+    registerHasten(api);
     registerBuildingOrders(api);
     registerUnitOrders(api);
     registerCompletion(api);

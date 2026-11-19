@@ -22,6 +22,7 @@ import { scientistsOf } from '../state/gameState';
 import { matchCost, matchHours } from '../util/pricing';
 import { canAfford, payCost } from '../util/treasury';
 import { isForkSite } from '../state/forkSite';
+import type { QueueHasten } from '../util/speedup';
 
 interface ResearchPayload {
   technology: string;
@@ -816,6 +817,33 @@ const grantTechnology: TechnologyGrant = (h, playerId, technology) => {
   return true;
 };
 
+/**
+ * Возможность `technology.hasten` (TEC-3): сдвинуть срок идущего исследования раньше. Тот же
+ * перенос, что у `boostResearch`: новый `completesAt` и новое событие завершения, а старое
+ * не сработает — его `completesAt` больше не совпадает со слотом.
+ */
+const researchHasten: QueueHasten = {
+  remaining: (h, playerId, ref) => {
+    const player = h.state.players[playerId];
+    if (!player || ref.kind !== 'research') return null;
+    const slot = technologyState(player).active?.find((a) => a.technology === ref.technology);
+    return slot ? Math.max(0, slot.completesAt - h.ctx.now) / hoursToMs(h.ctx, 1) : null;
+  },
+  hasten: (h, playerId, ref, hours) => {
+    const player = h.state.players[playerId];
+    if (!player || ref.kind !== 'research' || !(hours > 0)) return false;
+    const slot = technologyState(player).active?.find((a) => a.technology === ref.technology);
+    if (!slot) return false;
+    slot.completesAt = Math.max(h.ctx.now, Math.round(slot.completesAt - hoursToMs(h.ctx, hours)));
+    h.schedule(slot.completesAt, 'technology.complete', {
+      playerId,
+      technology: ref.technology,
+      completesAt: slot.completesAt,
+    });
+    return true;
+  },
+};
+
 export const technologyModule: GameModule = {
   id: 'technology',
   // 1.1.0: условие «есть юнит» видит и десант на плацдарме.
@@ -825,9 +853,11 @@ export const technologyModule: GameModule = {
   // 1.6.0: `effects.controlLimit` поднимает лимит управления (хук `control.limit`, BAL-19).
   // 1.7.0: `effects.armyUpkeep` дорожает содержание войск (хук `economy.unitUpkeep`), условие
   // `has_scientist` знает учёного по id (BAL-19, линия Наместника).
-  version: '1.7.0',
+  // 1.8.0: возможность `technology.hasten` — ускорение исследования (TEC-3).
+  version: '1.8.0',
   setup(api) {
     api.provideCapability<TechnologyGrant>('technology.grant', grantTechnology);
+    api.provideCapability<QueueHasten>('technology.hasten', researchHasten);
     api.onAction('technology.research', startResearch);
     api.onAction('technology.boost', boostResearch);
     api.onAction('technology.queue', enqueueResearch);
