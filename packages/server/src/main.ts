@@ -28,8 +28,10 @@ import { salvageFromEvents } from './dropRoller';
 import { MetaEconomy } from './metaEconomy';
 import { loadMetaEconomyCatalog, loadMetaEconomyCatalogHistory } from './metaEconomyCatalog';
 import { registerMetaEconomyApi } from './metaEconomyApi';
+import { registerMatchSpeedupApi } from './matchSpeedup';
+import { MatchSovereignLedger } from './matchSovereigns';
 import { createMetaRewardDelivery } from './metaEconomyDelivery';
-import { commerceOffers } from './commerceCatalog';
+import { registerCommerceOffersRoute } from './commerceCatalog';
 import { registerMetaCommerce } from './metaCommerce';
 import { initializeOrdinaryArsenal, syncAccountArsenal } from './mainGameArsenal';
 import { createMultiplayerServer, tlsFromEnv, wsLimitsFromEnv } from './wsServer';
@@ -707,10 +709,9 @@ const server = createMultiplayerServer({
             onChanged: refreshAccountArsenal,
             corpOf: (accountId) => stores.corpStore.membershipOf(accountId),
           });
-          scope.get('/commerce/offers', async (_request, reply) => {
-            reply.header('cache-control', 'no-store');
-            return { offers: commerceOffers() };
-          });
+          // TEC-3.1: a queue speed-up paid in ◆ — debited under a receipt, refunded on refusal.
+          registerMatchSpeedupApi(scope, { ledger: new MatchSovereignLedger(stores.metaEconomy), identify, seatOf: (id, login) => accountStore.seatOf(id, login), rooms: registry });
+          registerCommerceOffersRoute(scope);
             registerProfileApi(scope, {
               corporations: stores.corpStore,
               profiles: stores.profileStore,

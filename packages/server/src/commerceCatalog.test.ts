@@ -1,5 +1,6 @@
+import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
-import { commerceOffers } from './commerceCatalog';
+import { commerceOffers, registerCommerceOffersRoute } from './commerceCatalog';
 import { loadMetaEconomyCatalog } from './metaEconomyCatalog';
 import { loadShippedData } from './scenario';
 
@@ -28,5 +29,17 @@ describe('published Commerce content contract', () => {
       expect(offer.available).toBe(false);
       expect(offer.price).toBeUndefined();
     }
+  });
+});
+
+describe('GET /commerce/offers', () => {
+  it('serves the catalog uncached', async () => {
+    const app = Fastify();
+    registerCommerceOffersRoute(app);
+    const res = await app.inject({ method: 'GET', url: '/commerce/offers' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.json()).toEqual({ offers: commerceOffers() });
+    await app.close();
   });
 });
