@@ -1,4 +1,5 @@
 /** Presentation adapter for the existing HUD. Commands and windows keep their hosts. */
+import { initGameSelect } from './gameSelect';
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { holoIcon, skinIcon, type HoloIcon } from './holographicIcons';
@@ -47,6 +48,8 @@ export function commandWindowHtml(
 }
 
 export function initHolographicUi(host: HolographicHost) {
+  // Выпадающие списки — игровые, а не окно системы (заказ владельца 2026-11-19).
+  initGameSelect();
   const navigation = document.querySelector<HTMLElement>('.holo-nav');
   const back = document.getElementById('holo-back');
   if (back) back.innerHTML = holoIcon('caret-left');
