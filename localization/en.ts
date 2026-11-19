@@ -557,7 +557,7 @@ export const en: Record<string, string> = {
   'battle.win.info': 'Details',
   'battle.win.more-sides': '{n|side|sides}',
   'battle.win.one-target': 'Whole volley at one enemy',
-  'battle.win.overload': 'Line of fire overloaded: {n} in battle, limit {cap}, each hits at {pct}%',
+  'battle.win.overload': 'Fleet line overloaded: {n} {n|fleet|fleets} in battle, limit {cap}, each hits at {pct}%',
   'battle.win.pick-own': 'Orders for one fleet: tap its tile',
   'battle.win.queue': 'Volley order',
   'battle.win.retreat': 'Retreat',

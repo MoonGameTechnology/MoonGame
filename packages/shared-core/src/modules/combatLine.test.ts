@@ -7,9 +7,9 @@ import { parseGameData } from '../data/schemas';
 import { combatModule } from './combat';
 
 /**
- * Одна линия на державу (MSB-11, резолюция владельца 2026-11-18): предел линии
- * `min(1, L/N)` считается по всем живым кораблям державы в этом бою, а не по одному флоту.
- * Дробить армию на флоты по десять больше не выгодно. Внутри флота правило прежнее.
+ * Линия флотов державы (MSB-13, резолюция владельца 2026-11-19): внутри флота предел линии
+ * `min(1, L/N)` по его кораблям, как всегда; в бою пять флотов державы бьют в полную силу,
+ * при M > 5 каждый — на 5/M. Союзник линию не делит, стороны без хозяина — каждая сама.
  */
 const HOUR = 3_600_000;
 const data = parseGameData({
@@ -103,37 +103,52 @@ function firstVolley(state: GameState): number {
   return 100_000 - (result.state.fleets.t!.units[0]!.hp ?? 100_000);
 }
 
-describe('одна линия на державу (MSB-11)', () => {
-  it('пять флотов по 10 бьют как один флот из 50 — дробить невыгодно', () => {
-    const one = firstVolley(world({ big: ['a', 50] }));
-    const five = firstVolley(
-      world({ a1: ['a', 10], a2: ['a', 10], a3: ['a', 10], a4: ['a', 10], a5: ['a', 10] }),
-    );
+/** `n` флотов владельца `owner` по `ships` кораблей: id — `${prefix}1…${prefix}n`. */
+function fleets(prefix: string, owner: string | null, n: number, ships = 10) {
+  return Object.fromEntries(
+    Array.from({ length: n }, (_, i) => [`${prefix}${i + 1}`, [owner, ships]]),
+  ) as Record<string, [string | null, number]>;
+}
+
+describe('линия флотов державы (MSB-13)', () => {
+  it('внутри флота предел прежний: 50 кораблей одним флотом бьют как 10', () => {
     // 50 кораблей × 12 × 10/50 — как десять кораблей в полную силу.
-    expect(one).toBeCloseTo(120, 9);
-    expect(five).toBeCloseTo(one, 9);
+    expect(firstVolley(world({ big: ['a', 50] }))).toBeCloseTo(120, 9);
   });
 
-  it('пока кораблей державы не больше линии — штрафа нет, сколько бы ни было флотов', () => {
-    const two = firstVolley(world({ a1: ['a', 5], a2: ['a', 5] }));
-    expect(two).toBeCloseTo(10 * 12, 9);
+  it('пять флотов по 10 — в пределе линии: бьют всеми пятьюдесятью кораблями', () => {
+    expect(firstVolley(world(fleets('a', 'a', 5)))).toBeCloseTo(5 * 10 * 12, 9);
+  });
+
+  it('сверх пяти флотов каждый бьёт на 5/M — сумма не растёт', () => {
+    const six = firstVolley(world(fleets('a', 'a', 6)));
+    const ten = firstVolley(world(fleets('a', 'a', 10)));
+    expect(six).toBeCloseTo(6 * 10 * 12 * (5 / 6), 9);
+    expect(ten).toBeCloseTo(10 * 10 * 12 * 0.5, 9);
+    expect(six).toBeCloseTo(ten, 9);
+  });
+
+  it('флот, которому нечем стрелять, линию тоже занимает', () => {
+    const state = world({ ...fleets('a', 'a', 5), cargo: ['a', 1] });
+    state.fleets.cargo!.units = [{ unit: 'hulk', count: 1 }];
+    expect(firstVolley(state)).toBeCloseTo(5 * 10 * 12 * (5 / 6), 9);
   });
 
   it('у каждой державы своя линия: союзник её не делит', () => {
-    const state = world({ a1: ['a', 10], c1: ['c', 10] });
+    const state = world({ ...fleets('a', 'a', 5), c1: ['c', 10] });
     setStance(state, 'a', 'c', 'alliance');
-    expect(firstVolley(state)).toBeCloseTo(2 * 10 * 12, 9);
+    expect(firstVolley(state)).toBeCloseTo(6 * 10 * 12, 9);
   });
 
-  it('у пиратов и Роя хозяина нет — линия, как и прежде, у каждой стороны', () => {
-    expect(firstVolley(world({ p1: [null, 10], p2: [null, 10] }))).toBeCloseTo(2 * 10 * 12, 9);
+  it('у пиратов и Роя хозяина нет — линия у каждой стороны своя', () => {
+    expect(firstVolley(world(fleets('p', null, 6)))).toBeCloseTo(6 * 10 * 12, 9);
   });
 
-  it('прогноз считает линию державы так же, как бой', () => {
-    const shooters: Record<string, [string, number]> = {
-      a1: ['a', 10],
-      a2: ['a', 10],
-      a3: ['a', 30],
+  it('прогноз считает линию флотов так же, как бой', () => {
+    // Семь флотов державы — линия флотов работает, а у третьего ещё и свой предел кораблей.
+    const shooters: Record<string, [string | null, number]> = {
+      ...fleets('a', 'a', 6, 4),
+      big: ['a', 30],
     };
     const state = world(shooters);
     const ids = [...Object.keys(shooters), 't'];

@@ -127,37 +127,17 @@ describe('сворачивание ряда в «+N»', () => {
   });
 });
 
-describe('перегруз линии державы (MSB-11)', () => {
-  const ground = (unit: string): boolean => unit === 'militia';
-
-  it('в пределе — строки нет', () => {
-    expect(lineOverload([{ unit: 'frigate', count: 10 }], ground)).toBeNull();
-    expect(lineOverload([], ground)).toBeNull();
+describe('перегруз линии флотов державы (MSB-13)', () => {
+  it('пять флотов и меньше — строки нет', () => {
+    expect(lineOverload(5)).toBeNull();
+    expect(lineOverload(1)).toBeNull();
+    expect(lineOverload(0)).toBeNull();
   });
 
-  it('25 кораблей при пределе 10 — каждый бьёт на 40%', () => {
-    expect(
-      lineOverload(
-        [
-          { unit: 'frigate', count: 15 },
-          { unit: 'cruiser', count: 10 },
-        ],
-        ground,
-      ),
-    ).toEqual({ count: 25, cap: 10, pct: 40 });
-  });
-
-  it('у наземных предел 20; пустые стеки не считаются', () => {
-    expect(lineOverload([{ unit: 'militia', count: 20 }], ground)).toBeNull();
-    expect(
-      lineOverload(
-        [
-          { unit: 'militia', count: 30 },
-          { unit: 'frigate', count: 0 },
-        ],
-        ground,
-      ),
-    ).toEqual({ count: 30, cap: 20, pct: 66 });
+  it('сверх пяти — каждый флот бьёт на 5/M, как у ядра', () => {
+    expect(lineOverload(6)).toEqual({ count: 6, cap: 5, pct: 83 });
+    expect(lineOverload(7)).toEqual({ count: 7, cap: 5, pct: 71 });
+    expect(lineOverload(10)).toEqual({ count: 10, cap: 5, pct: 50 });
   });
 });
 
