@@ -1,3 +1,4 @@
+import type { FastifyInstance } from 'fastify';
 import type { CommerceOffer } from '@void/protocol';
 
 export const COMMERCE_CATALOG_VERSION = 'meta-v0.3';
@@ -65,5 +66,13 @@ export function commerceOffers(): CommerceOffer[] {
       available: false,
       unavailableReason: 'E_COMMERCE_UNAVAILABLE',
     };
+  });
+}
+
+/** The public offer list both hosts serve to the store screen. */
+export function registerCommerceOffersRoute(app: FastifyInstance): void {
+  app.get('/commerce/offers', async (_request, reply) => {
+    reply.header('cache-control', 'no-store');
+    return { offers: commerceOffers() };
   });
 }

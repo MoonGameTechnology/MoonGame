@@ -416,8 +416,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   (`squadronCardView.ts`), плитками, как у флота (`wingOrders.ts`); «Слить» — только у готовой базы.
 - «Производство» (`shipyard.ts`): открывается списком четырёх линий мира, каталог линии —
   по нажатию на неё (`decisions/productionSections.ts`), над каталогом очередь линии строками со сроком каждого заказа, свёрнутая до «+N»
-  (`decisions/laneQueue.ts`); мир с
-  простаивающей линией отмечен у выбора мира в шапке (`idleProductionLanes`);
+  (`decisions/laneQueue.ts`); мир с простаивающей линией отмечен у выбора мира в шапке (`idleProductionLanes`);
   шаблоны сборок (`decisions/buildTemplates.ts`), требования —
   `decisions/productionRequirements.ts` ([production-workbench.md](production-workbench.md)).
   «Герои» — `heroStaff.ts`, «Развитие» плитками (`decisions/heroTreeRows.ts`). Обновления
@@ -546,6 +545,7 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
 | Лента новостей: корпорации, битвы, медали игроков, объявления администратора | `corpNews.ts`, `newsApi.ts`, `newsScreen.ts` | вкл. (`GET /news`, кнопка в шапке хаба) |
 | Арсенал: стартовый набор, дроп, гейт `E_NOT_OWNED` | `mainGameArsenal.ts`, `arsenal.ts` | вкл. |
 | Мета-экономика: материалы, крафт, выплаты, сезон, Суверены, витрина за ◆, перки премиума, награды за медали | `metaEconomy*.ts`, `medalRewards.ts` | вкл. |
+| Ускорение очередей за ◆ в сетевой партии: списание под квитанцию, возврат при отказе ядра (TEC-3.1) | `matchSpeedup.ts`, `matchSovereigns.ts` | вкл. (`POST /matches/:id/speedup`; кнопок пока нет — TEC-3.2) |
 | Аукцион `MetaMarket`: комиссия 8%, торги, заказы на покупку | `metaMarket.ts`, `metaAuction.ts`, `metaOrders.ts` | вкл., от 700 XP (5-й уровень) |
 | Сессионная AvA в форматах от 2 на 2 до 10 на 10, медали, аренда корп-арсенала | `avaService.ts`, `avaFormats.ts`, `medalService.ts` и др. | вкл. |
 | Магазин Commerce: 4 товара и 6 пакетов Суверенов, провайдеров нет | `commerceMain.ts`, свой процесс и БД | недоступны |

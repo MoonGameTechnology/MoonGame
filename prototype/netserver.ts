@@ -12,9 +12,11 @@ import { MemoryDropStore } from '../packages/server/src/store';
 import { MetaEconomy } from '../packages/server/src/metaEconomy';
 import { loadMetaEconomyCatalog, loadMetaEconomyCatalogHistory } from '../packages/server/src/metaEconomyCatalog';
 import { registerMetaEconomyApi } from '../packages/server/src/metaEconomyApi';
+import { registerMatchSpeedupApi } from '../packages/server/src/matchSpeedup';
+import { MatchSovereignLedger } from '../packages/server/src/matchSovereigns';
 import { MemoryMetaEconomyStore, PostgresMetaEconomyStore, type MetaEconomyStore } from '../packages/server/src/metaEconomyStore';
 import { createMetaRewardDelivery } from '../packages/server/src/metaEconomyDelivery';
-import { commerceOffers } from '../packages/server/src/commerceCatalog';
+import { registerCommerceOffersRoute } from '../packages/server/src/commerceCatalog';
 import { registerMetaCommerce } from '../packages/server/src/metaCommerce';
 import { loadAvaMaps, loadDropTables, loadStarterArsenal, MODULE_MANIFEST_VERSION } from '../packages/server/src/scenario';
 import { skipIncompatibleMatch } from '../packages/server/src/matchRules';
@@ -1700,11 +1702,9 @@ const server = createMultiplayerServer({
       registerCorpMaterialsApi(app, new CorpMaterials({ store: metaEconomyStore, catalog: metaCatalog, corps: corpStore }), identifySession, process.env.CORPORATIONS_MAINTENANCE !== '1');
       registerMetaEconomyApi(app, { economy: metaEconomy, identify: identifySession, onChanged: refreshAccountArsenal,
         corpOf: (accountId) => corpStore.membershipOf(accountId) });
+      registerMatchSpeedupApi(app, { ledger: new MatchSovereignLedger(metaEconomyStore), identify: identifySession, seatOf: (id, login) => accountStore.seatOf(id, login), rooms: registry });
       registerMetaCommerce(app, metaEconomy, metaEconomyStore);
-      app.get('/commerce/offers', async (_request, reply) => {
-        reply.header('cache-control', 'no-store');
-        return { offers: commerceOffers() };
-      });
+      registerCommerceOffersRoute(app);
       registerMetaMarketApi(app, { market: metaMarket, identify: identifySession,
         onChanged: refreshAccountArsenal,
         canTrade: async (accountId) => (await commanderStore.xpOf(accountId)) >= metaCatalog.market.minimumAccountXp,
