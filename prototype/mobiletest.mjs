@@ -407,8 +407,9 @@ try {
   for (const route of ['/built', '/player']) {
     await p.goto(`http://127.0.0.1:${server.address().port}${route}`);
     await enterSkirmish(p, { tap: true });
-    assert(await p.locator('body.mobile-ui').count());
-    assert.equal(await p.locator('#purse .res').count(), 5);
+    // Вид телефона встаёт, когда партия уже отрисована, — кадром позже входа: ждём, а не снимаем.
+    await p.locator('body.mobile-ui').waitFor({ state: 'attached' });
+    await p.waitForFunction(() => document.querySelectorAll('#purse .res').length === 5);
   }
   const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   desktop.on('pageerror', (e) => errors.push(e.message));

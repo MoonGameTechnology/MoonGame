@@ -202,9 +202,29 @@ export async function pressSpeed(page, selector, { tap = false } = {}) {
   const press = (locator) => (tap ? locator.tap() : locator.click());
   const target = page.locator(selector);
   const toggle = page.locator('#phone-speed');
-  // Кнопка скорости появляется кадром позже входа в партию — ждём её или сам ряд.
-  await target.or(toggle).filter({ visible: true }).first().waitFor();
-  if (!(await target.isVisible())) await press(toggle);
+  // На телефоне (`tap`) решает раскрытость ряда (класс `phone-speed-open` на `body`), а не
+  // мгновенная видимость кнопки. Вид телефона (`mobile-ui`) встаёт, только когда партия уже
+  // отрисована, а до того полоса стоит по-настольному и видна: снимок того кадра говорил «видна»,
+  // и робот жал кнопку, которую тут же прятали. Поэтому сперва ждём вид телефона. Нажатие кнопки
+  // скорости повторяется, пока ряд не раскроется (до трёх раз): эмулятор телефона изредка теряет
+  // касание целиком — в документ не приходит ни одного события.
+  const phone =
+    tap &&
+    (await page
+      .waitForFunction(() => document.body.classList.contains('mobile-ui'), null, { timeout: 5000 })
+      .then(
+        () => true,
+        () => false,
+      ));
+  if (phone) {
+    const open = () => document.body.classList.contains('phone-speed-open');
+    // Кнопка скорости появляется кадром позже входа в партию.
+    await toggle.waitFor({ state: 'visible' });
+    for (let attempt = 0; attempt < 3 && !(await page.evaluate(open)); attempt++) {
+      await press(toggle);
+      await page.waitForFunction(open, null, { timeout: 2000 }).catch(() => {});
+    }
+  }
   await press(target);
 }
 
