@@ -8,6 +8,7 @@ function setup() {
   const state = newGame();
   const world = Object.values(state.planets).find((p) => p.owner === 'p1')!;
   const picker = { tagName: 'SELECT' };
+  let listOpen = false;
   const document = { activeElement: null as typeof picker | null };
   const stock = { innerHTML: '' };
   let queueHtml = '';
@@ -21,7 +22,13 @@ function setup() {
     classList: { contains: () => true },
     contains: (node: unknown) => node === picker,
     querySelector: (selector: string) =>
-      selector === '.pw-stock' ? stock : selector === '#cn-queue' ? queue : null,
+      selector === '.pw-stock'
+        ? stock
+        : selector === '#cn-queue'
+          ? queue
+          : selector === 'select[data-gsel-open]' && listOpen
+            ? picker
+            : null,
     querySelectorAll: () => [],
     addEventListener: (type: string, listener: () => void) => {
       handlers[type] = listener;
@@ -51,7 +58,11 @@ function setup() {
   });
   refresh.painted();
   queue.innerHTML = refresh.queueHtml();
+  const openList = (open: boolean): void => {
+    listOpen = open;
+  };
   return {
+    openList,
     state,
     world,
     document,
@@ -105,6 +116,17 @@ it('does not replace a focused native picker on the hero tab either', () => {
   expect(f.stock.innerHTML).not.toBe('');
   f.document.activeElement = null;
   f.refresh.refreshHeroes();
+  expect(f.paints()).toBe(1);
+});
+
+it('the game list open over the world picker defers the refresh like a focused select', () => {
+  const f = setup();
+  f.state.players.p1!.resources.credits = 12345;
+  f.openList(true);
+  f.refresh.refreshQueue();
+  expect(f.paints()).toBe(0);
+  f.openList(false);
+  f.refresh.refreshQueue();
   expect(f.paints()).toBe(1);
 });
 

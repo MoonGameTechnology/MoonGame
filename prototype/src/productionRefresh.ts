@@ -36,10 +36,11 @@ function availability(host: ProductionRefreshHost): string {
 }
 
 /** A full repaint disconnects the native select and dismisses its open popup.
- * Keep it mounted until change or blur; only passive refreshes are deferred. */
+ * Keep it mounted until change or blur; only passive refreshes are deferred. The game's own
+ * list (`gameSelect.ts`) keeps the focus on its rows and marks the select `data-gsel-open`. */
 function selecting(root: HTMLElement): boolean {
   const active = root.ownerDocument?.activeElement;
-  return active?.tagName === 'SELECT' && root.contains(active);
+  return (active?.tagName === 'SELECT' && root.contains(active)) || !!root.querySelector('select[data-gsel-open]');
 }
 
 /** Periodic stock, queue and hero updates share the same stable window root. */
