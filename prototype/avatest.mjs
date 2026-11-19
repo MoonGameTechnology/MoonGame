@@ -232,7 +232,7 @@ try {
   const peace = await request(`/ava-war/${battle}`, { token: alpha.token });
   assert.equal(peace.phase, 'peace');
   assert.equal(peace.side, 'challenger');
-  assert.equal(peace.scoreGoal, 3080); // team-2v2: 2 200 × 2 seats × 0.7
+  assert.equal(peace.scoreGoal, 2926); // team-2v2: 2 090 × 2 seats × 0.7
   assert.deepEqual(peace.mine.map((row) => row.login).sort(), [alpha.login, charlie.login].sort());
   assert.deepEqual(peace.rivals, { count: 1 });
   assert.equal((await request(`/ava-war/${battle}`, { token: outsider.token }, 403)).error, 'E_FORBIDDEN');
