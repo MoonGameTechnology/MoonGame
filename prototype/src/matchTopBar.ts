@@ -19,7 +19,7 @@ import {
   UNCONTROLLED_OUTPUT,
 } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
-import { capitalProgress } from '../../decisions/capitalProgress';
+import { capitalProgress, provinceShare } from '../../decisions/capitalProgress';
 import { controlTip, type ControlCounterView } from '../../decisions/controlCounter';
 import { allyPanelView } from '../../decisions/allyPanel';
 import { devourSieges } from '../../decisions/devourSiege';
@@ -797,9 +797,19 @@ export function initTopBar(host: TopBarHost): void {
     if (!(ev.target as Element).closest('.dstat')) return;
     const s = game.world();
     const ME = game.me();
-    if (ctx(s.time, s).config?.victory?.capitalCapture) {
+    const victory = ctx(s.time, s).config?.victory;
+    if (victory?.capitalCapture) {
       const capitals = capitalProgress(s, ME);
-      note(t('hud.capital.tip', { n: capitals.captured, total: capitals.total }));
+      // Доля карты — вторая дорога к победе, если карта её называет (дуэль — 90%).
+      const share = victory.dominationPercent;
+      note(share === undefined
+        ? t('hud.capital.tip', { n: capitals.captured, total: capitals.total })
+        : t('hud.capital.tip-share', {
+          n: capitals.captured,
+          total: capitals.total,
+          p: Math.round(share * 100),
+          m: Math.floor(provinceShare(s, ME, data) * 100),
+        }));
       return;
     }
     const mine = Object.values(s.planets).filter((p) => p.owner === ME);

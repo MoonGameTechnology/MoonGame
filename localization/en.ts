@@ -4255,6 +4255,7 @@ export const en: Record<string, string> = {
     'Under control: {n} of {limit} {limit|planet|planets}, {over} beyond control. Planets past the limit yield {p}% of their resources and build no units. Command research raises the limit.',
   'hud.capital.progress': '♜ {n}/{total}',
   'hud.capital.tip': 'Capture every enemy capital ({n}/{total}). Starting capitals are fixed.',
+  'hud.capital.tip-share': 'Capture every enemy capital ({n}/{total}) or {p}% of the provinces (you hold {m}%). Starting capitals are fixed.',
   'hud.score.tip':
     '✦ {score}/{limit}: a world — 50, any other province — 10, buildings add per level (you hold {w} {w|world|worlds}, {s} {s|province|provinces}). Win at ✦ {limit}, by eliminating rivals, or by domination.',
 

@@ -27,14 +27,14 @@ describe('victory score limit', () => {
     expect(SCORE_LIMIT).toBeLessThan(0.6 * 2410); // 2410 = board base points
   });
 
-  it('duel and four-player FFA: the points of the whole map and an 80% capture (BAL-16)', () => {
-    for (const [mapId, scoreLimit] of [
-      ['duel-1', 910],
-      ['ffa-4', 840],
+  it('duel and four-player FFA: the points of the whole map and their capture share (BAL-16)', () => {
+    for (const [mapId, scoreLimit, dominationPercent] of [
+      ['duel-1', 910, 0.9], // the duel plays for capitals; 90% is its second way (2026-11-20)
+      ['ffa-4', 840, 0.8],
     ] as const) {
       expect(ctx(0, { mapId }).config?.victory).toMatchObject({
         scoreLimit,
-        dominationPercent: 0.8,
+        dominationPercent,
       });
     }
     expect(ctx(0, { mapId: 'team-2v2' }).config?.victory?.dominationPercent).toBeUndefined();
