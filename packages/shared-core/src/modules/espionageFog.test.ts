@@ -214,6 +214,32 @@ describe('SPY-24 — an order does not give away the owner of a world in the fog
       scouted: { p1: { B: { owner: 'p2', at: 0 } }, p2: { H: { owner: 'p1', at: 0 } } },
     };
     expect(visibleState(s, 'p1', data).scouted).toEqual({ p1: { B: { owner: 'p2', at: 0 } } });
-    expect(visibleState({ ...s, scouted: { p2: s.scouted.p2 } }, 'p1', data).scouted).toBeUndefined();
+    expect(
+      visibleState({ ...s, scouted: { p2: s.scouted.p2 } }, 'p1', data).scouted,
+    ).toBeUndefined();
+  });
+
+  it('the projection shows the owner of the world the spy stands on, and only the owner', () => {
+    // SPM-1 (owner's report 2026-11-20): a network client reads the projection, not the
+    // world. Its spy waiting on B must see B as p2's there too, or the window greys every
+    // deed against the world the spy has just reached as «nobody's».
+    const s = fogged();
+    s.planets.B = { ...s.planets.B!, resources: { credits: 100 } };
+    const there = ok(kernel().applyAction(s, order('B', 'relocate'), ctx(0))).state;
+    expect(there.spies?.p1?.find((x) => x.location === 'B')?.state).toBe('wait');
+    const seen = visibleState(there, 'p1', data);
+    expect(seen.planets.B?.owner).toBe('p2');
+    expect(seen.planets.B?.resources).toEqual({});
+    expect(spyKnownOwner(seen, 'p1', 'B', new Set())).toEqual({ owner: 'p2' });
+    expect(seen.planets.N?.owner).toBeNull();
+    // On its way the spy stands nowhere yet: the world stays in the fog.
+    const flying = ok(
+      createKernel([espionageModule]).applyAction(s, order('B', 'relocate'), ctx(0)),
+    );
+    expect(flying.state.spies?.p1?.find((x) => x.location === 'B')?.state).toBe('travel');
+    expect(visibleState(flying.state, 'p1', data).planets.B?.owner).toBeNull();
+    // Another player's spy standing there opens nothing to p1.
+    const theirs = visibleState(there, 'p2', data);
+    expect(theirs.planets.N?.owner).toBeNull();
   });
 });
