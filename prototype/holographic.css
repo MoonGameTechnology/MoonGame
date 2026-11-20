@@ -213,7 +213,9 @@ body.holo-ui #market .mkbox,body.holo-ui #logwin .lwbox,body.holo-ui #diplo .dpb
   width:min(740px,calc(var(--vpw) * .72));max-height:calc(var(--vph) - var(--tbh) - 176px);
 }
 /* TT-5: дерево технологий шире и выше прочих окон — ветка видна целиком. */
-body.holo-ui #tech .twbox{width:min(980px,calc(var(--vpw) * .9));height:calc(var(--vph) - var(--tbh) - 150px);max-height:none;}
+body.holo-ui #tech .twbox{width:min(980px,calc(var(--vpw) * .9));height:calc(var(--vph) - var(--tbh) - 100px);max-height:none;}
+/* Три ряда ветки помещаются и на 1366×768: окно до низа экрана, без лишнего отступа под деревом. */
+body.holo-ui #tech .tt-tree{padding-bottom:8px;}
 body.holo-ui #constructor .cnbox{width:min(960px,calc(var(--vpw) * .78));max-height:calc(var(--vph) - var(--tbh) - 176px);}
 body.holo-ui :is(.lw-head,.cn-head,.mk-head){min-height:48px;padding:12px 16px;background:rgba(14,40,54,.25);}
 body.holo-ui :is(.lw-head,.cn-head,.mk-head) b{font-size:14px;}
