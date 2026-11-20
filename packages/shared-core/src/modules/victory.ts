@@ -373,6 +373,45 @@ function endOnSessionCap(
   }
 }
 
+/**
+ * Domination: hold a share of the CAPTURABLE provinces. The denominator counts only
+ * ownable territory — non-capturable void/empty/debris nodes (the bulk of a
+ * post-vision-rework map) must not dilute the share, or 60% becomes unreachable. One
+ * pass counts the denominator and each owner's holdings (O(planets), not O(players ×
+ * planets) — evaluateVictory runs on every time.advanced span).
+ *
+ * With a threshold ≤ 50% two units can cross it in the SAME span — the old `find` on the
+ * sorted id list crowned the alphabetically-first one. Domination means holding MORE than
+ * every rival: the crown goes to the strict leader among the qualifiers; a dead-equal
+ * share keeps the match running. Returns whether the match ended.
+ */
+function endOnDomination(
+  h: HandlerContext,
+  scores: Record<PlayerId, MatchScore>,
+  units: readonly PlayerId[][],
+  dominationPercent: number,
+  fixedSides: boolean,
+): boolean {
+  let capturableCount = 0;
+  const ownedCapturable = new Map<PlayerId, number>();
+  for (const p of recordValues(h.state.planets)) {
+    if (!isCapturable(h.ctx.data, p) || isForkSite(p)) continue;
+    capturableCount += 1;
+    if (p.owner !== null) ownedCapturable.set(p.owner, (ownedCapturable.get(p.owner) ?? 0) + 1);
+  }
+  if (capturableCount === 0 || !(dominationPercent > 0)) return false;
+  const holdings = (unit: PlayerId[]): number =>
+    unit.reduce((sum, id) => sum + (ownedCapturable.get(id) ?? 0), 0);
+  const qualified = units.filter((unit) => holdings(unit) / capturableCount >= dominationPercent);
+  if (qualified.length === 0) return false;
+  const best = Math.max(...qualified.map(holdings));
+  const leaders = qualified.filter((unit) => holdings(unit) === best);
+  if (leaders.length !== 1) return false;
+  const unit = leaders[0]!;
+  endMatch(h, highestScore(scores, unit) ?? unit[0]!, 'domination', fixedSides ? unit : undefined);
+  return true;
+}
+
 function evaluateVictory(h: HandlerContext): void {
   if (h.state.match.status === 'ended') {
     return;
@@ -488,8 +527,19 @@ function evaluateVictory(h: HandlerContext): void {
     eliminateLandless(h, scores, activeBefore);
     const result = capitalVictoryStatus(h.state, h.ctx.config.modeId);
     h.state.match.capitalObjectives = result.objectives;
-    if (result.winner)
+    if (result.winner) {
       endMatch(h, highestScore(scores, result.winner) ?? result.winner[0]!, 'capital-capture', result.winner);
+      return;
+    }
+    // A capital match ends on capitals, or — where the map or mode names a share
+    // explicitly (owner 2026-11-20: duel, 90%) — on holding that share of the map. The
+    // core's default share does not apply here: a capital mode without it races capitals only.
+    const share = h.ctx.config?.victory?.dominationPercent;
+    if (share !== undefined) {
+      const active = playerIds.filter((id) => h.state.players[id]?.status === 'active');
+      const sides = fixedVictoryUnits(h, active);
+      endOnDomination(h, scores, sides ?? active.map((id) => [id]), share, sides !== undefined);
+    }
     return;
   }
 
@@ -544,38 +594,8 @@ function evaluateVictory(h: HandlerContext): void {
     return;
   }
 
-  // Domination: hold a share of the CAPTURABLE provinces. The denominator counts
-  // only ownable territory — non-capturable void/empty/debris nodes (the bulk of a
-  // post-vision-rework map) must not dilute the share, or 60% becomes unreachable.
-  // One pass counts the denominator and each owner's holdings (O(planets), not
-  // O(players × planets) — evaluateVictory runs on every time.advanced span).
-  let capturableCount = 0;
-  const ownedCapturable = new Map<PlayerId, number>();
-  for (const p of recordValues(h.state.planets)) {
-    if (!isCapturable(h.ctx.data, p) || isForkSite(p)) continue;
-    capturableCount += 1;
-    if (p.owner !== null) ownedCapturable.set(p.owner, (ownedCapturable.get(p.owner) ?? 0) + 1);
-  }
-  const dominationPercent = rules.dominationPercent;
-  if (capturableCount > 0 && dominationPercent > 0) {
-    // With a threshold ≤ 50% two players can cross it in the SAME span — the old
-    // `find` on the sorted id list crowned the alphabetically-first one. Domination
-    // means holding MORE than every rival: the crown goes to the strict leader
-    // among the qualifiers; a dead-equal share keeps the match running.
-    const units = fixedSides ?? active.map((id) => [id]);
-    const holdings = (unit: PlayerId[]): number =>
-      unit.reduce((sum, id) => sum + (ownedCapturable.get(id) ?? 0), 0);
-    const qualified = units.filter((unit) => holdings(unit) / capturableCount >= dominationPercent);
-    if (qualified.length > 0) {
-      const best = Math.max(...qualified.map(holdings));
-      const leaders = qualified.filter((unit) => holdings(unit) === best);
-      if (leaders.length === 1) {
-        const unit = leaders[0]!;
-        endMatch(h, highestScore(scores, unit) ?? unit[0]!, 'domination', fixedSides ? unit : undefined);
-        return;
-      }
-    }
-  }
+  if (endOnDomination(h, scores, fixedSides ?? active.map((id) => [id]), rules.dominationPercent, fixedSides !== undefined))
+    return;
 
   // Score win — the genre's core race. 600 is the solo threshold (GDD §3.2); on by
   // default so a match without explicit config still has a points victory. A
@@ -622,7 +642,9 @@ export const victoryModule: GameModule = {
   // 1.8.0: последний союз в фиксированном 2v2 побеждает совместно.
   // 1.9.0: fixed teams use the persisted roster and the resolved mode for every PvP ending.
   // 1.10.0: бой за планету игрока: победителю +40, проигравшему −5% его счёта (BAL-16).
-  version: '1.11.0',
+  // 1.12.0: партия на столицы кончается и захватом доли карты, если карта или режим
+  //         называют долю явно (владелец 2026-11-20: дуэль — 90%).
+  version: '1.12.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));

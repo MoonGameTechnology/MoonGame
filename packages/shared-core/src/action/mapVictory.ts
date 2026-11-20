@@ -34,8 +34,10 @@ export const MAP_SCORE_LIMITS = {
 } as const;
 
 /** Captured share of provinces that wins at once (BAL-16, same resolution): 80% instead of
- *  the core's 60%, or capture ended the duel on day 4, before any battle. */
-const MAP_DOMINATION_PERCENT: Readonly<Record<string, number>> = { 'duel-1': 0.8, 'ffa-4': 0.8 };
+ *  the core's 60%, or capture ended the duel on day 4, before any battle. The duel plays
+ *  for capitals (`capital_duel`); 90% of the map is its second way to win (owner
+ *  2026-11-20). */
+const MAP_DOMINATION_PERCENT: Readonly<Record<string, number>> = { 'duel-1': 0.9, 'ffa-4': 0.8 };
 
 /** The victory rules a match on this map plays; `undefined` for a map outside the table,
  *  which keeps its mode's preset and the core's rules. */

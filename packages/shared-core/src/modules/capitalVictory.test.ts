@@ -23,7 +23,6 @@ const config: MatchConfig = {
   victory: {
     capitalCapture: true,
     scoreLimit: 1,
-    dominationPercent: 0.01,
     endsAt: 1,
   },
 };
@@ -57,6 +56,12 @@ function world(team = false): GameState {
     };
   }
   if (team) s.modeId = 'team_2v2';
+  return s;
+}
+/** `n` more provinces held by p1: with the two capitals the map has `n + 2`. */
+function withSpares(s: GameState, n: number): GameState {
+  for (let i = 0; i < n; i++)
+    s.planets[`spare${i}`] = { ...s.planets.home1!, id: `spare${i}`, position: { x: 10 + i, y: 5 } };
   return s;
 }
 function tick(s: GameState, now = 2): GameState {
@@ -119,6 +124,25 @@ describe('capital-only victory', () => {
     const s = world();
     s.match.battlePoints = { p1: 100000 };
     expect(tick(s).match.status).toBe('ongoing');
+  });
+  it('a capital mode without its own share ignores domination: 9 of 10 provinces is not a win', () => {
+    const s = withSpares(world(), 8);
+    expect(tick(s).match.status).toBe('ongoing');
+  });
+  it('a share named by the map or mode is a second way to win (owner 2026-11-20: duel, 90%)', () => {
+    const tickAt = (state: GameState, share: number) => {
+      const r = kernel.advanceTo(state, { now: 2, data, config: { ...config, victory: { ...config.victory, dominationPercent: share } } });
+      if (!r.ok) throw new Error(r.code);
+      return r.state;
+    };
+    // 9 of 10 provinces with the rival capital still standing — 90% wins on domination.
+    expect(tickAt(withSpares(world(), 8), 0.9).match).toMatchObject({
+      status: 'ended', winner: 'p1', reason: 'domination',
+    });
+    // 8 of 10 — short of 90%: the match goes on, capitals still decide.
+    const short = withSpares(world(), 8);
+    short.planets.spare7!.owner = null;
+    expect(tickAt(short, 0.9).match.status).toBe('ongoing');
   });
   it('ends a duel at capture, with a public objective and the capital reason', () => {
     const s = world();

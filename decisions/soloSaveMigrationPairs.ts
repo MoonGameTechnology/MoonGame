@@ -482,6 +482,10 @@ export const RESOURCE_PURCHASE_SOLO_MIGRATION = after(CELESTIAL_RINGS_SOLO_MIGRA
  *  world plays on unchanged until such a flight. */
 export const FORTRESS_SKY_SOLO_MIGRATION = after(RESOURCE_PURCHASE_SOLO_MIGRATION, { toRules: '1b308c299ad835' });
 
+/** Rules only — `victory` 1.12.0: a capital match also ends on the share of the map its map
+ *  or mode names (the duel, 90%). A saved duel short of that share plays on unchanged. */
+export const CAPITAL_SHARE_SOLO_MIGRATION = after(FORTRESS_SKY_SOLO_MIGRATION, { toRules: '1aa681c64bbe8f' });
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -527,4 +531,5 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   CELESTIAL_RINGS_SOLO_MIGRATION,
   RESOURCE_PURCHASE_SOLO_MIGRATION,
   FORTRESS_SKY_SOLO_MIGRATION,
+  CAPITAL_SHARE_SOLO_MIGRATION,
 ];
