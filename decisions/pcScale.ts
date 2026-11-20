@@ -57,9 +57,9 @@ export function pcScale(width: number, height: number, userPct = 100): number {
   return Math.round(zoom * 1000) / 1000;
 }
 
-/** Пороги узких раскладок консоли в px раскладки (правило 6): классы `holo-w1200` … `holo-h650`. */
+/** Пороги узких раскладок консоли в px раскладки (правило 6): классы `holo-w1200` … `holo-h650`; `holo-h800` — ноутбук 1366×768 при 100 %. */
 export const NARROW_LAYOUT_WIDTHS = [1200, 1100, 1050, 980, 900] as const;
-export const SHORT_LAYOUT_HEIGHTS = [760, 650] as const;
+export const SHORT_LAYOUT_HEIGHTS = [800, 760, 650] as const;
 
 /**
  * Узкие раскладки для окна `width × height` (CSS px) при зуме слоёв `zoom`: класс `body` →

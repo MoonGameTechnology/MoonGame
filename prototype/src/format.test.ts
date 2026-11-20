@@ -180,7 +180,7 @@ describe('format — имена и время', () => {
     // ключ строится из имени, поэтому подчёркивание обязано стать пробелом:
     // 'shuttle_carrier' → 'shuttle carrier' → data.shuttle-carrier
     expect(displayUnit('shuttle_carrier')).toBe('Носитель');
-    expect(displayUnit('cruiser')).toBe('крейсер');
+    expect(displayUnit('cruiser')).toBe('Крейсер');
   });
 
   it('buildingName берёт имя из данных, а без него — сам id (fail-soft)', () => {

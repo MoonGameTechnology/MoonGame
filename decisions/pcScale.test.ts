@@ -72,7 +72,7 @@ describe('узкие раскладки под зумом (UIX-2.2)', () => {
     for (const w of [720, 899, 900, 901, 980, 1050, 1100, 1199, 1200, 1201, 1366])
       for (const n of NARROW_LAYOUT_WIDTHS)
         expect(narrowLayouts(w, 900, 1)[`holo-w${n}`]).toBe(w <= n);
-    for (const h of [520, 649, 650, 651, 760, 761])
+    for (const h of [520, 649, 650, 651, 760, 761, 800, 801])
       for (const n of SHORT_LAYOUT_HEIGHTS)
         expect(narrowLayouts(1366, h, 1)[`holo-h${n}`]).toBe(h <= n);
   });
@@ -84,6 +84,7 @@ describe('узкие раскладки под зумом (UIX-2.2)', () => {
       'holo-w1100',
       'holo-w1050',
       'holo-w980',
+      'holo-h800',
       'holo-h760',
       'holo-h650',
     ]);
@@ -94,6 +95,7 @@ describe('узкие раскладки под зумом (UIX-2.2)', () => {
       'holo-w1200',
       'holo-w1100',
       'holo-w1050',
+      'holo-h800',
       'holo-h760',
       'holo-h650',
     ]);

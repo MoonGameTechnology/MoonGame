@@ -461,9 +461,13 @@ export function drawRadarRange(now: number): void {
   // Радиус — ОДНО число, а не пара полуосей: проекция равномерна по осям, это обещание
   // камеры (`mapRadius.ts`, правило 2). Эллипс здесь обещал неравномерность, которой нет.
   const radiusPx = (rr: number): number => worldDist(rr);
+  // Подписи колец — над кольцом, по центру: справа от мира, в строке его имени, они
+  // наезжали на имя. На мелком масштабе кольцо меньше подписи — тогда подписи нет: оба
+  // числа и так стоят в досье выделенного мира (аудит интерфейса 2026-11-20).
+  const MIN_LABEL_RING = 48;
   cx.save();
   cx.shadowColor = '#5ff0c0';
-  cx.textAlign = 'left';
+  cx.textAlign = 'center';
   cx.font = '700 10px ui-monospace,Menlo,monospace';
 
   // outer — signature reach (coarse blips in fog): «засечка», как в досье радара
@@ -479,7 +483,7 @@ export function drawRadarRange(now: number): void {
   cx.shadowBlur = fxBlur(2);
   cx.stroke();
   cx.fillStyle = rgba('#aef6e6', 0.85);
-  cx.fillText(t('map.radar.detect', { n: reach }), c.x + o + 7, c.y + 3);
+  if (o >= MIN_LABEL_RING) cx.fillText(t('map.radar.detect', { n: reach }), c.x, c.y - o - 6);
 
   // inner — full-reveal reach (contacts fully identified): «опознание»
   const inner = rings.reveal; // та же доля, что у сводного покрытия (REFM-63, правило 4)
@@ -494,6 +498,7 @@ export function drawRadarRange(now: number): void {
   cx.shadowBlur = fxBlur(3);
   cx.stroke();
   cx.fillStyle = rgba('#aef6e6', 0.9);
-  cx.fillText(t('map.radar.identify', { n: Math.round(inner) }), c.x + i + 7, c.y - 7);
+  if (i >= MIN_LABEL_RING && o - i >= 16)
+    cx.fillText(t('map.radar.identify', { n: Math.round(inner) }), c.x, c.y - i - 6);
   cx.restore();
 }

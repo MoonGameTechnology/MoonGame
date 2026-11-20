@@ -25,7 +25,7 @@ function openEditor(root: HTMLElement, template?: BuildTemplate, deletion?: stri
   const heading = template ? t('yard.tpl.save') : t('production.template-delete');
   dialog.setAttribute('aria-label', heading);
   dialog.innerHTML =
-    `<header><b></b><button class="btn-x" data-pw-template-close aria-label="${t('production.fitting-close')}">×</button></header>` +
+    `<header><b></b><button class="btn-x" data-pw-template-close aria-label="${t('production.fitting-close')}">✕</button></header>` +
     (template
       ? `<label>${t('production.template-name')}<input data-pw-template-name maxlength="${MAX_TEMPLATE_NAME}" autocomplete="off"></label><p class="pw-template-error" role="alert"></p>`
       : `<p>${t('production.template-delete-question')}</p>`) +

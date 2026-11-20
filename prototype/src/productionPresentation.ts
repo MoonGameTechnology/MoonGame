@@ -5,7 +5,7 @@ import { t } from '../../localization/runtime';
 
 /** The catalog and the fitting sheet share the existing order controller. */
 export function fittingSheet(content: string, title: string, ground = false): string {
-  return `<div class="pw-fitting-backdrop"><section class="pw-fitting-dialog" role="dialog" aria-modal="true" aria-label="${t('production.fitting')}"><header><b>${t(ground ? 'production.mobilization' : 'production.fitting')} · ${esc(title)}</b><button class="btn-x" data-pw-fit-close aria-label="${t('production.fitting-close')}">×</button></header><div class="pw-fitting-body">${content}</div><footer class="pw-fitting-footer"></footer></section></div>`;
+  return `<div class="pw-fitting-backdrop"><section class="pw-fitting-dialog" role="dialog" aria-modal="true" aria-label="${t('production.fitting')}"><header><b>${t(ground ? 'production.mobilization' : 'production.fitting')} · ${esc(title)}</b><button class="btn-x" data-pw-fit-close aria-label="${t('production.fitting-close')}">✕</button></header><div class="pw-fitting-body">${content}</div><footer class="pw-fitting-footer"></footer></section></div>`;
 }
 
 /** Preserve disclosure identity when another pane inserts/removes its own details. */
@@ -70,7 +70,7 @@ export function presentProduction(root: HTMLElement): void {
   if (templates) {
     const picker = root.ownerDocument.createElement('div');
     picker.className = 'pw-template-picker';
-    picker.innerHTML = `<section role="dialog" aria-modal="true" aria-label="${t('yard.tpl.title')}"><header><b>${t('yard.tpl.title')}</b><button class="btn-x" data-cntpl aria-label="${t('production.fitting-close')}">×</button></header></section>`;
+    picker.innerHTML = `<section role="dialog" aria-modal="true" aria-label="${t('yard.tpl.title')}"><header><b>${t('yard.tpl.title')}</b><button class="btn-x" data-cntpl aria-label="${t('production.fitting-close')}">✕</button></header></section>`;
     picker.firstElementChild!.append(templates);
     root.querySelector('.cnbox')!.append(picker);
     picker.querySelector<HTMLElement>('[data-cntpl]')?.focus();

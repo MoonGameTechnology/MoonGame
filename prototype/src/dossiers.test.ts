@@ -162,7 +162,7 @@ describe('dossiers — карточка стройки (порог 50%)', () => 
   it('заказ юнитов озаглавлен «сколько× кого»', () => {
     const d = taskDossier(s, homeId, 'unit', undefined, 'cruiser', 3, undefined, 0, 1);
     expect(d.name).toContain('3×');
-    expect(d.name).toContain('крейсер');
+    expect(d.name).toContain('Крейсер');
   });
 
   it('незнакомое здание и пустой заказ отдают заголовок, а не падают', () => {

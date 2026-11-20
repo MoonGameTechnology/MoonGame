@@ -19,17 +19,17 @@ export const STAT_KEY: Record<string, string> = {
   radarRange: 'stat.radar',
   sightRange: 'stat.sight',
   pointDefense: 'stat.point-defense',
-  siegeDamage: 'loadout.stat.siege',
-  shuttleDamage: 'loadout.stat.air-damage',
-  cloak: 'loadout.stat.cloak',
+  siegeDamage: 'stat.siege',
+  shuttleDamage: 'stat.air-damage',
+  cloak: 'stat.cloak',
   // Доли за игровой час (`perHourShare.ts`): без подписи чип читался бы «+0.05 hullRepair».
-  shieldRegen: 'loadout.stat.shield-regen',
-  hullRepair: 'loadout.stat.hull-repair',
-  retreatPull: 'loadout.stat.retreat-pull',
-  salvageBonus: 'loadout.stat.salvage',
-  fleetHullRepair: 'loadout.stat.fleet-repair',
-  mineCharge: 'loadout.stat.mine-charge',
-  mineHit: 'loadout.stat.mine-hit',
+  shieldRegen: 'stat.shield-regen',
+  hullRepair: 'stat.hull-repair',
+  retreatPull: 'stat.retreat-pull',
+  salvageBonus: 'stat.salvage',
+  fleetHullRepair: 'stat.fleet-repair',
+  mineCharge: 'stat.mine-charge',
+  mineHit: 'stat.mine-hit',
 };
 
 /** Число стата без знака: доля в час — процентом («5%/ч»), прочее — до десятых. */

@@ -266,10 +266,10 @@ export function openCodexHub(): void {
   const box = document.getElementById('codexhub');
   if (!box) return;
   box.innerHTML =
-    `<div class="chbox"><div class="ch-head"><span class="cx-ic">?</span><b>${t('codex.hub.title')}</b></div>` +
+    `<div class="chbox"><div class="ch-head"><span class="cx-ic">?</span><b>${t('codex.hub.title')}</b>` +
+    `<button class="ch-close btn-x" id="ch-close" type="button" aria-label="${t('card.close')}">✕</button></div>` +
     `<input id="ch-search" class="ch-search" type="text" placeholder="${t('codex.hub.search.ph')}" aria-label="${t('codex.hub.search.aria')}">` +
-    `<div class="ch-body" id="ch-results"></div>` +
-    `<button class="cx-close" id="ch-close">${t('codex.hub.close')}</button></div>`;
+    `<div class="ch-body" id="ch-results"></div></div>`;
   const input = document.getElementById('ch-search') as HTMLInputElement | null;
   if (input) input.oninput = () => renderCodexResults(input.value);
   renderCodexResults('');
@@ -291,6 +291,13 @@ function showIntro(card: IntroCard): void {
   el.innerHTML =
     `<div class="inbox"><span class="in-ic">✦</span><div class="in-text"><b>${esc(t(card.titleKey))}</b>` +
     `<span>${esc(t(card.bodyKey))}</span></div><button class="in-ok">${t('onb.intro.ok')}</button></div>`;
+  // В хабе подсказка встаёт над его нижними вкладками: иначе первое нажатие по вкладке
+  // уходит в подсказку и только убирает её (аудит интерфейса 2026-11-20).
+  const nav = document.body.classList.contains('hub-open')
+    ? document.querySelector<HTMLElement>('#hub .hub-nav')
+    : null;
+  const navTop = nav?.offsetParent ? nav.getBoundingClientRect().top : 0;
+  if (el.style) el.style.paddingBottom = navTop > 0 ? `${Math.ceil(window.innerHeight - navTop + 8)}px` : '';
   el.classList.add('show');
 }
 // Panel-open hook: show the intro for `id` once (unless already seen / a veteran).

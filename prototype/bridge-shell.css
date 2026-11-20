@@ -298,6 +298,11 @@ body.holo-ui:where(.holo-h760) #hub .hub-id { padding: 8px 16px; }
 body.holo-ui:where(.holo-h760) #hub .hub-nav { min-height: 52px; padding: 4px; }
 body.holo-ui:where(.holo-h760) #hub .hub-body { padding: 14px; }
 body.holo-ui:where(.holo-h760) #setup .smap { min-height: 200px; }
+/* Ноутбук 1366×768: темп партии не уходит под сгиб левой колонки — карта сжимается, а пояснение
+   к скорости остаётся подсказкой при наведении (аудит интерфейса 2026-11-20). */
+body.holo-ui:where(.holo-h800) #setup .sbox { height: calc(var(--vph) - 48px); }
+body.holo-ui:where(.holo-h800) #setup .smap { min-height: 120px; }
+body.holo-ui:where(.holo-h800) #setup .sspeedhint { display: none; }
 @media (prefers-reduced-motion: reduce) {
   body.holo-ui :is(#connect, #hub, #setup, #seatpick, #endscreen, #settings) *,
   body.holo-ui :is(#connect, #hub, #setup, #seatpick, #endscreen, #settings) *::before,

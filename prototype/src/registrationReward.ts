@@ -18,7 +18,7 @@ export function registrationRewardHtml(
   saving = false,
   notice = '',
 ): string {
-  return `<button type="button" class="rw-later btn-x" data-reward="later" aria-label="${esc(t('profile.reward.later'))}">×</button>
+  return `<button type="button" class="rw-later btn-x" data-reward="later" aria-label="${esc(t('profile.reward.later'))}">✕</button>
     <p class="rw-eyebrow">${esc(t('profile.medals'))}</p>
     <h2 id="registration-reward-title">${esc(t('profile.reward.title'))}</h2>
     <p class="rw-subtitle">${esc(t('profile.reward.subtitle'))}</p>

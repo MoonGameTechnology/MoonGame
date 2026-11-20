@@ -1,5 +1,6 @@
-/* Strategic phone screens share the existing controllers and action gates. */
-body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo) {
+/* Strategic phone screens share the existing controllers and action gates. «События» (#logwin)
+   открываются так же во весь экран, как «Производство» и «Наука» (аудит интерфейса 2026-11-20). */
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo, #logwin) {
   --dim: #9bb4c1;
   --cyan-dim: #73a9b7;
   inset: 0;
@@ -15,8 +16,8 @@ body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo) {
   -webkit-backdrop-filter: none;
 }
 body.mobile-ui
-  :is(#tech, #buildwin, #constructor, #market, #diplo)
-  > :is(.twbox, .cnbox, .mkbox, .dpbox) {
+  :is(#tech, #buildwin, #constructor, #market, #diplo, #logwin)
+  > :is(.twbox, .cnbox, .mkbox, .dpbox, .lwbox) {
   width: 100%;
   height: 100%;
   max-width: none;
@@ -28,33 +29,33 @@ body.mobile-ui
   box-shadow: inset 0 1px #b5e5f51a;
   overflow: hidden;
 }
-body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo) button {
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo, #logwin) button {
   min-height: 44px;
   min-width: 44px;
   touch-action: manipulation;
 }
-body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo) :is(input, select) {
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo, #logwin) :is(input, select) {
   min-height: 44px;
   max-width: 100%;
   font-size: 16px;
 }
 body.mobile-ui
-  :is(#tech, #buildwin, #constructor, #market, #diplo)
+  :is(#tech, #buildwin, #constructor, #market, #diplo, #logwin)
   :is(button, input, select):focus-visible {
   outline: 2px solid #b7efff;
   outline-offset: -3px;
 }
-body.mobile-ui :is(#tech, #buildwin, #constructor, #market) :is(.lw-head, .cn-head) {
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #logwin) :is(.lw-head, .cn-head) {
   flex: none;
   min-height: 58px;
   padding: 7px 12px;
   gap: 8px;
 }
-body.mobile-ui :is(#tech, #buildwin, #constructor, #market) :is(.lw-head, .cn-head) b {
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #logwin) :is(.lw-head, .cn-head) b {
   min-width: 0;
   font-size: var(--fs-body);
 }
-body.mobile-ui :is(.tw-close, .cn-close, .mk-close, .dp-close) {
+body.mobile-ui :is(.tw-close, .cn-close, .mk-close, .dp-close, #logwin .lw-close, #logwin .lw-recap) {
   width: 44px;
   height: 44px;
   flex: none;
@@ -160,8 +161,8 @@ body.mobile-ui #tech .tt-shade {
 }
 body.mobile-ui #tech .tt-qb,
 body.mobile-ui #tech .tt-qx { width: 44px; height: 44px; font-size: 12px; }
-body.mobile-ui #tech .tt-tabs { gap: 4px; padding: 9px 8px 7px; }
-body.mobile-ui #tech .tt-tab { min-width: 0; padding: 6px 2px 5px; gap: 3px; }
+body.mobile-ui #tech .tt-tabs { gap: 3px; padding: 9px 6px 7px; }
+body.mobile-ui #tech .tt-tab { min-width: 0; padding: 6px 0 5px; gap: 3px; }
 body.mobile-ui #tech .tt-tab svg { width: 20px; height: 20px; }
 body.mobile-ui #tech .tt-tname { font-size:var(--fs-caption); }
 body.mobile-ui #tech .tt-tname .full { display: none; }
@@ -170,7 +171,8 @@ body.mobile-ui #tech .tt-tprog { padding: 0 4px; }
 body.mobile-ui #tech .tt-cnt { display: none; }
 body.mobile-ui #tech .tt-tree { padding: 8px 8px 14px; }
 body.mobile-ui #tech .tt-row { gap: 8px; margin-bottom: 18px; }
-body.mobile-ui #tech .tt-item { width: 76px; padding: 7px 3px 6px; }
+/* Четыре темы в ряд на всю ширину листа: узкая плитка резала имена многоточием. */
+body.mobile-ui #tech .tt-item { width: calc((100% - 24px) / 4); max-width: 92px; padding: 7px 3px 6px; }
 body.mobile-ui #tech .tt-item b { font-size:var(--fs-caption); }
 body.mobile-ui #tech .tt-ico { width: 40px; height: 40px; }
 body.mobile-ui #tech .tt-mwin {

@@ -60,7 +60,7 @@ export function diploRosterHtml(view: RosterView): string {
       const badge = view.badge(row.id);
       const stance =
         row.stance === null
-          ? `<span class="dp-tag">${t('comms.you')}</span>`
+          ? '<span class="dp-tag"></span>' // «Вы» уже стоит в подписи имени
           : `<span class="dp-stance" style="color:${view.stanceCol(row.stance)};border-color:${view.stanceCol(row.stance)}">${view.stanceLabel(row.stance)}</span>`;
       return (
         `<div class="dp-row${expanded ? ' open' : ''}${isMe ? ' me' : ''}" data-roster-seat="${esc(row.id)}"${isMe ? '' : ` data-seat="${esc(row.id)}"`}>` +

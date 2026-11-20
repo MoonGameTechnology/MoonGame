@@ -632,7 +632,7 @@ body:not(.mobile-ui) #dp-search::placeholder{color:transparent;}
 .dunit{display:flex;flex-direction:column;gap:3px;min-width:0;padding:0;background:none;border:0;color:inherit;font:inherit;
   text-align:left;cursor:pointer;}
 .dunit-t{display:flex;justify-content:space-between;gap:6px;font-size:var(--fs-body);}
-.dunit-t span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dunit-t span{min-width:0;overflow-wrap:break-word;} /* имя юнита целиком, в две строки при нужде (аудит 2026-11-20) */
 .dunit-t b{font-variant-numeric:tabular-nums;font-weight:600;}
 .dhp{height:4px;border-radius:2px;background:rgba(53,214,230,.15);overflow:hidden;}
 .dhp i{display:block;height:100%;background:var(--grn);}

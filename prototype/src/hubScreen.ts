@@ -241,6 +241,15 @@ export let friends: ReturnType<typeof initFriends> | null = null;
 
 export let rank: ReturnType<typeof initRank> | null = null;
 
+/** «Войти» с вкладки хаба: только на сервере с аккаунтами — ведёт на страницу входа. */
+const hubCanSignIn = (): boolean => !!game.resolveServer() && authMode === 'accounts';
+function hubSignIn(): void {
+  showHub(false);
+  game.showConnect(true);
+  showStage('welcome');
+  fillWelcome((readLocal('void.nick') ?? '').trim(), 'show');
+}
+
 // --- «Арсенал» — the account's persistent collection and its workshop (hub tab, ARS-5) ----
 // The tab itself lives in `arsenalScreen.ts` (REFM-5); here it gets its hooks. Cache key is
 // per callsign, like the meta store. `authorizedBase` encodes the tab's policy: it may reuse
@@ -507,6 +516,8 @@ export function initHubScreen(host: HubScreenHost): void {
     friends = initFriends({
       root: () => $('hp-friends'),
       authorizedBase: hubAuthorizedBase,
+      canSignIn: hubCanSignIn,
+      signIn: hubSignIn,
       openPlayer: (login) => profile?.open(login),
       myMatches: inviteTargets,
       joinMatch: joinByNumber,
@@ -520,6 +531,8 @@ export function initHubScreen(host: HubScreenHost): void {
     rank = initRank({
       root: () => $('hp-rank'),
       authorizedBase: hubAuthorizedBase,
+      canSignIn: hubCanSignIn,
+      signIn: hubSignIn,
       openPlayer: (login) => profile?.open(login),
     });
   if (!__SECTOR_ZERO_ONLY__)
@@ -532,13 +545,8 @@ export function initHubScreen(host: HubScreenHost): void {
       confirmed: (items) => (moduleRewards ??= createModuleRewards()).observe(items),
       openCodex,
       authorizedBase: hubAuthorizedBase,
-      canSignIn: () => !!game.resolveServer() && authMode === 'accounts',
-      signIn: () => {
-        showHub(false);
-        game.showConnect(true);
-        showStage('welcome');
-        fillWelcome((readLocal('void.nick') ?? '').trim(), 'show');
-      },
+      canSignIn: hubCanSignIn,
+      signIn: hubSignIn,
       openAuction: () => hubTab('auction'),
       warrants: () => metaMarket?.balance() ?? 0,
       openHeroMatch: () => hubTab('games'),
@@ -578,13 +586,8 @@ export function initHubScreen(host: HubScreenHost): void {
       sheet: () => $('shop-sheet'),
       narrow: () => $('hp-shop').clientWidth < SHOP_WIDE_MIN,
       authorizedBase: hubAuthorizedBase,
-      canSignIn: () => !!game.resolveServer() && authMode === 'accounts',
-      signIn: () => {
-        showHub(false);
-        game.showConnect(true);
-        showStage('welcome');
-        fillWelcome((readLocal('void.nick') ?? '').trim(), 'show');
-      },
+      canSignIn: hubCanSignIn,
+      signIn: hubSignIn,
       warrants: () => metaMarket?.balance() ?? 0,
       now: () => Date.now(),
       accountChanged: (view) => {
@@ -605,6 +608,8 @@ export function initHubScreen(host: HubScreenHost): void {
     metaEconomy = initMetaEconomy({
       root: () => $('hp-supply'),
       authorizedBase: hubAuthorizedBase,
+      canSignIn: hubCanSignIn,
+      signIn: hubSignIn,
       changed: async () => {
         await arsenal?.refresh();
         await metaMarket?.sync();
@@ -708,13 +713,8 @@ export function initHubScreen(host: HubScreenHost): void {
         root: () => $('hp-corp'),
         sheet: () => $('corp-sheet'),
         note: (text) => void (hubNote.textContent = text),
-        canSignIn: () => !!game.resolveServer() && authMode === 'accounts',
-        signIn: () => {
-          showHub(false);
-          game.showConnect(true);
-          showStage('welcome');
-          fillWelcome((readLocal('void.nick') ?? '').trim(), 'show');
-        },
+        canSignIn: hubCanSignIn,
+        signIn: hubSignIn,
         // CORP-14: стиль базы покупают в магазине, на вкладке «Стили».
         openShop: (style) => {
           shop?.show('styles', style);

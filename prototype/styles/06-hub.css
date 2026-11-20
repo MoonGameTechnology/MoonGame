@@ -699,6 +699,8 @@
 #hub .hub-empty{padding:54px 16px;text-align:center;color:var(--dim);font-size:14px;line-height:1.9;}
 #hub .hub-empty .he-ic{font-size:38px;color:var(--dim);display:block;margin-bottom:14px;
   text-shadow:0 0 16px rgba(53,214,230,.3);}
+#hub .hub-empty .he-sub{font-size:var(--fs-body);color:var(--dim);}
+#hub .hub-empty .he-signin{margin-top:14px;min-height:44px;padding:0 28px;}
 /* tile grid: auto-fill instead of a hard 1fr 1fr — phones still land on two columns,
    wider screens fill the row instead of stretching two giant tiles across it */
 #hub .hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px;}

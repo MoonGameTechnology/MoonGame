@@ -896,6 +896,9 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .pc-head .pc-dia{width:14px;height:14px;transform:rotate(45deg);flex:0 0 auto;border-radius:2px;}
 .pc-head b{font-size:16px;color:#eafffb;flex:1;}
 .pc-head .pc-tag{font-size:var(--fs-caption);color:var(--dim);border:1px solid var(--line);padding:2px 6px;border-radius:2px;}
+/* Крестик окон «Настройки» и «Справочник» — как у остальных окон: красная рамка в шапке
+   (аудит интерфейса 2026-11-20: было «Готово» и «Закрыть» внизу). */
+.set-close,#codexhub .ch-close{flex:0 0 auto;margin-left:auto;width:44px;height:44px;border-radius:6px;font-size:16px;}
 .pc-stats{display:flex;flex-direction:column;gap:3px;margin-bottom:10px;}
 .pc-sec{font-size:var(--fs-caption);color:var(--dim);margin:4px 0 6px;}
 .pc-row{display:flex;justify-content:space-between;gap:10px;font-size:var(--fs-body);padding:3px 0;border-bottom:1px solid rgba(14,59,64,.4);}
