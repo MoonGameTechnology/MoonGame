@@ -100,7 +100,10 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '118'; // TEC-4: порядок тот же; `speedup` 1.1.0 —
+export const MODULE_MANIFEST_VERSION = '119'; // Небо у крепостей: порядок тот же; `shuttle` 2.3.1 и
+// `missiles` 1.1.1 — площадка крепости на развилке или причале не клетка закрытого неба. Партия на 118
+// пускала авиацию над куском кольца у такой крепости, и реплей разошёлся бы.
+// export const MODULE_MANIFEST_VERSION = '118'; // TEC-4: порядок тот же; `speedup` 1.1.0 —
 // `resources.buy`: ресурсы за ◆ из того же бюджета K. Партия на 117 такого действия не знала.
 // export const MODULE_MANIFEST_VERSION = '117'; // TEC-3: ЧЛЕНСТВО — `speedup` 1.0.0 в самый конец;
 // `construction` 1.16.0 и `technology` 1.8.0 дают возможности `construction.hasten` и

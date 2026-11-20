@@ -469,6 +469,18 @@ export function divert(
     });
     return;
   }
+  landElsewhere(h, strike, from, failed, dest);
+}
+
+/** Сесть не дома, а на `dest` — громко (`shuttle.diverted`): общий хвост `divert` и
+ *  возврата в обход закрытого неба (`turnHome`). */
+function landElsewhere(
+  h: HandlerContext,
+  strike: ShuttleStrike,
+  from: { x: number; y: number },
+  failed: StrikeBase,
+  dest: StrikeBase,
+): void {
   h.emit('shuttle.diverted', {
     strikeId: strike.id,
     owner: strike.owner,
@@ -491,11 +503,23 @@ export function divert(
  * эскадру: удар состоялся, погоня сорвалась, цель исчезла, патруль кончился. Дома не
  * стало, пока эскадра была в воздухе, — она ищет другую базу сразу, из точки разворота
  * (`divert`), а не летит в пустоту.
+ *
+ * Путь домой — тоже не над закрытым небом (`closedSky.ts`). Приказ проверил его на вылете,
+ * но носитель мог уйти за звезду, а погоня — увести эскадру в обход кольца. Тогда эскадра
+ * садится на ближайшую свою базу, путь к которой открыт (`nearestBase`, громко —
+ * `shuttle.diverted`). Такой базы нет — летит домой как есть: правило неба не повод
+ * терять машины.
  */
 export function turnHome(h: HandlerContext, strike: ShuttleStrike): void {
   const from = strike.at ?? strike.to;
   if (!landingSpot(h, strike.owner, strike.base, strike.id)) {
     return divert(h, strike, from, strike.base);
+  }
+  const home = basePosition(strike.base, h.state, h.ctx.now);
+  if (home && crossesClosedSky(closedSky(h.state, h.ctx.data), from, home)) {
+    const need = Math.max(1, stacksSize(strike.units, h.ctx.data));
+    const open = nearestBase(h, strike, from, need);
+    if (open) return landElsewhere(h, strike, from, strike.base, open);
   }
   flyTo(h, strike, strike.base, from);
 }

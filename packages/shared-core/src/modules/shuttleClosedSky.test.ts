@@ -56,6 +56,8 @@ const data: GameData = parseGameData({
       strikeRange: 450,
       chaseRadius: 20,
     }),
+    // Носитель: трюм на две машины, 100 ед/час.
+    carrier: { faction: 'x', stats: { attack: 3, defense: 9, speed: 100, hp: 40, cargoCapacity: 2 } },
     cruise: {
       faction: 'neutral',
       traits: ['shuttle', 'missile'],
@@ -288,6 +290,62 @@ describe('закрытое небо — без приказа', () => {
     // Без звезды та же погоня догоняет и бьёт.
     const open = run(apply(unstarred(chase()), hunt), 10).state;
     expect(open.fleets.E1?.units[0]?.hp).toBeLessThan(100);
+  });
+});
+
+describe('закрытое небо — путь домой', () => {
+  /**
+   * Носитель CV идёт от W(−200,0) к E(200,0) за 4 часа и бьёт эскадрой с борта чужой мир
+   * C(−200,200). Через 2 часа удар состоялся, а носитель уже в (0,0): прямой путь от C к нему
+   * лежит над звездой S(−60,100). Свой порт F(−300,250) — в стороне, путь к нему открыт.
+   */
+  function carrierWorld(withPort = true): GameState {
+    const s = createInitialState({ seed: 'sky-home', version: { data: '0.1.0', manifest: '1' } });
+    const cv: Fleet = {
+      id: 'CV',
+      owner: 'p1',
+      location: null,
+      movement: { from: 'W', to: 'E', departedAt: 0, arrivesAt: 4 * H },
+      units: [{ unit: 'carrier', count: 1 }],
+      hangar: [sq('sq:b', 'bomber', 2)],
+      traits: [],
+      battleId: null,
+    };
+    return {
+      ...s,
+      sight: { world: 5000, fleet: 5000, radarScale: 1 },
+      players: { p1: player('p1'), p2: player('p2') },
+      planets: {
+        W: planet('W', null, -200, 0),
+        E: planet('E', null, 200, 0),
+        S: star('S', -60, 100),
+        C: planet('C', 'p2', -200, 200),
+        ...(withPort ? { F: planet('F', 'p1', -300, 250, true) } : {}),
+      },
+      fleets: { CV: cv },
+      heroes: {},
+      battles: {},
+    };
+  }
+  const strikeC = act('shuttle.strike', { fleetId: 'CV', squadronId: 'sq:b', targetPlanetId: 'C' });
+
+  it('НОСИТЕЛЬ УШЁЛ ЗА ЗВЕЗДУ: эскадра садится на ближайшую базу, путь к которой открыт', () => {
+    const { state, events } = run(apply(carrierWorld(), strikeC), 6);
+    expect(payloads(events, 'shuttle.diverted')).toEqual([
+      expect.objectContaining({ fromId: 'CV', fromKind: 'fleet', baseId: 'F', baseKind: 'planet' }),
+    ]);
+    expect(state.planets.F?.hangar?.[0]?.units[0]?.count).toBe(2);
+    // Без звезды та же эскадра возвращается на носитель.
+    const open = run(apply(unstarred(carrierWorld()), strikeC), 6);
+    expect(payloads(open.events, 'shuttle.diverted')).toEqual([]);
+    expect(open.state.fleets.CV?.hangar?.[0]?.units[0]?.count).toBe(2);
+  });
+
+  it('ОТКРЫТОЙ БАЗЫ НЕТ: эскадра летит домой как есть, а не гибнет из-за правила неба', () => {
+    const { state, events } = run(apply(carrierWorld(false), strikeC), 6);
+    expect(payloads(events, 'shuttle.diverted')).toEqual([]);
+    expect(payloads(events, 'shuttle.lost')).toEqual([]);
+    expect(state.fleets.CV?.hangar?.[0]?.units[0]?.count).toBe(2);
   });
 });
 

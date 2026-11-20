@@ -123,7 +123,8 @@ function takeMissiles(base: LaunchBase, squad: Squadron, count: number): Array<{
 export const missilesModule: GameModule = {
   id: 'missiles',
   // 1.1.0: пуск над закрытым небом (звезда, чёрная дыра, их кольцо) отбит `E_SKY_CLOSED`.
-  version: '1.1.0',
+  // 1.1.1: площадка крепости не клетка неба — не отъедает кольцо рядом (`closedSky.ts`).
+  version: '1.1.1',
   setup(api) {
     api.onAction('missile.launch', (action, h) => {
       const p = (action.payload ?? {}) as Record<string, unknown>;

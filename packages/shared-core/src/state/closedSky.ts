@@ -21,6 +21,7 @@
 import type { GameData } from '../data/schemas';
 import type { GameState } from './gameState';
 import { SEED_WEIGHT, clampPowerWeights } from './mosaic';
+import { isForkSite } from './forkSite';
 
 /** Short of this many map units over a closed province, a path only grazes a corner of
  *  its border — not a flight over the star. */
@@ -35,19 +36,56 @@ export interface ClosedSky {
 
 type XY = { x: number; y: number };
 
-/** The closed sky of the map in `state`. A map without such provinces costs nothing. */
+/** The closed sky of the map in `state`. A map without such provinces costs nothing.
+ *  A fortress site (on a road fork or a province berth, `isForkSite`) is a node of the
+ *  state but not a cell of the mosaic (`buildFromMap.ts` and the map draw only the map's
+ *  provinces): counted as a site it would carve its own cell out of the ring next to it,
+ *  and aviation would fly over a ring the player sees whole. */
 export function closedSky(state: Pick<GameState, 'planets'>, data: GameData): ClosedSky {
-  const ids = Object.keys(state.planets).sort();
+  const ids = Object.keys(state.planets)
+    .filter((id) => !isForkSite(state.planets[id]))
+    .sort();
   const closed = ids.flatMap((id, i) =>
     data.sectorKinds[state.planets[id]!.kind ?? '']?.overflight === false ? [i] : [],
   );
   if (closed.length === 0) return { sites: [], closed };
+  // The build walks every pair of provinces (`clampPowerWeights`), and the world is a new
+  // object at every step while its mosaic stays the same all match: the last sky is kept
+  // per catalogue, keyed by exactly what it is built from.
   const sites = ids.map((id) => {
     const p = state.planets[id]!;
     return { x: p.position.x, y: p.position.y, w: (p.size ?? 1) * SEED_WEIGHT };
   });
+  const last = LAST_SKY.get(data);
+  if (last && sameSky(last, ids, sites, closed)) return last.sky;
+  const raw = sites.map((s) => ({ ...s }));
   clampPowerWeights(sites);
-  return { sites, closed };
+  const sky = { sites, closed };
+  LAST_SKY.set(data, { ids, raw, sky });
+  return sky;
+}
+
+/** The last sky {@link closedSky} built for a catalogue, with the provinces and unclamped
+ *  weights it was built from. A memo, not state: the answer is the same function of them. */
+const LAST_SKY = new WeakMap<
+  GameData,
+  { ids: readonly string[]; raw: ReadonlyArray<{ x: number; y: number; w: number }>; sky: ClosedSky }
+>();
+
+function sameSky(
+  last: NonNullable<ReturnType<typeof LAST_SKY.get>>,
+  ids: readonly string[],
+  sites: ReadonlyArray<{ x: number; y: number; w: number }>,
+  closed: readonly number[],
+): boolean {
+  if (last.ids.length !== ids.length || last.sky.closed.length !== closed.length) return false;
+  for (let i = 0; i < closed.length; i++) if (last.sky.closed[i] !== closed[i]) return false;
+  for (let i = 0; i < ids.length; i++) {
+    const a = last.raw[i]!;
+    const b = sites[i]!;
+    if (last.ids[i] !== ids[i] || a.x !== b.x || a.y !== b.y || a.w !== b.w) return false;
+  }
+  return true;
 }
 
 /** Does the straight path from `a` to `b` pass over closed sky? `a === b` asks about the
