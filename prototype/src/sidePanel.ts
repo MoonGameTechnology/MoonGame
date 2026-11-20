@@ -40,6 +40,7 @@ import {
 } from '../../decisions/actions';
 import { patrolToggles } from '../../decisions/aloftCard';
 import { canBuildHere } from '../../decisions/buildGate';
+import { sheetRevealPan } from '../../decisions/sheetReveal';
 import { fleetMachinePlaces } from '../../decisions/fleetHolds';
 import { changeSectorZeroProgress, sovereignRepairCost } from '../../decisions/sectorZeroProgress';
 import {
@@ -239,7 +240,6 @@ export function endSplitAwait(): void {
   splitAwait = null;
 }
 
-const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const inMatch = (): boolean => game.inMatch();
 const panelFleet = (): string | null => game.panelFleet();
 const objDossier = (key: string): Dossier | null => game.dossier(key);
@@ -348,13 +348,13 @@ export function revealMobileSelection(): void {
   const anchor = f ? fleetAnchor(f) : p ? world(p.position) : null;
   if (!anchor) return;
   const rect = el.getBoundingClientRect();
-  const top = topEl.getBoundingClientRect().bottom + 32;
+  // Верх окна — низ полосы ресурсов и плавающей строки статуса; нет окна — камера ждёт.
+  const status = document.getElementById('devline')?.getBoundingClientRect().bottom ?? 0;
+  const top = Math.max(topEl.getBoundingClientRect().bottom, status) + 32;
   const right = VH < 520 ? rect.left - 32 : VW - 28;
-  const bottom = VH < 520 ? VH - 28 : rect.top - 32;
-  panBy(
-    clamp(anchor.x, 28, Math.max(28, right)) - anchor.x,
-    clamp(anchor.y, top, Math.max(top, bottom)) - anchor.y,
-  );
+  const pan = sheetRevealPan(anchor, { top, left: 28, right, bottom: VH < 520 ? VH - 28 : rect.top - 32 });
+  if (!pan) return;
+  panBy(pan.dx, pan.dy);
   clampCam();
 }
 
