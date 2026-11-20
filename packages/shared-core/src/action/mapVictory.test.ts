@@ -6,7 +6,7 @@ describe('mapVictoryRules — правила победы карты, одна �
     expect(mapVictoryRules('team-2v2')).toEqual({ scoreLimit: MAP_SCORE_LIMITS['team-2v2'] });
     expect(mapVictoryRules('duel-1')).toEqual({
       scoreLimit: MAP_SCORE_LIMITS['duel-1'],
-      dominationPercent: 0.8,
+      dominationPercent: 0.9,
     });
   });
 
