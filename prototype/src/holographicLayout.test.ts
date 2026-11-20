@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOCK_BOTTOM, reframePresentation, supportsHolography, selectionWindowPosition, selectionThread } from './holographicLayout';
+import { DOCK_BOTTOM, reframePresentation, supportsHolography, selectionGap, selectionWindowPosition, selectionThread } from './holographicLayout';
 import { worldToScreen } from '../../packages/client/src/camera';
 import { isMobileViewport } from './viewport';
 
@@ -60,6 +60,15 @@ it('opens beside the selection on the side with room and below the top chrome', 
   // A tall window on a short screen (tablet): the chrome wins over the bottom edge — the
   // window used to be pushed up under the resource bar (owner, 2026-09-25).
   expect(selectionWindowPosition({ x: 500, y: 300 }, size, { width: 1024, height: 600 }, 176).y).toBe(176);
+});
+
+it('stands clear of the orbit ring with its fleets, not 30 px from the planet centre', () => {
+  const size = { width: 700, height: 420 };
+  const view = { width: 1920, height: 1080 };
+  // Кольцо орбиты в 60 px: окно встаёт за ним (60 + 16), а не на нём (аудит 2026-11-20).
+  expect(selectionWindowPosition({ x: 960, y: 778 }, size, view, 104, 60).x).toBe(960 + 76);
+  expect(selectionWindowPosition({ x: 1500, y: 300 }, size, view, 104, 60).x).toBe(1500 - 76 - 700);
+  expect(selectionGap(0)).toBe(30);
 });
 
 it('a wide horizontal window docks at the bottom instead of covering the map centre', () => {
