@@ -389,6 +389,9 @@ export function seatBadge(id: string): { icon: string; tag: string } {
  *  past the embargo tick (won't trade on the market) and then the war tick (declares war).
  *  Only shown for AI seats — humans have no favour meter. */
 function favourBarHtml(bot: string): string {
+  // At war the meter has nothing left to warn about, and a full «friendly» bar beside
+  // «War» reads as a contradiction (UI audit 2026-11-20).
+  if (getStance(game.state(), game.me(), bot) === 'war') return '';
   const f = botFavour(game.state(), bot, game.me());
   const pct = clamp(f / FAVOUR_BASE, 0, 1) * 100;
   const embPct = (FAVOUR_EMBARGO / FAVOUR_BASE) * 100;

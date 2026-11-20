@@ -622,7 +622,6 @@
 .mk-lbl{font-size:var(--fs-caption);color:var(--dim);}
 .mk-go{margin-left:auto;padding:7px 12px;border-radius:7px;font-size:var(--fs-caption);}
 .mk-sec{margin:12px 0 6px;font-size:var(--fs-caption);color:var(--dim);}
-.mk-sec.buy{color:var(--amber);}
 .mk-row{display:flex;align-items:center;gap:9px;padding:8px 10px;margin-bottom:6px;border:1px solid var(--line-hi);
   border-radius:8px;background:rgba(255,255,255,.02);}
 .mk-row .mk-qp{font-size:var(--fs-body);color:var(--ink);}
