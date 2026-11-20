@@ -34,6 +34,9 @@ function element() {
 function world(): GameState {
   const state = createInitialState({ seed: 'coalition-ui', version: { data: '1', manifest: '1' } });
   state.players.p1 = { id: 'p1', name: 'Orion', faction: 'x', status: 'active', resources: {} };
+  // Ещё два выбывших места: с двумя игроками на карте это дуэль, а в дуэли коалиций нет.
+  for (const id of ['p8', 'p9'])
+    state.players[id] = { id, name: id, faction: 'x', status: 'defeated', resources: {} };
   return state;
 }
 

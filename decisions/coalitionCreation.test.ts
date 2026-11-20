@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, type GameState } from '../packages/shared-core/src/index';
-import { canCreateCoalition, coalitionInviteBlock, canKickCoalitionMember, coalitionTreatyLocked } from './coalitionCreation';
+import { canCreateCoalition, coalitionInviteBlock, canKickCoalitionMember, coalitionTreatyLocked, isDuel } from './coalitionCreation';
 
 function world(): GameState {
   const state = createInitialState({
@@ -18,6 +18,18 @@ describe('coalition creation availability', () => {
 
   it.each(['team_2v2', 'team_3v3'])('excludes fixed-side mode %s', (modeId) => {
     expect(canCreateCoalition({ ...world(), modeId }, 'p1')).toBe(false);
+  });
+
+  it('excludes a duel: two players, NPC seats not counted', () => {
+    const state = world();
+    state.players.p2 = { ...state.players.p1!, id: 'p2', ai: true };
+    state.players.pirates = { ...state.players.p1!, id: 'pirates', npc: 'pirate' };
+    expect(isDuel(state)).toBe(true);
+    expect(canCreateCoalition(state, 'p1')).toBe(false);
+    expect(coalitionInviteBlock(state, 'p1', 'p2')).toBe('coal.duel');
+    state.players.p3 = { ...state.players.p1!, id: 'p3' };
+    expect(isDuel(state)).toBe(false);
+    expect(canCreateCoalition(state, 'p1')).toBe(true);
   });
 
   it.each(['missing', 'defeated', 'bot', 'npc', 'member'] as const)('excludes %s', (reason) => {
@@ -39,6 +51,7 @@ describe('coalition invitations and departure controls', () => {
   function pair(): GameState {
     const state = world();
     state.players.p2 = { ...state.players.p1!, id: 'p2' };
+    state.players.p3 = { ...state.players.p1!, id: 'p3' };
     state.coalitions = { c1: { id: 'c1', founder: 'p1', members: ['p1'], emblem: 'star', description: '' } };
     return state;
   }

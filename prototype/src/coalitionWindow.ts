@@ -7,7 +7,7 @@
  * правки и выхода. Открывается кнопкой полосы `#rail-coal`.
  */
 import { t } from '../../localization/runtime';
-import { canCreateCoalition, canKickCoalitionMember, coalitionInviteBlock } from '../../decisions/coalitionCreation';
+import { canCreateCoalition, canKickCoalitionMember, coalitionInviteBlock, isDuel } from '../../decisions/coalitionCreation';
 import {
   COALITION_DESC_MAX,
   COALITION_EMBLEMS,
@@ -122,6 +122,7 @@ function listHtml(): string {
   const s = game.state();
   // В командном режиме стороны задаёт режим, коалиций-сущностей нет.
   if (hasFixedSides(s.modeId)) return `<div class="cw-hint">${t('coal.fixed')}</div>`;
+  if (isDuel(s)) return `<div class="cw-hint">${t('coal.duel')}</div>`;
   const cap = coalitionCapacity(s);
   const mine = coalitionOf(s, game.me());
   const rows = all()
