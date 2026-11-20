@@ -24,6 +24,7 @@ import { spyRoster } from '../../decisions/spyRoster';
 import { t } from '../../localization/runtime';
 import { flashDone, flashProgress, noticeRing } from './flashFx';
 import { motionOn } from './graphicsPrefs';
+import { known, memory } from './mapFog';
 import { visible, world } from './mapCamera';
 import { TAU, youColor } from './mapPalette';
 import { worldName } from './planetName';
@@ -39,6 +40,7 @@ export interface MapSpiesHost {
 
 /** Цель тапа: корабль в пути или значок мира, и шпионы за ней. */
 export interface SpyHit {
+  kind: 'flight' | 'spot';
   x: number;
   y: number;
   halfW: number;
@@ -67,6 +69,11 @@ const flashes: { at: { x: number; y: number }; kind: SpyFlashKind; t: number }[]
 /** Цели тапа этого кадра (для харнеса `prototype/spymaptest.mjs`). */
 export function spyHits(): readonly SpyHit[] {
   return hits;
+}
+
+/** Виды вспышек, что сейчас горят (для харнеса). */
+export function spyFlashKinds(): SpyFlashKind[] {
+  return flashes.map((f) => f.kind);
 }
 
 /** Вспышка у мира `at` (позиция карты) по событию своего шпиона. */
@@ -135,9 +142,18 @@ export function drawSpyMarks(
       const c = world(p.position);
       if (!visible(c)) continue;
       const labelX = c.x + (lod.detail > 0 ? R + 12 : lod.markerRadius + 6);
+      // За значком ангара; иначе за именем мира — если имя нарисовано: у неопознанного
+      // мира вместо имени знак вопроса, и значок встаёт сразу за ним.
+      const after = chipAfter(p.id);
       cx.font = NAME_FONT;
-      const x = chipAfter(p.id) ?? labelX + cx.measureText(worldName(s, p.id)).width + 8;
-      chip(cx, spot.spyIds, x + (chipAfter(p.id) === undefined ? 0 : 4), c.y - 5);
+      const named = known(p.id) || memory.has(p.id);
+      const x =
+        after !== undefined
+          ? after + 4
+          : named
+            ? labelX + cx.measureText(worldName(s, p.id)).width + 8
+            : labelX;
+      chip(cx, spot.spyIds, x, c.y - 5);
     }
   }
   drawFlashes(cx, now);
@@ -200,7 +216,14 @@ function drawFlight(
   cx.strokeStyle = color;
   drawSpyShip(cx, spyShipOf(me, fl.id, fl.gen), lod.detail > 0.4);
   cx.restore();
-  hits.push({ x: ship.x, y: ship.y, halfW: px / 2, halfH: px / 2, spyIds: [fl.id] });
+  hits.push({
+    kind: 'flight',
+    x: ship.x,
+    y: ship.y,
+    halfW: px / 2,
+    halfH: px / 2,
+    spyIds: [fl.id],
+  });
   if (lod.detail <= 0.3 || sign === undefined) return;
   const text = `🕵 ${t(`spy.callsign.${sign}`)} · ${timeLeft(fl.until)}`;
   cx.font = LABEL_FONT;
@@ -238,7 +261,7 @@ function chip(cx: CanvasRenderingContext2D, spyIds: readonly number[], x: number
   cx.setLineDash([]);
   cx.fillStyle = youColor;
   cx.fillText(text, x + 5, y + 0.5);
-  hits.push({ x: x + w / 2, y, halfW: w / 2, halfH: h / 2, spyIds });
+  hits.push({ kind: 'spot', x: x + w / 2, y, halfW: w / 2, halfH: h / 2, spyIds });
 }
 
 function drawFlashes(cx: CanvasRenderingContext2D, now: number): void {
