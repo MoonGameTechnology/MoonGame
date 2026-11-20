@@ -1,5 +1,16 @@
 import { coalitionCapacity, coalitionOf, coalitionWallNow, hasFixedSides, type GameState } from '../packages/shared-core/src/index';
 
+/**
+ * Дуэль: на карте ровно два игрока (места NPC не в счёт). Коалиция вместила бы обоих, и
+ * воевать стало бы не с кем, поэтому коалиций в дуэли нет (аудит интерфейса 2026-11-20:
+ * дуэль предлагала «Создать коалицию» с вместимостью «2 игрока», то есть всю карту).
+ */
+export function isDuel(state: GameState): boolean {
+  let seats = 0;
+  for (const p of Object.values(state.players)) if (!p.npc) seats += 1;
+  return seats === 2;
+}
+
 /** The server validates the intent again; this only controls the session button. */
 export function canCreateCoalition(state: GameState, playerId: string): boolean {
   const player = state.players[playerId];
@@ -9,6 +20,7 @@ export function canCreateCoalition(state: GameState, playerId: string): boolean 
     !player.ai &&
     !player.npc &&
     !hasFixedSides(state.modeId) &&
+    !isDuel(state) &&
     !coalitionOf(state, playerId) &&
     (state.coalitionJoinAfter?.[playerId] ?? 0) <= coalitionWallNow(state)
   );
@@ -20,6 +32,7 @@ export function coalitionInviteBlock(state: GameState, playerId: string, target:
   const other = state.players[target];
   if (!actor || !other || playerId === target || actor.status !== 'active' || other.status !== 'active' || hasFixedSides(state.modeId))
     return 'err.forbidden';
+  if (isDuel(state)) return 'coal.duel';
   if (actor.ai || actor.npc || other.ai || other.npc) return 'comms.bots-no-coalition';
   const mine = coalitionOf(state, playerId);
   const theirs = coalitionOf(state, target);
