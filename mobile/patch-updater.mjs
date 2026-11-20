@@ -11,10 +11,8 @@
 //      manifest whose Ed25519 signature it has verified (prototype/src/updater.ts). The
 //      native side downloads the APK itself into the app's private cache, compares the
 //      SHA-256 of the bytes it got with the signed one, checks the package name and only
-//      then opens the system installer. The signing key of the APK is public
-//      (mobile/debug.keystore), so Android's own "same signer" rule cannot tell our build
-//      from a forged one: the digest check is what makes a compromised download host
-//      unable to swap the file. The earlier "hand the URL to the system browser" bridge is
+//      then opens the system installer. The digest check is what makes a compromised
+//      download host unable to swap the file, independent of the APK signing key. The earlier "hand the URL to the system browser" bridge is
 //      gone on purpose: the browser would install bytes nobody checked.
 //   2. AndroidManifest.xml — REQUEST_INSTALL_PACKAGES (the installer intent needs it on
 //      Android 8+), and the FileProvider the template ships, serving the cache directory.

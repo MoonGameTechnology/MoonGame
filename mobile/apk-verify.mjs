@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 const exec = promisify(execFile);
 // Build-tools 35/36 use Signer #1; 37 also prints scheme-specific V3.0 Signer:.
-// This sideload lane deliberately retains its existing debug certificate.
+// Exactly one signer: the release certificate pinned in distribution.json.
 export function verifyCertificate(output, expected) {
   const counts=[...output.matchAll(/^Number of signers: (\d+)\r?$/gm)];
   const lines=output.split(/\r?\n/).filter(x=>x.includes('certificate SHA-256 digest:'));
