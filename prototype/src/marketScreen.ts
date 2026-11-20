@@ -65,7 +65,11 @@ export function marketBoxHtml(
     const mine = l.owner === me;
     // ECON-4: получатель кредитов получает net (5% сгорает) — в биде это исполнитель.
     const takerNet = Math.floor(l.amount * l.price * (1 - MARKET_COMMISSION));
-    const qp = `<span class="mk-qp"><b>${l.amount}</b> ${curIc(l.resource)} @ ${l.price} ${curIc('credits')}${
+    // Поля лота приходят из состояния: в разметку они идут числом и экранированным id.
+    const amount = Number(l.amount);
+    const price = Number(l.price);
+    const id = esc(String(l.id));
+    const qp = `<span class="mk-qp"><b>${amount}</b> ${curIc(l.resource)} @ ${price} ${curIc('credits')}${
       bid && !mine
         ? ` <span class="mk-net">→ ${takerNet} ${curIc('credits')}</span>`
         : ''
@@ -73,7 +77,7 @@ export function marketBoxHtml(
     const who = `<span class="mk-who">${mine ? t('market.own-lot') : nameOf(l.owner)}</span>`;
     let btn: string;
     if (mine) {
-      btn = `<button class="mk-btn btn-second danger" data-mkcancel="${l.id}">${t('market.cancel')}</button>`;
+      btn = `<button class="mk-btn btn-second danger" data-mkcancel="${id}">${t('market.cancel')}</button>`;
     } else {
       // «Купить»/«Продать» исполняет лот ЦЕЛИКОМ (`marketTake` без количества), и ядро
       // проверяет весь лот: кнопка, горящая при деньгах на одну штуку, вела к отказу.
@@ -81,7 +85,7 @@ export function marketBoxHtml(
         l.side === 'sell'
           ? (res.credits ?? 0) >= l.amount * l.price
           : (res[l.resource] ?? 0) >= l.amount;
-      btn = `<button class="mk-btn btn-second" data-mktake="${l.id}"${can ? '' : ' disabled'}>${l.side === 'sell' ? t('market.buy') : t('market.sell')}</button>`;
+      btn = `<button class="mk-btn btn-second" data-mktake="${id}"${can ? '' : ' disabled'}>${l.side === 'sell' ? t('market.buy') : t('market.sell')}</button>`;
     }
     return `<div class="mk-row ${bid ? 'buy' : ''}">${qp}${who}${btn}</div>`;
   };
