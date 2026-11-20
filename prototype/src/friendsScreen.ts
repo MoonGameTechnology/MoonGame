@@ -23,6 +23,7 @@
  */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
+import { bindGuestSignIn, guestGateHtml } from './guestGate';
 import { detach } from './detach';
 import { inviteStep } from '../../decisions/friendInvite';
 import { matchNumberText } from '../../decisions/matchNumber';
@@ -184,6 +185,7 @@ export function friendsPanelHtml(
   rows: readonly FriendRow[],
   opts: {
     signedIn: boolean;
+    canSignIn?: boolean;
     note?: string;
     invites?: readonly FriendInvite[];
     hideMatches?: boolean;
@@ -191,10 +193,7 @@ export function friendsPanelHtml(
   } = { signedIn: true },
 ): string {
   if (!opts.signedIn) {
-    return (
-      `<div class="hub-empty"><span class="he-ic">☍</span>${t('friends.guest.title')}<br>` +
-      `<span style="font-size:var(--fs-caption);color:var(--dim)">${t('friends.guest.sub')}</span></div>`
-    );
+    return guestGateHtml('☍', t('friends.guest.sub'), opts.canSignIn ?? false);
   }
   const search =
     `<form class="fr-find" id="fr-find">` +
@@ -229,6 +228,9 @@ export interface FriendsHost {
   myMatches?(): readonly InviteMatch[];
   /** Войти в партию по номеру — той же дверью, что поле «Номер партии». */
   joinMatch?(matchId: string): void;
+  /** Можно ли войти отсюда (сервер с аккаунтами) и как. Без них гость видит причину. */
+  canSignIn?(): boolean;
+  signIn?(): void;
 }
 
 /** Человекочитаемая причина отказа сервера — по СТАБИЛЬНОМУ коду, а не по тексту. */
@@ -260,7 +262,8 @@ export function initFriends(host: FriendsHost): { refresh: () => Promise<void> }
   let signedIn = true;
 
   function paint(): void {
-    host.root().innerHTML = friendsPanelHtml(rows, { signedIn, note, invites, hideMatches, pick });
+    const canSignIn = host.canSignIn?.() ?? false;
+    host.root().innerHTML = friendsPanelHtml(rows, { signedIn, canSignIn, note, invites, hideMatches, pick });
   }
 
   /** Одно место, где экран говорит с сервером. Любой сбой — тихий: список остаётся
@@ -303,6 +306,7 @@ export function initFriends(host: FriendsHost): { refresh: () => Promise<void> }
     paint();
   }
 
+  if (host.signIn) bindGuestSignIn(host.root(), host.signIn);
   host.root().addEventListener('submit', (ev) => {
     ev.preventDefault();
     const input = host.root().querySelector('#fr-q') as HTMLInputElement | null;

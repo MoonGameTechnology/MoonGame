@@ -9,6 +9,7 @@ import { t, tData } from '../../localization/runtime';
 import { esc, nfmt } from './format';
 import { data } from './gameData';
 import { detach } from './detach';
+import { bindGuestSignIn, guestGateHtml } from './guestGate';
 import {
   createMetaEconomyClient,
   type MetaEconomyStatus,
@@ -97,6 +98,9 @@ export interface MetaEconomyHost {
   authorizedBase(): Promise<MetaSession | null>;
   changed(): Promise<void>;
   requestId?(): string;
+  /** Можно ли войти отсюда (сервер с аккаунтами) и как. Без них гость видит причину. */
+  canSignIn?(): boolean;
+  signIn?(): void;
 }
 
 /** The supply screen's words for the shared client's state. */
@@ -132,6 +136,10 @@ export function initMetaEconomy(host: MetaEconomyHost): { refresh(): Promise<voi
   const paint = (): void => {
     const view = client.view();
     const busy = client.busy();
+    if (client.status().kind === 'guest') {
+      host.root().innerHTML = guestGateHtml('⚒', t('supply.auth'), host.canSignIn?.() ?? false);
+      return;
+    }
     const status = statusLine(client.status());
     const statusHtml = status.text
       ? `<p class="me-hint${status.error ? ' me-error' : ''}" role="status">${esc(status.text)}</p>`
@@ -142,6 +150,7 @@ export function initMetaEconomy(host: MetaEconomyHost): { refresh(): Promise<voi
         ? metaEconomyHtml(view, busy)
         : `<div class="hub-empty">${t('supply.title')}<br>${button('data-me-refresh', t('supply.retry'), busy)}</div>`);
   };
+  if (host.signIn) bindGuestSignIn(host.root(), host.signIn);
   host.root().addEventListener('click', (event) => {
     const el = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
     if (!el || el.disabled || client.busy()) return;

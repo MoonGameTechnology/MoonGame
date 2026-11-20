@@ -17,6 +17,7 @@
  */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
+import { guestGateHtml, bindGuestSignIn } from './guestGate';
 
 export interface BoardRow {
   rank: number;
@@ -68,7 +69,7 @@ function rowHtml(r: BoardRow, kind: BoardKind, pinned = false): string {
 export function boardHtml(
   kind: BoardKind,
   view: BoardView,
-  opts: { signedIn: boolean } = { signedIn: true },
+  opts: { signedIn: boolean; canSignIn?: boolean } = { signedIn: true },
 ): string {
   const tabs =
     `<div class="rk-tabs">` +
@@ -82,11 +83,7 @@ export function boardHtml(
       .join('') +
     `</div>`;
   if (!opts.signedIn) {
-    return (
-      tabs +
-      `<div class="hub-empty"><span class="he-ic">▤</span>${t('rank.guest.title')}<br>` +
-      `<span style="font-size:var(--fs-caption);color:var(--dim)">${t('rank.guest.sub')}</span></div>`
-    );
+    return tabs + guestGateHtml('▤', t('rank.guest.sub'), opts.canSignIn ?? false);
   }
   if (view.rows.length === 0) {
     return (
@@ -134,6 +131,9 @@ export interface RankHost {
   root(): HTMLElement;
   /** База + токен сессии, или `null` — гость (место знает только аккаунт). */
   authorizedBase(): Promise<{ base: string; token: string } | null>;
+  /** Можно ли войти отсюда (сервер с аккаунтами) и как. Без них гость видит причину. */
+  canSignIn?(): boolean;
+  signIn?(): void;
 }
 
 export function initRank(host: RankHost): { refresh: () => Promise<void> } {
@@ -142,7 +142,10 @@ export function initRank(host: RankHost): { refresh: () => Promise<void> } {
   let signedIn = true;
 
   function paint(): void {
-    host.root().innerHTML = boardHtml(kind, boards[kind], { signedIn });
+    host.root().innerHTML = boardHtml(kind, boards[kind], {
+      signedIn,
+      canSignIn: host.canSignIn?.() ?? false,
+    });
   }
 
   /** Один запрос на ОБЕ доски: переключение подвкладки — это перерисовка, а не
@@ -184,6 +187,7 @@ export function initRank(host: RankHost): { refresh: () => Promise<void> } {
     paint();
   }
 
+  if (host.signIn) bindGuestSignIn(host.root(), host.signIn);
   host.root().addEventListener('click', (ev) => {
     const player = (ev.target as HTMLElement).closest('[data-profile]') as HTMLElement | null;
     if (player?.dataset.profile) { host.openPlayer?.(player.dataset.profile); return; }
