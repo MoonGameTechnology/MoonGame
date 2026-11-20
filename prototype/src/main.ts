@@ -392,9 +392,9 @@ import {
   stanceCol,
   youColor,
 } from './mapPalette';
-import { cam, centerOn, clampCam, defaultView, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, setView, world, worldDist } from './mapCamera';
+import { cam, centerOn, clampCam, defaultView, panByScreen, easeCam, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, setView, world, worldDist } from './mapCamera';
 import { fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, restoreFogMemory, vision, type Vision } from './mapFog';
-import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
+import { fleetAnchor, fleetOriginPx, fleetPos, initFleetGeometry, planetReach, selectedFleetIds, spinOrbits, strikeWorldPos } from './fleetGeometry';
 import { drawRadarContacts, drawRadarCoverage, drawRadarRange, drawScanSweep, IDENTIFY_REACH_FRACTION, initMapRadar, netSignatures, planetRadar, radarSweepSources, takeNetSignatures, updateRadarContacts, type RadarSources } from './mapRadar';
 import { apply, initOrderPipeline, playerOrder } from './orderPipeline';
 import {
@@ -893,12 +893,12 @@ const holographic = initHolographicUi({
     invalidatePanel();
     renderCmdBar();
   },
-  details: () => {
-    side.querySelector<HTMLElement>('[data-act="fleetinfo"]')?.click();
-  },
+  details: () => side.querySelector<HTMLElement>('[data-act="fleetinfo"]')?.click(),
   selectionKey: () =>
     (selStrike ? `strike:${selStrike}` : '') || (selSquadron ? `sq:${selSquadron}` : '') || selectedFleetIds().join('|') || panelFleet() || selPlanet || '',
   rightInset: () => (aviationOpen() ? (document.getElementById('aviapanel')?.getBoundingClientRect().width ?? 0) + 24 : 0),
+  reveal: (dx, dy) => panByScreen(dx, dy, canvas.getBoundingClientRect()),
+  selectionReach: () => (panelFleet() ? 32 : planetReach(selPlanet ? s.planets[selPlanet] : null, canvas.getBoundingClientRect(), VW)),
   selectionAnchor: () => {
     const fid = panelFleet();
     const fleet = fid && s.fleets[fid];
