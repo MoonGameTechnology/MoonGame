@@ -49,7 +49,8 @@ import { pcUi } from './graphicsPrefs';
 import { aiming, mobileDraft, pickWorld, selFleet, selPlanet, selSquadron } from './interaction';
 import { focusWorld, panBy, world } from './mapCamera';
 import { pointers } from './mapInput';
-import { applyTimeSpeed } from './matchTopBar';
+import { applyTimeSpeed, paceLessonWait } from './matchTopBar';
+import { LESSON_SPEED, lessonWaits } from '../../decisions/lessonPace';
 import { matchXp, type MetaState } from './meta';
 import type { SetupConfig } from './matchSetup';
 import { NET } from './netSession';
@@ -65,7 +66,7 @@ import { buildSetupConfig, prepareGuidedSetup } from './setupScreen';
 import { invalidatePanel, renderPanel } from './sidePanel';
 import { isDossierOpen } from './dossierFolds';
 import { refreshHubDoor } from './soloCheckpoint';
-import type { Rect, TourResult } from './spotlight';
+import type { Rect, SpotlightStep, TourResult } from './spotlight';
 import { type RunningTour, startTour } from './spotlightDom';
 import { activeConstruction, coreQueue } from './worldQueries';
 import type { TutorialGuide } from '../../packages/client/src/tutorialAnalytics';
@@ -147,7 +148,11 @@ export function launchTour(
       activeTour = null;
       onEnd?.(r);
     },
-    { keepClear: keepMarkClear },
+    {
+      keepClear: keepMarkClear,
+      // Урок первого матча ждёт таймеры на ×3600, а не на ×300 (`decisions/lessonPace.ts`).
+      ...(guide === 'main' ? { pace: (step: SpotlightStep | null) => paceLessonWait(lessonWaits(step)) } : {}),
+    },
     from,
     guide,
   );
@@ -182,6 +187,12 @@ function keepMarkClear(mark: Rect): void {
   if (!coveredSince) coveredSince = now;
   if (now - coveredSince < COVER_GRACE_MS || now < retryAt) return;
   coveredSince = 0;
+  // Телефон: окно сведений во весь экран закрывает карту целиком, камере некуда увести мир,
+  // и окно сворачивается (правило 5 `decisions/clearSpot.ts`).
+  if (game.mobile() && game.panelExpanded()) {
+    game.collapseSheet();
+    return;
+  }
   const spot = nearestClearSpot(at, { width: innerWidth, height: innerHeight }, markClear);
   if (spot) panBy(spot.x - at.x, spot.y - at.y);
   else retryAt = now + NO_SPOT_RETRY_MS;
@@ -352,7 +363,7 @@ export function startGuidedMatch(): void {
   game.startMatch(setup, false, (st) => guideScenario(st, setup.seats[0]!.id, data));
   // The bot-free lesson accelerates the real construction, research and travel clocks.
   guidedLesson = true;
-  applyTimeSpeed(300);
+  applyTimeSpeed(LESSON_SPEED);
   note(t('onb.tour.speed'));
 }
 // Fold the finished guide into the flag (+funnel); first completion earns XP + a nudge.

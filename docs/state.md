@@ -457,10 +457,10 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   ошибки форм — `formFeedback.ts`; позднее пришедший ответ не стирает новую сессию.
 
 **Обучение.** Гайд-матч (`firstMatchTour.ts`, цели `firstGoals.ts`, операция
-`firstMatchOperation.ts`) и полигон Sector Zero (`trainingTour.ts`, 12 этапов); проводка —
-`guideFlow.ts`, справочник — `helpCenter.ts`, термины — `termTip.ts`; сводка «пока тебя не
-было» — `buildRecap` (`packages/shared-core/src/util/recap.ts`). План и шаги —
-[onboarding-roadmap.md](onboarding-roadmap.md).
+`firstMatchOperation.ts`, ожидание таймеров на ×3600 — `decisions/lessonPace.ts`) и полигон
+Sector Zero (`trainingTour.ts`, 12 этапов); проводка — `guideFlow.ts`, справочник —
+`helpCenter.ts`, термины — `termTip.ts`; сводка «пока тебя не было» — `buildRecap`
+(`packages/shared-core/src/util/recap.ts`). План и шаги — [onboarding-roadmap.md](onboarding-roadmap.md).
 
 **Соло и ИИ.**
 - Ядро в браузере: `protoKernel.ts` на `GAME_MODULES`; ИИ мест — `ai.ts`, ход по фазам —

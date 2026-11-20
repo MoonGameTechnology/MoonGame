@@ -20,6 +20,7 @@
  */
 import type { AllyOrderKind } from '../../decisions/allyPanel';
 import {
+  AIMS,
   type Flag,
   type Reason,
   armDisarms,
@@ -195,6 +196,14 @@ const READ: Record<Flag, () => unknown> = {
 function isArmed(flag: Flag): boolean {
   const value = READ[flag]();
   return value !== false && value !== null;
+}
+
+/** Взведён прицел, который подтверждают тапом по КАРТЕ: все, кроме слияния звеньев (оно
+ *  на карточке базы). Телефон сворачивает под него окно сведений (`mobileHud.ts`): окно во
+ *  весь экран закрывало карту, и «Удар» или «Отступить» из сведений целились в тёмное окно
+ *  (ревизия обучения 2026-11-20). */
+export function mapAimArmed(): boolean {
+  return AIMS.some((flag) => flag !== 'squadMerge' && isArmed(flag));
 }
 
 /** Погасить один флаг: прицел исполнен или снят, окно закрыто. */

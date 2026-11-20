@@ -126,6 +126,42 @@ function sheetSteps(ui: OperationUi) {
   return { details, orders, commands };
 }
 
+/** Корабль героя выбирают его строкой в карточке мира, у которого он стоит. Пока открыта
+ *  карточка эскадры (после погрузки страйкера или удара), строки нет и кольцу не на чем
+ *  стоять: сперва мир на карте, на телефоне ещё «Сведения» (ревизия обучения 2026-11-20). */
+function heroShipSteps(d: OperationDeps, stage: Stage): SpotlightStep[] {
+  const { me, ui } = d;
+  const fleet = () => guideHeroFleet(d.world(), me);
+  const picked = () => !!fleet() && ui.selectedFleet() === fleet()!.id;
+  const row = () => {
+    const selector = ui.heroSelector();
+    return !!selector && ui.visible(selector);
+  };
+  const orbit = () => fleet()?.location ?? '';
+  const worldPicked = () => !!orbit() && ui.selectedWorld() === orbit();
+  return [
+    step(stage, 'hero-world', null, () => picked() || row() || worldPicked(), {
+      anchor: () => ui.anchor(orbit()),
+      reveal: () => ui.show('hero'),
+      gate: true,
+      copy: 'onb.guide.hero-world',
+    }),
+    ...(ui.mobile
+      ? [
+          step(stage, 'hero-details', '#mobile-sheet [data-mobile="details"]', () => picked() || row() || ui.intent('details'), {
+            copy: 'onb.guide.sheet',
+          }),
+        ]
+      : []),
+    step(stage, 'hero', null, picked, {
+      selector: ui.heroSelector,
+      reveal: () => ui.show('hero'),
+      gate: true,
+      copy: 'onb.guide.hero-ship',
+    }),
+  ];
+}
+
 export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
   const { me, home, ui } = d;
   const w = d.world;
@@ -199,25 +235,11 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     step(stage, `${unit}-catalog`, LANE(yard === 'squads' ? 'shuttles' : 'mobilization'), () => listed(unit) || ui.visible(`#constructor .pw-catalog[data-lane="${yard === 'squads' ? 'shuttles' : 'mobilization'}"]`) || enough(), { copy: yard === 'squads' ? 'onb.guide.yard.squads' : 'onb.guide.yard.infantry' }),
     // Мобилизация открывается на разделе, где игрок был в прошлый раз (могли быть «Герои»).
     ...(yard === 'infantry' ? [step(stage, `${unit}-section`, '#constructor [data-ctab="infantry"]', () => listed(unit) || enough(), { copy: 'onb.guide.yard.infantry' })] : []),
-    step(stage, `${unit}-select`, `#constructor [data-cnhull="${unit}"]`, () => ui.visible(`#constructor.pw-fitting-open [data-cnhull="${unit}"].on`) || enough(), { copy: 'onb.guide.build.units' }),
+    step(stage, `${unit}-select`, `#constructor [data-cnhull="${unit}"]`, () => ui.visible(`#constructor.pw-fitting-open [data-cnhull="${unit}"].on`) || enough(), { copy: yard === 'squads' ? 'onb.guide.build.equip' : 'onb.guide.build.hire' }),
     productionQuantity(stage, unit, stage === 'ground' ? GUIDE_TROOPS : 1, enough, ui),
     step(stage, unit, '#constructor [data-cnbuild]', enough),
     step(stage, `${unit}-fitting-close`, '#constructor [data-pw-fit-close]', () => !ui.visible('#constructor.pw-fitting-open') || !ui.visible('#constructor.show'), { copy: 'onb.guide.build.close' }),
     close(stage, `${unit}-close`),
-  ];
-  const heroShip = (stage: Stage) => [
-    step(
-      stage,
-      'hero',
-      null,
-      () => !!guideHeroFleet(w(), me) && ui.selectedFleet() === guideHeroFleet(w(), me)!.id,
-      {
-        selector: ui.heroSelector,
-        reveal: () => ui.show('hero'),
-        gate: true,
-        copy: 'onb.guide.hero-ship',
-      },
-    ),
   ];
   const deployed = (preparing = false) => !!guideHeroFleet(w(), me) || (preparing && !!guideHero(w(), me)?.mobilization);
   const refitted = () => guideHeroModules(w(), me).includes(GUIDE_HERO_MODULE);
@@ -295,7 +317,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       'mobilization',
       LANE('mobilization'),
       () => ui.visible('[data-ctab="heroes"]') || deployed(true),
-      { copy: 'production.mobilization' },
+      { copy: 'onb.guide.hero.mobilization' },
     ),
     step(
       'hero',
@@ -355,7 +377,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
     step('aviation', 'load', '[data-act="sqload"]', () => guideWingsAboard(w(), me) > 0),
 
     // Troops into the hold, then the flight.
-    ...heroShip('landing'),
+    ...heroShipSteps(d, 'landing'),
     ...commands('landing', 'troops-commands', 'troops'),
     step(
       'landing',
@@ -396,7 +418,7 @@ export function buildOperationSteps(d: OperationDeps): SpotlightStep[] {
       reveal: () => ui.show(GUIDE_ASSAULT),
       gate: true,
     }),
-    ...heroShip('assault'),
+    ...heroShipSteps(d, 'assault'),
     ...commands('assault', 'cast-commands', 'cast'),
     step(
       'assault',

@@ -483,7 +483,7 @@ export function drawRadarRange(now: number): void {
   cx.shadowBlur = fxBlur(2);
   cx.stroke();
   cx.fillStyle = rgba('#aef6e6', 0.85);
-  if (o >= MIN_LABEL_RING) cx.fillText(t('map.radar.detect', { n: reach }), c.x, c.y - o - 6);
+  if (o >= MIN_LABEL_RING) cx.fillText(t('map.radar.detect', { n: Math.round(reach) }), c.x, c.y - o - 6);
 
   // inner — full-reveal reach (contacts fully identified): «опознание»
   const inner = rings.reveal; // та же доля, что у сводного покрытия (REFM-63, правило 4)
