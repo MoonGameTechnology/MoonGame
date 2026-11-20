@@ -291,6 +291,13 @@ function showIntro(card: IntroCard): void {
   el.innerHTML =
     `<div class="inbox"><span class="in-ic">✦</span><div class="in-text"><b>${esc(t(card.titleKey))}</b>` +
     `<span>${esc(t(card.bodyKey))}</span></div><button class="in-ok">${t('onb.intro.ok')}</button></div>`;
+  // В хабе подсказка встаёт над его нижними вкладками: иначе первое нажатие по вкладке
+  // уходит в подсказку и только убирает её (аудит интерфейса 2026-11-20).
+  const nav = document.body.classList.contains('hub-open')
+    ? document.querySelector<HTMLElement>('#hub .hub-nav')
+    : null;
+  const navTop = nav?.offsetParent ? nav.getBoundingClientRect().top : 0;
+  if (el.style) el.style.paddingBottom = navTop > 0 ? `${Math.ceil(window.innerHeight - navTop + 8)}px` : '';
   el.classList.add('show');
 }
 // Panel-open hook: show the intro for `id` once (unless already seen / a veteran).
