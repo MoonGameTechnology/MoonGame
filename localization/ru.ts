@@ -5466,7 +5466,7 @@ export const ru: Record<string, string> = {
   'tech.curator': 'Ветку ведёт',
   'tech.action.running-clock': 'Идёт · {n}',
   'tech.branch.command.desc': 'Разведка и радары, герои, лимит планет и «Хранитель».',
-  'tech.branch.command.short': 'Команд.',
+  'tech.branch.command.short': 'Штаб',
   'tech.branch.ground.desc': 'Пехота, танки, укрепления, госпитали и урон в наземном бою.',
   'tech.branch.industry.desc': 'Добыча и производство ресурсов, налоги, завод техники.',
   'tech.branch.industry.short': 'Пром.',

@@ -5461,7 +5461,7 @@ export const en: Record<string, string> = {
   'tech.curator': 'Branch curated by',
   'tech.action.running-clock': 'In progress · {n}',
   'tech.branch.command.desc': 'Scouting and radar, heroes, planet limit and the Steward.',
-  'tech.branch.command.short': 'Command',
+  'tech.branch.command.short': 'HQ',
   'tech.branch.ground.desc': 'Infantry, tanks, fortifications, hospitals and ground combat damage.',
   'tech.branch.industry.desc': 'Resource extraction and production, taxes, the vehicle plant.',
   'tech.branch.industry.short': 'Industry',

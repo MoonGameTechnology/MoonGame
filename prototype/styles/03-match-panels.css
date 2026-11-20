@@ -272,9 +272,10 @@
 .tt-lines path.ok{stroke:#2f6f62;}
 .tt-row{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:24px;}
 .tt-row:last-child{margin-bottom:0;}
-.tt-item{--bc:var(--cyan);position:relative;z-index:1;width:92px;display:grid;justify-items:center;align-content:start;gap:4px;padding:8px 4px 7px;
+.tt-item{--bc:var(--cyan);position:relative;z-index:1;width:108px;display:grid;justify-items:center;align-content:start;gap:4px;padding:8px 4px 7px;
   border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,#10303a,#0b2229);color:var(--ink);font:inherit;text-align:center;cursor:pointer;}
-.tt-item b{font-size:var(--fs-caption);font-weight:600;line-height:1.2;min-height:2.4em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;hyphens:auto;}
+/* Имя темы целиком: до четырёх строк, перенос по слогам, а не многоточие (аудит 2026-11-20). */
+.tt-item b{font-size:var(--fs-caption);font-weight:600;line-height:1.2;min-height:2.4em;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:break-word;hyphens:auto;}
 .tt-ist{font-size:var(--fs-caption);color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap;}
 .tt-ico{position:relative;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:var(--bc);
   background:radial-gradient(circle at 50% 35%,color-mix(in srgb,var(--bc) 34%,transparent),color-mix(in srgb,var(--bc) 8%,#0b2229) 70%);

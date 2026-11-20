@@ -160,8 +160,8 @@ body.mobile-ui #tech .tt-shade {
 }
 body.mobile-ui #tech .tt-qb,
 body.mobile-ui #tech .tt-qx { width: 44px; height: 44px; font-size: 12px; }
-body.mobile-ui #tech .tt-tabs { gap: 4px; padding: 9px 8px 7px; }
-body.mobile-ui #tech .tt-tab { min-width: 0; padding: 6px 2px 5px; gap: 3px; }
+body.mobile-ui #tech .tt-tabs { gap: 3px; padding: 9px 6px 7px; }
+body.mobile-ui #tech .tt-tab { min-width: 0; padding: 6px 0 5px; gap: 3px; }
 body.mobile-ui #tech .tt-tab svg { width: 20px; height: 20px; }
 body.mobile-ui #tech .tt-tname { font-size:var(--fs-caption); }
 body.mobile-ui #tech .tt-tname .full { display: none; }
@@ -170,7 +170,8 @@ body.mobile-ui #tech .tt-tprog { padding: 0 4px; }
 body.mobile-ui #tech .tt-cnt { display: none; }
 body.mobile-ui #tech .tt-tree { padding: 8px 8px 14px; }
 body.mobile-ui #tech .tt-row { gap: 8px; margin-bottom: 18px; }
-body.mobile-ui #tech .tt-item { width: 76px; padding: 7px 3px 6px; }
+/* Четыре темы в ряд на всю ширину листа: узкая плитка резала имена многоточием. */
+body.mobile-ui #tech .tt-item { width: calc((100% - 24px) / 4); max-width: 92px; padding: 7px 3px 6px; }
 body.mobile-ui #tech .tt-item b { font-size:var(--fs-caption); }
 body.mobile-ui #tech .tt-ico { width: 40px; height: 40px; }
 body.mobile-ui #tech .tt-mwin {
