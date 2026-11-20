@@ -477,6 +477,11 @@ export const CELESTIAL_RINGS_SOLO_MIGRATION = after(SPEEDUP_SOLO_MIGRATION, {
 /** TEC-4: rules only — `speedup` 1.1.0 sells resources for ◆ (`resources.buy`, host-only). */
 export const RESOURCE_PURCHASE_SOLO_MIGRATION = after(CELESTIAL_RINGS_SOLO_MIGRATION, { toRules: '0f558d0bf17afc' });
 
+/** Rules only — `shuttle` 2.3.1 and `missiles` 1.1.1: a fortress site is no cell of the closed
+ *  sky, and a squadron whose way home lies over it lands at the nearest open base. A saved
+ *  world plays on unchanged until such a flight. */
+export const FORTRESS_SKY_SOLO_MIGRATION = after(RESOURCE_PURCHASE_SOLO_MIGRATION, { toRules: '1b308c299ad835' });
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -521,4 +526,5 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   SPEEDUP_SOLO_MIGRATION,
   CELESTIAL_RINGS_SOLO_MIGRATION,
   RESOURCE_PURCHASE_SOLO_MIGRATION,
+  FORTRESS_SKY_SOLO_MIGRATION,
 ];

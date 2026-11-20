@@ -140,6 +140,42 @@ describe('closedSky — граница неба совпадает с нарис
   });
 });
 
+describe('closedSky — память о последнем небе', () => {
+  it('тот же мир в новом объекте — то же небо без пересборки; сдвинутая звезда — новое небо', () => {
+    const first = closedSky(mapOf(grid()), data);
+    expect(closedSky(mapOf(grid()), data)).toBe(first);
+    const moved = closedSky(mapOf(grid({ x: 230 })), data);
+    expect(moved).not.toBe(first);
+    expect(crossesClosedSky(moved, P(310, 200), P(310, 200))).toBe(true);
+    expect(crossesClosedSky(first, P(310, 200), P(310, 200))).toBe(false);
+    // Крупнее та же звезда — тоже другое небо: вес входит в ключ.
+    expect(closedSky(mapOf(grid({ size: 1.4 })), data)).not.toBe(first);
+  });
+});
+
+describe('closedSky — площадка крепости не клетка мозаики', () => {
+  // Крепость на развилке (FORT-6.1) или на причале провинции — узел состояния, но не
+  // провинция: карта и дороги её клетку не рисуют. Посчитай её небо семенем — и она
+  // вырезала бы себе клетку из кольца рядом, и авиация летала бы над кольцом.
+  const withSite = (site: Partial<Planet>): Pick<GameState, 'planets'> => {
+    const map = mapOf(grid());
+    map.planets['fork-d-0'] = { ...planetOf({ id: 'fork-d-0', x: 90, y: 200 }), kind: 'fork_station', ...site };
+    return map;
+  };
+
+  it('развилка у края звезды не отъедает её небо: граница там же, где на карте', () => {
+    const sky = closedSky(withSite({ fork: { province: 'd', trail: 0 } }), data);
+    expect(crossesClosedSky(sky, P(120, 200), P(120, 200))).toBe(true);
+    expect(crossesClosedSky(sky, P(0, 200), P(150, 200))).toBe(true);
+    expect(crossesClosedSky(sky, P(95, 200), P(95, 200))).toBe(false);
+  });
+
+  it('крепость на причале провинции — так же', () => {
+    const sky = closedSky(withSite({ stationHost: 'd' }), data);
+    expect(crossesClosedSky(sky, P(120, 200), P(120, 200))).toBe(true);
+  });
+});
+
 describe('closedSky — какие провинции закрывают небо', () => {
   it('КАРТА БЕЗ ЗАКРЫТЫХ ПРОВИНЦИЙ ничего не стоит и ничего не запрещает', () => {
     const open = grid().map(({ kind: _kind, ...s }) => ({ ...s, kind: 'nebula' }));
