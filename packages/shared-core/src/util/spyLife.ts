@@ -1,9 +1,16 @@
 import { hoursToMs } from '../action/types';
 import type { HandlerContext } from '../kernel/module';
-import type { GameState, PlanetId, PlayerId, Spy, SpyOp } from '../state/gameState';
+import type { GameState, PlanetId, PlayerId, Spy, SpyOp, SpyWayPoint } from '../state/gameState';
 import { coalitionOf } from '../state/coalition';
 import { getStance } from '../state/diplomacy';
-import { spyHome, spyJourneyMs, spyPath, spyRoster, BASE_SPY_AGENTS } from '../state/spyTravel';
+import {
+  spyHome,
+  spyJourneyMs,
+  spyPath,
+  spyRoster,
+  spyWay,
+  BASE_SPY_AGENTS,
+} from '../state/spyTravel';
 import { noteScouted } from '../state/spyKnowledge';
 
 /**
@@ -91,6 +98,7 @@ function clearOrder(spy: Spy): void {
   delete spy.op;
   delete spy.posted;
   delete spy.postedAt;
+  delete spy.way;
 }
 
 /** How long `spy` of `owner` flies `from` → `to` (ms), through the `espionage.speed` pipeline
@@ -114,7 +122,8 @@ export function journeyMs(
 /**
  * Put `spy` on the way to `to` (`kind` — out on an order, or home), `ms` from now. A journey
  * of no length ends at once — `arrive` runs before this returns — so a spy that already
- * stands where it is sent starts there without a scheduled step.
+ * stands where it is sent starts there without a scheduled step. The way it flies is fixed
+ * now (`Spy.way`), `lead` first — the lanes a spy turning back retraces.
  */
 export function setOff(
   h: HandlerContext,
@@ -125,6 +134,7 @@ export function setOff(
   kind: 'travel' | 'return',
   ms: number,
   arrive: (h: HandlerContext, owner: PlayerId, spy: Spy) => void,
+  lead?: readonly SpyWayPoint[],
 ): void {
   const now = h.ctx.now;
   spy.state = kind;
@@ -132,6 +142,7 @@ export function setOff(
   spy.location = to;
   spy.departedAt = now;
   spy.arrivesAt = now + ms;
+  spy.way = spyWay(h.state, owner, from, to, now, spy.arrivesAt, lead);
   if (ms <= 0) {
     arrive(h, owner, spy);
     return;
@@ -144,8 +155,8 @@ export function setOff(
 }
 
 /** Send `spy` home to the capital from `from` (plus `extraMs` already owed on the way back —
- *  a spy called off mid-journey first turns back). No capital, or no way to it → it lies
- *  low where it is (`hidden`) until there is one. */
+ *  a spy called off mid-journey first turns back, retracing `lead`). No capital, or no way to
+ *  it → it lies low where it is (`hidden`) until there is one. */
 export function goHome(
   h: HandlerContext,
   owner: PlayerId,
@@ -153,6 +164,7 @@ export function goHome(
   arrive: (h: HandlerContext, owner: PlayerId, spy: Spy) => void,
   from: PlanetId = spy.location,
   extraMs = 0,
+  lead?: readonly SpyWayPoint[],
 ): void {
   clearOrder(spy);
   spy.mission = nextMission(h.state, owner);
@@ -163,7 +175,7 @@ export function goHome(
     spy.location = from;
     return;
   }
-  setOff(h, owner, spy, from, home, 'return', ms + extraMs, arrive);
+  setOff(h, owner, spy, from, home, 'return', ms + extraMs, arrive, lead);
 }
 
 /** A spy at the end of its way home: in the capital it rests (→ `true`); the capital moved

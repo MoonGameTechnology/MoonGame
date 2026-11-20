@@ -3,6 +3,7 @@ import type { Action } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import { noteJourney, noteScouted, spyKnownOwner, unguardedBy } from '../state/spyKnowledge';
 import { identifiedNodes } from '../state/visibility';
+import { spyTurnBack } from '../state/spyTravel';
 import { getStance } from '../state/diplomacy';
 import { coalitionOf } from '../state/coalition';
 import type { GameState, IntelGrant, Spy, SpyOp } from '../state/gameState';
@@ -357,6 +358,7 @@ function rollExposure(
  *  the deed if it still can, else waits there for orders. */
 function arrive(h: HandlerContext, owner: string, spy: Spy): void {
   noteJourney(h.state, owner, spy, h.ctx.now);
+  delete spy.way;
   if (spy.state === 'return') {
     if (reachHome(h, owner, spy, arrive))
       h.emit('espionage.home', { owner, spyId: spy.id, planetId: spy.location });
@@ -449,7 +451,8 @@ function callOff(h: HandlerContext, owner: string, spy: Spy): void {
   if (spy.posted && spy.op === 'recon') closeIntel(h, owner, spy.mission);
   if (spy.state === 'travel') {
     const back = Math.max(0, h.ctx.now - (spy.departedAt ?? h.ctx.now));
-    goHome(h, owner, spy, arrive, spy.from ?? spy.location, back);
+    const lead = spyTurnBack(spy.way, h.ctx.now);
+    goHome(h, owner, spy, arrive, spy.from ?? spy.location, back, lead);
     return;
   }
   goHome(h, owner, spy, arrive);
@@ -572,7 +575,8 @@ export const espionageModule: GameModule = {
   // 2.1.0: шпионы получают зарплату в кредитах (хук `economy.upkeep`).
   // 2.2.0: приказ сверяется с тем, что игрок знает о мире; разведка и ничейных миров (SPY-24).
   // 2.3.0: перевербованный просит перейти — принять навсегда или отказать (он сбегает).
-  version: '2.3.0',
+  // 2.4.0: путь шпиона с временем каждого мира записан в нём (`Spy.way`, SPM-1).
+  version: '2.4.0',
   setup(api) {
     registerEspionageEconomy(api);
 

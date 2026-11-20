@@ -26,6 +26,8 @@ import { openTab, pairOfChoices, tabPick } from '../../decisions/worldFleetTabs'
 import { fleetAnchor, forkFortressAt, forkMarkAt, strikeWorldPos } from './fleetGeometry';
 import { data } from './game';
 import { pcUi } from './graphicsPrefs';
+import { spyAt } from './mapSpies';
+import { openSpyFor, openSpyWindow } from './spyWindow';
 import {
   mobileChoices,
   offerChoices,
@@ -98,6 +100,16 @@ function hangarBadgeTap(game: MapInputHost, mx: number, my: number, touch: boole
   return true;
 }
 
+/** Тап по своему шпиону (SPM-1): корабль в пути или «🕵 N» мира — один шпион открывает его
+ *  задания, несколько — список шпионов. */
+function spyTap(mx: number, my: number, touch: boolean): boolean {
+  const ids = spyAt(mx, my, touch);
+  if (!ids?.length) return false;
+  if (ids.length === 1) openSpyFor(ids[0]!);
+  else openSpyWindow();
+  return true;
+}
+
 /** Обычный тап — выбор того, что под ним. */
 export function plainTapSelect(
   game: MapInputHost,
@@ -111,6 +123,7 @@ export function plainTapSelect(
   const MAP = game.nodes();
   const { rFleet, rNode, additive } = opts;
   if (!additive && hangarBadgeTap(game, mx, my, opts.touch)) return;
+  if (!additive && spyTap(mx, my, opts.touch)) return; // SPM-1: свой шпион на карте
   // Plain tap = selection. Правила выбора и перебора стопки — `tapCycle.ts` (REFM-65).
   // Контур берём из уже нарисованных ячеек. Этот запасной выбор касается только
   // обычного тапа: приказы выше сохраняют свои прежние цели, флоты — приоритет ниже.

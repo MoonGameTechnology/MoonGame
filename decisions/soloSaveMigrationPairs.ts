@@ -486,6 +486,10 @@ export const FORTRESS_SKY_SOLO_MIGRATION = after(RESOURCE_PURCHASE_SOLO_MIGRATIO
  *  or mode names (the duel, 90%). A saved duel short of that share plays on unchanged. */
 export const CAPITAL_SHARE_SOLO_MIGRATION = after(FORTRESS_SKY_SOLO_MIGRATION, { toRules: '1aa681c64bbe8f' });
 
+/** Rules only — `espionage` 2.4.0 keeps a spy's way with the time of each world (`Spy.way`,
+ *  SPM-1). A saved spy on its way has none and flies on unchanged; the map draws it straight. */
+export const SPY_WAY_SOLO_MIGRATION = after(CAPITAL_SHARE_SOLO_MIGRATION, { toRules: '0dfad1b06af520' });
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -532,4 +536,5 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   RESOURCE_PURCHASE_SOLO_MIGRATION,
   FORTRESS_SKY_SOLO_MIGRATION,
   CAPITAL_SHARE_SOLO_MIGRATION,
+  SPY_WAY_SOLO_MIGRATION,
 ];

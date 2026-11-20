@@ -22,6 +22,7 @@ import { selSquadron } from './interaction';
 import { visible, world } from './mapCamera';
 import { fleetBadgeBox } from './mapFleets';
 import { worldName } from './planetName';
+import { drawSpyMarks } from './mapSpies';
 import { artScale } from './semanticZoom';
 
 /** Что значкам нужно от игры. */
@@ -73,11 +74,24 @@ const DOT = '#f2c94c';
 const NAME_FONT = '700 12px ui-monospace,Menlo,monospace';
 const BADGE_FONT = '700 11px ui-monospace,Menlo,monospace';
 
-/** Нарисовать значки своих баз: мира — в строке его имени, носителя — у его плашки. */
-export function drawHangarBadges(lod: MapLod): void {
+/** Нарисовать значки своих баз: мира — в строке его имени, носителя — у его плашки. За ними —
+ *  свои шпионы (SPM-1, `mapSpies.ts`): корабли в пути и «🕵 N» за значком ангара мира. */
+export function drawHangarBadges(lod: MapLod, now = performance.now()): void {
   hits = [];
   bySpot = new Map();
-  if (lod.art <= 0) return;
+  if (lod.art > 0) drawBaseBadges(lod);
+  drawSpyMarks(
+    game,
+    lod,
+    (id) => {
+      const h = bySpot.get(id);
+      return h ? h.x + h.halfW : undefined;
+    },
+    now,
+  );
+}
+
+function drawBaseBadges(lod: MapLod): void {
   const s = game.world();
   const me = game.me();
   const cx = game.ctx();

@@ -1617,7 +1617,7 @@ function renderMap(now: number) {
   drawOrbitRings(now, detail); // кольцо орбиты у мира со стоящим флотом
   drawBattleTracers(now); // трассы огня между строями боя
   drawFleets(now, lod); // флоты: корпус доминанта, счёт, трюм, рамка выбора, портреты героев
-  drawHangarBadges(lod); // «◇ N» под своей базой с эскадрами: тап выделяет эскадру
+  drawHangarBadges(lod, now); // «◇ N» у базы с эскадрами; свои шпионы — корабли и «🕵 N» (SPM-1)
   drawRadarContacts(now); // swept enemy signatures — last-known ghosts until repainted
 
   // 7. Верхний слой: рамка выделения, метки, цели, радиусы и прицелы.

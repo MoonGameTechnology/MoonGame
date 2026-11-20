@@ -100,7 +100,10 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '120'; // Дуэль: порядок тот же; `victory` 1.12.0 — партия на
+export const MODULE_MANIFEST_VERSION = '121'; // SPM-1: порядок тот же; `espionage` 2.4.0 — шпион
+// хранит свой путь с временем каждого мира (`Spy.way`). Партия на 120 такого поля не писала, и
+// реплей разошёлся бы.
+// export const MODULE_MANIFEST_VERSION = '120'; // Дуэль: порядок тот же; `victory` 1.12.0 — партия на
 // столицы кончается и захватом доли карты, названной картой или режимом (дуэль — 90%). Партия на 119
 // на столицах долю карты не считала.
 // export const MODULE_MANIFEST_VERSION = '119'; // Небо у крепостей: порядок тот же; `shuttle` 2.3.1 и

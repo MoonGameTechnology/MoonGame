@@ -50,6 +50,17 @@ export interface Spy {
   defector?: string;
   /** Experience (the spy-levels module; absent = 0). Reset for a replacement. */
   xp?: number;
+  /** The way of the current journey (`travel` / `return`, SPM-1): the worlds it passes, the
+   *  first where it sets out and the last `location`, each with the world-time it is there.
+   *  Fixed when it sets off, so the owner's map shows the lanes it really flies, however the
+   *  territory changes on the way. Absent in older saves and when it is not on the way. */
+  way?: SpyWayPoint[];
+}
+
+/** A point of a spy's way (`Spy.way`): a world and the world-time (ms) the spy is there. */
+export interface SpyWayPoint {
+  at: PlanetId;
+  t: number;
 }
 
 /** An enemy agent the player's counter-intelligence turned (SPY-18), waiting for the
