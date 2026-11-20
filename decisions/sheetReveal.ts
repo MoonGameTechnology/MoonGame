@@ -40,3 +40,53 @@ export function sheetRevealPan(
     dy: clamp(anchor.y, win.top, win.bottom) - anchor.y,
   };
 }
+
+/** Прямоугольник окна на экране. */
+export interface RevealBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Окно выбора на ПК открылось поверх своего объекта (аудит интерфейса 2026-11-20, 1920 px:
+ * широкое окно планеты встаёт по центру внизу и закрывает саму планету и её флот). Окно
+ * остаётся там, где его ставят всегда (или где его поставил игрок), а камера один раз
+ * подвигает карту, чтобы объект встал рядом с окном. То же правило, что у листа телефона:
+ * двигается карта, а не окно.
+ *
+ * Свободных мест четыре: над окном, под ним, слева и справа (до краёв экрана, сверху — до
+ * низа панели `top`). Берётся то, куда объект доезжает кратчайшим сдвигом. Объект не под
+ * окном (с запасом `margin`) — `null`, камера стоит. Ни одно место не годится — тоже `null`.
+ */
+export function windowRevealPan(
+  anchor: { x: number; y: number },
+  box: RevealBox,
+  viewport: { width: number; height: number },
+  top: number,
+  margin = 32,
+): { dx: number; dy: number } | null {
+  const covered =
+    anchor.x >= box.x - margin &&
+    anchor.x <= box.x + box.width + margin &&
+    anchor.y >= box.y - margin &&
+    anchor.y <= box.y + box.height + margin;
+  if (!covered) return null;
+  const left = margin;
+  const right = viewport.width - margin;
+  const high = top + margin;
+  const low = viewport.height - margin;
+  const spots: RevealWindow[] = [
+    { top: high, bottom: box.y - margin, left, right },
+    { top: box.y + box.height + margin, bottom: low, left, right },
+    { top: high, bottom: low, left, right: box.x - margin },
+    { top: high, bottom: low, left: box.x + box.width + margin, right },
+  ];
+  let best: { dx: number; dy: number } | null = null;
+  for (const spot of spots) {
+    const pan = sheetRevealPan(anchor, spot);
+    if (pan && (!best || Math.hypot(pan.dx, pan.dy) < Math.hypot(best.dx, best.dy))) best = pan;
+  }
+  return best;
+}

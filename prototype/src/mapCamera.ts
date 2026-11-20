@@ -237,6 +237,13 @@ export function panBy(dx: number, dy: number): void {
   camera.x += dx;
   camera.y += dy;
 }
+/** Сдвинуть камеру на (dx, dy) экранных px и зажать: окно ПК открылось поверх объекта.
+ *  Экранные px и px холста (`VW`) под масштабом ПК не совпадают, поэтому пересчёт по `box`. */
+export function panByScreen(dx: number, dy: number, box: { width: number; height: number }): void {
+  if (!box.width || !box.height) return;
+  panBy((dx * game.vw()) / box.width, (dy * game.vh()) / box.height);
+  clampCam();
+}
 /** Тянуть камеру пальцем или мышью на (dx, dy) экранных пикселей. У края карта не встаёт
  *  стеной (просьба владельца 2026-10-25): за пределом она идёт за пальцем с растущим
  *  сопротивлением, а после отпускания возвращается сама ({@link releaseCam}). */

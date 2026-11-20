@@ -61,9 +61,14 @@ export const DOCK_BOTTOM = 72;
  *  Горизонтальное окно (шире половины экрана, решение владельца 2026-09-26) рядом с объектом
  *  не встаёт — оно закрыло бы середину карты вместе с самим объектом и местом, куда целиться.
  *  Оно пристыковано к низу, как консоль: над полосой скорости, по центру. */
+/** Зазор окна выбора от объекта: `reach` — радиус того, что видно вокруг него, в px. */
+export function selectionGap(reach: number): number {
+  return Math.max(30, Math.round(reach) + 16);
+}
+
 export function selectionWindowPosition(
   anchor: HoloPoint, size: { width: number; height: number },
-  viewport: { width: number; height: number }, chromeBottom: number,
+  viewport: { width: number; height: number }, chromeBottom: number, reach = 0,
 ): HoloPoint {
   if (size.width > viewport.width / 2) {
     return {
@@ -71,7 +76,9 @@ export function selectionWindowPosition(
       y: Math.max(chromeBottom, viewport.height - size.height - DOCK_BOTTOM),
     };
   }
-  const gap = 30;
+  // Зазор — от края того, что рисуется вокруг объекта (кольцо орбиты с флотами), а не от
+  // его центра: окно в 30 px от центра планеты закрывало её флот (аудит 2026-11-20).
+  const gap = selectionGap(reach);
   const right = anchor.x + gap;
   const left = anchor.x - size.width - gap;
   const x = right + size.width <= viewport.width - 12 ? right : left;

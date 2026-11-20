@@ -4,10 +4,11 @@ import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { holoIcon, skinIcon, type HoloIcon } from './holographicIcons';
 import { motionOn, glowOn, uiScalePct } from './graphicsPrefs';
-import { supportsHolography, selectionWindowPosition, selectionThread, type HoloPoint } from './holographicLayout';
+import { supportsHolography, selectionGap, selectionWindowPosition, selectionThread, type HoloPoint } from './holographicLayout';
 import { initFloatingWindows } from './floatingWindows';
 import { narrowLayouts, pcScale } from '../../decisions/pcScale';
 import { fitColumns, fitLayout, type FitLayout } from '../../decisions/selectionWindowFit';
+import { windowRevealPan } from '../../decisions/sheetReveal';
 
 /** Где CSS зумит интерфейс (PC-блок `prototype/styles/08-pc.css`): ПК с мышью от 900 px.
  *  Масштаб считается только там — иначе `--vph` поделили бы на зум, которого у слоёв нет. */
@@ -25,6 +26,10 @@ interface HolographicHost {
   /** Ширина, которую у правого края держит другая панель (список «◇ Авиация»): окно выбора
    *  открывается левее неё, и оба окна живут вместе. */
   rightInset?(): number;
+  /** Сдвинуть карту на (dx, dy) экранных px: окно открылось поверх своего объекта. */
+  reveal?(dx: number, dy: number): void;
+  /** Радиус в экранных px того, что рисуется вокруг выбранного (кольцо орбиты с флотами). */
+  selectionReach?(): number;
 }
 
 /** `aside` встаёт между приказами и «Подробнее»: окно флота консолью кладёт туда ⇅-меню
@@ -94,6 +99,7 @@ export function initHolographicUi(host: HolographicHost) {
   let height = 720;
   let scale = 1;
   let selected = '';
+  let revealPending = false;
   /** Раскладка окна выбора в прошлом кадре: сменилась — окно возвращают в экран. */
   let selectionLayout = '';
   let productionLayout = '';
@@ -254,7 +260,8 @@ export function initHolographicUi(host: HolographicHost) {
             measureChrome();
             windows.openAt('holo-selection-window', selectionWindowPosition(anchor,
               { width: box.width, height: box.height },
-              { width: width - (host.rightInset?.() ?? 0), height }, chromeBottom));
+              { width: width - (host.rightInset?.() ?? 0), height }, chromeBottom, host.selectionReach?.() ?? 0));
+            revealPending = true;
           }
           selected = key;
         }
@@ -270,7 +277,17 @@ export function initHolographicUi(host: HolographicHost) {
       // Window coordinates only respond to the user's drag/keys and viewport resize.
       windows.sync(enabled, width, height, scale);
       const box = enabled && inGame ? windows.bounds('holo-selection-window') : null;
-      const anchor = box ? host.selectionAnchor() : null;
+      let anchor = box ? host.selectionAnchor() : null;
+      // Окно открылось поверх своего объекта: карта один раз подвигается, окно стоит.
+      if (revealPending && box && anchor) {
+        const room = { width: width - (host.rightInset?.() ?? 0), height };
+        const pan = windowRevealPan(anchor, box, room, chromeBottom, selectionGap(host.selectionReach?.() ?? 0));
+        if (pan && host.reveal) {
+          host.reveal(pan.dx, pan.dy);
+          anchor = host.selectionAnchor();
+        }
+      }
+      revealPending = false;
       const line = box && anchor && anchor.x >= 0 && anchor.y >= 0 && anchor.x <= width && anchor.y <= height
         ? selectionThread(anchor, box) : null;
       thread.style.display = line ? 'block' : 'none';

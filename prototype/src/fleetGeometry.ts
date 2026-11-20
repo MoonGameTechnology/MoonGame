@@ -172,6 +172,15 @@ export function orbitRingRadius(pl: {
   }
   return orbitRadius(orbitBloom(game.lod().scale), nearest);
 }
+/** Радиус в экранных px того, что рисуется вокруг выбранной планеты: кольцо орбиты и флоты
+ *  на нём (шеврон — ещё 12 px). Окно выбора ПК встаёт за ним, а не в 30 px от центра. */
+export function planetReach(
+  pl: { position: { x: number; y: number }; links?: string[] } | null | undefined,
+  box: { width: number },
+  vw: number,
+): number {
+  return pl && vw > 0 ? ((orbitRingRadius(pl) + 12) * box.width) / vw : 0;
+}
 /** Angular position (radians) of a stationed fleet's orbit slot at index `idx` of
  *  `nPeers` sharing the ring — fanned out, and spinning when zoomed in close. */
 function orbitAngle(idx: number, nPeers: number): number {
