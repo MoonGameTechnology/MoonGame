@@ -48,6 +48,16 @@
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
 | CORP-20 | ⏳ | core srv proto | `docs/backlog.md` | Битва четырёх корпораций. |
 | CORP-21 | ⏳ | data | `docs/backlog.md` | Карта для битвы четырёх корпораций. |
+| SPM-0 | ✅ | docs | `docs/backlog.md` | Развилки решены владельцем (2026-11-20). |
+| SPM-1 | ✅ | core proto | `docs/backlog.md` | Шпион на карте. |
+| SPM-2 | ⏳ | core | `docs/backlog.md` | Опыт по веткам вместо общего уровня. |
+| SPM-3 | 🔒 | proto | `docs/backlog.md` | Ветки в окне шпионажа. |
+| SPM-4 | 🔒 | core proto | `docs/backlog.md` | Умения 3-го ранга. |
+| SPM-5 | 🔒 | core proto | `docs/backlog.md` | Новые задания 5-го ранга. |
+| SPM-6 | ⏳ | core | `docs/backlog.md` | Боты шпионят. |
+| SPM-7 | 🔒 | core proto | `docs/backlog.md` | Шпион следит за флотом. |
+| SPM-8 | 🔒 | core proto | `docs/backlog.md` | Саботаж флота и охрана своего флота. |
+| SPM-9 | ⏳ | core proto | `docs/backlog.md` | «Остаться на этом слое». |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |

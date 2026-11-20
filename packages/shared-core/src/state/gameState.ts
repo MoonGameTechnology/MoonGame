@@ -293,7 +293,7 @@ export interface ScoutedWorld {
   at: number;
 }
 
-export type { Spy, SpyOffer, SpyOp, SpyState } from './spy';
+export type { Spy, SpyOffer, SpyOp, SpyState, SpyWayPoint } from './spy';
 
 export type MatchStatus = 'ongoing' | 'ended';
 export type MatchEndReason =

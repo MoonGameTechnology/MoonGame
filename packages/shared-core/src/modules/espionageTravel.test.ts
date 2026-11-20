@@ -167,6 +167,11 @@ describe('SPY-23 — to the world, the deed, and home', () => {
       arrivesAt: H_E,
       op: 'theft',
       mission: 1,
+      way: [
+        { at: 'H', t: 0 },
+        { at: 'N', t: H_N },
+        { at: 'E', t: H_E },
+      ],
     });
     expect(ofType(sent.events, 'espionage.sent')[0]!.payload).toEqual({
       owner: 'p1',

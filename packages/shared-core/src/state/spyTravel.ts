@@ -2,7 +2,7 @@ import type { Context } from '../action/types';
 import { hoursToMs, travelSpeedFactorOf } from '../action/types';
 import { coalitionOf } from './coalition';
 import { getStance } from './diplomacy';
-import type { GameState, PlanetId, PlayerId, Spy } from './gameState';
+import type { GameState, PlanetId, PlayerId, Spy, SpyWayPoint } from './gameState';
 import { halfRoadLength } from './roads';
 
 /**
@@ -36,6 +36,15 @@ export function spyTerritoryFactor(
   return stance === 'war' ? SPY_ENEMY_FACTOR : SPY_NEUTRAL_FACTOR;
 }
 
+/** The lane `a → b` as a spy of `playerId` flies it: each half at the pace of the province it
+ *  lies in (map units at full speed). */
+function spyLegLength(state: GameState, playerId: PlayerId, a: PlanetId, b: PlanetId): number {
+  return (
+    halfRoadLength(state, a, b) / spyTerritoryFactor(state, playerId, a) +
+    halfRoadLength(state, b, a) / spyTerritoryFactor(state, playerId, b)
+  );
+}
+
 /**
  * The quickest lane route for a spy of `playerId` from `fromId` to `toId`: the hops after
  * `fromId` and the route's length weighted by territory (map units at full speed). Dijkstra
@@ -54,7 +63,6 @@ export function spyPath(
   const gated = (id: PlanetId): boolean => (state.planets[id]?.transit?.length ?? 0) > 0;
   const keyOf = (node: PlanetId, from: PlanetId | null): string =>
     gated(node) && from !== null ? `${node}\u0000${from}` : node;
-  const pace = (id: PlanetId): number => spyTerritoryFactor(state, playerId, id);
   const node = new Map<string, { at: PlanetId; from: PlanetId | null }>();
   const dist = new Map<string, number>();
   const prev = new Map<string, string>();
@@ -93,8 +101,7 @@ export function spyPath(
       }
       const k = keyOf(next, at);
       if (done.has(k)) continue;
-      const leg =
-        halfRoadLength(state, at, next) / pace(at) + halfRoadLength(state, next, at) / pace(next);
+      const leg = spyLegLength(state, playerId, at, next);
       const nd = best + leg;
       const cur = dist.get(k);
       if (cur === undefined || nd < cur) {
@@ -117,6 +124,86 @@ export function spyJourneyMs(
   const speed = SPY_SPEED * travelSpeedFactorOf(rules) * speedFactor;
   if (!Number.isFinite(speed) || speed <= 0) return null;
   return Math.round(hoursToMs({ ...rules, now: 0 }, length / speed));
+}
+
+/**
+ * The timed way of a journey (SPM-1, `Spy.way`): the quickest route `from` → `to` with the
+ * world-time the spy reaches each world, spread over `departedAt`…`arrivesAt` in proportion to
+ * the territory-weighted length of each lane — the spy's pace is the same all the way, only the
+ * territory slows it. `lead` is a way already owed before it (a spy turning back,
+ * {@link spyTurnBack}): it ends at `from`, and the route starts from its last time. No route →
+ * straight from the start to `to`.
+ */
+export function spyWay(
+  state: GameState,
+  playerId: PlayerId,
+  from: PlanetId,
+  to: PlanetId,
+  departedAt: number,
+  arrivesAt: number,
+  lead?: readonly SpyWayPoint[],
+): SpyWayPoint[] {
+  const way: SpyWayPoint[] = lead?.length
+    ? lead.map((p) => ({ ...p }))
+    : [{ at: from, t: departedAt }];
+  const start = way[way.length - 1]!.t;
+  const path = spyPath(state, playerId, from, to);
+  if (!path || path.route.length === 0) {
+    if (way[way.length - 1]!.at !== to) way.push({ at: to, t: arrivesAt });
+    else way[way.length - 1]!.t = arrivesAt;
+    return way;
+  }
+  let prev = from;
+  let flown = 0;
+  for (const id of path.route) {
+    flown += spyLegLength(state, playerId, prev, id);
+    const share = path.length > 0 ? flown / path.length : 1;
+    way.push({
+      at: id,
+      t: id === to ? arrivesAt : start + Math.round((arrivesAt - start) * share),
+    });
+    prev = id;
+  }
+  return way;
+}
+
+/**
+ * The way back of a spy called off mid-journey at `now` (SPM-1): it retraces the lanes it has
+ * flown, as fast as it came, to the world it set out from — reached `now − departedAt` later.
+ * The first point is the world just ahead of it, timed in the past, so that `now` falls on the
+ * very lane point where it turned. `undefined` — no way, or the journey is not under way.
+ */
+export function spyTurnBack(
+  way: readonly SpyWayPoint[] | undefined,
+  now: number,
+): SpyWayPoint[] | undefined {
+  if (!way?.length || way[0]!.t > now) return undefined;
+  const ahead = way.findIndex((p) => p.t > now);
+  if (ahead < 0) return undefined;
+  const out: SpyWayPoint[] = [];
+  for (let i = ahead; i >= 0; i--) out.push({ at: way[i]!.at, t: 2 * now - way[i]!.t });
+  return out;
+}
+
+/**
+ * Where on its way a spy is at `now` (SPM-1, for the owner's map): flying the lane `a → b`,
+ * `f` of it behind. Before the way starts it stands at the first world, after it ends at the
+ * last (`a === b`, `f` 0). An empty way → `null`.
+ */
+export function spyWayAt(
+  way: readonly SpyWayPoint[] | undefined,
+  now: number,
+): { a: PlanetId; b: PlanetId; f: number } | null {
+  if (!way?.length) return null;
+  const first = way[0]!;
+  if (now <= first.t) return { a: first.at, b: first.at, f: 0 };
+  for (let i = 1; i < way.length; i++) {
+    const p = way[i - 1]!;
+    const q = way[i]!;
+    if (now < q.t) return { a: p.at, b: q.at, f: q.t > p.t ? (now - p.t) / (q.t - p.t) : 1 };
+  }
+  const last = way[way.length - 1]!;
+  return { a: last.at, b: last.at, f: 0 };
 }
 
 /** Where a spy that is free for an order stands: its world when it rests, waits or works;

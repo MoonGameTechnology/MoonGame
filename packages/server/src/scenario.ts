@@ -100,7 +100,10 @@ export const DEV_MODULES: GameModule[] = GAME_MODULES;
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '119'; // Небо у крепостей: порядок тот же; `shuttle` 2.3.1 и
+export const MODULE_MANIFEST_VERSION = '120'; // SPM-1: порядок тот же; `espionage` 2.4.0 — шпион
+// хранит свой путь с временем каждого мира (`Spy.way`). Партия на 119 такого поля не писала, и
+// реплей разошёлся бы.
+// export const MODULE_MANIFEST_VERSION = '119'; // Небо у крепостей: порядок тот же; `shuttle` 2.3.1 и
 // `missiles` 1.1.1 — площадка крепости на развилке или причале не клетка закрытого неба. Партия на 118
 // пускала авиацию над куском кольца у такой крепости, и реплей разошёлся бы.
 // export const MODULE_MANIFEST_VERSION = '118'; // TEC-4: порядок тот же; `speedup` 1.1.0 —

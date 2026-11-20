@@ -92,6 +92,7 @@ export {
   type Spy,
   type SpyState,
   type SpyOp,
+  type SpyWayPoint,
 } from './state/gameState';
 export {
   buildStateFromMap,
@@ -876,6 +877,9 @@ export {
   spyHome,
   spyStandsAt,
   spyTerritoryFactor,
+  spyTurnBack,
+  spyWay,
+  spyWayAt,
   SPY_SPEED,
   SPY_NEUTRAL_FACTOR,
   SPY_ENEMY_FACTOR,

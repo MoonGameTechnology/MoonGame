@@ -35,6 +35,8 @@ import { SPY_JOURNEY_EVENTS, spyJourneyKey } from '../../decisions/spyJourney';
 import { SPY_TASKS, taskBlock, type SpyTask, type TaskBlock } from '../../decisions/spyTasks';
 import { oddsPct } from '../../decisions/spyOdds';
 import { espionageShown } from '../../decisions/sectorZeroTools';
+import { spyFlashOf } from '../../decisions/spyMarks';
+import { flashSpy } from './mapSpies';
 import { t } from '../../localization/runtime';
 import { esc, gameStamp } from './format';
 import { liveTimerHtml, patchLiveTimers, type LiveFormats } from './liveTimers';
@@ -343,6 +345,18 @@ export function openSpyWindow(planetId: string | null = null): void {
   render();
 }
 
+/** Тап по своему шпиону на карте (SPM-1): свободного — сразу к его заданиям, занятого — в
+ *  список, где у его строки кнопка отмены. */
+export function openSpyFor(spyId: number): void {
+  if (!espionageShown(game.sectorZeroToolsHidden())) return;
+  target = null;
+  ask = null;
+  const row = rows().find((r) => r.id === spyId);
+  step = row?.action === 'assign' ? { kind: 'tasks', spy: spyId } : { kind: 'roster' };
+  tileSel = null;
+  render();
+}
+
 export function closeSpyWindow(): void {
   step = { kind: 'closed' };
   ask = null;
@@ -391,6 +405,8 @@ export function refreshSpyWindow(): void {
 let spyLog: SpyRecord[] = [];
 export function pushSpyLog(text: string, type = '', payload: Record<string, unknown> = {}): void {
   spyLog = pushSpyRecord(spyLog, spyRecordOf(type, payload, game.state().time, text));
+  const flash = spyFlashOf(type, payload, game.me()); // SPM-1: вспышка у мира на карте
+  if (flash) flashSpy(game.state().planets[String(payload.planetId)]?.position, flash);
   refreshSpyWindow();
 }
 /** Строка ленты и журнала о пути своего шпиона (`decisions/spyJourney.ts`); `null` —
