@@ -5,6 +5,7 @@ import { peekValues } from '../util/draft';
 import { effectiveStat } from '../util/loadout';
 import { recordValues } from '../util/records';
 import { isForkSite } from './forkSite';
+import { spyStands } from './spyKnowledge';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { laneIsPublic } from './corridor';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
@@ -1234,145 +1235,7 @@ function project(
   // SHU-6.10, SHU-6.16: чужой патруль и чужая эскадра в полёте в обзоре — своими списками.
   writeSeenAircraft(view, state, viewerId, data);
 
-  // Planets: keep topology (id/position/links) but strip contents you can't see.
-  // A world you have seen before shows its remembered snapshot (variant B);
-  // one never identified shows nothing.
-  const remembered: PlanetId[] = [];
-  const memory = state.fog?.[viewerId];
-  const surveyed = state.surveyed?.[viewerId];
-  // Миры, на земле которых идёт СВОЙ наземный бой зрителя (или его блока зрения). Бой
-  // проекция и так оставляет (`engagementOf`), а обе его стороны живут в самом мире —
-  // гарнизон и плацдармы. Без них неопознанный мир отдавал бы бой с пустыми сторонами или
-  // протухший снимок памяти (замечание Codex на #1408).
-  // Мир → владельцы плацдармов, стоящих СТОРОНАМИ этих боёв: берег, оставшийся на земле без
-  // боя (после перемирия или ничьей), в бою не участвует и остаётся в тумане (замечание Codex
-  // на #1417).
-  const engagedBattles = engagementOf(state, viewerId).battles;
-  const groundFights = new Map<PlanetId, Set<PlayerId>>();
-  for (const b of Object.values(state.battles)) {
-    if (b.phase !== 'ground' || !engagedBattles.has(b.id)) continue;
-    const shores = groundFights.get(b.location) ?? new Set<PlayerId>();
-    for (const side of b.sides) if (side.ref.kind === 'beachhead') shores.add(side.ref.owner);
-    groundFights.set(b.location, shores);
-  }
-  for (const planet of Object.values(view.planets)) {
-    // BLD-1. Очередь стройки — БУДУЩЕЕ НАМЕРЕНИЕ, ровно то, за что ниже режут
-    // `scheduled` и выше — цепочки приказов: «что он собирается построить» это разведка
-    // планов, а не наблюдение мира. Поэтому режется РАНЬШЕ развилки видимости: чужой
-    // мир не отдаёт очередь, даже когда ты смотришь на него в упор.
-    // SPY-13, layer 3: a posted recon agent reads the plans of its world — the queue and a
-    // paused site; the rest stays cut.
-    const queueSpied = depth.queues.has(planet.id);
-    if (planet.owner !== viewerId) {
-      if (!queueSpied) delete planet.buildQueue;
-      // SHU-6.6. «Держать патруль» — постоянный приказ эскадры, то же намерение, что
-      // цепочки и авто-штурм: точка, где хозяин снова встанет кругом, — разведка планов.
-      // Ангар опознанного мира виден, флаг удержания и срок заправки в нём — нет.
-      for (const squad of planet.hangar ?? []) hideSquadronPlans(squad);
-      // FOG-9. Приостановленная стройка — то же НАМЕРЕНИЕ, только с паузой: вид, уровень
-      // и остаток цены рассказывают, что хозяин собирался тут поставить и сколько уже
-      // вложил. Резалось всё вокруг (`scheduled`, цепочки приказов, очередь), а это
-      // поле — нет, поэтому опознанный чужой мир отдавал планы прежнего владельца
-      // целиком. Режем там же и по той же причине.
-      if (!queueSpied) delete planet.pausedConstruction;
-      // SPY-15: подрыв экономики — тайна владельца мира: чужой срок подрыва рассказал бы,
-      // что на мир работает чужой агент.
-      delete planet.disruptedUntil;
-      // BAL-19: освоение знают двое — кто взял и у кого взяли; третьему оно выдало бы чужой захват.
-      if (planet.integration?.claim !== viewerId) delete planet.integration;
-      // Счётчик вылетов порта (`sortie`): чужие удары сняты целиком (`strikes` выше), а
-      // убыль топлива и начавшаяся перезарядка выдали бы скрытый вылет и без них.
-      delete planet.sortie;
-      for (const building of planet.buildings) delete building.repair;
-      if (planet.fortress) {
-        if (identify.has(planet.id)) {
-          planet.fortress = { level: planet.fortress.level, damageCursor: planet.fortress.damageCursor };
-        } else delete planet.fortress;
-      }
-    }
-    // FORT-5.13. `priorKind` — СЛУЖЕБНАЯ память конверсии («чем узел был до крепости»),
-    // и наружу она не идёт НИКОМУ: само её наличие выдаёт стоящую крепость, а значение —
-    // исходный вид местности под ней. Неопознанный узел отдавал бы и то и другое, а
-    // запомненный — конверсию, случившуюся уже после последнего наблюдения (в снимке
-    // памяти этого поля нет). Режется до развилки видимости и у всех сразу, как `fog` и
-    // поток ГСЧ: внутреннее поле ядра, которому в проекции делать нечего.
-    delete planet.priorKind;
-    // Ждущий флот (`joinsOnArrival`) ещё не в игре: зритель знает только свой — он и есть
-    // цель, куда вести флот. Чужой выдал бы состав и место до всякой разведки.
-    if (planet.awaitingFleets) {
-      const own = planet.awaitingFleets.filter((f) => f.owner === viewerId);
-      if (own.length > 0) planet.awaitingFleets = own;
-      else delete planet.awaitingFleets;
-    }
-    if (planet.owner === viewerId || identify.has(planet.id)) continue;
-    // FORT-6.1: площадка крепости на развилке — не топология карты, а сооружение, и само
-    // её существование говорит «здесь стоит (или стояла) крепость». Провинции видны всем
-    // (они и есть карта), а площадку, которую зритель не видел ни разу, он не получает
-    // вовсе — иначе туман выдавал бы каждую крепость на дорогах. Увиденную помнит, как и
-    // любой мир.
-    if (isForkSite(planet) && !memory?.[planet.id]) {
-      delete view.planets[planet.id];
-      continue;
-    }
-    // Ангар чужого мира не виден НИКОГДА (SHU-1.1): челнок стоит внутри порта, а не на
-    // орбите — снаружи видно здание, но не то, сколько машин в нём. Единственное
-    // исключение выше по функции: шпионаж (окно разведки опознаёт мир) вскрывает его
-    // целиком и сюда не доходит.
-    delete planet.hangar;
-    // ROS-1.5: плацдарм — войска НА ЗЕМЛЕ чужого мира, и виден он ровно там же, где
-    // виден гарнизон. На неопознанном мире его быть не должно: иначе десант соседа
-    // выдавал бы и сам факт вторжения, и место, куда игрок не смотрит. В памятном
-    // снимке его нет намеренно — плацдарм живёт часы, и «помнить» его значило бы
-    // показывать заведомо протухшее.
-    delete planet.beachheads;
-    const snap = memory?.[planet.id];
-    if (snap) {
-      planet.owner = snap.owner;
-      planet.garrison = snap.garrison.map((s) => ({ ...s }));
-      planet.buildings = snap.buildings.map((b) => {
-        const visible = { ...b };
-        delete visible.repair;
-        return visible;
-      });
-      planet.resources = {};
-      if (snap.terrain === undefined) delete planet.terrain;
-      else planet.terrain = snap.terrain;
-      if (snap.planetType === undefined) delete planet.planetType;
-      else planet.planetType = snap.planetType;
-      if (snap.kind === undefined) delete planet.kind;
-      else planet.kind = snap.kind;
-      remembered.push(planet.id);
-    } else {
-      planet.owner = null;
-      planet.garrison = [];
-      planet.buildings = [];
-      planet.resources = {};
-      // A province the viewer's ship has been inside keeps the type that ship found there
-      // (`surveyed`), and only the type: owner and contents still take a scan.
-      const found = surveyed?.[planet.id];
-      if (found?.terrain === undefined) delete planet.terrain;
-      else planet.terrain = found.terrain;
-      if (found?.planetType === undefined) delete planet.planetType;
-      else planet.planetType = found.planetType;
-      if (found?.kind === undefined) delete planet.kind;
-      else planet.kind = found.kind;
-    }
-    // Свой наземный бой: его стороны — живые. Хозяин, гарнизон и плацдармы боя — то, с чем и
-    // против кого зритель дерётся прямо сейчас; постройки, склады и посторонние берега мира
-    // остаются в тумане.
-    const shores = groundFights.get(planet.id);
-    if (shores) {
-      const live = state.planets[planet.id]!;
-      planet.owner = live.owner;
-      planet.garrison = live.garrison.map((st) => ({ ...st }));
-      const fighting = (live.beachheads ?? []).filter((b) => shores.has(b.owner));
-      if (fighting.length > 0) {
-        planet.beachheads = fighting.map((b) => ({ ...b, units: b.units.map((st) => ({ ...st })) }));
-      }
-    }
-  }
-  remembered.sort();
-  view.remembered = remembered;
+  projectPlanets(view, state, viewerId, identify, depth);
   delete view.fog; // memory is authoritative-internal — never shipped raw
   // The seeded RNG stream (sfc32 a/b/c/d) is the world's dice: a client holding it can
   // roll every upcoming combat round / dark event before the server does — the sharpest
@@ -1486,4 +1349,159 @@ function project(
   }
 
   return view;
+}
+
+/** Planets of the projection: topology (id / position / links) stays, contents the viewer
+ *  cannot see are stripped. A world seen before shows its remembered snapshot (variant B);
+ *  one never identified shows nothing. Lifted out of `project` (SLIM-6). */
+function projectPlanets(
+  view: VisibleState,
+  state: GameState,
+  viewerId: PlayerId,
+  identify: ReadonlySet<PlanetId>,
+  depth: IntelDepth,
+): void {
+  const remembered: PlanetId[] = [];
+  const memory = state.fog?.[viewerId];
+  const surveyed = state.surveyed?.[viewerId];
+  // Миры, на земле которых идёт СВОЙ наземный бой зрителя (или его блока зрения). Бой
+  // проекция и так оставляет (`engagementOf`), а обе его стороны живут в самом мире —
+  // гарнизон и плацдармы. Без них неопознанный мир отдавал бы бой с пустыми сторонами или
+  // протухший снимок памяти (замечание Codex на #1408).
+  // Мир → владельцы плацдармов, стоящих СТОРОНАМИ этих боёв: берег, оставшийся на земле без
+  // боя (после перемирия или ничьей), в бою не участвует и остаётся в тумане (замечание Codex
+  // на #1417).
+  const spiedOn = new Set((state.spies?.[viewerId] ?? []).filter(spyStands).map((spy) => spy.location));
+  const engagedBattles = engagementOf(state, viewerId).battles;
+  const groundFights = new Map<PlanetId, Set<PlayerId>>();
+  for (const b of Object.values(state.battles)) {
+    if (b.phase !== 'ground' || !engagedBattles.has(b.id)) continue;
+    const shores = groundFights.get(b.location) ?? new Set<PlayerId>();
+    for (const side of b.sides) if (side.ref.kind === 'beachhead') shores.add(side.ref.owner);
+    groundFights.set(b.location, shores);
+  }
+  for (const planet of Object.values(view.planets)) {
+    // BLD-1. Очередь стройки — БУДУЩЕЕ НАМЕРЕНИЕ, ровно то, за что ниже режут
+    // `scheduled` и выше — цепочки приказов: «что он собирается построить» это разведка
+    // планов, а не наблюдение мира. Поэтому режется РАНЬШЕ развилки видимости: чужой
+    // мир не отдаёт очередь, даже когда ты смотришь на него в упор.
+    // SPY-13, layer 3: a posted recon agent reads the plans of its world — the queue and a
+    // paused site; the rest stays cut.
+    const queueSpied = depth.queues.has(planet.id);
+    if (planet.owner !== viewerId) {
+      if (!queueSpied) delete planet.buildQueue;
+      // SHU-6.6. «Держать патруль» — постоянный приказ эскадры, то же намерение, что
+      // цепочки и авто-штурм: точка, где хозяин снова встанет кругом, — разведка планов.
+      // Ангар опознанного мира виден, флаг удержания и срок заправки в нём — нет.
+      for (const squad of planet.hangar ?? []) hideSquadronPlans(squad);
+      // FOG-9. Приостановленная стройка — то же НАМЕРЕНИЕ, только с паузой: вид, уровень
+      // и остаток цены рассказывают, что хозяин собирался тут поставить и сколько уже
+      // вложил. Резалось всё вокруг (`scheduled`, цепочки приказов, очередь), а это
+      // поле — нет, поэтому опознанный чужой мир отдавал планы прежнего владельца
+      // целиком. Режем там же и по той же причине.
+      if (!queueSpied) delete planet.pausedConstruction;
+      // SPY-15: подрыв экономики — тайна владельца мира: чужой срок подрыва рассказал бы,
+      // что на мир работает чужой агент.
+      delete planet.disruptedUntil;
+      // BAL-19: освоение знают двое — кто взял и у кого взяли; третьему оно выдало бы чужой захват.
+      if (planet.integration?.claim !== viewerId) delete planet.integration;
+      // Счётчик вылетов порта (`sortie`): чужие удары сняты целиком (`strikes` выше), а
+      // убыль топлива и начавшаяся перезарядка выдали бы скрытый вылет и без них.
+      delete planet.sortie;
+      for (const building of planet.buildings) delete building.repair;
+      if (planet.fortress) {
+        if (identify.has(planet.id)) {
+          planet.fortress = { level: planet.fortress.level, damageCursor: planet.fortress.damageCursor };
+        } else delete planet.fortress;
+      }
+    }
+    // FORT-5.13. `priorKind` — СЛУЖЕБНАЯ память конверсии («чем узел был до крепости»),
+    // и наружу она не идёт НИКОМУ: само её наличие выдаёт стоящую крепость, а значение —
+    // исходный вид местности под ней. Неопознанный узел отдавал бы и то и другое, а
+    // запомненный — конверсию, случившуюся уже после последнего наблюдения (в снимке
+    // памяти этого поля нет). Режется до развилки видимости и у всех сразу, как `fog` и
+    // поток ГСЧ: внутреннее поле ядра, которому в проекции делать нечего.
+    delete planet.priorKind;
+    // Ждущий флот (`joinsOnArrival`) ещё не в игре: зритель знает только свой — он и есть
+    // цель, куда вести флот. Чужой выдал бы состав и место до всякой разведки.
+    if (planet.awaitingFleets) {
+      const own = planet.awaitingFleets.filter((f) => f.owner === viewerId);
+      if (own.length > 0) planet.awaitingFleets = own;
+      else delete planet.awaitingFleets;
+    }
+    if (planet.owner === viewerId || identify.has(planet.id)) continue;
+    // FORT-6.1: площадка крепости на развилке — не топология карты, а сооружение, и само
+    // её существование говорит «здесь стоит (или стояла) крепость». Провинции видны всем
+    // (они и есть карта), а площадку, которую зритель не видел ни разу, он не получает
+    // вовсе — иначе туман выдавал бы каждую крепость на дорогах. Увиденную помнит, как и
+    // любой мир.
+    if (isForkSite(planet) && !memory?.[planet.id]) {
+      delete view.planets[planet.id];
+      continue;
+    }
+    // Ангар чужого мира не виден НИКОГДА (SHU-1.1): челнок стоит внутри порта, а не на
+    // орбите — снаружи видно здание, но не то, сколько машин в нём. Единственное
+    // исключение выше по функции: шпионаж (окно разведки опознаёт мир) вскрывает его
+    // целиком и сюда не доходит.
+    delete planet.hangar;
+    // ROS-1.5: плацдарм — войска НА ЗЕМЛЕ чужого мира, и виден он ровно там же, где
+    // виден гарнизон. На неопознанном мире его быть не должно: иначе десант соседа
+    // выдавал бы и сам факт вторжения, и место, куда игрок не смотрит. В памятном
+    // снимке его нет намеренно — плацдарм живёт часы, и «помнить» его значило бы
+    // показывать заведомо протухшее.
+    delete planet.beachheads;
+    const snap = memory?.[planet.id];
+    if (snap) {
+      planet.owner = snap.owner;
+      planet.garrison = snap.garrison.map((s) => ({ ...s }));
+      planet.buildings = snap.buildings.map((b) => {
+        const visible = { ...b };
+        delete visible.repair;
+        return visible;
+      });
+      planet.resources = {};
+      if (snap.terrain === undefined) delete planet.terrain;
+      else planet.terrain = snap.terrain;
+      if (snap.planetType === undefined) delete planet.planetType;
+      else planet.planetType = snap.planetType;
+      if (snap.kind === undefined) delete planet.kind;
+      else planet.kind = snap.kind;
+      remembered.push(planet.id);
+    } else {
+      planet.owner = null;
+      planet.garrison = [];
+      planet.buildings = [];
+      planet.resources = {};
+      // A province the viewer's ship has been inside keeps the type that ship found there
+      // (`surveyed`), and only the type: owner and contents still take a scan.
+      const found = surveyed?.[planet.id];
+      if (found?.terrain === undefined) delete planet.terrain;
+      else planet.terrain = found.terrain;
+      if (found?.planetType === undefined) delete planet.planetType;
+      else planet.planetType = found.planetType;
+      if (found?.kind === undefined) delete planet.kind;
+      else planet.kind = found.kind;
+    }
+    // SPM-1 (owner's report 2026-11-20): a world the viewer's own spy stands on — waiting
+    // there or at work — is one whose holder they know, live, as the core checks spy
+    // orders by it (`spyKnownOwner`). Its owner only: contents still take a scan. Without
+    // it a network client read the fog's «nobody» and greyed every task against the world
+    // its spy had just reached.
+    if (spiedOn.has(planet.id)) planet.owner = state.planets[planet.id]!.owner;
+    // Свой наземный бой: его стороны — живые. Хозяин, гарнизон и плацдармы боя — то, с чем и
+    // против кого зритель дерётся прямо сейчас; постройки, склады и посторонние берега мира
+    // остаются в тумане.
+    const shores = groundFights.get(planet.id);
+    if (shores) {
+      const live = state.planets[planet.id]!;
+      planet.owner = live.owner;
+      planet.garrison = live.garrison.map((st) => ({ ...st }));
+      const fighting = (live.beachheads ?? []).filter((b) => shores.has(b.owner));
+      if (fighting.length > 0) {
+        planet.beachheads = fighting.map((b) => ({ ...b, units: b.units.map((st) => ({ ...st })) }));
+      }
+    }
+  }
+  remembered.sort();
+  view.remembered = remembered;
 }

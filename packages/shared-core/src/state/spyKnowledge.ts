@@ -22,6 +22,12 @@ import { spyPath } from './spyTravel';
  * Pure: the espionage module checks orders with it, a client may grey out its buttons with it.
  */
 
+/** Does `spy` stand on its world now — waiting there or at work: its owner knows who holds
+ *  that world, live (the fog projection shows that owner too, `visibility.ts`). */
+export function spyStands(spy: Spy): boolean {
+  return spy.state === 'wait' || spy.state === 'work';
+}
+
 /** Whose `viewerId` takes `planetId` to be; `undefined` — the player does not know. */
 export function spyKnownOwner(
   state: Pick<GameState, 'planets' | 'fog' | 'scouted' | 'spies' | 'coalitions'>,
@@ -39,7 +45,7 @@ export function spyKnownOwner(
   )
     return live;
   const standing = (state.spies?.[viewerId] ?? []).some(
-    (s) => s.location === planetId && (s.state === 'wait' || s.state === 'work'),
+    (s) => s.location === planetId && spyStands(s),
   );
   if (standing) return live;
   const found = state.scouted?.[viewerId]?.[planetId];
