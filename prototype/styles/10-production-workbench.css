@@ -456,7 +456,10 @@ body:not(.hub-open) #codex {
 }
 #constructor .bw-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Ширина по слову: длинная «Инфраструктура» берёт место у короткого «Все», а не рвётся
+     посреди слова (аудит интерфейса 2026-11-20). */
+  grid-auto-flow: column;
+  grid-auto-columns: auto;
   gap: 3px;
   overflow: visible;
 }
@@ -499,6 +502,9 @@ body:not(.hub-open) #codex {
     overflow-wrap: anywhere;
     font-size: var(--fs-caption);
     padding: 5px 3px;
+  }
+  #constructor .bw-tab {
+    overflow-wrap: normal;
   }
   #constructor .bw-top {
     display: none;

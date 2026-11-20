@@ -224,10 +224,10 @@ export function settingsBoxHtml(
   ).join('');
   return (
     `<div class="setbox">` +
-    `<div class="pc-head"><span class="pc-dia" style="background:var(--cyan)"></span><b>${t('settings.title')}</b><span class="pc-tag">${t('settings.tag')}</span></div>` +
+    `<div class="pc-head"><span class="pc-dia" style="background:var(--cyan)"></span><b>${t('settings.title')}</b><span class="pc-tag">${t('settings.tag')}</span>` +
+    `<button class="set-close btn-x" id="set-close" type="button" aria-label="${t('card.close')}">✕</button></div>` +
     `<div class="set-tabs" role="tablist" aria-label="${t('settings.title')}">${tabs}</div>` +
     `<div class="set-panel" id="set-panel" role="tabpanel" aria-labelledby="set-tab-${tab}">${tabHtml(view, tab, renderingReportAvailable, barSlot)}</div>` +
-    `<button class="pc-close" id="set-close" type="button">${t('settings.done')}</button>` +
     `</div>`
   );
 }

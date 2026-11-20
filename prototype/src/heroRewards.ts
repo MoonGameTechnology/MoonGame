@@ -34,7 +34,7 @@ export function heroRewardHtml(reward: HeroReward, remaining: number, data: Game
       ).join('');
   const art = skill ? '✦' : heroPortraitHtml(reward.hero) || '◈';
   return `<article class="module-reveal hero-reveal">
-    <button type="button" class="mr-close btn-x" data-hero-reward="dismiss" aria-label="${esc(t('module-reward.close'))}">×</button>
+    <button type="button" class="mr-close btn-x" data-hero-reward="dismiss" aria-label="${esc(t('module-reward.close'))}">✕</button>
     <p class="mr-eyebrow">${esc(t('arsenal.tab.heroes'))}</p>
     <h2 id="hero-reward-title">${esc(t(improvement ? 'hero-reward.skill-upgraded' : TITLES[reward.kind]!))}</h2>
     <div class="mr-stage" aria-hidden="true"><div class="mr-ring"></div><div class="mr-ring mr-ring-inner"></div>

@@ -59,7 +59,7 @@ export const stars = (item: ArsenalItem): string =>
     : '';
 
 export const sheet = (title: string, icon: string, body: string): string =>
-  `<div class="mm-scrim" data-mm-close><section class="mm-sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><span class="mm-ic" aria-hidden="true">${icon}</span><b>${esc(title)}</b><button type="button" class="btn-x" data-mm-close aria-label="${esc(t('auction.close'))}">×</button></header>${body}</section></div>`;
+  `<div class="mm-scrim" data-mm-close><section class="mm-sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><span class="mm-ic" aria-hidden="true">${icon}</span><b>${esc(title)}</b><button type="button" class="btn-x" data-mm-close aria-label="${esc(t('auction.close'))}">✕</button></header>${body}</section></div>`;
 
 /** Фактические бонусы копии (редкость и звёзды учтены) — покупатель видит их до траты варрантов. */
 export const effectsLine = (item: ArsenalItem): string => {

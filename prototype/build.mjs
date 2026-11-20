@@ -292,7 +292,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <!--dev-only--><span class="sep" id="restart-sep" style="display:none"></span><button id="restart" data-i18n-title="speed.restart" style="display:none">⟳</button><span class="sep"></span><!--/dev-only--><button id="tomenu" class="spd-pc-hide" data-i18n-title="speed.exit">⌂</button>
 </div>
 <div id="cmdbar"></div>
-<div id="troopswin" role="dialog" aria-modal="true" aria-labelledby="troops-title" hidden><div class="troops-box"><header class="troops-head"><div><b id="troops-title" data-i18n="fleet.console.load"></b><span class="troops-fleet"></span></div><button type="button" class="btn-x" data-cmd="tcancel" data-i18n-aria="card.close">×</button></header><div class="troops-content"></div></div></div>
+<div id="troopswin" role="dialog" aria-modal="true" aria-labelledby="troops-title" hidden><div class="troops-box"><header class="troops-head"><div><b id="troops-title" data-i18n="fleet.console.load"></b><span class="troops-fleet"></span></div><button type="button" class="btn-x" data-cmd="tcancel" data-i18n-aria="card.close">✕</button></header><div class="troops-content"></div></div></div>
 <div id="codex"></div>
 <div id="codexhub"></div>
 <div id="intro"></div>
@@ -300,7 +300,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="goals"></div>
 <aside id="pirate-intro" hidden>
   <b class="pe-title" data-i18n="pve.pirates.title"></b>
-  <button type="button" id="pirate-close" class="pe-close btn-x" data-i18n-aria="pve.pirates.hide">×</button>
+  <button type="button" id="pirate-close" class="pe-close btn-x" data-i18n-aria="pve.pirates.hide">✕</button>
   <p id="pirate-copy" class="pe-copy" aria-live="polite"></p>
   <button type="button" id="pirate-action" class="pe-action"></button>
 </aside>
@@ -747,7 +747,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <svg id="setupmap" class="smap" preserveAspectRatio="xMidYMid meet" role="group" data-i18n-aria="setup.map.aria"></svg>
         <div id="setuplegend" class="slegend"></div>
         <p class="smaphint shint" id="setuphint" data-i18n="setup.map-hint"></p>
-        <div class="sspeedsec solo-only">
+        <div class="sspeedsec solo-only" data-i18n-title="setup.speed.hint">
           <div class="sspeedlabel" data-i18n="setup.speed.label"></div>
           <p class="sspeedhint" data-i18n="setup.speed.hint"></p>
           <div id="setupspeed" class="sspeed">

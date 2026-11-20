@@ -1543,7 +1543,6 @@ export const ru: Record<string, string> = {
     'режим плана: нажимайте на точки карты — курс · ждать · штурм · огонь; флот исполнит цепочку сам',
 
   // --- codex — Кодекс: карточка здания/юнита/модуля (строки характеристик) и статьи-термины.
-  'codex.hub.close': 'Закрыть',
   'codex.hub.empty': 'Ничего не найдено',
   'codex.hub.search.aria': 'Поиск по справочнику',
   'codex.hub.search.ph': 'Поиск: юнит, здание, термин…',
@@ -2430,6 +2429,8 @@ export const ru: Record<string, string> = {
   'dossier.hint': 'Наведите на объект слева — здесь появится его досье.',
   'dossier.stat.atk.name': 'Атака',
   'dossier.stat.cap.name': 'Эффективность состава',
+  // Короткая подпись той же строки в «Составе» флота: длинная обрезалась до «Эффективно…».
+  'fleet.stat.cap.short': 'Строй',
   'dossier.stat.datk.name': 'Атака',
   'dossier.stat.ddef.name': 'Защита',
   'dossier.stat.def.name': 'Защита',
@@ -5087,7 +5088,6 @@ export const ru: Record<string, string> = {
   'settings.bar.pick-at': '{name}, место {n}',
   'settings.bar.picks': 'Окна',
   'settings.bar.reset': 'Вернуть как было',
-  'settings.done': 'Готово',
   'settings.gfx.fps': 'Счётчик FPS',
   'settings.gfx.frame-rate': 'Лимит частоты кадров',
   'settings.gfx.frame-rate.auto': 'По частоте экрана',

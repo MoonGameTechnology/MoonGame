@@ -1537,7 +1537,6 @@ export const en: Record<string, string> = {
     'plan mode: select map points — move · wait · assault · fire; the fleet runs the chain itself',
 
   // --- codex — Кодекс: карточка здания/юнита/модуля (строки характеристик) и статьи-термины.
-  'codex.hub.close': 'Close',
   'codex.hub.empty': 'Nothing found',
   'codex.hub.search.aria': 'Search the codex',
   'codex.hub.search.ph': 'Search: unit, building, term…',
@@ -2422,6 +2421,8 @@ export const en: Record<string, string> = {
   'dossier.hint': 'Hover an object on the left — its dossier appears here.',
   'dossier.stat.atk.name': 'Attack',
   'dossier.stat.cap.name': 'Force efficiency',
+  // Короткая подпись той же строки в «Составе» флота: длинная обрезалась до «Эффективно…».
+  'fleet.stat.cap.short': 'Formation',
   'dossier.stat.datk.name': 'Attack',
   'dossier.stat.ddef.name': 'Defense',
   'dossier.stat.def.name': 'Defense',
@@ -5082,7 +5083,6 @@ export const en: Record<string, string> = {
   'settings.bar.pick-at': '{name}, spot {n}',
   'settings.bar.picks': 'Windows',
   'settings.bar.reset': 'Restore default',
-  'settings.done': 'Done',
   'settings.gfx.fps': 'FPS counter',
   'settings.gfx.frame-rate': 'Frame rate limit',
   'settings.gfx.frame-rate.auto': 'Match display refresh rate',

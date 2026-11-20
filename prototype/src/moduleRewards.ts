@@ -35,7 +35,7 @@ export function moduleRewardHtml(reward: ModuleReward, remaining: number): strin
         ? t('arsenal.copy.grade', { n: grade })
         : '';
   return `<article class="module-reveal rarity-${rarity}">
-    <button type="button" class="mr-close btn-x" data-module-reward="dismiss" aria-label="${esc(t('module-reward.close'))}">×</button>
+    <button type="button" class="mr-close btn-x" data-module-reward="dismiss" aria-label="${esc(t('module-reward.close'))}">✕</button>
     <p class="mr-eyebrow">${esc(t('hub.nav.arsenal'))}</p>
     <h2 id="module-reward-title">${esc(title)}</h2>
     <div class="mr-stage" aria-hidden="true"><div class="mr-ring"></div><div class="mr-ring mr-ring-inner"></div>

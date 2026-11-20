@@ -987,7 +987,7 @@ function fleetConsoleHtml(f: Fleet): string {
     {
       stat: 'cap',
       icon: 'stack',
-      label: t('dossier.stat.cap.name'),
+      label: t('fleet.stat.cap.short'),
       value: `${nShips}/${COMBAT_UNIT_CAP} · ${Math.round(combatEfficiency(nShips) * 100)}%`,
       tone: 'neutral',
     },

@@ -266,10 +266,10 @@ export function openCodexHub(): void {
   const box = document.getElementById('codexhub');
   if (!box) return;
   box.innerHTML =
-    `<div class="chbox"><div class="ch-head"><span class="cx-ic">?</span><b>${t('codex.hub.title')}</b></div>` +
+    `<div class="chbox"><div class="ch-head"><span class="cx-ic">?</span><b>${t('codex.hub.title')}</b>` +
+    `<button class="ch-close btn-x" id="ch-close" type="button" aria-label="${t('card.close')}">✕</button></div>` +
     `<input id="ch-search" class="ch-search" type="text" placeholder="${t('codex.hub.search.ph')}" aria-label="${t('codex.hub.search.aria')}">` +
-    `<div class="ch-body" id="ch-results"></div>` +
-    `<button class="cx-close" id="ch-close">${t('codex.hub.close')}</button></div>`;
+    `<div class="ch-body" id="ch-results"></div></div>`;
   const input = document.getElementById('ch-search') as HTMLInputElement | null;
   if (input) input.oninput = () => renderCodexResults(input.value);
   renderCodexResults('');

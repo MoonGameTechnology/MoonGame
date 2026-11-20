@@ -1,5 +1,6 @@
-/* Strategic phone screens share the existing controllers and action gates. */
-body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo) {
+/* Strategic phone screens share the existing controllers and action gates. «События» (#logwin)
+   открываются так же во весь экран, как «Производство» и «Наука» (аудит интерфейса 2026-11-20). */
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo, #logwin) {
   --dim: #9bb4c1;
   --cyan-dim: #73a9b7;
   inset: 0;
@@ -15,8 +16,8 @@ body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo) {
   -webkit-backdrop-filter: none;
 }
 body.mobile-ui
-  :is(#tech, #buildwin, #constructor, #market, #diplo)
-  > :is(.twbox, .cnbox, .mkbox, .dpbox) {
+  :is(#tech, #buildwin, #constructor, #market, #diplo, #logwin)
+  > :is(.twbox, .cnbox, .mkbox, .dpbox, .lwbox) {
   width: 100%;
   height: 100%;
   max-width: none;
@@ -28,33 +29,33 @@ body.mobile-ui
   box-shadow: inset 0 1px #b5e5f51a;
   overflow: hidden;
 }
-body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo) button {
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo, #logwin) button {
   min-height: 44px;
   min-width: 44px;
   touch-action: manipulation;
 }
-body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo) :is(input, select) {
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo, #logwin) :is(input, select) {
   min-height: 44px;
   max-width: 100%;
   font-size: 16px;
 }
 body.mobile-ui
-  :is(#tech, #buildwin, #constructor, #market, #diplo)
+  :is(#tech, #buildwin, #constructor, #market, #diplo, #logwin)
   :is(button, input, select):focus-visible {
   outline: 2px solid #b7efff;
   outline-offset: -3px;
 }
-body.mobile-ui :is(#tech, #buildwin, #constructor, #market) :is(.lw-head, .cn-head) {
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #logwin) :is(.lw-head, .cn-head) {
   flex: none;
   min-height: 58px;
   padding: 7px 12px;
   gap: 8px;
 }
-body.mobile-ui :is(#tech, #buildwin, #constructor, #market) :is(.lw-head, .cn-head) b {
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #logwin) :is(.lw-head, .cn-head) b {
   min-width: 0;
   font-size: var(--fs-body);
 }
-body.mobile-ui :is(.tw-close, .cn-close, .mk-close, .dp-close) {
+body.mobile-ui :is(.tw-close, .cn-close, .mk-close, .dp-close, #logwin .lw-close, #logwin .lw-recap) {
   width: 44px;
   height: 44px;
   flex: none;
