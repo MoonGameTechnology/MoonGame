@@ -368,7 +368,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
       state(() => productionGrew(d.world(), me, b, data)),
     ),
     ...yard('economy', 'catalog', 'ships', 'cruiser'),
-    step('economy', 'ship-select', '#constructor [data-cnhull="cruiser"]', visible('#constructor.pw-fitting-open [data-cnhull="cruiser"].on'), { copy: 'onb.guide.build.units' }),
+    step('economy', 'ship-select', '#constructor [data-cnhull="cruiser"]', visible('#constructor.pw-fitting-open [data-cnhull="cruiser"].on'), { copy: 'onb.guide.build.equip' }),
     step('economy', 'ship-order', '#constructor [data-cnbuild]', action('unit.build')),
     close('economy', 'ship-close'),
     step(
@@ -543,7 +543,7 @@ export function buildTrainingTour(d: TrainingTourDeps): SpotlightStep[] {
     world('finale', 'base', 'base'),
     ...details('finale', 'details'),
     ...yard('finale', 'catalog', 'infantry', 'heavy_infantry'),
-    step('finale', 'recruit-select', '#constructor [data-cnhull="heavy_infantry"]', visible('#constructor.pw-fitting-open [data-cnhull="heavy_infantry"].on'), { copy: 'onb.guide.build.units' }),
+    step('finale', 'recruit-select', '#constructor [data-cnhull="heavy_infantry"]', visible('#constructor.pw-fitting-open [data-cnhull="heavy_infantry"].on'), { copy: 'onb.guide.build.hire' }),
     trainingRecruitQuantity(d),
     step(
       'finale',

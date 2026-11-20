@@ -49,6 +49,7 @@ import type { MetaState } from './meta';
 import { buildRecap } from './recap';
 import { catalogPortraitHtml } from './shipArt';
 import { shipCardHtml } from './shipCard';
+import { tourRunning } from './spotlightDom';
 import { invalidatePanel, renderPanel } from './sidePanel';
 import { PRODUCTION_UNITS } from './productionRoster';
 import { refusalText } from '../../decisions/refusalText';
@@ -302,6 +303,9 @@ function showIntro(card: IntroCard): void {
 }
 // Panel-open hook: show the intro for `id` once (unless already seen / a veteran).
 export function maybeIntro(id: string): void {
+  // Во время урока окно объясняет сам урок, а вводная легла бы поверх его подсветки
+  // (ревизия обучения 2026-11-20). Не показанная — не прочитана: она дождётся настоящей партии.
+  if (tourRunning()) return;
   const seen = parseSeenIntros(readLocal(seenIntrosKey()));
   const veteran = game.loadMeta().xp > 0; // finished at least one match → knows the ropes
   const { card, seen: next } = resolveIntro(seen, id, { veteran });

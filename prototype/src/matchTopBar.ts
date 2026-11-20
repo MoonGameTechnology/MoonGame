@@ -12,6 +12,7 @@
  * экране, своё место, имена, пульс чипа союзника, окна, пауза забега и кнопка скорости телефона
  * живут в `main.ts`; модуль получает их хуками {@link initTopBar}: импорт оттуда был бы циклом.
  */
+import { LESSON_WAIT_SPEED } from '../../decisions/lessonPace';
 import type { GameState } from '../../packages/shared-core/src/index';
 import {
   identifiedNodes,
@@ -650,6 +651,32 @@ export function applyTimeSpeed(mult: number, fastMult: number = mult * 3): void 
   markSpeed();
   for (const x of Array.from(document.querySelectorAll('[data-mult]')))
     x.classList.toggle('on', Number((x as HTMLElement).dataset.mult) === mult);
+}
+
+/** Темп урока до ожидания: пока ожидание идёт, тут прежний «×N», иначе null. */
+let lessonPaceBack: number | null = null;
+/**
+ * Ожидание урока на ×3600 (`decisions/lessonPace.ts`): шаг, где игрок только ждёт таймер,
+ * поднимает темп, следующий шаг возвращает прежний. Пауза и темп, выбранные игроком, его:
+ * на паузе ожидание не ускоряется, а свой «×N», выбранный во время ожидания, остаётся.
+ */
+export function paceLessonWait(waiting: boolean): void {
+  if (waiting === (lessonPaceBack !== null)) return;
+  if (waiting) {
+    if (game.speed() === 0 || timeMult >= LESSON_WAIT_SPEED) return;
+    lessonPaceBack = timeMult;
+    applyTimeSpeed(LESSON_WAIT_SPEED);
+    return;
+  }
+  const back = lessonPaceBack!;
+  lessonPaceBack = null;
+  if (timeMult !== LESSON_WAIT_SPEED) return;
+  const paused = game.speed() === 0;
+  applyTimeSpeed(back);
+  if (paused) {
+    game.setSpeed(0);
+    markSpeed();
+  }
 }
 
 /** Кадр полосы скорости: перезапуск, управление временем и кнопка скорости телефона. */

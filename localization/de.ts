@@ -3788,7 +3788,6 @@ export const de: Record<string, string> = {
   'onb.guide.build.catalog': 'Drücken Sie „Bauen“, um das Produktionsfenster zu öffnen.',
   'onb.guide.build.all': 'Wählen Sie „Alle“, um jedes Bauwerk zu sehen.',
   'onb.guide.build.close': 'Auftrag erteilt. Schließen Sie den Katalog.',
-  'onb.guide.build.units': 'Drücken Sie „Einheiten bauen“, um den Katalog zu öffnen.',
   'onb.guide.market.open': 'Öffnen Sie den „Markt“: Hier werden Ressourcen innerhalb der Partie gehandelt.',
   'onb.guide.market.sell': 'Die Gilde kauft Metall. Drücken Sie „Verkaufen“: Credits werden abzüglich 15% Gebühr gutgeschrieben.',
   'onb.guide.market.tab': 'Öffnen Sie den Reiter „Mikro“: Die Gilde verkauft Mikroelektronik.',
