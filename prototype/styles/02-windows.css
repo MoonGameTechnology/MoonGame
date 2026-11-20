@@ -755,6 +755,18 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .btn-x:hover{color:var(--red);background-color:color-mix(in srgb,var(--red) 14%,transparent);}
 .btn-x:active{background-color:color-mix(in srgb,var(--red) 24%,transparent);}
 .btn-x:focus-visible{outline:2px solid var(--red);outline-offset:2px;}
+/* Скошенная кнопка (заказ владельца 2026-11-20: «кнопки игровые, а не мобильного устройства») —
+   модификатор ФОРМЫ к любому стилю выше. Срезает левый верхний и правый нижний углы и обводит
+   срез линией цвета рамки самой кнопки (`inherit`), поэтому цвет, рамку, наведение и погашенность
+   по-прежнему даёт стиль. Фокус — внутри кнопки: снаружи его срезал бы clip-path. */
+.btn-cut{--cut:8px;position:relative;border-radius:0;
+  clip-path:polygon(var(--cut) 0,100% 0,100% calc(100% - var(--cut)),calc(100% - var(--cut)) 100%,0 100%,0 var(--cut));}
+.btn-cut::before,.btn-cut::after{content:'';position:absolute;width:calc(var(--cut) * 1.4142);height:0;pointer-events:none;
+  transform:rotate(-45deg);}
+.btn-cut::before{left:-1px;top:calc(var(--cut) - 1px);transform-origin:0 0;border-top:1px solid;border-top-color:inherit;}
+.btn-cut::after{right:-1px;bottom:calc(var(--cut) - 1px);transform-origin:100% 100%;border-bottom:1px solid;
+  border-bottom-color:inherit;}
+.btn-cut:focus-visible{outline-offset:-4px;}
 
 /* desktop: spread the panel's scrollable sections into side-by-side columns,
    divided by faint vertical rules, instead of one tall single-width stack. Each

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SPY_TASKS, taskBlock } from './spyTasks';
+import { SPY_TASKS, taskBlock, taskOfKey } from './spyTasks';
 
 const enemy = { owner: 'p2', coalitionMate: false, ownerOut: false };
 const own = { owner: 'p1', coalitionMate: false, ownerOut: false };
@@ -59,5 +59,27 @@ describe('spyTasks — карточки окна «Дать задание»', (
 
   it('правило 7: без выбранного мира всё доступно', () => {
     for (const task of SPY_TASKS) expect(taskBlock(task, null, 'p1', false)).toBeNull();
+  });
+});
+
+describe('spyTasks — клавиши 1–8 на ПК (правило 9)', () => {
+  const press = (code: string, mods: Partial<{ ctrl: boolean; alt: boolean; meta: boolean; repeat: boolean }> = {}) =>
+    taskOfKey({ code, ctrl: false, alt: false, meta: false, repeat: false, ...mods });
+
+  it('цифра верхнего ряда и цифрового блока — задание по порядку карточек', () => {
+    SPY_TASKS.forEach((task, i) => {
+      expect(press(`Digit${i + 1}`)).toBe(task);
+      expect(press(`Numpad${i + 1}`)).toBe(task);
+    });
+  });
+
+  it('лишняя цифра, ноль, буквы, сочетания и автоповтор — не задание', () => {
+    expect(press(`Digit${SPY_TASKS.length + 1}`)).toBeNull();
+    expect(press('Digit0')).toBeNull();
+    expect(press('KeyR')).toBeNull();
+    expect(press('Digit1', { ctrl: true })).toBeNull();
+    expect(press('Digit1', { alt: true })).toBeNull();
+    expect(press('Digit1', { meta: true })).toBeNull();
+    expect(press('Digit1', { repeat: true })).toBeNull();
   });
 });

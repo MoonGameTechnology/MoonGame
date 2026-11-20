@@ -51,6 +51,7 @@
 | SPM-0 | ✅ | docs | `docs/backlog.md` | Развилки решены владельцем (2026-11-20). |
 | SPM-1 | ✅ | core proto | `docs/backlog.md` | Шпион на карте. |
 | SPM-1a | ✅ | core | `docs/backlog.md` | Сетевой матч гасил задания против мира, где стоит шпион. |
+| SPM-1b | ✅ | proto | `docs/backlog.md` | Кнопки шпионажа игровые, а не телефонного приложения. |
 | SPM-2 | ⏳ | core | `docs/backlog.md` | Опыт по веткам вместо общего уровня. |
 | SPM-3 | 🔒 | proto | `docs/backlog.md` | Ветки в окне шпионажа. |
 | SPM-4 | 🔒 | core proto | `docs/backlog.md` | Умения 3-го ранга. |
