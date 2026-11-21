@@ -83,7 +83,8 @@ const tap = (root: string, hits: Record<string, Record<string, string>>, id = ''
 
 function stubPage(): void {
   page = new Map();
-  vi.stubGlobal('document', { getElementById: el });
+  // Окно «Шпионаж» слушает цифры 1–8 на документе (SPM-1b); здесь клавиши не нажимаются.
+  vi.stubGlobal('document', { getElementById: el, addEventListener: () => {} });
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
   vi.stubGlobal('location', { pathname: '/', href: '' });
   vi.stubGlobal('__PLAYER_BUILD__', false);

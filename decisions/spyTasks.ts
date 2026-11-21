@@ -24,6 +24,10 @@
  *    Сведения в тумане старые: мир помнится за игроком, который с тех пор выбыл. Ловить
  *    шпиона там некому, поэтому разведка идёт без бросков, а остальное ядро отвергнет
  *    (`E_NO_PLAYER`), контрразведку тоже.
+ * 9. **На ПК задание выбирается цифрой 1–8 по порядку карточек** (заказ владельца
+ *    2026-11-20: кнопки игровые). Читается место клавиши (`KeyboardEvent.code`), а не
+ *    символ, как у остальных клавиш ПК (`hotkeys.ts`, правило 1): верхний ряд и цифровой
+ *    блок. С Ctrl, Alt или ⌘ и автоповтор не считаются.
  */
 import type { SpyOp } from '../packages/shared-core/src/index';
 
@@ -73,4 +77,17 @@ export function taskBlock(
   if (task === 'counter') return null;
   if (world.owner === me) return 'own-world';
   return world.coalitionMate ? 'coalition' : null;
+}
+
+/** Правило 9: задание по нажатой клавише; `null` — клавиша не выбирает задание. */
+export function taskOfKey(press: {
+  code: string;
+  ctrl: boolean;
+  alt: boolean;
+  meta: boolean;
+  repeat: boolean;
+}): SpyTask | null {
+  if (press.ctrl || press.alt || press.meta || press.repeat) return null;
+  const m = /^(?:Digit|Numpad)([1-9])$/.exec(press.code);
+  return m ? (SPY_TASKS[Number(m[1]) - 1] ?? null) : null;
 }

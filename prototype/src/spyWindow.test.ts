@@ -26,6 +26,14 @@ interface El {
 }
 
 let page: Map<string, El>;
+/** Слушатели клавиш документа (цифры 1–8 окна заданий). */
+let keys: Array<(ev: unknown) => void>;
+const key = (code: string, mods: Record<string, boolean> = {}): boolean => {
+  let prevented = false;
+  for (const fn of keys)
+    fn({ code, ctrlKey: false, altKey: false, metaKey: false, repeat: false, target: null, ...mods, preventDefault: () => (prevented = true) });
+  return prevented;
+};
 function stub(id: string): El {
   const on = new Map<string, Array<(ev: unknown) => void>>();
   const el: El = {
@@ -58,7 +66,11 @@ const tap = (root: string, hits: Record<string, Record<string, string>>): void =
 
 function stubPage(): void {
   page = new Map();
-  vi.stubGlobal('document', { getElementById: el });
+  keys = [];
+  vi.stubGlobal('document', {
+    getElementById: el,
+    addEventListener: (type: string, fn: (ev: unknown) => void) => void (type === 'keydown' && keys.push(fn)),
+  });
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
   vi.stubGlobal('location', { pathname: '/', href: '' });
   vi.stubGlobal('__PLAYER_BUILD__', false);
@@ -207,6 +219,30 @@ describe('окно «Шпионаж»', () => {
     ]);
     expect(win.spyPicking()).toBe(false);
     expect(el('spypick').classes.has('show')).toBe(false);
+  });
+
+  it('ПК: цифра 1–8 нажимает карточку по порядку, номер виден на карточке, в списке цифры молчат', async () => {
+    const { win } = await boot([{ id: 1, state: 'rest', location: 'cap' }]);
+    el('rail-spy').click();
+    expect(key('Digit5')).toBe(false); // список шпионов: заданий нет
+    tap('spywin', { '[data-spy-assign]': { spyAssign: '1' } });
+    const cards = el('spywin').innerHTML;
+    SPY_TASKS.forEach((_, i) => expect(cards).toContain(`<kbd class="sp-key">${i + 1}</kbd>`));
+    expect(key('Digit5', { ctrlKey: true })).toBe(false);
+    expect(win.spyPicking()).toBe(false);
+    expect(key('Digit5')).toBe(true);
+    expect(win.spyPicking()).toBe(true);
+    expect(el('spypick').innerHTML).toContain(t(`spy.task.${SPY_TASKS[4]}.name`));
+  });
+
+  it('ПК: цифра погашенного задания на выбранном мире ничего не делает', async () => {
+    const { win, enemy } = await boot([{ id: 1, state: 'rest', location: 'cap' }], { fog: true });
+    win.openSpyWindow(enemy);
+    tap('spywin', { '[data-spy-assign]': { spyAssign: '1' } });
+    key(`Digit${SPY_TASKS.indexOf('theft') + 1}`); // мир в тумане: кража погашена
+    expect(el('spywin').innerHTML).not.toContain('data-spy-yes');
+    key(`Digit${SPY_TASKS.indexOf('recon') + 1}`);
+    expect(el('spywin').innerHTML).toContain('data-spy-yes');
   });
 
   it('SPY-24: мир в тумане, где не бывал свой шпион, — только разведка и переезд', async () => {

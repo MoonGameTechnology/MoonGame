@@ -500,12 +500,25 @@ describe('крестик ✕ — красная рамка классом .btn-x
     );
   });
 
-  /** Классы и id крестиков из разметки: правило с ними в последнем звене красит крестик. */
+  it('скос `.btn-cut` не красит: только форма, срез — цветом рамки самой кнопки', () => {
+    const own = rules(GAME).filter((r) => /^\.btn-cut\b/.test(r.sel));
+    expect(own.length).toBeGreaterThanOrEqual(3);
+    for (const { body } of own) {
+      expect(body).not.toMatch(/(?<![-\w])(background|color|box-shadow|opacity)\s*:/);
+      expect(body).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
+      for (const m of body.matchAll(/border-(?:top|bottom)-color\s*:\s*([^;]+)/g))
+        expect(m[1]!.trim()).toBe('inherit');
+    }
+  });
+
+  /** Классы и id крестиков из разметки: правило с ними в последнем звене красит крестик.
+   *  `.btn-cut` — модификатор формы (скос углов): срез он обводит цветом рамки самой кнопки
+   *  (`inherit`), поэтому крестик остаётся красным, и в метки он не идёт. */
   const marks = new Set([
     '.btn-x',
     ...[...tags.map(({ tag }) => /class="([^"]*)"/.exec(tag)?.[1] ?? ''), ...made.map((x) => x.cls)]
       .flatMap((cls) => cls.split(/\s+/))
-      .filter((c) => c && !/^(btn-x|danger)$/.test(c))
+      .filter((c) => c && !/^(btn-x|danger|btn-cut)$/.test(c))
       .map((c) => `.${c}`),
     ...tags.flatMap(({ tag }) => [...tag.matchAll(/\bid="([\w-]+)"/g)].map((m) => `#${m[1]}`)),
   ]);

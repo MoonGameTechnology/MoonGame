@@ -428,12 +428,12 @@ wrangler.jsonc         сайт на Cloudflare: статические стра
   [ping-system.md](ping-system.md)).
 - Вкладка «Шпионаж» (`spyWindow.ts`, кнопка рядом с «Дипломатией» и «Сообщениями», на
   телефоне — в «Ещё»): строка на шпиона — портрет с уровнем (`spyPortrait.ts`, 10 лиц в
-  `spyPortraitArt.ts`), позывной, место, занятие, таймер и кнопка (`decisions/spyRoster.ts`); «Дать задание» — 8
-  карточек от передислокации до саботажа, невозможные на выбранном мире серые
-  (`decisions/spyTasks.ts`); затем выбор мира на карте и вопрос «Да / Нет» с шансом и
+  `spyPortraitArt.ts`), позывной с кораблём, место, занятие, таймер и кнопка (`decisions/spyRoster.ts`); «Дать задание» — 8
+  карточек, невозможные на выбранном мире серые, на ПК — цифра 1–8 (`decisions/spyTasks.ts`;
+  скошенные плашки и линейные значки — SPM-1b, `spyTaskIcons.ts`, `.btn-cut`); затем выбор мира на карте и вопрос «Да / Нет» с шансом и
   временем пути. На карточке мира — одна кнопка шпиона. Под списком — окна разведки и архив
   (`decisions/spyArchive.ts`), строки пути — `decisions/spyJourney.ts`. На карте свои шпионы
-  (SPM-1, `mapSpies.ts`, `decisions/spyMarks.ts`): корабль на лейне с пунктиром до цели, «🕵 N» у мира.
+  (SPM-1, `mapSpies.ts`, `decisions/spyMarks.ts`): корабль и пунктир — по дорогам флота (SPM-1c), «🕵 N» у мира.
 - Клавиши ПК — `decisions/hotkeys.ts`, `pcHotkeys.ts`; Back и Escape — `backLayers.ts`,
   `backGesture.ts`. Вид: размеры текста `typeScale` в `packages/client/src/theme.ts` =
   `--fs-*` в `prototype/styles/01-base.css`, палитра `--sf-*` (сторож — `surfaceTokens.test.ts`);

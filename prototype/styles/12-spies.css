@@ -5,32 +5,60 @@
 #spywin{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #spywin.show{display:flex;}
-#spywin .spbox{display:flex;flex-direction:column;width:min(720px,96vw);max-height:88vh;background:var(--glass);
-  border:1px solid var(--cyan);border-radius:10px;overflow:hidden;
-  box-shadow:0 0 44px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
-#spywin .sp-title{color:#eafffb;font-size:var(--fs-heading);}
-#spywin .sp-count{margin-left:8px;margin-right:auto;padding:2px 8px;border:1px solid var(--line-hi);border-radius:999px;
+/* Скошенная плашка (заказ владельца 2026-11-20: «интерфейс кнопок игровой, а не мобильного
+   устройства»): срезаны левый верхний и правый нижний углы, срез обведён цветом рамки. Две полосы
+   фона по срезам лежат поверх заливки; рамка — `--edge`, заливка — `--fill`, срез — `--cut`. */
+#spywin :is(.sp-row,.sp-card,.sp-tile,.sp-detail,.sp-ph,.sp-count,.sp-tag,.sp-key),.sp-ask,#spypick{
+  --cut:10px;--edge:var(--sf-edge);--fill:var(--sf-card);border:1px solid var(--edge);border-radius:0;
+  background:linear-gradient(135deg,var(--edge) calc(var(--cut) * .7071 + 1px),transparent 0) border-box,
+    linear-gradient(315deg,var(--edge) calc(var(--cut) * .7071 + 1px),transparent 0) border-box,var(--fill) padding-box;
+  clip-path:polygon(var(--cut) 0,100% 0,100% calc(100% - var(--cut)),calc(100% - var(--cut)) 100%,0 100%,0 var(--cut));}
+/* Рамка окна — общая для окон игры (на ПК её даёт стекло holographic.css), скошено то, что внутри. */
+#spywin .spbox{display:flex;flex-direction:column;width:min(860px,96vw);max-height:88vh;background:var(--glass);
+  border:1px solid var(--cyan-dim);border-radius:10px;overflow:hidden;box-shadow:0 0 44px rgba(0,0,0,.6);}
+#spywin .sp-title{display:flex;align-items:center;gap:6px;min-width:0;color:var(--sf-hi);font-size:var(--fs-heading);}
+#spywin .sp-title>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#spywin .sp-count{--cut:6px;--edge:var(--line-hi);--fill:transparent;margin-left:8px;margin-right:auto;padding:2px 10px;
   color:var(--ink);font-size:var(--fs-caption);white-space:nowrap;}
+#spywin .dp-head{border-bottom-color:var(--line-hi);}
+#spywin .dp-head .btn-cut{width:36px;height:36px;margin:0;padding:0;font-size:var(--fs-heading);}
 #spywin .sp-back{margin:0 4px 0 0;}
 .sp-list{padding:8px 10px;overflow-y:auto;}
-.spy-photo{border-radius:12%;}
+/* Фото в скошенной рамке цвета занятия; линейные значки и силуэт корабля — цветом текста. */
+#spywin .sp-ph{--cut:8px;--edge:var(--st,var(--cyan));--fill:var(--sf-inset);display:block;flex:0 0 auto;padding:1px;}
+#spywin .sp-ph .spy-photo{display:block;width:100%;height:100%;
+  clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);}
+#spywin .sp-ico,.sp-ask .sp-ico{flex:0 0 auto;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round;}
+#spywin .sp-ship{flex:0 0 auto;width:20px;height:20px;transform:rotate(90deg);color:var(--cyan);}
+#spywin .sp-ship .h{fill:color-mix(in srgb,currentColor 22%,transparent);stroke:currentColor;stroke-width:1.2;stroke-dasharray:1.6 1.1;}
+#spywin .sp-ship :is(.d,.e){fill:none;stroke:currentColor;stroke-width:.8;opacity:.8;}
+#spywin .btn-cut .sp-ico{width:18px;height:18px;}
 
 /* Строка: фото · имя над «занятие · место» · таймер · кнопка; по низу полоса хода */
-#spywin .sp-row{position:relative;display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;
-  grid-template-areas:'photo name time act' 'photo line time act';align-items:center;column-gap:10px;row-gap:1px;
-  padding:6px 8px;margin-bottom:5px;border:1px solid var(--sf-edge);border-top:1px solid var(--sf-edge);border-radius:8px;
-  background:var(--sf-card);overflow:hidden;--st:var(--dim);}
-#spywin .sp-row:hover{border-color:var(--sf-edge-hi);}
-#spywin .sp-row .spy-photo{grid-area:photo;width:44px;height:44px;display:block;box-shadow:0 0 0 1px var(--st);}
-#spywin .sp-row .sp-name{grid-area:name;align-self:end;color:#eafffb;font-size:var(--fs-body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#spywin .sp-line{grid-area:line;align-self:start;display:flex;align-items:center;gap:6px;min-width:0;color:var(--ink);font-size:var(--fs-caption);}
-#spywin .sp-dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--st);box-shadow:0 0 6px var(--st);}
+#spywin .sp-row{position:relative;display:grid;grid-template-columns:52px minmax(0,1fr) auto auto;
+  grid-template-areas:'photo name time act' 'photo line time act' 'photo bar time act';align-items:center;
+  column-gap:12px;row-gap:2px;padding:8px 10px;margin-bottom:6px;--cut:12px;--st:var(--dim);}
+#spywin .sp-row:hover{--edge:var(--sf-edge-hi);}
+#spywin .sp-row .sp-ph{grid-area:photo;width:52px;height:52px;}
+#spywin .sp-row .sp-name{grid-area:name;align-self:end;display:flex;align-items:center;gap:6px;min-width:0;font-size:var(--fs-body);
+  color:var(--sf-hi);}
+#spywin .sp-name>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#spywin .sp-line{grid-area:line;display:flex;align-items:center;gap:6px;min-width:0;color:var(--ink);font-size:var(--fs-caption);}
 #spywin .sp-doing{color:var(--st);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #spywin .sp-place{flex:0 1 auto;min-width:0;color:var(--sf-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #spywin .sp-place::before{content:'· ';color:var(--dim);}
-#spywin .sp-row .sp-time{grid-area:time;color:var(--amber);font-size:var(--fs-caption);font-variant-numeric:tabular-nums;white-space:nowrap;}
-#spywin .sp-row .sp-act{grid-area:act;margin:0;min-width:132px;}
-#spywin .sp-bar{position:absolute;left:0;bottom:0;height:2px;background:var(--st);opacity:.85;}
+#spywin .sp-row .sp-time{grid-area:time;display:flex;align-items:center;gap:4px;color:var(--amber);font-size:var(--fs-caption);
+  font-variant-numeric:tabular-nums;white-space:nowrap;}
+#spywin .sp-row .sp-time .sp-ico{width:14px;height:14px;}
+#spywin .sp-row .sp-act{grid-area:act;display:inline-flex;align-items:center;justify-content:center;gap:8px;margin:0;
+  min-width:150px;min-height:40px;padding:0 14px;font-size:var(--fs-body);}
+/* Ход пути или дела — шкала из делений цвета занятия. */
+#spywin .sp-track{grid-area:bar;align-self:start;position:relative;display:block;width:min(100%,220px);height:4px;
+  background:color-mix(in srgb,var(--st) 22%,transparent);
+  -webkit-mask:repeating-linear-gradient(90deg,currentColor 0 18px,transparent 18px 22px);
+  mask:repeating-linear-gradient(90deg,currentColor 0 18px,transparent 18px 22px);}
+#spywin .sp-bar{position:absolute;left:0;top:0;bottom:0;background:var(--st);}
 /* Цвет занятия: свободен — зелёный, в пути — циан, на задании — янтарь, остальное тихое */
 #spywin .sp-st-rest,#spywin .sp-st-wait{--st:var(--grn);}
 #spywin .sp-st-travel{--st:var(--cyan);}
@@ -41,73 +69,98 @@
 #spywin .in-sec{margin-top:8px;}
 
 /* Окно «Дать задание»: фото и занятие шпиона в шапке, карточки одного размера */
-#spywin .sp-head-who{padding:6px 10px;}
-#spywin .sp-head-who .spy-photo{width:36px;height:36px;flex:0 0 auto;}
-#spywin .sp-who{display:flex;flex-direction:column;min-width:0;margin-right:auto;line-height:1.2;}
-#spywin .sp-who .sp-title{font-size:var(--fs-body);}
+#spywin .sp-head-who{gap:10px;padding:8px 12px;}
+#spywin .sp-head-who .sp-ph{width:46px;height:46px;}
+#spywin .sp-who{display:flex;flex-direction:column;gap:2px;min-width:0;margin-right:auto;line-height:1.2;}
+#spywin .sp-who .sp-title{font-size:var(--fs-heading);}
 #spywin .sp-sub{color:var(--sf-dim);font-size:var(--fs-caption);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#spywin .sp-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:1fr;gap:6px;padding:10px;overflow-y:auto;}
-#spywin .sp-card{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:112px;padding:8px 9px 8px 11px;
-  text-align:left;background:var(--sf-card);border:1px solid var(--sf-edge);border-radius:8px;color:var(--ink);cursor:pointer;
-  font:var(--fs-caption)/1.3 var(--sf-font);overflow:hidden;--tone:var(--cyan);}
+#spywin .sp-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:1fr;gap:8px;padding:12px;overflow-y:auto;}
+/* Карточка задания: значок и имя, описание, подвал «цена · срок · клавиша». Уголок справа —
+   тон задания: тихое бирюзовое, громкое янтарное. Наведение — заливка тоном и скоба слева. */
+#spywin .sp-card{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:6px;min-height:132px;padding:10px 0 0;
+  text-align:left;color:var(--ink);cursor:pointer;font:var(--fs-caption)/1.35 var(--sf-font);--cut:12px;--tone:var(--cyan);}
 #spywin .sp-card[data-hot]{--tone:var(--amber);}
-#spywin .sp-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tone);opacity:.8;}
-#spywin .sp-card .sp-glyph{position:absolute;right:7px;top:6px;font-size:16px;line-height:1;opacity:.85;}
-#spywin .sp-card b{padding-right:22px;color:#eafffb;font-size:var(--fs-body);line-height:1.2;overflow-wrap:anywhere;hyphens:auto;}
-#spywin .sp-card .sp-desc{flex:1 1 auto;color:var(--sf-dim);overflow:hidden;}
-#spywin .sp-card .sp-cost{align-self:stretch;padding-top:5px;border-top:1px solid var(--line);color:var(--amber);font-variant-numeric:tabular-nums;}
-#spywin .sp-card:hover:not(:disabled),#spywin .sp-card:active:not(:disabled){border-color:var(--tone);
-  background:color-mix(in srgb,var(--tone) 12%,transparent);}
+#spywin .sp-card::after{content:'';position:absolute;right:0;top:0;border-top:14px solid var(--tone);border-left:14px solid transparent;}
+#spywin .sp-top{display:flex;align-items:flex-start;gap:10px;padding:0 14px;color:var(--tone);}
+#spywin .sp-top .sp-ico{width:26px;height:26px;filter:drop-shadow(0 0 4px color-mix(in srgb,var(--tone) 45%,transparent));}
+#spywin .sp-card b{color:var(--sf-hi);font-size:var(--fs-body);line-height:1.2;overflow-wrap:anywhere;hyphens:auto;-webkit-hyphens:auto;}
+#spywin .sp-card .sp-desc{flex:1 1 auto;padding:0 12px;color:var(--sf-dim);overflow:hidden;}
+#spywin .sp-card .sp-cost{display:flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border-top:1px solid var(--line);
+  background:var(--sf-inset);color:var(--rc-credits);font-variant-numeric:tabular-nums;}
+#spywin .sp-hrs{display:inline-flex;align-items:center;gap:4px;margin-left:6px;color:var(--sf-dim);}
+#spywin .sp-hrs .sp-ico{width:14px;height:14px;}
+#spywin .sp-card .sp-why{color:var(--sf-dim);}
+#spywin .sp-key{--cut:4px;--edge:var(--line-hi);--fill:transparent;margin-left:auto;min-width:22px;padding:1px 6px;
+  color:var(--ink);font:600 12px/1.3 var(--sf-font);text-align:center;}
+#spywin .sp-card:is(:hover,:focus-visible,:active):not(:disabled){--edge:var(--tone);
+  --fill:color-mix(in srgb,var(--tone) 14%,var(--sf-card));}
+#spywin .sp-card:is(:hover,:focus-visible):not(:disabled)::before{content:'';position:absolute;left:4px;bottom:4px;width:10px;height:10px;
+  border:2px solid var(--tone);border-top:0;border-right:0;}
+#spywin .sp-card:focus-visible{outline:none;}
 #spywin .sp-card:disabled{cursor:default;opacity:.42;filter:grayscale(1);}
-#spywin .sp-card:disabled .sp-cost{color:var(--dim);}
+@media not ((hover:hover) and (pointer:fine)){#spywin .sp-key{display:none;}}
 
 /* Телефон: плитки 4×2 и панель выбранного задания вместо карточек (на ПК скрыты) */
 #spywin .sp-tiles,#spywin .sp-detail{display:none;}
-#spywin .sp-tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:80px;padding:8px 3px 6px;
-  background:var(--sf-card);border:1px solid var(--sf-edge);border-radius:8px;color:#eafffb;cursor:pointer;overflow:hidden;
-  font:600 12px/1.15 var(--sf-font);text-align:center;--tone:var(--cyan);}
+#spywin .sp-tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:92px;padding:10px 3px 7px;
+  color:var(--sf-hi);cursor:pointer;font:600 12px/1.15 var(--sf-font);text-align:center;--tone:var(--cyan);}
 #spywin .sp-tile[data-hot],#spywin .sp-detail[data-hot]{--tone:var(--amber);}
-#spywin .sp-tile::before{content:'';position:absolute;left:0;right:0;top:0;height:3px;background:var(--tone);opacity:.85;}
-#spywin .sp-tile .sp-glyph{font-size:21px;line-height:1.1;}
+#spywin .sp-tile::after{content:'';position:absolute;right:0;top:0;border-top:11px solid var(--tone);border-left:11px solid transparent;}
+#spywin .sp-tile .sp-ico{width:28px;height:28px;color:var(--tone);
+  filter:drop-shadow(0 0 4px color-mix(in srgb,var(--tone) 45%,transparent));}
 #spywin .sp-tile .sp-tn{max-width:100%;hyphens:auto;-webkit-hyphens:auto;overflow-wrap:break-word;}
-#spywin .sp-tile .sp-tp{margin-top:auto;color:var(--amber);font-weight:500;font-variant-numeric:tabular-nums;}
-#spywin .sp-tile.sp-on{border-color:var(--tone);background:color-mix(in srgb,var(--tone) 16%,transparent);box-shadow:inset 0 -3px 0 var(--tone);}
+#spywin .sp-tile .sp-tp{display:flex;align-items:center;gap:3px;margin-top:auto;color:var(--rc-credits);font-weight:500;
+  font-variant-numeric:tabular-nums;}
+#spywin .sp-tile.sp-on{--edge:var(--tone);--fill:color-mix(in srgb,var(--tone) 18%,var(--sf-card));}
+#spywin .sp-tile.sp-on::before{content:'';position:absolute;left:3px;bottom:3px;width:10px;height:10px;border:2px solid var(--tone);
+  border-top:0;border-right:0;}
 #spywin .sp-tile.sp-off{opacity:.45;filter:grayscale(1);}
-#spywin .sp-detail{flex-direction:column;gap:6px;margin:8px;padding:10px;border:1px solid var(--sf-edge);border-radius:8px;
-  background:var(--sf-inset);--tone:var(--cyan);}
-#spywin .sp-dh{display:flex;align-items:center;gap:8px;color:#eafffb;font-size:var(--fs-body);}
-#spywin .sp-tag{margin-left:auto;padding:1px 7px;border:1px solid var(--tone);border-radius:999px;color:var(--tone);font-size:12px;white-space:nowrap;}
+#spywin .sp-detail{flex-direction:column;gap:8px;margin:8px;padding:12px;--cut:12px;--fill:var(--sf-inset);--tone:var(--cyan);}
+#spywin .sp-dh{display:flex;align-items:center;gap:10px;color:var(--sf-hi);font-size:var(--fs-body);font-weight:600;}
+#spywin .sp-dh .sp-ico{width:24px;height:24px;color:var(--tone);}
+#spywin .sp-tag{--cut:5px;--edge:var(--tone);--fill:transparent;margin-left:auto;padding:1px 8px;color:var(--tone);font-size:12px;
+  font-weight:500;white-space:nowrap;}
 #spywin .sp-dd{margin:0;color:var(--sf-dim);font-size:var(--fs-caption);}
 #spywin .sp-why{margin:0;color:var(--amber);font-size:var(--fs-caption);}
-#spywin .sp-chips{display:flex;flex-wrap:wrap;gap:6px;}
-#spywin .sp-chip{padding:2px 8px;border:1px solid var(--line-hi);border-radius:999px;color:var(--amber);font-size:var(--fs-caption);font-variant-numeric:tabular-nums;}
-#spywin .sp-go{margin:0;min-height:44px;}
+#spywin .sp-chips{display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding-top:8px;border-top:1px solid var(--line);
+  font-size:var(--fs-caption);font-variant-numeric:tabular-nums;}
+#spywin .sp-chip{display:inline-flex;align-items:center;gap:4px;color:var(--rc-credits);}
+#spywin .sp-chips .sp-hrs{margin:0;}
+#spywin .sp-go{display:flex;align-items:center;justify-content:center;gap:10px;margin:0;min-height:48px;--cut:10px;
+  font-size:var(--fs-heading);}
+#spywin .sp-go .sp-ico{width:22px;height:22px;}
 
 /* Выбор мира на карте: полоса сверху с отменой */
 #spypick{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 58px);transform:translateX(-50%);z-index:60;
-  display:none;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:8px 12px;background:var(--glass);
-  border:1px solid var(--cyan);border-radius:10px;color:#eafffb;box-shadow:0 0 24px rgba(0,0,0,.5);}
+  display:none;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:8px 12px;--edge:var(--cyan-dim);
+  --fill:var(--glass);color:var(--sf-hi);}
+#spypick .btn-cut{margin:0;min-height:36px;padding:0 14px;}
 #spypick.show{display:flex;}
 
 /* Вопрос «Да / Нет» */
 .sp-ask{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:70;width:min(380px,calc(100vw - 32px));
-  padding:14px 16px;background:var(--glass);border:1px solid var(--cyan);border-radius:10px;color:#eafffb;
-  box-shadow:0 0 44px rgba(0,0,0,.7);}
+  padding:16px 18px;--cut:14px;--edge:var(--cyan-dim);--fill:var(--sf-inset);color:var(--sf-hi);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);}
 .sp-ask p{margin:0 0 10px;}
 .sp-ask .sp-facts{color:var(--ink);font-size:var(--fs-caption);}
 .sp-yesno{display:flex;gap:8px;}
-.sp-yesno .b{flex:1 1 0;}
+.sp-yesno .b{flex:1 1 0;min-height:40px;margin:0;}
 
 @media (max-width:640px){
   .sp-list{padding:8px;}
-  #spywin .sp-row{grid-template-columns:44px minmax(0,1fr) auto;grid-template-areas:'photo name act' 'photo line act' 'photo time act';
-    column-gap:8px;padding:7px 8px;}
+  #spywin .sp-row{grid-template-columns:44px minmax(0,1fr) auto;
+    grid-template-areas:'photo name act' 'photo line act' 'photo time act' 'photo bar act';column-gap:8px;padding:7px 8px;}
+  #spywin .sp-row .sp-ph{width:44px;height:44px;}
   #spywin .sp-row .sp-name{align-self:center;}
   #spywin .sp-line{flex-wrap:wrap;row-gap:0;}
-  #spywin .sp-place{flex-basis:100%;padding-left:13px;}
+  #spywin .sp-place{flex-basis:100%;}
   #spywin .sp-place::before{content:'';}
-  #spywin .sp-row .sp-time{justify-self:start;padding-left:13px;}
-  #spywin .sp-row .sp-act{min-width:0;width:104px;min-height:44px;padding:6px 8px;font-size:var(--fs-caption);line-height:1.15;white-space:normal;}
+  #spywin .sp-row .sp-time{justify-self:start;}
+  #spywin .sp-row .sp-act{min-width:0;width:108px;min-height:44px;padding:6px 8px;gap:4px;font-size:var(--fs-caption);line-height:1.15;
+    white-space:normal;}
+  #spywin .sp-row .sp-act .sp-ico{display:none;}
+  #spywin .sp-track{padding-left:0;}
+  #spywin .dp-head .btn-cut{width:44px;height:44px;}
   #spywin .sp-cards{display:none;}
   #spywin .sp-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px 8px 0;}
   #spywin .sp-detail{display:flex;}
