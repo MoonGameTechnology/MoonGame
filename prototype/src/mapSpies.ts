@@ -10,16 +10,17 @@
  * `drawHangarBadges` (`mapHangars.ts`) — его хозяин даёт мир, своё место и холст. Тап
  * разбирает `mapTapSelect.ts` по {@link spyAt}.
  */
-import type { GameState, PlanetId } from '../../packages/shared-core/src/index';
-import {
-  laneRoad,
-  pointAlong,
-  spyRoster as coreSpyRoster,
-} from '../../packages/shared-core/src/index';
+import type { GameState, SpyWayPoint } from '../../packages/shared-core/src/index';
+import { spyRoster as coreSpyRoster } from '../../packages/shared-core/src/index';
 import type { MapLod } from '../../packages/client/src/mapLod';
 import { rgba } from '../../packages/client/src/holoDraw';
 import { drawSpyShip, spyShipOf } from '../../packages/client/src/spyShipShapes';
-import { spyMarks, type SpyFlashKind, type SpyFlight } from '../../decisions/spyMarks';
+import {
+  spyFlightRoad,
+  spyMarks,
+  type SpyFlashKind,
+  type SpyFlight,
+} from '../../decisions/spyMarks';
 import { spyRoster } from '../../decisions/spyRoster';
 import { t } from '../../localization/runtime';
 import { flashDone, flashProgress, noticeRing } from './flashFx';
@@ -49,6 +50,9 @@ export interface SpyHit {
 }
 
 let hits: SpyHit[] = [];
+/** Последний виденный путь туда каждого своего шпиона: отозванный разворачивается на дороге
+ *  так, как летел (`decisions/spyMarks.ts`, правило 2а). */
+const outbound = new Map<number, readonly SpyWayPoint[]>();
 
 const NAME_FONT = '700 12px ui-monospace,Menlo,monospace';
 const BADGE_FONT = '700 11px ui-monospace,Menlo,monospace';
@@ -100,21 +104,6 @@ export function spyAt(x: number, y: number, touch: boolean): readonly number[] |
   return best ? best.spyIds : null;
 }
 
-/** Точки дороги лейна `a → b` от доли `f` до конца (позиции карты). */
-function roadFrom(s: GameState, a: PlanetId, b: PlanetId, f: number): { x: number; y: number }[] {
-  const road = laneRoad(s, a, b);
-  if (!road) return [];
-  const out = [pointAlong(road, f)];
-  let total = 0;
-  const cum = [0];
-  for (let i = 1; i < road.length; i++) {
-    total += Math.hypot(road[i]!.x - road[i - 1]!.x, road[i]!.y - road[i - 1]!.y);
-    cum.push(total);
-  }
-  for (let i = 1; i < road.length; i++) if (cum[i]! > f * total) out.push(road[i]!);
-  return out;
-}
-
 /** Нарисовать своих шпионов: корабли в пути и значки миров. `chipAfter` — правый край
  *  значка ангара мира в этом кадре (значок шпионов встаёт за ним), если он нарисован. */
 export function drawSpyMarks(
@@ -128,7 +117,8 @@ export function drawSpyMarks(
   const me = host.me();
   const cx = host.ctx();
   const own = s.spies?.[me] ?? coreSpyRoster(s, me);
-  const marks = spyMarks(own, s.time);
+  for (const spy of own) if (spy.state === 'travel' && spy.way) outbound.set(spy.id, spy.way);
+  const marks = spyMarks(own, s.time, outbound);
   const callsign = new Map(spyRoster(own).map((r) => [r.id, r.callsign]));
   cx.save();
   cx.textAlign = 'left';
@@ -169,14 +159,9 @@ function drawFlight(
   sign: number | undefined,
 ): void {
   const color = youColor;
-  // Путь впереди по дорогам: остаток текущего лейна, затем лейны до цели.
-  const pts = roadFrom(s, fl.a, fl.b, fl.f);
-  let prev = fl.b;
-  for (const id of fl.ahead) {
-    pts.push(...roadFrom(s, prev, id, 0).slice(1));
-    prev = id;
-  }
-  const at = pts[0] ?? s.planets[fl.a]?.position;
+  // Путь впереди по дорогам, как у флота: мимо промежуточного мира — по развилке.
+  const pts = spyFlightRoad(s, fl);
+  const at = pts[0];
   if (!at) return;
   const screen = pts.map((p) => world(p));
   const ship = world(at);

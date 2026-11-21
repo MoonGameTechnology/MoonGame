@@ -52,6 +52,7 @@
 | SPM-1 | ✅ | core proto | `docs/backlog.md` | Шпион на карте. |
 | SPM-1a | ✅ | core | `docs/backlog.md` | Сетевой матч гасил задания против мира, где стоит шпион. |
 | SPM-1b | ✅ | proto | `docs/backlog.md` | Кнопки шпионажа игровые, а не телефонного приложения. |
+| SPM-1c | ✅ | proto | `docs/backlog.md` | Шпион заходил в узел промежуточного мира. |
 | SPM-2 | ⏳ | core | `docs/backlog.md` | Опыт по веткам вместо общего уровня. |
 | SPM-3 | 🔒 | proto | `docs/backlog.md` | Ветки в окне шпионажа. |
 | SPM-4 | 🔒 | core proto | `docs/backlog.md` | Умения 3-го ранга. |
