@@ -1116,6 +1116,7 @@ export const en: Record<string, string> = {
   'side.fork.where': 'Trail to: {exits}',
   'side.fork.hint': 'A fork fortress engages everything on this trail and stays yours even if the province falls.',
   'side.fork.not-owned': 'A fortress goes on a fork of your own province.',
+  'side.fork.planet': 'No fortress in a province with a planet.',
   'place.fork-fortress': 'Fork fortress · {planet}',
   'side.wing.aloft': 'out on sortie, places: {n}',
   'side.wing.blocked.busy': 'the ship is in battle — no squadron is launching now',

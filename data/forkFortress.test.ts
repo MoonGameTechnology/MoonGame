@@ -66,7 +66,8 @@ function map(): GameState {
   const planets: Record<string, Planet> = {
     A: { ...world('p2', 200, -150, ['B']), id: 'A', roads: { crossings: { B: xab }, trails: [{ exits: ['B'], fork: null }] } },
     B: {
-      ...world('p1', 0, 0, ['A', 'C', 'D']),
+      // Туманность, а не планета: в провинции с планетой крепость не ставят и на развилке.
+      ...world('p1', 0, 0, ['A', 'C', 'D'], { kind: 'nebula' }),
       id: 'B',
       roads: {
         crossings: { A: xab, C: xcb, D: xdb },
@@ -110,7 +111,7 @@ describe('крепость на развилке — новая точка по�
     expect(site).toMatchObject({ kind: 'station_site', owner: 'p1', position: { x: 60, y: 0 }, links: [], fork: { province: 'B', trail: 0 } });
     expect(site!.buildings.map((b) => [b.type, b.level])).toEqual([['starfort', 1]]);
     // Провинция не превратилась ни во что: «не превращается — появляется».
-    expect(st.planets.B).toMatchObject({ kind: 'planet', owner: 'p1', buildings: [] });
+    expect(st.planets.B).toMatchObject({ kind: 'nebula', owner: 'p1', buildings: [] });
     const guns = st.fleets[GUNS];
     expect(guns, 'крепость без орудий').toBeDefined();
     expect(guns!.location, 'орудия стоят на дороге, а не на площадке').toBeNull();
@@ -126,6 +127,18 @@ describe('крепость на развилке — новая точка по�
     };
     expect(code(deploy('B', 0, 'p2'))).toBe('E_FORBIDDEN');
     expect(code(deploy('C', 0))).toBe('E_FORBIDDEN');
+  });
+
+  it('в провинции с планетой развилка крепость не принимает, как и сама провинция', () => {
+    // Сообщение владельца 2026-11-21: «в провинции с планетой построить космическую
+    // крепость… так не должно быть». Развилка — точка дороги внутри провинции, и вид
+    // провинции решает за неё так же, как за узел.
+    const kernel = createKernel([stationModule]);
+    const s = map();
+    s.planets.B!.kind = 'planet';
+    const r = kernel.applyAction(s, deploy('B', 0), ctx());
+    expect(r.ok ? 'ok' : r.code).toBe('E_NOT_STATIONABLE');
+    expect(s.planets[SITE], 'площадка не появилась').toBeUndefined();
   });
 
   it('без развилки ставить некуда; кривая тропа — кривая нагрузка', () => {

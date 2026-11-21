@@ -699,6 +699,8 @@ export function forkPanelHtml(fork: { province: string; trail: number }): string
     }
   } else if (raise.blocked === 'not-owned') {
     h += `<div class="row dim">${esc(t('side.fork.not-owned'))}</div>`;
+  } else if (province?.kind === 'planet') {
+    h += `<div class="row dim">${esc(t('side.fork.planet'))}</div>`;
   }
   return h;
 }

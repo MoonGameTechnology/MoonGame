@@ -220,7 +220,8 @@ export const stationModule: GameModule = {
   // 1.2.0: прикрытие — только отряду из одних орудий (находка Codex на #1393).
   // 1.3.0: крепость на развилке — новая точка постройки (FORT-6.1).
   // 1.4.1: fortress deployment costs four times as much (480 metal before fittings).
-  version: '1.4.2',
+  // 1.5.0: a fork fortress obeys its province kind — none in a province with a planet.
+  version: '1.5.0',
   setup(api) {
     api.onAction('station.deploy', (action, h: HandlerContext) => {
       const { planetId, trail, modules } = action.payload as { planetId?: string; trail?: unknown; modules?: unknown };
@@ -247,6 +248,10 @@ export const stationModule: GameModule = {
       const siteId = anchor ? forkSiteId(anchor.province, anchor.trail) : model ? stationSiteId(planetId) : planetId;
       const site = h.state.planets[siteId];
       if (anchor) {
+        // Развилка — точка дороги ВНУТРИ провинции, поэтому вид провинции решает и за неё:
+        // в провинции с планетой крепость не ставят ни на узел, ни на развилку
+        // (сообщение владельца 2026-11-21: «в провинции с планетой… так не должно быть»).
+        if (!isStationable(h.ctx.data, node)) return h.reject('E_NOT_STATIONABLE');
         if (!forkSiteEdge(h.state, anchor)) return h.reject('E_NOT_STATIONABLE');
         if (site && (!isForkSite(site) || site.owner !== null)) return h.reject('E_NOT_STATIONABLE');
       } else if (!isStationable(h.ctx.data, node)) {
