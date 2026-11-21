@@ -82,12 +82,13 @@ export function fortressRaise(
  * когда-то стояла крепость (у ядра она живёт узлом `forkSiteId(province, trail)`).
  *
  * Правила — редьюсера (`station.deploy` с `trail`), и порядок их тот же: провинция твоя
- * (развилка — в ЗАХВАЧЕННОЙ провинции, и только сейчас), площадка свободна (одна развилка —
+ * (развилка — в ЗАХВАЧЕННОЙ провинции, и только сейчас), вид провинции принимает крепость
+ * (в провинции с планетой её нет и на развилке), площадка свободна (одна развилка —
  * одна крепость), дальше общие ворота технологии и казны. Сама развилка тут не
  * проверяется: кнопку рисуют на отметке развилки, а отметку без развилки не ставят.
  */
 export function forkFortressRaise(
-  province: Pick<Planet, 'owner'> | undefined,
+  province: Pick<Planet, 'owner' | 'kind'> | undefined,
   site: Pick<Planet, 'owner'> | undefined,
   viewerId: string,
   treasury: ResourceBag,
@@ -98,6 +99,8 @@ export function forkFortressRaise(
   const locks = technologiesUnlocking(data, 'building', STATION_CORE);
   const cost = matchCost(match, STATION_COST);
   if (province?.owner !== viewerId) return notHere('not-owned', locks, cost);
+  // Вид провинции решает и за её развилку: в провинции с планетой крепости нет нигде.
+  if (!isStationable(data, province)) return notHere('kind', locks, cost);
   if (site && site.owner !== null) return notHere('kind', locks, cost);
   return placeable(locks, treasury, completed, cost);
 }

@@ -490,6 +490,9 @@ export const CAPITAL_SHARE_SOLO_MIGRATION = after(FORTRESS_SKY_SOLO_MIGRATION, {
  *  SPM-1). A saved spy on its way has none and flies on unchanged; the map draws it straight. */
 export const SPY_WAY_SOLO_MIGRATION = after(CAPITAL_SHARE_SOLO_MIGRATION, { toRules: '0dfad1b06af520' });
 
+/** `station` 1.5.0: a fork fortress obeys its province kind — none in a province with a planet. */
+export const FORK_PLANET_SOLO_MIGRATION = after(SPY_WAY_SOLO_MIGRATION, { toRules: '0d65479baac99c' });
+
 /** The audited pairs, oldest first; each starts where the one before it ends, so a save
  *  of any listed release reaches a later one pair by pair. Nothing else is migrated. */
 export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
@@ -537,4 +540,5 @@ export const SOLO_MIGRATIONS: readonly SoloMigration[] = [
   FORTRESS_SKY_SOLO_MIGRATION,
   CAPITAL_SHARE_SOLO_MIGRATION,
   SPY_WAY_SOLO_MIGRATION,
+  FORK_PLANET_SOLO_MIGRATION,
 ];

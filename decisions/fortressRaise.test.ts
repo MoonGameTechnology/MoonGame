@@ -171,11 +171,11 @@ describe('FORT-6.1 — кнопка крепости на РАЗВИЛКЕ и р
   // Настоящие данные и дерево технологий: развилка — та же крепость, и ворота у неё те же.
   const real = shippedGameData();
   const withTech = createKernel([stationModule, technologyModule]);
-  const locks = forkFortressRaise({ owner: 'p1' }, undefined, 'p1', rich, real).needs;
+  const locks = forkFortressRaise({ owner: 'p1', kind: 'nebula' }, undefined, 'p1', rich, real).needs;
   const SITE = forkSiteId('B', 0);
 
   /** Провинция B с развилкой F на восточной тропе; площадка — если на развилке стояла крепость. */
-  function world(owner: string | null, site: string | null | undefined, metal: number, completed: string[]): GameState {
+  function world(owner: string | null, site: string | null | undefined, metal: number, completed: string[], kind = 'nebula'): GameState {
     const base = createInitialState({ seed: 'ff', version: { data: real.version, manifest: '1' } });
     const bare = (id: string, x: number, y: number, links: string[], extra: Partial<Planet> = {}): Planet => ({
       id, owner: null, kind: 'planet', position: { x, y }, links, resources: {}, buildings: [], garrison: [], traits: [], ...extra,
@@ -185,6 +185,7 @@ describe('FORT-6.1 — кнопка крепости на РАЗВИЛКЕ и р
       C: bare('C', 200, 150, ['B'], { roads: { crossings: { B: { x: 100, y: 75 } }, trails: [{ exits: ['B'], fork: null }] } }),
       B: bare('B', 0, 0, ['A', 'C'], {
         owner,
+        kind,
         roads: {
           crossings: { A: { x: 100, y: -75 }, C: { x: 100, y: 75 } },
           trails: [{ exits: ['A', 'C'], fork: { x: 60, y: 0 } }],
@@ -208,26 +209,32 @@ describe('FORT-6.1 — кнопка крепости на РАЗВИЛКЕ и р
 
   it('своя провинция и свободная развилка — кнопка есть; занятая или чужая — нет', () => {
     const tech = [locks[0]!];
-    expect(forkFortressRaise({ owner: 'p1' }, undefined, 'p1', rich, real, tech)).toMatchObject({ show: true, enabled: true });
-    expect(forkFortressRaise({ owner: 'p1' }, { owner: null }, 'p1', rich, real, tech).enabled, 'пустая площадка').toBe(true);
-    expect(forkFortressRaise({ owner: 'p1' }, { owner: 'p2' }, 'p1', rich, real, tech)).toMatchObject({ show: false, blocked: 'kind' });
-    expect(forkFortressRaise({ owner: 'p2' }, undefined, 'p1', rich, real, tech)).toMatchObject({ show: false, blocked: 'not-owned' });
+    expect(forkFortressRaise({ owner: 'p1', kind: 'nebula' }, undefined, 'p1', rich, real, tech)).toMatchObject({ show: true, enabled: true });
+    expect(forkFortressRaise({ owner: 'p1', kind: 'nebula' }, { owner: null }, 'p1', rich, real, tech).enabled, 'пустая площадка').toBe(true);
+    expect(forkFortressRaise({ owner: 'p1', kind: 'nebula' }, { owner: 'p2' }, 'p1', rich, real, tech)).toMatchObject({ show: false, blocked: 'kind' });
+    expect(forkFortressRaise({ owner: 'p2', kind: 'nebula' }, undefined, 'p1', rich, real, tech)).toMatchObject({ show: false, blocked: 'not-owned' });
     expect(forkFortressRaise(undefined, undefined, 'p1', rich, real, tech).blocked).toBe('not-owned');
   });
 
+  it('в провинции с планетой кнопки на развилке нет: вид провинции решает и за развилку', () => {
+    const tech = [locks[0]!];
+    expect(forkFortressRaise({ owner: 'p1', kind: 'planet' }, undefined, 'p1', rich, real, tech))
+      .toMatchObject({ show: false, enabled: false, blocked: 'kind' });
+  });
+
   it('ни одного расклада, где кнопка и ядро расходятся', () => {
-    for (const owner of ['p1', 'p2', null]) {
+    for (const kind of ['nebula', 'planet']) for (const owner of ['p1', 'p2', null]) {
       for (const site of [undefined, null, 'p1', 'p2']) {
         for (const metal of [10, 120, 479, 480, 5000]) {
           for (const completed of [[], [locks[0]!]]) {
-            const st = world(owner, site, metal, completed);
+            const st = world(owner, site, metal, completed, kind);
             const decision = forkFortressRaise(st.planets.B, st.planets[SITE], 'p1', st.players.p1!.resources, real, completed);
             const r = withTech.applyAction(
               st,
               { id: 's:p1:1', type: 'station.deploy', playerId: 'p1', payload: { planetId: 'B', trail: 0 }, issuedAt: 0 },
               { now: 0, data: real },
             );
-            const tag = `${owner}/${String(site)}/${metal}/${completed.join(',') || 'нет техн.'}`;
+            const tag = `${kind}/${owner}/${String(site)}/${metal}/${completed.join(',') || 'нет техн.'}`;
             expect(decision.enabled, `${tag}: кнопка и ядро разошлись`).toBe(r.ok);
           }
         }

@@ -1118,6 +1118,7 @@ export const ru: Record<string, string> = {
   'side.fork.where': 'Тропа к: {exits}',
   'side.fork.hint': 'Крепость на развилке встречает боем всех на этой тропе и остаётся твоей, даже если провинцию захватят.',
   'side.fork.not-owned': 'Крепость ставят на развилке своей провинции.',
+  'side.fork.planet': 'В провинции с планетой крепость не ставят.',
   'place.fork-fortress': 'Крепость на развилке · {planet}',
   'side.wing.aloft': 'в вылете, мест: {n}',
   'side.wing.blocked.busy': 'корабль в бою — звеньям не до вылета',
