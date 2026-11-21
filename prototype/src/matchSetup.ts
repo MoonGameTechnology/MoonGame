@@ -26,6 +26,7 @@ import {
   type Player,
   type Fleet,
   FAVOUR_BASE,
+  seedTeamCoalitions,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
 import { botCouncil } from './botCouncil';
@@ -540,7 +541,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   // deepClone); cast past GameState's shape. The market's own keys are NOT seeded here
   // anymore: с CONV-9 книга — это ядерный `state.market`, и модуль заводит её сам при
   // первой заявке (`??= []`), как и до сведения делало ядро.
-  return {
+  const world = {
     ...base,
     mapId: preset.id,
     match: { ...base.match, buildingScoreDivisor: data.scoring.buildingDivisor },
@@ -558,4 +559,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     shipLoadouts,
     capital,
   } as GameState;
+  // «Команда = коалиция» (2026-11-21): each side of a team mode is one coalition.
+  seedTeamCoalitions(world);
+  return world;
 }

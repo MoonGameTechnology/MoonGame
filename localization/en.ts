@@ -2377,6 +2377,7 @@ export const en: Record<string, string> = {
   'coal.leave': 'Leave the coalition',
   'coal.leave.confirm': 'Confirm departure in 24 h',
   'coal.duel': 'No coalitions in a duel: the map holds only you and your rival.',
+  'coal.team': 'Your team is your coalition until the match ends: you cannot leave or switch it.',
   'coal.fixed': 'Team modes have no coalitions: the mode sets the sides.',
   'coal.back': '← All coalitions',
   'diplo.profile': 'Open player profile',

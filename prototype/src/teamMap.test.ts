@@ -224,6 +224,17 @@ describe.each(TEAM_MAPS)('$title', ({ id, mode, provinces, side, allyHops, enemy
     expect(result.state.match.winners).toEqual([...teamA].sort());
   });
 
+  it('seats each team in one coalition it cannot leave (owner 2026-11-21)', () => {
+    const s = fresh();
+    expect(Object.values(s.coalitions!).map((c) => c.members)).toEqual([[...teamA].sort(), [...teamB].sort()]);
+    const raw = buildStateFromMap({ ...preset.map!, mode }, data, {
+      slots: Object.fromEntries(seats.map((seat, i) => [`slot_${i + 1}`, { playerId: seat.id }])),
+    });
+    expect(Object.keys(raw.coalitions ?? {})).toHaveLength(2);
+    const leave = { id: 'leave-team', type: 'coalition.leave', playerId: teamA[0]!, issuedAt: 0, payload: {} };
+    expect(order(s, leave, 0).error).toBe('E_FORBIDDEN');
+  });
+
   it('keeps human and AI teammates allied through declarations and low bot favour', () => {
     const s = fresh();
     for (const [target, stance] of [['p2', 'war'], ['p2', 'peace'], [teamB[0]!, 'peace'], [teamB[0]!, 'alliance']]) {

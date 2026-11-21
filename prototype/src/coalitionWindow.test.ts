@@ -253,3 +253,38 @@ describe('coalition invitation, kick and exit UI', () => {
     expect(env.orders).toHaveLength(0);
   });
 });
+
+describe('team mode: the team is the coalition (owner 2026-11-21)', () => {
+  function teamWorld(): void {
+    env.state = ownCoalition(env.state);
+    env.state.modeId = 'team_2v2';
+    env.state.players.p2 = { ...env.state.players.p1!, id: 'p2', name: 'Vega' };
+    env.state.players.p3 = { ...env.state.players.p1!, id: 'p3', name: 'Lyra' };
+    env.state.coalitions!.c1!.members = ['p1', 'p2'];
+    env.state.coalitions!.c2 = { id: 'c2', founder: 'p3', members: ['p3'], emblem: 'sun', description: '' };
+  }
+  it('lists both sides with their roster as the seat count, without creation', () => {
+    teamWorld();
+    openCoalitions();
+    expect(panel.innerHTML).toContain(t('coal.team'));
+    expect(panel.innerHTML).toContain('☻ 2 / 2');
+    expect(panel.innerHTML).toContain('☻ 1 / 1');
+    expect(panel.innerHTML).not.toContain('class="cw-create"');
+    expect(panel.innerHTML).not.toContain(t('coal.capacity', { n: 2 }));
+  });
+  it('lets the team edit its card but offers no exit, kick or invitations', () => {
+    teamWorld();
+    openCoalitions();
+    panel.click('[data-coal]', { coal: 'c1' });
+    expect(panel.innerHTML).toContain('id="cw-text"');
+    expect(panel.innerHTML).not.toContain('cw-leave');
+    expect(panel.innerHTML).not.toContain('data-kick');
+    expect(panel.innerHTML).not.toContain('data-invite');
+    expect(panel.innerHTML).not.toContain('cw-mem empty');
+  });
+  it('keeps the old hint for a team match started before teams were coalitions', () => {
+    env.state.modeId = 'team_2v2';
+    openCoalitions();
+    expect(panel.innerHTML).toContain(t('coal.fixed'));
+  });
+});

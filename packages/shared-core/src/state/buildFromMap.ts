@@ -15,6 +15,7 @@ import {
   type PlayerArsenal,
 } from './gameState';
 import { pairKey } from './diplomacy';
+import { seedTeamCoalitions } from './coalition';
 import { distance } from './route';
 import { mosaicBorderSegments, mosaicBorders, sealPlan, type MosaicSeed } from './mosaic';
 import { deriveRoads, shareRoadNetwork } from './roads';
@@ -878,7 +879,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     .sort()
     .find((id) => map.sectors[id]!.captive !== undefined);
 
-  return {
+  const built: GameState = {
     ...base,
     players,
     capital,
@@ -900,4 +901,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       ? { captive: { hideout: hideoutId, zone: map.sectors[hideoutId]!.captive!.zone } }
       : {}),
   };
+  // A team mode seats each side in one coalition from the first minute.
+  seedTeamCoalitions(built);
+  return built;
 }

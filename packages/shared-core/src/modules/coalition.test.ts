@@ -4,11 +4,11 @@ import { diplomacyModule } from './diplomacy';
 import { createInitialState, type GameState, type Player } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
 import { getOffer, getStance, setOffer, setStance, type DiplomacyCapability } from '../state/diplomacy';
-import { coalitionCapacity, coalitionOf, COALITION_DEPARTURE_MS, COALITION_JOIN_COOLDOWN_MS } from '../state/coalition';
+import { coalitionCapacity, coalitionOf, COALITION_DEPARTURE_MS, COALITION_JOIN_COOLDOWN_MS, seedTeamCoalitions } from '../state/coalition';
 import { isValidActionPayload } from '../actions/payloadSchemas';
 import type { GameModule } from '../kernel/module';
 import type { Action, ApplyResult, AdvanceResult, Context } from '../action/types';
-import { deepFreeze } from '../util/clone';
+import { deepClone, deepFreeze } from '../util/clone';
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -621,5 +621,56 @@ describe('coalition ordinary-hour clock mapping', () => {
       expect(code(kernel.applyAction(board(20), act('p1', 'coalition.clock.rebase', payload), ctx()))).toBe('E_BAD_PAYLOAD');
     }
     expect(isValidActionPayload('coalition.clock.rebase', { wallTime: epoch, gameTime: 0, timeScale: 24 })).toBe(false);
+  });
+});
+
+describe('Команда = коалиция (командные режимы)', () => {
+  const teamCtx = (): Context => ({ now: 0, data, config: { timeScale: 1, modeId: 'team_2v2' } });
+  const killing = createKernel([diplomacyModule, killer]);
+  /** 2×2: p1+p2 (A, p2 — ИИ) против p3+p4 (B), плюс пираты. */
+  function teams(): GameState {
+    const s = board(4);
+    s.modeId = 'team_2v2';
+    s.players.p1!.team = 'A';
+    s.players.p2 = player('p2', { team: 'A', ai: true });
+    s.players.p3!.team = 'B';
+    s.players.p4!.team = 'B';
+    s.players.pirates = player('pirates', { npc: 'pirate', team: 'A' });
+    setStance(s, 'p1', 'p2', 'alliance');
+    setStance(s, 'p3', 'p4', 'alliance');
+    seedTeamCoalitions(s);
+    return s;
+  }
+
+  it('каждая сторона — одна коалиция с первой минуты, NPC в неё не входят', () => {
+    const s = teams();
+    expect(Object.values(s.coalitions!).map((c) => c.members)).toEqual([['p1', 'p2'], ['p3', 'p4']]);
+    expect(coalitionOf(s, 'pirates')).toBeNull();
+    // Повторный вызов и свободный режим ничего не меняют.
+    const again = deepClone(s);
+    seedTeamCoalitions(again);
+    expect(again).toEqual(s);
+    const free = board(4);
+    free.players.p1!.team = 'A';
+    seedTeamCoalitions(free);
+    expect(free.coalitions).toBeUndefined();
+  });
+
+  it('выйти, исключить или основать другую нельзя', () => {
+    const s = deepFreeze(teams());
+    expect(code(kernel.applyAction(s, act('p1', 'coalition.leave', {}), teamCtx()))).toBe('E_FORBIDDEN');
+    expect(code(kernel.applyAction(s, act('p1', 'coalition.kick', { target: 'p2' }), teamCtx()))).toBe('E_FORBIDDEN');
+    expect(code(kernel.applyAction(s, act('p1', 'coalition.create', {}), teamCtx()))).toBe('E_FORBIDDEN');
+  });
+
+  it('эмблему и описание команда правит как обычная коалиция', () => {
+    const s = ok(kernel.applyAction(teams(), act('p3', 'coalition.edit', { emblem: 'skull', description: 'Б' }), teamCtx()));
+    expect(coalitionOf(s, 'p4')).toMatchObject({ emblem: 'skull', description: 'Б' });
+  });
+
+  it('выбывший остаётся в составе стороны, союз команды цел', () => {
+    const s = ok(killing.applyAction(teams(), act('p1', 'test.kill', { id: 'p2' }), teamCtx()));
+    expect(coalitionOf(s, 'p1')?.members).toEqual(['p1', 'p2']);
+    expect(getStance(s, 'p1', 'p2')).toBe('alliance');
   });
 });

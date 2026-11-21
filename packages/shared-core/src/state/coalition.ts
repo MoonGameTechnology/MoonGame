@@ -1,5 +1,6 @@
 import type { GameState, PlayerId } from './gameState';
 import { MS_PER_HOUR } from '../util/time';
+import { hasFixedSides } from '../action/matchMode';
 
 /** Membership changes use ordinary hours, independent of simulation acceleration. */
 export const COALITION_DEPARTURE_MS = 24 * MS_PER_HOUR;
@@ -148,4 +149,28 @@ export function removeMember(state: GameState, playerId: PlayerId): PlayerId[] {
     if (c.founder === playerId) c.founder = [...rest].sort()[0]!;
   }
   return rest;
+}
+
+/**
+ * Командный режим (решение владельца 2026-11-21, «Команда = коалиция»): каждая сторона
+ * матча с первой минуты стоит в одной коалиции. Состав задаёт режим, а не договор, поэтому
+ * выйти, исключить или вступить нельзя (`diplomacy.ts` держит `coalitionsOn`), а потолок
+ * {@link coalitionCapacity} к ней не применяется. В коалицию идут все места стороны, кроме
+ * NPC: ИИ-союзник по команде — такой же член стороны. Свободный режим или уже заведённые
+ * коалиции — состояние возвращается как было. Draft-мутатор свежего мира; стороны и места
+ * идут по сортировке, так что тот же ростер даёт тот же JSON (инвариант #1).
+ */
+export function seedTeamCoalitions(state: GameState): void {
+  if (!hasFixedSides(state.modeId) || state.coalitions) return;
+  const sides = new Map<string, PlayerId[]>();
+  for (const id of Object.keys(state.players).sort()) {
+    const p = state.players[id]!;
+    if (p.npc || p.team === undefined) continue;
+    sides.set(p.team, [...(sides.get(p.team) ?? []), id]);
+  }
+  for (const team of [...sides.keys()].sort()) {
+    const [founder, ...rest] = sides.get(team)!;
+    const c = foundCoalition(state, founder!);
+    c.members = [founder!, ...rest].sort();
+  }
 }

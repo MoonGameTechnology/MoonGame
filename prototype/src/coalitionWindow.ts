@@ -79,6 +79,11 @@ function nameOf(id: string): string {
 function titleOf(c: Coalition): string {
   return t('coal.name', { who: esc(nameOf(c.founder)) });
 }
+/** A team-mode coalition is the whole side: its seat count is its roster, not the map cap. */
+function capOf(c: Coalition): number {
+  const s = game.state();
+  return hasFixedSides(s.modeId) ? c.members.length : coalitionCapacity(s);
+}
 function seatsHtml(c: Coalition, cap: number): string {
   const full = c.members.length >= cap;
   return `<span class="cw-seats${full ? ' full' : ''}">☻ ${c.members.length} / ${cap}</span>`;
@@ -120,10 +125,10 @@ function invitationsHtml(c: Coalition): string {
 
 function listHtml(): string {
   const s = game.state();
-  // В командном режиме стороны задаёт режим, коалиций-сущностей нет.
-  if (hasFixedSides(s.modeId)) return `<div class="cw-hint">${t('coal.fixed')}</div>`;
+  const team = hasFixedSides(s.modeId);
+  // Командный матч, начатый до «команда = коалиция», коалиций не имеет: стороны задаёт режим.
+  if (team && !s.coalitions) return `<div class="cw-hint">${t('coal.fixed')}</div>`;
   if (isDuel(s)) return `<div class="cw-hint">${t('coal.duel')}</div>`;
-  const cap = coalitionCapacity(s);
   const mine = coalitionOf(s, game.me());
   const rows = all()
     .map((c) => {
@@ -137,10 +142,12 @@ function listHtml(): string {
         (c.id === mine?.id ? ` <em>${t('coal.mine')}</em>` : '') +
         `</span><span class="cw-members">${members}</span>` +
         (c.description ? `<span class="cw-desc">${esc(c.description)}</span>` : '') +
-        `</span>${seatsHtml(c, cap)}</button>`
+        `</span>${seatsHtml(c, capOf(c))}</button>`
       );
     })
     .join('');
+  if (team) return `<div class="cw-hint">${t('coal.team')}</div><div class="cw-list">${rows}</div>`;
+  const cap = coalitionCapacity(s);
   return (
     `<div class="cw-cap">${t('coal.capacity', { n: cap })}</div>` +
     (canCreateCoalition(s, game.me())
@@ -154,7 +161,8 @@ function listHtml(): string {
 
 function cardHtml(c: Coalition): string {
   const s = game.state();
-  const cap = coalitionCapacity(s);
+  const team = hasFixedSides(s.modeId);
+  const cap = capOf(c);
   const mine = c.members.includes(game.me());
   const emblem = draftEmblem ?? c.emblem;
   const members = c.members.map((id) => {
@@ -181,7 +189,7 @@ function cardHtml(c: Coalition): string {
     ? `<div class="cw-sec">${t('coal.desc')}</div>` +
       `<textarea id="cw-text" maxlength="${COALITION_DESC_MAX}" rows="3" placeholder="${t('coal.desc.ph')}">${esc(c.description)}</textarea>` +
       `<div class="cw-acts"><button class="cw-save">${t('coal.save')}</button>` +
-      (c.departures?.[game.me()] ? '' : `<button class="cw-leave holdable${confirmLeave ? ' sure' : ''}" data-hold="leave">${holdConfirmHtml(t('coal.leave'), t('coal.leave.confirm'))}</button>`) + '</div>'
+      (team || c.departures?.[game.me()] ? '' : `<button class="cw-leave holdable${confirmLeave ? ' sure' : ''}" data-hold="leave">${holdConfirmHtml(t('coal.leave'), t('coal.leave.confirm'))}</button>`) + '</div>'
     : `<div class="cw-sec">${t('coal.desc')}</div>` +
       `<div class="cw-text">${c.description ? esc(c.description) : t('coal.desc.empty')}</div>`;
   return (
@@ -189,7 +197,8 @@ function cardHtml(c: Coalition): string {
     `<div class="cw-hero"><span class="cw-big">${glyph(emblem)}</span>` +
     `<span class="cw-main"><span class="cw-name">${titleOf(c)}</span>${seatsHtml(c, cap)}</span></div>` +
     `<div class="cw-sec">${t('coal.members')}</div><div class="cw-mems">${members}${slots}</div>` +
-    (mine ? `<div class="cw-hint">${t('coal.how')}</div><div class="cw-hint">${t('coal.timing')}</div>` + invitationsHtml(c) : '') +
+    (team ? `<div class="cw-hint">${t('coal.team')}</div>` : '') +
+    (mine && !team ? `<div class="cw-hint">${t('coal.how')}</div><div class="cw-hint">${t('coal.timing')}</div>` + invitationsHtml(c) : '') +
     picker +
     desc
   );

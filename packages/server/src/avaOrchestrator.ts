@@ -9,6 +9,7 @@ import {
   type MatchMap,
   type PlayerArsenal,
   type SlotAssignment,
+  seedTeamCoalitions,
 } from '@void/shared-core';
 import { avaMatchId } from '@void/protocol';
 import { pickAvaMap } from './avaMapPool';
@@ -288,6 +289,8 @@ export class AvaOrchestrator {
       mapId: map.id,
       ...(modeId !== undefined && map.mode === undefined ? { modeId } : {}),
     };
+    // The mode may arrive here rather than from the map: each side is one coalition then.
+    seedTeamCoalitions(state);
     const matchId = avaMatchId(matchupId);
 
     // Raise the room FIRST (persist its snapshot — idempotent by match id), then record the

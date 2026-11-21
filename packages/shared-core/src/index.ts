@@ -222,6 +222,7 @@ export {
   coalitionWallNow,
   coalitionGameTime,
   coalitionOf,
+  seedTeamCoalitions,
   type Coalition,
   type CoalitionClock,
   type CoalitionDeparture,
