@@ -326,6 +326,25 @@ describe('действия мира', () => {
     }
   });
 
+  it('звезда, чёрная дыра и их кольца — только имя и род: ни пинга, ни шпионов, ни гарнизона', async () => {
+    const { env, card } = await boot();
+    expect(card('Z')).toContain('data-act="ping"');
+    expect(card('Z')).toContain('data-act="spyagents"');
+    const landmark = (kind: string, terrain?: string) =>
+      planet('S', null, { kind, planetType: undefined, ...(terrain ? { terrain } : {}) });
+    for (const kind of ['star', 'black_hole', 'dust_shell']) {
+      env.s.planets.S = landmark(kind);
+      const html = card('S');
+      // Из кнопок остаётся только крестик карточки.
+      expect(html.match(/data-act="[^"]*"/g)).toEqual(['data-act="close"']);
+      expect(html).not.toContain(t('side.neutral'));
+      expect(html).toContain(t('side.landmark.hint'));
+    }
+    env.types.S = { name: 'Star' } as SectorType;
+    env.s.planets.S = landmark('star', 'red_giant');
+    expect(sub(card('S'))).toBe(`${tData('Star')}·${tData('Red Giant')}`);
+  });
+
   it('открытое окно разведки видно на карточке отсчётом', async () => {
     const { env, card } = await boot();
     env.intel = [{ kind: 'planet', target: 'N', until: env.s.time + 3 * HOUR }];

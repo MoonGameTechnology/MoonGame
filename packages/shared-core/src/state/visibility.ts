@@ -5,6 +5,7 @@ import { peekValues } from '../util/draft';
 import { effectiveStat } from '../util/loadout';
 import { recordValues } from '../util/records';
 import { isForkSite } from './forkSite';
+import { withLandmarks } from './landmarks';
 import { spyStands } from './spyKnowledge';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { laneIsPublic } from './corridor';
@@ -996,9 +997,12 @@ export function viewCoverage(
 ): Coverage {
   if (state.match.status !== 'ended') {
     const sensors = state.sensorView;
-    return sensors?.viewerId === viewerId
-      ? coverageInCircles(planets, sensors.circles)
-      : sensorCoverage(state, viewerId, data, planets);
+    const live =
+      sensors?.viewerId === viewerId
+        ? coverageInCircles(planets, sensors.circles)
+        : sensorCoverage(state, viewerId, data, planets);
+    // Stars, black holes and their rings are on every map from the start (`landmarks.ts`).
+    return withLandmarks(live, planets, data);
   }
   return {
     identify: new Set(planets.map((p) => p.id)),
