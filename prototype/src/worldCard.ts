@@ -31,6 +31,7 @@ import {
   uncontrolledPlanets,
   integrationShare,
   isIntegrating,
+  isLandmark,
 } from '../../packages/shared-core/src/index';
 import { isMineFleet } from '../../packages/shared-core/src/state/minefields';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
@@ -564,6 +565,14 @@ export function planetPanelHtml(p: Planet): string {
   const facets = [
     ...new Set([kindName, ptName, sec].filter((n): n is string => !!n).map((n) => tData(n))),
   ];
+  // ОРИЕНТИР (решение владельца 2026-11-21): звезда, чёрная дыра и их кольца видны всем с
+  // начала матча, но взаимодействия с ними нет — ни пинга, ни шпионов, ни гарнизона: в них
+  // нельзя ни войти, ни пролететь (`state/landmarks.ts`). Карточка говорит только, что это.
+  if (isLandmark(p.kind, data))
+    return (
+      cardHeader(ownerColor(null), placeName(p.id), facets.join(' · ')) +
+      `<div class="row dim">${t('side.landmark.hint')}</div>`
+    );
   // Счёт машин ангара — тот же, что у прежней вкладки «Эскадра» (`planetTabs.ts`, REFM-41).
   const here = Object.values(s.fleets).filter((f) => f.location === p.id && !isMineFleet(f, data));
   const counts = tabCounts(p, data, here);

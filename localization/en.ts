@@ -5253,6 +5253,7 @@ export const en: Record<string, string> = {
     'Press "Move" and tap a destination — every selected fleet routes there and stops. "Merge" fuses the group into one fleet (distant ones fly in first). Shift- or Ctrl/⌘-click a fleet to add it to the group; Shift-drag empty space to box-select several.',
   'side.group.sub': '{f} {f|fleet|fleets} · {s} {s|ship|ships} · {tr} troops',
   'side.group.title': 'Task group',
+  'side.landmark.hint': 'No entry and no overflight.',
   'side.neutral': 'Neutral',
   'side.none': 'none',
   'side.notelemetry.hint': 'Send a fleet toward this system (or extend radar) to detect it.',

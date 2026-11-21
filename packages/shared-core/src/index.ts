@@ -126,6 +126,7 @@ export {
   type SealPlan,
 } from './state/mosaic';
 export { closedSky, crossesClosedSky, type ClosedSky } from './state/closedSky';
+export { isLandmark } from './state/landmarks';
 export {
   FORK_AT,
   FORK_DETOUR,
