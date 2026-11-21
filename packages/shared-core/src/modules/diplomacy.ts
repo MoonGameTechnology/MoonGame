@@ -51,8 +51,9 @@ function isStance(value: unknown): value is DiplomaticStance {
   return value === 'war' || value === 'peace' || value === 'pact' || value === 'alliance';
 }
 
-/** COAL-1: коалиции-сущности живут только в свободных режимах. В командных стороны
- *  заданы правилами матча, и союз там — состав команды, а не договор. */
+/** COAL-1: коалиции, которые игроки собирают сами, живут только в свободных режимах. В
+ *  командных каждая сторона — коалиция с первой минуты (`seedTeamCoalitions`), и её
+ *  состав задан правилами матча: ни основать, ни выйти, ни исключить нельзя. */
 function coalitionsOn(h: HandlerContext): boolean {
   return !hasFixedSides(h.ctx.config?.modeId);
 }
@@ -504,10 +505,10 @@ export const diplomacyModule: GameModule = {
           if (id !== playerId) setMapShare(h.state, playerId, id, false);
         }
       }
-      // COAL-1: выбывший освобождает место в коалиции, а его союзы с оставшимися
-      // сменяются миром — чат и метки союзников читают стойку, а не состав. Союз
-      // оставшихся между собой цел.
-      leaveCoalition(h, playerId, null);
+      // COAL-1: выбывший освобождает место в коалиции, его союзы с оставшимися сменяются
+      // миром (чат и метки читают стойку, а не состав). В командном режиме коалиция —
+      // сторона матча: выбывший остаётся в составе, союз задан режимом.
+      if (coalitionsOn(h)) leaveCoalition(h, playerId, null);
     });
   },
 };

@@ -102,5 +102,11 @@ describe('coalition invitations and departure controls', () => {
     expect(canKickCoalitionMember(state, 'p2', 'p1')).toBe(false);
     expect(canKickCoalitionMember(state, 'p1', 'p1')).toBe(false);
     expect(coalitionTreatyLocked(state, 'p1', 'p2')).toBe(true);
+  });  it('a team-mode coalition has no departure: no kick, no «leave first» treaty lock', () => {
+    const state = pair();
+    state.coalitions!.c1!.members.push('p2');
+    state.modeId = 'team_2v2';
+    expect(canKickCoalitionMember(state, 'p1', 'p2')).toBe(false);
+    expect(coalitionTreatyLocked(state, 'p1', 'p2')).toBe(false);
   });
 });

@@ -55,8 +55,9 @@ export function canKickCoalitionMember(state: GameState, playerId: string, targe
     coalition.members.includes(target) && !coalition.departures?.[playerId] && !coalition.departures?.[target];
 }
 
-/** Breaking a coalition treaty cannot skip its departure notice. */
+/** Breaking a coalition treaty cannot skip its departure notice. A team-mode coalition has
+ *  no departure at all: the mode itself fixes the stance, as before teams were coalitions. */
 export function coalitionTreatyLocked(state: GameState, playerId: string, target: string): boolean {
   const coalition = coalitionOf(state, playerId);
-  return !!coalition && coalition.members.includes(target);
+  return !!coalition && !hasFixedSides(state.modeId) && coalition.members.includes(target);
 }
