@@ -2,6 +2,7 @@
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { INFO_ICON } from './infoIcon';
+import { mapAimArmed } from './interaction';
 import type { TapPick } from '../../decisions/tapCycle';
 import type { CardTab } from '../../decisions/worldFleetTabs';
 
@@ -262,7 +263,7 @@ export function initMobileHud(host: MobileHudHost) {
       tab: CardTab | null = null,
     ): void {
       if (!active) return;
-      if (key !== selected) {
+      if (key !== selected || (expanded && mapAimArmed())) {
         selected = key;
         expand(false);
         requestAnimationFrame(host.resized);

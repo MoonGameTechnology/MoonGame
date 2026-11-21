@@ -327,6 +327,8 @@ export interface RunningTour {
 
 let current: SpotlightTour | null = null;
 let closeCurrent: ((reason: TutorialOutcome) => void) | null = null;
+/** Идёт ли тур (свёрнутый тоже): вводные к окнам ждут его конца (`helpCenter.ts`). */
+export const tourRunning = (): boolean => current !== null;
 
 /** Is the target wholly on screen, inside the scrolling panel that holds it? */
 function onScreen(node: Element, r: DOMRect): boolean {
@@ -348,6 +350,8 @@ function onScreen(node: Element, r: DOMRect): boolean {
 export interface TourMap {
   /** Every frame a map point is marked (`step.anchor`): keep it pressable (ONB-14). */
   keepClear(mark: Rect): void;
+  /** Every frame: the step on screen (`null` once the tour is over), for the clock's pace. */
+  pace?(step: SpotlightStep | null): void;
 }
 
 /**
@@ -386,6 +390,7 @@ export function startTour(
     if (!document.hidden) telemetry?.checkpoint('heartbeat');
   }, 30000);
   const finish = (outcome: TutorialOutcome): void => {
+    map?.pace?.(null);
     telemetry?.finish(outcome);
     clearInterval(heartbeat);
     document.removeEventListener('visibilitychange', hidden);
@@ -440,6 +445,7 @@ export function startTour(
     },
     render: (view) => {
       paint(o, view);
+      map?.pace?.(view?.step ?? null);
       // Folded, or hidden over an open dossier: nothing is marked on screen then.
       if (view?.target && view.step.anchor && o.root.style.display === 'block')
         map?.keepClear(view.target);

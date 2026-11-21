@@ -3809,7 +3809,6 @@ export const pl: Record<string, string> = {
   'onb.guide.build.catalog': 'Naciśnij „Zbuduj”, aby otworzyć okno produkcji.',
   'onb.guide.build.all': 'Wybierz „Wszystkie”, aby zobaczyć każdy budynek.',
   'onb.guide.build.close': 'Zamówienie przyjęte. Zamknij katalog.',
-  'onb.guide.build.units': 'Naciśnij „Buduj jednostki”, aby otworzyć katalog.',
   'onb.guide.market.open': 'Otwórz „Rynek”: tutaj gracze handlują surowcami w trakcie partii.',
   'onb.guide.market.sell': 'Gildia skupuje metal. Naciśnij „Sprzedaj”: kredyty wpłyną po potrąceniu 15% prowizji.',
   'onb.guide.market.tab': 'Otwórz zakładkę „Mikroelektronika”: gildia sprzedaje mikroelektronikę.',

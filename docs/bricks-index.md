@@ -1187,6 +1187,7 @@
 | ONB-14 | ✅ | proto | `docs/onboarding-roadmap.md` | Отмеченный мир не прячется под окном |
 | ONB-15 | ✅ | proto | `docs/onboarding-roadmap.md` | Цель первой сессии на каждую главу урока |
 | ONB-16 | ✅ | srv proto data | `docs/onboarding-roadmap.md` | Награды за медали профиля |
+| ONB-17 | ✅ | proto | `docs/onboarding-roadmap.md` | Обучение по текущей игре |
 | TRN-7 | ✅ | proto | `docs/onboarding-roadmap.md` | Пошаговый полигон Sector Zero |
 | ONB-3 | ✅ | proto | `docs/onboarding-roadmap.md` | Just-in-time интро механик (прогрессивное раскрытие) |
 | ONB-4 | ✅ | proto | `docs/onboarding-roadmap.md` | Help/кодекс-хаб («?» везде) |

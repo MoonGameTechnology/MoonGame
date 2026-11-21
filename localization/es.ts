@@ -3801,7 +3801,6 @@ export const es: Record<string, string> = {
   'onb.guide.build.catalog': 'Pulsa «Construir» para abrir la ventana de producción.',
   'onb.guide.build.all': 'Selecciona «Todos» para ver todas las estructuras.',
   'onb.guide.build.close': 'Encargo recibido. Cierra el catálogo.',
-  'onb.guide.build.units': 'Pulsa «Construir unidades» para abrir el catálogo.',
   'onb.guide.market.open': 'Abre el «Mercado»: aquí se comercian recursos dentro de la partida.',
   'onb.guide.market.sell': 'El gremio compra metal. Pulsa «Vender»: los créditos llegarán con un 15% de comisión deducido.',
   'onb.guide.market.tab': 'Abre la pestaña «Micro»: el gremio vende microelectrónica.',
